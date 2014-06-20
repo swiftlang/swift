@@ -1441,7 +1441,7 @@ struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
     return TestObjCKeyTy(value)
   }
 
-  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
+  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
     return TestBridgedKeyTy(x.value)
   }
 
@@ -1477,7 +1477,7 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
     return TestObjCValueTy(value)
   }
 
-  static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy? {
+  static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy {
     return TestBridgedValueTy(x.value)
   }
 
@@ -1505,7 +1505,7 @@ struct TestBridgedEquatableValueTy : Equatable, Printable, _BridgedToObjectiveC 
     return TestObjCEquatableValueTy(value)
   }
 
-  static func bridgeFromObjectiveC(x: TestObjCEquatableValueTy) -> TestBridgedEquatableValueTy? {
+  static func bridgeFromObjectiveC(x: TestObjCEquatableValueTy) -> TestBridgedEquatableValueTy {
     return TestBridgedEquatableValueTy(x.value)
   }
 

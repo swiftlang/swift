@@ -923,8 +923,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       var oldCocoaGenerator = _CocoaDictionaryGenerator(cocoaDictionary)
       while let (key: AnyObject, value: AnyObject) = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
-            key: bridgeFromObjectiveCUnconditional(key, KeyType.self),
-            value: bridgeFromObjectiveCUnconditional(value, ValueType.self))
+            key: bridgeFromObjectiveC(key, KeyType.self),
+            value: bridgeFromObjectiveC(value, ValueType.self))
       }
       newNativeStorage.count = cocoaDictionary.count
 
@@ -987,10 +987,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaStorage.assertingGet(i._cocoaIndex)
-      let nativeKey =
-          bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self)
-      let nativeValue =
-          bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
+      let nativeKey = bridgeFromObjectiveC(anyObjectKey, KeyType.self)
+      let nativeValue = bridgeFromObjectiveC(anyObjectValue, ValueType.self)
       return (nativeKey, nativeValue)
     }
   }
@@ -1003,7 +1001,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
       let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
-      return bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
+      return bridgeFromObjectiveC(anyObjectValue, ValueType.self)
     }
   }
 
@@ -1014,7 +1012,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
-        return bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
+        return bridgeFromObjectiveC(anyObjectValue, ValueType.self)
       }
       return .None
     }
@@ -1180,8 +1178,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       let anyObjectKey: AnyObject =
           cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
       migrateDataToNativeStorage(cocoaStorage)
-      nativeRemoveObjectForKey(
-          bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self))
+      nativeRemoveObjectForKey(bridgeFromObjectiveC(anyObjectKey, KeyType.self))
     }
   }
 
@@ -1594,10 +1591,8 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
     case ._Cocoa(var cocoaGenerator):
       if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaGenerator.next() {
-        let nativeKey =
-            bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self)
-        let nativeValue =
-            bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
+        let nativeKey = bridgeFromObjectiveC(anyObjectKey, KeyType.self)
+        let nativeValue = bridgeFromObjectiveC(anyObjectValue, ValueType.self)
         return (nativeKey, nativeValue)
       }
       return .None
@@ -1809,8 +1804,7 @@ func == <KeyType : Equatable, ValueType : Equatable>(
       let optRhsValue: AnyObject? =
           rhsCocoa.maybeGet(bridgeToObjectiveCUnconditional(key))
       if let rhsValue: AnyObject = optRhsValue {
-        if value ==
-            bridgeFromObjectiveCUnconditional(rhsValue, ValueType.self) {
+        if value == bridgeFromObjectiveC(rhsValue, ValueType.self) {
           continue
         }
       }

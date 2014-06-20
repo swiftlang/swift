@@ -89,9 +89,7 @@ protocol _BridgedToObjectiveC {
   /// via as), and may defer complete checking until later. For
   /// example, when bridging from NSArray to Array<T>, we can defer
   /// the checking for the individual elements of the array.
-  ///
-  /// FIXME: The optional return here is vestigial.
-  class func bridgeFromObjectiveC(source: ObjectiveCType) -> Self?
+  class func bridgeFromObjectiveC(source: ObjectiveCType) -> Self
 }
 
 /// Whether a given type conforming to this protocol bridges to
@@ -144,22 +142,20 @@ func bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 @asmname("swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 
-/// Attempt to convert `x` from its Objective-C representation to its Swift
+/// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 ///
 /// - If `T` is a class type:
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
 /// - otherwise, if `T` conforms to `_BridgedToObjectiveC`:
-///   + if `T` conforms to `_ConditionallyBridgedToObjectiveC` and
-///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
-///   + otherwise, if the dynamic type of `x` is not `T.getObjectiveCType()`
-///     or a subclass of it, the result is empty;
+///   + if the dynamic type of `x` is not `T.getObjectiveCType()`
+///     or a subclass of it, trap
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveC(x)`;
-/// - otherwise, the result is empty.
-func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T? {
+/// - otherwise, trap
+func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return x as? T
+    return x as T
   }
   return _bridgeNonVerbatimFromObjectiveC(x, T.self)
 }
@@ -184,15 +180,8 @@ func bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
   return _bridgeNonVerbatimFromObjectiveCConditional(x, T.self)
 }
 
-/// Like `bridgeFromObjectiveC`, but traps in case bridging failed.
-func bridgeFromObjectiveCUnconditional<T>(x: AnyObject, _: T.Type) -> T {
-  let optResult = bridgeFromObjectiveC(x, T.self)
-  _precondition(optResult, "value failed to bridge from Objective-C type to a Swift type")
-  return optResult!
-}
-
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
-func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type) -> T?
+func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type) -> T
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject, 

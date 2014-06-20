@@ -165,7 +165,7 @@ struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveC {
     return TestObjCKeyTy(value)
   }
 
-  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
+  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
     return TestBridgedKeyTy(x.value)
   }
 

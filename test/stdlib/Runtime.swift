@@ -16,7 +16,7 @@ struct NotBridgedValueType {
   var a: ClassA = ClassA(value: 4242)
 }
 
-struct BridgedValueType : _BridgedToObjectiveC {
+struct BridgedValueType : _ConditionallyBridgedToObjectiveC {
   static func getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
@@ -25,7 +25,16 @@ struct BridgedValueType : _BridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> BridgedValueType? {
+  static func isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+
+  static func bridgeFromObjectiveC(x: ClassA) -> BridgedValueType {
+    assert(x.value % 2 == 0, "not bridged to Objective-C")
+    return BridgedValueType(value: x.value)
+  }
+
+  static func bridgeFromObjectiveCConditional(x: ClassA) -> BridgedValueType? {
     if x.value % 2 == 0 {
       return BridgedValueType(value: x.value)
     }
@@ -35,7 +44,7 @@ struct BridgedValueType : _BridgedToObjectiveC {
   var value: Int
 }
 
-struct BridgedLargeValueType : _BridgedToObjectiveC {
+struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveC {
   init(value: Int) {
     value0 = value
     value1 = value
@@ -56,7 +65,16 @@ struct BridgedLargeValueType : _BridgedToObjectiveC {
     return ClassA(value: value0)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType? {
+  static func isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+
+  static func bridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType {
+    assert(x.value % 2 == 0, "not bridged to Objective-C")
+    return BridgedLargeValueType(value: x.value)
+  }
+
+  static func bridgeFromObjectiveCConditional(x: ClassA) -> BridgedLargeValueType? {
     if x.value % 2 == 0 {
       return BridgedLargeValueType(value: x.value)
     }
@@ -84,11 +102,9 @@ struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType? {
-    if x.value % 2 == 0 {
-      return ConditionallyBridgedValueType(value: x.value)
-    }
-    return .None
+  static func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType {
+    assert(x.value % 2 == 0, "not bridged from Objective-C")
+    return ConditionallyBridgedValueType(value: x.value)
   }
 
   static func bridgeFromObjectiveCConditional(x: ClassA) 
@@ -127,45 +143,45 @@ RuntimeBridging.test("bridgeToObjectiveC") {
 
 RuntimeBridging.test("bridgeFromObjectiveC") {
   // Bridge back using NotBridgedValueType.
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 21), NotBridgedValueType.self))
 
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 42), NotBridgedValueType.self))
 
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), NotBridgedValueType.self))
 
   // Bridge back using BridgedValueType.
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedValueType.self))
 
   expectEqual(42, bridgeFromObjectiveC(
-      ClassA(value: 42), BridgedValueType.self)!.value)
+      ClassA(value: 42), BridgedValueType.self).value)
 
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedValueType.self))
 
   // Bridge back using BridgedLargeValueType.
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedLargeValueType.self))
 
   expectEqual(42, bridgeFromObjectiveC(
-      ClassA(value: 42), BridgedLargeValueType.self)!.value)
+      ClassA(value: 42), BridgedLargeValueType.self).value)
 
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedLargeValueType.self))
 
   // Bridge back using BridgedVerbatimRefType.
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedVerbatimRefType.self))
 
-  expectEmpty(bridgeFromObjectiveC(
+  expectEmpty(bridgeFromObjectiveCConditional(
       ClassA(value: 42), BridgedVerbatimRefType.self))
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
   expectTrue(bridgeFromObjectiveC(
-      bridgedVerbatimRef, BridgedVerbatimRefType.self)! === bridgedVerbatimRef)
+      bridgedVerbatimRef, BridgedVerbatimRefType.self) === bridgedVerbatimRef)
 }
 
 RuntimeBridging.test("isBridgedToObjectiveC") {

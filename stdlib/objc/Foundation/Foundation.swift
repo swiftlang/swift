@@ -427,7 +427,7 @@ extension String : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSString) -> String? {
+  static func bridgeFromObjectiveC(x: NSString) -> String {
     return String(x)
   }
 }
@@ -457,7 +457,7 @@ extension Int : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     return x.integerValue
   }
 }
@@ -481,7 +481,7 @@ extension UInt : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> UInt? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
     return UInt(x.unsignedIntegerValue.value)
   }
 }
@@ -503,7 +503,7 @@ extension Float : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Float? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Float {
     return x.floatValue
   }
 }
@@ -525,7 +525,7 @@ extension Double : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Double? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Double {
     return x.doubleValue
   }
 }
@@ -548,7 +548,7 @@ extension Bool: _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Bool? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
     return x.boolValue
   }
 }
@@ -621,13 +621,9 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     return reinterpretCast(self._buffer._asCocoaArray())
   }
 
-  static func bridgeFromObjectiveC(source: NSArray) -> Array? {
-    // This is used for checked casts, so avoid allocating a buffer if
-    // we could statically know we're going to fail
-    if !Swift.isBridgedToObjectiveC(T.self) {
-      return nil
-    }
-
+  static func bridgeFromObjectiveC(source: NSArray) -> Array {
+    _precondition(Swift.isBridgedToObjectiveC(T.self), 
+                  "array element type is not bridged to Objective-C")
     if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
       return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
@@ -768,7 +764,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     return _convertDictionaryToNSDictionary(self)
   }
 
-  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     return Dictionary(_cocoaDictionary: reinterpretCast(x))
   }
 
@@ -984,7 +980,7 @@ extension NSRange : _BridgedToObjectiveC {
     return NSValue(range: self)
   }
 
-  static func bridgeFromObjectiveC(x: NSValue) -> NSRange? {
+  static func bridgeFromObjectiveC(x: NSValue) -> NSRange {
     return x.rangeValue
   }
 }

@@ -35,8 +35,8 @@ struct B : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> A {
     return A()
   }
-  static func bridgeFromObjectiveC(x: A) -> B? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: A) -> B {
+    return B()
   }
 }
 

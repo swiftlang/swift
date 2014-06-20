@@ -128,8 +128,8 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
     }
   }
 
-  static func bridgeFromObjectiveC(x: AnyObject) -> T!? {
-    return Swift.bridgeFromObjectiveCUnconditional(x, T.self)
+  static func bridgeFromObjectiveC(x: AnyObject) -> T! {
+    return Swift.bridgeFromObjectiveC(x, T.self)
   }
 
   static func bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {

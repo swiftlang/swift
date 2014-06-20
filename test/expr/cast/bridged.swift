@@ -16,8 +16,8 @@ struct BridgedStruct : _BridgedToObjectiveC {
     return BridgedClass()
   }
 
-  static func bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct? {
-    return nil
+  static func bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+    return BridgedStruct()
   }
 }
 

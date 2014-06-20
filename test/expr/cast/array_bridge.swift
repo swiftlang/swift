@@ -11,8 +11,8 @@ struct B : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> A {
     return A()
   }
-  static func bridgeFromObjectiveC(x: A) -> B? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: A) -> B {
+    return B()
   }
 }
 
@@ -42,8 +42,8 @@ struct F : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> E {
     return E()
   }
-  static func bridgeFromObjectiveC(x: E) -> F? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: E) -> F {
+    return F()
   }
 }
 
@@ -64,8 +64,8 @@ struct H : _ConditionallyBridgedToObjectiveC {
   func bridgeToObjectiveC() -> G {
     return G()
   }
-  static func bridgeFromObjectiveC(x: G) -> H? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: G) -> H {
+    return H()
   }
   static func bridgeFromObjectiveCConditional(x: G) -> H? {
     _preconditionFailure("implement")
@@ -88,8 +88,8 @@ struct I : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> AnyObject {
     return A()
   }
-  static func bridgeFromObjectiveC(x: AnyObject) -> I? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: AnyObject) -> I {
+    return I()
   }
 }
 

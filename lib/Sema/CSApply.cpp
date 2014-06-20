@@ -1161,10 +1161,17 @@ namespace {
       // Form the call.
       Expr *valueMetatype = TypeExpr::createImplicit(valueType, tc.Context);
       Expr *args[1] = { object };
-      return tc.callWitness(valueMetatype, cs.DC, bridgedProto,
-                            conformance,
-                            tc.Context.Id_bridgeFromObjectiveC,
-                            args, diag::broken_bridged_to_objc_protocol);
+      Expr *result = tc.callWitness(valueMetatype, cs.DC, bridgedProto,
+                                    conformance,
+                                    tc.Context.Id_bridgeFromObjectiveC,
+                                    args, 
+                                    diag::broken_bridged_to_objc_protocol);
+      if (!result)
+        return nullptr;
+
+      return new (tc.Context) InjectIntoOptionalExpr(
+                                result, 
+                                OptionalType::get(result->getType()));
     }
 
     TypeAliasDecl *MaxIntegerTypeDecl = nullptr;

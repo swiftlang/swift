@@ -47,7 +47,7 @@ extension String : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  static func bridgeFromObjectiveC(x: NSString) -> String? {
+  static func bridgeFromObjectiveC(x: NSString) -> String {
     _fatalError("implement")
   }
 }
@@ -59,7 +59,7 @@ extension Int : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     _fatalError("implement")
   }
 }
@@ -71,8 +71,8 @@ extension Array : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  static func bridgeFromObjectiveC(x: NSArray) -> Array? {
-    return nil
+  static func bridgeFromObjectiveC(x: NSArray) -> Array {
+    return []
   }
 }
 
@@ -83,7 +83,7 @@ extension Dictionary : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
-    return nil
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+    return [:]
   }
 }

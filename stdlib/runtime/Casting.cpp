@@ -1529,7 +1529,7 @@ struct _BridgedToObjectiveCWitnessTable {
 
   // func bridgeToObjectiveC() -> ObjectiveCType
   HeapObject *(*bridgeToObjectiveC)(OpaqueValue *self, const Metadata *Self);
-  // class func bridgeFromObjectiveC(x: ObjectiveCType) -> Self?
+  // class func bridgeFromObjectiveC(x: ObjectiveCType) -> Self
   OpaqueExistentialContainer (*bridgeFromObjectiveC)(HeapObject *sourceValue,
                                                      const Metadata *self,
                                                      const Metadata *selfType);
@@ -1628,7 +1628,7 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
 // @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, nativeType: NativeType.Type
-// ) -> NativeType?
+// ) -> NativeType
 extern "C" OpaqueExistentialContainer
 swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
@@ -1665,9 +1665,8 @@ swift_bridgeNonVerbatimFromObjectiveC(
     }
   }
 
-  // return nil
-  swift_unknownRelease(sourceValue);
-  return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
+  // Fail.
+  swift::crash("value type is not bridged to Objective-C");
 }
 
 // @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
@@ -1715,9 +1714,24 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
   // Perform direct bridging. bridgeFromObjectiveC returns `Self?`;
   // this function returns `NativeType`, so we don't need to re-wrap
   // the optional.
-  return bridgeWitness->bridgeFromObjectiveC(
-    static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-      nativeType, nativeType);
+  OpaqueExistentialContainer value
+    = bridgeWitness->bridgeFromObjectiveC(
+        static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+        nativeType, nativeType);
+
+  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
+  // It is important so that we don't return a value with Existential metadata.
+  using box = OpaqueExistentialBox<1>;
+
+  box::Container outValue;
+  outValue.Header.Type = nativeType;
+  nativeType->vw_initializeBufferWithTake(
+    outValue.getBuffer(),
+    reinterpret_cast<OpaqueValue *>(&value.Buffer));
+
+  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
+           reinterpret_cast<OpaqueValue *>(&outValue), 
+           nativeType);
 }
 
 // func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool

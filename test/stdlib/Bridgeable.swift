@@ -37,7 +37,7 @@ struct BridgedValueType : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> C {
     return C()
   }
-  static func bridgeFromObjectiveC(x: C) -> BridgedValueType? {
+  static func bridgeFromObjectiveC(x: C) -> BridgedValueType {
     _preconditionFailure("implement")
   }
 }
@@ -69,7 +69,7 @@ struct ConditionallyBridged<T>
   func bridgeToObjectiveC() -> C {
     return C()
   }
-  static func bridgeFromObjectiveC(x: C) -> ConditionallyBridged<T>? {
+  static func bridgeFromObjectiveC(x: C) -> ConditionallyBridged<T> {
     _preconditionFailure("implement")
   }
   static func bridgeFromObjectiveCConditional(x: C) -> ConditionallyBridged<T>?{

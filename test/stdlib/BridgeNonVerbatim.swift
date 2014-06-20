@@ -71,8 +71,8 @@ struct X : _BridgedToObjectiveC {
     return Tracked(value)
   }
 
-  static func bridgeFromObjectiveC(x: Tracked) -> X? {
-    _preconditionFailure("implement")
+  static func bridgeFromObjectiveC(x: Tracked) -> X {
+    return X(x.value)
   }
 
   var value: Int

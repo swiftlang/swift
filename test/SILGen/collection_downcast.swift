@@ -18,8 +18,8 @@ struct BridgedSwift : Hashable, _BridgedToObjectiveC {
     return BridgedObjC()
   }
 
-  static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift? {
-    return nil
+  static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+    return BridgedSwift()
   }
 }
 
