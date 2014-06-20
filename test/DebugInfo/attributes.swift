@@ -1,11 +1,11 @@
 // RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
 
-// CHECK-DAG: {{.*}}i32 40960,{{.*}}null, metadata ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
+// CHECK-DAG: {{.*}}i32 30,{{.*}}null, metadata ![[TY0:.*]]} ; [ DW_TAG_structure_type ] [{{.*}}ObjCClass{{.*}}] [line [[@LINE+1]]
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
 // DW_LANG_Swift = 0xa000 [FIXME: this number will change!]
-// CHECK-DAG: ![[TY1:[0-9]+]] = {{.*}}i32 40960,{{.*}} [ DW_TAG_structure_type ] [{{.*}}SwiftClass{{.*}}] [line [[@LINE+1]]
+// CHECK-DAG: ![[TY1:[0-9]+]] = {{.*}}i32 30,{{.*}} [ DW_TAG_structure_type ] [{{.*}}SwiftClass{{.*}}] [line [[@LINE+1]]
 class SwiftClass {
       @objc func objcmethod() -> () {}
       func swiftmethod() -> () {}

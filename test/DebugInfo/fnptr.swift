@@ -12,7 +12,7 @@ func main() -> Int {
 
   // CHECK-DAG: i32 {{.*}}, metadata ![[BARPT:.*]], i32 0, i32 0, i64 2} ; [ DW_TAG_auto_variable ] [bar_function_pointer] [line [[@LINE+1]]]
     var bar_function_pointer = bar
-  // CHECK-DAG: [[BARPT]]{{.*}}, metadata ![[BARMEMBERS:[0-9]+]], i32 40960,{{.*}} ; [ DW_TAG_structure_type ] [_TtFT_T_]
+  // CHECK-DAG: [[BARPT]]{{.*}}, metadata ![[BARMEMBERS:[0-9]+]], i32 30,{{.*}} ; [ DW_TAG_structure_type ] [_TtFT_T_]
     // CHECK-DAG: ![[BARMEMBERS]] = metadata !{metadata ![[BARMEMBER:.*]]}
     // CHECK-DAG: ![[BARMEMBER]] = {{.*}}metadata ![[BARPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BARPTR]] = {{.*}} metadata ![[BART:[0-9]+]]} ; [ DW_TAG_pointer_type ]
@@ -21,7 +21,7 @@ func main() -> Int {
     bar_function_pointer();// Set breakpoint here
 
     // CHECK-DAG: i32 {{.*}}, metadata ![[BAZPT:.*]], i32 0, i32 0, i64 2} ; [ DW_TAG_auto_variable ] [baz_function_pointer]
-    // CHECK-DAG: [[BAZPT]]{{.*}}, metadata ![[BAZMEMBERS:[0-9]+]], i32 40960,{{.*}} ; [ DW_TAG_structure_type ] [_TtFSfSi]
+    // CHECK-DAG: [[BAZPT]]{{.*}}, metadata ![[BAZMEMBERS:[0-9]+]], i32 30,{{.*}} ; [ DW_TAG_structure_type ] [_TtFSfSi]
     // CHECK-DAG: ![[BAZMEMBERS]] = metadata !{metadata ![[BAZMEMBER:.*]]}
     // CHECK-DAG: ![[BAZMEMBER]] = {{.*}}metadata ![[BAZPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BAZPTR]] = {{.*}} metadata ![[BAZT:[0-9]+]]} ; [ DW_TAG_pointer_type ]
@@ -31,7 +31,7 @@ func main() -> Int {
     baz_function_pointer(2.89)
 
     // CHECK-DAG: i32 {{.*}}, metadata ![[BARZPT:.*]], i32 0, i32 0, i64 2} ; [ DW_TAG_auto_variable ] [barz_function_pointer] 
-    // CHECK-DAG: [[BARZPT]]{{.*}}, metadata ![[BARZMEMBERS:[0-9]+]], i32 40960,{{.*}} ; [ DW_TAG_structure_type ] [_TtFTSfSf_Si]
+    // CHECK-DAG: [[BARZPT]]{{.*}}, metadata ![[BARZMEMBERS:[0-9]+]], i32 30,{{.*}} ; [ DW_TAG_structure_type ] [_TtFTSfSf_Si]
     // CHECK-DAG: ![[BARZMEMBERS]] = metadata !{metadata ![[BARZMEMBER:.*]]}
     // CHECK-DAG: ![[BARZMEMBER]] = {{.*}}metadata ![[BARZPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BARZPTR]] = {{.*}} metadata ![[BARZT:[0-9]+]]} ; [ DW_TAG_pointer_type ]

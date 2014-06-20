@@ -10,7 +10,7 @@ class AnotherClass : AProtocol {
 }
 
 
-// CHECK-DAG: null, metadata ![[PROTOS:[0-9]+]], i32 40960, null, null, metadata !"_TtQq_F12generic_args9aFunction{{.*}}"} ; [ DW_TAG_structure_type ] [_TtQq_F12generic_args{{.*}}]
+// CHECK-DAG: null, metadata ![[PROTOS:[0-9]+]], i32 30, null, null, metadata !"_TtQq_F12generic_args9aFunction{{.*}}"} ; [ DW_TAG_structure_type ] [_TtQq_F12generic_args{{.*}}]
 // CHECK-DAG: ![[PROTOS]] = metadata !{metadata ![[INHERIT:.*]]}
 // CHECK-DAG: ![[INHERIT]] = {{.*}}metadata ![[PROTOCOL:.*]]} ; [ DW_TAG_inheritance ]
 // CHECK-DAG: null, null, metadata ![[PROTOCOL]]} ; [ DW_TAG_structure_type ] [_TtMP12generic_args9AProtocol_]
