@@ -1154,6 +1154,23 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     return true;
   }
   
+  // A DiscardAssignmentExpr is special in that it introduces a new type
+  // variable but places no constraints upon it. Instead, it relies on the rhs
+  // of its assignment expression to determine its type. Unfortunately, in the
+  // case of error recovery, the "_" expression may be left alone with no
+  // constraints for us to derive an error from. In that case, we'll fall back
+  // to the "outside assignment" error.
+  if (ActiveConstraints.empty() &&
+      InactiveConstraints.empty() &&
+      !failedConstraint &&
+      isa<DiscardAssignmentExpr>(expr)) {
+    
+    TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
+    .highlight(expr->getSourceRange());
+    
+    return true;
+  }
+  
   return false;
 }
 

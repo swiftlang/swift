@@ -656,7 +656,8 @@ func test() {
   (&x).convertFromIntegerLiteral()  // expected-error {{'inout int_test3' is not identical to 'int_test3'}}
 }
 
-
+// Unused l-value
+_ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
 //===----------------------------------------------------------------------===//
 // Collection Literals
