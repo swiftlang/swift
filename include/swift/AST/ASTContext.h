@@ -375,6 +375,9 @@ public:
 
   /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
+
+  EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
+  EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
   
   /// Retrieve the declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *getUnsafePointerDecl() const;

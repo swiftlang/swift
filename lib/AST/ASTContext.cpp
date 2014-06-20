@@ -494,6 +494,30 @@ static EnumElementDecl *findEnumElement(EnumDecl *e, StringRef name) {
   return nullptr;
 }
 
+EnumElementDecl *ASTContext::getOptionalSomeDecl(OptionalTypeKind kind) const {
+  switch (kind) {
+  case OTK_Optional:
+    return getOptionalSomeDecl();
+  case OTK_ImplicitlyUnwrappedOptional:
+    return getImplicitlyUnwrappedOptionalSomeDecl();
+  case OTK_None:
+    llvm_unreachable("getting Some decl for non-optional type?");
+  }
+  llvm_unreachable("bad OTK");
+}
+
+EnumElementDecl *ASTContext::getOptionalNoneDecl(OptionalTypeKind kind) const {
+  switch (kind) {
+  case OTK_Optional:
+    return getOptionalNoneDecl();
+  case OTK_ImplicitlyUnwrappedOptional:
+    return getImplicitlyUnwrappedOptionalNoneDecl();
+  case OTK_None:
+    llvm_unreachable("getting None decl for non-optional type?");
+  }
+  llvm_unreachable("bad OTK");
+}
+
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!Impl.OptionalSomeDecl)
     Impl.OptionalSomeDecl = findEnumElement(getOptionalDecl(), "Some");
