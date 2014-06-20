@@ -2760,7 +2760,9 @@ SourceRange FuncDecl::getSourceRange() const {
   if (getBodyResultTypeLoc().hasLocation())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
   const Pattern *LastPat = getBodyParamPatterns().back();
-  return { StartLoc, LastPat->getEndLoc() };
+  if (!LastPat->isImplicit())
+    return { StartLoc, LastPat->getEndLoc() };
+  return StartLoc;
 }
 
 SourceRange EnumElementDecl::getSourceRange() const {

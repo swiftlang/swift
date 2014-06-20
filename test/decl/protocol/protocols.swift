@@ -440,4 +440,8 @@ protocol ShouldntCrash {
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
   let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+
+  // <rdar://problem/16789886> Assert on protocol property requirement without a type
+  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}} expected-error {{variable with getter/setter must have an explicit type}}
 }
+
