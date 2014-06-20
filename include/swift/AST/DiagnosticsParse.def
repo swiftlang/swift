@@ -204,8 +204,8 @@ ERROR(computed_property_no_accessors, decl_parsing, none,
       "computed property must have accessors specified", ())
 ERROR(expected_getset_in_protocol,decl_parsing,none,
       "expected get or set in a protocol property", ())
-ERROR(getset_missing_type,decl_parsing,none,
-      "variable with getter/setter must have an explicit type", ())
+ERROR(computed_property_missing_type,decl_parsing,none,
+      "computed property must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,decl_parsing,none,
       "getter/setter can only be defined for a single variable", ())
 ERROR(expected_rbrace_in_getset,decl_parsing,none,

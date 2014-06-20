@@ -214,7 +214,7 @@ var computed_prop_with_init_1: X {
 } = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}}
 
 // FIXME: Redundant error below
-var x2 { // expected-error{{variable with getter/setter must have an explicit type}} expected-error{{type annotation missing in pattern}}
+var x2 { // expected-error{{computed property must have an explicit type}} expected-error{{type annotation missing in pattern}}
   get {
     return _x
   }

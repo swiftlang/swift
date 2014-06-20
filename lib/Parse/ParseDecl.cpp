@@ -2420,7 +2420,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     TyLoc = TP->getTypeLoc();
   } else {
     if (PrimaryVar) {
-      diagnose(pattern->getLoc(), diag::getset_missing_type);
+      diagnose(pattern->getLoc(), diag::computed_property_missing_type);
       Invalid = true;
     }
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));

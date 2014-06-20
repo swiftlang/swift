@@ -442,6 +442,6 @@ protocol ShouldntCrash {
   let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
-  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}} expected-error {{variable with getter/setter must have an explicit type}}
+  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}} expected-error {{computed property must have an explicit type}}
 }
 

@@ -142,7 +142,7 @@ func missingControllingExprInFor() {
   }
 
   // FIXME: This should produce the same diagnostic as the test above.
-  for var i { // expected-error {{variable with getter/setter must have an explicit type}} expected-error {{type annotation missing in pattern}}
+  for var i { // expected-error {{computed property must have an explicit type}} expected-error {{type annotation missing in pattern}}
   } // expected-error 2{{expected ';' in 'for' statement}} expected-error {{computed property must have accessors specified}}
   // FIXME: Horrible "trailing" diagnostic.
   func resyncParser() {} // expected-error {{expected '{' in 'for' statement}} expected-error {{expected condition in 'for' statement}} expected-error {{expected expression}}
