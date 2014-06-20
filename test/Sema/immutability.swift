@@ -395,3 +395,11 @@ class ClassWithConvenienceInit {
   }
 }
 
+struct StructWithDelegatingInit {
+  let x: Int
+  
+  init(x: Int) { self.x = x }
+  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to 'x' in 'self'}}
+}
+
+

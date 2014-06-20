@@ -2032,7 +2032,8 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
         // If this is a convenience initializer (i.e. one that calls
         // self.init), then let properties are never mutable in it.  They are
         // only mutable in designated initializers.
-        if (CD->isConvenienceInit())
+        if (CD->getDelegatingOrChainedInitKind(nullptr) ==
+            ConstructorDecl::BodyInitKind::Delegating)
           return false;
 
         return true;
