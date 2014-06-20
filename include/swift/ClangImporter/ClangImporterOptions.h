@@ -33,6 +33,10 @@ public:
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;
+
+  // If true, the audited APIs will be imported with the tighter types, not
+  // unwrapped optional.
+  bool ImportWithTighterObjCPointerTypes = false;
 };
 
 } // end namespace swift

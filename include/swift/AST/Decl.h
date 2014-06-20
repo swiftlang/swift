@@ -2373,7 +2373,7 @@ CanGenericSignature::getGenericParams() const{
 /// Kinds of optional types.
 enum OptionalTypeKind : unsigned {
   /// The type is not an optional type.
-  OTK_None,
+  OTK_None = 0,
 
   /// The type is Optional<T>.
   OTK_Optional,

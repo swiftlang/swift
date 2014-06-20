@@ -86,3 +86,11 @@
 + (NSInteger)nsDictionaryClassMethod;
 @property (readonly) NSDictionary *nsDictionaryProperty;
 @end
+
+@interface NSView : NSObject
+- (BOOL)isDescendantOf:(NSView *)aView;
+- (NSView *)ancestorSharedWithView:(NSView *)aView;
+- (void)setSubviews:(NSArray *)newSubviews;
+- (void)addSubview:(NSView *)aView;
+- (void)addSubview:(NSView *)aView positioned:(unsigned)place relativeTo:(NSView *)otherView;
+@end

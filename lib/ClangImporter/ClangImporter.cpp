@@ -509,7 +509,8 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     SplitPrepositions(ctx.LangOpts.SplitPrepositions),
-    InferImplicitProperties(opts.InferImplicitProperties)
+    InferImplicitProperties(opts.InferImplicitProperties),
+    ImportWithTighterObjCPointerTypes(opts.ImportWithTighterObjCPointerTypes)
 {
 }
 ClangImporter::Implementation::~Implementation() {
@@ -1111,6 +1112,28 @@ namespace {
   KnownObjCMethod &&operator|(KnownObjCMethod &&known, Unavailable unavailable){
     known.Unavailable = true;
     known.UnavailableMsg = unavailable.Msg;
+    return std::move(known);
+  }
+
+  // Signature has been audited with respect to optional types.
+  struct OptionalTypeAdjustment {
+    llvm::SmallVector<OptionalTypeKind, 3> AdjustedTypes;
+
+    template<typename ...Ts>
+    OptionalTypeAdjustment(unsigned numParams, Ts ...kinds) {
+      if (numParams > 0 ) {
+        assert(sizeof...(Ts) == numParams);
+        OptionalTypeKind actualKinds[] = { kinds... };
+        AdjustedTypes.append(actualKinds, actualKinds + numParams);
+      }
+     }
+  };
+  KnownObjCMethod &&operator|(KnownObjCMethod &&known,
+                              OptionalTypeAdjustment adjustment) {
+    known.OptionalTypesAudited = true;
+    known.NumAdjustedOptionalTypes = adjustment.AdjustedTypes.size();
+    for (unsigned i = 0; i < known.NumAdjustedOptionalTypes; ++i)
+      known.addTypeInfo(i, adjustment.AdjustedTypes[i]);
     return std::move(known);
   }
 }

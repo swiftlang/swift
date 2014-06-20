@@ -647,12 +647,22 @@ static bool isCFAudited(ImportTypeKind importKind) {
 }
 
 /// Wrap a type in the Optional type appropriate to the import kind.
-static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
+static Type
+getOptionalType(Type payloadType,
+                ImportTypeKind kind,
+                OptionalTypeKind OptKind = OTK_ImplicitlyUnwrappedOptional) {
   // Import pointee types as true Optional.
   if (kind == ImportTypeKind::Pointee)
     return OptionalType::get(payloadType);
-  // Otherwise, import as ImplicitlyUnwrappedOptional.
-  return ImplicitlyUnwrappedOptionalType::get(payloadType);
+
+  switch (OptKind) {
+  case OTK_ImplicitlyUnwrappedOptional:
+    return ImplicitlyUnwrappedOptionalType::get(payloadType);
+  case OTK_None:
+    return payloadType;
+  case OTK_Optional:
+    return OptionalType::get(payloadType);
+  }
 }
 
 /// Turn T into Unmanaged<T>.
@@ -676,7 +686,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         clang::QualType clangType,
                                         Type importedType,
                                         ImportTypeKind importKind,
-                                        ImportHint hint) {
+                                        ImportHint hint,
+                                        OptionalTypeKind optKind) {
   if (importKind == ImportTypeKind::Abstract) {
     return importedType;
   }
@@ -776,14 +787,15 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       hint == ImportHint::ObjCPointer ||
       hint == ImportHint::CFPointer ||
       hint == ImportHint::Block) {
-    importedType = getOptionalType(importedType, importKind);
+    importedType = getOptionalType(importedType, importKind, optKind);
   }
 
   return importedType;
 }
 
 Type ClangImporter::Implementation::importType(clang::QualType type,
-                                               ImportTypeKind importKind) {
+                                               ImportTypeKind importKind,
+                                               OptionalTypeKind optionality) {
   if (type.isNull())
     return Type();
 
@@ -821,7 +833,8 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
 
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
-                                     importKind, importResult.Hint);
+                                     importKind, importResult.Hint,
+                                     optionality);
 }
 
 Type ClangImporter::Implementation::importPropertyType(
@@ -958,8 +971,20 @@ Type ClangImporter::Implementation::importMethodType(
   else
     resultKind = ImportTypeKind::Result;
 
+  // Check if we know more about the type from our whitelists.
+  KnownObjCMethod *knownMethod = 0;
+  if (ImportWithTighterObjCPointerTypes)
+    if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl))
+      if (auto knownMethodTmp = getKnownObjCMethod(MD))
+        if (knownMethodTmp->OptionalTypesAudited)
+          knownMethod = knownMethodTmp;
+
+  OptionalTypeKind OptionalityOfReturn = knownMethod
+                                         ? knownMethod->getReturnTypeInfo()
+                                         : OTK_ImplicitlyUnwrappedOptional;
+
   // Import the result type.
-  auto swiftResultTy = importType(resultType, resultKind);
+  auto swiftResultTy = importType(resultType, resultKind, OptionalityOfReturn);
   if (!swiftResultTy)
     return Type();
 
@@ -985,7 +1010,12 @@ Type ClangImporter::Implementation::importMethodType(
     } else if (kind == SpecialMethodKind::PropertyAccessor) {
       swiftParamTy = importType(paramTy, ImportTypeKind::PropertyAccessor);
     } else {
-      swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+      OptionalTypeKind OptionalityOfParam = knownMethod
+                                          ? knownMethod->getParamTypeInfo(index)
+                                          : OTK_ImplicitlyUnwrappedOptional;
+      swiftParamTy = importType(paramTy,
+                                ImportTypeKind::Parameter,
+                                OptionalityOfParam);
     }
     if (!swiftParamTy)
       return Type();

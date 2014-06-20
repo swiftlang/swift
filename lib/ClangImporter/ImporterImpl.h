@@ -201,6 +201,11 @@ enum class FactoryAsInitKind {
 /// Describes an Objective-C method for which the we have special knowledge, as
 /// described in \c KnownObjCMethods.def.
 struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
+private:
+  static unsigned const OptionalTypeKindMask = 3;
+  static unsigned const OptionalTypeKindSize = 2;
+
+public:
   /// Whether this is a designated initializer of its class.
   unsigned DesignatedInit : 1;
 
@@ -210,13 +215,31 @@ struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
   /// Whether this method is marked unavailable.
   unsigned Unavailable : 1;
 
+  /// Whether the signature has been audited with respect to optional types.
+  /// If yes, we consider all types to be non-optional unless otherwise noted.
+  /// If this flag is not set, the pointer types are imported as implicitely
+  /// unwrapped optionals.
+  unsigned OptionalTypesAudited : 1;
+
+  /// Number of types whose optionality is encoded with the OptionalTypesPayload.
+  unsigned NumAdjustedOptionalTypes;
+
+  /// Stores the optionality of the return type and the parameters.
+  //  OptionalTypeKindSize bits are used to encode the optionality. The info
+  //  about the return type is stored at position 0, followed by the optionality
+  //  of the parameters.
+  uint64_t OptionalTypesPayload;
+
   /// Message to use when this method is unavailable.
   StringRef UnavailableMsg;
 
   KnownObjCMethod() 
     : DesignatedInit(false),
       FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
-      Unavailable(false) { }
+      Unavailable(false),
+      OptionalTypesAudited(false),
+      NumAdjustedOptionalTypes(0),
+      OptionalTypesPayload(0){ }
 
   FactoryAsInitKind getFactoryAsInitKind() const {
     return static_cast<FactoryAsInitKind>(FactoryAsInit);
@@ -225,6 +248,38 @@ struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
   void setFactoryAsInitKind(FactoryAsInitKind kind) {
     FactoryAsInit = static_cast<unsigned>(kind);
   }
+
+  void addTypeInfo(unsigned index, OptionalTypeKind kind) {
+    assert(index <= sizeof(OptionalTypesPayload)/OptionalTypeKindSize);
+    assert(kind < OptionalTypeKindMask);
+    assert(OptionalTypesAudited = true);
+    unsigned kindValue =
+      (static_cast<unsigned>(kind)) << (index * OptionalTypeKindSize);
+    OptionalTypesPayload |= kindValue;
+  }
+
+private:
+  OptionalTypeKind getTypeInfo(unsigned index) {
+    assert(OptionalTypesAudited &&
+           "Checking the type adjustment on non-audited method.");
+    // If we don't have info about this parameter, return the default.
+    if (index > NumAdjustedOptionalTypes)
+      return OTK_None;
+    return static_cast<OptionalTypeKind>(( OptionalTypesPayload
+                                           >> (index * OptionalTypeKindSize) )
+                                         & OptionalTypeKindMask);
+  }
+
+public:
+  OptionalTypeKind getParamTypeInfo(unsigned index) {
+    index++;
+    return getTypeInfo(index);
+  }
+
+  OptionalTypeKind getReturnTypeInfo() {
+    return getTypeInfo(0);
+  }
+
 };
 
 /// \brief Implementation of the Clang importer.
@@ -261,6 +316,7 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
+  const bool ImportWithTighterObjCPointerTypes;
 
 private:
   /// \brief A count of the number of load module operations.
@@ -778,7 +834,9 @@ public:
   ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
-  Type importType(clang::QualType type, ImportTypeKind kind);
+  Type importType(clang::QualType type,
+                  ImportTypeKind kind,
+                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
 
   /// \brief Import the given function type.
   ///

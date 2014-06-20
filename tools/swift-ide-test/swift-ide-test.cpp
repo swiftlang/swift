@@ -158,6 +158,11 @@ ImplicitObjCWith("implicit-objc-with",
                  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+ImportWithTighterObjCPointerTypes("import-with-tighter-objc-types",
+                 llvm::cl::desc("import audited APIs with the tighter types, not unwrapped optionals"),
+                 llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
                    llvm::cl::desc("Implicitly import Objective-C factory methods as initializers"),
                    llvm::cl::init(false));
@@ -1596,8 +1601,10 @@ int main(int argc, char *argv[]) {
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
     options::ImportObjCHeader;
   InitInvok.getLangOptions().SplitPrepositions = options::SplitObjCSelectors;
-  InitInvok.getClangImporterOptions().InferImplicitProperties
-    = options::ImplicitProperties;
+  InitInvok.getClangImporterOptions().InferImplicitProperties =
+    options::ImplicitProperties;
+  InitInvok.getClangImporterOptions().ImportWithTighterObjCPointerTypes =
+    options::ImportWithTighterObjCPointerTypes;
   InitInvok.getLangOptions().ImplicitObjCWith = options::ImplicitObjCWith;
 
   for (auto ConfigName : options::BuildConfigs)
