@@ -25,7 +25,7 @@ the Swift programming language. SIL accommodates the following use cases:
 
 In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
-target-specific concepts as well as Swift can.
+target-specific concepts as well as LLVM can.
 
 SIL in the Swift Compiler
 -------------------------
@@ -1283,7 +1283,7 @@ does not take ownership of the referenced memory. The referenced memory must
 be initialized upon function entry and exit. If the ``@inout`` argument
 refers to a fragile physical variable, then the argument is the address of that
 variable. If the ``@inout`` argument refers to a logical property, then the
-argument is the address of a caller-owner writeback buffer. it is the caller's
+argument is the address of a caller-owner writeback buffer. It is the caller's
 responsibility to initialize the buffer by storing the result of the property
 getter prior to calling the function and to write back to the property
 on return by loading from the buffer and invoking the setter with the final
