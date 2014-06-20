@@ -351,3 +351,33 @@ func QoI() {
   }
   get_only = 92            // expected-error {{cannot assign to a get-only property 'get_only'}}
 }
+
+
+
+// <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
+struct rdar17051675_S {
+  let x = 0
+  init(newX: Int) {
+    x = 42
+  }
+}
+
+extension rdar17051675_S {
+  init(newY: Int) {
+    x = 42
+  }
+}
+
+struct rdar17051675_S2<T> {
+  let x = 0
+  init(newX: Int) {
+    x = 42
+  }
+}
+
+extension rdar17051675_S2 {
+  init(newY: Int) {
+    x = 42
+  }
+}
+

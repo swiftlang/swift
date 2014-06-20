@@ -2020,9 +2020,17 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   // 'let' properties are generally immutable, unless they are a 'let' ivar
   // and we are in the init() for the type that holds the ivar.
   if (isLet()) {
-    if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC))
-      if (CD->getDeclContext() == getDeclContext())
+    if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC)) {
+      auto *DC = getDeclContext();
+      auto *CDC = CD->getDeclContext();
+      
+      // If this init is defined inside of the same type (or in an extension
+      // thereof) as the let property, then it is mutable.
+      if (CDC->isTypeContext() && DC->isTypeContext() &&
+          CDC->getDeclaredTypeInContext()->isEqual(
+                     getDeclContext()->getDeclaredTypeInContext()))
         return true;
+    }
 
     return false;
   }
