@@ -280,6 +280,12 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
     bool NestingDetected = Super::initWithInst(I);
 
+    // If we know that there is another decrement on the same pointer that has
+    // not been matched up to an increment, then the pointer must have a
+    // reference count of at least 2 before this decrement. This implies it is
+    // known safe.
+    KnownSafe = NestingDetected;
+
     // Clear our decrement list and insert I into it.
     Decrements.clear();
     Decrements.insert(I);

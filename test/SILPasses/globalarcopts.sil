@@ -1084,3 +1084,21 @@ bb3:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @release_use_optimization : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+sil @release_use_optimization : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
