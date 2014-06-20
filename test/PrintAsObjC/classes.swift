@@ -277,6 +277,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (void)setObject:(Subscripts2 *)newValue atIndexedSubscript:(int16_t)i;
 // CHECK-NEXT: - (NSObject *)objectForKeyedSubscript:(NSObject *)o;
 // CHECK-NEXT: - (void)setObject:(NSObject *)newValue forKeyedSubscript:(NSObject *)o;
+// CHECK-NEXT: @property (nonatomic) NSArray * cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {
@@ -297,6 +298,9 @@ class MyObject : NSObject {}
       println("nope")
     }
   }
+  
+  // <rdar://problem/17165953> Swift: @lazy property reflects back into Objective-C with two properties, one for underlying storage
+  @lazy var cardPaths : String[] = []
 }
 
 // CHECK-LABEL: @interface Subscripts3

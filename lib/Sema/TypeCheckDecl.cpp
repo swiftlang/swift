@@ -1914,6 +1914,10 @@ static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   if (VD->getDeclContext()->isClassOrClassExtensionContext())
     Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
+  
+  // Don't reflect storage back to Objective-C, either through the runtime or
+  // a generated header.
+  Storage->setIsObjC(false);
 
   addMemberToContext(Storage, VD->getDeclContext());
 
@@ -2198,8 +2202,6 @@ public:
       ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(VD->getDeclContext());
-      bool isMemberOfObjCProtocol =
-          protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (VD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
@@ -2207,11 +2209,12 @@ public:
         reason = ObjCReason::ExplicitlyIBOutlet;
       else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
         reason = ObjCReason::ExplicitlyNSManaged;
-      else if (isMemberOfObjCProtocol)
+      else if (protocolContext && protocolContext->isObjC())
         reason = ObjCReason::MemberOfObjCProtocol;
 
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    (classContext && classContext->isObjC());
+                    (classContext && classContext->isObjC() &&
+                     !VD->isImplicit());
       if (isObjC && !TC.isRepresentableInObjC(VD, reason))
         isObjC = false;
       
