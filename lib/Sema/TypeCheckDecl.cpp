@@ -1915,10 +1915,6 @@ static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
     Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
   
-  // Don't reflect storage back to Objective-C, either through the runtime or
-  // a generated header.
-  Storage->setIsObjC(false);
-
   addMemberToContext(Storage, VD->getDeclContext());
 
   // Create the pattern binding decl for the storage decl.  This will get
