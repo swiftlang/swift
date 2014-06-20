@@ -37,15 +37,19 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 
   init(_ v : UInt32) {
-    var lowHalf = v & 0xFFFF
-    // reserved in each plane
-    _precondition(lowHalf != 0xFFFE && lowHalf != 0xFFFF)
-    // UTF-16 surrogate pair values are not valid code points
-    _precondition(v < 0xD800 || v > 0xDFFF)
-    // U+FDD0...U+FDEF are also reserved
-    _precondition(v < 0xFDD0 || v > 0xFDEF)
-    // beyond what is defined to be valid
-    _precondition(v < 0x10FFFF)
+    // Unicode 6.3.0:
+    //
+    //     D9.  Unicode codespace: A range of integers from 0 to 10FFFF.
+    //
+    //     D76. Unicode scalar value: Any Unicode code point except
+    //     high-surrogate and low-surrogate code points.
+    //
+    //     * As a result of this definition, the set of Unicode scalar values
+    //     consists of the ranges 0 to D7FF and E000 to 10FFFF, inclusive.
+
+    _precondition(v < 0xD800 || v > 0xDFFF,
+        "high- and low-surrogate code points are not valid Unicode scalar values")
+    _precondition(v <= 0x10FFFF, "value is outside of Unicode codespace")
 
     self._value = v.value
   }
@@ -180,7 +184,8 @@ extension UnicodeScalar {
 
 extension UInt8 {
   init(_ v : UnicodeScalar) {
-    _precondition(v.value <= UInt32(UInt8.max), "Code point value does not fit into UInt8")
+    _precondition(v.value <= UInt32(UInt8.max),
+        "Code point value does not fit into UInt8")
     self = UInt8(v.value)
   }
 }
@@ -230,7 +235,7 @@ extension UnicodeScalar {
 
 /// Helpers to provide type context to guide type inference in code like::
 ///
-///   var zero = _asUnicodeCodePoint('0')
+///   var zero = _asUnicodeCodePoint("0")
 func _asUnicodeCodePoint(us: UnicodeScalar) -> Builtin.Int32 {
   return us._value
 }

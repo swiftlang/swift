@@ -25,8 +25,7 @@ var bytes = UnsafePointer<CChar>.alloc(11)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)
-var magic = String.fromCString(bytes)
-println("the magic word is \(magic) //")
+println("the magic word is \(String.fromCString(CString(bytes))) //")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
 let errFile = 

@@ -18,7 +18,11 @@ struct _Process {
     // have that, so we don't need this awkward closure initialization.
     var _args = new String[Int(C_ARGC)]
     for i in 0..<Int(C_ARGC) {
-      _args[i] = String.fromCString(C_ARGV[i])
+      if let s = String.fromCStringRepairingIllFormedUTF8(C_ARGV[i]).0 {
+        _args[i] = s
+      } else {
+        _args[i] = ""
+      }
     }
     return _args
   }()

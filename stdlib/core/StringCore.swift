@@ -292,13 +292,15 @@ struct _StringCore {
         }
       }
       else {
-        transcode(UTF16.self, encoding,
+        let hadError = transcode(UTF16.self, encoding,
           UnsafeArray(
             start: UnsafePointer<UTF16.CodeUnit>(_baseAddress),
             length: count
           ).generate(),
-          output
+          output,
+          stopOnError: true
         )
+        _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
       }
     }
     else if (hasCocoaBuffer) {

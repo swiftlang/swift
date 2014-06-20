@@ -14,16 +14,30 @@
 
 // XXX FIXME: we need a clean memory management story here
 
+/// An equivalent of nul-terminated `char *` in C.
+///
+/// `CString` behaves exactly like `char *`:
+///
+/// * it does not own the storage;
+///
+/// * it can contain a `NULL` pointer;
+///
+/// * it may not contain well-formed UTF-8.  Because of this, comparison
+///   operators `<` and `==` on `CString` use `strcmp` instead of Unicode
+///   comparison algorithms.
 struct CString :
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible,
     LogicValue {
-  var _bytesPtr : UnsafePointer<UInt8>
+  var _bytesPtr: UnsafePointer<UInt8>
 
-  @transparent
-  init(_ _bytesPtr : UnsafePointer<UInt8>) {
-    self._bytesPtr = _bytesPtr
+  init(_ bytesPtr: UnsafePointer<UInt8>) {
+    self._bytesPtr = bytesPtr
+  }
+
+  init(_ bytesPtr: UnsafePointer<CChar>) {
+    self._bytesPtr = UnsafePointer<UInt8>(bytesPtr)
   }
 
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
@@ -44,7 +58,7 @@ struct CString :
   static func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
                                                byteSize: Builtin.Word,
                                                isASCII: Builtin.Int1) -> CString {
-    return CString(UnsafePointer(start))
+    return CString(UnsafePointer<CChar>(start))
   }
 
   static func convertFromStringLiteral(value: CString) -> CString {
@@ -80,10 +94,12 @@ struct CString :
 
 extension CString : DebugPrintable {
   var debugDescription: String {
-    if _isNull {
-      return "<null C string>"
+    let (optionalString, hadError) =
+        String.fromCStringRepairingIllFormedUTF8(self)
+    if let s = optionalString {
+      return (hadError ? "<ill-formed UTF-8>" : "") + s.debugDescription
     }
-    return String.fromCString(self).debugDescription
+    return "<null C string>"
   }
 }
 
@@ -108,20 +124,43 @@ func <(lhs: CString, rhs: CString) -> Bool {
 extension CString : Equatable, Hashable, Comparable {
   @transparent
   var hashValue: Int {
-    return String.fromCString(self).hashValue
+    if let s = String.fromCStringRepairingIllFormedUTF8(self).0 {
+      return s.hashValue
+    }
+    return 0
   }
 }
 
 extension String {
-  /// Creates a new String by copying the null-terminated data referenced by
-  /// a CString.
-  static func fromCString(cs: CString) -> String {
-    var len = Int(_strlen(cs))
-    return String(UTF8.self, 
-                  input: UnsafeArray(start: cs._bytesPtr, length: len))
+  /// Creates a new `String` by copying the nul-terminated UTF-8 data
+  /// referenced by a `CString`.
+  ///
+  /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
+  /// UTF-8 code unit sequences.
+  static func fromCString(cs: CString) -> String? {
+    if cs._isNull {
+      return .None
+    }
+    let len = Int(_strlen(cs))
+    return String._fromCodeUnitSequence(UTF8.self,
+        input: UnsafeArray(start: cs._bytesPtr, length: len))
   }
 
-  static func fromCString(up: UnsafePointer<CChar>) -> String {
-    return fromCString(CString(UnsafePointer<UInt8>(up)))
+  /// Creates a new `String` by copying the nul-terminated UTF-8 data
+  /// referenced by a `CString`.
+  ///
+  /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
+  /// ill-formed UTF-8 code unit sequences, replaces them with replacement
+  /// characters (U+FFFD).
+  static func fromCStringRepairingIllFormedUTF8(cs: CString)
+      -> (String?, hadError: Bool) {
+    if cs._isNull {
+      return (.None, hadError: false)
+    }
+    let len = Int(_strlen(cs))
+    let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
+        input: UnsafeArray(start: cs._bytesPtr, length: len))
+    return (result, hadError: hadError)
   }
 }
+

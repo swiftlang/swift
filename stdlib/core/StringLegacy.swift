@@ -15,17 +15,7 @@
 // be a drop-in replacement for String
 //
 extension String {
-  
-  init<
-    Encoding: UnicodeCodec, Input: Collection
-  where Input.GeneratorType.Element == Encoding.CodeUnit
-  >(
-    _ _encoding: Encoding.Type, input: Input
-  )
-  {
-    self = String(_StringBuffer(encoding: _encoding, input: input))
-  }
-  
+
   init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_StringBuffer(capacity: s.core.count * sz, 
@@ -37,8 +27,8 @@ extension String {
   }
 
   init(count: Int, repeatedValue c: UnicodeScalar) {
-    self = String(UTF32.self, 
-                  input: Repeat(count: count, repeatedValue: c.value))
+    self = String._fromWellFormedCodeUnitSequence(UTF32.self,
+        input: Repeat(count: count, repeatedValue: c.value))
   }
   
   var _lines : String[] {
@@ -89,7 +79,8 @@ extension String {
       }
     }
 
-    return String(UTF8.self, input: resultArray)
+    return String._fromWellFormedCodeUnitSequence(UTF8.self,
+        input: resultArray)
   }
 
   var lowercaseString : String {
@@ -125,7 +116,8 @@ extension String {
       }
     }
 
-    return String(UTF8.self, input: resultArray)
+    return String._fromWellFormedCodeUnitSequence(UTF8.self,
+        input: resultArray)
   }
 
   init(_ _c: UnicodeScalar) {

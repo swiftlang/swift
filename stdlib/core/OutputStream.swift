@@ -270,7 +270,7 @@ func _doubleToString(value: Double) -> String {
     (bufferPtr) in
     let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
     let actualLength = _doubleToStringImpl(bufferUTF8Ptr, 32, value)
-    return String(
+    return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
   }
@@ -292,7 +292,7 @@ func _int64ToString(
       let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
-      return String(
+      return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
     }
@@ -303,7 +303,7 @@ func _int64ToString(
       let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
-      return String(
+      return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
     }
@@ -326,7 +326,7 @@ func _uint64ToString(
       let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
-      return String(
+      return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
     }
@@ -337,7 +337,7 @@ func _uint64ToString(
       let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
-      return String(
+      return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
     }
@@ -389,11 +389,13 @@ extension UnicodeScalar : Streamable {
 }
 
 extension CString : Streamable {
+  /// Writes the `CString` to the output stream.  If the `CString` does not
+  /// contain well-formed UTF-8, invokes a runtime trap.
   func writeTo<Target : OutputStream>(inout target: Target) {
     if _isNull {
       return
     }
-    target.write(String.fromCString(self))
+    target.write(String.fromCString(self)!)
   }
 }
 

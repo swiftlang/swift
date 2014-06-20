@@ -151,7 +151,7 @@ func test_StdlibTypesPrinted() {
   cstr = "\\ \' \" \n \r \t \x05"
   debugPrintedIs(cstr, "\"\\\\ \\\' \\\" \\n \\r \\t \\x05\"")
 
-  var nullCString = CString(UnsafePointer.null())
+  var nullCString = CString(UnsafePointer<CChar>.null())
   printedIs(nullCString, "")
   debugPrintedIs(nullCString, "<null C string>")
 

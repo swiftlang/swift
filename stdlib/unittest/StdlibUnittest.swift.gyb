@@ -25,8 +25,23 @@ func expectEqual<T : Equatable>(
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
+    println()
+  }
+}
+
+func expectEqual<T : Equatable>(
+    expected: T, actual: T,
+    collectMoreInfo: () -> String,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
+    println(collectMoreInfo())
     println()
   }
 }
@@ -38,7 +53,7 @@ func expectNotEqual<T : Equatable>(
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -52,8 +67,8 @@ func expectOptionalEqual<T : Equatable>(
   if !actual || expected != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -74,8 +89,8 @@ func expectEqual${Generic}(
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -87,7 +102,7 @@ func _expectNotEqual${Generic}(
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -109,10 +124,52 @@ func expectLE(
   }
 }
 
+func expectGE(
+    expected: ${ComparableType}, actual: ${ComparableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !(expected >= actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
 %end
 
+struct AssertionResult : Printable, LogicValue {
+  init(isPass: Bool) {
+    self._isPass = isPass
+  }
+
+  func getLogicValue() -> Bool {
+    return _isPass
+  }
+
+  func withDescription(description: String) -> AssertionResult {
+    var result = self
+    result.description += description
+    return result
+  }
+
+  let _isPass: Bool
+  var description: String = ""
+}
+
+func assertionSuccess() -> AssertionResult {
+  return AssertionResult(isPass: true)
+}
+
+func assertionFailure() -> AssertionResult {
+  return AssertionResult(isPass: false)
+}
+
+%for BoolType in ['Bool', 'AssertionResult']:
+
 func expectTrue(
-    actual: Bool,
+    actual: ${BoolType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if !actual {
@@ -125,7 +182,7 @@ func expectTrue(
 }
 
 func expectFalse(
-    actual: Bool,
+    actual: ${BoolType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if actual {
@@ -136,6 +193,8 @@ func expectFalse(
     println()
   }
 }
+
+%end
 
 func expectEmpty<T>(
     value: Optional<T>,
@@ -200,5 +259,16 @@ struct TestCase {
 
   var name: String
   var _tests: _Test[] = []
+}
+
+// These APIs don't really belong in a unittesting library, but are useful
+// in tests, and stdlib does not have such facilities yet.
+
+func asHex(a: UInt8[]) -> String {
+  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
+}
+
+func asHex(a: UInt32[]) -> String {
+  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 

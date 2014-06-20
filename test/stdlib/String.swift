@@ -1,7 +1,70 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-println(sizeof(String.self) - 3 * sizeof(Int.self))
-// CHECK: 0
+import StdlibUnittest
+
+var StringTests = TestCase("StringTests")
+
+StringTests.test("sizeof") {
+  expectEqual(3 * sizeof(Int.self), sizeof(String.self))
+}
+
+func checkUnicodeScalarViewIteration(
+    expectedScalars: UInt32[], str: String) -> AssertionResult {
+  if true {
+    var us = str.unicodeScalars
+    var i = us.startIndex
+    var end = us.endIndex
+    var decoded: UInt32[] = []
+    while i != end {
+      decoded += us[i].value
+      i = i.succ()
+    }
+    if expectedScalars != decoded {
+      return assertionFailure()
+          .withDescription("forward traversal:\n")
+          .withDescription("expected: \(asHex(expectedScalars))\n")
+          .withDescription("actual:   \(asHex(decoded))")
+    }
+  }
+  if true {
+    var us = str.unicodeScalars
+    var start = us.startIndex
+    var i = us.endIndex
+    var decoded: UInt32[] = []
+    while i != start {
+      i = i.pred()
+      decoded += us[i].value
+    }
+    if expectedScalars != decoded {
+      return assertionFailure()
+          .withDescription("backward traversal:\n")
+          .withDescription("expected: \(asHex(expectedScalars))\n")
+          .withDescription("actual:   \(asHex(decoded))")
+    }
+  }
+
+  return assertionSuccess()
+}
+
+StringTests.test("unicodeScalars") {
+  checkUnicodeScalarViewIteration([], "")
+  checkUnicodeScalarViewIteration([ 0x0000 ], "\u0000")
+  checkUnicodeScalarViewIteration([ 0x0041 ], "A")
+  checkUnicodeScalarViewIteration([ 0x007f ], "\u007f")
+  checkUnicodeScalarViewIteration([ 0x0080 ], "\u0080")
+  checkUnicodeScalarViewIteration([ 0x07ff ], "\u07ff")
+  checkUnicodeScalarViewIteration([ 0x0800 ], "\u0800")
+  checkUnicodeScalarViewIteration([ 0xd7ff ], "\ud7ff")
+  checkUnicodeScalarViewIteration([ 0x8000 ], "\u8000")
+  checkUnicodeScalarViewIteration([ 0xe000 ], "\ue000")
+  checkUnicodeScalarViewIteration([ 0xfffd ], "\ufffd")
+  checkUnicodeScalarViewIteration([ 0xffff ], "\uffff")
+  checkUnicodeScalarViewIteration([ 0x10000 ], "\U00010000")
+  checkUnicodeScalarViewIteration([ 0x10ffff ], "\U0010ffff")
+}
+
+StringTests.run()
+// CHECK: {{^}}StringTests: All tests passed
 
 func testStringToInt() {
   println("test String to Int")
@@ -64,7 +127,7 @@ func testStringToInt() {
   {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
-    var str = String(UTF8.self, input: chars)
+    var str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
     var is_isnot = str.toInt() ? "is" : "is not"
     println("\(str) \(is_isnot) an Int")
   }

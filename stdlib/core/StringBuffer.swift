@@ -78,33 +78,45 @@ struct _StringBuffer {
       = ((_storage._capacity() - capacityBump) << 1) + elementShift
   }
 
-  init<
-    Encoding: UnicodeCodec, Input: Collection
-  where Input.GeneratorType.Element == Encoding.CodeUnit
+  static func fromCodeUnits<
+    Encoding : UnicodeCodec, Input : Collection // Sequence?
+    where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
-    encoding: Encoding.Type, input: Input, minimumCapacity: Int = 0
-  ) {
+    encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,
+    minimumCapacity: Int = 0
+  ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF16 code units we'll need
     var inputStream = input.generate()
-    var (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream)
+    if let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
+        repairIllFormedSequences: repairIllFormedSequences) {
 
-    // Allocate storage
-    self = _StringBuffer(
-      capacity: max(utf16Count, minimumCapacity),
-      initialSize: utf16Count,
-      elementWidth: isAscii ? 1 : 2)
+      // Allocate storage
+      var result = _StringBuffer(
+          capacity: max(utf16Count, minimumCapacity),
+          initialSize: utf16Count,
+          elementWidth: isAscii ? 1 : 2)
 
-    if isAscii {
-      var p = UnsafePointer<UTF8.CodeUnit>(start)
-      transcode(encoding, UTF32.self, input.generate(), SinkOf {
-          (p++).memory = UTF8.CodeUnit($0)
-        })
-    }
-    else {
-      var p = _storage.elementStorage
-      transcode(encoding, UTF16.self, input.generate(), SinkOf {
-          (p++).memory = $0
-        })
+      if isAscii {
+        var p = UnsafePointer<UTF8.CodeUnit>(result.start)
+        let hadError = transcode(encoding, UTF32.self, input.generate(),
+            SinkOf {
+              (p++).memory = UTF8.CodeUnit($0)
+            },
+            stopOnError: !repairIllFormedSequences)
+        _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
+        return (result, hadError)
+      }
+      else {
+        var p = result._storage.elementStorage
+        let hadError = transcode(encoding, UTF16.self, input.generate(),
+            SinkOf {
+              (p++).memory = $0
+            },
+            stopOnError: !repairIllFormedSequences)
+        return (result, hadError)
+      }
+    } else {
+      return (.None, true)
     }
   }
 

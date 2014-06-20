@@ -18,8 +18,47 @@ struct String {
   init(_ _core: _StringCore) {
     self.core = _core
   }
-  
+
   var core: _StringCore
+}
+
+extension String {
+  static func _fromWellFormedCodeUnitSequence<
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.GeneratorType.Element == Encoding.CodeUnit
+  >(
+    encoding: Encoding.Type, input: Input
+  ) -> String {
+    return String._fromCodeUnitSequence(encoding, input: input)!
+  }
+
+  static func _fromCodeUnitSequence<
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.GeneratorType.Element == Encoding.CodeUnit
+  >(
+    encoding: Encoding.Type, input: Input
+  ) -> String? {
+    let (stringBufferOptional, _) =
+        _StringBuffer.fromCodeUnits(encoding, input: input,
+            repairIllFormedSequences: false)
+    if let stringBuffer = stringBufferOptional {
+      return String(stringBuffer)
+    } else {
+      return .None
+    }
+  }
+
+  static func _fromCodeUnitSequenceWithRepair<
+    Encoding: UnicodeCodec, Input: Collection
+    where Input.GeneratorType.Element == Encoding.CodeUnit
+  >(
+    encoding: Encoding.Type, input: Input
+  ) -> (String, hadError: Bool) {
+    let (stringBuffer, hadError) =
+        _StringBuffer.fromCodeUnits(encoding, input: input,
+            repairIllFormedSequences: true)
+    return (String(stringBuffer!), hadError)
+  }
 }
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
@@ -28,7 +67,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) -> String {
 
-    return String(
+    return String._fromWellFormedCodeUnitSequence(
       UTF8.self,
       input: UnsafeArray(start: UnsafePointer<UTF8.CodeUnit>(start), 
                          length: Int(byteSize)))
@@ -74,7 +113,7 @@ extension String : _BuiltinStringLiteralConvertible {
           owner: nil))
     }
     else {
-      return String(
+      return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeArray(start: UnsafePointer<UTF8.CodeUnit>(start), length: 
                            Int(byteSize)))
@@ -108,7 +147,14 @@ extension String {
       encoding, output: SinkOf<Encoding.CodeUnit>({ _ in ++codeUnitCount;() }))
     return codeUnitCount
   }
-  
+
+  // FIXME: this function does not handle the case when a wrapped NSString
+  // contains unpaired surrogates.  Fix this before exposing this function as a
+  // public API.  But it is unclear if it is valid to have such an NSString in
+  // the first place.  If it is not, we should not be crashing in an obscure
+  // way -- add a test for that.
+  // Related: <rdar://problem/17340917> Please document how NSString interacts
+  // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodec,
     Output: Sink
@@ -241,8 +287,8 @@ extension String {
     start: UnsafePointer<UTF8.CodeUnit>, utf8Count: Int
   ) {
     resultStorage.initialize(
-      String(UTF8.self, 
-             input: UnsafeArray(start: start, length: utf8Count)))
+        String._fromWellFormedCodeUnitSequence(UTF8.self,
+            input: UnsafeArray(start: start, length: utf8Count)))
   }
 }
 

@@ -77,7 +77,10 @@ extension Selector : Equatable, Hashable {
 
 extension Selector : Printable {
   var description: String {
-    return String.fromCString(sel_getName(self))
+    if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
+      return s
+    }
+    return "<NULL>"
   }
 }
 
@@ -85,7 +88,7 @@ extension String {
   /// Construct the C string representation of an Objective-C selector.
   init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
-    self = String.fromCString(sel_getName(_sel))
+    self = String.fromCString(sel_getName(_sel))!
   }
 }
 

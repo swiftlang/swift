@@ -1023,7 +1023,7 @@ NSStringAPIs.run()
 var CStringTests = TestCase("CStringTests")
 
 func getNullCString() -> CString {
-  return CString(UnsafePointer.null())
+  return CString(UnsafePointer<CChar>.null())
 }
 
 func getASCIICString() -> (CString, dealloc: ()->()) {
@@ -1044,6 +1044,28 @@ func getNonASCIICString() -> (CString, dealloc: ()->()) {
   return (CString(up), { up.dealloc(100) })
 }
 
+func getIllFormedUTF8String1() -> (CString, dealloc: ()->()) {
+  var up = UnsafePointer<UInt8>.alloc(100)
+  up[0] = 0x41
+  up[1] = 0xed
+  up[2] = 0xa0
+  up[3] = 0x80
+  up[4] = 0x41
+  up[5] = 0
+  return (CString(up), { up.dealloc(100) })
+}
+
+func getIllFormedUTF8String2() -> (CString, dealloc: ()->()) {
+  var up = UnsafePointer<UInt8>.alloc(100)
+  up[0] = 0x41
+  up[1] = 0xed
+  up[2] = 0xa0
+  up[3] = 0x81
+  up[4] = 0x41
+  up[5] = 0
+  return (CString(up), { up.dealloc(100) })
+}
+
 func asCCharArray(a: UInt8[]) -> CChar[] {
   return a.map { $0.asSigned() }
 }
@@ -1060,6 +1082,15 @@ CStringTests.test("init(_:)") {
     var (s, dealloc) = getNonASCIICString()
     dealloc()
   }
+  if true {
+    var (s, dealloc) = getIllFormedUTF8String1()
+    dealloc()
+  }
+}
+
+CStringTests.test("initFromSignedUnsigned") {
+  CString(UnsafePointer<UInt8>())
+  CString(UnsafePointer<Int8>())
 }
 
 CStringTests.test("convertFromLiterals") {
@@ -1085,6 +1116,11 @@ CStringTests.test("getLogicValue()") {
     expectTrue(s.getLogicValue())
     dealloc()
   }
+  if true {
+    var (s, dealloc) = getIllFormedUTF8String1()
+    expectTrue(s.getLogicValue())
+    dealloc()
+  }
 }
 
 CStringTests.test("persist()") {
@@ -1102,32 +1138,163 @@ CStringTests.test("persist()") {
     expectEqual(asCCharArray([ 0xd0, 0xb0, 0xd0, 0xb1, 0 ]), s.persist()!)
     dealloc()
   }
+  if true {
+    var (s, dealloc) = getIllFormedUTF8String1()
+    expectEqual(asCCharArray([ 0x41, 0xed, 0xa0, 0x80, 0x41, 0 ]), s.persist()!)
+    dealloc()
+  }
 }
 
 CStringTests.test("debugDescription") {
   if true {
-    var s = getNullCString()
+    let s = getNullCString()
     expectEqual("<null C string>", s.debugDescription)
   }
   if true {
-    var (s, dealloc) = getASCIICString()
+    let (s, dealloc) = getASCIICString()
     expectEqual("\"ab\"", s.debugDescription)
     dealloc()
   }
   if true {
-    var (s, dealloc) = getNonASCIICString()
+    let (s, dealloc) = getNonASCIICString()
     expectEqual("\"аб\"", s.debugDescription)
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getIllFormedUTF8String1()
+    expectEqual("<ill-formed UTF-8>\"\u0041\ufffd\ufffd\ufffd\u0041\"",
+        s.debugDescription)
+    dealloc()
+  }
+}
+
+CStringTests.test("hashValue") {
+  if true {
+    let s = getNullCString()
+    expectEqual(0, s.hashValue)
+  }
+  if true {
+    let (s, dealloc) = getASCIICString()
+    expectEqual("ab".hashValue, s.hashValue)
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getNonASCIICString()
+    expectEqual("аб".hashValue, s.hashValue)
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getIllFormedUTF8String1()
+    expectEqual("\u0041\ufffd\ufffd\ufffd\u0041".hashValue,
+        s.hashValue)
     dealloc()
   }
 }
 
 CStringTests.test("OperatorEquals") {
-  var (s1, dealloc1) = getASCIICString()
-  var (s2, dealloc2) = getNonASCIICString()
-  expectTrue(s1 == s1)
-  expectFalse(s1 == s2)
-  dealloc1()
-  dealloc2()
+  if true {
+    let (s1, dealloc1) = getASCIICString()
+    let (s2, dealloc2) = getNonASCIICString()
+    expectTrue(s1 == s1)
+    expectFalse(s1 == s2)
+    dealloc1()
+    dealloc2()
+  }
+  if true {
+    let (s1, dealloc1) = getIllFormedUTF8String1()
+    let (s2, dealloc2) = getIllFormedUTF8String1()
+    expectTrue(s1 == s2)
+    dealloc1()
+    dealloc2()
+  }
+  if true {
+    let (s1, dealloc1) = getIllFormedUTF8String1()
+    let (s2, dealloc2) = getIllFormedUTF8String2()
+    // This would return true if were decoding UTF-8 and replacing ill-formed
+    // sequences with U+FFFD.
+    expectFalse(s1 == s2)
+    dealloc1()
+    dealloc2()
+  }
+}
+
+CStringTests.test("OperatorLess") {
+  if true {
+    let (s1, dealloc1) = getASCIICString()
+    let (s2, dealloc2) = getNonASCIICString()
+    expectFalse(s1 < s1)
+    expectTrue(s1 < s2)
+    dealloc1()
+    dealloc2()
+  }
+  if true {
+    let (s1, dealloc1) = getIllFormedUTF8String1()
+    let (s2, dealloc2) = getIllFormedUTF8String1()
+    expectFalse(s1 < s2)
+    dealloc1()
+    dealloc2()
+  }
+  if true {
+    let (s1, dealloc1) = getIllFormedUTF8String1()
+    let (s2, dealloc2) = getIllFormedUTF8String2()
+    // This would return false if were decoding UTF-8 and replacing ill-formed
+    // sequences with U+FFFD.
+    expectTrue(s1 < s2)
+    dealloc1()
+    dealloc2()
+  }
+}
+
+CStringTests.test("String.fromCString") {
+  if true {
+    let s = getNullCString()
+    expectEmpty(String.fromCString(s))
+  }
+  if true {
+    let (s, dealloc) = getASCIICString()
+    expectOptionalEqual("ab", String.fromCString(s))
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getNonASCIICString()
+    expectOptionalEqual("аб", String.fromCString(s))
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getIllFormedUTF8String1()
+    expectEmpty(String.fromCString(s))
+    dealloc()
+  }
+}
+
+CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
+  if true {
+    let s = getNullCString()
+    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
+    expectEmpty(result)
+    expectFalse(hadError)
+  }
+  if true {
+    let (s, dealloc) = getASCIICString()
+    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
+    expectOptionalEqual("ab", result)
+    expectFalse(hadError)
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getNonASCIICString()
+    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
+    expectOptionalEqual("аб", result)
+    expectFalse(hadError)
+    dealloc()
+  }
+  if true {
+    let (s, dealloc) = getIllFormedUTF8String1()
+    let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
+    expectOptionalEqual("\u0041\ufffd\ufffd\ufffd\u0041", result)
+    expectTrue(hadError)
+    dealloc()
+  }
 }
 
 CStringTests.run()

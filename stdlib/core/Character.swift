@@ -107,7 +107,7 @@ extension String {
     case .SmallRepresentation(var _63bits):
       var value = Character._smallValue(_63bits)
       var size = Character._smallSize(value)
-      self = String(
+      self = String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeArray(
           start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&value)), 

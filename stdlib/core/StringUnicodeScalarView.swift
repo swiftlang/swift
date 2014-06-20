@@ -52,7 +52,9 @@ extension String {
       func pred() -> IndexType {
         var i = _position
         let codeUnit = self._base[--i]
-        if codeUnit >= 0xD800 && codeUnit <= 0xE000 {
+        // FIXME: consider adding:
+        // assert(!(codeUnit >= 0xD800 && codeUnit <= 0xDBFF), "unpaired surrogates are ill-formed")
+        if codeUnit >= 0xDC00 && codeUnit <= 0xDFFF {
           --i
         }
         return IndexType(i, _base)
@@ -72,7 +74,14 @@ extension String {
     
     subscript(i: IndexType) -> UnicodeScalar {
       var scratch = ScratchGenerator(_base, i._position)
-      return UTF16.decode(&scratch)!
+      switch UTF16.decode(&scratch) {
+      case .Result(let us):
+        return us
+      case .EmptyInput:
+        _fatalError("can not subscript using an endIndex")
+      case .Error:
+        _fatalError("unpaired surrogates are ill-formed in UTF-16")
+      }
     }
 
     func __slice__(start: IndexType, end: IndexType) -> UnicodeScalarView {
@@ -90,7 +99,14 @@ extension String {
       }
 
       mutating func next() -> UnicodeScalar? {
-        return UTF16.decode(&self._base)
+        switch UTF16.decode(&self._base) {
+        case .Result(let us):
+          return us
+        case .EmptyInput:
+          return .None
+        case .Error:
+          _fatalError("unpaired surrogates are ill-formed in UTF-16")
+        }
       }
       var _base: _StringCore.GeneratorType
     }
