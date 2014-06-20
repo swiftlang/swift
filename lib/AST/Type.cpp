@@ -69,14 +69,48 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
-bool CanType::hasReferenceSemanticsImpl(CanType type) {
-  // At the moment, Builtin.NativeObject, class types, and function types.
+bool TypeBase::isAnyClassReferenceType() {
+  return getCanonicalType().isAnyClassReferenceType();
+}
+
+bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-    return false;
-      
+    llvm_unreachable("sugared canonical type?");
+
+  // These types are always class references.
+  case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinNativeObject:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+    return true;
+
+  // For Self types, recurse on the underlying type.
+  case TypeKind::DynamicSelf:
+    return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
+                               functionsCount);
+
+  // Archetypes and existentials are only class references if class-bounded.
+  case TypeKind::Archetype:
+    return cast<SubstitutableType>(type)->requiresClass();
+  case TypeKind::Protocol:
+    return cast<ProtocolType>(type)->requiresClass();
+  case TypeKind::ProtocolComposition:
+    return cast<ProtocolCompositionType>(type)->requiresClass();
+
+  case TypeKind::UnboundGeneric:
+    return isa<ClassDecl>(cast<UnboundGenericType>(type)->getDecl());
+
+  // Functions have reference semantics, but are not class references.
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
+    return functionsCount;
+
+  // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::BuiltinInteger:
@@ -94,35 +128,10 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-    return false;
-
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
-    return false; // This might seem non-obvious.
-
-  case TypeKind::Archetype:
-    return cast<SubstitutableType>(type)->requiresClass();
-  case TypeKind::Protocol:
-    return cast<ProtocolType>(type)->requiresClass();
-  case TypeKind::ProtocolComposition:
-    return cast<ProtocolCompositionType>(type)->requiresClass();
-
-  case TypeKind::DynamicSelf:
-    return cast<DynamicSelfType>(type)->getSelfType()->hasReferenceSemantics();
-      
-  case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinNativeObject:
-  case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILFunction:
-    return true;
-
-  case TypeKind::UnboundGeneric:
-    return isa<ClassDecl>(cast<UnboundGenericType>(type)->getDecl());
+    return false;
 
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -142,9 +151,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
 /// But not:
 ///   - function types
 bool TypeBase::allowsOwnership() {
-  CanType canonical = getCanonicalType();
-  return (!isa<AnyFunctionType>(canonical)
-          && canonical.hasReferenceSemantics());
+  return getCanonicalType().isAnyClassReferenceType();
 }
 
 bool TypeBase::isAnyExistentialType(SmallVectorImpl<ProtocolDecl*> &protocols) {
@@ -431,6 +438,15 @@ Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   return Type();
 }
 
+CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
+                                              OptionalTypeKind &kind) {
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+    if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
+      return boundTy.getGenericArgs()[0];
+  kind = OTK_None;
+  return CanType();
+}
+
 Type TypeBase::getAnyPointerElementType()  {
   if (auto boundTy = getAs<BoundGenericType>()) {
     auto &C = getASTContext();
@@ -440,13 +456,6 @@ Type TypeBase::getAnyPointerElementType()  {
       return boundTy->getGenericArgs()[0];
   }
   return Type();
-}
-
-CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
-    if (boundTy->getDecl()->classifyAsOptionalType())
-      return boundTy.getGenericArgs()[0];
-  return CanType();
 }
 
 Type TypeBase::lookThroughAllAnyOptionalTypes() {

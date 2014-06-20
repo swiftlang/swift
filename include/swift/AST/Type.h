@@ -35,6 +35,7 @@ class GenericSignature;
 class LazyResolver;
 class Module;
 class NominalTypeDecl;
+enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
 class SubstitutableType;
@@ -149,7 +150,8 @@ private:
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool hasReferenceSemanticsImpl(CanType type);
+  static bool isReferenceTypeImpl(CanType type, bool functionsCount);
+  static bool isClassReferenceTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type,
@@ -159,7 +161,8 @@ class CanType : public Type {
   static void getAnyExistentialTypeProtocolsImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getAnyOptionalObjectTypeImpl(CanType type);
+  static CanType getAnyOptionalObjectTypeImpl(CanType type,
+                                              OptionalTypeKind &kind);
   static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
@@ -176,7 +179,20 @@ public:
 
   /// Do values of this type have reference semantics?
   bool hasReferenceSemantics() const {
-    return hasReferenceSemanticsImpl(*this);
+    return isReferenceTypeImpl(*this, /*functions count*/ true);
+  }
+
+  /// Are values of this type essentially just class references,
+  /// possibly with some extra metadata?
+  ///
+  ///   - any of the builtin reference types
+  ///   - a class type
+  ///   - a bound generic class type
+  ///   - a class-bounded archetype type
+  ///   - a class-bounded existential type
+  ///   - a dynamic Self type
+  bool isAnyClassReferenceType() const {
+    return isReferenceTypeImpl(*this, /*functions count*/ false);
   }
 
   /// Is this type existential?
@@ -227,7 +243,12 @@ public:
   }
 
   CanType getAnyOptionalObjectType() const {
-    return getAnyOptionalObjectTypeImpl(*this);
+    OptionalTypeKind kind;
+    return getAnyOptionalObjectTypeImpl(*this, kind);
+  }
+
+  CanType getAnyOptionalObjectType(OptionalTypeKind &kind) const {
+    return getAnyOptionalObjectTypeImpl(*this, kind);
   }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.

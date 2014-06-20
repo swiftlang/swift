@@ -319,6 +319,17 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
+
+  /// Are values of this type essentially just class references,
+  /// possibly with some sort of additional information?
+  ///
+  ///   - any of the builtin reference types
+  ///   - a class type
+  ///   - a bound generic class type
+  ///   - a class-bounded archetype type
+  ///   - a class-bounded existential type
+  ///   - a dynamic Self type
+  bool isAnyClassReferenceType();
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
