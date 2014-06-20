@@ -2028,8 +2028,15 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
       // thereof) as the let property, then it is mutable.
       if (CDC->isTypeContext() && DC->isTypeContext() &&
           CDC->getDeclaredTypeInContext()->isEqual(
-                     getDeclContext()->getDeclaredTypeInContext()))
+                             getDeclContext()->getDeclaredTypeInContext())) {
+        // If this is a convenience initializer (i.e. one that calls
+        // self.init), then let properties are never mutable in it.  They are
+        // only mutable in designated initializers.
+        if (CD->isConvenienceInit())
+          return false;
+
         return true;
+      }
     }
 
     return false;

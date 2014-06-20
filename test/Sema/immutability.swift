@@ -381,3 +381,17 @@ extension rdar17051675_S2 {
   }
 }
 
+
+// <rdar://problem/17400366> let properties should not be mutable in convenience initializers
+class ClassWithConvenienceInit {
+  let x = 0
+  init(newX: Int) {
+    x = 42
+  }
+  
+  convenience init(newY: Int) {
+    self.init(newX: 19)
+    x = 67  // expected-error {{cannot assign to 'x' in 'self'}}
+  }
+}
+
