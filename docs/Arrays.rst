@@ -177,7 +177,8 @@ Bridging Rules and Terminology for all Types
   ``T.isBridgedToObjectiveC()`` is ``false`` is a user programming
   error that may be diagnosed at
   runtime. ``bridgeFromObjectiveCConditional`` can be used to attempt
-  to bridge back, and return ``nil`` if 
+  to bridge back, and return ``nil`` if the entire object cannot be
+  bridged.
 
   .. Admonition:: Implementation Note
 

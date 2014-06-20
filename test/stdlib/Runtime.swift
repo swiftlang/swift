@@ -158,6 +158,8 @@ RuntimeBridging.test("bridgeFromObjectiveC") {
 
   expectEqual(42, bridgeFromObjectiveC(
       ClassA(value: 42), BridgedValueType.self).value)
+  expectEqual(42, bridgeFromObjectiveCConditional(
+      ClassA(value: 42), BridgedValueType.self)!.value)
 
   expectEmpty(bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedValueType.self))
@@ -168,6 +170,8 @@ RuntimeBridging.test("bridgeFromObjectiveC") {
 
   expectEqual(42, bridgeFromObjectiveC(
       ClassA(value: 42), BridgedLargeValueType.self).value)
+  expectEqual(42, bridgeFromObjectiveCConditional(
+      ClassA(value: 42), BridgedLargeValueType.self)!.value)
 
   expectEmpty(bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedLargeValueType.self))
@@ -182,6 +186,8 @@ RuntimeBridging.test("bridgeFromObjectiveC") {
   var bridgedVerbatimRef = BridgedVerbatimRefType()
   expectTrue(bridgeFromObjectiveC(
       bridgedVerbatimRef, BridgedVerbatimRefType.self) === bridgedVerbatimRef)
+  expectTrue(bridgeFromObjectiveCConditional(
+      bridgedVerbatimRef, BridgedVerbatimRefType.self)! === bridgedVerbatimRef)
 }
 
 RuntimeBridging.test("isBridgedToObjectiveC") {

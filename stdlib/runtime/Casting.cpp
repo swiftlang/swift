@@ -1655,9 +1655,8 @@ swift_bridgeNonVerbatimFromObjectiveC(
                                                           objectiveCType));
         
       if (sourceValueAsObjectiveCType) {
-        // The type matches.  bridgeFromObjectiveC returns `Self?`;
-        // this function returns `NativeType`, so we don't need to
-        // re-wrap the optional.
+        // The type matches.  bridgeFromObjectiveC returns `Self`, so
+        // we can just return it directly.
         return bridgeWitness->bridgeFromObjectiveC(
           static_cast<HeapObject*>(sourceValueAsObjectiveCType),
             nativeType, nativeType);
@@ -1711,18 +1710,14 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
             nativeType, nativeType);
   }
 
-  // Perform direct bridging. bridgeFromObjectiveC returns `Self?`;
-  // this function returns `NativeType`, so we don't need to re-wrap
-  // the optional.
+  // Perform direct bridging. bridgeFromObjectiveC returns `Self`, so
+  // we need to wrap it in an optional.
   OpaqueExistentialContainer value
     = bridgeWitness->bridgeFromObjectiveC(
         static_cast<HeapObject*>(sourceValueAsObjectiveCType),
         nativeType, nativeType);
 
-  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
-  // It is important so that we don't return a value with Existential metadata.
   using box = OpaqueExistentialBox<1>;
-
   box::Container outValue;
   outValue.Header.Type = nativeType;
   nativeType->vw_initializeBufferWithTake(
