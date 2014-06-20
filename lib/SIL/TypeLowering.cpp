@@ -158,6 +158,19 @@ NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
                                     "Swift", "CConstPointer");
 }
 
+AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
+  if (!MostGeneralArchetype) {
+    MostGeneralArchetype =
+      ArchetypeType::getNew(Context,
+                            /*parent*/ nullptr,
+                            /*associated/protocol type*/ (ProtocolDecl*) 0,
+                            /*name*/ Identifier(),
+                            /*conformsto*/ {},
+                            /*superclass*/ Type())->getCanonicalType();
+  }
+  return AbstractionPattern(MostGeneralArchetype);
+}
+
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
     // If captured directly, the variable is captured by box.

@@ -476,6 +476,8 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
   Optional<NominalTypeDecl*> CConstPointerDecl;
   Optional<NominalTypeDecl*> CMutablePointerDecl;
+
+  CanType MostGeneralArchetype;
   
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
@@ -490,6 +492,9 @@ public:
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
+
+  /// Return a most-general-possible abstraction pattern.
+  AbstractionPattern getMostGeneralAbstraction();
 
   /// Get the calling convention used by witnesses of a protocol.
   static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
