@@ -691,21 +691,22 @@ void PrintAST::printInherited(const Decl *decl,
     if (UseProtocolCompositionSyntax)
       Printer << ">";
   } else {
-    SmallVector<Type, 6> TypesToPrint;
+    SmallVector<TypeLoc, 6> TypesToPrint;
     for (auto TL : inherited) {
-      if (auto NTD = TL.getType()->getAnyNominal()) {
-        if (!shouldPrint(NTD))
-          continue;
+      if (auto Ty = TL.getType()) {
+        if (auto NTD = Ty->getAnyNominal())
+          if (!shouldPrint(NTD))
+            continue;
       }
-      TypesToPrint.push_back(TL.getType());
+      TypesToPrint.push_back(TL);
     }
     if (TypesToPrint.empty())
       return;
 
     Printer << " : ";
 
-    interleave(TypesToPrint, [&](Type Ty) {
-      Ty->print(Printer, Options);
+    interleave(TypesToPrint, [&](TypeLoc TL) {
+      printTypeLoc(TL);
     }, [&]() {
       Printer << ", ";
     });
@@ -820,12 +821,16 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     Printer << "typealias ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
-  if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
+  if (Options.TypeDefinitions) {
+    bool ShouldPrint = true;
     Type Ty = decl->getUnderlyingType();
     // If the underlying type is private, don't print it.
-    if (!Options.SkipPrivateStdlibDecls || !Ty.isPrivateStdlibType()) {
+    if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
+      ShouldPrint = false;
+
+    if (ShouldPrint) {
       Printer << " = ";
-      Ty.print(Printer, Options);
+      printTypeLoc(decl->getUnderlyingTypeLoc());
     }
   }
 }

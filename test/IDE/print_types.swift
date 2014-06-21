@@ -118,8 +118,8 @@ protocol QuxProtocol { typealias Qux }
 struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>>(a: A, b: B, c: C) {
-// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<BarProtocol, FooProtocol>> (A, B, C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<BarProtocol, FooProtocol>> (A, B, C) -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, B, C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, B, C) -> (){{$}}
 
   var a1 = a
 // CHECK: VarDecl '''a1''' A{{$}}

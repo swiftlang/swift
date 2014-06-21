@@ -14,6 +14,7 @@
 // RUN: FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
+// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE_TYPE -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
@@ -24,6 +25,7 @@
 // RUN: FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
+// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE_TYPEREPR -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
@@ -530,11 +532,13 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   typealias `protocol` = `class`
-// PASS_COMMON-NEXT: {{^}}  typealias `protocol` = d0200_EscapedIdentifiers.`class`{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  typealias `protocol` = d0200_EscapedIdentifiers.`class`{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias `protocol` = `class`{{$}}
 
   class `extension` : `class` {}
-// PASS_COMMON-NEXT: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
+// PASS_COMMON: {{^}}    @objc deinit {{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -1033,8 +1037,10 @@ struct GenericParams1<
     StructGenericFooX : FooClass,
     StructGenericBar : protocol<FooProtocol, BarProtocol>,
     StructGenericBaz> {
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<BarProtocol, FooProtocol>, StructGenericBaz> {{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<BarProtocol, FooProtocol>, StructGenericBaz> {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
+//
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}struct GenericParams1<StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : protocol<FooProtocol, BarProtocol>, StructGenericBaz> {{{$}}
   init<
       GenericFoo : FooProtocol,
       GenericFooX : FooClass,
@@ -1042,8 +1048,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericBar, f: GenericBaz)
   {}
-// PASS_ONE_LINE-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
+//
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  init<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
 
   func genericParams1<
       GenericFoo : FooProtocol,
@@ -1052,8 +1060,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericBar, f: GenericBaz)
   {}
-// PASS_ONE_LINE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<BarProtocol, FooProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
+//
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : protocol<FooProtocol, BarProtocol>, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericBar, f: GenericBaz){{$}}
 }
 
 struct GenericParams2<T : FooProtocol where T : BarProtocol> {}
