@@ -347,9 +347,6 @@ void swift::swift_retainUnowned(HeapObject *object) {
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_slow(HeapObject *object) {
-  // Bump the retain count so that retains/releases that occur during the
-  // destructor don't recursively destroy the object.
-  swift_retain_noresult(object);
   asFullMetadata(object->metadata)->destroy(object);
 }
 
@@ -366,7 +363,7 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
   assert(isAlignmentMask(allocatedAlignMask));
-  assert(object->refCount == (RC_INTERVAL|RC_DEALLOCATING_BIT));
+  assert(object->refCount == RC_DEALLOCATING_BIT);
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
