@@ -166,7 +166,8 @@ namespace {
     }
     
     void visitIsaPattern(IsaPattern *P) {
-      printCommon(P, "pattern_isa") << ' ';
+      printCommon(P, "pattern_isa") 
+        << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastTypeLoc().getType().print(OS);
       if (auto sub = P->getSubPattern()) {
         OS << '\n';

@@ -276,3 +276,17 @@ case +++(_, var d, 3): // expected-error{{'+++' is not a prefix unary operator}}
 case (_, var e, 3) +++ (1, 2, 3): // expected-error{{pattern variable binding cannot appear in an expression}}
   ()
 }
+
+// FIXME: We don't currently allow subpatterns for "isa" patterns that
+// require interesting conditional downcasts.
+class Base { }
+class Derived : Base { }
+
+
+switch [Derived(), Derived(), Base()] {
+case let ds as Derived[]: // expected-error{{downcast pattern value of type 'Derived[]' cannot be used}}
+  ()
+
+default:
+  ()
+}
