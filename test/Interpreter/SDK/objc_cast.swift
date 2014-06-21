@@ -581,6 +581,10 @@ var objOptOpt: AnyObject?? = .Some(.Some(["a", "b", "c"]))
 downcastToStringArrayOptOpt(objOptOpt)
 
 // CHECK: {{^}}none{{$}}
+objOptOpt = .Some(.Some([1 : "hello", 2 : "swift", 3 : "world"]))
+downcastToStringArrayOptOpt(objOptOpt)
+
+// CHECK: {{^}}none{{$}}
 objOptOpt = .Some(.Some([1, 2, 3]))
 downcastToStringArrayOptOpt(objOptOpt)
 
