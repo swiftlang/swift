@@ -195,10 +195,14 @@ getBuiltinGenericFunction(Identifier Id,
     GenericParamTypes.push_back(gp.getAsTypeParam()->getDeclaredType()
                                   ->castTo<GenericTypeParamType>());
   }
-
-  Requirement Marker(RequirementKind::WitnessMarker,
-                     GenericParamTypes[0], Type());
-  GenericSignature *Sig = GenericSignature::get(GenericParamTypes, Marker);
+  // Create witness markers for all of the generic param types.
+  SmallVector<Requirement, 2> requirements;
+  for (auto param : GenericParamTypes) {
+    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
+                                       param, Type()));
+  }
+  
+  GenericSignature *Sig = GenericSignature::get(GenericParamTypes,requirements);
   
   Type InterfaceType = GenericFunctionType::get(Sig,
                                                 ArgParamType, ResType,
@@ -626,6 +630,45 @@ static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                    ResultTy, BodyResultTy, ParamList);
 }
 
+static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
+                                              Identifier Id) {
+  // <T, U> T -> U
+  // SILGen and IRGen check additional constraints during lowering.
+  
+  // Create the generic parameters.
+  Module *M = Context.TheBuiltinModule;
+
+  SmallVector<ArchetypeType *, 2> Archetypes;
+  SmallVector<GenericParam, 2> GenericParams;
+  unsigned index = 0;
+  for (char const *name : {"T", "U"}) {
+    Identifier GenericName = Context.getIdentifier(name);
+    ArchetypeType *Archetype
+      = ArchetypeType::getNew(Context, nullptr,
+                              static_cast<AssociatedTypeDecl *>(nullptr),
+                              GenericName,
+                              ArrayRef<Type>(), Type(), false, index);
+    auto GenericTyDecl =
+      new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
+                                         GenericName, SourceLoc(), 0, index);
+    GenericTyDecl->setArchetype(Archetype);
+
+    Archetypes.push_back(Archetype);
+    GenericParams.push_back(GenericTyDecl);
+    ++index;
+  }
+  auto ParamList = GenericParamList::create(Context, SourceLoc(), GenericParams,
+                                            SourceLoc());
+  ParamList->setAllArchetypes(Context.AllocateCopy(Archetypes));
+  
+  TupleTypeElt Params(GenericParams[0].getAsTypeParam()->getDeclaredType());
+  TupleTypeElt BodyArgs(Archetypes[0]);
+  
+  return getBuiltinGenericFunction(Id, Params, BodyArgs,
+                           GenericParams[1].getAsTypeParam()->getDeclaredType(),
+                           Archetypes[1], ParamList);
+}
+
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   Type GenericTy;
@@ -639,6 +682,8 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
+
+
 
 static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
   // <T> T -> T.Type
@@ -1263,6 +1308,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::BridgeFromRawPointer:
     if (!Types.empty()) return nullptr;
     return getNativeObjectCast(Context, Id, BV);
+      
+  case BuiltinValueKind::ReinterpretCast:
+    if (!Types.empty()) return nullptr;
+    return getReinterpretCastOperation(Context, Id);
       
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;

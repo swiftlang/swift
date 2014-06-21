@@ -1,6 +1,8 @@
 // RUN: %swift -emit-silgen -parse-stdlib %s | FileCheck %s
 // RUN: %swift -emit-sil -O0 -parse-stdlib %s | FileCheck -check-prefix=CANONICAL %s
 
+import Swift
+
 @class_protocol protocol ClassProto { }
 
 // CHECK-LABEL: sil @_TF8builtins3foo
@@ -148,6 +150,7 @@ func init_gen<T>(x: T, y: Builtin.RawPointer) {
 }
 
 class C {}
+class D {}
 
 // CHECK-LABEL: sil @_TF8builtins22class_to_native_object
 func class_to_native_object(c:C) -> Builtin.NativeObject {
@@ -339,4 +342,20 @@ func autorelease(o: O) {
 // CANONICAL:         unreachable
 @noreturn func unreachable() {
   Builtin.unreachable()
+}
+
+// CHECK-LABEL: sil @_TF8builtins15reinterpretCastFCS_1CTBwCS_1DGSqS0___ : $@thin (@owned C) -> @owned (Builtin.Word, D, Optional<C>)
+// CHECK-NEXT:  bb0(%0 : $C):
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    strong_retain %0 : $C
+// CHECK-NEXT:    unchecked_trivial_bit_cast %0 : $C to $Builtin.Word
+// CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $D
+// CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $Optional<C>
+// CHECK-NOT:     strong_release
+// CHECK-NOT:     release_value
+// CHECK:         return
+func reinterpretCast(c: C) -> (Builtin.Word, D, C?) {
+  return (Builtin.reinterpretCast(c) as Builtin.Word,
+          Builtin.reinterpretCast(c) as D,
+          Builtin.reinterpretCast(c) as C?)
 }

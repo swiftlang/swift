@@ -21,6 +21,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/PrettyStackTrace.h"
 
 using namespace swift;
@@ -2490,6 +2491,44 @@ namespace {
     
     gen.B.createCondFail(loc, args[0].getUnmanagedValue());
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+  }
+  
+  /// Specialized emitter for Builtin.reinterpretCast.
+  static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ArrayRef<Substitution> substitutions,
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
+    assert(args.size() == 1 && "reinterpretCast should be given one argument");
+    assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
+    
+    // The arguments currently both need to be loadable.
+    auto &fromTL = gen.getTypeLowering(substitutions[0].Replacement);
+    auto &toTL = gen.getTypeLowering(substitutions[1].Replacement);
+    
+    if (!fromTL.isLoadable() && !toTL.isLoadable()) {
+      gen.SGM.diagnose(loc.getSourceLoc(),
+                       diag::not_implemented,
+                       "Builtin.reinterpretCast with address-only type");
+      SILValue undef = SILUndef::get(toTL.getLoweredType(), gen.SGM.M);
+      return ManagedValue::forUnmanaged(undef);
+    }
+
+    // If the destination is trivial, do a trivial bitcast, leaving the cleanup
+    // on the original value intact.
+    if (toTL.isTrivial()) {
+      SILValue in = args[0].getValue();
+      SILValue out = gen.B.createUncheckedTrivialBitCast(loc, in,
+                                                         toTL.getLoweredType());
+      return ManagedValue::forUnmanaged(out);
+    }
+    
+    // Otherwise, do a reference-counting-identical bitcast, forwarding the
+    // cleanup onto the new value.
+    SILValue in = args[0].getValue();
+    SILValue out = gen.B.createUncheckedRefBitCast(loc, in,
+                                                   toTL.getLoweredType());
+    return ManagedValue(out, args[0].getCleanup());
   }
   
   /// The type of trait builtins.
