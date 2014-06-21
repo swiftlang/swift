@@ -1448,13 +1448,22 @@ namespace {
                                     memberLoc, expr->isImplicit());
         }
       }
+
+      if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
+        expr = new (TC.Context) UnresolvedCheckedCastExpr(
+                                  forced->getSubExpr(),
+                                  forced->getLoc(),
+                                  forced->getCastTypeLoc());
+        if (forced->isImplicit())
+          expr->setImplicit();
+        return expr;
+      }
      
       return expr;
     }
 
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
-
   };
 
   class ConstraintWalker : public ASTWalker {

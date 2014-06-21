@@ -33,6 +33,25 @@ func testArrayDowncast(array: AnyObject[]) -> BridgedObjC[] {
   return array as BridgedObjC[]
 }
 
+// CHECK-LABEL: sil @_TF19collection_downcast27testArrayDowncastFromObject
+// CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+func testArrayDowncastFromObject(obj: AnyObject) -> BridgedObjC[] {
+// CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSa20bridgeFromObjectiveCU__fMGSaQ__FCSo7NSArrayGSaQ__ : $@thin <τ_0_0> (@owned NSArray, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+// CHECK:   [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<BridgedObjC>.Type
+// CHECK:   [[NSARRAY_OBJ:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $NSArray
+// CHECK:   apply [[BRIDGE_FN]]<BridgedObjC>([[NSARRAY_OBJ]], [[ARRAY_META]]) : $@thin <τ_0_0> (@owned NSArray, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  return obj as BridgedObjC[]
+}
+
+// CHECK-LABEL: sil @_TF19collection_downcast28testArrayDowncastFromNSArray
+// CHECK: bb0([[NSARRAY_OBJ:%[0-9]+]] : $NSArray):
+func testArrayDowncastFromNSArray(obj: NSArray) -> BridgedObjC[] {
+// CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSa20bridgeFromObjectiveCU__fMGSaQ__FCSo7NSArrayGSaQ__ : $@thin <τ_0_0> (@owned NSArray, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+// CHECK:   [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<BridgedObjC>.Type
+// CHECK:   apply [[BRIDGE_FN]]<BridgedObjC>([[NSARRAY_OBJ]], [[ARRAY_META]]) : $@thin <τ_0_0> (@owned NSArray, @thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  return obj as BridgedObjC[]
+}
+
 // CHECK-LABEL: sil @_TF19collection_downcast28testArrayDowncastConditional
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
 func testArrayDowncastConditional(array: AnyObject[]) -> BridgedObjC[]? {
@@ -71,6 +90,17 @@ func testArrayIsaBridged(array: AnyObject[]) -> Bool {
   // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs37_arrayBridgeFromObjectiveCConditionalU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   return array is BridgedSwift[] ? true : false
+}
+
+// CHECK-LABEL: sil @_TF19collection_downcast32testDictionaryDowncastFromObject
+// CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+func testDictionaryDowncastFromObject(obj: AnyObject) 
+       -> Dictionary<BridgedObjC, BridgedObjC> {
+  // CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFVSs10Dictionary20bridgeFromObjectiveCUSs8Hashable___fMGS_Q_Q0__FCSo12NSDictionaryGS_Q_Q0__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned NSDictionary, @thin Dictionary<τ_0_0, τ_0_1>.Type) -> @owned Dictionary<τ_0_0, τ_0_1>
+  // CHECK:   [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<BridgedObjC, BridgedObjC>.Type
+  // CHECK:   [[NSDICT_OBJ:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $NSDictionary
+  // CHECK:   apply [[BRIDGE_FN]]<BridgedObjC, BridgedObjC>([[NSDICT_OBJ]], [[DICT_META]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned NSDictionary, @thin Dictionary<τ_0_0, τ_0_1>.Type) -> @owned Dictionary<τ_0_0, τ_0_1>
+  return obj as Dictionary<BridgedObjC, BridgedObjC>
 }
 
 // CHECK-LABEL: sil @_TF19collection_downcast22testDictionaryDowncast

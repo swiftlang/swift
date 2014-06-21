@@ -55,6 +55,42 @@ extension Int : _BridgedToObjectiveC {
   }
 }
 
+extension Array : _ConditionallyBridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSArray.self
+  }
+  func bridgeToObjectiveC() -> NSArray {
+    return NSArray()
+  }
+  static func bridgeFromObjectiveC(x: NSArray) -> Array {
+    fatal("implement")
+  }
+  static func bridgeFromObjectiveCConditional(x: NSArray) -> Array? {
+    return nil
+  }
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+}
+
+extension Dictionary : _ConditionallyBridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSDictionary.self
+  }
+  func bridgeToObjectiveC() -> NSDictionary {
+    return NSDictionary()
+  }
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+    fatal("implement")
+  }
+  static func bridgeFromObjectiveCConditional(x: NSDictionary) -> Dictionary? {
+    return nil
+  }
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+}
+
 extension NSObject : Hashable {
   var hashValue: Int { return 0 }
 }

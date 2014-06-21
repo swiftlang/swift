@@ -1988,8 +1988,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   return CheckedCastKind::Unresolved;
 }
 
-/// If the expression is a an implicit call to bridgeFromObjectiveC,
-/// returns the argument of that call.
+/// If the expression is a an implicit call to bridgeFromObjectiveC or
+/// bridgeFromObjectiveCConditional, returns the argument of that call.
 static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   auto call = dyn_cast<CallExpr>(expr);
   if (!call || !call->isImplicit())
@@ -2022,44 +2022,46 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   // If we have an implicit force, look through it.
   if (auto forced = dyn_cast<ForceValueExpr>(expr)) {
     if (forced->isImplicit()) {
-      // Skip through optional evaluations and binds.
-      auto skipOptionalEvalAndBinds = [](Expr *expr) -> Expr* {
-        do {
-          if (!expr->isImplicit())
-            break;
-
-          if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
-            expr = optionalEval->getSubExpr();
-            continue;
-          }
-
-          if (auto bindOptional = dyn_cast<BindOptionalExpr>(expr)) {
-            expr = bindOptional->getSubExpr();
-            continue;
-          }
-          
-          break;
-        } while (true);
-
-        return expr;
-      };
-
-      auto sub = skipOptionalEvalAndBinds(forced->getSubExpr());
-      
-      // If we have an explicit cast, we're done.
-      if (isa<ForcedCheckedCastExpr>(sub) || 
-          isa<ConditionalCheckedCastExpr>(sub))
-        return cast<ExplicitCastExpr>(sub);
-
-      // Otherwise, try to look through an implicit
-      // bridgeFromObjectiveC() call.
-      if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
-        sub = skipOptionalEvalAndBinds(arg);
-        if (isa<ForcedCheckedCastExpr>(sub) || 
-            isa<ConditionalCheckedCastExpr>(sub))
-          return cast<ExplicitCastExpr>(sub);
-      }
+      expr = forced->getSubExpr();
     }
+  }
+
+  // Skip through optional evaluations and binds.
+  auto skipOptionalEvalAndBinds = [](Expr *expr) -> Expr* {
+    do {
+      if (!expr->isImplicit())
+        break;
+
+      if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        expr = optionalEval->getSubExpr();
+        continue;
+      }
+
+      if (auto bindOptional = dyn_cast<BindOptionalExpr>(expr)) {
+        expr = bindOptional->getSubExpr();
+        continue;
+      }
+      
+      break;
+    } while (true);
+
+    return expr;
+  };
+
+  auto sub = skipOptionalEvalAndBinds(expr);
+  
+  // If we have an explicit cast, we're done.
+  if (isa<ForcedCheckedCastExpr>(sub) || 
+      isa<ConditionalCheckedCastExpr>(sub))
+    return cast<ExplicitCastExpr>(sub);
+
+  // Otherwise, try to look through an implicit
+  // bridgeFromObjectiveC() call.
+  if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
+    sub = skipOptionalEvalAndBinds(arg);
+    if (isa<ForcedCheckedCastExpr>(sub) || 
+        isa<ConditionalCheckedCastExpr>(sub))
+      return cast<ExplicitCastExpr>(sub);
   }
 
   return nullptr;
