@@ -559,4 +559,29 @@ if let array = obj as? Dictionary<String, Dictionary<String, String>[]> {
   println("Not a Dictionary<String, Dictionary<String, String>[]>[]")
 }
 
+// Helper function that downcasts 
+func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
+  if let strArrOptOpt = obj as? String[]?? {
+    if let strArrOpt = strArrOptOpt {
+      if let strArr = strArrOpt {
+        println("some(some(some(\(strArr))))")
+      } else {
+        println("some(some(none))")
+      }
+    } else {
+      println("some(none)")
+    }
+  } else {
+    println("none")
+  }
+}
+
+// CHECK: {{^}}some(some(some([a, b, c]))){{$}}
+var objOptOpt: AnyObject?? = .Some(.Some(["a", "b", "c"]))
+downcastToStringArrayOptOpt(objOptOpt)
+
+// CHECK: {{^}}none{{$}}
+objOptOpt = .Some(.Some([1, 2, 3]))
+downcastToStringArrayOptOpt(objOptOpt)
+
 println("ok")  // CHECK: ok

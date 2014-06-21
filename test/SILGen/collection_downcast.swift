@@ -156,4 +156,3 @@ func testDictionaryDowncastBridgedKVConditional(dict: Dictionary<NSObject, AnyOb
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as? Dictionary<BridgedSwift, BridgedSwift>
 }
-

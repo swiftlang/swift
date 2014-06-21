@@ -2545,16 +2545,23 @@ namespace {
       Expr *subExpr = cast->getSubExpr();
       Type srcType = subExpr->getType();
 
-      // There's nothing special to do if the operand isn't optional.
       SmallVector<Type, 4> srcOptionals;
       srcType = plumbOptionals(srcType, srcOptionals);
-      if (srcOptionals.empty()) {
-        cast->setType(finalResultType);
-        return cast;
-      }
 
       SmallVector<Type, 4> destOptionals;
       auto destValueType = plumbOptionals(finalResultType, destOptionals);
+
+      // Check whether we need to bridge the source type to the
+      // destination type.
+      Type bridgedThroughClass
+        = tc.getDynamicBridgedThroughObjCClass(cs.DC, srcType, destValueType);
+
+      // There's nothing special to do if the operand isn't optional
+      // and we don't need any bridging.
+      if (srcOptionals.empty() && !bridgedThroughClass) {
+        cast->setType(finalResultType);
+        return cast;
+      }
 
       // If this is a conditional cast, the result type will always
       // have at least one level of optional, which should become the
@@ -2563,8 +2570,11 @@ namespace {
         assert(!destOptionals.empty() &&
                "result of checked cast is not an optional type");
         cast->setType(destOptionals.back());
+
+        if (bridgedThroughClass)
+          cast->setType(OptionalType::get(bridgedThroughClass));
       } else {
-        cast->setType(destValueType);
+        cast->setType(bridgedThroughClass? bridgedThroughClass : destValueType);
       }
 
       // The result type (without the final optional) is a subtype of
@@ -2578,10 +2588,14 @@ namespace {
       unsigned numRequiredOptionals =
         srcOptionals.size() - (destOptionals.size() - destExtraOptionals);
 
+      // Determine whether we require conditional bridging.
+      bool requiresConditionalBridging = conditionalCast && bridgedThroughClass;
+
       // The number of OptionalEvaluationExprs between the point of the
       // inner cast and the enclosing OptionalEvaluationExpr (exclusive)
       // which represents failure for the entire operation.
-      unsigned failureDepth = destOptionals.size() - destExtraOptionals;
+      unsigned failureDepth = destOptionals.size() - destExtraOptionals 
+                            + requiresConditionalBridging;
 
       // Drill down on the operand until it's non-optional.
       SourceLoc fakeQuestionLoc = subExpr->getEndLoc();
@@ -2591,7 +2605,7 @@ namespace {
 
         // As we move into the range of mapped optionals, start
         // lowering the depth.
-        unsigned depth = failureDepth;
+        unsigned depth = failureDepth - requiresConditionalBridging;
         if (i >= numRequiredOptionals) {
           depth -= (i - numRequiredOptionals) + 1;
         } else if (!conditionalCast) {
@@ -2611,13 +2625,59 @@ namespace {
       // If we're casting to an optional type, we need to capture the
       // final M bindings.
       Expr *result = cast;
+
+      // First, handle any required bridging.
+      if (bridgedThroughClass) {
+        // If the source type is the bridged class, we don't need the
+        // actual cast, so grab it's subexpression.
+        // FIXME: This loses source information.
+        bool dropCast = srcType->isEqual(bridgedThroughClass);
+        if (dropCast)
+          result = cast->getSubExpr();
+
+        if (requiresConditionalBridging) {
+          // When conditionally bridging, we need to carry through the
+          // optional.
+          if (!dropCast) {
+            result = new (tc.Context) BindOptionalExpr(result, 
+                                                       cast->getEndLoc(),
+                                                       failureDepth, 
+                                                       bridgedThroughClass);
+            result->setImplicit(true);
+          }
+
+          result = bridgeFromObjectiveCConditional(result, destValueType);
+          if (!result)
+            return nullptr;
+
+          // Update type sugar.
+          result->setType(OptionalType::get(destValueType));
+
+          if (!dropCast) {
+            result = new (tc.Context) OptionalEvaluationExpr(
+                                        result,
+                                        OptionalType::get(destValueType));
+          }
+        } else {
+          result = bridgeFromObjectiveC(result, destValueType);
+          if (!result)
+            return nullptr;
+
+          // Update type sugar.
+          result->setType(destValueType);
+        }
+      }
+
       if (destOptionals.size() > destExtraOptionals) {
-        // If the innermost cast fails, the entire expression fails.  To
-        // get this behavior, we have to bind and then re-inject the result.
-        // (SILGen should know how to peephole this.)
-        result = new (tc.Context) BindOptionalExpr(result, cast->getEndLoc(),
-                                                   failureDepth, destValueType);
-        result->setImplicit(true);
+        if (conditionalCast) {
+          // If the innermost cast fails, the entire expression fails.  To
+          // get this behavior, we have to bind and then re-inject the result.
+          // (SILGen should know how to peephole this.)
+          result = new (tc.Context) BindOptionalExpr(result, cast->getEndLoc(),
+                                      failureDepth-requiresConditionalBridging, 
+                                      destValueType);
+          result->setImplicit(true);
+        }
 
         for (unsigned i = destOptionals.size(); i != 0; --i) {
           Type destType = destOptionals[i-1];
@@ -2712,57 +2772,8 @@ namespace {
       if (expr->isImplicit())
         cast->setImplicit();
 
-      // Check whether we're casting to a bridged value type. 
-      // Allow for casts from AnyObject to a bridged type.
-      auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
-      auto toValueType = toType->lookThroughAllAnyOptionalTypes();
-      Type finalResultType = simplifyType(expr->getType());
-      Type bridgedThroughClass;
-      if (castKind == CheckedCastKind::ArrayDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncast ||
-          !(bridgedThroughClass = tc.getDynamicBridgedThroughObjCClass(
-                                    cs.DC, fromValueType, toValueType))) {
-        // We're not casting through a bridged type, so finish up the
-        // optional bindings and we're done.
-        return handleOptionalBindings(cast, finalResultType, 
-                                      /*conditionalCast=*/false);
-      }
-
-      // Rebuild the class type we're bridging through with the
-      // optionals from the final result type.
-      Type intermediateResultType = bridgedThroughClass;
-      SmallVector<Type, 2> finalOptionals;
-      plumbOptionals(finalResultType, finalOptionals);
-      for (unsigned i = finalOptionals.size(); i > 0; --i) {
-        // Figure out the kind of this optional.
-        OptionalTypeKind kind;
-        finalOptionals[i-1]->getAnyOptionalObjectType(kind);
-        
-        intermediateResultType = OptionalType::get(kind,intermediateResultType);
-      }
-
-      // Form a cast to the intermediate result type, which is the
-      // class through which we are bridging.
-      cast->getCastTypeLoc().setType(intermediateResultType,
-                                       /*validated=*/true);
-      toType = intermediateResultType;
-      Expr *result = handleOptionalBindings(cast, toType, 
-                                            /*conditionalCast=*/false);
-      if (!result)
-        return nullptr;
-
-      // If the cast's subexpression has the type same as we're trying
-      // to cast to, drop the cast itself and perform a bridge.
-      // FIXME: The AST no longer reflects the source.
-      if (cast->getSubExpr()->getType()->isEqual(intermediateResultType)) {
-        result = cast->getSubExpr();
-      }
-
-      // Form a call to the bridgeFromObjectiveC witness, then patch
-      // up the result type.
-      result = bridgeFromObjectiveC(result, toValueType);
-      result->setType(finalResultType);
-      return result;
+      return handleOptionalBindings(cast, simplifyType(expr->getType()),
+                                    /*conditionalCast=*/false);
     }
 
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
@@ -2834,67 +2845,8 @@ namespace {
         break;
       }
       
-      // Check whether we're casting from AnyObject to a bridged type
-      // of some sort.
-
-      // Allow for casts from AnyObject to a bridged type.
-      auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
-      auto toValueType = toType->lookThroughAllAnyOptionalTypes();
-      Type finalResultType = simplifyType(expr->getType());
-      Type bridgedThroughClass;
-      if (castKind == CheckedCastKind::ArrayDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncast ||
-          !(bridgedThroughClass = tc.getDynamicBridgedThroughObjCClass(
-                                    cs.DC, fromValueType, toValueType))) {
-        // We're not casting through a bridged type, so finish up the
-        // optional bindings and we're done.
-        return handleOptionalBindings(expr, finalResultType, 
-                                      /*conditionalCast=*/true);
-      }
-
-      // Rebuild the class type we're bridging through with the
-      // optionals from the final result type (except the outermost).
-      Type intermediateResultType = bridgedThroughClass;
-      SmallVector<Type, 2> finalOptionals;
-      plumbOptionals(finalResultType, finalOptionals);
-      for (unsigned i = finalOptionals.size(); i > 1; --i) {
-        // Figure out the kind of this optional.
-        OptionalTypeKind kind;
-        finalOptionals[i-1]->getAnyOptionalObjectType(kind);
-        
-        intermediateResultType = OptionalType::get(kind,intermediateResultType);
-      }
-
-      // Form a cast to the intermediate result type, which is the
-      // class through which we are bridging.
-      expr->getCastTypeLoc().setType(intermediateResultType,/*validated=*/true);
-      toType = OptionalType::get(intermediateResultType);
-      auto result = handleOptionalBindings(expr, toType, 
-                                           /*conditionalCast=*/true);
-      if (!result)
-        return nullptr;
-
-      // If the cast's subexpression has the type same as we're trying
-      // to cast to, drop the cast itself and perform a bridge.
-      // FIXME: The AST no longer reflects the source.
-      if (expr->getSubExpr()->getType()->isEqual(intermediateResultType)) {
-        result = expr->getSubExpr();
-        result = new (tc.Context) InjectIntoOptionalExpr(result,
-                                                         expr->getType());
-      }
-
-      // Bind the optional produced by the checked cast.
-      result = new (tc.Context) BindOptionalExpr(result, SourceLoc(),
-                                                 /*depth=*/0, 
-                                                 intermediateResultType);
-
-      // Form a call to the bridgeFromObjectiveCConditional witness.
-      result = bridgeFromObjectiveCConditional(result, toValueType);
-      if (!result)
-        return nullptr;
-
-      // Wrap up the optional evaluation and we're done.
-      return new (tc.Context) OptionalEvaluationExpr(result, finalResultType);
+      return handleOptionalBindings(expr, simplifyType(expr->getType()),
+                                    /*conditionalCast=*/true);
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
