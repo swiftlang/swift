@@ -2522,9 +2522,8 @@ namespace {
           return nullptr;
 
         // Extract a Bool from the resulting expression.
-        // FIXME: This loses the 'is' sugar.
-        return solution.convertToLogicValue(result,
-                                            cs.getConstraintLocator(expr));
+        return solution.convertOptionalToBool(result,
+                                              cs.getConstraintLocator(expr));
       }
 
       return expr;
@@ -5307,6 +5306,46 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   }
 
   return result;
+}
+
+Expr *
+Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+  ExprRewriter rewriter(cs, *this);
+  auto &tc = cs.getTypeChecker();
+
+  auto proto = tc.getProtocol(expr->getLoc(), KnownProtocolKind::LogicValue);
+
+  // Find the witness we need to use.
+  Type type = expr->getType();
+  auto witness = findNamedWitness(tc, cs.DC, type->getRValueType(), proto,
+                                  tc.Context.Id_GetLogicValue,
+                                  diag::condition_broken_proto);
+
+  // Form a reference to this member.
+  auto &ctx = tc.Context;
+  Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
+                                            witness, expr->getEndLoc(),
+                                            /*Implicit=*/true);
+  bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
+  if (failed) {
+    // If the member reference expression failed to type check, the Expr's
+    // type does not conform to the given protocol.
+    tc.diagnose(expr->getLoc(),
+                diag::type_does_not_conform,
+                type,
+                proto->getType());
+    return nullptr;
+  }
+
+  // Call the witness.
+  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
+                                     expr->getEndLoc(), /*Implicit=*/true);
+  expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
+  failed = tc.typeCheckExpressionShallow(expr, cs.DC);
+  assert(!failed && "Could not call witness?");
+  (void)failed;  
+  return expr;
 }
 
 Expr *
