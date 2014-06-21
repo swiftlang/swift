@@ -1671,16 +1671,17 @@ recur:
   
   // Collect the non-wildcard nodes from the column.
   SmallVector<SpecializingPattern, 4> specializers;
-  unsigned firstWildcardRow = ~0U;
+  Optional<unsigned> firstWildcardRow;
   for (; r < rows; ++r) {
     const Pattern *p = clauses[r][0];
     if (isWildcardPattern(p)) {
-      firstWildcardRow = r;
+      if (!firstWildcardRow)
+        firstWildcardRow = r;
       continue;
     }
     // If there was a preceding wildcard, we need to include in the
     // specialization. Otherwise, we can start the specialization at this row.
-    unsigned specRow = firstWildcardRow == ~0U ? r : firstWildcardRow;
+    unsigned specRow = firstWildcardRow ? *firstWildcardRow : r;
     specializers.push_back({clauses[r][0], specRow});
   }
 

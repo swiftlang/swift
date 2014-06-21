@@ -1268,3 +1268,33 @@ func testStructWithComputedProperty(#s : StructWithComputedProperty) {
     println(a)
   }
 }
+
+// <rdar://problem/17272985>
+enum ABC { case A, B, C }
+
+// CHECK-LABEL: sil @_TF6switch18testTupleWildcardsFTOS_3ABCS0__T_ 
+// CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
+// CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
+// CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[ON_A:bb[0-9]+]], case #ABC.C!enumelt: [[ON_C:bb[0-9]+]]
+// CHECK:       [[ON_A]]:
+// CHECK:         function_ref @_TF6switch1aFT_T_
+// CHECK:       [[ON_C]]:
+// CHECK:         switch_enum [[Y]] : $ABC, case #ABC.A!enumelt: [[ON_C_A:bb[0-9]+]]
+// CHECK:       [[ON_C_A]]:
+// CHECK:         br [[ON_C_A_2:bb[0-9]+]]
+// CHECK:       [[ON_C_A_2]]:
+// CHECK:         function_ref @_TF6switch1bFT_T_
+func testTupleWildcards(x: ABC, y: ABC) {
+  switch (x, y) {
+  case (.A, _):
+    a()
+  case (_, .A):
+    b()
+  case (_, .B):
+    c()
+  case (.C, .C):
+    d()
+  default:
+    e()
+  }
+}
