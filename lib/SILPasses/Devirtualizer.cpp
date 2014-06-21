@@ -890,11 +890,11 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
 }
 
 namespace {
-  /// Perform early binding of virtual calls by speculating that the requested
+  /// Generate inline caches of virtual calls by speculating that the requested
   /// class is at the bottom of the class hierarchy.
-  class SILEarlyBindingPass : public SILFunctionTransform {
+  class SILInlineCaches : public SILFunctionTransform {
   public:
-    virtual ~SILEarlyBindingPass() {}
+    virtual ~SILInlineCaches() {}
 
     virtual void run() {
       bool Changed = false;
@@ -909,7 +909,7 @@ namespace {
         }
       }
 
-      // Perform the early binding.
+      // Create the inline caches.
       for (auto AI : ToSpecialize)
         Changed |= specializeClassMethodDispatch(AI);
 
@@ -923,7 +923,7 @@ namespace {
 
 } // end anonymous namespace
 
-SILTransform *swift::createEarlyBinding() {
-  return new SILEarlyBindingPass();
+SILTransform *swift::createInlineCaches() {
+  return new SILInlineCaches();
 }
 

@@ -114,7 +114,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     // Run the laste passes.
     SILPassManager PM2(&Module, Options);
     registerAnalysisPasses(PM2, &Module);
-    PM2.add(createEarlyBinding());
+    PM2.add(createInlineCaches());
     PM2.runOneIteration();
     PM.runOneIteration();
 

@@ -54,7 +54,7 @@ enum class PassKind {
   SILDeadFunctionElimination,
   SILSpecialization,
   SILDevirt,
-  SILEarlyBinding,
+  SILInlineCaches,
   SimplifyCFG,
   PerformanceInlining,
   CodeMotion,
@@ -160,9 +160,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SILDevirt,
                                    "devirtualize",
                                    "Devirtualize virtual calls"),
-                        clEnumValN(PassKind::SILEarlyBinding,
-                                   "earlybinding",
-                                   "Early binding of virtual calls"),
+                        clEnumValN(PassKind::SILInlineCaches,
+                                   "inlinecaches",
+                                   "Create inline caches for virtual calls"),
                         clEnumValN(PassKind::PredictableMemoryOpt,
                                    "predictable-memopt",
                                    "Predictable early memory optimization"),
@@ -355,8 +355,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
     case PassKind::SILDevirt:
       PM.add(createDevirtualization());
       break;
-    case PassKind::SILEarlyBinding:
-      PM.add(createEarlyBinding());
+    case PassKind::SILInlineCaches:
+      PM.add(createInlineCaches());
       break;
     case PassKind::SimplifyCFG:
       PM.add(createSimplifyCFG());
