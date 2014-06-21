@@ -2663,7 +2663,7 @@ static void emitValueBitCast(IRGenFunction &IGF,
   inTI.initialize(IGF, in, inStorage);
   // Load the 'out' value as the destination type.
   auto outStorage = IGF.Builder.CreateBitCast(inStorage,
-                                              outTI.getStorageType());
+                                        outTI.getStorageType()->getPointerTo());
   outTI.loadAsTake(IGF, outStorage, out);
   return;
 }
