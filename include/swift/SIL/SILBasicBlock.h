@@ -53,7 +53,7 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  SILBasicBlock(SILFunction *F);
+  SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
   ~SILBasicBlock();
 
   SILFunction *getParent() { return Parent; }

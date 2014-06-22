@@ -53,9 +53,13 @@ SILModule &SILArgument::getModule() const {
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::SILBasicBlock(SILFunction *Parent)
-  : Parent(Parent), PredList(0) {
-  Parent->getBlocks().push_back(this);
+SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
+  : Parent(parent), PredList(0) {
+  if (afterBB) {
+    parent->getBlocks().insertAfter(afterBB, this);
+  } else {
+    parent->getBlocks().push_back(this);
+  }
 }
 SILBasicBlock::~SILBasicBlock() {
   // iplist's destructor is going to destroy the InstList.
