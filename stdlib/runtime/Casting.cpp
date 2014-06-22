@@ -753,15 +753,19 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
 }
 
 /// Perform a dynamic cast of a metatype to a metatype.
+///
+/// Note that the check is whether 'metatype' is an *instance of*
+/// 'targetType', not a *subtype of it*.
 static bool _dynamicCastMetatypeToMetatype(OpaqueValue *dest,
                                            const Metadata *metatype,
-                                           const Metadata *targetType,
+                                           const MetatypeMetadata *targetType,
                                            DynamicCastFlags flags) {
   const Metadata *result;
   if (flags & DynamicCastFlags::Unconditional) {
-    result = swift_dynamicCastMetatypeUnconditional(metatype, targetType);
+    result = swift_dynamicCastMetatypeUnconditional(metatype,
+                                                    targetType->InstanceType);
   } else {
-    result = swift_dynamicCastMetatype(metatype, targetType);
+    result = swift_dynamicCastMetatype(metatype, targetType->InstanceType);
     if (!result) return false;
   }
 
