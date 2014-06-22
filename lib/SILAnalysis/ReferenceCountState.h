@@ -49,6 +49,13 @@ static inline bool isRefCountDecrement(SILInstruction &I) {
 /// strong_release) pair or a (retain_value, release_value) pair.
 static inline bool matchingRefCountPairType(SILInstruction *I1,
                                             SILInstruction *I2) {
+// While we support layout compatible types, we just return true here. If/when
+// that support is removed in the future, this code should be re-enabled. Keep
+// in mind that there is nothing inherently wrong with matching up retain_value,
+// strong_retain, release_value, strong_release. Previously though there were no
+// cases where it could possibly come up so I put this assertion in just to be
+// careful since I had not discussed this with anyone.
+#if 0
   // Always put the strong retain on the left.
   if (isa<StrongRetainInst>(I2) || isa<RetainValueInst>(I2))
     std::swap(I1, I2);
@@ -60,6 +67,9 @@ static inline bool matchingRefCountPairType(SILInstruction *I1,
          "invalid.");
   return (isa<StrongRetainInst>(I1) && isa<StrongReleaseInst>(I2)) ||
     (isa<RetainValueInst>(I1) && isa<ReleaseValueInst>(I2));
+#else
+  return true;
+#endif
 }
 
 //===----------------------------------------------------------------------===//

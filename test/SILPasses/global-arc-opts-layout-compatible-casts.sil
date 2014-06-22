@@ -7,14 +7,40 @@ import Builtin
 
 class C {}
 
-// CHECK-LABEL: sil @test : $@thin (C) -> () {
+enum FakeOptional<T> {
+  case Some(T)
+  case None
+}
+
+// Simple test that stripping works.
+// CHECK-LABEL: sil @test1 : $@thin (C) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @test : $@thin (C) -> () {
+sil @test1 : $@thin (C) -> () {
 bb0(%0 : $C):
   strong_retain %0 : $C
   %1 = unchecked_ref_bit_cast %0 : $C to $Builtin.NativeObject
   strong_release %1 : $Builtin.NativeObject
   %2 = tuple()
   return %2 : $()
+}
+
+// We allow for matching up of retain_value, strong_release now that we
+// have unchecked_ref_bit_cast.
+
+// CHECK-LABEL: sil @test2 : $@thin (FakeOptional<C>, FakeOptional<C>) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @test2 : $@thin (FakeOptional<C>, FakeOptional<C>) -> () {
+bb0(%0 : $FakeOptional<C>, %1 : $FakeOptional<C>):
+  retain_value %0 : $FakeOptional<C>
+  %2 = unchecked_ref_bit_cast %0 : $FakeOptional<C> to $C
+  strong_release %2 : $C
+  %3 = unchecked_ref_bit_cast %1 : $FakeOptional<C> to $C
+  strong_retain %3 : $C
+  release_value %1 : $FakeOptional<C>
+  %9999 = tuple()
+  return %9999 : $()
 }
