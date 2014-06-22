@@ -452,7 +452,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 struct AutoreleasingUnsafePointer<T /* TODO : class */>
-  : Equatable, LogicValue, NilLiteralConvertible {
+  : Equatable, LogicValue, NilLiteralConvertible, _Pointer {
   let value: Builtin.RawPointer
 
   @transparent
@@ -736,3 +736,4 @@ func _convertUnsafePointerToAutoreleasingUnsafePointer<T>(
 ) -> AutoreleasingUnsafePointer<T> {
   return AutoreleasingUnsafePointer(p.value)
 }
+

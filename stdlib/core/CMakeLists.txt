@@ -57,6 +57,7 @@ set(SWIFTLIB_ESSENTIAL
   Nil.swift
   Optional.swift
   OutputStream.swift
+  Pointer.swift
   Policy.swift
   REPL.swift
   Range.swift

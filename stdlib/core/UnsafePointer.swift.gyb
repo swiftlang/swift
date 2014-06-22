@@ -19,7 +19,7 @@
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
 struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
-                    LogicValue, NilLiteralConvertible {
+                    LogicValue, NilLiteralConvertible, _Pointer {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
