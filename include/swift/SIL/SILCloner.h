@@ -213,9 +213,13 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
     llvm_unreachable("Unmapped instruction while cloning?");
   }
 
-  // If we have undef, just copy it.
-  if (SILUndef *U = dyn_cast<SILUndef>(Value))
-    return SILValue(U, Value.getResultNumber());
+  // If we have undef, just remap the type.
+  if (SILUndef *U = dyn_cast<SILUndef>(Value)) {
+    auto type = getOpType(U->getType());
+    ValueBase *undef =
+      (type == U->getType() ? U : SILUndef::get(type, Builder.getModule()));
+    return SILValue(undef, Value.getResultNumber());
+  }
 
   llvm_unreachable("Unmapped value while cloning?");
 }
