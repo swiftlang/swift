@@ -464,3 +464,92 @@ void swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   assert(result.Consumption == CastConsumptionKind::TakeAlways);
   (void) result;
 }
+
+/// Can the given cast be performed by the scalar checked-cast
+/// instructions?
+///
+/// CAUTION: if you introduce bridging conversions to the set of
+/// things handleable by the scalar checked casts --- and that's not
+/// totally unreasonable --- you will need to make the scalar checked
+/// casts take a cast consumption kind.
+bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
+                                                CanType sourceType,
+                                                CanType targetType) {
+  // Look through one level of optionality on the source.
+  auto sourceObjectType = sourceType;
+  if (auto type = sourceObjectType.getAnyOptionalObjectType())
+    sourceObjectType = type;
+
+  // Class-to-class casts can be scalar.  The source can be
+  // anything that embeds a class reference; the destination must
+  // be a class type, but (for now) cannot be a class existential
+  // with non-ObjC protocols.
+  if (sourceObjectType.isAnyClassReferenceType() &&
+      (targetType->mayHaveSuperclass() ||
+       targetType.isObjCExistentialType()))
+    return true;
+
+  // Metatype-to-metatype casts can also be scalar. Again, for now,
+  // require the destination to be non-existential.
+  if (isa<AnyMetatypeType>(sourceObjectType) &&
+      isa<MetatypeType>(targetType))
+    return true;
+
+  // Otherwise, we need to use the general indirect-cast functions.
+  return false;
+}
+
+/// Carry out the operations required for an indirect conditional cast
+/// using a scalar cast operation.
+void swift::
+emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
+                                      SILLocation loc,
+                                      CastConsumptionKind consumption,
+                                      SILValue src, CanType sourceType,
+                                      SILValue dest, CanType targetType,
+                                      SILBasicBlock *indirectSuccBB,
+                                      SILBasicBlock *indirectFailBB) {
+  assert(canUseScalarCheckedCastInstructions(B.getModule(),
+                                             sourceType, targetType));
+
+  // We only need a different failure block if the cast consumption
+  // requires us to destroy the source value.
+  SILBasicBlock *scalarFailBB;
+  if (!shouldDestroyOnFailure(consumption)) {
+    scalarFailBB = indirectFailBB;
+  } else {
+    scalarFailBB = B.splitBlockForFallthrough();
+  }
+
+  // We always need a different success block.
+  SILBasicBlock *scalarSuccBB = B.splitBlockForFallthrough();
+
+  auto &srcTL = B.getModule().Types.getTypeLowering(src.getType());
+
+  // Always take; this works under an assumption that retaining the
+  // result is equivalent to retaining the source.  That means that
+  // these casts would not be appropriate for bridging-like conversions.
+  SILValue srcValue = srcTL.emitLoadOfCopy(B, loc, src, IsTake);
+
+  SILType targetValueType = dest.getType().getObjectType();
+  B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
+                            scalarSuccBB, scalarFailBB);
+
+  // Emit the success block.
+  B.setInsertionPoint(scalarSuccBB); {
+    auto &targetTL = B.getModule().Types.getTypeLowering(targetValueType);
+    SILValue succValue =
+      new (B.getModule()) SILArgument(targetValueType, scalarSuccBB);
+    if (!shouldTakeOnSuccess(consumption))
+      targetTL.emitRetainValue(B, loc, succValue);
+    targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);
+    B.createBranch(loc, indirectSuccBB);
+  }
+
+  // Emit the failure block.
+  if (shouldDestroyOnFailure(consumption)) {
+    B.setInsertionPoint(scalarFailBB);
+    srcTL.emitReleaseValue(B, loc, srcValue);
+    B.createBranch(loc, indirectFailBB);
+  }
+}

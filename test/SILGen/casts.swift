@@ -54,7 +54,7 @@ func is_archetype<T : B>(b: B) -> Bool {
 
 // CHECK: sil @_TF5casts20downcast_conditional
 // CHECK:   checked_cast_br {{%.*}} : $B to $D
-// CHECK:   load {{.*}} : $*Optional<D>
+// CHECK:   bb{{[0-9]+}}({{.*}} : $Optional<D>)
 func downcast_conditional(b: B) -> D? {
   return b as? D
 }
@@ -63,13 +63,28 @@ protocol P {}
 struct S : P {}
 
 // CHECK: sil @_TF5casts32downcast_existential_conditional
-// CHECK:   checked_cast_br {{%.*}} : $*P to $*S
-// -- The result needs to be copied out of the existential container
-// CHECK: {{bb.*}}({{%.*}} : $*S):
-// CHECK;   copy_addr
-// CHECK;   load
-// CHECK: {{bb.*}}:
-// CHECK:   load {{.*}} : $*Optional<S>
+// CHECK: bb0([[IN:%.*]] : $*P):
+// CHECK:   [[COPY:%.*]] = alloc_stack $P
+// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]#1
+// CHECK:   [[TMP:%.*]] = alloc_stack $S
+// CHECK:   checked_cast_addr_br take_always P in [[COPY]]#1 : $*P to S in [[TMP]]#1 : $*S, bb1, bb2
+//   Success block.
+// CHECK: bb1:
+// CHECK:   [[T0:%.*]] = load [[TMP]]#1 : $*S
+// CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, [[T0]] : $S
+// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   dealloc_stack [[COPY]]#0
+// CHECK:   br bb3([[T1]] : $Optional<S>)
+//   Failure block.
+// CHECK: bb2:
+// CHECK:   [[T0:%.*]] = enum $Optional<S>, #Optional.None!enumelt
+// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   dealloc_stack [[COPY]]#0
+// CHECK:   br bb3([[T0]] : $Optional<S>)
+//   Continuation block.
+// CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
+// CHECK:   destroy_addr [[IN]] : $*P
+// CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {
   return p as? S
 }

@@ -288,6 +288,59 @@ protected:
   }
 
   /// Attempt to simplify a conditional checked cast.
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *inst) {
+    SILLocation loc = getOpLocation(inst->getLoc());
+    SILValue src = getOpValue(inst->getSrc());
+    SILValue dest = getOpValue(inst->getDest());
+    CanType sourceType = getOpASTType(inst->getSourceType());
+    CanType targetType = getOpASTType(inst->getTargetType());
+    SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
+    SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
+
+    SILBuilder &B = getBuilder();
+    switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
+    case DynamicCastFeasibility::WillSucceed: {
+      emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
+                                              inst->getConsumptionKind(),
+                                              src, sourceType,
+                                              dest, targetType);
+      auto br = B.createBranch(loc, succBB);
+      doPostProcess(inst, br);
+      return;
+    }
+
+    case DynamicCastFeasibility::MaySucceed: {
+      // Try to use the scalar cast instruction.
+      if (canUseScalarCheckedCastInstructions(B.getModule(),
+                                              sourceType, targetType)) {
+        emitIndirectConditionalCastWithScalar(B, SwiftMod, loc,
+                                              inst->getConsumptionKind(),
+                                              src, sourceType,
+                                              dest, targetType,
+                                              succBB, failBB);
+        return;
+      }
+
+      // Otherwise, use the indirect cast.
+      auto br = B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+                                              src, sourceType,
+                                              dest, targetType,
+                                              succBB, failBB);
+      doPostProcess(inst, br);
+      return;
+    }
+
+    case DynamicCastFeasibility::WillFail:
+      if (shouldDestroyOnFailure(inst->getConsumptionKind())) {
+        auto &srcTL = B.getModule().getTypeLowering(src.getType());
+        srcTL.emitDestroyAddress(B, loc, src);
+      }
+      doPostProcess(inst, B.createBranch(loc, failBB));
+      return;
+    }    
+  }
+
+  /// Attempt to simplify a conditional checked cast.
   void visitCheckedCastBranchInst(CheckedCastBranchInst *inst) {
     // We cannot improve on an exact cast.
     if (inst->isExact()) {
@@ -340,9 +393,6 @@ protected:
       return;
     }
 
-    // Ok, we have an invalid cast. Insert a trap so we trap at
-    // runtime as the spec for the instruction requires and propagate
-    // undef to all uses.
     case DynamicCastFeasibility::WillFail:
       doPostProcess(inst, B.createBranch(loc, failBB));
       return;

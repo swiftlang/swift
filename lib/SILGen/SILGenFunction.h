@@ -853,6 +853,11 @@ public:
                         const TypeLowering &castTL,
                         CheckedCastKind kind);
 
+  void emitCheckedCastBranch(SILLocation loc, Expr *src,
+                             Type targetType, SGFContext C,
+                             std::function<void(ManagedValue)> handleTrue,
+                             std::function<void()> handleFalse);
+
   /// Initialize a memory location with an optional value.
   ///
   /// \param loc   The location to use for the resulting optional.
