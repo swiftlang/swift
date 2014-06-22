@@ -65,6 +65,16 @@ enum class CastConsumptionKind : unsigned char {
   CopyOnSuccess,
 };
 
+/// Should the source value be destroyed if the cast fails?
+inline bool shouldDestroyOnFailure(CastConsumptionKind kind) {
+  return (kind == CastConsumptionKind::TakeAlways);
+}
+
+/// Should the source value be taken if the cast succeeds?
+inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
+  return IsTake_t(kind != CastConsumptionKind::CopyOnSuccess);
+}
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{

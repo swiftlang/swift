@@ -36,17 +36,10 @@ static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
 
   if (mode == CheckedCastMode::Unconditional)
     flags |= DynamicCastFlags::Unconditional;
-
-  switch (consumptionKind) {
-  case CastConsumptionKind::TakeAlways:
+  if (shouldDestroyOnFailure(consumptionKind))
     flags |= DynamicCastFlags::DestroyOnFailure;
-    SWIFT_FALLTHROUGH;
-  case CastConsumptionKind::TakeOnSuccess:
+  if (shouldTakeOnSuccess(consumptionKind))
     flags |= DynamicCastFlags::TakeOnSuccess;
-    break;
-  case CastConsumptionKind::CopyOnSuccess:
-    break;
-  }
 
   return flags;
 }

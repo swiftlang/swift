@@ -115,7 +115,7 @@ namespace {
 
     bool isAddress() const { return Value.getType().isAddress(); }
     IsTake_t shouldTake() const {
-      return IsTake_t(Consumption != CastConsumptionKind::CopyOnSuccess);
+      return shouldTakeOnSuccess(Consumption);
     }
 
     Source() = default;

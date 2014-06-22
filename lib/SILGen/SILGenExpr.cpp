@@ -22,6 +22,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1641,27 +1642,8 @@ namespace {
 
   private:
     CastStrategy getStrategy() const {
-      // Look through one level of optionality on the source.
-      auto sourceObjectType = SourceType;
-      if (auto type = sourceObjectType.getAnyOptionalObjectType())
-        sourceObjectType = type;
-
-      // Class-to-class casts can be scalar.  The source can be
-      // anything that embeds a class reference; the destination must
-      // be a class type, but (for now) cannot be a class existential
-      // with non-ObjC protocols.
-      if (sourceObjectType.isAnyClassReferenceType() &&
-          (TargetType->mayHaveSuperclass() ||
-           TargetType.isObjCExistentialType()))
+      if (canUseScalarCheckedCastInstructions(SGF.SGM.M, SourceType, TargetType))
         return CastStrategy::Scalar;
-
-      // Metatype-to-metatype casts can also be scalar. Again, for now,
-      // require the destination to be non-existential.
-      if (isa<AnyMetatypeType>(sourceObjectType) &&
-          isa<MetatypeType>(TargetType))
-        return CastStrategy::Scalar;
-
-      // Otherwise, we need to use the general indirect-cast functions.
       return CastStrategy::Address;
     }
   };
