@@ -252,12 +252,14 @@ void DCE::propagateLiveness(SILInstruction *I) {
   }
 
   switch (I->getKind()) {
-  default:
+#define TERMINATOR(ID, PARENT, MEM)
+#define VALUE(ID, PARENT) case ValueKind::ID:
+#include "swift/SIL/SILNodes.def"
     llvm_unreachable("Unexpected terminator instruction!");
 
   case ValueKind::BranchInst:
   case ValueKind::UnreachableInst:
-    break;
+    return;
 
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
@@ -268,9 +270,14 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case ValueKind::DynamicMethodBranchInst:
   case ValueKind::CheckedCastBranchInst:
     markValueLive(I->getOperand(0).getDef());
-    break;
+    return;
 
+  case ValueKind::CheckedCastAddrBranchInst:
+    markValueLive(I->getOperand(0).getDef());
+    markValueLive(I->getOperand(1).getDef());
+    return;
   }
+  llvm_unreachable("corrupt instruction!");
 }
 
 SILBasicBlock *DCE::nearestUsefulPostDominator(SILBasicBlock *Block) {
