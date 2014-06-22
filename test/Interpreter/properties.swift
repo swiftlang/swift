@@ -234,3 +234,17 @@ println("testing rdar://16805609")    // CHECK: testing rdar://16805609
 person.value = "foo"                  // CHECK-NEXT: reached me
 println("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
 
+
+
+
+// rdar://17192398 - Lazy optional types always nil
+class r17192398Failure {
+  @lazy var i : Int? = 42
+  func testLazy() {
+    assert(i == 42)
+  }
+}
+
+let x = r17192398Failure()
+x.testLazy()
+
