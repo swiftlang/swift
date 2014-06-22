@@ -224,7 +224,7 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
   LatState = NewState;
-  KnownSafe &= KnownSafe;
+  KnownSafe &= Other.KnownSafe;
 
   // If we're doing a merge on a path that's previously seen a partial merge,
   // conservatively drop the sequence, to avoid doing partial RR
@@ -262,7 +262,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
   LatState = NewState;
-  KnownSafe &= KnownSafe;
+  KnownSafe &= Other.KnownSafe;
 
   // If we're doing a merge on a path that's previously seen a partial merge,
   // conservatively drop the sequence, to avoid doing partial RR
