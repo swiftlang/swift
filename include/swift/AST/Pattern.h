@@ -572,8 +572,8 @@ class EnumElementPattern : public Pattern {
   
 public:
   EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                      Identifier Name, EnumElementDecl *Element,
-                      Pattern *SubPattern, Optional<bool> Implicit = {})
+                     Identifier Name, EnumElementDecl *Element,
+                     Pattern *SubPattern, Optional<bool> Implicit = {})
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
