@@ -2502,20 +2502,44 @@ namespace {
     assert(args.size() == 1 && "reinterpretCast should be given one argument");
     assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
     
-    // The arguments currently both need to be loadable.
     auto &fromTL = gen.getTypeLowering(substitutions[0].Replacement);
     auto &toTL = gen.getTypeLowering(substitutions[1].Replacement);
     
-    if (!fromTL.isLoadable() && !toTL.isLoadable()) {
-      gen.SGM.diagnose(loc.getSourceLoc(),
-                       diag::not_implemented,
-                       "Builtin.reinterpretCast with address-only type");
-      SILValue undef = SILUndef::get(toTL.getLoweredType(), gen.SGM.M);
-      return ManagedValue::forUnmanaged(undef);
+    // If casting between address-only types, cast the address.
+    if (!fromTL.isLoadable() || !toTL.isLoadable()) {
+      SILValue fromAddr;
+      
+      // If the from value is loadable, move it to a buffer.
+      if (fromTL.isLoadable()) {
+        fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue().getType());
+        gen.B.createStore(loc, args[0].getValue(), fromAddr);
+      } else {
+        fromAddr = args[0].getValue();
+      }
+      
+      auto toAddr = gen.B.createUncheckedAddrCast(loc, fromAddr,
+                                        toTL.getLoweredType().getAddressType());
+      
+      SILValue toValue;
+      // Load the destination value if it's loadable.
+      if (toTL.isLoadable()) {
+        toValue = gen.B.createLoad(loc, toAddr);
+      } else {
+        toValue = toAddr;
+      }
+      
+      // Forward it along with the original cleanup.
+      // TODO: Could try to pick which of the original or destination types has
+      // a cheaper cleanup.
+      return ManagedValue(toValue, args[0].getCleanup());
     }
+    
+    // If casting from an address-only type, load the result
 
     // If the destination is trivial, do a trivial bitcast, leaving the cleanup
     // on the original value intact.
+    // TODO: Could try to pick which of the original or destination types has
+    // a cheaper cleanup.
     if (toTL.isTrivial()) {
       SILValue in = args[0].getValue();
       SILValue out = gen.B.createUncheckedTrivialBitCast(loc, in,

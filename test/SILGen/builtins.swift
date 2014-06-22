@@ -359,3 +359,20 @@ func reinterpretCast(c: C) -> (Builtin.Word, D, C?) {
           Builtin.reinterpretCast(c) as D,
           Builtin.reinterpretCast(c) as C?)
 }
+
+// CHECK-LABEL: sil @_TF8builtins19reinterpretAddrOnlyU___FQ_Q0_
+func reinterpretAddrOnly<T, U>(t: T) -> U {
+  // CHECK: unchecked_addr_cast {{%.*}} : $*T to $*U
+  return Builtin.reinterpretCast(t)
+}
+
+// CHECK-LABEL: sil @_TF8builtins27reinterpretAddrOnlyLoadableU__FTSiQ__TQ_Si_
+func reinterpretAddrOnlyLoadable<T>(a: Int, b: T) -> (T, Int) {
+  // CHECK: [[BUF:%.*]] = alloc_stack $Int
+  // CHECK: store {{%.*}} to [[BUF]]#1
+  // CHECK: unchecked_addr_cast [[BUF]]#1 : $*Int to $*T
+  return (Builtin.reinterpretCast(a) as T,
+  // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
+  // CHECK: load [[RES]]
+          Builtin.reinterpretCast(b) as Int)
+}
