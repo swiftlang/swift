@@ -2032,7 +2032,8 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
         // If this is a convenience initializer (i.e. one that calls
         // self.init), then let properties are never mutable in it.  They are
         // only mutable in designated initializers.
-        if (CD->isConvenienceInit())
+        if (CD->getDelegatingOrChainedInitKind(nullptr) ==
+            ConstructorDecl::BodyInitKind::Delegating)
           return false;
 
         return true;
@@ -2942,44 +2943,54 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
     FindReferenceToInitializer(DiagnosticEngine *diags) : Diags(diags) { }
 
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-      if (auto apply = dyn_cast<ApplyExpr>(E)) {
-        if (isa<OtherConstructorDeclRefExpr>(
-              apply->getFn()->getSemanticsProvidingExpr())) {
-          BodyInitKind myKind;
-          if (apply->getArg()->isSuperExpr())
-            myKind = BodyInitKind::Chained;
-          else
-            myKind = BodyInitKind::Delegating;
-
-          if (Kind == BodyInitKind::None) {
-            Kind = myKind;
-
-            // If we're not emitting diagnostics, we're done.
-            if (!Diags) {
-              return { false, nullptr };
-            }
-
-            InitExpr = apply;
-            return { true, E };
-          }
-
-          assert(Diags && "Failed to abort traversal early");
-
-          // If the kind changed, complain.
-          if (Kind != myKind) {
-            // The kind changed. Complain.
-            Diags->diagnose(E->getLoc(), diag::init_delegates_and_chains);
-            Diags->diagnose(InitExpr->getLoc(), diag::init_delegation_or_chain,
-                            Kind == BodyInitKind::Chained);
-          }
-
-          return { true, E };
-        }
-      }
-
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
         return { false, E };
+
+      // Look for calls of a constructor.
+      auto apply = dyn_cast<ApplyExpr>(E);
+      if (!apply)
+        return { true, E };
+
+      auto Callee = apply->getFn()->getSemanticsProvidingExpr();
+      
+      BodyInitKind myKind;
+
+      if (isa<OtherConstructorDeclRefExpr>(Callee)) {
+        if (apply->getArg()->isSuperExpr())
+          myKind = BodyInitKind::Chained;
+        else
+          myKind = BodyInitKind::Delegating;
+      } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(Callee)) {
+        if (UCE->getSubExpr()->isSuperExpr())
+          myKind = BodyInitKind::Chained;
+        else
+          myKind = BodyInitKind::Delegating;
+      } else {
+        // Not a constructor call.
+        return { true, E };
+      }
+      
+      if (Kind == BodyInitKind::None) {
+        Kind = myKind;
+
+        // If we're not emitting diagnostics, we're done.
+        if (!Diags)
+          return { false, nullptr };
+
+        InitExpr = apply;
+        return { true, E };
+      }
+
+      assert(Diags && "Failed to abort traversal early");
+
+      // If the kind changed, complain.
+      if (Kind != myKind) {
+        // The kind changed. Complain.
+        Diags->diagnose(E->getLoc(), diag::init_delegates_and_chains);
+        Diags->diagnose(InitExpr->getLoc(), diag::init_delegation_or_chain,
+                        Kind == BodyInitKind::Chained);
+      }
 
       return { true, E };
     }
@@ -2996,11 +3007,13 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
     }
   }
 
-  // Cache the result.
-  ConstructorDeclBits.ComputedBodyInitKind
-    = static_cast<unsigned>(finder.Kind) + 1;
-  if (init)
-    *init = finder.InitExpr;
+  // Cache the result if it is trustworthy.
+  if (diags) {
+    ConstructorDeclBits.ComputedBodyInitKind
+      = static_cast<unsigned>(finder.Kind) + 1;
+    if (init)
+      *init = finder.InitExpr;
+  }
 
   return finder.Kind;
 }
