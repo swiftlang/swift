@@ -1585,7 +1585,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
       Tok.isNot(tok::r_brace)) {
     Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
   } else if (Status.isSuccess()) {
-    diagnose(CaseLoc, diag::case_stmt_without_body)
+    diagnose(CaseLoc, diag::case_stmt_without_body,
+             CaseLabelItems.back().isDefault())
         .highlight(SourceRange(CaseLoc, ColonLoc));
   }
   BraceStmt *Body;

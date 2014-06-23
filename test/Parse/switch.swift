@@ -92,7 +92,7 @@ case 1: // expected-error {{'case' label in a 'switch' should have at least one 
 switch x {
 case 0:
   x = 0
-default: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+default: // expected-error {{'default' label in a 'switch' should have at least one executable statement}}
 }
 
 switch x {
@@ -131,13 +131,13 @@ switch x {
 }
 
 switch x {
-default: // expected-error{{'case' label in a 'switch' should have at least one executable statement}}
+default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}}
 case 0: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
 
 switch x {
-default: // expected-error{{'case' label in a 'switch' should have at least one executable statement}}
+default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}}
 default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }

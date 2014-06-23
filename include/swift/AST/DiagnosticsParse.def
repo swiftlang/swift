@@ -747,8 +747,8 @@ ERROR(var_binding_with_multiple_case_patterns,stmt_parsing,none,
       "'case' labels with multiple patterns cannot declare variables",
       ())
 ERROR(case_stmt_without_body,stmt_parsing,none,
-      "'case' label in a 'switch' should have at least one executable "
-      "statement", ())
+      "%select{'case'|'default'}0 label in a 'switch' should have at least one "
+      "executable statement", (bool))
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
