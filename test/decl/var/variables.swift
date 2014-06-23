@@ -44,17 +44,17 @@ var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' in
 // rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
 var ao1 : AnyObject
 var ao2 = ao1          // expected-warning {{variable 'ao2' inferred to have type 'AnyObject', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}}
+                       // expected-note {{add an explicit type annotation to silence this warning}}{{8-8=: AnyObject}}
 
 var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}}
+                       // expected-note {{add an explicit type annotation to silence this warning}}{{9-9=: AnyObject.Type}}
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
 var ptr = nil // expected-error {{cannot convert the expression's type '$T0' to type 'NilLiteralConvertible'}}
 
 func testAnyObjectOptional() -> AnyObject? {
-  var x = testAnyObjectOptional() // expected-warning {{variable 'x' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
+  var x = testAnyObjectOptional() // expected-warning {{variable 'x' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}{{8-8=: AnyObject?}}
   return x
 }
 

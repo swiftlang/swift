@@ -815,7 +815,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       SourceLoc fixItLoc = NP->getLoc();
       fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-        .fixItInsert(fixItLoc, " : " + type.getString());
+        .fixItInsert(fixItLoc, ": " + type.getString());
     }
 
     return false;
