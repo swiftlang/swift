@@ -1161,6 +1161,14 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
     }
   };
 
+  // Add a known context.
+  auto addContext = [&](Identifier className, KnownObjCMethod known) {
+    assert(KnownObjCContexts.find(className) == KnownObjCContexts.end() &&
+           "Context is already known!?");
+    // Record this known context.
+    KnownObjCContexts[className] = known;
+  };
+
   using namespace known_methods;
 
   // Function object that creates a selector.
@@ -1172,6 +1180,9 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
 #define CLASS_METHOD(ClassName, Selector, Options)  \
   addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
             /*isInstanceMethod=*/false, KnownObjCMethod() | Options);
+#define OBJC_CONTEXT(ContextName, Options)  \
+  addContext(SwiftContext.getIdentifier(#ContextName), \
+            KnownObjCMethod() | Options);
 #include "KnownObjCMethods.def"
 }
 
@@ -1195,14 +1206,21 @@ KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
   }
 
   Identifier contextID = SwiftContext.getIdentifier(contextName);
+  // Look it up in the method maps.
   ObjCSelector selector = importSelector(method->getSelector());
   auto &knownMethods = method->isClassMethod() ? KnownClassMethods
                                                : KnownInstanceMethods;
   auto known = knownMethods.find({contextID, selector});
-  if (known == knownMethods.end())
-    return nullptr;
+  if (known != knownMethods.end())
+    return &known->second;
 
-  return &known->second;
+  // Look it up in the contexts map if more specialized infois nt available.
+  auto knownContext = KnownObjCContexts.find(contextID);
+  if (knownContext != KnownObjCContexts.end()) {
+    return &knownContext->second;
+  }
+
+  return nullptr;
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(

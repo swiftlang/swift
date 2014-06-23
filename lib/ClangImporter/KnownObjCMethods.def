@@ -38,6 +38,11 @@
 //       method's return type. Pass '0' as the first argument for a method with
 //       only non-optional (OTK_None) types.
 //
+// OBJC_CONTEXT(ClassName, Options)
+//   Describes default method options in a class or protocol. This can be used
+//   to list options common to all/most methods of the audited class. These
+//   defaults can be overwritten by using INSTANCE_METHOD and CLASS_METHOD.
+//
 
 #ifndef INSTANCE_METHOD
 #  error define INSTANCE_METHOD before including KnownMethods.def
@@ -45,6 +50,10 @@
 
 #ifndef CLASS_METHOD
 #  error define CLASS_METHOD before including KnownMethods.def
+#endif
+
+#ifndef OBJC_CONTEXT
+#  error define OBJC_CONTEXT before including KnownMethods.def
 #endif
 
 // ObjectiveC
@@ -265,8 +274,7 @@ INSTANCE_METHOD(NSWindow,
 INSTANCE_METHOD(NSWindowController, (1, "initWithWindow"), DesignatedInit)
 
 // Optional type annotations for NSView
-INSTANCE_METHOD(NSView, (1, "isDescendantOf"), OptionalTypeAdjustment(0))
-INSTANCE_METHOD(NSView, (1, "ancestorSharedWithView"), OptionalTypeAdjustment(2, OTK_Optional, OTK_None))
+OBJC_CONTEXT(NSView, OptionalTypeAdjustment(1, OTK_Optional))
 INSTANCE_METHOD(NSView, (1, "setSubviews"), OptionalTypeAdjustment(2, OTK_None, OTK_None))
 INSTANCE_METHOD(NSView, (1, "addSubview"), OptionalTypeAdjustment(0))
 INSTANCE_METHOD(NSView, (3, "addSubview", "positioned", "relativeTo"), OptionalTypeAdjustment(4, OTK_None, OTK_None, OTK_None, OTK_Optional));
@@ -313,7 +321,6 @@ INSTANCE_METHOD(UIView, (1, "initWithFrame"), DesignatedInit)
 
 INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"), 
                 DesignatedInit)
-
 
 #undef INSTANCE_METHOD
 #undef CLASS_METHOD

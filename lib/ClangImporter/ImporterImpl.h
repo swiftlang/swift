@@ -377,6 +377,11 @@ public:
   llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
     KnownClassMethods;
 
+  /// A map from class or protocol name to a model method for this class, which
+  /// contains information about the methods of this class or protocol. This
+  /// info can be shadowed by more specific information from KnownMethods maps.
+  llvm::DenseMap<Identifier, KnownObjCMethod> KnownObjCContexts;
+
   /// Populate the tables of known methods, if it hasn't been done
   /// already.
   void populateKnownObjCMethods();
