@@ -378,6 +378,11 @@ public:
   llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
     KnownClassMethods;
 
+  /// A map from (class or protocol name, property identifier) pairs to a prior
+  /// information about that class method of an Objective-C class.
+  llvm::DenseMap<std::pair<Identifier, Identifier>, OptionalTypeKind>
+    KnownObjCProperties;
+
   /// A map from class or protocol name to a model method for this class, which
   /// contains information about the methods of this class or protocol. This
   /// info can be shadowed by more specific information from KnownMethods maps.
@@ -390,6 +395,10 @@ public:
   /// Retrieve any information known a priori about the given Objective-C,
   /// method, if we have it.
   KnownObjCMethod *getKnownObjCMethod(const clang::ObjCMethodDecl *method);
+
+  /// Retrieve any information known a priori about the given Objective-C,
+  /// property, if we have it. Specifically, the optionality of the type.
+  OptionalTypeKind getKnownObjCProperty(const clang::ObjCPropertyDecl *prop);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 

@@ -39,9 +39,14 @@
 //       only non-optional (OTK_None) types.
 //
 // OBJC_CONTEXT(ClassName, Options)
+//
 //   Describes default method options in a class or protocol. This can be used
 //   to list options common to all/most methods of the audited class. These
 //   defaults can be overwritten by using INSTANCE_METHOD and CLASS_METHOD.
+//
+// OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)
+//
+//   Describes the optionality if the type of the Objective C property.
 //
 
 #ifndef INSTANCE_METHOD
@@ -293,6 +298,8 @@ INSTANCE_METHOD(NSView, (1, "exitFullScreenModeWithOptions"), OptionalTypeAdjust
 INSTANCE_METHOD(NSView, (2, "showDefinitionForAttributedString", "atPoint"), OptionalTypeAdjustment(2, OTK_ImplicitlyUnwrappedOptional, OTK_Optional))
 INSTANCE_METHOD(NSView, (4, "showDefinitionForAttributedString", "range", "options", "baselineOriginProvider"), OptionalTypeAdjustment(4, OTK_ImplicitlyUnwrappedOptional, OTK_Optional, OTK_ImplicitlyUnwrappedOptional, OTK_Optional))
 INSTANCE_METHOD(NSView, (1, "constraintsAffectingLayoutForOrientation"), OptionalTypeAdjustment(1, OTK_None))
+OBJC_PROPERTY(NSView, nextKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, trackingAreas, OTK_None)
 
 // NotificationCenter
 CLASS_METHOD(NCWidgetController, (0, "widgetController"), FactoryAsClassMethod)

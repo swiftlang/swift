@@ -839,7 +839,10 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
 
 Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl) {
-  return importType(decl->getType(), ImportTypeKind::Property);
+  OptionalTypeKind optionality = ImportWithTighterObjCPointerTypes
+                                 ? getKnownObjCProperty(decl)
+                                 : OTK_ImplicitlyUnwrappedOptional;
+  return importType(decl->getType(), ImportTypeKind::Property, optionality);
 }
 
 Type ClangImporter::Implementation::importFunctionType(

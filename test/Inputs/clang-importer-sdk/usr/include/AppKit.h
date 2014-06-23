@@ -93,4 +93,10 @@
 - (void)setSubviews:(NSArray *)newSubviews;
 - (void)addSubview:(NSView *)aView;
 - (void)addSubview:(NSView *)aView positioned:(unsigned)place relativeTo:(NSView *)otherView;
+@property (readonly, copy) NSArray *trackingAreas;
+@property (copy) NSArray *subviews;
+@end
+
+@interface NSView(NSKeyboardUI)
+@property (assign) NSView *nextKeyView;
 @end

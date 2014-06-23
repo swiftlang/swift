@@ -1169,6 +1169,16 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
     KnownObjCContexts[className] = known;
   };
 
+  // Add a known property.
+  auto addProperty = [&](Identifier className, Identifier propertyName,
+                         OptionalTypeKind kind) {
+    assert(KnownObjCProperties.find({className, propertyName}) ==
+             KnownObjCProperties.end() &&
+           "Property is already known!?");
+    // Record this known property.
+    KnownObjCProperties[{className, propertyName}] = kind;
+  };
+
   using namespace known_methods;
 
   // Function object that creates a selector.
@@ -1183,16 +1193,16 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
 #define OBJC_CONTEXT(ContextName, Options)  \
   addContext(SwiftContext.getIdentifier(#ContextName), \
             KnownObjCMethod() | Options);
+#define OBJC_PROPERTY(ContextName, PropertyName, Options)  \
+  addProperty(SwiftContext.getIdentifier(#ContextName), \
+              SwiftContext.getIdentifier(#PropertyName), \
+              Options);
 #include "KnownObjCMethods.def"
 }
 
-KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
-                   const clang::ObjCMethodDecl *method)
-{
-  populateKnownObjCMethods();
-  
+static StringRef getObjCContextName(const clang::Decl *decl) {
   // Find the name of the method's context.
-  auto objcDC = method->getDeclContext();
+  auto objcDC = decl->getDeclContext();
   StringRef contextName;
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(objcDC)) {
     contextName = objcClass->getName();
@@ -1201,6 +1211,19 @@ KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
   } else if (auto objcProto=dyn_cast<clang::ObjCProtocolDecl>(objcDC)) {
     contextName = objcProto->getName();
   } else {
+    // error case.
+    return StringRef();
+  }
+  return contextName;
+}
+
+KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
+                   const clang::ObjCMethodDecl *method) {
+  populateKnownObjCMethods();
+
+  // Find the name of the method's context.
+  StringRef contextName = getObjCContextName(method);
+  if (contextName.empty()) {
     // error case.
     return nullptr;
   }
@@ -1214,13 +1237,33 @@ KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
   if (known != knownMethods.end())
     return &known->second;
 
-  // Look it up in the contexts map if more specialized infois nt available.
+  // Look it up in the contexts map if more specialized info is not available.
   auto knownContext = KnownObjCContexts.find(contextID);
   if (knownContext != KnownObjCContexts.end()) {
     return &knownContext->second;
   }
 
   return nullptr;
+}
+
+OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
+                   const clang::ObjCPropertyDecl *prop) {
+  populateKnownObjCMethods();
+
+  // Find the name of the property's context.
+  StringRef contextName = getObjCContextName(prop);
+  if (contextName.empty()) {
+    // error case.
+    return OTK_ImplicitlyUnwrappedOptional;
+  }
+
+  Identifier contextID = SwiftContext.getIdentifier(contextName);
+  Identifier propIdentifier = SwiftContext.getIdentifier(prop->getName());
+  auto known = KnownObjCProperties.find({contextID, propIdentifier});
+  if (known != KnownObjCProperties.end())
+    return known->second;
+
+  return OTK_ImplicitlyUnwrappedOptional;
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(

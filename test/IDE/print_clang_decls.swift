@@ -82,6 +82,9 @@
 // APPKIT:      {{^}}class NSView : NSObject {{{$}}
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
-// APPKIT-NEXT: func setSubviews(newSubviews: AnyObject[])
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: CUnsignedInt, relativeTo otherView: NSView?)
+// APPKIT-NEXT: var trackingAreas: AnyObject[] { get }
+// APPKIT-NEXT: var subviews: AnyObject[]!
+// APPKIT:      extension NSView {
+// APPKIT-NEXT:   var nextKeyView: NSView?
