@@ -11,12 +11,12 @@ struct RC4 {
 
   mutating
   func initialize(Key: UInt8[]) {
-    for i in 0..256 {
+    for (var i = 0; i < 256; i++) {
       State[i] = UInt8(i)
     }
 
     var j : UInt8 = 0
-    for i in 0..256 {
+    for (var i = 0; i < 256; i++) {
       var K : UInt8 = Key[i % Key.count]
       var S : UInt8 = State[i]
       j = j &+ S &+ K
@@ -43,7 +43,7 @@ struct RC4 {
   mutating
   func encrypt(inout Data: UInt8[]) {
     var cnt = Data.count
-    for i in 0..cnt {
+    for (var i = 0; i < cnt; i++) {
       Data[i] = Data[i] ^ next()
     }
   }
@@ -58,7 +58,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
   var LongData : UInt8[] = new UInt8[messageLen]
 
   // Generate a long message.
-  for i in 0..messageLen {
+  for (var i = 0; i < messageLen; i++) {
     LongData[i] = SecretData[i % SecretData.count]
   }
 
@@ -67,7 +67,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
 
   let start = __mach_absolute_time__()
 
-  for i in 0..iterations {
+  for (var i = 0; i < iterations; i++) {
     Enc.encrypt(&LongData)
   }
 
