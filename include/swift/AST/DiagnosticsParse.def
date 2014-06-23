@@ -266,7 +266,7 @@ ERROR(func_decl_nonglobal_operator,decl_parsing,none,
 ERROR(func_decl_without_paren,decl_parsing,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,decl_parsing,none,
-      "%select{ERROR|static functions|class methods}0 may only be declared on a type",
+      "%select{ERROR|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(static_functions_not_mutating,sema_tcd,none,
       "static functions may not be declared mutating", ())

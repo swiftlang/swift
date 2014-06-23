@@ -64,11 +64,11 @@ ERROR(super_not_in_class_method,common,none,
       "'super' members cannot be referenced in a non-class type", ())
 
 ERROR(static_func_in_class,common,none,
-      "static functions are only allowed within structs and enums; "
+      "static methods are only allowed within structs and enums; "
       "use 'class' to declare a class method", ())
 ERROR(class_func_in_struct,common,none,
       "class methods are only allowed within classes and protocols; "
-      "use 'static' to declare a static function", ())
+      "use 'static' to declare a static method", ())
 ERROR(static_var_in_class,common,none,
       "static properties are only allowed within structs and enums; "
       "use 'class' to declare a class property", ())

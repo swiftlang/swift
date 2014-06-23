@@ -60,7 +60,7 @@ func braceStmt3() {
 
 //===--- Recovery for misplaced 'static'.
 
-static func toplevelStaticFunc() {} // expected-error {{static functions may only be declared on a type}}
+static func toplevelStaticFunc() {} // expected-error {{static methods may only be declared on a type}}
 
 static struct StaticStruct {} // expected-error {{declaration cannot be marked 'static'}}
 static class StaticClass {} // expected-error {{declaration cannot be marked 'static'}}
