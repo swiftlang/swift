@@ -4,7 +4,6 @@
 // should be rewritten soon so it doesn't expose legacy components
 // like OpaqueString anyway, so we can just disable the failing
 // configuration
-// XFAIL: asan
 //
 // Memory allocator specifics also vary across platorms.
 // REQUIRES: CPU=x86_64, OS=macosx
