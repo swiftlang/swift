@@ -1,6 +1,9 @@
 Latest
 ------
 
+2014-06-23
+---------
+
 * The half-open range operator has been renamed from ".." to "..<" to reduce
   confusion.  The ..< operator is precedented in Groovy (among other languages)
   and makes it much more clear that it doesn't include the endpoint.
