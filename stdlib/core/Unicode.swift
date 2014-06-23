@@ -446,32 +446,108 @@ struct UTF16 : UnicodeCodec {
 
   init() {}
 
+  /// A lookahead buffer for one UTF-16 code unit.
+  var _decodeLookahead: UInt32 = 0
+
+  /// Flags with layout: `0b0000_00xy`.
+  ///
+  /// `y` is the EOF flag.
+  ///
+  /// `x` is set when `_decodeLookahead` contains a code unit.
+  var _lookaheadFlags: UInt8 = 0
+
   mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UTFDecodeResult {
-    return UTF16.decode(&input)
-  }
-
-  static func decode<
-    G : Generator where G.Element == CodeUnit
-  >(inout input: G) -> UTFDecodeResult {
-    let first = input.next()
-    if !first {
+    if _lookaheadFlags & 0b01 != 0 {
       return .EmptyInput
     }
 
-    let unit0 = UInt32(first!)
-    if (unit0 >> 11) != 0x1B {
+    // Note: maximal subpart of ill-formed sequence for UTF-16 can only have
+    // length 1.  Length 0 does not make sense.  Neither does length 2 -- in
+    // that case the sequence is valid.
+
+    var unit0: UInt32
+    if _fastPath(_lookaheadFlags & 0b10 == 0) {
+      if let first = input.next() {
+        unit0 = UInt32(first)
+      } else {
+        // Set EOF flag.
+        _lookaheadFlags |= 0b01
+        return .EmptyInput
+      }
+    } else {
+      // Fetch code unit from the lookahead buffer and note this fact in flags.
+      unit0 = _decodeLookahead
+      _lookaheadFlags &= 0b01
+    }
+
+    // A well-formed pair of surrogates looks like this:
+    // [1101 10ww wwxx xxxx] [1101 11xx xxxx xxxx]
+
+    if _fastPath((unit0 >> 11) != 0b1101_1) {
+      // Neither high-surrogate, nor low-surrogate -- sequence of 1 code unit,
+      // decoding is trivial.
       return .Result(UnicodeScalar(unit0))
     }
 
-    let unit1 = UInt32(input.next()!)
+    if _slowPath((unit0 >> 10) == 0b1101_11) {
+      // `unit0` is a low-surrogate.  We have an ill-formed sequence.
+      return .Error
+    }
 
-    // FIXME: Uglified due to type checker performance issues.
-    var result : UInt32 = 0x10000
-    result += ((unit0 - 0xD800) << 10)
-    result += (unit1 - 0xDC00)
-    return .Result(UnicodeScalar(result))
+    // At this point we know that `unit0` is a high-surrogate.
+
+    var unit1: UInt32
+    if let second = input.next() {
+      unit1 = UInt32(second)
+    } else {
+      // EOF reached.  Set EOF flag.
+      _lookaheadFlags |= 0b01
+
+      // We have seen a high-surrogate and EOF, so we have an ill-formed
+      // sequence.
+      return .Error
+    }
+
+    if _fastPath((unit1 >> 10) == 0b1101_11) {
+      // `unit1` is a low-surrogate.  We have a well-formed surrogate pair.
+
+      let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+      return .Result(UnicodeScalar(result))
+    }
+
+    // Otherwise, we have an ill-formed sequence.  These are the possible
+    // cases:
+    //
+    // * `unit1` is a high-surrogate, so we have a pair of two high-surrogates.
+    //
+    // * `unit1` is not a surrogate.  We have an ill-formed sequence:
+    //   high-surrogate followed by a non-surrogate.
+
+    // Save the second code unit in the lookahead buffer.
+    _decodeLookahead = unit1
+    _lookaheadFlags |= 0b10
+    return .Error
+  }
+
+  /// Try to decode one Unicode scalar, and return the actual number of code
+  /// units it spanned in the input.  This function may consume more code
+  /// units than required for this scalar.
+  mutating func _decodeOne<
+    G : Generator where G.Element == CodeUnit
+  >(inout input: G) -> (UTFDecodeResult, Int) {
+    let result = decode(&input)
+    switch result {
+    case .Result(let us):
+      return (result, UTF16.width(us))
+
+    case .EmptyInput:
+      return (result, 0)
+
+    case .Error:
+      return (result, 1)
+    }
   }
 
   static func encode<
@@ -483,9 +559,9 @@ struct UTF16 : UnicodeCodec {
       output.put(UInt16(scalarValue))
     }
     else {
-      var lead_offset = UInt32(0xD800) - (0x10000 >> 10)
+      var lead_offset = UInt32(0xd800) - (0x10000 >> 10)
       output.put(UInt16(lead_offset + (scalarValue >> 10)))
-      output.put(UInt16(0xDC00 + (scalarValue & 0x3FF)))
+      output.put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
 

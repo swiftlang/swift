@@ -318,14 +318,14 @@ class EOFCountingGenerator<T> : Generator {
   }
 }
 
-func checkDecodeUTF8(
-    expectedHead: UInt32[],
-    expectedRepairedTail: UInt32[], utf8Str: UInt8[]
+func checkDecodeUTF<Codec : UnicodeCodec>(
+    codec: Codec.Type, expectedHead: UInt32[],
+    expectedRepairedTail: UInt32[], utfStr: Codec.CodeUnit[]
 ) -> AssertionResult {
   if true {
     var decoded: UInt32[] = []
-    var g = EOFCountingGenerator(utf8Str)
-    transcode(UTF8.self, UTF32.self, g,
+    var g = EOFCountingGenerator(utfStr)
+    transcode(codec, UTF32.self, g,
         SinkOf {
           decoded += $0
         },
@@ -344,8 +344,8 @@ func checkDecodeUTF8(
     expected += expectedRepairedTail
 
     var decoded: UInt32[] = []
-    var g = EOFCountingGenerator(utf8Str)
-    transcode(UTF8.self, UTF32.self, g,
+    var g = EOFCountingGenerator(utfStr)
+    transcode(codec, UTF32.self, g,
         SinkOf {
           decoded += $0
         },
@@ -360,6 +360,21 @@ func checkDecodeUTF8(
   }
 
   return assertionSuccess()
+}
+
+func checkDecodeUTF8(
+    expectedHead: UInt32[],
+    expectedRepairedTail: UInt32[], utf8Str: UInt8[]
+) -> AssertionResult {
+  return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
+}
+
+func checkDecodeUTF16(
+    expectedHead: UInt32[],
+    expectedRepairedTail: UInt32[], utf16Str: UInt16[]
+) -> AssertionResult {
+  return checkDecodeUTF(UTF16.self, expectedHead, expectedRepairedTail,
+      utf16Str)
 }
 
 var UTF8Decoder = TestCase("UTF8Decoder")
@@ -795,11 +810,11 @@ UTF8Decoder.test("MissingContinuationBytes") {
       [ 0xfc, 0x80, 0x80, 0x80, 0x80 ]))
 
   // Sequences that represent surrogates with one trailing byte missing.
-  // High surrogates
+  // High-surrogates
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xa0 ]))
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xac ]))
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xaf ]))
-  // Low surrogates
+  // Low-surrogates
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xb0 ]))
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xb4 ]))
   expectTrue(checkDecodeUTF8([], [ 0xfffd, 0xfffd ], [ 0xed, 0xbf ]))
@@ -1183,7 +1198,7 @@ UTF8Decoder.test("IsolatedSurrogates") {
 
   // Note: U+E0100 is <DB40 DD00> in UTF16.
 
-  // High surrogates
+  // High-surrogates
 
   // U+D800
   expectTrue(checkDecodeUTF8(
@@ -1207,7 +1222,7 @@ UTF8Decoder.test("IsolatedSurrogates") {
       [ 0xfffd, 0xfffd, 0xfffd ],
       [ 0xed, 0xaf, 0xbf ]))
 
-  // Low surrogates
+  // Low-surrogates
 
   // U+DC00
   expectTrue(checkDecodeUTF8(
@@ -1547,4 +1562,328 @@ UTF8Decoder.test("Noncharacters") {
 
 UTF8Decoder.run()
 // CHECK: {{^}}UTF8Decoder: All tests passed
+
+var UTF16Decoder = TestCase("UTF16Decoder")
+
+UTF16Decoder.test("Empty") {
+  expectTrue(checkDecodeUTF16([], [], []))
+}
+
+UTF16Decoder.test("SmokeTest") {
+  //
+  // 1-word sequences
+  //
+
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16([ 0x0041 ], [], [ 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  expectTrue(checkDecodeUTF16([ 0x0041, 0x0042 ], [], [ 0x0041, 0x0042 ]))
+
+  // U+0000 NULL
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0000 NULL
+  expectTrue(checkDecodeUTF16(
+      [ 0x0000, 0x0041, 0x0042, 0x0000 ], [],
+      [ 0x0000, 0x0041, 0x0042, 0x0000 ]))
+
+  // U+0283 LATIN SMALL LETTER ESH
+  expectTrue(checkDecodeUTF16([ 0x0283 ], [], [ 0x0283 ]))
+
+  // U+03BA GREEK SMALL LETTER KAPPA
+  // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
+  // U+03C3 GREEK SMALL LETTER SIGMA
+  // U+03BC GREEK SMALL LETTER MU
+  // U+03B5 GREEK SMALL LETTER EPSILON
+  expectTrue(checkDecodeUTF16(
+      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ], [],
+      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ]))
+
+  // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+  // U+6587 CJK UNIFIED IDEOGRAPH-6587
+  expectTrue(checkDecodeUTF16(
+      [ 0x4f8b, 0x6587 ], [],
+      [ 0x4f8b, 0x6587 ]))
+
+  // U+D55C HANGUL SYLLABLE HAN
+  // U+AE00 HANGUL SYLLABLE GEUL
+  expectTrue(checkDecodeUTF16(
+      [ 0xd55c, 0xae00 ], [],
+      [ 0xd55c, 0xae00 ]))
+
+  // U+1112 HANGUL CHOSEONG HIEUH
+  // U+1161 HANGUL JUNGSEONG A
+  // U+11AB HANGUL JONGSEONG NIEUN
+  // U+1100 HANGUL CHOSEONG KIYEOK
+  // U+1173 HANGUL JUNGSEONG EU
+  // U+11AF HANGUL JONGSEONG RIEUL
+  expectTrue(checkDecodeUTF16(
+      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ], [],
+      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ]))
+
+  //
+  // 2-word sequences
+  //
+
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16([ 0x00010000 ], [], [ 0xd800, 0xdc00 ]))
+
+  // U+10100 AEGEAN WORD SEPARATOR LINE
+  expectTrue(checkDecodeUTF16([ 0x00010100 ], [], [ 0xd800, 0xdd00 ]))
+
+  // U+103FF (unassigned)
+  expectTrue(checkDecodeUTF16([ 0x000103ff ], [], [ 0xd800, 0xdfff ]))
+
+
+  // U+E0000 (unassigned)
+  expectTrue(checkDecodeUTF16([ 0x000e0000 ], [], [ 0xdb40, 0xdc00 ]))
+
+  // U+E0100 VARIATION SELECTOR-17
+  expectTrue(checkDecodeUTF16([ 0x000e0100 ], [], [ 0xdb40, 0xdd00 ]))
+
+  // U+E03FF (unassigned)
+  expectTrue(checkDecodeUTF16([ 0x000e03ff ], [], [ 0xdb40, 0xdfff ]))
+
+
+  // U+10FC00 (private use)
+  expectTrue(checkDecodeUTF16([ 0x0010fc00 ], [], [ 0xdbff, 0xdc00 ]))
+
+  // U+10FD00 (private use)
+  expectTrue(checkDecodeUTF16([ 0x0010fd00 ], [], [ 0xdbff, 0xdd00 ]))
+
+  // U+10FFFF (private use, noncharacter)
+  expectTrue(checkDecodeUTF16([ 0x0010ffff ], [], [ 0xdbff, 0xdfff ]))
+}
+
+UTF16Decoder.test("Incomplete") {
+  //
+  // Incomplete sequences that end right before EOF.
+  //
+
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd ], [ 0xd800 ]))
+
+  // U+D800 (high-surrogate)
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xd800, 0xd800 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xd800 ]))
+
+  // U+10000 LINEAR B SYLLABLE B008 A
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16(
+      [ 0x00010000 ], [ 0xfffd ],
+      [ 0xd800, 0xdc00, 0xd800 ]))
+
+  //
+  // Incomplete sequences with more code units following them.
+  //
+
+  // U+D800 (high-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0x0041 ], [ 0xd800, 0x0041 ]))
+
+  // U+D800 (high-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [], [ 0xfffd, 0x00010000 ],
+      [ 0xd800, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0x0041 ],
+      [ 0x0041, 0xd800, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xd800, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+DB40 (high-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
+      [ 0x0041, 0xd800, 0xdb40, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+DB40 (high-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xd800, 0xdb40, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+DB40 (high-surrogate)
+  // U+DBFF (high-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
+      [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+D800 (high-surrogate)
+  // U+DB40 (high-surrogate)
+  // U+DBFF (high-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0xd800, 0xdc00 ]))
+}
+
+UTF16Decoder.test("IllFormed") {
+  //
+  // Low-surrogate right before EOF.
+  //
+
+  // U+DC00 (low-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd ], [ 0xdc00 ]))
+
+  // U+DC00 (low-surrogate)
+  // U+DC00 (low-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  expectTrue(checkDecodeUTF16([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xdc00 ]))
+
+  // U+10000 LINEAR B SYLLABLE B008 A
+  // U+DC00 (low-surrogate)
+  expectTrue(checkDecodeUTF16(
+      [ 0x00010000 ], [ 0xfffd ],
+      [ 0xd800, 0xdc00, 0xdc00 ]))
+
+  //
+  // Low-surrogate with more code units following it.
+  //
+
+  // U+DC00 (low-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0x0041 ], [ 0xdc00, 0x0041 ]))
+
+  // U+DC00 (low-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [], [ 0xfffd, 0x00010000 ],
+      [ 0xdc00, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0x0041 ],
+      [ 0x0041, 0xdc00, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xdc00, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+DD00 (low-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
+      [ 0x0041, 0xdc00, 0xdd00, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+DD00 (low-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xdc00, 0xdd00, 0xd800, 0xdc00 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+DD00 (low-surrogate)
+  // U+DFFF (low-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
+      [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0x0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+DC00 (low-surrogate)
+  // U+DD00 (low-surrogate)
+  // U+DFFF (low-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
+      [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0xd800, 0xdc00 ]))
+
+  //
+  // Low-surrogate followed by high-surrogate.
+  //
+
+  // U+DC00 (low-surrogate)
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xd800 ]))
+
+  // U+DC00 (low-surrogate)
+  // U+DB40 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdb40 ]))
+
+  // U+DC00 (low-surrogate)
+  // U+DBFF (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdbff ]))
+
+
+  // U+DD00 (low-surrogate)
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xd800 ]))
+
+  // U+DD00 (low-surrogate)
+  // U+DB40 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdb40 ]))
+
+  // U+DD00 (low-surrogate)
+  // U+DBFF (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdbff ]))
+
+
+  // U+DFFF (low-surrogate)
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xd800 ]))
+
+  // U+DFFF (low-surrogate)
+  // U+DB40 (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdb40 ]))
+
+  // U+DFFF (low-surrogate)
+  // U+DBFF (high-surrogate)
+  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdbff ]))
+
+
+  // U+DC00 (low-surrogate)
+  // U+D800 (high-surrogate)
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF16(
+      [], [ 0xfffd, 0xfffd, 0x0041 ],
+      [ 0xdc00, 0xd800, 0x0041 ]))
+
+  // U+DC00 (low-surrogate)
+  // U+D800 (high-surrogate)
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF16(
+      [], [ 0xfffd, 0xfffd, 0x10000 ],
+      [ 0xdc00, 0xd800, 0xd800, 0xdc00 ]))
+}
+
+UTF16Decoder.run()
+// CHECK: {{^}}UTF16Decoder: All tests passed
 

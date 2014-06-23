@@ -23,10 +23,10 @@ extension String {
       self._base = _base
     }
 
-    struct ScratchGenerator : Generator {
-      var base :_StringCore
-      var idx : Int
-      init(_ core : _StringCore, _ pos : Int) {
+    struct _ScratchGenerator : Generator {
+      var base: _StringCore
+      var idx: Int
+      init(_ core: _StringCore, _ pos: Int) {
         idx = pos
         base = core
       }
@@ -44,9 +44,10 @@ extension String {
       }
 
       func succ() -> IndexType {
-        var scratch = ScratchGenerator(_base, _position)
-        UTF16.decode(&scratch)
-        return IndexType(scratch.idx, _base)
+        var scratch = _ScratchGenerator(_base, _position)
+        var decoder = UTF16()
+        let (result, length) = decoder._decodeOne(&scratch)
+        return IndexType(_position + length, _base)
       }
 
       func pred() -> IndexType {
@@ -73,8 +74,9 @@ extension String {
     }
     
     subscript(i: IndexType) -> UnicodeScalar {
-      var scratch = ScratchGenerator(_base, i._position)
-      switch UTF16.decode(&scratch) {
+      var scratch = _ScratchGenerator(_base, i._position)
+      var decoder = UTF16()
+      switch decoder.decode(&scratch) {
       case .Result(let us):
         return us
       case .EmptyInput:
@@ -99,7 +101,7 @@ extension String {
       }
 
       mutating func next() -> UnicodeScalar? {
-        switch UTF16.decode(&self._base) {
+        switch _decoder.decode(&self._base) {
         case .Result(let us):
           return us
         case .EmptyInput:
@@ -108,6 +110,7 @@ extension String {
           _fatalError("unpaired surrogates are ill-formed in UTF-16")
         }
       }
+      var _decoder: UTF16 = UTF16()
       var _base: _StringCore.GeneratorType
     }
     
