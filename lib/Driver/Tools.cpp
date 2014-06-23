@@ -124,16 +124,24 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   arguments.push_back("-target");
   std::string TripleStr = TC.getTripleString();
   arguments.push_back(inputArgs.MakeArgString(TripleStr));
+  const llvm::Triple &Triple = TC.getTriple();
+
+  // Enable address top-byte ignored in the ARM64 backend.
+  if (Triple.getArch() == llvm::Triple::arm64 ||
+      Triple.getArch() == llvm::Triple::aarch64) {
+    arguments.push_back("-Xllvm");
+    arguments.push_back("-aarch64-use-tbi");
+  }
 
   // Handle the CPU and its preferences.
   if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
     arg->render(inputArgs, arguments);
   else
-    configureDefaultCPU(TC.getTriple(), arguments);
+    configureDefaultCPU(Triple, arguments);
   inputArgs.AddAllArgs(arguments, options::OPT_target_feature);
 
   // Default the ABI based on the triple.
-  configureDefaultABI(TC.getTriple(), arguments);
+  configureDefaultABI(Triple, arguments);
 
   arguments.push_back("-module-name");
   arguments.push_back(inputArgs.MakeArgString(OI.ModuleName));
