@@ -250,7 +250,8 @@ public:
   }
 
   void addTypeInfo(unsigned index, OptionalTypeKind kind) {
-    assert(index <= sizeof(OptionalTypesPayload)/OptionalTypeKindSize);
+    assert(index <=
+           (sizeof(OptionalTypesPayload) * CHAR_BIT)/OptionalTypeKindSize);
     assert(kind < OptionalTypeKindMask);
     assert(OptionalTypesAudited = true);
     unsigned kindValue =
