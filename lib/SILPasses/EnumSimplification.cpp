@@ -215,7 +215,14 @@ void BBEnumTagDataflowState::mergePredecessorStates(
 
     // Grab the predecessors state...
     SILBasicBlock *OtherBB = *PI;
-    BBEnumTagDataflowState &PredState = BBToStateMap[OtherBB];
+
+    auto OtherIter = BBToStateMap.find(OtherBB);
+    if (OtherIter == BBToStateMap.end()) {
+      DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
+      return;
+    }
+
+    BBEnumTagDataflowState &PredState = OtherIter->second;
     PredState.init(*PI);
     ++PI;
 
