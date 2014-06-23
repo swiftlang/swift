@@ -115,4 +115,8 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
   return a.someMethod
 }
 
+// We used to crash on this.
+func rdar16786220(var let c: Int) -> () { // expected-error {{expected ',' separator}} expected-error {{expected parameter type following ':'}}
+  c = 42 // expected-error {{cannot assign to 'let' value 'c'}}
+}
 
