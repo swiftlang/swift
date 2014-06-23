@@ -344,6 +344,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+              -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
               -DCMAKE_CXX_FLAGS="-stdlib=libc++ ${CMAKE_CXX_FLAGS}" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_EXE_LINKER_FLAGS}" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_SHARED_LINKER_FLAGS}" \
