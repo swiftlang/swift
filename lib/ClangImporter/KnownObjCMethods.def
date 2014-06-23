@@ -252,11 +252,11 @@ INSTANCE_METHOD(NSTextTableBlock,
 
 INSTANCE_METHOD(NSTextView, (2, "initWithFrame", "textContainer"), 
                 DesignatedInit)
+INSTANCE_METHOD(NSTextView, (1, "initWithFrame"), DesignatedInit)
 
 INSTANCE_METHOD(NSUserDefaultsController, 
                 (2, "initWithDefaults", "initialValues"), DesignatedInit)
 
-INSTANCE_METHOD(NSTextView, (1, "initWithFrame"), DesignatedInit)
 
 INSTANCE_METHOD(NSWindow, 
                 (4, "initWithContentRect", "styleMask", "backing", "defer"), 
