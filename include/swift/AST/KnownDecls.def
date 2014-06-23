@@ -36,6 +36,13 @@ FUNC_DECL(DictionaryBridgeFromObjectiveC,
 FUNC_DECL(DictionaryBridgeFromObjectiveCConditional, 
           "_dictionaryBridgeFromObjectiveCConditional")
 
-
+FUNC_DECL(ConvertPointerToPointerArgument,
+          "_convertPointerToPointerArgument")
+FUNC_DECL(ConvertInOutToPointerArgument,
+          "_convertInOutToPointerArgument")
+FUNC_DECL(ConvertMutableArrayToPointerArgument,
+          "_convertMutableArrayToPointerArgument")
+FUNC_DECL(ConvertConstArrayToPointerArgument,
+          "_convertConstArrayToPointerArgument")
 
 #undef FUNC_DECL

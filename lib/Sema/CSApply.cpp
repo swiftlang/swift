@@ -4154,18 +4154,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::User: {
+      tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return coerceViaUserConversion(expr, toType, locator);
     }
     
     case ConversionRestrictionKind::InoutToPointer: {
+      tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) InOutToPointerExpr(expr, toType);
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
+      tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) ArrayToPointerExpr(expr, toType);
     }
     
     case ConversionRestrictionKind::PointerToPointer: {
+      tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) PointerToPointerExpr(expr, toType);
     }
     }

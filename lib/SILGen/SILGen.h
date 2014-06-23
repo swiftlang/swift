@@ -100,6 +100,8 @@ public:
   Optional<SILDeclRef> UnsafePointerToCMutablePointerFn;
   Optional<SILDeclRef> UnsafePointerToAutoreleasingUnsafePointerFn;
   Optional<SILDeclRef> ConvertArraySimpleFn;
+
+  Optional<ProtocolDecl*> PointerProtocol;
   
 public:
   SILGenModule(SILModule &M, Module *SM);

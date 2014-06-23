@@ -837,6 +837,10 @@ public:
   /// exist.
   bool requireOptionalIntrinsics(SourceLoc loc);
 
+  /// Require that the library intrinsics for working with UnsafePointer<T>
+  /// exist.
+  bool requirePointerArgumentIntrinsics(SourceLoc loc);
+
   /// \brief Retrieve the witness type with the given name.
   ///
   /// \param type The type that conforms to the given protocol.

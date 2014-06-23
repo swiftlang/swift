@@ -867,6 +867,16 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
          ::hasOptionalIntrinsics(*this, resolver, OTK_ImplicitlyUnwrappedOptional);
 }
 
+bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
+  return getUnsafePointerDecl()
+    && getConstUnsafePointerDecl()
+    && getAutoreleasingUnsafePointerDecl()
+    && getConvertPointerToPointerArgument(resolver)
+    && getConvertMutableArrayToPointerArgument(resolver)
+    && getConvertConstArrayToPointerArgument(resolver)
+    && getConvertInOutToPointerArgument(resolver);
+}
+
 void ASTContext::addedExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }

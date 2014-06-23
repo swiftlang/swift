@@ -382,6 +382,12 @@ bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
   return true;
 }
 
+bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
+  if (Context.hasPointerArgumentIntrinsics(this)) return false;
+
+  diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  return true;
+}
 
 /// doesVarDeclMemberProduceLValue - Return true if a reference to the specified
 /// VarDecl should produce an lvalue.  If present, baseType indicates the base

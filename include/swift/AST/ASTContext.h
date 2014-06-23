@@ -420,6 +420,12 @@ public:
   /// non-null.
   bool hasOptionalIntrinsics(LazyResolver *resolver) const;
 
+  /// Check whether the standary library provides all the correct
+  /// intrinsic support for UnsafePointer<T> function arguments.
+  ///
+  /// If this is true, the methods to getConvert*ToPointerArgument
+  bool hasPointerArgumentIntrinsics(LazyResolver *resolver) const;
+
   /// Retrieve the declaration of Swift._getBool.
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 

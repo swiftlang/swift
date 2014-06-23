@@ -5479,14 +5479,72 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   return RValue(SGF, E, SGF.emitManagedRetain(E, entry.first));
 }
 
-RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C) {
+ProtocolDecl *SILGenFunction::getPointerProtocol() {
+  if (SGM.PointerProtocol)
+    return *SGM.PointerProtocol;
+  
+  SmallVector<ValueDecl*, 1> lookup;
+  getASTContext().lookupInSwiftModule("_Pointer", lookup);
+  // FIXME: Should check for protocol in Sema
+  assert(lookup.size() == 1 && "no _Pointer protocol");
+  assert(isa<ProtocolDecl>(lookup[0]) && "_Pointer is not a protocol");
+  SGM.PointerProtocol = cast<ProtocolDecl>(lookup[0]);
+  return cast<ProtocolDecl>(lookup[0]);
+}
+
+/// Produce a Substitution for a type that conforms to the standard library
+/// _Pointer protocol.
+Substitution SILGenFunction::getPointerSubstitution(Type pointerType,
+                                                    ArchetypeType *archetype) {
+  auto &Ctx = getASTContext();
+  ProtocolDecl *pointerProto = getPointerProtocol();
+  auto conformance
+    = Ctx.getStdlibModule()->lookupConformance(pointerType, pointerProto,
+                                               nullptr);
+  assert(conformance.getInt() == ConformanceKind::Conforms
+         && "not a _Pointer type");
+
+  // FIXME: Cache this
+  ProtocolConformance *conformances[] = {conformance.getPointer()};
+  auto conformancesCopy = Ctx.AllocateCopy(conformances);
+  
+  return Substitution{archetype, pointerType, conformancesCopy};
+}
+
+RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
+                                              SGFContext C) {
   llvm_unreachable("not implemented");
 }
-RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C) {
+RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
+                                              SGFContext C) {
   llvm_unreachable("not implemented");
 }
-RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
+RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
+                                                SGFContext C) {
+  auto &Ctx = SGF.getASTContext();
+  auto converter = Ctx.getConvertPointerToPointerArgument(nullptr);
+  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  // Get the original pointer value, abstracted to the converter function's
+  // expected level.
+  AbstractionPattern origTy(converter->getType()->castTo<AnyFunctionType>()
+                                                ->getInput());
+  auto &origTL = SGF.getTypeLowering(origTy, E->getSubExpr()->getType());
+  ManagedValue orig = SGF.emitRValueAsOrig(E->getSubExpr(), origTy, origTL);
+  // The generic function currently always requires indirection, but pointers
+  // are always loadable.
+  auto origBuf = SGF.emitTemporaryAllocation(E, orig.getType());
+  SGF.B.createStore(E, orig.forward(SGF), origBuf);
+  orig = SGF.emitManagedBufferWithCleanup(origBuf);
+  
+  // Invoke the conversion intrinsic to convert to the destination type.
+  Substitution subs[2] = {
+    SGF.getPointerSubstitution(E->getSubExpr()->getType(), converterArchetypes[0]),
+    SGF.getPointerSubstitution(E->getType(), converterArchetypes[1]),
+  };
+  
+  auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, C);
+  return RValue(SGF, E, result);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

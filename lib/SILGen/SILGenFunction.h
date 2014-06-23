@@ -989,6 +989,14 @@ public:
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
   ArrayRef<Substitution> getForwardingSubstitutions();
+  
+  /// Get the _Pointer protocol used for pointer argument operations.
+  ProtocolDecl *getPointerProtocol();
+  
+  /// Produce a substitution for invoking a pointer argument conversion
+  /// intrinsic.
+  Substitution getPointerSubstitution(Type pointerType,
+                                      ArchetypeType *archetype);
 };
 
 } // end namespace Lowering
