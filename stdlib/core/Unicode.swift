@@ -576,15 +576,18 @@ struct UTF32 : UnicodeCodec {
   mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UTFDecodeResult {
-    return UTF32.decode(&input)
+    return UTF32._decode(&input)
   }
 
-  static func decode<
+  static func _decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UTFDecodeResult {
-    var x = input.next()
-    if x {
-      return .Result(UnicodeScalar(x!))
+    if let x: UInt32 = input.next() {
+      if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
+        return .Result(UnicodeScalar(x))
+      } else {
+        return .Error
+      }
     }
     return .EmptyInput
   }
