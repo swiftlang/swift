@@ -454,7 +454,7 @@ swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
 bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
   bool NestingDetected = false;
 
-  DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
+  DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
 
   // For each BB in our reverse post order...
   for (auto *BB : reversed(PostOrder)) {
