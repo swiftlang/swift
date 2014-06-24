@@ -319,10 +319,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // extensions, so we'll need to be smarter here.
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  bool ImportsObjCModule = false;
+  bool ImportsFoundationModule = false;
+  auto FoundationModuleName = Ctx.getIdentifier("Foundation");
   SF.forAllVisibleModules([&](Module::ImportedModule import) {
-    if (import.second->getName() == Ctx.ObjCModuleName)
-      ImportsObjCModule = true;
+    if (import.second->getName() == FoundationModuleName)
+      ImportsFoundationModule = true;
 
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
@@ -396,10 +397,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (Ctx.LangOpts.EnableObjCAttrRequiresObjCModule &&
       SF.Kind == SourceFileKind::Main &&
       StartElem == 0 &&
-      SF.FirstObjCAttrLoc && !ImportsObjCModule) {
+      SF.FirstObjCAttrLoc && !ImportsFoundationModule) {
     auto L = SF.FirstObjCAttrLoc.getValue();
-    Ctx.Diags.diagnose(L, diag::objc_decl_used_without_objc_module,
-                       Ctx.ObjCModuleName)
+    Ctx.Diags.diagnose(L, diag::objc_decl_used_without_required_module,
+                       "objc", FoundationModuleName)
     .highlight(SourceRange(L));
   }
 

@@ -1,14 +1,14 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-import ObjectiveC
+import Foundation
 
 class X {
   init() {}
 
   @objc func f() { println("X.f()") }
 
-  @objc var value : Int {
-    println("X.value getter\n")
+  @objc var myValue : Int {
+    println("X.myValue getter\n")
     return 17
   }
 }
@@ -45,12 +45,12 @@ func test_dynamic_lookup_g(obj: AnyObject) {
   }
 }
 
-func test_dynamic_lookup_value(obj: AnyObject) {
-  var ov = obj.value
+func test_dynamic_lookup_myValue(obj: AnyObject) {
+  var ov = obj.myValue
   if ov {
-    println("value = \(ov!)")
+    println("myValue = \(ov!)")
   } else {
-    println("Object does not respond to the selector \"value\".")
+    println("Object does not respond to the selector \"myValue\".")
   }
 }
 
@@ -66,8 +66,8 @@ test_dynamic_lookup_g(X())
 // CHECK: Y.g()
 test_dynamic_lookup_g(Y())
 
-// CHECK: X.value getter
-// CHECK: value = 17
-test_dynamic_lookup_value(X())
-// CHECK: Object does not respond to the selector "value"
-test_dynamic_lookup_value(Y())
+// CHECK: X.myValue getter
+// CHECK: myValue = 17
+test_dynamic_lookup_myValue(X())
+// CHECK: Object does not respond to the selector "myValue"
+test_dynamic_lookup_myValue(Y())
