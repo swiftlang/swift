@@ -3791,6 +3791,8 @@ namespace {
 
     Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
+      if (hasNativeSwiftDecl(decl))
+        return nullptr;
 
       // Find the Swift class being extended.
       auto objcClass
@@ -3852,19 +3854,26 @@ namespace {
       return nullptr;
     }
 
-    template <typename T, typename U>
-    bool hasNativeSwiftDecl(const U *decl, Identifier name,
-                            const DeclContext *dc, T *&swiftDecl) {
+    template <typename U>
+    bool hasNativeSwiftDecl(const U *decl) {
       using clang::AnnotateAttr;
       for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
         if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
-          auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-          swiftDecl = resolveSwiftDecl<T>(decl, name, wrapperUnit);
           return true;
         }
       }
 
       return false;
+    }
+
+    template <typename T, typename U>
+    bool hasNativeSwiftDecl(const U *decl, Identifier name,
+                            const DeclContext *dc, T *&swiftDecl) {
+      if (!hasNativeSwiftDecl(decl))
+        return false;
+      auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
+      swiftDecl = resolveSwiftDecl<T>(decl, name, wrapperUnit);
+      return true;
     }
 
     void markMissingSwiftDecl(ValueDecl *VD) {

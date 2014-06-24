@@ -21,3 +21,5 @@ getBaseClass().categoryMethod()
 useBaseProto(getBaseProtoObjC())
 let p: BaseProto = UserClass()
 useBaseProtoObjC(p)
+
+getBaseClass().extensionMethod()

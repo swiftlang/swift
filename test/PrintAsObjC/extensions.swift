@@ -18,14 +18,16 @@ import AppKit
 // CHECK-NEXT: @end
 @objc class A1 {}
 
-// CHECK: @interface A1 ()
+// CHECK: SWIFT_EXTENSION{{$}}
+// CHECK: @interface A1 (extensions_Swift)
 // CHECK-NEXT: @end
 extension A1 {}
 
 // CHECK: @interface A2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: @interface A2 ()
+// CHECK: SWIFT_EXTENSION{{$}}
+// CHECK: @interface A2 (extensions_Swift)
 // CHECK-NEXT: @end
 extension A2 {}
 @objc class A2 {}
@@ -34,7 +36,8 @@ extension A2 {}
 class NotObjC {}
 extension NotObjC {}
 
-// CHECK: @interface NSObject ()
+// CHECK: SWIFT_EXTENSION{{$}}
+// CHECK: @interface NSObject (extensions_Swift)
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
@@ -42,7 +45,8 @@ extension NSObject {}
 
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
-// CHECK: @interface NSString ()
+// CHECK: SWIFT_EXTENSION{{$}}
+// CHECK: @interface NSString (extensions_Swift)
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
 // CHECK-NEXT: + (NSString *)fromColor:(NSColor *)color;

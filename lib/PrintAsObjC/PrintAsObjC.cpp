@@ -136,7 +136,8 @@ private:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-    os << "@interface " << baseClass->getName() << " ()";
+    os << "SWIFT_EXTENSION\n@interface " << baseClass->getName()
+       << " (" << ED->getModuleContext()->Name << "_Swift)";
     printProtocols(ED->getProtocols());
     os << "\n";
     printMembers(ED->getMembers());
@@ -909,6 +910,9 @@ public:
            "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
            "# define SWIFT_PROTOCOL_EXTRA\n"
            "#endif\n"
+           "#if !defined(SWIFT_EXTENSION_EXTRA)\n"
+           "# define SWIFT_EXTENSION_EXTRA\n"
+           "#endif\n"
            "#if !defined(SWIFT_CLASS)\n"
            "# if defined(__has_attribute) && "
              "__has_attribute(objc_subclassing_restricted) \n"
@@ -924,6 +928,10 @@ public:
            "#if !defined(SWIFT_PROTOCOL)\n"
            "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "SWIFT_PROTOCOL_EXTRA\n"
+           "#endif\n"
+           "\n"
+           "#if !defined(SWIFT_EXTENSION)\n"
+           "# define SWIFT_EXTENSION SWIFT_EXTENSION_EXTRA\n"
            "#endif\n"
            "\n"
            "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"

@@ -10,3 +10,7 @@ func useBaseClass(_: BaseClass) {}
 protocol BaseProto {}
 
 func useBaseProto(_: BaseProto) {}
+
+extension BaseClass {
+  func extensionMethod() {}
+}
