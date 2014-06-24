@@ -23,7 +23,7 @@ func swift_bufferAllocate(
   bufferType: HeapBufferStorageBase.Type, size: Int, alignMask: Int) -> AnyObject
 
 @asmname("malloc_size")
-func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
+func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
@@ -120,7 +120,7 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
   }
 
   func _allocatedSize() -> Int {
-    return c_malloc_size(UnsafePointer(_address))
+    return _malloc_size(UnsafePointer(_address))
   }
 
   func _allocatedAlignMask() -> Int {

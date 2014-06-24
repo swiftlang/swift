@@ -100,7 +100,7 @@ struct _StringCore {
     // Copy the old stuff into the new storage
     if _fastPath(srcElementWidth == dstElementWidth) {
       // No change in storage width; we can use memcpy
-      c_memcpy(
+      _memcpy(
         dest: UnsafePointer(dstStart),
         src: UnsafePointer(srcStart),
         size: UInt(count << (srcElementWidth - 1)))

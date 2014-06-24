@@ -51,9 +51,9 @@ func encodeBitsAsWords<T: CVarArg>(x: T) -> Word[] {
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
   var tmp = x
-  c_memcpy(dest: UnsafePointer(result._elementStorageIfContiguous),
-           src: UnsafePointer(Builtin.addressof(&tmp)),
-           size: UInt(sizeof(T.self)))
+  _memcpy(dest: UnsafePointer(result._elementStorageIfContiguous),
+          src: UnsafePointer(Builtin.addressof(&tmp)),
+          size: UInt(sizeof(T.self)))
   return result
 }
 

@@ -37,7 +37,7 @@ extension _StringCore {
       
       var result: UTF8Chunk = ~0 // start with all bits set
       
-      c_memcpy(
+      _memcpy(
         dest: UnsafePointer(Builtin.addressof(&result)), 
         src: UnsafePointer(startASCII + i), 
         size: numericCast(utf16Count))

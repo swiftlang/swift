@@ -150,8 +150,8 @@ var C_ARGC : CInt = CInt()
 var C_ARGV : UnsafePointer<CString> = UnsafePointer<CString>()
 
 
-func c_memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
-              #size: UInt) {
+func _memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
+             #size: UInt) {
   let dest = dest.value
   let src = src.value
   let size = UInt64(size).value

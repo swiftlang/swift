@@ -677,7 +677,7 @@ extension UTF16 {
     source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
   ) {
     if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
-      c_memcpy(
+      _memcpy(
         dest: UnsafePointer(destination),
         src: UnsafePointer(source),
         size: UInt(count) * UInt(Builtin.strideof(U.self)))
