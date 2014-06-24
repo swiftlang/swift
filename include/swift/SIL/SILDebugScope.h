@@ -20,6 +20,7 @@
 
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
 
@@ -60,6 +61,8 @@ public:
     : Loc(CalleeScope->Loc), Parent(CalleeScope->Parent),
       InlinedCallSite(CallSiteScope), SILFn(InlinedFn) {
     assert(CallSiteScope && CalleeScope);
+    assert(InlinedFn->getRefCount() > 0 &&
+           "Inlined function will be garbage collected");
   }
 
   void setParent(SILDebugScope *P) { Parent = P; }

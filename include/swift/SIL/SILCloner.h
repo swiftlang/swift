@@ -158,6 +158,9 @@ public:
     auto ClonedScope = new (To.getModule()) SILDebugScope(*OrigScope);
     ClonedScope->SILFn = &To;
     To.setDebugScope(ClonedScope);
+
+    if (OrigScope->SILFn)
+      To.getModule().markFunctionAsInlined(OrigScope->SILFn);
 }
 
 private:
