@@ -57,3 +57,61 @@ func arrayToPointer() {
   // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
   // CHECK: release_value [[OWNER]]
 }
+
+// CHECK-LABEL: sil @_TF18pointer_conversion14inoutToPointerFT_T_ 
+func inoutToPointer() {
+  var int = 0
+  // CHECK: [[INT:%.*]] = alloc_box $Int
+  takesMutablePointer(&int)
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGVSs13UnsafePointerSi_T_
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs8_Pointer__FBpQ_
+  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>>({{%.*}}, [[POINTER]])
+  // CHECK: apply [[TAKES_MUTABLE]]
+
+  var logicalInt: Int {
+    get { return 0 }
+    set { }
+  }
+  takesMutablePointer(&logicalInt)
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGVSs13UnsafePointerSi_T_
+  // CHECK: [[GETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_gL_10logicalIntSi
+  // CHECK: apply [[GETTER]]
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs8_Pointer__FBpQ_
+  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>>
+  // CHECK: apply [[TAKES_MUTABLE]]
+  // CHECK: [[SETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_sL_10logicalIntSi
+  // CHECK: apply [[SETTER]]
+}
+
+class C {}
+
+func takesPlusOnePointer(x: UnsafePointer<C>) {}
+func takesPlusZeroPointer(x: AutoreleasingUnsafePointer<C>) {}
+
+// CHECK-LABEL: sil @_TF18pointer_conversion19classInoutToPointerFT_T_
+func classInoutToPointer() {
+  var c = C()
+  // CHECK: [[VAR:%.*]] = alloc_box $C
+  takesPlusOnePointer(&c)
+  // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_TF18pointer_conversion19takesPlusOnePointerFGVSs13UnsafePointerCS_1C_T_
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs8_Pointer__FBpQ_
+  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<C>>({{%.*}}, [[POINTER]])
+  // CHECK: apply [[TAKES_PLUS_ONE]]
+
+  takesPlusZeroPointer(&c)
+  // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @_TF18pointer_conversion20takesPlusZeroPointerFGVSs26AutoreleasingUnsafePointerCS_1C_T_
+  // CHECK: [[OWNED:%.*]] = load [[VAR]]
+  // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
+  // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
+  // CHECK: store [[UNOWNED]] to [[WRITEBACK]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs30_convertInOutToPointerArgumentUSs8_Pointer__FBpQ_
+  // CHECK: apply [transparent] [[CONVERT]]<AutoreleasingUnsafePointer<C>>({{%.*}}, [[POINTER]])
+  // CHECK: apply [[TAKES_PLUS_ZERO]]
+  // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
+  // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
+  // CHECK: retain_value [[OWNED_OUT]]
+  // CHECK: assign [[OWNED_OUT]] to [[VAR]]
+}

@@ -3303,7 +3303,12 @@ public:
     return T->getKind() == TypeKind::UnownedStorage;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
+BEGIN_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
+  static CanUnownedStorageType get(CanType referent) {
+    return cast<UnownedStorageType>(
+        CanType(UnownedStorageType::get(referent, referent->getASTContext())));
+  }
+END_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
 
 /// \brief The storage type of a variable with @unowned(unsafe)
 /// ownership semantics, akin to the library Unmanaged<> type.
@@ -3325,7 +3330,12 @@ public:
     return T->getKind() == TypeKind::UnmanagedStorage;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
+BEGIN_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
+  static CanUnmanagedStorageType get(CanType referent) {
+    return cast<UnmanagedStorageType>(
+       CanType(UnmanagedStorageType::get(referent, referent->getASTContext())));
+  }
+END_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
 
 /// \brief The storage type of a variable with [weak] ownership semantics.
 class WeakStorageType : public ReferenceStorageType {

@@ -1084,7 +1084,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
 
   // Easy case: the types match.
   if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    assert(!hasDifferentTypeOfRValue(srcTL));
+    //assert(!hasDifferentTypeOfRValue(srcTL));
     return srcTL.emitLoadOfCopy(B, loc, src, isTake);
   }
 
@@ -1105,7 +1105,7 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
 
   // Easy case: the types match.
   if (srcTL.getLoweredType() == destTL.getLoweredType()) {
-    assert(!hasDifferentTypeOfRValue(srcTL));
+    //assert(!hasDifferentTypeOfRValue(srcTL));
     B.createCopyAddr(loc, src, dest, isTake, isInit);
     return;
   }
@@ -1124,7 +1124,7 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
 
   // Easy case: the types match.
   if (rvalue.getType() == destTL.getLoweredType()) {
-    assert(!hasDifferentTypeOfRValue(destTL));
+    //assert(!hasDifferentTypeOfRValue(destTL));
     assert(destTL.isAddressOnly() == rvalue.getType().isAddress());
     if (rvalue.getType().isAddress()) {
       B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);

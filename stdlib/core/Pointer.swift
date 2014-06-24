@@ -17,18 +17,12 @@ func _convertPointerToPointerArgument<
   return ToPointer(from.value)
 }
 
-/// Derive a pointer argument from an inout parameter.
-///
-/// This function is invoked with special writeback semantics; the lifetime
-/// of the inout buffer is guaranteed for the duration of the call for which
-/// this conversion is performed, rather than only for the duration of the
-/// conversion call itself.
+/// Derive a pointer argument from the address of an inout parameter.
 @transparent
 func _convertInOutToPointerArgument<
-  From,
   ToPointer: _Pointer
->(inout from: From) -> ToPointer {
-  return ToPointer(Builtin.addressof(&from))
+>(from: Builtin.RawPointer) -> ToPointer {
+  return ToPointer(from)
 }
 
 /// Derive a pointer argument from an inout array parameter.

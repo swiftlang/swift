@@ -5511,9 +5511,94 @@ Substitution SILGenFunction::getPointerSubstitution(Type pointerType,
   return Substitution{archetype, pointerType, conformancesCopy};
 }
 
+namespace {
+class AutoreleasingWritebackComponent : public LogicalPathComponent {
+public:
+  AutoreleasingWritebackComponent(LValueTypeData typeData)
+    : LogicalPathComponent(typeData)
+  {}
+  
+  std::unique_ptr<LogicalPathComponent>
+  clone(SILGenFunction &gen, SILLocation l) const override {
+    return std::unique_ptr<LogicalPathComponent>(
+      new AutoreleasingWritebackComponent(getTypeData()));
+  }
+  
+  void set(SILGenFunction &gen, SILLocation loc,
+           RValue &&value, ManagedValue base) const override {
+    // Convert the value back to a +1 strong reference.
+    auto unowned = std::move(value).getAsSingleValue(gen, loc).getUnmanagedValue();
+    auto strongType = SILType::getPrimitiveObjectType(
+              unowned.getType().castTo<UnmanagedStorageType>().getReferentType());
+    auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
+    gen.B.createRetainValue(loc, owned);
+    auto ownedMV = gen.emitManagedRValueWithCleanup(owned);
+    
+    // Reassign the +1 storage with it.
+    ownedMV.assignInto(gen, loc, base.getUnmanagedValue());
+  }
+  
+  ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                   ManagedValue base, SGFContext c) const override {
+    // Load the value at +0.
+    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
+    // Convert it to unowned.
+    auto unownedType = SILType::getPrimitiveObjectType(
+            CanUnmanagedStorageType::get(owned.getType().getSwiftRValueType()));
+    SILValue unowned = gen.B.createRefToUnmanaged(loc, owned, unownedType);
+    
+    return ManagedValue::forUnmanaged(unowned);
+  }
+};
+} // end anonymous namespace
+
 RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
                                               SGFContext C) {
-  llvm_unreachable("not implemented");
+  // Get the original lvalue.
+  LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr());
+  
+  // If we're converting on the behalf of an AutoreleasingUnsafePointer, convert
+  // the lvalue to unowned(unsafe), so we can point at +0 storage.
+  PointerTypeKind pointerKind;
+  Type elt = E->getType()->getAnyPointerElementType(pointerKind);
+  assert(elt && "not a pointer");
+  (void)elt;
+  switch (pointerKind) {
+  case PTK_UnsafePointer:
+  case PTK_ConstUnsafePointer:
+    // +1 is fine.
+    break;
+
+  case PTK_AutoreleasingUnsafePointer: {
+    // Set up a writeback through a +0 buffer.
+    LValueTypeData typeData = lv.getTypeData();
+    LValueTypeData unownedTypeData(
+      AbstractionPattern(
+        CanUnmanagedStorageType::get(typeData.OrigFormalType.getAsType())),
+      CanUnmanagedStorageType::get(typeData.SubstFormalType),
+      SILType::getPrimitiveObjectType(typeData.TypeOfRValue.getSwiftRValueType()));
+    lv.add<AutoreleasingWritebackComponent>(unownedTypeData);
+    break;
+  }
+  }
+  
+  // Get the lvalue address as a raw pointer.
+  SILValue address = SGF.emitAddressOfLValue(E, lv).getUnmanagedValue();
+  address = SGF.B.createAddressToPointer(E, address,
+                               SILType::getRawPointerType(SGF.getASTContext()));
+  
+  // Disable nested writeback scopes for any calls evaluated during the
+  // conversion intrinsic.
+  InOutConversionScope scope(SGF);
+  
+  // Invoke the conversion intrinsic.
+  auto &Ctx = SGF.getASTContext();
+  FuncDecl *converter = Ctx.getConvertInOutToPointerArgument(nullptr);
+  Substitution sub = SGF.getPointerSubstitution(E->getType(),
+                          converter->getGenericParams()->getAllArchetypes()[0]);
+  auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, sub,
+                                        ManagedValue::forUnmanaged(address), C);
+  return RValue(SGF, E, result);
 }
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
