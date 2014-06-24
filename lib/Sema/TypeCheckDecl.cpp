@@ -2194,7 +2194,7 @@ public:
     // The instance var requires ObjC interop if it has an @objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
     Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy && !VD->isStatic()) {
+    if (ContextTy) {
       ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(VD->getDeclContext());
@@ -5627,9 +5627,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!isInClassOrProtocolContext(VD))
         error = diag::invalid_objc_decl;
-      else if (VD->isStatic())
-        error = diag::objc_invalid_on_static_var;
-      /* Otherwise it is an instance variable -- ok */
     } else if (isa<ProtocolDecl>(D)) {
       /* ok */
     } else {

@@ -87,8 +87,10 @@ class subject_getterSetter1 {
 
 class subject_staticVar1 {
   @objc
-  class var staticVar1: Int = 42 // expected-error {{type properties cannot be declared '@objc'}}
-  // expected-error@-1 {{class variables not yet supported}}
+  class var staticVar1: Int = 42 // expected-error {{class variables not yet supported}}
+
+  @objc
+  class var staticVar2: Int { return 42 }
 }
 
 @objc
@@ -1357,7 +1359,7 @@ class infer_staticVar1 {
 // CHECK-LABEL: @objc class infer_staticVar1 {
 
   class var staticVar1: Int = 42 // expected-error {{class variables not yet supported}}
-  // CHECK: {{^}} class var staticVar1: Int
+  // CHECK: @objc class var staticVar1: Int
 }
 
 // @!objc

@@ -201,6 +201,8 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @property (nonatomic, readonly) Properties * this;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
+// CHECK-NEXT: + (Properties *)shared;
+// CHECK-NEXT: + (void)setShared:(Properties *)newValue;
 // CHECK-NEXT: @property (nonatomic) Properties * weakOther;
 // CHECK-NEXT: @property (nonatomic) Properties * unownedOther;
 // CHECK-NEXT: @property (nonatomic) Properties * unmanagedOther;
@@ -222,7 +224,10 @@ class MyObject : NSObject {}
     }
   }
 
-  class var shared: Properties { return Properties() }
+  class var shared: Properties {
+    get { return Properties() }
+    set { }
+  }
 
   weak var weakOther: Properties?
   unowned var unownedOther: Properties = .shared

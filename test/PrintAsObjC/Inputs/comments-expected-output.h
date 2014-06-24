@@ -16,6 +16,9 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
 
 /// Aaa.  v1.
 @property (nonatomic) NSInteger v1;
+
+/// Aaa.  v2.
++ (NSInteger)v2;
 @end
 
 

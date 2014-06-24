@@ -248,9 +248,16 @@ private:
   void visitVarDecl(VarDecl *VD) {
     assert(VD->getDeclContext()->isTypeContext() &&
            "cannot handle global variables right now");
-    assert(!VD->isStatic() && "class properties cannot be @objc");
 
     printDocumentationComment(VD);
+
+    if (VD->isStatic()) {
+      // Objective-C doesn't have class properties. Just print the accessors.
+      printAbstractFunction(VD->getGetter(), true);
+      if (auto setter = VD->getSetter())
+        printAbstractFunction(setter, true);
+      return;
+    }
 
     // For now, never promise atomicity.
     os << "@property (nonatomic";
