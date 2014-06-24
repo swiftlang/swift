@@ -73,3 +73,14 @@ extern NSNumber * const SomeNumber;
 
 
 __weak id globalWeakVar;
+
+@protocol Incomplete
+- (id)getObject;
+- (id)getObjectFromVarArgs:(id)first, ...;
+@end
+
+@protocol IncompleteOptional
+@optional
+- (id)getObject;
+- (id)getObjectFromVarArgs:(id)first, ...;
+@end

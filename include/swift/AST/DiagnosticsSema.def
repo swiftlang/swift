@@ -456,6 +456,9 @@ ERROR(type_does_not_inherit,sema_tcd,none,
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
+ERROR(protocol_has_missing_requirements,sema_tcd,none,
+      "type %0 cannot conform to protocol %1 because it has requirements that "
+      "cannot be satisfied", (Type, Type))
 ERROR(witness_argument_name_mismatch,sema_tcd,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))

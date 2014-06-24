@@ -426,3 +426,7 @@ func testWeakVariable() {
   let _: AnyObject = globalWeakVar
 }
 
+class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-error {{type 'IncompleteProtocolAdopter' cannot conform to protocol 'Incomplete' because it has requirements that cannot be satisfied}}
+  func getObject() -> AnyObject { return self }
+}
+

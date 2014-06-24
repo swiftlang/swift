@@ -924,8 +924,9 @@ public:
     typeResolver = newResolver;
   }
 
-  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t unused) override;
+  virtual ArrayRef<Decl *>
+  loadAllMembers(const Decl *D, uint64_t unused,
+                 bool *hasMissingRequiredMembers) override;
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {

@@ -1832,6 +1832,15 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return conformance;
   }
 
+  // If the protocol contains missing requirements, it can't be conformed to
+  // at all.
+  if (Proto->hasMissingRequirements()) {
+    TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
+                T, Proto->getDeclaredType());
+    conformance->setState(ProtocolConformanceState::Invalid);
+    return conformance;
+  }
+
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;

@@ -524,7 +524,8 @@ public:
                                      GenericParamList *outerParams = nullptr);
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t contextData) override;
+                                          uint64_t contextData,
+                                          bool *ignored) override;
 
   virtual ArrayRef<ProtocolConformance *>
   loadAllConformances(const Decl *D, uint64_t contextData) override;

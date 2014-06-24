@@ -3207,7 +3207,8 @@ Type ModuleFile::getType(TypeID TID) {
 }
 
 ArrayRef<Decl *> ModuleFile::loadAllMembers(const Decl *D,
-                                            uint64_t contextData) {
+                                            uint64_t contextData,
+                                            bool *) {
   // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);

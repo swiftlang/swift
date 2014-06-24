@@ -3464,7 +3464,8 @@ namespace {
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
                            DeclContext *swiftContext,
-                           SmallVectorImpl<Decl *> &members) {
+                           SmallVectorImpl<Decl *> &members,
+                           bool &hasMissingRequiredMember) {
       llvm::SmallPtrSet<Decl *, 4> knownMembers;
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
            m != mEnd; ++m) {
@@ -3473,8 +3474,18 @@ namespace {
           continue;
 
         auto member = Impl.importDecl(nd);
-        if (!member)
+        if (!member) {
+          if (auto method = dyn_cast<clang::ObjCMethodDecl>(nd)) {
+            if (method->getImplementationControl() ==
+                clang::ObjCMethodDecl::Required)
+              hasMissingRequiredMember = true;
+          } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(nd)) {
+            if (prop->getPropertyImplementation() ==
+                clang::ObjCPropertyDecl::Required)
+              hasMissingRequiredMember = true;
+          }
           continue;
+        }
 
         // If this member is a method that is a getter or setter for a property
         // that was imported, don't add it to the list of members so it won't
@@ -4903,7 +4914,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 
 
 ArrayRef<Decl *>
-ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
+ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused,
+                                              bool *hasMissingRequiredMembers) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
@@ -4921,8 +4933,13 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   }
 
   ImportingEntityRAII Importing(*this);
+
+  bool scratch;
+  if (!hasMissingRequiredMembers)
+    hasMissingRequiredMembers = &scratch;
+  *hasMissingRequiredMembers = false;
   converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
-                              members);
+                              members, *hasMissingRequiredMembers);
 
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
     auto swiftClass = cast<ClassDecl>(D);

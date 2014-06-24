@@ -106,8 +106,12 @@ public:
   /// \p D.
   ///
   /// The implementation should \em not call setMembers on \p D.
-  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t contextData) {
+  ///
+  /// \param[out] hasMissingRequiredMembers If present, set to true if any
+  /// members failed to import and were non-optional protocol requirements.
+  virtual ArrayRef<Decl *>
+  loadAllMembers(const Decl *D, uint64_t contextData,
+                 bool *hasMissingRequiredMembers = nullptr) {
     llvm_unreachable("unimplemented");
   }
 

@@ -462,8 +462,12 @@ class alignas(8) Decl {
 
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
+
+    /// True if the protocol has requirements that cannot be satisfied (e.g.
+    /// because they could not be imported from Objective-C).
+    unsigned HasMissingRequirements : 1;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 11 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 12 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class ClassDeclBitfields {
@@ -3043,6 +3047,20 @@ public:
   /// Record the current stage of circularity checking.
   void setCircularityCheck(CircularityCheck circularity) {
     ProtocolDeclBits.Circularity = static_cast<unsigned>(circularity);
+  }
+
+  /// Returns true if the protocol has requirements that are not listed in its
+  /// members.
+  ///
+  /// This can occur, for example, if the protocol is an Objective-C protocol
+  /// with requirements that cannot be represented in Swift.
+  bool hasMissingRequirements() const {
+    (void)getMembers();
+    return ProtocolDeclBits.HasMissingRequirements;
+  }
+
+  void setHasMissingRequirements(bool newValue) {
+    ProtocolDeclBits.HasMissingRequirements = newValue;
   }
 
   /// Retrieve the name to use for this protocol when interoperating

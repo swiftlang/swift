@@ -531,9 +531,15 @@ void IterableDeclContext::loadAllMembers() const {
     break;
   }
 
-  for (auto member : resolver->loadAllMembers(container, contextData)) {
+  bool hasMissingRequiredMembers = false;
+  for (auto member : resolver->loadAllMembers(container, contextData,
+                                              &hasMissingRequiredMembers)) {
     const_cast<IterableDeclContext *>(this)->addMember(member);
   }
+
+  if (hasMissingRequiredMembers)
+    if (auto proto = dyn_cast<ProtocolDecl>(this))
+      const_cast<ProtocolDecl *>(proto)->setHasMissingRequirements(true);
 
   --NumUnloadedLazyIterableDeclContexts;
 }
