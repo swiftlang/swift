@@ -1270,18 +1270,20 @@ static bool areLayoutCompatibleTypes(SILType Ty1, SILType Ty2, SILModule &Mod,
 
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
+  SILModule &Mod = UADCI->getModule();
+
   // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
   //   ->
   // (unchecked-addr-cast x X->Z)
   if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return new (UADCI->getModule()) UncheckedAddrCastInst(
+    return new (Mod) UncheckedAddrCastInst(
         UADCI->getLoc(), OtherUADCI->getOperand(), UADCI->getType());
 
   // (unchecked-addr-cast cls->superclass) -> (upcast cls->superclass)
   if (UADCI->getType() != UADCI->getOperand().getType() &&
       UADCI->getType().isSuperclassOf(UADCI->getOperand().getType()))
-    return new (UADCI->getModule())
-        UpcastInst(UADCI->getLoc(), UADCI->getOperand(), UADCI->getType());
+    return new (Mod) UpcastInst(UADCI->getLoc(), UADCI->getOperand(),
+                                UADCI->getType());
 
   // *NOTE* InstSimplify already handles the identity case so we don't need to
   // worry about that problem here and can assume that the cast types are
@@ -1289,10 +1291,11 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   llvm::SmallVector<Projection, 4> Projs;
 
   // Given (unchecked_addr_cast x X->Y), we prove that Y is layout compatible
-  // with X before we attempt to rewrite anything.
+  // with X as an aggregate. If we can do that, then we can rewrite the cast as
+  // a typed GEP.
   if (areLayoutCompatibleTypes(UADCI->getType(),
                                UADCI->getOperand().getType(),
-                               UADCI->getModule(),
+                               Mod,
                                Projs)) {
     SILBuilder Builder(UADCI);
     SILValue V = UADCI->getOperand();
@@ -1315,7 +1318,67 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     return replaceInstUsesWith(*UADCI, V.getDef(), 0);
   }
 
-  return nullptr;
+  // Ok, we can't rewrite this one. See if we have all loads from this
+  // instruction. If we do, load the original type and create a bitcast.
+
+  // First if our UADCI has not users, bail. This will be eliminated by DCE.
+  if (UADCI->use_empty())
+    return nullptr;
+
+  SILType InputTy = UADCI->getOperand().getType();
+  SILType OutputTy = UADCI->getType();
+
+  // If either type is address only, do not do anything here.
+  if (InputTy.isAddressOnly(Mod) ||
+      OutputTy.isAddressOnly(Mod))
+    return nullptr;
+
+  // If our UADCI does not have fully layout compatible types, we can't do
+  // anything here.
+  if (!OutputTy.isLayoutCompatibleWith(InputTy, Mod))
+    return nullptr;
+
+  // If our types have mismatching trivial properties, bail.
+  // TODO: Can we handle this case?
+  bool InputIsTrivial = InputTy.isTrivial(Mod);
+  bool OutputIsTrivial = OutputTy.isTrivial(Mod);
+  if (InputIsTrivial != OutputIsTrivial)
+    return nullptr;
+  bool IsTrivialCast = InputIsTrivial;
+
+  // For each user U of the unchecked_addr_cast...
+  for (auto U : UADCI->getUses())
+    // Check if it is load. If it is not a load, bail...
+    if (!isa<LoadInst>(U->getUser()))
+      return nullptr;
+
+  SILValue Op = UADCI->getOperand();
+  SILLocation Loc = UADCI->getLoc();
+
+  // Ok, we have all loads. Lets simplify this. Go back through the loads a
+  // second time, rewriting them into a load + bitcast from our source.
+  for (auto U : UADCI->getUses()) {
+    // Grab the original load.
+    LoadInst *L = cast<LoadInst>(U->getUser());
+
+    // Insert a new load from our source and bitcast that as appropriate.
+    LoadInst *NewLoad = Builder->createLoad(Loc, Op);
+    SILInstruction *BitCast = nullptr;
+    if (IsTrivialCast)
+      BitCast = Builder->createUncheckedTrivialBitCast(Loc, NewLoad,
+                                                       OutputTy.getObjectType());
+    else
+      BitCast = Builder->createUncheckedRefBitCast(Loc, NewLoad,
+                                                   OutputTy.getObjectType());
+
+    // Replace all uses of the old load with the new bitcasted result and erase
+    // the old load.
+    replaceInstUsesWith(*L, BitCast, 0);
+    eraseInstFromFunction(*L);
+  }
+
+  // Delete the old cast.
+  return eraseInstFromFunction(*UADCI);
 }
 
 SILInstruction *
