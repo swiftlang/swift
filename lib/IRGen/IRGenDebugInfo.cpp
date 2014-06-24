@@ -248,7 +248,7 @@ Location getLoc(SourceManager &SM, SourceLoc Loc) {
 template <typename WithLoc>
 Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
   Location L = {};
-  if (!S || S->isImplicit())
+  if (S == nullptr)
     return L;
 
   SourceLoc Loc = End ? S->getEndLoc() : S->getStartLoc();
