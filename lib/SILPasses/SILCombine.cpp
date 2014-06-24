@@ -1405,7 +1405,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   SILType PayloadType = TEDAI->getType().getObjectType();
 
   // Go back through a second time now that we know all of our users are
-  // stores. Perform the transformation on each load.
+  // loads. Perform the transformation on each load.
   for (auto U : TEDAI->getUses()) {
     // Grab the load.
     LoadInst *L = cast<LoadInst>(U->getUser());
@@ -1419,10 +1419,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     eraseInstFromFunction(*L);
   }
 
-  // Just return nullptr without removing unchecked_take_enum_data_addr. The
-  // reason why we do this is so that we ensure that the enum address is
-  // properly invalidated.
-  return nullptr;
+  return eraseInstFromFunction(*TEDAI);
 }
 
 SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
