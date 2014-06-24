@@ -38,30 +38,37 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 /// Given the already emitted load PrevLI, see if we can find a projection
 /// address path to LI. If we can, emit the corresponding aggregate projection
 /// insts and return the last such inst.
-static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
-  // Attempt to find the projection path from LI -> PrevLI.
-  SILValue PrevLIOp = PrevLI->getOperand();
-  SILValue LIOp = LI->getOperand();
+///
+/// TODO: This is confusing to me and needs better names. What this is supposed
+/// to do is find the relationship in between the address we are loading from \p
+/// LI and \p Address under the assumption that \p Value is the value stored at
+/// \p Address. Then it emits the relevant typed extracts to get the appropriate
+/// part of Value to propagate to users of LI.
+static SILValue
+findExtractPathBetweenValues(SILValue Address, SILValue StoredValue,
+                             LoadInst *Load) {
+  // Attempt to find the projection path from Address -> Load->getOperand().
+  SILValue LIOp = Load->getOperand();
   llvm::SmallVector<Projection, 4> ProjectionPath;
 
   // If we failed to find the path, return an empty value early.
-  if (!findAddressProjectionPathBetweenValues(PrevLIOp, LIOp, ProjectionPath))
+  if (!findAddressProjectionPathBetweenValues(Address, LIOp, ProjectionPath))
     return SILValue();
 
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (ProjectionPath.empty())
-    return PrevLI;
+    return StoredValue;
 
   // Ok, at this point we know that we can construct our aggregate projections
   // from our list of address projections.
-  SILValue LastExtract = PrevLI;
-  SILBuilder Builder(LI);
+  SILValue LastExtract = StoredValue;
+  SILBuilder Builder(Load);
   while (!ProjectionPath.empty()) {
     auto P = ProjectionPath.pop_back_val();
     if (ValueDecl *D = P.getDecl()) {
       if (P.getNominalType() == Projection::NominalType::Struct) {
-        LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
+        LastExtract = Builder.createStructExtract(Load->getLoc(), LastExtract,
                                                   cast<VarDecl>(D),
                                                   P.getType().getObjectType());
         assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
@@ -71,13 +78,13 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
                "Expected an enum decl here. Only other possibility is a "
                "class which we do not support");
         LastExtract = Builder.createUncheckedEnumData(
-            LI->getLoc(), LastExtract, cast<EnumElementDecl>(D),
+            Load->getLoc(), LastExtract, cast<EnumElementDecl>(D),
             P.getType().getObjectType());
         assert(cast<UncheckedEnumDataInst>(*LastExtract).getElement() &&
                "Instruction must have an enum element decl!");
       }
     } else {
-      LastExtract = Builder.createTupleExtract(LI->getLoc(), LastExtract,
+      LastExtract = Builder.createTupleExtract(Load->getLoc(), LastExtract,
                                                P.getIndex(),
                                                P.getType().getObjectType());
       assert(cast<TupleExtractInst>(*LastExtract).getTupleType() &&
@@ -238,12 +245,9 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
   Stores.insert(SI);
 }
 
-static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
-  SILValue Source = SI->getSrc();
-  auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LI->getOperand());
-  if (!UADCI)
-    return SI->getDest() != LI->getOperand()? SILValue() : Source;
-
+static SILValue
+tryToForwardStoreToUncheckedAddrToLoad(StoreInst *SI, LoadInst *LI,
+                                       UncheckedAddrCastInst *UADCI) {
   SILValue UADCIOp = UADCI->getOperand();
   if (SI->getDest() != UADCIOp)
     return SILValue();
@@ -269,6 +273,7 @@ static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
     return SILValue();
 
   SILBuilder B(SI);
+  SILValue Source = SI->getSrc();
 
   // If both input and output are trivial types, return an
   // unchecked_trivial_bit_cast.
@@ -283,8 +288,19 @@ static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
                                      OutputTy.getObjectType());
 }
 
+static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
+  // First if we have a store + unchecked_addr_cast + load, try to forward the
+  // value the store using a bitcast.
+  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LI->getOperand()))
+    return tryToForwardStoreToUncheckedAddrToLoad(SI, LI, UADCI);
+
+  // Next, try to promote partial loads from stores. If this fails, it will
+  // return SILValue(), which is also our failure condition.
+  return findExtractPathBetweenValues(SI->getDest(), SI->getSrc(), LI);  
+}
+
 void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {  
-  // If we are loading a value that we just saved then use the saved value.
+  // If we are loading a value that we just stored, forward the stored value.
   for (auto *PrevStore : Stores) {
     SILValue Result = tryToForwardStoreToLoad(PrevStore, LI);
     if (!Result)
@@ -298,34 +314,11 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     return;
   }
 
-  // Promote partial loads.
-  // Check that we are loading a struct element:
-  if (auto *SEAI = dyn_cast<StructElementAddrInst>(LI->getOperand())) {
-    for (auto *PrevStore : Stores) {
-      // And that the previous store stores into that struct.
-      if (PrevStore->getDest() != SEAI->getOperand())
-        continue;
-
-      // And that the stored value is a struct construction instruction:
-      auto *SI = dyn_cast<StructInst>(PrevStore->getSrc());
-      if (!SI)
-        continue;
-
-      DEBUG(llvm::dbgs() << "    Forwarding element store from: "
-            << *PrevStore);
-      unsigned FieldNo = SEAI->getFieldNo();
-      SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
-      deleteInstruction(LI);
-      Changed = true;
-      NumForwardedLoads++;
-      return;
-    }
-  }
-
   // Search the previous loads and replace the current load with one of the
   // previous loads.
   for (auto PrevLI : Loads) {
-    SILValue ForwardingExtract = findExtractPathBetweenValues(PrevLI, LI);
+    SILValue ForwardingExtract =
+      findExtractPathBetweenValues(PrevLI->getOperand(), PrevLI, LI);
     if (!ForwardingExtract)
       continue;
 

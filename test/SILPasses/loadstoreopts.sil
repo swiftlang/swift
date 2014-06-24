@@ -164,14 +164,14 @@ struct Agg1 {
   var a : Agg2
 }
 
-// CHECK-LABEL: sil @load_store_forwarding_from_aggregate_to_field
+// CHECK-LABEL: sil @load_dedup_forwarding_from_aggregate_to_field
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]]
 // CHECK-NEXT: load [[INPUT_PTR]]
 // CHECK-NEXT: struct_extract
 // CHECK-NEXT: struct_extract
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
-sil @load_store_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
+sil @load_dedup_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
 bb0(%0 : $*Agg1):
   %1 = load %0 : $*Agg1
   %2 = struct_element_addr %0 : $*Agg1, #Agg1.a
@@ -184,10 +184,11 @@ bb0(%0 : $*Agg1):
 struct Wrapper {
   var value : Builtin.Int32
 }
-//CHECK-LABEL: promote_partial_load
-//CHECK: alloc_stack
-//CHECK-NOT: load
-//CHECK: return %0
+// CHECK-LABEL: promote_partial_load
+// CHECK: alloc_stack
+// CHECK-NOT: load
+// CHECK: [[RESULT:%[0-9]+]] = struct_extract
+// CHECK: return [[RESULT]]
 sil @promote_partial_load : $@thin (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = alloc_stack $Wrapper
@@ -320,4 +321,25 @@ bb0(%0 : $Optional<B>):
   dealloc_stack %1#0 : $*@local_storage Optional<B>
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_from_aggregate_to_field
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil @load_store_forwarding_from_aggregate_to_field : $@thin (Agg1) -> (Builtin.Int32) {
+bb0(%0 : $Agg1):
+  %1 = alloc_stack $Agg1
+  store %0 to %1#1 : $*Agg1
+  %2 = struct_element_addr %1#1 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load %4 : $*Builtin.Int32
+  dealloc_stack %1#0 : $*@local_storage Agg1
+  return %5 : $Builtin.Int32
 }
