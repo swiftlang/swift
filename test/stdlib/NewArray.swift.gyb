@@ -39,8 +39,8 @@ class X : ForwardIndex, Comparable, Printable {
     return value.description
   }
 
-  func succ() -> X {
-    return X(self.value.succ())
+  func successor() -> X {
+    return X(self.value.successor())
   }
   
   var value: Int
@@ -131,7 +131,7 @@ where T.GeneratorType.Element == T._Buffer.Element,
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
   let y = x
-  x[x.endIndex.pred()] = 17
+  x[x.endIndex.predecessor()] = 17
   let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
   

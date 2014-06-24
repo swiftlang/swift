@@ -300,13 +300,13 @@ extension String : Collection {
       self._base = _base
     }
 
-    func succ() -> Index {
+    func successor() -> Index {
        // For now, each Character will just be a single UnicodeScalar
-      return Index(_base.succ())
+      return Index(_base.successor())
     }
-    func pred() -> Index {
+    func predecessor() -> Index {
        // For now, each Character will just be a single UnicodeScalar
-      return Index(_base.pred())
+      return Index(_base.predecessor())
     }
     let _base: UnicodeScalarView.IndexType
 

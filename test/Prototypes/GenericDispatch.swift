@@ -34,7 +34,7 @@ println("testing...")
 // yet smart enough to handle.
 protocol F_ {
   // Non-defaulted requirements of F go here
-  func succ() -> Self
+  func successor() -> Self
 }
 
 protocol F : F_ {
@@ -61,7 +61,7 @@ func _distance<I>(other: I) -> (_Distance, (I)) {
 
 // Default Implementation of distance for F's
 func ~> <I: F_>(self_:I, (_Distance, (I))) -> Int {
-  self_.succ() // Use an F-specific operation
+  self_.successor() // Use an F-specific operation
   println("F")
   return 0
 }
@@ -113,12 +113,12 @@ func ~> <I: D_>(x:I, args: (_Distance, (I))) -> Int {
 
 // This model of F automatically gets F's default implementation of distance
 struct SlowIndex : F {
-  func succ() -> SlowIndex { return self }
+  func successor() -> SlowIndex { return self }
 }
 
 // This model of R automatically gets R's default implementation of distance
 struct FastIndex : R {
-  func succ() -> FastIndex { return self }
+  func successor() -> FastIndex { return self }
   static func sub(x: FastIndex, y: FastIndex) {}
 }
 
@@ -129,7 +129,7 @@ struct X : D {
     return 3
   }
   // Inherited requirements
-  func succ() -> X { return self }
+  func successor() -> X { return self }
   static func sub(x: X, y: X) {}
 }
 

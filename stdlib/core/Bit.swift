@@ -16,12 +16,12 @@
 enum Bit : Int, RandomAccessIndex {
   case zero = 0, one = 1
 
-  func succ() -> Bit {
+  func successor() -> Bit {
     _precondition(self == .zero, "Can't increment past one")
     return .one
   }
 
-  func pred() -> Bit {
+  func predecessor() -> Bit {
     _precondition(self == .one, "Can't decrement past zero")
     return .zero
   }

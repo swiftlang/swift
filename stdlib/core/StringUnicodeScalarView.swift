@@ -43,14 +43,14 @@ extension String {
         self._base = _base
       }
 
-      func succ() -> IndexType {
+      func successor() -> IndexType {
         var scratch = _ScratchGenerator(_base, _position)
         var decoder = UTF16()
         let (result, length) = decoder._decodeOne(&scratch)
         return IndexType(_position + length, _base)
       }
 
-      func pred() -> IndexType {
+      func predecessor() -> IndexType {
         var i = _position
         let codeUnit = self._base[--i]
         // FIXME: consider adding:

@@ -77,7 +77,7 @@ func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 // isn't yet smart enough to handle.
 
 protocol _Incrementable : Equatable {
-  func succ() -> Self
+  func successor() -> Self
 }
 
 protocol _ForwardIndex : _Incrementable {
@@ -86,14 +86,14 @@ protocol _ForwardIndex : _Incrementable {
 
 @prefix @assignment @transparent
 func ++ <T : _Incrementable> (inout x: T) -> T {
-  x = x.succ()
+  x = x.successor()
   return x
 }
 
 @postfix @assignment @transparent
 func ++ <T : _Incrementable> (inout x: T) -> T {
   var ret = x
-  x = x.succ()
+  x = x.successor()
   return ret
 }
 
@@ -165,7 +165,7 @@ func _advanceForward<T: _ForwardIndex>(
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndex -----------------------------------------------===//
 protocol _BidirectionalIndex : _ForwardIndex {
-  func pred() -> Self
+  func predecessor() -> Self
 }
 
 protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
@@ -173,7 +173,7 @@ protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
 
 @prefix @assignment @transparent
 func -- <T: _BidirectionalIndex> (inout x: T) -> T {
-  x = x.pred()
+  x = x.predecessor()
   return x
 }
 
@@ -181,7 +181,7 @@ func -- <T: _BidirectionalIndex> (inout x: T) -> T {
 @postfix @assignment @transparent
 func -- <T: _BidirectionalIndex> (inout x: T) -> T {
   var ret = x
-  x = x.pred()
+  x = x.predecessor()
   return ret
 }
 

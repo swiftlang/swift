@@ -71,7 +71,7 @@ func insertionSort<
       // moving elements forward to make room.
       var i = sortedEnd
       do {
-        let predecessor: C.GeneratorType.Element = elements[i.pred()]
+        let predecessor: C.GeneratorType.Element = elements[i.predecessor()]
         
         // if x doesn't belong before y, we've found its position
         if !less(x, predecessor) {
@@ -105,7 +105,7 @@ func partition<C: MutableCollection where C.IndexType: RandomAccessIndex>(
 
   // Variables i and j point to the next element to be visited.
   var i = range.startIndex
-  var j = range.endIndex.pred()
+  var j = range.endIndex.predecessor()
 
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
@@ -131,8 +131,8 @@ func partition<C: MutableCollection where C.IndexType: RandomAccessIndex>(
   }
 
   // Swap the pivot in between the two partitions.
-  swap(&elements[i.pred()], &elements[range.startIndex])
-  return i.pred()
+  swap(&elements[i.predecessor()], &elements[range.startIndex])
+  return i.predecessor()
 }
 
 
@@ -161,7 +161,7 @@ func _quickSort<C: MutableCollection where C.IndexType: RandomAccessIndex>(
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
   _quickSort(&elements, range.startIndex..<part_idx, &less);
-  _quickSort(&elements, (part_idx.succ())..<range.endIndex, &less);
+  _quickSort(&elements, (part_idx.successor())..<range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -174,9 +174,9 @@ func sort<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout collection: C,
-  pred: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predecessor: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) {
-  quickSort(&collection, indices(collection), pred)
+  quickSort(&collection, indices(collection), predecessor)
 }
 
 func sort<
@@ -188,9 +188,9 @@ func sort<
   quickSort(&collection, indices(collection))
 }
 
-func sort<T>(inout array: T[], pred: (T, T) -> Bool) {
+func sort<T>(inout array: T[], predecessor: (T, T) -> Bool) {
   return array.withMutableStorage {
-    a in sort(&a, pred)
+    a in sort(&a, predecessor)
     return
   }
 }
@@ -209,10 +209,10 @@ func sorted<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   source: C,
-  pred: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predecessor: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) -> C {
   var result = source
-  sort(&result, pred)
+  sort(&result, predecessor)
   return result
 }
 
@@ -229,10 +229,10 @@ func sorted<
   S: Sequence
 >(
   source: S,
-  pred: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
+  predecessor: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
 ) -> S.GeneratorType.Element[] {
   var result = Array(source)
-  sort(&result, pred)
+  sort(&result, predecessor)
   return result
 }
 
@@ -270,7 +270,7 @@ func insertionSort<
       // moving elements forward to make room.
       var i = sortedEnd
       do {
-        let predecessor: C.GeneratorType.Element = elements[i.pred()]
+        let predecessor: C.GeneratorType.Element = elements[i.predecessor()]
 
         // if x doesn't belong before y, we've found its position
         if !Less.compare(x, predecessor) {
@@ -302,7 +302,7 @@ func partition<
 
   // Variables i and j point to the next element to be visited.
   var i = range.startIndex
-  var j = range.endIndex.pred()
+  var j = range.endIndex.predecessor()
 
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
@@ -328,8 +328,8 @@ func partition<
   }
 
   // Swap the pivot in between the two partitions.
-  swap(&elements[i.pred()], &elements[range.startIndex])
-  return i.pred()
+  swap(&elements[i.predecessor()], &elements[range.startIndex])
+  return i.predecessor()
 }
 
 func quickSort<
@@ -356,7 +356,7 @@ func _quickSort<
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
   _quickSort(&elements, range.startIndex..<part_idx);
-  _quickSort(&elements, (part_idx.succ())..<range.endIndex);
+  _quickSort(&elements, (part_idx.successor())..<range.endIndex);
 }
 //// End of non-predicate sort functions.
 
@@ -444,7 +444,7 @@ func split<Seq: Sliceable, R:LogicValue>(
       if startIndex {
         var i = startIndex!
         result.append(seq[i..<j])
-        startIndex = .Some(j.succ())
+        startIndex = .Some(j.successor())
         if ++splits >= maxSplit {
           break
         }
@@ -551,7 +551,7 @@ func equal<
   where
     S1.GeneratorType.Element == S2.GeneratorType.Element
 >(a1: S1, a2: S2,
-  pred: (S1.GeneratorType.Element, S1.GeneratorType.Element) -> Bool) -> Bool
+  predecessor: (S1.GeneratorType.Element, S1.GeneratorType.Element) -> Bool) -> Bool
 {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -559,7 +559,7 @@ func equal<
     var e1 = g1.next()
     var e2 = g2.next()
     if e1 && e2 {
-      if !pred(e1!, e2!) {
+      if !predecessor(e1!, e2!) {
         return false
       }
     }

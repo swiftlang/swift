@@ -148,7 +148,7 @@ extension String {
         _sanityCheck(_coreIndex <= _core.count)
       }
       
-      func succ() -> Index {
+      func successor() -> Index {
         let newBuffer0 = (_buffer >> 8) | (
           0xFF << numericCast((sizeofValue(_buffer) - 1) * 8)
         )

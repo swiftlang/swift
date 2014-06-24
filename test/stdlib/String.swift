@@ -17,7 +17,7 @@ func checkUnicodeScalarViewIteration(
     var decoded: UInt32[] = []
     while i != end {
       decoded += us[i].value
-      i = i.succ()
+      i = i.successor()
     }
     if expectedScalars != decoded {
       return assertionFailure()
@@ -32,7 +32,7 @@ func checkUnicodeScalarViewIteration(
     var i = us.endIndex
     var decoded: UInt32[] = []
     while i != start {
-      i = i.pred()
+      i = i.predecessor()
       decoded += us[i].value
     }
     if expectedScalars != decoded {

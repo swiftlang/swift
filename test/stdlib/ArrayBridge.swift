@@ -62,8 +62,8 @@ class Tracked : NSObject, ForwardIndex, Printable, Fooable {
     return "Base#\(serialNumber)(\(value))"
   }
 
-  func succ() -> Tracked {
-    return Tracked(self.value.succ())
+  func successor() -> Tracked {
+    return Tracked(self.value.successor())
   }
 
   var value: Int
@@ -123,8 +123,8 @@ struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveC {
     self.trak = Tracked(value)
   }
   
-  func succ() -> BridgedSwift {
-    return BridgedSwift(trak.value.succ())
+  func successor() -> BridgedSwift {
+    return BridgedSwift(trak.value.successor())
   }
 
   var trak: Tracked

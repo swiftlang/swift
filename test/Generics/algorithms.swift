@@ -25,10 +25,10 @@ func find<R : Generator where R.Element : Eq>
   return result
 }
 
-func findIf<R : Generator>(range: R, pred: (R.Element) -> Bool) -> R {
+func findIf<R : Generator>(range: R, predecessor: (R.Element) -> Bool) -> R {
   var result = range
   for x in GeneratorSequence(range) {
-    if pred(x) {
+    if predecessor(x) {
       break
     }
     result.next()
@@ -47,10 +47,10 @@ func count<R : Generator where R.Element : Eq>
   return result
 }
 
-func countIf<R : Generator>(range: R, pred: (R.Element) -> Bool) -> Int {
+func countIf<R : Generator>(range: R, predecessor: (R.Element) -> Bool) -> Int {
   var result = 0
   for x in GeneratorSequence(range) {
-    if pred(x) {
+    if predecessor(x) {
       ++result
     }
   }
@@ -76,12 +76,12 @@ func equal<R1 : Generator, R2 : Generator where R1.Element : Eq,
 
 func equalIf<R1 : Generator, R2 : Generator>
        (var range1 : R1, var range2 : R2,
-        pred : (R1.Element, R2.Element)-> Bool) -> Bool {
+        predecessor : (R1.Element, R2.Element)-> Bool) -> Bool {
   var e1 = range1.next()
   var e2 = range2.next()
     
   while e1 && e2 {
-    if !pred(e1!, e2!) {
+    if !predecessor(e1!, e2!) {
       return false
     }
     e1 = range1.next()
@@ -108,13 +108,13 @@ func mismatch<R1 : Generator, R2 : Generator where R1.Element : Eq,
 
 func mismatchIf<R1 : Generator, R2 : Generator>
        (var range1 : R1, var range2 : R2,
-        pred : (R1.Element, R2.Element) -> Bool) -> (R1, R2) {
+        predecessor : (R1.Element, R2.Element) -> Bool) -> (R1, R2) {
   var prev1 = range1, prev2 = range2
 
   while true {
     var e1 = range1.next(), e2 = range2.next()
     
-    if !e1 || !e2 || !pred(e1!, e2!) { break }
+    if !e1 || !e2 || !predecessor(e1!, e2!) { break }
     prev1.next()
     prev2.next()
   }

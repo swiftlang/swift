@@ -16,12 +16,12 @@ struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
 
   init(_ _base: I) { self._base = _base }
 
-  func succ() -> ReverseIndex {
-    return ReverseIndex(_base.pred())
+  func successor() -> ReverseIndex {
+    return ReverseIndex(_base.predecessor())
   }
   
-  func pred() -> ReverseIndex {
-    return ReverseIndex(_base.succ())
+  func predecessor() -> ReverseIndex {
+    return ReverseIndex(_base.successor())
   }
 }
 
@@ -54,7 +54,7 @@ struct ReverseView<
   }
 
   subscript(i: IndexType) -> T.GeneratorType.Element {
-    return _base[i._base.pred()]
+    return _base[i._base.predecessor()]
   }
   
   var _base: T

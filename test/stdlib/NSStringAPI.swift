@@ -216,13 +216,13 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
 
   if true {
     let s = "abcd"
-    let r = s.startIndex.succ()..<s.endIndex
+    let r = s.startIndex.successor()..<s.endIndex
     expectEqual(NSComparisonResult.OrderedSame,
         s.compare("bcd", range: r))
   }
   if true {
     let s = "абвг"
-    let r = s.startIndex.succ()..<s.endIndex
+    let r = s.startIndex.successor()..<s.endIndex
     expectEqual(NSComparisonResult.OrderedSame,
         s.compare("бвг", range: r))
   }

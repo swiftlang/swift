@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 protocol Incrementable  {
-  func succ() -> Self
+  func successor() -> Self
 }
 
 protocol _ForwardIndex  {
@@ -12,7 +12,7 @@ protocol ForwardIndex : _ForwardIndex {
 }
 
 protocol _BidirectionalIndex : _ForwardIndex {
-  func pred() -> Self
+  func predecessor() -> Self
 }
 
 protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
@@ -29,7 +29,7 @@ struct MyInt : RandomAccessIndex
 {
   typealias DistanceType = MyInt
 
-  func pred() -> MyInt {
+  func predecessor() -> MyInt {
   	return self
   }
 }

@@ -181,7 +181,7 @@ func == <Element>(lhs: DictionaryIndex<Element>, rhs: DictionaryIndex<Element>) 
 struct DictionaryIndex<Element> : BidirectionalIndex {
   typealias Index = DictionaryIndex<Element>
 
-  func pred() -> Index {
+  func predecessor() -> Index {
     var j = self.offset
     while --j > 0 {
       if buffer[j] {
@@ -191,7 +191,7 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
     return self
   }
 
-  func succ() -> Index {
+  func successor() -> Index {
     var i = self.offset + 1
     // FIXME: Can't write the simple code pending
     // <rdar://problem/15484639> Refcounting bug
@@ -225,7 +225,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
   }
 
   var startIndex: Index {
-    return Index(buffer: _buffer, offset: -1).succ()
+    return Index(buffer: _buffer, offset: -1).successor()
   }
 
   var endIndex: Index {

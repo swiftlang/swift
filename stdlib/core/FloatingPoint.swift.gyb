@@ -423,11 +423,11 @@ func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp 
 @transparent
 extension ${Self} : RandomAccessIndex {
   @transparent
-  func succ() -> ${Self} {
+  func successor() -> ${Self} {
     return self + 1.0
   }
   @transparent
-  func pred() -> ${Self} {
+  func predecessor() -> ${Self} {
     return self - 1.0
   }
   

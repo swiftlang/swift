@@ -20,9 +20,9 @@ println("testing")
 // CHECK-NEXT: 1
 println((one - zero).toRaw())
 // CHECK-NEXT: 1
-println(zero.succ().toRaw())
+println(zero.successor().toRaw())
 // CHECK-NEXT: 0
-println(one.pred().toRaw())
+println(one.predecessor().toRaw())
 
 // CHECK: done.
 println("done.")

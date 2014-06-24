@@ -46,8 +46,8 @@ class Tracked : ForwardIndex, Printable {
     return value.description
   }
 
-  func succ() -> Tracked {
-    return Tracked(self.value.succ())
+  func successor() -> Tracked {
+    return Tracked(self.value.successor())
   }
 
   var value: Int

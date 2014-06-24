@@ -140,7 +140,7 @@ func ..< <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
 /// Forms a closed range including both the minimum and maximum values.
 @transparent
 func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
-  return Range(start: min, end: max.succ())
+  return Range(start: min, end: max.successor())
 }
 
 struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, Sequence {
@@ -153,7 +153,7 @@ struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, Sequence {
 
   mutating func next() -> Element? {
     if _bounds.0 == _bounds.1 { return .None }
-    _bounds.1 = _bounds.1.pred()
+    _bounds.1 = _bounds.1.predecessor()
     return _bounds.1
   }
 

@@ -12,8 +12,8 @@ func foo(x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{cannot convert the expression's type '()' to type 'Int'}}
 
 struct X {}
-func mySort(array: String[], pred: (String, String) -> Bool) -> String[] {}
-func mySort(array: X[], pred: (X, X) -> Bool) -> X[] {}
+func mySort(array: String[], predecessor: (String, String) -> Bool) -> String[] {}
+func mySort(array: X[], predecessor: (X, X) -> Bool) -> X[] {}
 var strings : String[]
 mySort(strings, { x, y in x < y })
 

@@ -258,11 +258,11 @@ extension ${Self} : Printable {
 @transparent
 extension ${Self} : RandomAccessIndex {
   @transparent
-  func succ() -> ${Self} {
+  func successor() -> ${Self} {
     return self + 1
   }
   @transparent
-  func pred() -> ${Self} {
+  func predecessor() -> ${Self} {
     return self - 1
   }
   

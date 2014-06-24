@@ -3,8 +3,8 @@
 // Make sure we are not looping forever.
 extension Array {
   mutating
-  func new_method(pred: (T, T) -> Bool, left : Int, right : Int) {
-      new_method(pred, left: left, right: right);
+  func new_method(predecessor: (T, T) -> Bool, left : Int, right : Int) {
+      new_method(predecessor, left: left, right: right);
   }
 }
 var x1 = [1]

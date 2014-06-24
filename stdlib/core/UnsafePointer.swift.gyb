@@ -228,10 +228,10 @@ struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
   var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
-  func succ() -> ${Self} {
+  func successor() -> ${Self} {
     return self + 1
   }
-  func pred() -> ${Self} {
+  func predecessor() -> ${Self} {
     return self - 1
   }
 

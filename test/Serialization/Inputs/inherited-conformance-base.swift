@@ -2,11 +2,11 @@
 struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>> : BidirectionalIndex {
   var value = 0
   
-  func pred() -> Counter {
+  func predecessor() -> Counter {
     return Counter(value: value - 1)
   }
 
-  func succ() -> Counter {
+  func successor() -> Counter {
     return Counter(value: value + 1)
   }
 }

@@ -27,7 +27,7 @@ enum MembersReferenceRawType : Int {
     self = MembersReferenceRawType.fromRaw(x)!
   }
 
-  func succ() -> MembersReferenceRawType {
+  func successor() -> MembersReferenceRawType {
     return MembersReferenceRawType.fromRaw(toRaw() + 1)!
   }
 }

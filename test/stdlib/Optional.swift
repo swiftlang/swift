@@ -78,7 +78,7 @@ case .None:
 println("forced extraction: \(x!).")
 // CHECK: forced extraction: 1.
 
-println("forced extraction use: \(x!.succ()).")
+println("forced extraction use: \(x!.successor()).")
 // CHECK-NEXT: forced extraction use: 2.
 
 func testRelation(p: (Int?, Int?) -> Bool) {

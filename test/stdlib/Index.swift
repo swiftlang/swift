@@ -18,8 +18,8 @@ struct F : ForwardIndex {
     self.x = x
   }
 
-  func succ() -> F {
-    println("F.succ: \(x)")
+  func successor() -> F {
+    println("F.successor: \(x)")
     return F(x + 1)
   }
 }
@@ -35,12 +35,12 @@ struct B : BidirectionalIndex {
     self.x = x
   }
 
-  func succ() -> B {
-    println("B.succ: \(x)")
+  func successor() -> B {
+    println("B.successor: \(x)")
     return B(x + 1)
   }
-  func pred() -> B {
-    println("B.pred: \(x)")
+  func predecessor() -> B {
+    println("B.predecessor: \(x)")
     return B(x - 1)
   }
 }
@@ -56,12 +56,12 @@ struct R : RandomAccessIndex {
     self.x = x
   }
 
-  func succ() -> R {
-    println("R.succ: \(x)")
+  func successor() -> R {
+    println("R.successor: \(x)")
     return R(x + 1)
   }
-  func pred() -> R {
-    println("R.pred: \(x)")
+  func predecessor() -> R {
+    println("R.predecessor: \(x)")
     return R(x - 1)
   }
   func distanceTo(rhs: R) -> Int {
@@ -86,17 +86,17 @@ println("<F>")
 println("[\(distance(F(10), F(10)))]")
 // CHECK-NEXT: [0]
 println("[\(distance(F(10), F(13)))]")
-// CHECK-NEXT: F.succ: 10
-// CHECK-NEXT: F.succ: 11
-// CHECK-NEXT: F.succ: 12
+// CHECK-NEXT: F.successor: 10
+// CHECK-NEXT: F.successor: 11
+// CHECK-NEXT: F.successor: 12
 // CHECK-NEXT: [3]
 println("[\(advance(F(7), 2).x)]")
-// CHECK-NEXT: F.succ: 7
-// CHECK-NEXT: F.succ: 8
+// CHECK-NEXT: F.successor: 7
+// CHECK-NEXT: F.successor: 8
 // CHECK-NEXT: [9]
 println("[\(advance(F(3), 99, F(5)).x)]")
-// CHECK-NEXT: F.succ: 3
-// CHECK-NEXT: F.succ: 4
+// CHECK-NEXT: F.successor: 3
+// CHECK-NEXT: F.successor: 4
 // CHECK-NEXT: [5]
 
 println("<B>")
@@ -104,27 +104,27 @@ println("<B>")
 println("[\(distance(B(10), B(10)))]")
 // CHECK-NEXT: [0]
 println("[\(distance(B(10), B(12)))]")
-// CHECK-NEXT: B.succ: 10
-// CHECK-NEXT: B.succ: 11
+// CHECK-NEXT: B.successor: 10
+// CHECK-NEXT: B.successor: 11
 // CHECK-NEXT: [2]
 println("[\(advance(B(7), 2).x)]")
-// CHECK-NEXT: B.succ: 7
-// CHECK-NEXT: B.succ: 8
+// CHECK-NEXT: B.successor: 7
+// CHECK-NEXT: B.successor: 8
 // CHECK-NEXT: [9]
 println("[\(advance(B(7), -3).x)]")
-// CHECK-NEXT: B.pred: 7
-// CHECK-NEXT: B.pred: 6
-// CHECK-NEXT: B.pred: 5
+// CHECK-NEXT: B.predecessor: 7
+// CHECK-NEXT: B.predecessor: 6
+// CHECK-NEXT: B.predecessor: 5
 // CHECK-NEXT: [4]
 println("[\(advance(B(13), 99, B(17)).x)]")
-// CHECK-NEXT: B.succ: 13
-// CHECK-NEXT: B.succ: 14
-// CHECK-NEXT: B.succ: 15
-// CHECK-NEXT: B.succ: 16
+// CHECK-NEXT: B.successor: 13
+// CHECK-NEXT: B.successor: 14
+// CHECK-NEXT: B.successor: 15
+// CHECK-NEXT: B.successor: 16
 // CHECK-NEXT: [17]
 println("[\(advance(B(13), -99, B(11)).x)]")
-// CHECK-NEXT: B.pred: 13
-// CHECK-NEXT: B.pred: 12
+// CHECK-NEXT: B.predecessor: 13
+// CHECK-NEXT: B.predecessor: 12
 // CHECK-NEXT: [11]
 
 

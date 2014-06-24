@@ -439,7 +439,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
   var startIndex: Index {
-    return Index(nativeStorage: self, offset: -1).succ()
+    return Index(nativeStorage: self, offset: -1).successor()
   }
 
   var endIndex: Index {
@@ -573,7 +573,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
       return nil
     }
     let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
-    nextIndex = nextIndex.succ()
+    nextIndex = nextIndex.successor()
     // Not using bridgeToObjectiveC() here because we know that KeyType is
     // bridged verbatim.
     return _reinterpretCastToAnyObject(nativeKey)
@@ -750,7 +750,7 @@ class _NativeDictionaryStorageOwnerBase
       let bridgedKey: AnyObject = _reinterpretCastToAnyObject(nativeKey)
       unmanagedObjects[i] = bridgedKey
       ++stored
-      currIndex = currIndex.succ()
+      currIndex = currIndex.successor()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.memory = theState
@@ -1279,7 +1279,7 @@ struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
     self.offset = offset
   }
 
-  func pred() -> NativeIndex {
+  func predecessor() -> NativeIndex {
     var j = offset
     while --j > 0 {
       if nativeStorage[j] {
@@ -1289,7 +1289,7 @@ struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
     return self
   }
 
-  func succ() -> NativeIndex {
+  func successor() -> NativeIndex {
     var i = offset + 1
     // FIXME: Can't write the simple code pending
     // <rdar://problem/15484639> Refcounting bug
@@ -1343,12 +1343,12 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
     self.nextKeyIndex = nextKeyIndex
   }
 
-  func pred() -> Index {
+  func predecessor() -> Index {
     _precondition(nextKeyIndex >= 1, "can not advance startIndex backwards")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex - 1)
   }
 
-  func succ() -> Index {
+  func successor() -> Index {
     _precondition(nextKeyIndex < allKeys.count, "can not advance endIndex forward")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex + 1)
   }
@@ -1403,29 +1403,29 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
 
   typealias Index = DictionaryIndex<KeyType, ValueType>
 
-  func pred() -> Index {
+  func predecessor() -> Index {
     if _fastPath(_guaranteedNative) {
-      return ._Native(_nativeIndex.pred())
+      return ._Native(_nativeIndex.predecessor())
     }
 
     switch self {
     case ._Native(let nativeIndex):
-      return ._Native(nativeIndex.pred())
+      return ._Native(nativeIndex.predecessor())
     case ._Cocoa(let cocoaIndex):
-      return ._Cocoa(cocoaIndex.pred())
+      return ._Cocoa(cocoaIndex.predecessor())
     }
   }
 
-  func succ() -> Index {
+  func successor() -> Index {
     if _fastPath(_guaranteedNative) {
-      return ._Native(_nativeIndex.succ())
+      return ._Native(_nativeIndex.successor())
     }
 
     switch self {
     case ._Native(let nativeIndex):
-      return ._Native(nativeIndex.succ())
+      return ._Native(nativeIndex.successor())
     case ._Cocoa(let cocoaIndex):
-      return ._Cocoa(cocoaIndex.succ())
+      return ._Cocoa(cocoaIndex.successor())
     }
   }
 }
@@ -1573,7 +1573,7 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
         return .None
       }
       let result = startIndex.nativeStorage.assertingGet(startIndex)
-      self = ._Native(start: startIndex.succ(), end: endIndex)
+      self = ._Native(start: startIndex.successor(), end: endIndex)
       return result
     case ._Cocoa:
       _fatalError("internal error: not baked by NSDictionary")
@@ -1876,14 +1876,14 @@ struct _DictionaryMirrorPosition<Key : Hashable,Value> {
     _dicPos = d.startIndex
   }
 
-  mutating func succ() {
+  mutating func successor() {
     _intPos = _intPos + 1
-    _dicPos = _dicPos.succ()
+    _dicPos = _dicPos.successor()
   }
 
   mutating func prec() {
     _intPos = _intPos - 1
-    _dicPos = _dicPos.pred()
+    _dicPos = _dicPos.predecessor()
   }
 }
 
@@ -1924,7 +1924,7 @@ class _DictionaryMirror<Key : Hashable,Value> : Mirror {
     // shift to a different range, .. and so on
     if (i >= 0) && (i < count) {
       while _pos < i {
-        _pos.succ()
+        _pos.successor()
       }
       while _pos > i {
         _pos.prec()
