@@ -92,7 +92,7 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
     SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                         NewName, FTy, nullptr,
                         Orig->getLocation(), Orig->isBare(),
-                        Orig->isTransparent(), 0,
+                        Orig->isTransparent(), Orig->isNoinline(), 0,
                         Orig->getDebugScope(), Orig->getDeclContext());
 
   NumSpecialized++;

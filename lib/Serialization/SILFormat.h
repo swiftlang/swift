@@ -215,6 +215,7 @@ namespace sil_block {
     SILLinkageField,
     BCFixed<1>,        // transparent
     BCFixed<1>,        // global_init
+    BCFixed<1>,        // noinline
     TypeIDField
                        // followed by generic param list, if any
   >;

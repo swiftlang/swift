@@ -24,6 +24,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  Optional<SILLocation> loc,
                                  IsBare_t isBareSILFunction,
                                  IsTransparent_t isTrans,
+                                 bool isNoinline,
                                  SILFunction *insertBefore,
                                  SILDebugScope *debugScope,
                                  DeclContext *DC) {
@@ -38,8 +39,8 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
 
   auto fn = new (M) SILFunction(M, linkage, name,
                                 loweredType, contextGenericParams, loc,
-                                isBareSILFunction, isTrans, insertBefore,
-                                debugScope, DC);
+                                isBareSILFunction, isTrans, isNoinline,
+                                insertBefore, debugScope, DC);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -51,6 +52,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          Optional<SILLocation> Loc,
                          IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans,
+                         bool isNoinline,
                          SILFunction *InsertBefore,
                          SILDebugScope *DebugScope,
                          DeclContext *DC)
@@ -65,6 +67,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Bare(isBareSILFunction),
     Transparent(isTrans),
     GlobalInitFlag(false),
+    NoinlineFlag(isNoinline),
     Linkage(unsigned(Linkage)) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);

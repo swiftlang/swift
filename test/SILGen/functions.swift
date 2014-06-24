@@ -521,3 +521,7 @@ func funcToBlock(x: () -> ()) -> @objc_block () -> () {
 func blockToFunc(x: @objc_block () -> ()) -> () -> () {
   return x
 }
+
+// CHECK-LABEL: sil [noinline] @_TF9functions15noinline_calleeFT_T_ : $@thin () -> ()
+@noinline
+func noinline_callee() {}

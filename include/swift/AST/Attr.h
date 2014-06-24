@@ -851,7 +851,8 @@ public:
   }
 
   bool isConversion() const { return has(AK_conversion); }
-  bool isTransparent() const {return has(AK_transparent);}
+  bool isNoinline() const { return has(AK_noinline); }
+  bool isTransparent() const { return has(AK_transparent); }
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }

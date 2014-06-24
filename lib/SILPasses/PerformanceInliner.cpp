@@ -133,6 +133,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
       DEBUG(llvm::dbgs() << "        FAIL! Couldn't find inlineable callee.\n");
       continue;
     }
+    if (Callee->isNoinline())
+      continue;
 
     DEBUG(llvm::dbgs() << "        Found callee:" <<  Callee->getName()
           << ".\n");

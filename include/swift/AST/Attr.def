@@ -167,6 +167,7 @@ VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment,
 ATTR(conversion)
 ATTR(infix)
 ATTR(mutating)
+ATTR(noinline)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(optional)

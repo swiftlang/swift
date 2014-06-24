@@ -1772,6 +1772,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
                            fn->getAttrs().isOptional(),
+                           fn->getAttrs().isNoinline(),
                            fn->getBodyParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),

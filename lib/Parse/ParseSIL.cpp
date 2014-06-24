@@ -667,7 +667,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
-                                 Parser &P) {
+                                 bool &isNoinline, Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
@@ -676,6 +676,8 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
       isTransparent = true;
     else if (P.Tok.getText() == "global_init")
       isGlobalInit = true;
+    else if (P.Tok.getText() == "noinline")
+      isNoinline = true;
     else {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
       return true;
@@ -2934,9 +2936,9 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
-  bool isGlobalInit = false;
+  bool isGlobalInit = false, isNoinline = false;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(isTransparent, isGlobalInit, *this) ||
+      parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -2959,6 +2961,7 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setGlobalInit(isGlobalInit);
+    FunctionState.F->setNoinline(isNoinline);
 
     // Now that we have a SILFunction parse the body, if present.
 

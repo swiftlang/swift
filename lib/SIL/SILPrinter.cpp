@@ -1305,6 +1305,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isGlobalInit())
     OS << "[global_init] ";
   
+  if (isNoinline())
+    OS << "[noinline] ";
+
   printName(OS);
   OS << " : $";
   

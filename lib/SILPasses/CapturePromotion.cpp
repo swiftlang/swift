@@ -323,7 +323,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   return SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
                              Orig->getContextGenericParams(),
                              Orig->getLocation(), Orig->isBare(),
-                             IsNotTransparent, Orig,
+                             IsNotTransparent, Orig->isNoinline(), Orig,
                              Orig->getDebugScope());
 }
 

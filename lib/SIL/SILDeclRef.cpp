@@ -228,6 +228,11 @@ bool SILDeclRef::isTransparent() const {
   return hasDecl() ? getDecl()->isTransparent() : false;
 }
 
+/// \brief True if the function has noinline attribute.
+bool SILDeclRef::isNoinline() const {
+  return hasDecl() ? getDecl()->getAttrs().isNoinline() : false;
+}
+
 bool SILDeclRef::isForeignThunk() const {
   // Non-decl entry points are never thunks.
   if (!hasDecl())

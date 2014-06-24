@@ -82,6 +82,9 @@ private:
   /// The function's global_init attribute.
   unsigned GlobalInitFlag : 1;
 
+  /// The function's noinline attribute.
+  unsigned NoinlineFlag : 1;
+
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
   
@@ -94,6 +97,7 @@ private:
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
+              bool isNoinline,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
               DeclContext *DC);
@@ -105,6 +109,7 @@ public:
                              Optional<SILLocation> loc = Nothing,
                              IsBare_t isBareSILFunction = IsNotBare,
                              IsTransparent_t isTrans = IsNotTransparent,
+                             bool isNoinline = false,
                              SILFunction *InsertBefore = nullptr,
                              SILDebugScope *DebugScope = nullptr,
                              DeclContext *DC = nullptr);
@@ -189,6 +194,10 @@ public:
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
+
+  /// Get this function's noinline attribute.
+  bool isNoinline() const { return NoinlineFlag; }
+  void setNoinline(bool isNI) { NoinlineFlag = isNI; }
 
   /// Get this function's global_init attribute.
   ///

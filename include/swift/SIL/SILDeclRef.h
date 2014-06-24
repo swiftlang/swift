@@ -221,6 +221,8 @@ struct SILDeclRef {
   
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
+  /// \brief True if the function has noinline attribute.
+  bool isNoinline() const;
 
   /// \brief Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;

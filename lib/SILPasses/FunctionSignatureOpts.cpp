@@ -248,8 +248,8 @@ SILFunction *FunctionSignatureOptCloner::initCloned(
   // Create the new function.
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewName, NewFTy, nullptr, Orig.getLocation(),
-      Orig.isBare(), Orig.isTransparent(), 0, Orig.getDebugScope(),
-      Orig.getDeclContext());
+      Orig.isBare(), Orig.isTransparent(), Orig.isNoinline(),
+      0, Orig.getDebugScope(), Orig.getDeclContext());
 
   // Return our newly created F for cloning.
   return NewF;
