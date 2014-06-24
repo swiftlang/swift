@@ -102,6 +102,9 @@ struct PrintOptions {
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
+  /// Whether to print accessibility information on all value decls.
+  bool PrintAccessibility = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     BothIfDifferent,
@@ -135,6 +138,7 @@ struct PrintOptions {
     result.SkipPrivateStdlibDecls = false;
     result.PrintImplicitAttrs = true;
     result.PrintAttrTransparent = true;
+    result.PrintAccessibility = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     return result;

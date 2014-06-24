@@ -231,6 +231,38 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Printer << "override ";
   }
 
+  void printAccessibility(Accessibility access, StringRef suffix = "") {
+    Printer << "/*";
+    switch (access) {
+    case Accessibility::Private:
+      Printer << "@private";
+      break;
+    case Accessibility::Internal:
+      Printer << "@internal";
+      break;
+    case Accessibility::Public:
+      Printer << "@public";
+      break;
+    }
+    Printer << suffix << "*/ ";
+  }
+
+  void printAccessibility(const ValueDecl *D) {
+    if (!Options.PrintAccessibility || !D->hasAccessibility() ||
+        D->getAttrs().hasAttribute<AccessibilityAttr>())
+      return;
+
+    printAccessibility(D->getAccessibility());
+
+    if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
+      if (auto setter = storageDecl->getSetter()) {
+        Accessibility setterAccess = setter->getAccessibility();
+        if (setterAccess != D->getAccessibility())
+          printAccessibility(setterAccess, "(set)");
+      }
+    }
+  }
+
   void printTypeLoc(const TypeLoc &TL) {
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
@@ -774,6 +806,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
+  printAttributes(decl);
   Printer << "extension ";
   recordDeclLoc(decl);
   decl->getExtendedType().print(Printer, Options);
@@ -792,14 +825,18 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // binding decls.  As a hack, scan the decl to find out if any of the
   // variables are immutable, and if so, we print as 'let'.  This allows us to
   // handle the 'let x = 4' case properly at least.
-  bool isMutable = true;
+  const VarDecl *anyVar = nullptr;
+  Optional<Accessibility> access;
   decl->getPattern()->forEachVariable([&](VarDecl *V) {
-    if (!V->isSettable(V->getDeclContext()))
-      isMutable = false;
+    anyVar = V;
   });
 
-  printAttributes(decl);
-  Printer << (isMutable ? "var " : "let ");
+  // FIXME: PatternBindingDecls don't have attributes themselves, so just assume
+  // the variables all have the same attributes. This isn't exactly true
+  // after type-checking, but it's close enough for now.
+  printAttributes(anyVar);
+  printAccessibility(anyVar);
+  Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
     // FIXME: Implement once we can pretty-print expressions.
@@ -817,6 +854,7 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "typealias ";
   recordDeclLoc(decl);
@@ -859,6 +897,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "enum ";
   recordDeclLoc(decl);
@@ -872,6 +911,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "struct ";
   recordDeclLoc(decl);
@@ -885,6 +925,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "class ";
   recordDeclLoc(decl);
@@ -898,6 +939,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "protocol ";
   recordDeclLoc(decl);
@@ -911,6 +953,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
   printOverrideKeyword(decl);
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
@@ -1138,6 +1181,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   } else {
     printDocumentationComment(decl);
     printAttributes(decl);
+    printAccessibility(decl);
     printOverrideKeyword(decl);
     if (decl->isStatic() && !decl->isOperator())
       printStaticKeyword(decl->getCorrectStaticSpelling());
@@ -1205,6 +1249,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
   printOverrideKeyword(decl);
+  printAccessibility(decl);
   recordDeclLoc(decl);
   Printer << "subscript ";
   printPattern(decl->getIndices());
@@ -1217,6 +1262,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printAccessibility(decl);
 
   if (decl->getInitKind() == CtorInitializerKind::Convenience ||
       decl->getInitKind() == CtorInitializerKind::ConvenienceFactory)

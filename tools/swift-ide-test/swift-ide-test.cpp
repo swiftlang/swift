@@ -265,6 +265,11 @@ PrintImplicitAttrs("print-implicit-attrs",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+PrintAccessibility("print-accessibility",
+                   llvm::cl::desc("Print accessibility for all values"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipUnavailable("skip-unavailable",
                 llvm::cl::desc("Don't print unavailable declarations"),
                 llvm::cl::init(false));
@@ -933,6 +938,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       bool PreferTypeRepr,
                       bool ExplodePatternBindingDecls,
                       bool PrintImplicitAttrs,
+                      bool PrintAccessibility,
                       bool PrintUnavailableDecls) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
@@ -954,6 +960,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   Options.PreferTypeRepr = PreferTypeRepr;
   Options.ExplodePatternBindingDecls = ExplodePatternBindingDecls;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
+  Options.PrintAccessibility = PrintAccessibility;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
   Module *M = CI.getMainModule();
@@ -1013,6 +1020,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool SynthesizeSugarOnTypes,
                           bool AnnotatePrint,
                           bool PrintImplicitAttrs,
+                          bool PrintAccessibility,
                           bool PrintUnavailableDecls,
                           bool PrintRegularComments,
                           bool PrintPrivateStdlibDecls) {
@@ -1038,6 +1046,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   Options.FullyQualifiedTypesIfAmbiguous = FullyQualifiedTypesIfAmbiguous;
   Options.SynthesizeSugarOnTypes = SynthesizeSugarOnTypes;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
+  Options.PrintAccessibility = PrintAccessibility;
   Options.PrintRegularClangComments = PrintRegularComments;
   Options.SkipPrivateStdlibDecls = !PrintPrivateStdlibDecls;
   Options.SkipUnavailable = !PrintUnavailableDecls;
@@ -1660,6 +1669,7 @@ int main(int argc, char *argv[]) {
                           /*PreferTypeRepr=*/options::PreferTypeRepr,
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
+                          options::PrintAccessibility,
                           !options::SkipUnavailable);
     break;
 
@@ -1671,6 +1681,7 @@ int main(int argc, char *argv[]) {
                           /*PreferTypeRepr=*/options::PreferTypeRepr,
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
+                          options::PrintAccessibility,
                           !options::SkipUnavailable);
     break;
 
@@ -1689,6 +1700,7 @@ int main(int argc, char *argv[]) {
         options::SynthesizeSugarOnTypes,
         options::AnnotatePrint,
         options::PrintImplicitAttrs,
+        options::PrintAccessibility,
         !options::SkipUnavailable,
         options::PrintRegularComments,
         !options::SkipPrivateStdlibDecls);

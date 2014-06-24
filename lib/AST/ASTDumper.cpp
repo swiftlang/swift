@@ -407,6 +407,21 @@ namespace {
 
       OS << '\'';
 
+      if (VD->hasAccessibility()) {
+        OS << " access=";
+        switch (VD->getAccessibility()) {
+        case Accessibility::Private:
+          OS << "private";
+          break;
+        case Accessibility::Internal:
+          OS << "internal";
+          break;
+        case Accessibility::Public:
+          OS << "public";
+          break;
+        }
+      }
+
       if (VD->conformsToProtocolRequirement())
         OS << " conforms";
       if (auto Overridden = VD->getOverriddenDecl()) {
