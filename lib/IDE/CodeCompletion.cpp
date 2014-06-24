@@ -675,7 +675,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       break;
     if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation)
       continue;
-    if (C.hasText()) {
+    if (C.hasText() && !C.isAnnotation()) {
       OS << C.getText();
     }
   }
