@@ -239,6 +239,11 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   eqDecl->setType(fnTy);
   eqDecl->setInterfaceType(interfaceTy);
 
+  // Since we can't insert the == operator into the same FileUnit as the enum,
+  // itself, we have to give it at least internal access.
+  eqDecl->setAccessibility(std::max(enumDecl->getAccessibility(),
+                                    Accessibility::Internal));
+
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(eqDecl);
   
@@ -430,7 +435,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
     interfaceType = type;
   
   getterDecl->setInterfaceType(interfaceType);
-  
+  getterDecl->setAccessibility(enumDecl->getAccessibility());
+
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(getterDecl);
   
@@ -441,7 +447,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                            intType, enumDecl);
   hashValueDecl->setImplicit();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
-  
+  hashValueDecl->setAccessibility(enumDecl->getAccessibility());
+
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);
   hashValuePat

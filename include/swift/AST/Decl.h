@@ -1488,15 +1488,17 @@ public:
     ExtensionDeclBits.CheckedInheritanceClause = checked;
   }
 
+  bool hasDefaultAccessibility() const {
+    return ExtensionDeclBits.DefaultAccessLevel != 0;
+  }
+
   Accessibility getDefaultAccessibility() const {
-    assert(ExtensionDeclBits.DefaultAccessLevel != 0 &&
-           "default accessibility not computed yet");
+    assert(hasDefaultAccessibility() && "not computed yet");
     return static_cast<Accessibility>(ExtensionDeclBits.DefaultAccessLevel - 1);
   }
 
   void setDefaultAccessibility(Accessibility access) {
-    assert(ExtensionDeclBits.DefaultAccessLevel == 0 &&
-           "default accessibility already set");
+    assert(!hasDefaultAccessibility() && "default accessibility already set");
     ExtensionDeclBits.DefaultAccessLevel = static_cast<unsigned>(access) + 1;
   }
 
@@ -1834,13 +1836,17 @@ public:
   /// Overwrite the type of this declaration.
   void overwriteType(Type T);
 
+  bool hasAccessibility() const {
+    return TypeAndAccess.getInt() != 0;
+  }
+
   Accessibility getAccessibility() const {
-    assert(TypeAndAccess.getInt() != 0 && "accessibility not computed yet");
+    assert(hasAccessibility() && "accessibility not computed yet");
     return static_cast<Accessibility>(TypeAndAccess.getInt() - 1);
   }
 
   void setAccessibility(Accessibility access) {
-    assert(TypeAndAccess.getInt() == 0 && "accessibility already set");
+    assert(!hasAccessibility() && "accessibility already set");
     TypeAndAccess.setInt(static_cast<unsigned>(access) + 1);
   }
 

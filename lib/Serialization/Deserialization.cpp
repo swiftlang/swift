@@ -1377,6 +1377,20 @@ getActualCtorInitializerKind(uint8_t raw) {
   return Nothing;
 }
 
+static Optional<swift::Accessibility>
+getActualAccessibility(uint8_t raw) {
+  switch (serialization::AccessibilityKind(raw)) {
+#define CASE(NAME) \
+  case serialization::AccessibilityKind::NAME: \
+    return Accessibility::NAME;
+  CASE(Private)
+  CASE(Internal)
+  CASE(Public)
+#undef CASE
+  }
+  return Nothing;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -1423,12 +1437,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       switch (recordID) {
-      case decls_block::Asmname_DECL_ATTR:
+      case decls_block::Asmname_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::AsmnameDeclAttrLayout::readRecord(
             scratch, isImplicit);
         Attr = new (ctx) AsmnameAttr(blobData, isImplicit);
         break;
+      }
 
       case decls_block::Availability_DECL_ATTR: {
         bool isImplicit;
@@ -1503,10 +1518,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
+    uint8_t rawAccessLevel;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID, interfaceTypeID,
-                                             isImplicit);
+                                             isImplicit, rawAccessLevel);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
@@ -1517,6 +1533,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType, DC);
     declOrOffset = alias;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      alias->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (auto interfaceType = getType(interfaceTypeID))
       alias->setInterfaceType(interfaceType);
@@ -1602,6 +1625,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                   defaultDefinitionID);
     declOrOffset = assocType;
 
+    assocType->setAccessibility(cast<ProtocolDecl>(DC)->getAccessibility());
     assocType->setSuperclass(getType(superclassID));
     assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     if (isImplicit)
@@ -1621,10 +1645,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
+    uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit, rawProtocolIDs);
+                                          isImplicit, rawAccessLevel,
+                                          rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1637,6 +1663,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), { }, genericParams, DC);
     declOrOffset = theStruct;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      theStruct->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (isImplicit)
       theStruct->setImplicit();
@@ -1675,7 +1708,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit, isObjC, isTransparent;
-    uint8_t storedInitKind;
+    uint8_t storedInitKind, rawAccessLevel;
     TypeID signatureID;
     TypeID interfaceID;
     DeclID overriddenID;
@@ -1685,7 +1718,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                isObjC, isTransparent,
                                                storedInitKind,
                                                signatureID, interfaceID,
-                                               overriddenID, argNameIDs);
+                                               overriddenID, rawAccessLevel,
+                                               argNameIDs);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -1704,6 +1738,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           /*bodyParams=*/nullptr, nullptr,
                                           genericParams, parent);
     declOrOffset = ctor;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      ctor->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     Pattern *bodyParams0 = maybeReadPattern();
     Pattern *bodyParams1 = maybeReadPattern();
@@ -1763,16 +1804,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC, isOptional, isStatic, isLet;
-    uint8_t StorageKind;
+    uint8_t storageKind, rawAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isOptional, isStatic,
-                                       isLet, StorageKind, typeID,
+                                       isLet, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
-                                       willSetID, didSetID, overriddenID);
+                                       willSetID, didSetID, overriddenID,
+                                       rawAccessLevel);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1787,10 +1829,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = var;
 
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      var->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
+
     if (auto interfaceType = getType(interfaceTypeID))
       var->setInterfaceType(interfaceType);
 
-    switch ((VarDeclStorageKind)StorageKind) {
+    switch ((VarDeclStorageKind)storageKind) {
     case VarDeclStorageKind::Stored: break;
     case VarDeclStorageKind::StoredWithTrivialAccessors:
       var->makeStoredWithTrivialAccessors(
@@ -1860,7 +1909,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit;
     bool isStatic;
-    uint8_t RawStaticSpelling;
+    uint8_t rawStaticSpelling, rawAccessLevel;
     bool isAssignmentOrConversion;
     bool isObjC, isTransparent, isMutating, hasDynamicSelf;
     bool isOptional;
@@ -1874,14 +1923,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> nameIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
-                                        isStatic, RawStaticSpelling,
+                                        isStatic, rawStaticSpelling,
                                         isAssignmentOrConversion,
                                         isObjC, isTransparent,
                                         isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
-                                        hasCompoundName, nameIDs);
+                                        hasCompoundName, rawAccessLevel,
+                                        nameIDs);
     
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
@@ -1897,8 +1947,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
-    auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
-    if (!StaticSpelling.hasValue()) {
+    auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
+    if (!staticSpelling.hasValue()) {
       error();
       return nullptr;
     }
@@ -1915,9 +1965,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         name = DeclName(names[0]);
     }
     auto fn = FuncDecl::createDeserialized(
-        ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(), name,
+        ctx, SourceLoc(), staticSpelling.getValue(), SourceLoc(), name,
         SourceLoc(), genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      fn->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
@@ -2015,10 +2072,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC;
+    uint8_t rawAccessLevel;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, isObjC,
+                                            isImplicit, isObjC, rawAccessLevel,
                                             protocolIDs);
 
     auto DC = getDeclContext(contextID);
@@ -2028,6 +2086,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
                                         getIdentifier(nameID), { });
     declOrOffset = proto;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      proto->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
       proto->setGenericParams(genericParams);
@@ -2044,7 +2109,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       auto sig = GenericSignature::get(paramTypes, requirements);
       proto->setGenericSignature(sig);
     }
-
 
     if (isImplicit)
       proto->setImplicit();
@@ -2123,13 +2187,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool requiresStoredPropertyInits;
     bool foreign;
     TypeID superclassID;
+    uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawProtocolIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
-                                         foreign,
-                                         superclassID, rawProtocolIDs);
+                                         foreign, superclassID, rawAccessLevel,
+                                         rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2142,6 +2207,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
                                         SourceLoc(), { }, genericParams, DC);
     declOrOffset = theClass;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      theClass->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
@@ -2193,10 +2265,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit;
     TypeID rawTypeID;
+    uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
-                                        isImplicit, rawTypeID,
+                                        isImplicit, rawTypeID, rawAccessLevel,
                                         rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
@@ -2211,6 +2284,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                       SourceLoc(), { }, genericParams, DC);
 
     declOrOffset = theEnum;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      theEnum->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     if (isImplicit)
       theEnum->setImplicit();
@@ -2279,6 +2359,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       elem->setInterfaceType(interfaceType);
     if (isImplicit)
       elem->setImplicit();
+    elem->setAccessibility(cast<EnumDecl>(DC)->getAccessibility());
 
     break;
   }
@@ -2289,6 +2370,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
+    uint8_t rawAccessLevel;
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
@@ -2296,7 +2378,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
-                                             overriddenID,
+                                             overriddenID, rawAccessLevel,
                                              argNameIDs);
     auto Getter = cast_or_null<FuncDecl>(getDecl(getterID));
     auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
@@ -2320,6 +2402,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto subscript = new (ctx) SubscriptDecl(name, SourceLoc(), indices,
                                              SourceLoc(), elemTy, DC);
     declOrOffset = subscript;
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      subscript->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
 
     subscript->setAccessors(SourceRange(), Getter, Setter);
     subscript->setType(getType(declTypeID));
@@ -2383,15 +2472,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
                                               isObjC, signatureID);
 
-    DeclContext *parent = getDeclContext(parentID);
+    DeclContext *DC = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_deinit, SourceLoc(),
-                                         /*selfpat*/nullptr, parent);
+                                         /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
-
+    dtor->setAccessibility(cast<ClassDecl>(DC)->getAccessibility());
     Pattern *selfParams = maybeReadPattern();
     assert(selfParams && "Didn't get self pattern?");
     dtor->setSelfPattern(selfParams);

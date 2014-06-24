@@ -167,6 +167,7 @@ getBuiltinFunction(Identifier Id,
                           TypeLoc::withoutLoc(ResType),
                           DC);
   FD->setImplicit();
+  FD->setAccessibility(Accessibility::Public);
   return FD;
 }
 
@@ -240,7 +241,8 @@ getBuiltinGenericFunction(Identifier Id,
     
   func->setInterfaceType(InterfaceType);
   func->setImplicit();
-  
+  func->setAccessibility(Accessibility::Public);
+
   return func;
 }
 

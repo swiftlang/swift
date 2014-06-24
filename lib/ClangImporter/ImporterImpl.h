@@ -939,6 +939,8 @@ public:
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
+    if (auto VD = dyn_cast<ValueDecl>(D))
+      VD->setAccessibility(Accessibility::Public);
     return D;
   }
 };

@@ -1376,6 +1376,16 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ValueDecl *VD) {
+      if (!VD->hasAccessibility() && !VD->getDeclContext()->isLocalContext() &&
+          !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+        dumpRef(VD);
+        Out << " does not have accessibility";
+        abort();
+      }
+      verifyCheckedBase(VD);
+    }
+
     void verifyChecked(PatternBindingDecl *binding) {
     }
 

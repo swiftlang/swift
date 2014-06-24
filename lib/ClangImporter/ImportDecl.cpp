@@ -473,6 +473,7 @@ static FuncDecl *makeOptionSetFactoryMethod(
   
   factoryDecl->setStatic();
   factoryDecl->setImplicit();
+  factoryDecl->setAccessibility(Accessibility::Public);
   
   Type factoryType = FunctionType::get(ParenType::get(C, rawType), retType);
   factoryType = FunctionType::get(selfDecl->getType(), factoryType);
@@ -533,7 +534,8 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   toRawType = FunctionType::get(optionSetType, toRawType);
   toRawDecl->setType(toRawType);
   toRawDecl->setBodyResultType(rawType);
-  
+  toRawDecl->setAccessibility(Accessibility::Public);
+
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
                                         valueDecl, SourceLoc(),
@@ -615,7 +617,8 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
                                 toRawType);
   getLVDecl->setType(toRawType);
   getLVDecl->setBodyResultType(boolType);
-  
+  getLVDecl->setAccessibility(Accessibility::Public);
+
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
                                         valueDecl, SourceLoc(),
@@ -671,7 +674,8 @@ static FuncDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
   
   factoryDecl->setStatic();
   factoryDecl->setImplicit();
-  
+  factoryDecl->setAccessibility(Accessibility::Public);
+
   Type factoryType = FunctionType::get(TupleType::getEmpty(C), optionSetType);
   factoryType = FunctionType::get(selfDecl->getType(), factoryType);
   factoryDecl->setType(factoryType);
@@ -724,7 +728,8 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
                                            selfPattern, methodParam,
                                            nullptr, optionSetDecl);
   ctorDecl->setImplicit();
-  
+  ctorDecl->setAccessibility(Accessibility::Public);
+
   auto fnTy = FunctionType::get(TupleType::getEmpty(C), optionSetType);
   auto allocFnTy = FunctionType::get(metaTy, fnTy);
   auto initFnTy = FunctionType::get(optionSetType, fnTy);
@@ -786,6 +791,7 @@ static FuncDecl *makeClassToClassImplicitConversion(ClassDecl *fromDecl,
       params, TypeLoc::withoutLoc(resultType), fromDecl);
   conversionDecl->setImplicit();
   conversionDecl->getMutableAttrs().add(new (C) FinalAttr(/*implicit*/ true));
+  conversionDecl->setAccessibility(Accessibility::Public);
 
   auto argType = TupleType::getEmpty(C);
   Type fnType = FunctionType::get(argType, resultType);
@@ -1220,6 +1226,7 @@ namespace {
       auto initFnTy = FunctionType::get(selfType, fnTy);
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
+      constructor->setAccessibility(Accessibility::Public);
 
       // Assign all of the member variables appropriately.
       SmallVector<ASTNode, 4> stmts;
@@ -1423,6 +1430,7 @@ namespace {
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
+        var->setAccessibility(Accessibility::Private);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
@@ -1500,6 +1508,7 @@ namespace {
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
+        var->setAccessibility(Accessibility::Private);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
@@ -1863,6 +1872,8 @@ namespace {
           name, nameLoc,
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc, decl);
+
+      result->setAccessibility(Accessibility::Public);
 
       if (decl->isNoReturn())
         result->getMutableAttrs().add(
@@ -2250,6 +2261,8 @@ namespace {
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
           SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
           bodyPatterns, TypeLoc(), dc, decl);
+
+      result->setAccessibility(Accessibility::Public);
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;
@@ -2827,6 +2840,7 @@ namespace {
           TypeLoc::withoutLoc(elementTy), dc);
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
+      thunk->setAccessibility(Accessibility::Public);
 
       if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
         thunk->getMutableAttrs().add(objcAttr->clone(context));
@@ -2913,6 +2927,7 @@ namespace {
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
+      thunk->setAccessibility(Accessibility::Public);
 
       if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
         thunk->getMutableAttrs().add(objcAttr->clone(context));
@@ -3427,6 +3442,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
+      result->setAccessibility(Accessibility::Public);
       addObjCAttribute(result, Nothing);
 
       if (overridden)
@@ -4851,6 +4867,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);
+  func->setAccessibility(Accessibility::Public);
 
   auto expr = valueExpr;
 

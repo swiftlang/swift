@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 105;
+const uint16_t VERSION_MINOR = 106;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -209,6 +209,15 @@ enum LibraryKind : uint8_t {
   Framework
 };
 using LibraryKindField = BCFixed<1>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class AccessibilityKind : uint8_t {
+  Private = 0,
+  Internal,
+  Public,
+};
+using AccessibilityKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -583,7 +592,8 @@ namespace decls_block {
     DeclIDField, // context decl
     TypeIDField, // underlying type
     TypeIDField, // interface type
-    BCFixed<1>  // implicit flag
+    BCFixed<1>,  // implicit flag
+    AccessibilityKindField // accessibility
   >;
 
   using GenericTypeParamDeclLayout = BCRecordLayout<
@@ -611,21 +621,23 @@ namespace decls_block {
 
   using StructLayout = BCRecordLayout<
     STRUCT_DECL,
-    IdentifierIDField, // name
-    DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    BCArray<DeclIDField> // protocols
+    IdentifierIDField,      // name
+    DeclIDField,            // context decl
+    BCFixed<1>,             // implicit flag
+    AccessibilityKindField, // accessibility
+    BCArray<DeclIDField>    // protocols
     // Trailed by the generic parameters (if any), the decl context record, and
     // finally conformance info (if any).
   >;
 
   using EnumLayout = BCRecordLayout<
     ENUM_DECL,
-    IdentifierIDField, // name
-    DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    TypeIDField, // raw type
-    BCArray<DeclIDField> // protocols
+    IdentifierIDField,      // name
+    DeclIDField,            // context decl
+    BCFixed<1>,             // implicit flag
+    TypeIDField,            // raw type
+    AccessibilityKindField, // accessibility
+    BCArray<DeclIDField>    // protocols
     // Trailed by the generic parameters (if any), the decl context record, and
     // finally conformance info (if any).
   >;
@@ -640,19 +652,21 @@ namespace decls_block {
     BCFixed<1>,        // requires stored property initial values
     BCFixed<1>,        // foreign
     TypeIDField,       // superclass
-    BCArray<DeclIDField> // protocols
+    AccessibilityKindField, // accessibility
+    BCArray<DeclIDField>    // protocols
     // Trailed by the generic parameters (if any), the decl context record, and
     // finally conformance info (if any).
   >;
 
   using ProtocolLayout = BCRecordLayout<
     PROTOCOL_DECL,
-    IdentifierIDField, // name
-    DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    BCFixed<1>,  // objc?
-    BCArray<DeclIDField> // protocols
-  // Trailed by the generic parameters (if any) and the decl context record
+    IdentifierIDField,      // name
+    DeclIDField,            // context decl
+    BCFixed<1>,             // implicit flag
+    BCFixed<1>,             // objc?
+    AccessibilityKindField, // accessibility
+    BCArray<DeclIDField>    // protocols
+    // Trailed by the generic parameters (if any) and the decl context record
   >;
 
   using ConstructorLayout = BCRecordLayout<
@@ -665,6 +679,7 @@ namespace decls_block {
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField, // overridden decl
+    AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // argument names
     // Trailed by its generic parameters, if any, followed by the parameter
     // patterns.
@@ -686,7 +701,8 @@ namespace decls_block {
     DeclIDField,  // setter
     DeclIDField,  // willset
     DeclIDField,  // didset
-    DeclIDField   // overridden decl
+    DeclIDField,  // overridden decl
+    AccessibilityKindField // accessibility
   >;
 
   using ParamLayout = BCRecordLayout<
@@ -718,6 +734,7 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     BCFixed<1>,   // name is compound?
+    AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // name components
     // The record is trailed by:
     // - its asmname, if any
@@ -774,6 +791,7 @@ namespace decls_block {
     DeclIDField, // getter
     DeclIDField, // setter
     DeclIDField, // overridden decl
+    AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // name components
     // The indices pattern trails the record.
   >;

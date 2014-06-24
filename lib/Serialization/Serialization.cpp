@@ -1172,6 +1172,18 @@ getStableStaticSpelling(swift::StaticSpellingKind SS) {
   }
 }
 
+static uint8_t getRawStableAccessibility(Accessibility access) {
+  switch (access) {
+#define CASE(NAME) \
+  case Accessibility::NAME: \
+    return static_cast<uint8_t>(serialization::AccessibilityKind::NAME);
+  CASE(Private)
+  CASE(Internal)
+  CASE(Public)
+#undef CASE
+  }
+}
+
 /// Asserts if the declaration has any attributes other than the ones
 /// specified in the template parameters.
 ///
@@ -1465,13 +1477,17 @@ void Serializer::writeDecl(const Decl *D) {
     if (typeAlias->hasUnderlyingType())
       underlying = typeAlias->getUnderlyingType();
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(typeAlias->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(typeAlias->getName()),
                                 addDeclRef(DC),
                                 addTypeRef(underlying),
                                 addTypeRef(typeAlias->getInterfaceType()),
-                                typeAlias->isImplicit());
+                                typeAlias->isImplicit(),
+                                rawAccessLevel);
     break;
   }
 
@@ -1534,11 +1550,15 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto proto : theStruct->getProtocols())
       protocols.push_back(addDeclRef(proto));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(theStruct->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
                              addIdentifierRef(theStruct->getName()),
                              addDeclRef(DC),
                              theStruct->isImplicit(),
+                             rawAccessLevel,
                              protocols);
 
 
@@ -1561,12 +1581,16 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto proto : theEnum->getProtocols())
       protocols.push_back(addDeclRef(proto));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(theEnum->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[EnumLayout::Code];
     EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theEnum->getName()),
                             addDeclRef(DC),
                             theEnum->isImplicit(),
                             addTypeRef(theEnum->getRawType()),
+                            rawAccessLevel,
                             protocols);
 
     writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
@@ -1589,6 +1613,9 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto proto : theClass->getProtocols())
       protocols.push_back(addDeclRef(proto));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(theClass->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theClass->getName()),
@@ -1599,6 +1626,7 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->requiresStoredPropertyInits(),
                             theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
+                            rawAccessLevel,
                             protocols);
 
     writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
@@ -1620,12 +1648,16 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto proto : proto->getProtocols())
       protocols.push_back(addDeclRef(proto));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(proto->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
                                proto->isObjC(),
+                               rawAccessLevel,
                                protocols);
 
     writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
@@ -1644,25 +1676,28 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
 
-    FuncDecl *WillSet = nullptr, *DidSet = nullptr;
+    FuncDecl *willSet = nullptr, *didSet = nullptr;
 
-    VarDeclStorageKind StorageKind;
+    VarDeclStorageKind storageKind;
     switch (var->getStorageKind()) {
     case VarDecl::Stored:
-      StorageKind = VarDeclStorageKind::Stored;
+      storageKind = VarDeclStorageKind::Stored;
       break;
     case VarDecl::StoredWithTrivialAccessors:
-      StorageKind = VarDeclStorageKind::StoredWithTrivialAccessors;
+      storageKind = VarDeclStorageKind::StoredWithTrivialAccessors;
       break;
     case VarDecl::Computed:
-      StorageKind = VarDeclStorageKind::Computed;
+      storageKind = VarDeclStorageKind::Computed;
       break;
     case VarDecl::Observing:
-      StorageKind = VarDeclStorageKind::Observing;
-      WillSet = var->getWillSetFunc();
-      DidSet = var->getDidSetFunc();
+      storageKind = VarDeclStorageKind::Observing;
+      willSet = var->getWillSetFunc();
+      didSet = var->getDidSetFunc();
       break;
     }
+
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(var->getAccessibility());
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1673,14 +1708,15 @@ void Serializer::writeDecl(const Decl *D) {
                           var->getAttrs().isOptional(),
                           var->isStatic(),
                           var->isLet(),
-                          uint8_t(StorageKind),
+                          uint8_t(storageKind),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
-                          addDeclRef(WillSet),
-                          addDeclRef(DidSet),
-                          addDeclRef(var->getOverriddenDecl()));
+                          addDeclRef(willSet),
+                          addDeclRef(didSet),
+                          addDeclRef(var->getOverriddenDecl()),
+                          rawAccessLevel);
     break;
   }
 
@@ -1721,7 +1757,10 @@ void Serializer::writeDecl(const Decl *D) {
     nameComponents.push_back(addIdentifierRef(fn->getFullName().getBaseName()));
     for (auto argName : fn->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
-      
+
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(fn->getAccessibility());
+
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addDeclRef(DC),
                            fn->isImplicit(),
@@ -1740,6 +1779,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
                            !fn->getFullName().isSimpleName(),
+                           rawAccessLevel,
                            nameComponents);
 
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
@@ -1779,6 +1819,9 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto argName : subscript->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(subscript->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclRef(DC),
@@ -1791,6 +1834,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(subscript->getGetter()),
                                 addDeclRef(subscript->getSetter()),
                                 addDeclRef(subscript->getOverriddenDecl()),
+                                rawAccessLevel,
                                 nameComponents);
 
     writePattern(subscript->getIndices());
@@ -1809,6 +1853,9 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto argName : ctor->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
 
+    uint8_t rawAccessLevel =
+      getRawStableAccessibility(ctor->getAccessibility());
+
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(DC),
@@ -1820,6 +1867,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
+                                  rawAccessLevel,
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);

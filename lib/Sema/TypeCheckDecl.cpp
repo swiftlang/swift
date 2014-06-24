@@ -2057,6 +2057,80 @@ static void configureConstructorType(ConstructorDecl *ctor,
   ctor->setInitializerType(initFnType);
 }
 
+const AccessibilityAttr *findAccessibilityAttr(const DeclAttributes &attrs,
+                                               bool forSetter = false) {
+  auto explicitAttrIter = std::find_if(attrs.begin(), attrs.end(),
+                                       [=](const DeclAttribute *attr) -> bool {
+    if (auto AA = dyn_cast<AccessibilityAttr>(attr))
+      return AA->isForSetter() == forSetter;
+    return false;
+  });
+
+  if (explicitAttrIter != attrs.end())
+    return cast<AccessibilityAttr>(*explicitAttrIter);
+  return nullptr;
+}
+
+static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
+  if (ED->hasDefaultAccessibility())
+    return;
+
+  if (const AccessibilityAttr *AA = findAccessibilityAttr(ED->getAttrs())) {
+    ED->setDefaultAccessibility(AA->getAccess());
+    return;
+  }
+
+  TC.checkInheritanceClause(ED);
+  if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
+    TC.validateDecl(nominal);
+    ED->setDefaultAccessibility(std::min(nominal->getAccessibility(),
+                                         Accessibility::Internal));
+  } else {
+    // Recover by assuming "internal", which is the most common thing anyway.
+    ED->setDefaultAccessibility(Accessibility::Internal);
+  }
+}
+
+static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
+  if (D->hasAccessibility())
+    return;
+
+  // Check if the decl has an explicit accessibility attribute.
+  if (const AccessibilityAttr *AA = findAccessibilityAttr(D->getAttrs())) {
+    D->setAccessibility(AA->getAccess());
+    return;
+  }
+
+  // If not, it inherits the default accessibility of its parent context.
+  DeclContext *DC = D->getDeclContext();
+  switch (DC->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+    D->setAccessibility(Accessibility::Private);
+    break;
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    D->setAccessibility(Accessibility::Internal);
+    break;
+  case DeclContextKind::NominalTypeDecl: {
+    auto nominal = cast<NominalTypeDecl>(DC);
+    TC.validateDecl(nominal);
+    Accessibility access = nominal->getAccessibility();
+    if (!isa<ProtocolDecl>(nominal))
+      access = std::min(access, Accessibility::Internal);
+    D->setAccessibility(access);
+    break;
+  }
+  case DeclContextKind::ExtensionDecl: {
+    auto extension = cast<ExtensionDecl>(DC);
+    computeDefaultAccessibility(TC, extension);
+    D->setAccessibility(extension->getDefaultAccessibility());
+  }
+  }
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -2190,6 +2264,7 @@ public:
 
     validateAttributes(TC, VD);
     TC.checkDeclAttributesEarly(VD);
+    computeAccessibility(TC, VD);
 
     // The instance var requires ObjC interop if it has an @objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
@@ -2424,6 +2499,7 @@ public:
            "Decl parsing must prevent subscripts outside of types!");
 
     TC.checkDeclAttributesEarly(SD);
+    computeAccessibility(TC, SD);
 
     auto dc = SD->getDeclContext();
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
@@ -2521,6 +2597,7 @@ public:
     TAD->setIsBeingTypeChecked();
     
     TC.checkDeclAttributesEarly(TAD);
+    computeAccessibility(TC, TAD);
     if (!IsSecondPass) {
       TypeResolutionOptions options;
       if (TAD->getDeclContext()->isTypeContext()) {
@@ -2556,6 +2633,9 @@ public:
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     TC.checkDeclAttributesEarly(assocType);
+    if (!assocType->hasAccessibility())
+      assocType->setAccessibility(assocType->getProtocol()->getAccessibility());
+
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull() &&
@@ -2616,6 +2696,7 @@ public:
       return;
 
     TC.checkDeclAttributesEarly(ED);
+    computeAccessibility(TC, ED);
 
     if (!IsSecondPass) {
       TC.validateDecl(ED);
@@ -2777,6 +2858,7 @@ public:
       return;
 
     TC.checkDeclAttributesEarly(SD);
+    computeAccessibility(TC, SD);
 
     if (!IsSecondPass) {
       TC.validateDecl(SD);
@@ -2947,6 +3029,7 @@ public:
       return;
 
     TC.checkDeclAttributesEarly(CD);
+    computeAccessibility(TC, CD);
 
     if (!IsSecondPass) {
       TC.validateDecl(CD);
@@ -3104,6 +3187,7 @@ public:
       return;
 
     TC.checkDeclAttributesEarly(PD);
+    computeAccessibility(TC, PD);
 
     if (IsSecondPass) {
       return;
@@ -3489,6 +3573,7 @@ public:
     }
 
     TC.checkDeclAttributesEarly(FD);
+    computeAccessibility(TC, FD);
 
     if (IsSecondPass || FD->hasType())
       return;
@@ -4223,6 +4308,9 @@ public:
 
     EnumDecl *ED = EED->getParentEnum();
     Type ElemTy = ED->getDeclaredTypeInContext();
+
+    if (!EED->hasAccessibility())
+      EED->setAccessibility(ED->getAccessibility());
     
     // Only attempt to validate the argument type or raw value if the element
     // is not currenly being validated.
@@ -4377,6 +4465,7 @@ public:
     }
 
     TC.checkDeclAttributesEarly(CD);
+    computeAccessibility(TC, CD);
 
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
@@ -4510,10 +4599,14 @@ public:
       return;
     }
 
-    TC.checkDeclAttributesEarly(DD);
-
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");
+
+    TC.checkDeclAttributesEarly(DD);
+    if (!DD->hasAccessibility()) {
+      auto enclosingClass = cast<ClassDecl>(DD->getParent());
+      DD->setAccessibility(enclosingClass->getAccessibility());
+    }
 
     GenericParamList *outerGenericParams;
     Type SelfTy = configureImplicitSelf(DD, outerGenericParams);
@@ -4568,6 +4661,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     llvm_unreachable("not a value decl");
 
   case DeclKind::TypeAlias: {
+    computeAccessibility(*this, D);
+
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
     if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
@@ -4597,9 +4692,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::Initializer:
       llvm_unreachable("cannot have type params");
 
-    case DeclContextKind::NominalTypeDecl:
-      typeCheckDecl(cast<NominalTypeDecl>(DC), true);
+    case DeclContextKind::NominalTypeDecl: {
+      auto nominal = cast<NominalTypeDecl>(DC);
+      typeCheckDecl(nominal, true);
+      if (!typeParam->hasAccessibility())
+        typeParam->setAccessibility(nominal->getAccessibility());
       break;
+    }
 
     case DeclContextKind::ExtensionDecl:
       llvm_unreachable("not yet implemented");
@@ -4607,13 +4706,17 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::AbstractClosureExpr:
       llvm_unreachable("cannot have type params");
 
-    case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::AbstractFunctionDecl: {
       if (auto nominal = dyn_cast<NominalTypeDecl>(DC->getParent()))
         typeCheckDecl(nominal, true);
       else if (auto extension = dyn_cast<ExtensionDecl>(DC->getParent()))
         typeCheckDecl(extension, true);
-      typeCheckDecl(cast<AbstractFunctionDecl>(DC), true);
+      auto fn = cast<AbstractFunctionDecl>(DC);
+      typeCheckDecl(fn, true);
+      if (!typeParam->hasAccessibility())
+        typeParam->setAccessibility(fn->getAccessibility());
       break;
+    }
     }
     break;
   }
@@ -4647,6 +4750,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Compute the declared type.
     nominal->computeType();
 
+    computeAccessibility(*this, D);
     validateAttributes(*this, D);
     checkInheritanceClause(D);
 
@@ -4686,6 +4790,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                           proto->getDeclContext());
     finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
 
+    computeAccessibility(*this, D);
     checkInheritanceClause(D);
     validateAttributes(*this, D);
 
@@ -4728,6 +4833,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       
   case DeclKind::Var:
   case DeclKind::Param: {
+    computeAccessibility(*this, D);
     if (D->hasType())
       return;
 
@@ -4772,15 +4878,39 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     break;
   }
       
-  case DeclKind::Func:
-  case DeclKind::Subscript:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
-  case DeclKind::EnumElement:
+  case DeclKind::Func: {
+    auto fn = cast<FuncDecl>(D);
     if (D->hasType())
       return;
+    if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
+      computeAccessibility(*this, storage);
+      // FIXME: Handle setter accessibility.
+      fn->setAccessibility(storage->getAccessibility());
+    } else {
+      computeAccessibility(*this, D);
+    }
     typeCheckDecl(D, true);
     break;
+  }
+
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+    if (D->hasType())
+      return;
+    computeAccessibility(*this, D);
+    typeCheckDecl(D, true);
+    break;
+
+  case DeclKind::Destructor:
+  case DeclKind::EnumElement: {
+    if (D->hasType())
+      return;
+    auto container = cast<NominalTypeDecl>(D->getDeclContext());
+    validateDecl(container);
+    D->setAccessibility(container->getAccessibility());
+    typeCheckDecl(D, true);
+    break;
+  }
   }
 
   assert(D->hasType());  
@@ -4810,6 +4940,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
+  Accessibility accessLevel = std::min(decl->getAccessibility(),
+                                       Accessibility::Internal);
+
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
   SmallVector<Identifier, 8> argNames;
@@ -4819,6 +4952,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
     // Computed and static properties are not initialized.
     for (auto var : decl->getStoredProperties()) {
       tc.validateDecl(var);
+      accessLevel = std::min(accessLevel, var->getAccessibility());
 
       auto varType = tc.getTypeOfRValue(var);
 
@@ -4851,6 +4985,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
   // Mark implicit.
   ctor->setImplicit();
+  ctor->setAccessibility(accessLevel);
 
   // Type-check the constructor declaration.
   tc.typeCheckDecl(ctor, /*isFirstPass=*/true);
@@ -5091,6 +5226,8 @@ createDesignatedInitOverride(TypeChecker &tc,
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);
   ctor->setImplicit();
+  ctor->setAccessibility(std::min(classDecl->getAccessibility(),
+                                  Accessibility::Internal));
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;

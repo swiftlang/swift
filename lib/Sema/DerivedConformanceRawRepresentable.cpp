@@ -88,6 +88,7 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   rawTypeDecl->setImplicit();
   rawTypeDecl->setType(rawType);
   rawTypeDecl->setInterfaceType(rawInterfaceType);
+  rawTypeDecl->setAccessibility(enumDecl->getAccessibility());
   enumDecl->addMember(rawTypeDecl);
   return rawTypeDecl;
 }
@@ -207,6 +208,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   else
     interfaceType = type;
   toRawDecl->setInterfaceType(interfaceType);
+  toRawDecl->setAccessibility(enumDecl->getAccessibility());
 
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(toRawDecl);
@@ -388,6 +390,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   else
     interfaceType = type;
   fromRawDecl->setInterfaceType(interfaceType);
+  fromRawDecl->setAccessibility(enumDecl->getAccessibility());
 
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
