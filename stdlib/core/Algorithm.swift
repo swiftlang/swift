@@ -180,9 +180,9 @@ struct Less<T: Comparable> {
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout collection: C,
-  predecessor: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predicate: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) {
-  quickSort(&collection, indices(collection), predecessor)
+  quickSort(&collection, indices(collection), predicate)
 }
 
 @public func sort<
@@ -194,9 +194,9 @@ struct Less<T: Comparable> {
   quickSort(&collection, indices(collection))
 }
 
-@public func sort<T>(inout array: T[], predecessor: (T, T) -> Bool) {
+@public func sort<T>(inout array: T[], predicate: (T, T) -> Bool) {
   return array.withMutableStorage {
-    a in sort(&a, predecessor)
+    a in sort(&a, predicate)
     return
   }
 }
@@ -215,10 +215,10 @@ struct Less<T: Comparable> {
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   source: C,
-  predecessor: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predicate: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) -> C {
   var result = source
-  sort(&result, predecessor)
+  sort(&result, predicate)
   return result
 }
 
@@ -235,10 +235,10 @@ struct Less<T: Comparable> {
   S: Sequence
 >(
   source: S,
-  predecessor: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
+  predicate: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
 ) -> S.GeneratorType.Element[] {
   var result = Array(source)
-  sort(&result, predecessor)
+  sort(&result, predicate)
   return result
 }
 
@@ -557,7 +557,7 @@ func _quickSort<
   where
     S1.GeneratorType.Element == S2.GeneratorType.Element
 >(a1: S1, a2: S2,
-  predecessor: (S1.GeneratorType.Element, S1.GeneratorType.Element) -> Bool) -> Bool
+  predicate: (S1.GeneratorType.Element, S1.GeneratorType.Element) -> Bool) -> Bool
 {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -565,7 +565,7 @@ func _quickSort<
     var e1 = g1.next()
     var e2 = g2.next()
     if e1 && e2 {
-      if !predecessor(e1!, e2!) {
+      if !predicate(e1!, e2!) {
         return false
       }
     }
