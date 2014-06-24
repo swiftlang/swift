@@ -5517,7 +5517,39 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
 }
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
-  llvm_unreachable("not implemented");
+  auto &Ctx = SGF.getASTContext();
+  FuncDecl *converter;
+  // Convert the array mutably if it's being passed inout.
+  if (E->getSubExpr()->getType()->is<InOutType>()) {
+    converter = Ctx.getConvertMutableArrayToPointerArgument(nullptr);
+  } else {
+    converter = Ctx.getConvertConstArrayToPointerArgument(nullptr);
+  }
+  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  // Get the original value.
+  ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  
+  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
+  Substitution subs[2] = {
+    Substitution{
+      converterArchetypes[0],
+      E->getSubExpr()->getType()->getInOutObjectType()
+        ->castTo<BoundGenericType>()
+        ->getGenericArgs()[0],
+      {}
+    },
+    SGF.getPointerSubstitution(E->getType(),
+                               
+                               converterArchetypes[1]),
+  };
+  auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, C);
+  
+  // Lifetime-extend the owner, and pass on the pointer.
+  auto owner = SGF.B.createTupleExtract(E, result.forward(SGF), 0);
+  SGF.emitManagedRValueWithCleanup(owner);
+  auto pointer = SGF.B.createTupleExtract(E, result.getValue(), 1);
+  return RValue(SGF, E, ManagedValue::forUnmanaged(pointer));
 }
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {

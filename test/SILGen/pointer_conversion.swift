@@ -32,3 +32,28 @@ func pointerToPointer(mp: UnsafePointer<Int>,
   // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>, ConstUnsafePointer<Void>>
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 }
+
+// CHECK-LABEL: sil @_TF18pointer_conversion14arrayToPointerFT_T_
+func arrayToPointer() {
+  var ints = [1,2,3]
+
+  takesMutablePointer(&ints)
+  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGVSs13UnsafePointerSi_T_
+  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFSs37_convertMutableArrayToPointerArgumentU_Ss8_Pointer__FRGSaQ__TGSqPSs9AnyObject__Q0__
+  // CHECK: apply [transparent] [[CONVERT_MUTABLE]]<Int, UnsafePointer<Int>>([[TUPLE_BUF:%.*]]#1,
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
+  // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
+  // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[POINTER]])
+  // CHECK: release_value [[OWNER]]
+
+  takesConstPointer(ints)
+  // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGVSs18ConstUnsafePointerSi_T_
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFSs35_convertConstArrayToPointerArgumentU_Ss8_Pointer__FGSaQ__TGSqPSs9AnyObject__Q0__
+  // CHECK: apply [transparent] [[CONVERT_CONST]]<Int, ConstUnsafePointer<Int>>([[TUPLE_BUF:%.*]]#1,
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
+  // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
+  // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
+  // CHECK: release_value [[OWNER]]
+}
