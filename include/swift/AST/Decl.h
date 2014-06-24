@@ -526,7 +526,7 @@ class alignas(8) Decl {
 
     unsigned ImportKind : 3;
   };
-  enum { NumImportDeclBits = NumDeclBits + 4 };
+  enum { NumImportDeclBits = NumDeclBits + 3 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
   class ExtensionDeclBitfields {
@@ -537,8 +537,10 @@ class alignas(8) Decl {
     ///
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
+
+    unsigned DefaultAccessLevel : 2;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 4 };
+  enum { NumExtensionDeclBits = NumDeclBits + 3 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -559,6 +561,7 @@ protected:
     InfixOperatorDeclBitfields InfixOperatorDeclBits;
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
+    uint32_t OpaqueBits;
   };
 
   // FIXME: Unused padding here.
@@ -583,7 +586,7 @@ protected:
   static const DeclAttributes EmptyAttrs;
 
   Decl(DeclKind kind, DeclContext *DC)
-      : Context(DC), Attrs(&EmptyAttrs) {
+      : OpaqueBits(0), Context(DC), Attrs(&EmptyAttrs) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
@@ -1456,9 +1459,7 @@ public:
       IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
       ExtensionLoc(ExtensionLoc),
       ExtendedType(ExtendedType), Inherited(Inherited)
-  {
-    ExtensionDeclBits.CheckedInheritanceClause = false;
-  }
+  {}
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLoc() const { return ExtensionLoc; }
@@ -1485,6 +1486,18 @@ public:
   /// Note that we have already type-checked the inheritance clause.
   void setCheckedInheritanceClause(bool checked = true) {
     ExtensionDeclBits.CheckedInheritanceClause = checked;
+  }
+
+  Accessibility getDefaultAccessibility() const {
+    assert(ExtensionDeclBits.DefaultAccessLevel != 0 &&
+           "default accessibility not computed yet");
+    return static_cast<Accessibility>(ExtensionDeclBits.DefaultAccessLevel - 1);
+  }
+
+  void setDefaultAccessibility(Accessibility access) {
+    assert(ExtensionDeclBits.DefaultAccessLevel == 0 &&
+           "default accessibility already set");
+    ExtensionDeclBits.DefaultAccessLevel = static_cast<unsigned>(access) + 1;
   }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
@@ -1757,7 +1770,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  Type Ty;
+  llvm::PointerIntPair<Type, 2, unsigned> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
@@ -1809,10 +1822,10 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const { return !Ty.isNull(); }
+  bool hasType() const { return !TypeAndAccess.getPointer().isNull(); }
   Type getType() const {
-    assert(!Ty.isNull() && "declaration has no type set yet");
-    return Ty;
+    assert(hasType() && "declaration has no type set yet");
+    return TypeAndAccess.getPointer();
   }
 
   /// Set the type of this declaration for the first time.
@@ -1820,6 +1833,16 @@ public:
 
   /// Overwrite the type of this declaration.
   void overwriteType(Type T);
+
+  Accessibility getAccessibility() const {
+    assert(TypeAndAccess.getInt() != 0 && "accessibility not computed yet");
+    return static_cast<Accessibility>(TypeAndAccess.getInt() - 1);
+  }
+
+  void setAccessibility(Accessibility access) {
+    assert(TypeAndAccess.getInt() == 0 && "accessibility already set");
+    TypeAndAccess.setInt(static_cast<unsigned>(access) + 1);
+  }
 
   /// Get the innermost declaration context that can provide generic
   /// parameters used within this declaration.

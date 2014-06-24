@@ -1181,15 +1181,12 @@ ArrayRef<ValueDecl *> ValueDecl::getConformances() {
 }
 
 void ValueDecl::setType(Type T) {
-  assert(Ty.isNull() && "changing type of declaration");
-  Ty = T;
-  if (!T.isNull() && T->is<ErrorType>())
-    setInvalid();
+  assert(!hasType() && "changing type of declaration");
+  overwriteType(T);
 }
 
-/// Overwrite the type of this declaration.
 void ValueDecl::overwriteType(Type T) {
-  Ty = T;
+  TypeAndAccess.setPointer(T);
   if (!T.isNull() && T->is<ErrorType>())
     setInvalid();
 }
