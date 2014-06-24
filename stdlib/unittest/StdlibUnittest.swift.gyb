@@ -166,15 +166,29 @@ func _expectNotEqual${Generic}(
   return AssertionResult(isPass: false)
 }
 
+@public struct SourceLoc {
+  let file: String
+  let line: UWord
+
+  init(_ file: String, _ line: UWord) {
+    self.file = file
+    self.line = line
+  }
+}
+
 %for BoolType in ['Bool', 'AssertionResult']:
 
 @public func expectTrue(
     actual: ${BoolType},
+    extraLoc: SourceLoc? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if !actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    if let el = extraLoc {
+      println("extra loc: \(el.file), line \(el.line)")
+    }
     println("expected: true")
     println("actual: \(actual)")
     println()

@@ -70,7 +70,7 @@ func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
   }
   _preconditionFailure("Index out of range")
 }
-  
+
 // buffer should have a length >= 4
 func nsEncode<CodeUnit>(
   var c: UInt32,
@@ -171,7 +171,7 @@ class CodecTest<Codec: TestableUnicodeCodec> {
       println("\(hex(scalar.value))")
     }
     */
-    
+
     // Use Cocoa to encode the scalar
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
     let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
@@ -190,12 +190,12 @@ class CodecTest<Codec: TestableUnicodeCodec> {
     }
     encodeBuffer.clear()
     Codec.encode(scalar, output: &self.encodeBuffer)
-    
+
     if !equal(nsEncoded, encodeBuffer.elements)  {
       println("Decoding failed: \(hex(nsEncoded)) => \(hex(scalar.value)) => \(hex(encodeBuffer.storage[0]))")
     }
   }
-  
+
   func run() {
     println("testing \(Codec.name())")
     for i in minScalarOrd..<maxScalarOrd {
@@ -272,7 +272,7 @@ func additionalUtf16Tests() {
       // CHECK-NEXT: [ 0, 1, 2, 0, 1, 2 ]
       UTF16.copy(p16, destination: p16 + 3, count: 3)
       println(u16)
-      
+
       // CHECK-NEXT: [ 9, 10, 11, 9, 10, 11 ]
       UTF16.copy(p8, destination: p8 + 3, count: 3)
       println(u8)
@@ -283,7 +283,7 @@ func additionalUtf16Tests() {
       repairIllFormedSequences: false)!
   // CHECK-NEXT: 6 / true
   println("\(count0) / \(isASCII0)")
-  
+
   let (count1, isASCII1) = UTF16.measure(UTF16.self, input: u16.generate(),
       repairIllFormedSequences: false)!
   // CHECK-NEXT: 6 / true
@@ -294,7 +294,7 @@ func additionalUtf16Tests() {
   let (count2, isASCII2) = UTF16.measure(UTF8.self, input: u8.generate(),
       repairIllFormedSequences: false)!
   // CHECK-NEXT: 2 / false
-  println("\(count2) / \(isASCII2)")  
+  println("\(count2) / \(isASCII2)")
 }
 additionalUtf16Tests()
 
@@ -385,6 +385,580 @@ func checkDecodeUTF32(
       utf32Str)
 }
 
+func checkEncodeUTF8(expected: UInt8[], scalars: UInt32[]) -> AssertionResult {
+  var encoded: UInt8[] = []
+  var g = EOFCountingGenerator(scalars)
+  let hadError = transcode(UTF32.self, UTF8.self, g,
+      SinkOf {
+        encoded += $0
+      },
+      stopOnError: true)
+  expectFalse(hadError)
+  expectGE(1, g.numTimesReturnedEOF)
+  if expected != encoded {
+    return assertionFailure()
+        .withDescription("\n")
+        .withDescription("expected: \(asHex(expected))\n")
+        .withDescription("actual:   \(asHex(encoded))")
+  }
+
+  return assertionSuccess()
+}
+
+struct UTF8Test {
+  let scalars: UInt32[]
+  let encoded: UInt8[]
+  let loc: SourceLoc
+
+  init(_ scalars: UInt32[], _ encoded: UInt8[],
+       file: String = __FILE__, line: UWord = __LINE__) {
+    self.scalars = scalars
+    self.encoded = encoded
+    self.loc = SourceLoc(file, line)
+  }
+}
+
+let UTF8TestsSmokeTest = [
+  //
+  // 1-byte sequences
+  //
+
+  // U+0041 LATIN CAPITAL LETTER A
+  UTF8Test([ 0x0041 ], [ 0x41 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  UTF8Test([ 0x0041, 0x0042 ], [ 0x41, 0x42 ]),
+
+  // U+0061 LATIN SMALL LETTER A
+  // U+0062 LATIN SMALL LETTER B
+  // U+0063 LATIN SMALL LETTER C
+  UTF8Test([ 0x0061, 0x0062, 0x0063 ], [ 0x61, 0x62, 0x63 ]),
+
+  // U+0000 NULL
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0000 NULL
+  UTF8Test(
+      [ 0x0000, 0x0041, 0x0042, 0x0000 ],
+      [ 0x00, 0x41, 0x42, 0x00 ]),
+
+  //
+  // 2-byte sequences
+  //
+
+  // U+0283 LATIN SMALL LETTER ESH
+  UTF8Test([ 0x0283 ], [ 0xca, 0x83 ]),
+
+  // U+03BA GREEK SMALL LETTER KAPPA
+  // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
+  // U+03C3 GREEK SMALL LETTER SIGMA
+  // U+03BC GREEK SMALL LETTER MU
+  // U+03B5 GREEK SMALL LETTER EPSILON
+  UTF8Test(
+      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ],
+      [ 0xce, 0xba, 0xe1, 0xbd, 0xb9, 0xcf, 0x83, 0xce, 0xbc, 0xce, 0xb5 ]),
+
+  // U+0430 CYRILLIC SMALL LETTER A
+  // U+0431 CYRILLIC SMALL LETTER BE
+  // U+0432 CYRILLIC SMALL LETTER VE
+  UTF8Test([ 0x0430, 0x0431, 0x0432 ], [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2 ]),
+
+  //
+  // 3-byte sequences
+  //
+
+  // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+  // U+6587 CJK UNIFIED IDEOGRAPH-6587
+  UTF8Test(
+      [ 0x4f8b, 0x6587 ],
+      [ 0xe4, 0xbe, 0x8b, 0xe6, 0x96, 0x87 ]),
+
+  // U+D55C HANGUL SYLLABLE HAN
+  // U+AE00 HANGUL SYLLABLE GEUL
+  UTF8Test(
+      [ 0xd55c, 0xae00 ],
+      [ 0xed, 0x95, 0x9c, 0xea, 0xb8, 0x80 ]),
+
+  // U+1112 HANGUL CHOSEONG HIEUH
+  // U+1161 HANGUL JUNGSEONG A
+  // U+11AB HANGUL JONGSEONG NIEUN
+  // U+1100 HANGUL CHOSEONG KIYEOK
+  // U+1173 HANGUL JUNGSEONG EU
+  // U+11AF HANGUL JONGSEONG RIEUL
+  UTF8Test(
+      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ],
+      [ 0xe1, 0x84, 0x92, 0xe1, 0x85, 0xa1, 0xe1, 0x86, 0xab,
+        0xe1, 0x84, 0x80, 0xe1, 0x85, 0xb3, 0xe1, 0x86, 0xaf ]),
+
+  // U+3042 HIRAGANA LETTER A
+  // U+3044 HIRAGANA LETTER I
+  // U+3046 HIRAGANA LETTER U
+  // U+3048 HIRAGANA LETTER E
+  // U+304A HIRAGANA LETTER O
+  UTF8Test(
+      [ 0x3042, 0x3044, 0x3046, 0x3048, 0x304a ],
+      [ 0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86,
+        0xe3, 0x81, 0x88, 0xe3, 0x81, 0x8a ]),
+
+  //
+  // 4-byte sequences
+  //
+
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0001F425 ],
+      [ 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0001F425 ],
+      [ 0x41, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0001F425 ],
+      [ 0x41, 0x42, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+0045 LATIN CAPITAL LETTER E
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0x45, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+0045 LATIN CAPITAL LETTER E
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+0045 LATIN CAPITAL LETTER E
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+0047 LATIN CAPITAL LETTER G
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+0045 LATIN CAPITAL LETTER E
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+0047 LATIN CAPITAL LETTER G
+  // U+0048 LATIN CAPITAL LETTER H
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0048,
+        0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+        0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0043 LATIN CAPITAL LETTER C
+  // U+0044 LATIN CAPITAL LETTER D
+  // U+0045 LATIN CAPITAL LETTER E
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+0047 LATIN CAPITAL LETTER G
+  // U+0048 LATIN CAPITAL LETTER H
+  // U+0049 LATIN CAPITAL LETTER I
+  // U+1F425 FRONT-FACING BABY CHICK
+  UTF8Test(
+      [ 0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0048, 0x0049,
+        0x0001F425 ],
+      [ 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+        0xf0, 0x9f, 0x90, 0xa5 ]),
+
+  // U+E0100 VARIATION SELECTOR-17
+  UTF8Test(
+      [ 0x000E0100 ],
+      [ 0xf3, 0xa0, 0x84, 0x80 ]),
+]
+
+struct UTF16Test {
+  let scalarsHead: UInt32[]
+  let scalarsRepairedTail: UInt32[]
+  let encoded: UInt16[]
+  let loc: SourceLoc
+
+  init(_ scalarsHead: UInt32[], _ scalarsRepairedTail: UInt32[],
+       _ encoded: UInt16[],
+       file: String = __FILE__, line: UWord = __LINE__) {
+    self.scalarsHead = scalarsHead
+    self.scalarsRepairedTail = scalarsRepairedTail
+    self.encoded = encoded
+    self.loc = SourceLoc(file, line)
+  }
+}
+
+let UTF16Tests = [
+  "Empty": [
+    UTF16Test([], [], []),
+  ],
+
+  "SmokeTest": [
+    //
+    // 1-word sequences
+    //
+
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test([ 0x0041 ], [], [ 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+0042 LATIN CAPITAL LETTER B
+    UTF16Test([ 0x0041, 0x0042 ], [], [ 0x0041, 0x0042 ]),
+
+    // U+0000 NULL
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+0042 LATIN CAPITAL LETTER B
+    // U+0000 NULL
+    UTF16Test(
+        [ 0x0000, 0x0041, 0x0042, 0x0000 ], [],
+        [ 0x0000, 0x0041, 0x0042, 0x0000 ]),
+
+    // U+0283 LATIN SMALL LETTER ESH
+    UTF16Test([ 0x0283 ], [], [ 0x0283 ]),
+
+    // U+03BA GREEK SMALL LETTER KAPPA
+    // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
+    // U+03C3 GREEK SMALL LETTER SIGMA
+    // U+03BC GREEK SMALL LETTER MU
+    // U+03B5 GREEK SMALL LETTER EPSILON
+    UTF16Test(
+        [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ], [],
+        [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ]),
+
+    // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+    // U+6587 CJK UNIFIED IDEOGRAPH-6587
+    UTF16Test(
+        [ 0x4f8b, 0x6587 ], [],
+        [ 0x4f8b, 0x6587 ]),
+
+    // U+D55C HANGUL SYLLABLE HAN
+    // U+AE00 HANGUL SYLLABLE GEUL
+    UTF16Test(
+        [ 0xd55c, 0xae00 ], [],
+        [ 0xd55c, 0xae00 ]),
+
+    // U+1112 HANGUL CHOSEONG HIEUH
+    // U+1161 HANGUL JUNGSEONG A
+    // U+11AB HANGUL JONGSEONG NIEUN
+    // U+1100 HANGUL CHOSEONG KIYEOK
+    // U+1173 HANGUL JUNGSEONG EU
+    // U+11AF HANGUL JONGSEONG RIEUL
+    UTF16Test(
+        [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ], [],
+        [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ]),
+
+    // U+D7FF (unassigned)
+    UTF16Test([ 0xd7ff ], [], [ 0xd7ff ]),
+
+    // U+E000 (private use)
+    UTF16Test([ 0xe000 ], [], [ 0xe000 ]),
+
+    // U+FFFD REPLACEMENT CHARACTER
+    UTF16Test([ 0xfffd ], [], [ 0xfffd ]),
+
+    // U+FFFF (noncharacter)
+    UTF16Test([ 0xffff ], [], [ 0xffff ]),
+
+    //
+    // 2-word sequences
+    //
+
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test([ 0x00010000 ], [], [ 0xd800, 0xdc00 ]),
+
+    // U+10100 AEGEAN WORD SEPARATOR LINE
+    UTF16Test([ 0x00010100 ], [], [ 0xd800, 0xdd00 ]),
+
+    // U+103FF (unassigned)
+    UTF16Test([ 0x000103ff ], [], [ 0xd800, 0xdfff ]),
+
+
+    // U+E0000 (unassigned)
+    UTF16Test([ 0x000e0000 ], [], [ 0xdb40, 0xdc00 ]),
+
+    // U+E0100 VARIATION SELECTOR-17
+    UTF16Test([ 0x000e0100 ], [], [ 0xdb40, 0xdd00 ]),
+
+    // U+E03FF (unassigned)
+    UTF16Test([ 0x000e03ff ], [], [ 0xdb40, 0xdfff ]),
+
+
+    // U+10FC00 (private use)
+    UTF16Test([ 0x0010fc00 ], [], [ 0xdbff, 0xdc00 ]),
+
+    // U+10FD00 (private use)
+    UTF16Test([ 0x0010fd00 ], [], [ 0xdbff, 0xdd00 ]),
+
+    // U+10FFFF (private use, noncharacter)
+    UTF16Test([ 0x0010ffff ], [], [ 0xdbff, 0xdfff ]),
+  ],
+
+  "Incomplete": [
+    //
+    // Incomplete sequences that end right before EOF.
+    //
+
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xfffd ], [ 0xd800 ]),
+
+    // U+D800 (high-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xd800, 0xd800 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    UTF16Test([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xd800 ]),
+
+    // U+10000 LINEAR B SYLLABLE B008 A
+    // U+D800 (high-surrogate)
+    UTF16Test(
+        [ 0x00010000 ], [ 0xfffd ],
+        [ 0xd800, 0xdc00, 0xd800 ]),
+
+    //
+    // Incomplete sequences with more code units following them.
+    //
+
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test([], [ 0xfffd, 0x0041 ], [ 0xd800, 0x0041 ]),
+
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xfffd, 0x00010000 ],
+        [ 0xd800, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0x0041 ],
+        [ 0x0041, 0xd800, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xd800, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
+        [ 0x0041, 0xd800, 0xdb40, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xd800, 0xdb40, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+DBFF (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
+        [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+DBFF (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0xd800, 0xdc00 ]),
+  ],
+
+  "IllFormed": [
+    //
+    // Low-surrogate right before EOF.
+    //
+
+    // U+DC00 (low-surrogate)
+    UTF16Test([], [ 0xfffd ], [ 0xdc00 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DC00 (low-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    UTF16Test([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xdc00 ]),
+
+    // U+10000 LINEAR B SYLLABLE B008 A
+    // U+DC00 (low-surrogate)
+    UTF16Test(
+        [ 0x00010000 ], [ 0xfffd ],
+        [ 0xd800, 0xdc00, 0xdc00 ]),
+
+    //
+    // Low-surrogate with more code units following it.
+    //
+
+    // U+DC00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test([], [ 0xfffd, 0x0041 ], [ 0xdc00, 0x0041 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xfffd, 0x00010000 ],
+        [ 0xdc00, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0x0041 ],
+        [ 0x0041, 0xdc00, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xdc00, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
+        [ 0x0041, 0xdc00, 0xdd00, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xdc00, 0xdd00, 0xd800, 0xdc00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+DFFF (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
+        [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+DFFF (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
+        [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0xd800, 0xdc00 ]),
+
+    //
+    // Low-surrogate followed by high-surrogate.
+    //
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xd800 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdb40 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdbff ]),
+
+
+    // U+DD00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xd800 ]),
+
+    // U+DD00 (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdb40 ]),
+
+    // U+DD00 (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdbff ]),
+
+
+    // U+DFFF (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xd800 ]),
+
+    // U+DFFF (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdb40 ]),
+
+    // U+DFFF (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdbff ]),
+
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [], [ 0xfffd, 0xfffd, 0x0041 ],
+        [ 0xdc00, 0xd800, 0x0041 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xfffd, 0xfffd, 0x10000 ],
+        [ 0xdc00, 0xd800, 0xd800, 0xdc00 ]),
+  ],
+]
+
 var UTF8Decoder = TestCase("UTF8Decoder")
 
 UTF8Decoder.test("Internal/_numTrailingBytes") {
@@ -418,76 +992,10 @@ UTF8Decoder.test("Empty") {
 }
 
 UTF8Decoder.test("SmokeTest") {
-  //
-  // 1-byte sequences
-  //
-
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF8([ 0x0041 ], [], [ 0x41 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+0042 LATIN CAPITAL LETTER B
-  expectTrue(checkDecodeUTF8([ 0x0041, 0x0042 ], [], [ 0x41, 0x42 ]))
-
-  // U+0000 NULL
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+0042 LATIN CAPITAL LETTER B
-  // U+0000 NULL
-  expectTrue(checkDecodeUTF8(
-      [ 0x0000, 0x0041, 0x0042, 0x0000 ], [],
-      [ 0x00, 0x41, 0x42, 0x00 ]))
-
-  //
-  // 2-byte sequences
-  //
-
-  // U+0283 LATIN SMALL LETTER ESH
-  expectTrue(checkDecodeUTF8([ 0x0283 ], [], [ 0xca, 0x83 ]))
-
-  // U+03BA GREEK SMALL LETTER KAPPA
-  // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
-  // U+03C3 GREEK SMALL LETTER SIGMA
-  // U+03BC GREEK SMALL LETTER MU
-  // U+03B5 GREEK SMALL LETTER EPSILON
-  expectTrue(checkDecodeUTF8(
-      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ], [],
-      [ 0xce, 0xba, 0xe1, 0xbd, 0xb9, 0xcf, 0x83, 0xce, 0xbc, 0xce, 0xb5 ]))
-
-  //
-  // 3-byte sequences
-  //
-
-  // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
-  // U+6587 CJK UNIFIED IDEOGRAPH-6587
-  expectTrue(checkDecodeUTF8(
-      [ 0x4f8b, 0x6587 ], [],
-      [ 0xe4, 0xbe, 0x8b, 0xe6, 0x96, 0x87 ]))
-
-  // U+D55C HANGUL SYLLABLE HAN
-  // U+AE00 HANGUL SYLLABLE GEUL
-  expectTrue(checkDecodeUTF8(
-      [ 0xd55c, 0xae00 ], [],
-      [ 0xed, 0x95, 0x9c, 0xea, 0xb8, 0x80 ]))
-
-  // U+1112 HANGUL CHOSEONG HIEUH
-  // U+1161 HANGUL JUNGSEONG A
-  // U+11AB HANGUL JONGSEONG NIEUN
-  // U+1100 HANGUL CHOSEONG KIYEOK
-  // U+1173 HANGUL JUNGSEONG EU
-  // U+11AF HANGUL JONGSEONG RIEUL
-  expectTrue(checkDecodeUTF8(
-      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ], [],
-      [ 0xe1, 0x84, 0x92, 0xe1, 0x85, 0xa1, 0xe1, 0x86, 0xab,
-        0xe1, 0x84, 0x80, 0xe1, 0x85, 0xb3, 0xe1, 0x86, 0xaf ]))
-
-  //
-  // 4-byte sequences
-  //
-
-  // U+E0100 VARIATION SELECTOR-17
-  expectTrue(checkDecodeUTF8(
-      [ 0x000E0100 ], [],
-      [ 0xf3, 0xa0, 0x84, 0x80 ]))
+  for test in UTF8TestsSmokeTest {
+    expectTrue(checkDecodeUTF8(test.scalars, [], test.encoded),
+        extraLoc: test.loc)
+  }
 }
 
 UTF8Decoder.test("FirstPossibleSequence") {
@@ -1573,335 +2081,14 @@ UTF8Decoder.run()
 
 var UTF16Decoder = TestCase("UTF16Decoder")
 
-UTF16Decoder.test("Empty") {
-  expectTrue(checkDecodeUTF16([], [], []))
-}
-
-UTF16Decoder.test("SmokeTest") {
-  //
-  // 1-word sequences
-  //
-
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16([ 0x0041 ], [], [ 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+0042 LATIN CAPITAL LETTER B
-  expectTrue(checkDecodeUTF16([ 0x0041, 0x0042 ], [], [ 0x0041, 0x0042 ]))
-
-  // U+0000 NULL
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+0042 LATIN CAPITAL LETTER B
-  // U+0000 NULL
-  expectTrue(checkDecodeUTF16(
-      [ 0x0000, 0x0041, 0x0042, 0x0000 ], [],
-      [ 0x0000, 0x0041, 0x0042, 0x0000 ]))
-
-  // U+0283 LATIN SMALL LETTER ESH
-  expectTrue(checkDecodeUTF16([ 0x0283 ], [], [ 0x0283 ]))
-
-  // U+03BA GREEK SMALL LETTER KAPPA
-  // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
-  // U+03C3 GREEK SMALL LETTER SIGMA
-  // U+03BC GREEK SMALL LETTER MU
-  // U+03B5 GREEK SMALL LETTER EPSILON
-  expectTrue(checkDecodeUTF16(
-      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ], [],
-      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ]))
-
-  // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
-  // U+6587 CJK UNIFIED IDEOGRAPH-6587
-  expectTrue(checkDecodeUTF16(
-      [ 0x4f8b, 0x6587 ], [],
-      [ 0x4f8b, 0x6587 ]))
-
-  // U+D55C HANGUL SYLLABLE HAN
-  // U+AE00 HANGUL SYLLABLE GEUL
-  expectTrue(checkDecodeUTF16(
-      [ 0xd55c, 0xae00 ], [],
-      [ 0xd55c, 0xae00 ]))
-
-  // U+1112 HANGUL CHOSEONG HIEUH
-  // U+1161 HANGUL JUNGSEONG A
-  // U+11AB HANGUL JONGSEONG NIEUN
-  // U+1100 HANGUL CHOSEONG KIYEOK
-  // U+1173 HANGUL JUNGSEONG EU
-  // U+11AF HANGUL JONGSEONG RIEUL
-  expectTrue(checkDecodeUTF16(
-      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ], [],
-      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ]))
-
-  // U+D7FF (unassigned)
-  expectTrue(checkDecodeUTF16([ 0xd7ff ], [], [ 0xd7ff ]))
-
-  // U+E000 (private use)
-  expectTrue(checkDecodeUTF16([ 0xe000 ], [], [ 0xe000 ]))
-
-  // U+FFFD REPLACEMENT CHARACTER
-  expectTrue(checkDecodeUTF16([ 0xfffd ], [], [ 0xfffd ]))
-
-  // U+FFFF (noncharacter)
-  expectTrue(checkDecodeUTF16([ 0xffff ], [], [ 0xffff ]))
-
-  //
-  // 2-word sequences
-  //
-
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16([ 0x00010000 ], [], [ 0xd800, 0xdc00 ]))
-
-  // U+10100 AEGEAN WORD SEPARATOR LINE
-  expectTrue(checkDecodeUTF16([ 0x00010100 ], [], [ 0xd800, 0xdd00 ]))
-
-  // U+103FF (unassigned)
-  expectTrue(checkDecodeUTF16([ 0x000103ff ], [], [ 0xd800, 0xdfff ]))
-
-
-  // U+E0000 (unassigned)
-  expectTrue(checkDecodeUTF16([ 0x000e0000 ], [], [ 0xdb40, 0xdc00 ]))
-
-  // U+E0100 VARIATION SELECTOR-17
-  expectTrue(checkDecodeUTF16([ 0x000e0100 ], [], [ 0xdb40, 0xdd00 ]))
-
-  // U+E03FF (unassigned)
-  expectTrue(checkDecodeUTF16([ 0x000e03ff ], [], [ 0xdb40, 0xdfff ]))
-
-
-  // U+10FC00 (private use)
-  expectTrue(checkDecodeUTF16([ 0x0010fc00 ], [], [ 0xdbff, 0xdc00 ]))
-
-  // U+10FD00 (private use)
-  expectTrue(checkDecodeUTF16([ 0x0010fd00 ], [], [ 0xdbff, 0xdd00 ]))
-
-  // U+10FFFF (private use, noncharacter)
-  expectTrue(checkDecodeUTF16([ 0x0010ffff ], [], [ 0xdbff, 0xdfff ]))
-}
-
-UTF16Decoder.test("Incomplete") {
-  //
-  // Incomplete sequences that end right before EOF.
-  //
-
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd ], [ 0xd800 ]))
-
-  // U+D800 (high-surrogate)
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xd800, 0xd800 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xd800 ]))
-
-  // U+10000 LINEAR B SYLLABLE B008 A
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16(
-      [ 0x00010000 ], [ 0xfffd ],
-      [ 0xd800, 0xdc00, 0xd800 ]))
-
-  //
-  // Incomplete sequences with more code units following them.
-  //
-
-  // U+D800 (high-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0x0041 ], [ 0xd800, 0x0041 ]))
-
-  // U+D800 (high-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [], [ 0xfffd, 0x00010000 ],
-      [ 0xd800, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0x0041 ],
-      [ 0x0041, 0xd800, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xd800, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+DB40 (high-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
-      [ 0x0041, 0xd800, 0xdb40, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+DB40 (high-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xd800, 0xdb40, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+DB40 (high-surrogate)
-  // U+DBFF (high-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
-      [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+D800 (high-surrogate)
-  // U+DB40 (high-surrogate)
-  // U+DBFF (high-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xd800, 0xdb40, 0xdbff, 0xd800, 0xdc00 ]))
-}
-
-UTF16Decoder.test("IllFormed") {
-  //
-  // Low-surrogate right before EOF.
-  //
-
-  // U+DC00 (low-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd ], [ 0xdc00 ]))
-
-  // U+DC00 (low-surrogate)
-  // U+DC00 (low-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  expectTrue(checkDecodeUTF16([ 0x0041 ], [ 0xfffd ], [ 0x0041, 0xdc00 ]))
-
-  // U+10000 LINEAR B SYLLABLE B008 A
-  // U+DC00 (low-surrogate)
-  expectTrue(checkDecodeUTF16(
-      [ 0x00010000 ], [ 0xfffd ],
-      [ 0xd800, 0xdc00, 0xdc00 ]))
-
-  //
-  // Low-surrogate with more code units following it.
-  //
-
-  // U+DC00 (low-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0x0041 ], [ 0xdc00, 0x0041 ]))
-
-  // U+DC00 (low-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [], [ 0xfffd, 0x00010000 ],
-      [ 0xdc00, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0x0041 ],
-      [ 0x0041, 0xdc00, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xdc00, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+DD00 (low-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x0041 ],
-      [ 0x0041, 0xdc00, 0xdd00, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+DD00 (low-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xdc00, 0xdd00, 0xd800, 0xdc00 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+DD00 (low-surrogate)
-  // U+DFFF (low-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x0041 ],
-      [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0x0041 ]))
-
-  // U+0041 LATIN CAPITAL LETTER A
-  // U+DC00 (low-surrogate)
-  // U+DD00 (low-surrogate)
-  // U+DFFF (low-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [ 0x0041 ], [ 0xfffd, 0xfffd, 0xfffd, 0x00010000 ],
-      [ 0x0041, 0xdc00, 0xdd00, 0xdfff, 0xd800, 0xdc00 ]))
-
-  //
-  // Low-surrogate followed by high-surrogate.
-  //
-
-  // U+DC00 (low-surrogate)
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xd800 ]))
-
-  // U+DC00 (low-surrogate)
-  // U+DB40 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdb40 ]))
-
-  // U+DC00 (low-surrogate)
-  // U+DBFF (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdc00, 0xdbff ]))
-
-
-  // U+DD00 (low-surrogate)
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xd800 ]))
-
-  // U+DD00 (low-surrogate)
-  // U+DB40 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdb40 ]))
-
-  // U+DD00 (low-surrogate)
-  // U+DBFF (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdd00, 0xdbff ]))
-
-
-  // U+DFFF (low-surrogate)
-  // U+D800 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xd800 ]))
-
-  // U+DFFF (low-surrogate)
-  // U+DB40 (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdb40 ]))
-
-  // U+DFFF (low-surrogate)
-  // U+DBFF (high-surrogate)
-  expectTrue(checkDecodeUTF16([], [ 0xfffd, 0xfffd ], [ 0xdfff, 0xdbff ]))
-
-
-  // U+DC00 (low-surrogate)
-  // U+D800 (high-surrogate)
-  // U+0041 LATIN CAPITAL LETTER A
-  expectTrue(checkDecodeUTF16(
-      [], [ 0xfffd, 0xfffd, 0x0041 ],
-      [ 0xdc00, 0xd800, 0x0041 ]))
-
-  // U+DC00 (low-surrogate)
-  // U+D800 (high-surrogate)
-  // U+10000 LINEAR B SYLLABLE B008 A
-  expectTrue(checkDecodeUTF16(
-      [], [ 0xfffd, 0xfffd, 0x10000 ],
-      [ 0xdc00, 0xd800, 0xd800, 0xdc00 ]))
+UTF16Decoder.test("Test") {
+  for (name, batch) in UTF16Tests {
+    println("Batch: \(name)")
+    for test in batch {
+      expectTrue(checkDecodeUTF16(test.scalarsHead, test.scalarsRepairedTail,
+          test.encoded), extraLoc: test.loc)
+    }
+  }
 }
 
 UTF16Decoder.run()
@@ -2048,4 +2235,231 @@ UTF32Decoder.test("IllFormed") {
 
 UTF32Decoder.run()
 // CHECK: {{^}}UTF32Decoder: All tests passed
+
+var UTF8Encoder = TestCase("UTF8Encoder")
+
+UTF8Encoder.test("SmokeTest") {
+  for test in UTF8TestsSmokeTest {
+    expectTrue(checkEncodeUTF8(test.encoded, test.scalars),
+        extraLoc: test.loc)
+  }
+}
+
+UTF8Encoder.run()
+// CHECK: {{^}}UTF8Encoder: All tests passed
+
+
+import Foundation
+
+// The most simple subclass of NSString that CoreFoundation does not know
+// about.
+class NonContiguousNSString : NSString {
+  convenience init(_ scalars: UInt8[]) {
+    var encoded: UInt16[] = []
+    var g = scalars.generate()
+    let hadError = transcode(UTF8.self, UTF16.self, g,
+        SinkOf {
+          encoded += $0
+        },
+        stopOnError: true)
+    expectFalse(hadError)
+    self.init(encoded)
+  }
+
+  init(_ value: UInt16[]) {
+    _value = value
+    super.init()
+  }
+
+  convenience init(_ scalars: UInt32[]) {
+    var encoded: UInt16[] = []
+    var g = scalars.generate()
+    let hadError = transcode(UTF32.self, UTF16.self, g,
+        SinkOf {
+          encoded += $0
+        },
+        stopOnError: true)
+    expectFalse(hadError)
+    self.init(encoded)
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    // Ensure that copying this string produces a class that CoreFoundation
+    // does not know about.
+    return self
+  }
+
+  @objc override var length: Int {
+    return _value.count
+  }
+
+  @objc override func characterAtIndex(index: Int) -> unichar {
+    return _value[index]
+  }
+
+  var _value: UInt16[]
+}
+
+func checkUTF8View(expected: UInt8[], stringUnderTest: String) {
+  var utf8Bytes: UInt8[] = Array(stringUnderTest.utf8)
+  expectEqual(expected, utf8Bytes)
+}
+
+var StringUTFViews = TestCase("StringUTFViews")
+
+StringUTFViews.test("UTF8NativeImplementation") {
+  for test in UTF8TestsSmokeTest {
+    // Add a non-ASCII character at the beginning to force Swift String and
+    // CoreFoundation off the ASCII fast path.
+    //
+    // U+0283 LATIN SMALL LETTER ESH
+    var backingStorage: UInt16[] = [ 0x0283 ]
+    let expected: UInt8[] = [ 0xca, 0x83 ] + test.encoded
+
+    var g = test.scalars.generate()
+    transcode(UTF32.self, UTF16.self, g,
+        SinkOf {
+          backingStorage += $0
+        },
+        stopOnError: false)
+
+    backingStorage.withUnsafePointerToElements {
+      (ptr) -> () in
+      let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
+          ptr, backingStorage.count, kCFAllocatorNull)
+      expectFalse(CFStringGetCStringPtr(cfstring,
+          CFStringBuiltInEncodings.ASCII.toRaw()).getLogicValue())
+      expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
+      checkUTF8View(expected, cfstring)
+      return ()
+    }
+  }
+
+  for (name, batch) in UTF16Tests {
+    println("Batch: \(name)")
+    for test in batch {
+      var expected: UInt8[] = []
+      var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
+      var g = expectedScalars.generate()
+      transcode(UTF32.self, UTF8.self, g,
+          SinkOf {
+            expected += $0
+          },
+          stopOnError: false)
+
+      test.encoded.withUnsafePointerToElements {
+        (ptr) -> () in
+        let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
+            ptr, test.encoded.count, kCFAllocatorNull)
+        if !test.encoded.isEmpty {
+          // Exclude the empty testcase from this check because it will fail --
+          // CoreFoundation will return NULL for character data of an empty
+          // string.
+          expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
+        }
+        checkUTF8View(expected, cfstring)
+        return ()
+      }
+    }
+  }
+}
+
+func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
+  // Sanity checks to make sure we are testing the code path that does UTF-8
+  // encoding itself, instead of dispatching to CF.  Both the original string
+  // itself and its copies should be resilient to CF's fast path functions,
+  // because Swift bridging may copy the string to ensure that it is not
+  // mutated.
+  let cfstring: CFString = reinterpretCast(nss)
+  assert(!CFStringGetCStringPtr(cfstring,
+      CFStringBuiltInEncodings.ASCII.toRaw()))
+  assert(!CFStringGetCStringPtr(cfstring,
+      CFStringBuiltInEncodings.UTF8.toRaw()))
+  assert(!CFStringGetCharactersPtr(cfstring))
+
+  let copy = CFStringCreateCopy(nil, cfstring)
+  assert(!CFStringGetCStringPtr(copy,
+      CFStringBuiltInEncodings.ASCII.toRaw()))
+  assert(!CFStringGetCStringPtr(copy,
+      CFStringBuiltInEncodings.UTF8.toRaw()))
+  assert(!CFStringGetCharactersPtr(copy))
+}
+
+StringUTFViews.test("UTF8CocoaImplementation") {
+  for test in UTF8TestsSmokeTest {
+    var nss = NonContiguousNSString(test.scalars)
+    verifyThatStringIsOpaqueForCoreFoundation(nss)
+    checkUTF8View(test.encoded, nss)
+  }
+
+  /*
+  FIXME: This crashes now.
+  for (name, batch) in UTF16Tests {
+    println("Batch: \(name)")
+    for test in batch {
+      var expected: UInt8[] = []
+      var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
+      var g = expectedScalars.generate()
+      transcode(UTF32.self, UTF8.self, g,
+          SinkOf {
+            expected += $0
+          },
+          stopOnError: false)
+
+      dump(test.encoded)
+      var nss = NonContiguousNSString(test.encoded)
+      verifyThatStringIsOpaqueForCoreFoundation(nss)
+      checkUTF8View(expected, nss)
+    }
+  }
+  */
+}
+
+StringUTFViews.test("UTF8CocoaImplementationExtra") {
+  // These tests don't add much additional value as long as tests above
+  // actually test the code path we care about.
+  if true {
+    var bytes: UInt8[] = [ 97, 98, 99 ]
+    var cfstring: CFString = CFStringCreateWithBytesNoCopy(kCFAllocatorDefault,
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.toRaw(), 0, kCFAllocatorNull)
+
+    // Sanity checks to make sure we are testing the code path that does UTF-8
+    // encoding itself, instead of dispatching to CF.
+    // GetCStringPtr fails because our un-copied bytes aren't zero-terminated.
+    // GetCharactersPtr fails because our un-copied bytes aren't UTF-16.
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.ASCII.toRaw()))
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.UTF8.toRaw()))
+    assert(!CFStringGetCharactersPtr(cfstring))
+
+    checkUTF8View(bytes, cfstring)
+    _fixLifetime(bytes)
+  }
+
+  if true {
+    var bytes: UInt8[] = [ 97, 98, 99 ]
+    var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.toRaw(), 0)
+
+    // Sanity checks to make sure we are testing the code path that does UTF-8
+    // encoding itself, instead of dispatching to CF.
+    // CFStringCreateWithBytes() usually allocates zero-terminated ASCII
+    // or UTF-16, in which case one of the fast paths will succeed.
+    // This test operates only when CF creates a tagged pointer string object.
+    if (object_getClassName(cfstring) == "NSTaggedPointerString") {
+      assert(!CFStringGetCStringPtr(cfstring,
+          CFStringBuiltInEncodings.ASCII.toRaw()))
+      assert(!CFStringGetCStringPtr(cfstring,
+          CFStringBuiltInEncodings.UTF8.toRaw()))
+      assert(!CFStringGetCharactersPtr(cfstring))
+
+      checkUTF8View(bytes, cfstring)
+    }
+  }
+}
+
+
+StringUTFViews.run()
+// CHECK: {{^}}StringUTFViews: All tests passed
 

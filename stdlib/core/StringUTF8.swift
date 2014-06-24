@@ -53,23 +53,18 @@ extension _StringCore {
   /// don't have contiguous ASCII storage.
   func _encodeSomeUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
-    
+
     if _fastPath(!_baseAddress._isNull) {
-      
       let utf16Count = self.count
       let utf8Max = sizeof(UTF8Chunk.self)
       var result: UTF8Chunk = 0
-      var leadSurrogate: UInt = 0
       var utf8Count = 0
       var nextIndex = i
-      for (
-        ;
-        nextIndex < utf16Count && utf8Count != utf8Max;
-        ++nextIndex
-      ) {
+      while (nextIndex < utf16Count && utf8Count != utf8Max) {
         let u = UInt(startUTF16[nextIndex])
         let shift = UTF8Chunk(utf8Count * 8)
-        
+        var utf16Length = 1
+
         if _fastPath(u <= 0x7f) {
           result |= UTF8Chunk(u) << shift
           ++utf8Count
@@ -77,7 +72,9 @@ extension _StringCore {
         else {
           var scalarUtf8Length: Int
           var r: UInt
-          if _fastPath(u < 0xD800 || u >= 0xE000) {
+          if _fastPath((u >> 11) != 0b1101_1) {
+            // Neither high-surrogate, nor low-surrogate -- sequence of 1 code
+            // unit, decoding is trivial.
             if u < 0x800 {
               r = 0b10__00_0000__110__0_0000
               r |= u >> 6
@@ -93,21 +90,37 @@ extension _StringCore {
             }
           }
           else {
-            if leadSurrogate == 0 {
-              leadSurrogate = u
-              continue
-            }
-            else {
-              // combine surrogates to get the full Unicode scalar value
-              let v = ((leadSurrogate - 0xD800) << 10) + u - 0xDC00 + 0x1_0000
-              leadSurrogate = 0  // consume the lead surrogate
-              
-              r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
-              r |= v >> 18
-              r |= ((v >> 12) & 0b11_1111) << 8
-              r |= ((v >> 6) & 0b11_1111) << 16
-              r |= (v        & 0b11_1111) << 24
-              scalarUtf8Length = 4
+            var unit0 = u
+            if _slowPath((unit0 >> 10) == 0b1101_11) {
+              // `unit0` is a low-surrogate.  We have an ill-formed sequence.
+              // Replace it with U+FFFD.
+              r = 0xbdbfef
+              scalarUtf8Length = 3
+            } else if _slowPath(nextIndex + 1 == utf16Count) {
+              // We have seen a high-surrogate and EOF, so we have an
+              // ill-formed sequence.  Replace it with U+FFFD.
+              r = 0xbdbfef
+              scalarUtf8Length = 3
+            } else {
+              let unit1 = UInt(startUTF16[nextIndex + 1])
+              if _fastPath((unit1 >> 10) == 0b1101_11) {
+                // `unit1` is a low-surrogate.  We have a well-formed surrogate
+                // pair.
+                let v = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+
+                r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
+                r |= v >> 18
+                r |= ((v >> 12) & 0b11_1111) << 8
+                r |= ((v >> 6) & 0b11_1111) << 16
+                r |= (v        & 0b11_1111) << 24
+                scalarUtf8Length = 4
+                utf16Length = 2
+              } else {
+                // Otherwise, we have an ill-formed sequence.  Replace it with
+                // U+FFFD.
+                r = 0xbdbfef
+                scalarUtf8Length = 3
+              }
             }
           }
           // Don't overrun the buffer
@@ -117,6 +130,7 @@ extension _StringCore {
           result |= numericCast(r) << shift
           utf8Count += scalarUtf8Length
         }
+        nextIndex += utf16Length
       }
       // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
       if utf8Count < sizeofValue(result) {
