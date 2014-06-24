@@ -70,3 +70,6 @@ __attribute__((objc_root_class))
 extern const int MAX;
 extern NSString * const SomeImageName;
 extern NSNumber * const SomeNumber;
+
+
+__weak id globalWeakVar;

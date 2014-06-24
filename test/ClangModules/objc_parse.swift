@@ -422,3 +422,7 @@ func testConstantGlobals() {
   SomeNumber = nil // expected-error{{cannot assign to 'let' value 'SomeNumber'}}
 }
 
+func testWeakVariable() {
+  let _: AnyObject = globalWeakVar
+}
+

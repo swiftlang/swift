@@ -175,6 +175,7 @@ ClangImporter::create(ASTContext &ctx,
   };
 
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+  llvm::Triple triple(irGenOpts.Triple);
 
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
@@ -195,6 +196,20 @@ ClangImporter::create(ASTContext &ctx,
     "-Werror=non-modular-include-in-framework-module",
     "<swift-imported-modules>"
   };
+
+  std::string runtimeArgBuf{"-fobjc-runtime="};
+  llvm::raw_string_ostream runtimeArg{runtimeArgBuf};
+  unsigned major, minor, micro;
+  if (triple.isiOS()) {
+    runtimeArg << "ios";
+    triple.getiOSVersion(major, minor, micro);
+  } else {
+    assert(triple.isMacOSX());
+    runtimeArg << "macosx";
+    triple.getMacOSXVersion(major, minor, micro);
+  }
+  runtimeArg << '-' << clang::VersionTuple(major, minor, micro);
+  invocationArgStrs.push_back(std::move(runtimeArg.str()));
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
