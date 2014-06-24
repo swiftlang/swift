@@ -470,8 +470,13 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
 }
 
 SourceRange AssignExpr::getSourceRange() const {
-  if (isFolded())
-    return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
+    if (isFolded()) {
+        auto dstStart = Dest->getStartLoc();
+        if (!dstStart.isValid() && Dest->isImplicit())
+            return Src->getSourceRange();
+        else
+            return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
+    }
   return EqualLoc;
 }
 
