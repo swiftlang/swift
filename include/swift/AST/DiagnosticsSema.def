@@ -366,6 +366,11 @@ ERROR(class_protocol_not_protocol,sema_tcd,none,
 ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
       "'unsafe_no_objc_tagged_pointer' attribute can only be applied to "
       "class protocols", ())
+ERROR(access_control_in_protocol,sema_tcd,none,
+      "%0 attribute cannot be used in protocols", (DeclAttribute))
+ERROR(access_control_setter,sema_tcd,none,
+      "%0(set) attribute can only be applied to variables and subscripts",
+      (DeclAttribute))
 
 ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())

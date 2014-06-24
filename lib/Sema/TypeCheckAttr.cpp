@@ -43,7 +43,6 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
-  IGNORED_ATTR(Accessibility)
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
@@ -67,6 +66,7 @@ public:
   void visitAssignmentAttr(AssignmentAttr *attr);
   void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
+  void visitAccessibilityAttr(AccessibilityAttr *attr);
 };
 } // end anonymous namespace
 
@@ -290,6 +290,24 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // TODO: Lazy properties can't yet be observed.
   if (VD->getStorageKind() == VarDecl::Observing)
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
+}
+
+void AttributeEarlyChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
+  // Accessibility attr may only be used on value decls and extensions.
+  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+
+  // And not on certain value decls.
+  if (isa<DestructorDecl>(D) || isa<EnumElementDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+
+  // Or within protocols.
+  if (isa<ProtocolDecl>(D->getDeclContext()))
+    return diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
+
+  // If its subject is a setter, that only works on vars and subscripts.
+  if (attr->isForSetter() && !isa<AbstractStorageDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::access_control_setter, attr);
 }
 
 
