@@ -268,6 +268,17 @@ private:
     // FIXME: Include "weak", "strong", "assign" here.
     // They aren't actually needed (they won't change runtime semantics), but
     // they provide documentation and improve the quality of warnings.
+    // For now, just handle "copy", which we get warnings about.
+    Type ty = VD->getType();
+    if (auto unwrappedTy = ty->getOptionalObjectType())
+      ty = unwrappedTy;
+    if (auto nominal = ty->getStructOrBoundGenericStruct()) {
+      if (nominal == ctx.getArrayDecl() ||
+          nominal == ctx.getDictionaryDecl() ||
+          nominal == ctx.getStringDecl()) {
+        os << ", copy";
+      }
+    }
 
     // Even though Swift doesn't use custom accessor names, we need to be
     // consistent when an Objective-C property is overridden.
@@ -292,7 +303,7 @@ private:
     }
 
     os << ") ";
-    print(VD->getType(), VD->getName().str());
+    print(ty, VD->getName().str());
     os << ";\n";
   }
 

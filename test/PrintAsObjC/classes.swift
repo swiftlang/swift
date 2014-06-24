@@ -207,6 +207,9 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @property (nonatomic) Properties * unownedOther;
 // CHECK-NEXT: @property (nonatomic) Properties * unmanagedOther;
 // CHECK-NEXT: @property (nonatomic) id outlet;
+// CHECK-NEXT: @property (nonatomic, copy) NSString * string;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray * array;
+// CHECK-NEXT: @property (nonatomic, copy) NSDictionary * dictionary;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -234,6 +237,10 @@ class MyObject : NSObject {}
   unowned(unsafe) var unmanagedOther: Properties = .shared
 
   @IBOutlet var outlet: AnyObject
+
+  var string = "abc"
+  var array: AnyObject[] = []
+  var dictionary: Dictionary<String, String> = [:]
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
@@ -282,7 +289,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (void)setObject:(Subscripts2 *)newValue atIndexedSubscript:(int16_t)i;
 // CHECK-NEXT: - (NSObject *)objectForKeyedSubscript:(NSObject *)o;
 // CHECK-NEXT: - (void)setObject:(NSObject *)newValue forKeyedSubscript:(NSObject *)o;
-// CHECK-NEXT: @property (nonatomic) NSArray * cardPaths;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray * cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {

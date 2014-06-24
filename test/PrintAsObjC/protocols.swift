@@ -89,7 +89,7 @@ extension NSString : A, ZZZ {}
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
 // CHECK-NEXT: @property (nonatomic) id <Properties> b;
 // CHECK-NEXT: @optional
-// CHECK-NEXT: @property (nonatomic, readonly) NSString * c;
+// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * c;
 // CHECK-NEXT: @end
 @objc @class_protocol protocol Properties {
   var a: Int { get }
