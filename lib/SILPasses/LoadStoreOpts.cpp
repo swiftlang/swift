@@ -38,15 +38,9 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 /// Given the already emitted load PrevLI, see if we can find a projection
 /// address path to LI. If we can, emit the corresponding aggregate projection
 /// insts and return the last such inst.
-///
-/// TODO: This is confusing to me and needs better names. What this is supposed
-/// to do is find the relationship in between the address we are loading from \p
-/// LI and \p Address under the assumption that \p Value is the value stored at
-/// \p Address. Then it emits the relevant typed extracts to get the appropriate
-/// part of Value to propagate to users of LI.
 static SILValue
-findExtractPathBetweenValues(SILValue Address, SILValue StoredValue,
-                             LoadInst *Load) {
+findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
+                                      LoadInst *Load) {
   // Attempt to find the projection path from Address -> Load->getOperand().
   SILValue LIOp = Load->getOperand();
   llvm::SmallVector<Projection, 4> ProjectionPath;
@@ -246,13 +240,15 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
 }
 
 static SILValue
-tryToForwardStoreToUncheckedAddrToLoad(StoreInst *SI, LoadInst *LI,
-                                       UncheckedAddrCastInst *UADCI) {
+tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
+                                              SILValue StoredValue,
+                                              LoadInst *LI,
+                                              UncheckedAddrCastInst *UADCI) {
   SILValue UADCIOp = UADCI->getOperand();
-  if (SI->getDest() != UADCIOp)
+  if (Address != UADCIOp)
     return SILValue();
 
-  SILModule &Mod = SI->getModule();
+  SILModule &Mod = UADCI->getModule();
   SILType InputTy = UADCIOp.getType();
   SILType OutputTy = UADCI->getType();
 
@@ -272,37 +268,44 @@ tryToForwardStoreToUncheckedAddrToLoad(StoreInst *SI, LoadInst *LI,
   if (InputTy.hasArchetype() || OutputTy.hasArchetype())
     return SILValue();
 
-  SILBuilder B(SI);
-  SILValue Source = SI->getSrc();
+  SILBuilder B(LI);
 
   // If both input and output are trivial types, return an
   // unchecked_trivial_bit_cast.
   if (InputIsTrivial && OutputIsTrivial) {
-    return B.createUncheckedTrivialBitCast(SI->getLoc(), Source,
+    return B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
                                            OutputTy.getObjectType());
   }
 
   // Otherwise, both must have some sort of reference counts on them. Insert the
   // ref count cast.
-  return B.createUncheckedRefBitCast(SI->getLoc(), Source,
+  return B.createUncheckedRefBitCast(UADCI->getLoc(), StoredValue,
                                      OutputTy.getObjectType());
 }
 
-static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
+/// Given an address \p Address and a value \p Value stored there that is then
+/// loaded or partially loaded by \p LI, forward the value with the appropriate
+/// extracts.
+static SILValue tryToForwardAddressValueToLoad(SILValue Address,
+                                               SILValue StoredValue,
+                                               LoadInst *LI) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
   if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LI->getOperand()))
-    return tryToForwardStoreToUncheckedAddrToLoad(SI, LI, UADCI);
+    return tryToForwardAddressValueToUncheckedAddrToLoad(Address, StoredValue,
+                                                         LI, UADCI);
 
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
-  return findExtractPathBetweenValues(SI->getDest(), SI->getSrc(), LI);  
+  return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI);  
 }
 
 void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {  
   // If we are loading a value that we just stored, forward the stored value.
   for (auto *PrevStore : Stores) {
-    SILValue Result = tryToForwardStoreToLoad(PrevStore, LI);
+    SILValue Result = tryToForwardAddressValueToLoad(PrevStore->getDest(),
+                                                     PrevStore->getSrc(),
+                                                     LI);
     if (!Result)
       continue;
 
@@ -316,15 +319,15 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
 
   // Search the previous loads and replace the current load with one of the
   // previous loads.
-  for (auto PrevLI : Loads) {
-    SILValue ForwardingExtract =
-      findExtractPathBetweenValues(PrevLI->getOperand(), PrevLI, LI);
-    if (!ForwardingExtract)
+  for (auto *PrevLI : Loads) {
+    SILValue Result = tryToForwardAddressValueToLoad(PrevLI->getOperand(),
+                                                     PrevLI, LI);
+    if (!Result)
       continue;
 
     DEBUG(llvm::dbgs() << "    Replacing with previous load: "
-                       << *ForwardingExtract);
-    SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
+                       << *Result);
+    SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
     Changed = true;
     NumDupLoads++;
