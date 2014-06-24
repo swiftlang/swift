@@ -189,6 +189,10 @@ namespace {
 class GlobalARCOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
+    // If ARC optimizations are disabled, don't optimize anything and bail.
+    if (!getOptions().EnableARCOptimizations)
+      return;
+
     auto *AA = getAnalysis<AliasAnalysis>();
     if (processFunction(*getFunction(), AA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
