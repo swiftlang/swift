@@ -132,10 +132,20 @@ public:
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
 
+  // Require that the operand is a non-optional reference-counted type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
     require(value.getType().isObject(), valueDescription +" must be an object");
     require(value.getType().hasReferenceSemantics(),
             valueDescription + " must have reference semantics");
+  }
+  
+  // Require that the operand is a reference-counted type, or potentially an
+  // optional thereof.
+  void requireRetainablePointerValue(SILValue value,
+                                     const Twine &valueDescription) {
+    require(value.getType().isObject(), valueDescription +" must be an object");
+    require(value.getType().hasRetainablePointerRepresentation(),
+            valueDescription + " must have retainable pointer representation");
   }
 
   /// Assert that two types are equal.
@@ -1538,7 +1548,7 @@ public:
   }
 
   void checkRefToUnownedInst(RefToUnownedInst *I) {
-    requireReferenceValue(I->getOperand(), "Operand of ref_to_unowned");
+    requireRetainablePointerValue(I->getOperand(), "Operand of ref_to_unowned");
     auto operandType = I->getOperand().getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
@@ -1551,7 +1561,7 @@ public:
     auto operandType = requireObjectType(UnownedStorageType,
                                          I->getOperand(),
                                          "Operand of unowned_to_ref");
-    requireReferenceValue(I, "Result of unowned_to_ref");
+    requireRetainablePointerValue(I, "Result of unowned_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
     require(operandType.getReferentType() == resultType,
             "Operand of unowned_to_ref does not have the "
@@ -1559,7 +1569,7 @@ public:
   }
 
   void checkRefToUnmanagedInst(RefToUnmanagedInst *I) {
-    requireReferenceValue(I->getOperand(), "Operand of ref_to_unmanaged");
+    requireRetainablePointerValue(I->getOperand(), "Operand of ref_to_unmanaged");
     auto operandType = I->getOperand().getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnmanagedStorageType, I,
                                         "Result of ref_to_unmanaged");
@@ -1572,7 +1582,7 @@ public:
     auto operandType = requireObjectType(UnmanagedStorageType,
                                          I->getOperand(),
                                          "Operand of unmanaged_to_ref");
-    requireReferenceValue(I, "Result of unmanaged_to_ref");
+    requireRetainablePointerValue(I, "Result of unmanaged_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
     require(operandType.getReferentType() == resultType,
             "Operand of unmanaged_to_ref does not have the "

@@ -1293,7 +1293,10 @@ const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
 /// depends on the underlying reference type.
 const TypeInfo *
 TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
-  CanType referent = CanType(refType->getReferentType());
+  // The type may be optional.
+  CanType referent(refType->getReferentType());
+  if (auto referentObj = referent.getAnyOptionalObjectType())
+    referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createUnownedStorageType(*this);
@@ -1303,7 +1306,10 @@ TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
 /// depends on the underlying reference type.
 const TypeInfo *
 TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
-  CanType referent = CanType(refType->getReferentType());
+  // The type may be optional.
+  CanType referent(refType->getReferentType());
+  if (auto referentObj = referent.getAnyOptionalObjectType())
+    referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createUnmanagedStorageType(*this);

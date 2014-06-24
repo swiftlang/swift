@@ -88,6 +88,7 @@ class C {}
 
 func takesPlusOnePointer(x: UnsafePointer<C>) {}
 func takesPlusZeroPointer(x: AutoreleasingUnsafePointer<C>) {}
+func takesPlusZeroOptionalPointer(x: AutoreleasingUnsafePointer<C?>) {}
 
 // CHECK-LABEL: sil @_TF18pointer_conversion19classInoutToPointerFT_T_
 func classInoutToPointer() {
@@ -114,4 +115,7 @@ func classInoutToPointer() {
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
   // CHECK: retain_value [[OWNED_OUT]]
   // CHECK: assign [[OWNED_OUT]] to [[VAR]]
+
+  var cq: C? = C()
+  takesPlusZeroOptionalPointer(&cq)
 }

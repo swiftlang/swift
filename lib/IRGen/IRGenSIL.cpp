@@ -2706,10 +2706,40 @@ void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
 }
 
 // SIL scalar conversions which never change the IR type.
-#define NOOP_CONVERSION(KIND)                                    \
-void IRGenSILFunction::visit##KIND##Inst(swift::KIND##Inst *i) { \
-  Explosion temp = getLoweredExplosion(i->getOperand());         \
-  setLoweredExplosion(SILValue(i, 0), temp);                     \
+// FIXME: Except for optionals, which get bit-packed into an integer.
+static void trivialRefConversion(IRGenSILFunction &IGF,
+                                 SILValue input,
+                                 SILValue result) {
+  Explosion temp = IGF.getLoweredExplosion(input);
+  auto &inputTI = IGF.getTypeInfo(input.getType());
+  auto &resultTI = IGF.getTypeInfo(result.getType());
+  
+  // If the types are the same, forward the existing value.
+  if (inputTI.getStorageType() == resultTI.getStorageType()) {
+    IGF.setLoweredExplosion(result, temp);
+    return;
+  }
+  
+  // Otherwise, do the conversion.
+  llvm::Value *value = temp.claimNext();
+  auto schema = resultTI.getSchema(ResilienceExpansion::Minimal);
+  assert(schema.size() == 1 && "not a single scalar type");
+  auto resultTy = schema.begin()->getScalarType();
+  if (resultTy->isPointerTy())
+    value = IGF.Builder.CreateIntToPtr(value, resultTy);
+  else
+    value = IGF.Builder.CreatePtrToInt(value, resultTy);
+  
+  Explosion out(temp.getKind());
+  out.add(value);
+  IGF.setLoweredExplosion(result, out);
+}
+
+// SIL scalar conversions which never change the IR type.
+// FIXME: Except for optionals, which get bit-packed into an integer.
+#define NOOP_CONVERSION(KIND)                                     \
+void IRGenSILFunction::visit##KIND##Inst(swift::KIND##Inst *i) {  \
+  ::trivialRefConversion(*this, i->getOperand(), SILValue(i, 0)); \
 }
 NOOP_CONVERSION(UnownedToRef)
 NOOP_CONVERSION(RefToUnowned)
