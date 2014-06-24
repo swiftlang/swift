@@ -1,9 +1,21 @@
-// RUN: %sil-opt %s -load-store-opts -verify | FileCheck %s
+// RUN: %sil-opt %s -module-name Swift -load-store-opts -verify | FileCheck %s
 
 import Builtin
-import Swift
 
-class B { }
+struct A {
+  var i : Builtin.Int32
+}
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+enum Optional<T> {
+  case None
+  case Some(T)
+}
+
 class E : B { }
 
 // CHECK-LABEL: sil @store_promotion
@@ -170,21 +182,21 @@ bb0(%0 : $*Agg1):
 }
 
 struct Wrapper {
-  var value : Int
+  var value : Builtin.Int32
 }
 //CHECK-LABEL: promote_partial_load
 //CHECK: alloc_stack
 //CHECK-NOT: load
 //CHECK: return %0
-sil @promote_partial_load : $@thin (Int) -> Int {
-bb0(%0 : $Int):
+sil @promote_partial_load : $@thin (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
   %1 = alloc_stack $Wrapper
-  %2 = struct $Wrapper (%0 : $Int)
+  %2 = struct $Wrapper (%0 : $Builtin.Int32)
   store %2 to %1#1 : $*Wrapper
   %3 = struct_element_addr %1#1 : $*Wrapper, #Wrapper.value
-  %4 = load %3 : $*Int
+  %4 = load %3 : $*Builtin.Int32
   dealloc_stack %1#0 : $*@local_storage Wrapper
-  return %4 : $Int
+  return %4 : $Builtin.Int32
 }
 
 // CHECK-LABEL: sil @tbaa_class_alias_nonclass
@@ -242,4 +254,70 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
   dealloc_stack %2#0 : $*@local_storage Builtin.Int32
   %7 = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32)
   return %7 : $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
+// CHECK-NEXT: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $A
+// CHECK-NEXT: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.Int32>
+// CHECK-NOT: unchecked_trivial_bit_cast
+// CH
+sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+bb0(%0 : $Optional<A>):
+  %1 = alloc_stack $Optional<A>
+  store %0 to %1#1 : $*Optional<A>
+  %2 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1#1 : $*Optional<A> to $*A
+  %5 = load %4 : $*A
+  %6 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<A>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is layout
+// compatible with heap references, but does not have reference
+// semantics b/c it is a trivial type. We currently do not handle such a case.
+
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $B
+// CHECK-NEXT: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
+// CHECK-NEXT: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
+// CHECK-NOT: unchecked_ref_bit_cast
+sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+bb0(%0 : $Optional<B>):
+  %1 = alloc_stack $Optional<B>
+  store %0 to %1#1 : $*Optional<B>
+  %2 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1#1 : $*Optional<B> to $*B
+  %5 = load %4 : $*B
+  %6 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<B>
+  %9999 = tuple()
+  return %9999 : $()
 }

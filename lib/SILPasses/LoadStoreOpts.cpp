@@ -238,14 +238,60 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
   Stores.insert(SI);
 }
 
+static SILValue tryToForwardStoreToLoad(StoreInst *SI, LoadInst *LI) {
+  SILValue Source = SI->getSrc();
+  auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LI->getOperand());
+  if (!UADCI)
+    return SI->getDest() != LI->getOperand()? SILValue() : Source;
+
+  SILValue UADCIOp = UADCI->getOperand();
+  if (SI->getDest() != UADCIOp)
+    return SILValue();
+
+  SILModule &Mod = SI->getModule();
+  SILType InputTy = UADCIOp.getType();
+  SILType OutputTy = UADCI->getType();
+
+  // If OutputTy is not layout compatible with InputTy, there is nothing we can
+  // do here.
+  if(!OutputTy.isLayoutCompatibleWith(InputTy, Mod))
+    return SILValue();
+
+  bool InputIsTrivial = InputTy.isTrivial(Mod);
+  bool OutputIsTrivial = OutputTy.isTrivial(Mod);
+
+  // If one is trivial and the other is not, bail.
+  if (InputIsTrivial != OutputIsTrivial)
+    return SILValue();
+
+  // If either are generic, bail.
+  if (InputTy.hasArchetype() || OutputTy.hasArchetype())
+    return SILValue();
+
+  SILBuilder B(SI);
+
+  // If both input and output are trivial types, return an
+  // unchecked_trivial_bit_cast.
+  if (InputIsTrivial && OutputIsTrivial) {
+    return B.createUncheckedTrivialBitCast(SI->getLoc(), Source,
+                                           OutputTy.getObjectType());
+  }
+
+  // Otherwise, both must have some sort of reference counts on them. Insert the
+  // ref count cast.
+  return B.createUncheckedRefBitCast(SI->getLoc(), Source,
+                                     OutputTy.getObjectType());
+}
+
 void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {  
   // If we are loading a value that we just saved then use the saved value.
   for (auto *PrevStore : Stores) {
-    if (PrevStore->getDest() != LI->getOperand())
+    SILValue Result = tryToForwardStoreToLoad(PrevStore, LI);
+    if (!Result)
       continue;
 
     DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
-    SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
+    SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
     Changed = true;
     NumForwardedLoads++;

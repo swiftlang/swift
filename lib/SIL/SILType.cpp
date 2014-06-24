@@ -189,3 +189,202 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
   // Could not find the record in the aggregate.
   return false;
 }
+
+/// Prove that \p Ty is layout compatible with RawPointer.
+static bool isLayoutCompatibleWithRawPointer(SILType Ty, SILModule &Mod) {
+  // Builtin.RawPointer is layout compatible with heap object reference types.
+  if (Ty.isHeapObjectReferenceType())
+    return true;
+
+  // Builtin.RawPointer is layout compatible with optional of heap object
+  // reference types.
+  if (SILType OptionalT = Ty.getOptionalObjectType(Mod).getAddressType())
+    if (OptionalT.isHeapObjectReferenceType())
+      return true;
+
+  // Builtin.RawPointer is layout compatible with Builtin.Word.
+  if (Ty == SILType::getBuiltinWordType(Mod.getASTContext()))
+    return true;
+
+  // Otherwise, be conservative and return false.
+  return false;
+}
+
+/// Returns true if scalar type \p LHS is layout compatible with scalar \p RHS.
+static bool isLayoutCompatibleAsNonAggregates(SILType LHS, SILType RHS,
+                                              SILModule &Mod) {
+  // First check canonicalize Builtin.RawPointer on the LHS.
+  if (RHS.is<BuiltinRawPointerType>())
+    std::swap(LHS, RHS);
+
+  // Ok, now if either LHS or RHS was a Builtin.RawPointer on input, we know the
+  // type must be in LHS.
+  if (LHS.is<BuiltinRawPointerType>())
+    return isLayoutCompatibleWithRawPointer(RHS, Mod);
+
+  // Now canonicalize so that if we have a heap object reference, it is on the
+  // left side.
+  if (RHS.isHeapObjectReferenceType())
+    std::swap(LHS, RHS);
+
+  // Ok, we now know that if either of our types are heap object reference type,
+  // then we must have a heap object reference type in LHS. If we don't, there
+  // is nothing further we can do.
+  if (!LHS.isHeapObjectReferenceType())
+    return false;
+
+  // Ok, we know that LHS is a heap object reference type. If RHS is an
+  // Builtin.NativeObject or a Builtin.UnknownObject they are layout compatible.
+  if (RHS.is<BuiltinNativeObjectType>() || RHS.is<BuiltinUnknownObjectType>())
+    return true;
+
+  // As one last final check, if both are classes and have a derived class
+  // relationship, they are layout compatible.
+  if (LHS.getClassOrBoundGenericClass() && RHS.getClassOrBoundGenericClass())
+    return LHS.isSuperclassOf(RHS) || RHS.isSuperclassOf(LHS);
+
+  // Otherwise conservatively assume that the two types are not layout
+  // compatible.
+  return false;
+}
+
+static SILType getFirstPayloadOfEnum(EnumDecl *E, SILType TyIter,
+                                     SILModule &Mod) {
+  for (EnumElementDecl *Elt : E->getAllElements())
+    if (Elt->hasArgumentType())
+      return TyIter.getEnumElementType(Elt, Mod);
+  return SILType();
+}
+
+static SILType getFieldOfSingleFieldStruct(StructDecl *S, SILType TyIter,
+                                           SILModule &Mod) {
+  // Look through S's stored properties.
+  auto Range = S->getStoredProperties();
+
+  // If S has no stored properties, there is nothing we can do, bail.
+  if (Range.begin() == Range.end())
+    return SILType();
+
+  // Otherwise, grab the first field of S.
+  auto Iter = Range.begin();
+  VarDecl *FirstVar = *Iter;
+  ++Iter;
+
+  // If we have more than one stored field, the struct is not able to have
+  // layout compatible relationships with any of its fields.
+  if (Iter != Range.end())
+    return SILType();
+
+  // Otherwise return the singular field of S.
+  return TyIter.getFieldType(FirstVar, Mod);
+}
+
+/// Returns true if scalar \p LHS is layout compatible with the aggregate type
+/// \p RHS.
+static bool isLayoutCompatibleWithAggregate(SILType LHS, SILType RHS,
+                                            SILModule &Mod) {
+  // The plan is to drill into RHS as far as we can until we find LHS or can not
+  // find any more aggregate
+  SILType TyIter = RHS;
+
+  while (true) {
+    // If this type is the type we are searching for (Ty1), we have succeeded,
+    // return.
+    if (TyIter == LHS)
+      return true;
+
+    // Then if we have an enum...
+    if (EnumDecl *E = TyIter.getEnumOrBoundGenericEnum()) {
+      // Attempt to compute the first payloaded case of the enum. If we find it,
+      // continue.
+      if ((TyIter = getFirstPayloadOfEnum(E, TyIter, Mod)))
+        continue;
+
+      // Otherwise this enum has no payloads implying that it can not be layout
+      // compatible with anything.
+      return false;
+    }
+
+    // Then if we have a struct address...
+    if (StructDecl *S = TyIter.getStructOrBoundGenericStruct()) {
+      // If it has only one field, it is layout compatible with it, so set
+      // TyIter to it. If S has more than one field, it can not be layout
+      // compatible with any of them, so return false.
+      if ((TyIter = getFieldOfSingleFieldStruct(S, TyIter, Mod)))
+        continue;
+
+      return false;
+    }
+
+    // If we reached this point, then this type has no subrecords we are
+    // interested in. Check if LHS/RHS are layout compatible as scalars.
+    return isLayoutCompatibleAsNonAggregates(TyIter, LHS, Mod) ||
+      isLayoutCompatibleAsNonAggregates(LHS, TyIter, Mod);
+  }
+}
+
+/// Returns true if this Type (LHS) is layout compatible with RHS. *NOTE* This
+/// does not imply that RHS is layout compatible with LHS (i.e. this method
+/// returning true does not imply commutativity of the layout compatible
+/// relation).
+bool SILType::isLayoutCompatibleWith(SILType RHS, SILModule &Mod) const {
+  // Create a reference to ourselves so we can canonicalize.
+  SILType LHS = *this;
+
+  // If we are equal to Ty, we must be layout compatible with it.
+  if (LHS == RHS)
+    return true;
+
+  // If either LHS or RHS has archetypes, bail since we don't know what the
+  // archetypes are. This could probably be improved.
+  if (LHS.hasArchetype() || RHS.hasArchetype())
+    return false;
+
+  // First check if RHS is an enum...
+  if (RHS.getEnumOrBoundGenericEnum()) {
+    // If LHS is an enum as well...
+    if (LHS.getEnumOrBoundGenericEnum()) {
+      // If both are optional types with layout compatible types, they are
+      // layout compatible.
+      SILType LHSOptType = LHS.getOptionalObjectType(Mod);
+      SILType RHSOptType = RHS.getOptionalObjectType(Mod);
+      if (LHSOptType && RHSOptType &&
+          LHSOptType.isLayoutCompatibleWith(RHSOptType, Mod))
+        return true;
+    }
+
+    // Otherwise if we have a generic enum, try to prove that the LHS/RHS are
+    // layout compatible by using the fact the enum is an aggregate to see if
+    // LHS is the payload of RHS.  We do not handle the case where LHS is an
+    // enum since enums are not commutatively layout compatible with their first
+    // payload.
+    if (isLayoutCompatibleWithAggregate(LHS, RHS, Mod))
+      return true;
+  }
+
+  // Then check if RHS is a struct. If so, handle it especially.
+  if (RHS.getStructOrBoundGenericStruct())
+    if (isLayoutCompatibleWithAggregate(LHS, RHS, Mod))
+      return true;
+  // Then check if LHS is a struct. If so handle it especially. This works since
+  // structs are commutatively layout compatible with their contents if they
+  // only have one field.
+  if (LHS.getStructOrBoundGenericStruct())
+    if (isLayoutCompatibleWithAggregate(RHS, LHS, Mod))
+      return true;
+
+  // Otherwise attempt to prove that the LHS, RHS are layout compatible as
+  // non-aggregate types.
+  return isLayoutCompatibleAsNonAggregates(LHS, RHS, Mod) ||
+    isLayoutCompatibleAsNonAggregates(RHS, LHS, Mod);
+}
+
+SILType SILType::getOptionalObjectType(SILModule &M) const {
+  if (auto boundTy = getObjectType().getAs<BoundGenericEnumType>()) {
+    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional) {
+      CanType cTy = boundTy->getGenericArgs()[0]->getCanonicalType();
+      return M.Types.getLoweredType(cTy);
+    }
+  }
+  return SILType();
+}

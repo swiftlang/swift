@@ -379,6 +379,15 @@ public:
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
 
+  /// Returns true if this Type is layout compatible with Ty. *NOTE* This does
+  /// not imply that Ty is layout compatible with this type (i.e. this does not
+  /// imply commutativity).
+  bool isLayoutCompatibleWith(SILType Ty, SILModule &SILMod) const;
+
+  /// Returns the lowered type for T if this type is Optional<T>; otherwise,
+  /// return the null type.
+  SILType getOptionalObjectType(SILModule &SILMod) const;
+
   //
   // Accessors for types used in SIL instructions:
   //
