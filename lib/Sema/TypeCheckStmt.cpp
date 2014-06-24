@@ -505,7 +505,11 @@ public:
     // FIXME: Could allow unbound generic types in this pattern, then override
     // here.
     Pattern *pattern = S->getPattern();
-    if (TC.coercePatternToType(pattern, DC, ElementTy, TR_EnumerationVariable))
+    TypeResolutionOptions TROptions;
+    TROptions |= TR_EnumerationVariable;
+    TROptions |= TR_FromNonInferredPattern;
+
+    if (TC.coercePatternToType(pattern, DC, ElementTy, TROptions))
       return nullptr;
     S->setPattern(pattern);
     

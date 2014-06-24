@@ -50,6 +50,11 @@ var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
                        // expected-note {{add an explicit type annotation to silence this warning}}{{9-9=: AnyObject.Type}}
 
+
+for item in AnyObject[]() {  // No warning in for-each loop.
+}
+
+
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
 var ptr = nil // expected-error {{cannot convert the expression's type '$T0' to type 'NilLiteralConvertible'}}
 
