@@ -30,6 +30,10 @@
 #define VIRTUAL_DECL_ATTR(X, CLASS, OPTIONS, CODE) DECL_ATTR(X, CLASS, OPTIONS, CODE)
 #endif
 
+#ifndef DECL_ATTR_ALIAS
+#define DECL_ATTR_ALIAS(SPELLING, CLASS)
+#endif
+
 #ifndef TYPE_ATTR
 #define TYPE_ATTR(X)
 #endif
@@ -144,6 +148,14 @@ SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
                  OnProtocol, 18)
 
+VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
+                  OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
+                  OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor,
+                  /* Not serialized */ 65535)
+DECL_ATTR_ALIAS(private, Accessibility)
+DECL_ATTR_ALIAS(internal, Accessibility)
+DECL_ATTR_ALIAS(public, Accessibility)
+
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
                   /* Not serialized */ 65535)
@@ -165,6 +177,7 @@ VIRTUAL_ATTR(unowned_unsafe)
 ATTR(weak)
 ATTR(requires_stored_property_inits)
 
+// Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS)
 AVAILABILITY_PLATFORM(OSX)
 AVAILABILITY_PLATFORM(iOSApplicationExtension)
@@ -172,8 +185,9 @@ AVAILABILITY_PLATFORM(OSXApplicationExtension)
 
 #undef AVAILABILITY_PLATFORM
 #undef VIRTUAL_ATTR
+#undef TYPE_ATTR
+#undef DECL_ATTR_ALIAS
 #undef VIRTUAL_DECL_ATTR
 #undef SIMPLE_DECL_ATTR
 #undef DECL_ATTR
-#undef TYPE_ATTR
 #undef ATTR

@@ -285,6 +285,7 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   return llvm::StringSwitch<DeclAttrKind>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
+#define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
 #define VIRTUAL_DECL_ATTR(...)
 #include "swift/AST/Attr.def"
   .Default(DAK_Count);
@@ -340,8 +341,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
 
-#define VIRTUAL_DECL_ATTR(_, CLASS, ...) case DAK_##CLASS:
-#include "swift/AST/Attr.def"
+  case DAK_Override:
+  case DAK_RawDocComment:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
 
@@ -351,6 +352,73 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(new (Context) CLASS##Attr(AtLoc, Loc)); \
     break;
 #include "swift/AST/Attr.def"
+
+  case DAK_Accessibility: {
+
+    // Diagnose using accessibility in a local scope, which isn't meaningful.
+    if (CurDeclContext->isLocalContext()) {
+      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+    }
+
+    auto access = llvm::StringSwitch<Accessibility>(AttrName)
+      .Case("private", Accessibility::Private)
+      .Case("public", Accessibility::Public)
+      .Case("internal", Accessibility::Internal);
+
+    if (!consumeIf(tok::l_paren)) {
+      // Normal accessibility attribute.
+      AttrRange = Loc;
+      auto previousIter = std::find_if(Attributes.begin(), Attributes.end(),
+                                       [](const DeclAttribute *attr) -> bool {
+        if (auto AA = dyn_cast<AccessibilityAttr>(attr))
+          return !AA->isForSetter();
+        return false;
+      });
+      if (previousIter == Attributes.end())
+        Attributes.add(new (Context) AccessibilityAttr(AtLoc, Loc, access));
+      else
+        DuplicateAttribute = *previousIter;
+      break;
+    }
+
+    // Parse the subject.
+    if (Tok.isContextualKeyword("set")) {
+      consumeToken();
+    } else {
+      diagnose(Loc, diag::attr_accessibility_expected_set, AttrName);
+      // Minimal recovery: if there's a single token and then an r_paren,
+      // consume them both. If there's just an r_paren, consume that.
+      if (!consumeIf(tok::r_paren)) {
+        if (Tok.isNot(tok::l_paren) && peekToken().is(tok::r_paren)) {
+          consumeToken();
+          consumeToken(tok::r_paren);
+        }
+      }
+      return false;
+    }
+
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      return false;
+    }
+
+    auto previousIter = std::find_if(Attributes.begin(), Attributes.end(),
+                                     [](const DeclAttribute *attr) -> bool {
+      if (auto AA = dyn_cast<AccessibilityAttr>(attr))
+        return AA->isForSetter();
+      return false;
+    });
+    if (previousIter == Attributes.end()) {
+      Attributes.add(new (Context) AccessibilityAttr(AtLoc, AttrRange, access,
+                                                     /*forSetter=*/true));
+    } else {
+      DuplicateAttribute = *previousIter;
+    }
+
+    break;
+  }
 
   case DAK_Asmname: {
     if (!consumeIf(tok::l_paren)) {
@@ -366,12 +434,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     StringRef AsmName =
       getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
 
+    consumeToken(tok::string_literal);
+
     if (!AsmName.empty())
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
     else
       DiscardAttribute = true;
-
-    consumeToken(tok::string_literal);
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName);
@@ -383,7 +451,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (CurDeclContext->isLocalContext()) {
       // Emit an error, but do not discard the attribute.  This enables
       // better recovery in the parser.
-      diagnose(Loc, diag::attr_asmname_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
     if (!DiscardAttribute)
@@ -466,7 +534,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     }
 
-    SourceRange R(Loc, Tok.getLoc());
+    AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName);
@@ -477,7 +545,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       auto PlatformKind = AvailabilityAttr::platformFromString(Platform);
       if (PlatformKind.hasValue()) {
         Attributes.add(new (Context)
-                       AvailabilityAttr(AtLoc, R, PlatformKind.getValue(),
+                       AvailabilityAttr(AtLoc, AttrRange,
+                                        PlatformKind.getValue(),
                                         Message, true,
                                         /*Implicit=*/false));
       }
@@ -618,6 +687,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'noreturn'
 ///     'optional'
 ///     'mutating'
+///     ( 'private' | 'internal' | 'public' )
+///     ( 'private' | 'internal' | 'public' ) '(' 'set' ')'
 ///     'requires_stored_property_inits'
 /// \endverbatim
 ///
@@ -666,15 +737,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
     // Recover by eating @foo when foo is not known.
     consumeToken();
-      
-    // Recovery by eating "@foo=bar" if present.
-    if (consumeIf(tok::equal)) {
-      if (Tok.is(tok::identifier) ||
-          Tok.is(tok::integer_literal) ||
-          Tok.is(tok::floating_literal) ||
-          Tok.is(tok::string_literal))
-        consumeToken();
-    }
+
     return true;
   }
 
@@ -797,12 +860,14 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     if (justChecking) return true;
 
     StringRef Text = Tok.getText();
-    bool isDeclAttribute = false
-#define ATTR(X) || Text == #X
+    bool isDeclAttribute = llvm::StringSwitch<bool>(Text)
+#define ATTR(X) .Case(#X, true)
 #define VIRTUAL_ATTR(X)
-#define DECL_ATTR(X, ...) || Text == #X
+#define DECL_ATTR(X, ...) ATTR(X)
+#define DECL_ALIAS(X, ...) ATTR(X)
+#define VIRTUAL_DECL_ATTR(X, ...)
 #include "swift/AST/Attr.def"
-    ;
+      .Default(false);
     
     if (isDeclAttribute)
       diagnose(Tok, diag::decl_attribute_applied_to_type);

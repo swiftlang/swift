@@ -107,25 +107,30 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   // This switch is not using Attr.def because some simple attributes have
   // custom behavior.
   switch (getKind()) {
-  case DAK_IBAction:       Printer << "@IBAction"; break;
-  case DAK_IBDesignable:   Printer << "@IBDesignable"; break;
-  case DAK_IBInspectable:  Printer << "@IBInspectable"; break;
-  case DAK_IBOutlet:       Printer << "@IBOutlet"; break;
-  case DAK_Assignment:     Printer << "@assignment"; break;
-  case DAK_ClassProtocol:  Printer << "@class_protocol"; break;
-  case DAK_Exported:       Printer << "@exported"; break;
-  case DAK_Final:          Printer << "@final"; break;
-  case DAK_NoReturn:       Printer << "@noreturn"; break;
+  case DAK_IBAction:
+  case DAK_IBDesignable:
+  case DAK_IBInspectable:
+  case DAK_IBOutlet:
+  case DAK_Assignment:
+  case DAK_ClassProtocol:
+  case DAK_Exported:
+  case DAK_Final:
+  case DAK_NoReturn:
   case DAK_UnsafeNoObjCTaggedPointer:
-    Printer << "@unsafe_no_objc_tagged_pointer";
-    break;
-  case DAK_NSCopying:      Printer << "@NSCopying"; break;
-  case DAK_NSManaged:      Printer << "@NSManaged"; break;
-  case DAK_UIApplicationMain: Printer << "@UIApplicationMain"; break;
-  case DAK_Lazy:           Printer << "@lazy"; break;
+  case DAK_NSCopying:
+  case DAK_NSManaged:
+  case DAK_UIApplicationMain:
+  case DAK_Lazy:
   case DAK_LLDBDebuggerFunction:
-    Printer << "@LLDBDebuggerFunction";
+    Printer << "@" << getAttrName();
     break;
+
+  case DAK_Accessibility:
+    Printer << "@" << getAttrName();
+    if (cast<AccessibilityAttr>(this)->isForSetter())
+      Printer << "(set)";
+    break;
+
   case DAK_Asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;
@@ -189,9 +194,6 @@ StringRef DeclAttribute::getAttrName() const {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
   case DAK_##CLASS: \
     return #NAME;
-#define VIRTUAL_DECL_ATTR(NAME, CLASS, ...) \
-  case DAK_##CLASS: \
-    llvm_unreachable("cannot get the name of a virtual attribute");
 #include "swift/AST/Attr.def"
   case DAK_Asmname:
     return "asmname";
@@ -199,6 +201,18 @@ StringRef DeclAttribute::getAttrName() const {
     return "availability";
   case DAK_ObjC:
     return "objc";
+  case DAK_Accessibility:
+    switch (cast<AccessibilityAttr>(this)->getAccess()) {
+    case Accessibility::Private:
+      return "private";
+    case Accessibility::Internal:
+      return "internal";
+    case Accessibility::Public:
+      return "public";
+    }
+  case DAK_Override:
+  case DAK_RawDocComment:
+    llvm_unreachable("cannot get the name of a virtual attribute");
   }
 }
 

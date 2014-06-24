@@ -65,6 +65,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define ATTR(X) .Case(#X, true)
 #define TYPE_ATTR(X) .Case(#X, true)
 #define DECL_ATTR(X, ...) .Case(#X, true)
+#define DECL_ATTR_ALIAS(X, ...) .Case(#X, true)
 #define VIRTUAL_DECL_ATTR(X, ...)
 #include "swift/AST/Attr.def"
       .Default(false);

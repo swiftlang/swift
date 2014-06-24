@@ -43,6 +43,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(Accessibility)
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
@@ -323,6 +324,7 @@ public:
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ObjC)

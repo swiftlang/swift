@@ -46,6 +46,18 @@ enum class Associativity {
   Right
 };
 
+
+/// Access control levels.
+enum class Accessibility {
+  /// Private access is limited to the current file.
+  Private,
+  /// Internal access is limited to the current module.
+  Internal,
+  /// Public access is not limited.
+  Public
+};
+
+
 class InfixData {
   unsigned Precedence : 8;
 
@@ -289,9 +301,20 @@ protected:
   enum { NumObjCAttrBits = NumDeclAttrBits + 1 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
+  class AccessibilityAttrBitFields {
+    friend class AccessibilityAttr;
+    unsigned : NumDeclAttrBits;
+
+    unsigned AccessLevel : 2;
+    unsigned IsForSetter : 1;
+  };
+  enum { NumAccessibilityAttrBits = NumDeclAttrBits + 2 };
+  static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
+
   union {
     DeclAttrBitFields DeclAttrBits;
     ObjCAttrBitFields ObjCAttrBits;
+    AccessibilityAttrBitFields AccessibilityAttrBits;
   };
 
   DeclAttribute *Next = nullptr;
@@ -676,6 +699,32 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjC;
+  }
+};
+
+/// Represents a 'private', 'internal', or 'public' marker on a declaration.
+class AccessibilityAttr : public DeclAttribute {
+public:
+  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
+                    bool forSetter = false, bool implicit = false)
+      : DeclAttribute(DAK_Accessibility, atLoc, range, implicit) {
+    AccessibilityAttrBits.IsForSetter = forSetter;
+    AccessibilityAttrBits.AccessLevel = static_cast<unsigned>(access);
+    assert(getAccess() == access && "not enough bits for accessibility");
+  }
+
+  Accessibility getAccess() const {
+    return static_cast<Accessibility>(AccessibilityAttrBits.AccessLevel);
+  }
+
+  /// Returns true if this attribute is for a property or subscript setter,
+  /// e.g. "private(set)".
+  bool isForSetter() const {
+    return AccessibilityAttrBits.IsForSetter;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Accessibility;
   }
 };
 

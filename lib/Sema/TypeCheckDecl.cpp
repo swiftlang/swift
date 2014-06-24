@@ -3990,6 +3990,7 @@ public:
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
+    UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
