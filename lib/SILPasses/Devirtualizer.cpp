@@ -444,6 +444,23 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   return processNormalProtocolConformance();
 }
 
+/// The substitution is going to fail if there are more dependent types than
+/// substitutions.
+static bool isSubstitutionGoingToFailHack(ArrayRef<Substitution> Subs,
+                                          CanSILFunctionType GenCalleeType) {
+  auto *GenSig = GenCalleeType->getGenericSignature();
+  unsigned NumSubsNeccessary = 0;
+  for (auto depTy : GenSig->getAllDependentTypes()) {
+    if (depTy->getAs<SubstitutableType>() ||
+        depTy->getAs<DependentMemberType>()) {
+      ++NumSubsNeccessary;
+    }
+  }
+  if (NumSubsNeccessary > Subs.size())
+    return true;
+  return false;
+}
+
 bool
 WitnessMethodDevirtualizer::
 processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
@@ -453,6 +470,12 @@ processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
   // updated.
   SILModule &M = F->getModule();
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+
+  // HACK: work around the fact that the substitution below might fail (there
+  // are more dependent types than substitutions).
+  if (isSubstitutionGoingToFailHack(Subs, GenCalleeType))
+    return false;
+
   CanSILFunctionType SubstCalleeType =
     GenCalleeType->substInterfaceGenericArgs(M, M.getSwiftModule(),
                                              Subs);
