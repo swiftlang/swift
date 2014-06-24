@@ -63,6 +63,7 @@ namespace swift {
   class ProtocolConformance;
   class Substitution;
   enum OptionalTypeKind : unsigned;
+  enum PointerTypeKind : unsigned;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -407,7 +408,11 @@ public:
 
   /// Determines the element type of a known *UnsafePointer variant, or returns
   /// null if the type is not a pointer.
-  Type getAnyPointerElementType();
+  Type getAnyPointerElementType(PointerTypeKind &PTK);
+  Type getAnyPointerElementType() {
+    PointerTypeKind Ignore;
+    return getAnyPointerElementType(Ignore);
+  }
   
   /// \brief Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.

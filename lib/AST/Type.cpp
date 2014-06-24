@@ -447,13 +447,19 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
   return CanType();
 }
 
-Type TypeBase::getAnyPointerElementType()  {
+Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK)  {
   if (auto boundTy = getAs<BoundGenericType>()) {
     auto &C = getASTContext();
-    if (boundTy->getDecl() == C.getUnsafePointerDecl()
-        || boundTy->getDecl() == C.getConstUnsafePointerDecl()
-        || boundTy->getDecl() == C.getAutoreleasingUnsafePointerDecl())
-      return boundTy->getGenericArgs()[0];
+    if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
+      PTK = PTK_UnsafePointer;
+    } else if (boundTy->getDecl() == C.getConstUnsafePointerDecl()) {
+      PTK = PTK_ConstUnsafePointer;
+    } else if (boundTy->getDecl() == C.getAutoreleasingUnsafePointerDecl()) {
+      PTK = PTK_AutoreleasingUnsafePointer;
+    } else {
+      return Type();
+    }
+    return boundTy->getGenericArgs()[0];
   }
   return Type();
 }

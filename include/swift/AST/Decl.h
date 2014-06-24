@@ -2382,6 +2382,13 @@ enum OptionalTypeKind : unsigned {
   OTK_ImplicitlyUnwrappedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
+  
+// Kinds of pointer types.
+enum PointerTypeKind : unsigned {
+  PTK_UnsafePointer,
+  PTK_ConstUnsafePointer,
+  PTK_AutoreleasingUnsafePointer,
+};
 
 /// An implicitly created member decl, used when importing a Clang enum type.
 /// These are not added to their enclosing type unless forced.
