@@ -902,8 +902,11 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
 static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
                            bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
-  auto otherCtorRef = cast<OtherConstructorDeclRefExpr>(
+  auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getFn()->getSemanticsProvidingExpr());
+  if (!otherCtorRef)
+    return false;
+  
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {

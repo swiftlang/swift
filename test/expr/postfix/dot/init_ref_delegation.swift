@@ -64,8 +64,8 @@ enum E1 {
 
 // Ill-formed initializer delegation: no matching constructor
 class Z0 {
-  init() {
-    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+  init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}}
+    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}} expected-note {{delegation occurs here}}
   }
 
   init(value: Int) { /* ... */ }
