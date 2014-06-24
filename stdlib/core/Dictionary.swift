@@ -1931,7 +1931,7 @@ class _DictionaryMirror<Key : Hashable,Value> : Mirror {
       }
       return ("[\(_pos._intPos)]",reflect(_dict[_pos._dicPos]))
     }
-    _fatalError("don't ask")
+    _fatalError("Mirror access out of bounds")
   }
 
   var summary: String {

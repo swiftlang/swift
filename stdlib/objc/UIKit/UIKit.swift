@@ -142,7 +142,7 @@ struct _UIViewMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { _fatalError("don't ask") } }
+  subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
   
   var summary: String { get { return ""} }
   

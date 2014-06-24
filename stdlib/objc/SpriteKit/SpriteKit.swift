@@ -35,7 +35,7 @@ struct _SKShapeNodeMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
 
   var summary: String { return _value.description }
   
@@ -70,7 +70,7 @@ struct _SKSpriteNodeMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
 
   var summary: String { return _value.description }
   
@@ -105,7 +105,7 @@ struct _SKTextureAtlasMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
 
   var summary: String { return _value.description }
   
@@ -140,7 +140,7 @@ struct _SKTextureMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
 
   var summary: String { return _value.description }
   

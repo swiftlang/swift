@@ -1090,7 +1090,7 @@ struct _NSURLMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { _fatalError("don't ask") } }
+  subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
   
   var summary: String { get { return _u.absoluteString } }
   
@@ -1122,7 +1122,7 @@ struct _NSRangeMirror : Mirror {
     switch i {
       case 0: return ("location",reflect(_r.location))
       case 1: return ("length",reflect(_r.length))
-      default: _fatalError("don't ask")
+      default: _fatalError("Mirror access out of bounds")
     }
   }
   
@@ -1163,7 +1163,7 @@ struct _NSDateMirror : Mirror {
   var count: Int { get { return 0 } }
   
   subscript(i: Int) -> (String,Mirror) {
-    _fatalError("don't ask")
+    _fatalError("Mirror access out of bounds")
   }
   
   var summary: String {
@@ -1361,7 +1361,7 @@ struct _NSSetMirror : Mirror {
     if i >= 0 && i < count {
       return ("[\(i)]",reflect(_a[i]))
     }
-    _fatalError("don't ask")
+    _fatalError("Mirror access out of bounds")
   }
   
   var summary: String { return "\(count) elements" }

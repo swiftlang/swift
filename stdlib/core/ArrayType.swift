@@ -112,7 +112,7 @@ struct _ArrayTypeMirror<T : ArrayType> : Mirror {
     if (i >= 0) && (i < count) {
       return ("[\(i)]",reflect(_value[i]))
     }
-    _fatalError("don't ask")
+    _fatalError("Mirror access out of bounds")
   }
 
   var summary: String {
