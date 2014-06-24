@@ -1194,6 +1194,11 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
+/// Prove that Ty1 is layout compatible with Ty2. This is separate from the
+/// implementation in SILType since we are only interested in rewritting
+/// unchecked_addr_cast from structs, enums into respectively fields, payloads.
+///
+/// TODO: Refactor this into SILType?
 static bool areLayoutCompatibleTypes(SILType Ty1, SILType Ty2, SILModule &Mod,
                                      llvm::SmallVectorImpl<Projection> &Projs) {
   // If Ty1 == Ty2, they must be layout compatible.
@@ -1205,12 +1210,12 @@ static bool areLayoutCompatibleTypes(SILType Ty1, SILType Ty2, SILModule &Mod,
   if (Ty1.hasArchetype() || Ty2.hasArchetype())
     return false;
 
-  SILType TyIter = Ty1;
+  SILType TyIter = Ty2;
 
   while (true) {
-    // If this type is the type we are searching for (Ty2), we have succeeded,
+    // If this type is the type we are searching for (Ty1), we have succeeded,
     // return.
-    if (TyIter == Ty2)
+    if (TyIter == Ty1)
       return true;
 
     // Then if we have an enum...
@@ -1279,10 +1284,14 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
         UpcastInst(UADCI->getLoc(), UADCI->getOperand(), UADCI->getType());
 
   // *NOTE* InstSimplify already handles the identity case so we don't need to
-  // worry about that problem here.
+  // worry about that problem here and can assume that the cast types are
+  // different.
   llvm::SmallVector<Projection, 4> Projs;
-  if (areLayoutCompatibleTypes(UADCI->getOperand().getType(),
-                               UADCI->getType(),
+
+  // Given (unchecked_addr_cast x X->Y), we prove that Y is layout compatible
+  // with X before we attempt to rewrite anything.
+  if (areLayoutCompatibleTypes(UADCI->getType(),
+                               UADCI->getOperand().getType(),
                                UADCI->getModule(),
                                Projs)) {
     SILBuilder Builder(UADCI);
