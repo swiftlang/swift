@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-func ==(
+@public func ==(
   lhs: String.UnicodeScalarView.IndexType,
   rhs: String.UnicodeScalarView.IndexType
 ) -> Bool {
@@ -18,7 +18,7 @@ func ==(
 }
 
 extension String {
-  struct UnicodeScalarView : Sliceable, Sequence {
+  @public struct UnicodeScalarView : Sliceable, Sequence {
     init(_ _base: _StringCore) {
       self._base = _base
     }
@@ -35,22 +35,20 @@ extension String {
       }
     }
 
-    // FIXME: This index should probably become bidirectional, as UTF16
-    // is traversable in either direction.
-    struct IndexType : BidirectionalIndex {
+    @public struct IndexType : BidirectionalIndex {
       init(_ _position: Int, _ _base: _StringCore) {
         self._position = _position
         self._base = _base
       }
 
-      func successor() -> IndexType {
+      @public func successor() -> IndexType {
         var scratch = _ScratchGenerator(_base, _position)
         var decoder = UTF16()
         let (result, length) = decoder._decodeOne(&scratch)
         return IndexType(_position + length, _base)
       }
 
-      func predecessor() -> IndexType {
+      @public func predecessor() -> IndexType {
         var i = _position
         let codeUnit = self._base[--i]
         // FIXME: consider adding:
@@ -65,15 +63,15 @@ extension String {
       var _base: _StringCore
     }
 
-    var startIndex: IndexType {
+    @public var startIndex: IndexType {
       return IndexType(_base.startIndex, _base)
     }
     
-    var endIndex: IndexType {
+    @public var endIndex: IndexType {
       return IndexType(_base.endIndex, _base)
     }
     
-    subscript(i: IndexType) -> UnicodeScalar {
+    @public subscript(i: IndexType) -> UnicodeScalar {
       var scratch = _ScratchGenerator(_base, i._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
@@ -86,21 +84,22 @@ extension String {
       }
     }
 
+    
     func __slice__(start: IndexType, end: IndexType) -> UnicodeScalarView {
       return UnicodeScalarView(_base[start._position..<end._position])
     }
 
-    subscript(r: Range<IndexType>) -> UnicodeScalarView {
+    @public subscript(r: Range<IndexType>) -> UnicodeScalarView {
       return UnicodeScalarView(
         _base[r.startIndex._position..<r.endIndex._position])
     }
 
-    struct GeneratorType : Generator {
+    @public struct GeneratorType : Generator {
       init(_ _base: _StringCore.GeneratorType) {
         self._base = _base
       }
 
-      mutating func next() -> UnicodeScalar? {
+      @public mutating func next() -> UnicodeScalar? {
         switch _decoder.decode(&self._base) {
         case .Result(let us):
           return us
@@ -114,16 +113,16 @@ extension String {
       var _base: _StringCore.GeneratorType
     }
     
-    func generate() -> GeneratorType {
+    @public func generate() -> GeneratorType {
       return GeneratorType(_base.generate())
     }
 
-    @conversion
+    @conversion @public
     func __conversion() -> String {
       return String(_base)
     }
 
-    func compare(other : UnicodeScalarView) -> Int {
+    @public func compare(other : UnicodeScalarView) -> Int {
       // Try to compare the string without decoding
       // the UTF16 string.
       var aIdx = self._base.startIndex
@@ -211,10 +210,10 @@ extension String {
 }
 
 extension String {
-  func compare(other : String) -> Int {
+  @public func compare(other : String) -> Int {
     return(UnicodeScalarView(core).compare(UnicodeScalarView(other.core)))
   }
-  var unicodeScalars : UnicodeScalarView {
+  @public var unicodeScalars : UnicodeScalarView {
     return UnicodeScalarView(core)
   }
 }

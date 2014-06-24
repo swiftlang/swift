@@ -17,14 +17,14 @@
 /// Effectively a proxy for NSString that doesn't mention it by
 /// name.  NSString's conformance to this protocol is declared in
 /// Foundation.
-@class_protocol @objc protocol _CocoaString {}
+@class_protocol @objc @public protocol _CocoaString {}
 
 /// Loading Foundation initializes these function variables
 /// with useful values
 
 /// Produces a `_StringBuffer` from a given subrange of a source
 /// `_CocoaString`, having the given minimum capacity.
-var _cocoaStringToContiguous: (
+@public var _cocoaStringToContiguous: (
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer = _cocoaStringToContiguousNotInitialized
 
@@ -36,7 +36,7 @@ func _cocoaStringToContiguousNotInitialized(
 
 /// Reads the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
-var _cocoaStringReadAll: (
+@public var _cocoaStringReadAll: (
   source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
 ) -> Void = _cocoaStringReadAllNotInitialized
 
@@ -46,7 +46,7 @@ func _cocoaStringReadAllNotInitialized(
   _fatalError("_cocoaStringReadAll not initialized")
 }
 
-var _cocoaStringLength: (
+@public var _cocoaStringLength: (
   source: _CocoaString
 ) -> Int = _cocoaStringLengthNotInitialized
 
@@ -56,7 +56,7 @@ func _cocoaStringLengthNotInitialized(
   _fatalError("_cocoaStringLength not initialized")
 }
 
-var _cocoaStringSlice: (
+@public var _cocoaStringSlice: (
   target: _StringCore, subRange: Range<Int>
 ) -> _StringCore = _cocoaStringSliceNotInitialized
 
@@ -66,7 +66,7 @@ func _cocoaStringSliceNotInitialized(
   _fatalError("_cocoaStringSlice not initialized")
 }
 
-var _cocoaStringSubscript: (
+@public var _cocoaStringSubscript: (
   target: _StringCore, position: Int
 ) -> UTF16.CodeUnit = _cocoaStringSubscriptNotInitialized
 
@@ -76,7 +76,7 @@ func _cocoaStringSubscriptNotInitialized(
   _fatalError("_cocoaStringSubscript not initialized")
 }
 
-var _cocoaStringEncodeSomeUTF8: (
+@public var _cocoaStringEncodeSomeUTF8: (
   target: _StringCore, position: Int
 ) -> (_StringCore.IndexType, _StringCore.UTF8Chunk)
   = _cocoaStringEncodeSomeUTF8NotInitialized

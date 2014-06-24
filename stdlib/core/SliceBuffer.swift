@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for Slice<T>
-struct SliceBuffer<T> : ArrayBufferType {
+@internal struct SliceBuffer<T> : ArrayBufferType {
   typealias Element = T
   typealias NativeStorage = ContiguousArrayStorage<T>
   typealias NativeBuffer = ContiguousArrayBuffer<T>

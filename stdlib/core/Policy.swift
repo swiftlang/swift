@@ -17,7 +17,7 @@ import SwiftShims
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
-typealias Void = ()
+@public typealias Void = ()
 
 //===----------------------------------------------------------------------===//
 // Aliases for floating point types
@@ -25,17 +25,17 @@ typealias Void = ()
 // FIXME: it should be the other way round, Float = Float32, Double = Float64,
 // but the type checker loses sugar currently, and ends up displaying 'FloatXX'
 // in diagnostics.
-typealias Float32 = Float
-typealias Float64 = Double
+@public typealias Float32 = Float
+@public typealias Float64 = Double
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained literals
 //===----------------------------------------------------------------------===//
-typealias IntegerLiteralType = Int
-typealias FloatLiteralType = Double
+@public typealias IntegerLiteralType = Int
+@public typealias FloatLiteralType = Double
 // typealias CharacterLiteralType = ?
-typealias ExtendedGraphemeClusterType = String
-typealias StringLiteralType = String
+@public typealias ExtendedGraphemeClusterType = String
+@public typealias StringLiteralType = String
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
@@ -47,20 +47,20 @@ typealias StringLiteralType = String
 // Rationale: 1024 bits are enough to represent the absolute value of min/max
 // IEEE Binary64, and we need 1 bit to represent the sign.  Instead of using
 // 1025, we use the next round number -- 2048.
-typealias MaxBuiltinIntegerType = Builtin.Int2048
-typealias MaxBuiltinFloatType = Builtin.FPIEEE64
+@public typealias MaxBuiltinIntegerType = Builtin.Int2048
+@public typealias MaxBuiltinFloatType = Builtin.FPIEEE64
 
 //===----------------------------------------------------------------------===//
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
-typealias Any = protocol<>
-@class_protocol @objc
+@public typealias Any = protocol<>
+@class_protocol @objc @public
 protocol AnyObject {}
 
-typealias AnyClass = AnyObject.Type
+@public typealias AnyClass = AnyObject.Type
 
-func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
+@public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case (.Some(let l), .Some(let r)):
     return Bool(Builtin.cmp_eq_RawPointer(
@@ -74,45 +74,45 @@ func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   }
 }
 
-func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
+@public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
 
 //
 // Equatable
 //
-protocol Equatable {
+@public protocol Equatable {
   func == (lhs: Self, rhs: Self) -> Bool
 }
 
-func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
+@public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
 
 //
 // Comparable
 //
-protocol _Comparable {
+@public protocol _Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func > <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+@public func > <T : _Comparable>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
-func <= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+@public func <= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
-func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+@public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
-protocol Comparable : _Comparable, Equatable {
+@public protocol Comparable : _Comparable, Equatable {
   func <=(lhs: Self, rhs: Self) -> Bool
   func >=(lhs: Self, rhs: Self) -> Bool
   func >(lhs: Self, rhs: Self) -> Bool
 }
 
-protocol BitwiseOperations {
+@public protocol BitwiseOperations {
   func & (_: Self, _: Self) -> Self
   func |(_: Self, _: Self) -> Self
   func ^(_: Self, _: Self) -> Self
@@ -130,7 +130,7 @@ protocol BitwiseOperations {
   class var allZeros: Self { get }
 }
 
-protocol Hashable : Equatable {
+@public protocol Hashable : Equatable {
   /// Returns the hash value.  The hash value is not guaranteed to be stable
   /// across different invocations of the same program.  Do not persist the hash
   /// value across program runs.
@@ -138,27 +138,27 @@ protocol Hashable : Equatable {
 }
 
 // The opposite of a Generator (like an Output Iterator)
-protocol Sink {
+@public protocol Sink {
   typealias Element
   mutating func put(x: Element)
 }
 
-func == <T: _RawOptionSet>(a: T, b: T) -> Bool {
+@public func == <T: _RawOptionSet>(a: T, b: T) -> Bool {
   return a.toRaw() == b.toRaw()
 }
 
 /* FIXME: These should be default implementations of the BitwiseOperations
    conformance for RawOptionSet. */
-func & <T: RawOptionSet>(a: T, b: T) -> T {
+@public func & <T: RawOptionSet>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() & b.toRaw())
 }
-func | <T: RawOptionSet>(a: T, b: T) -> T {
+@public func | <T: RawOptionSet>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() | b.toRaw())
 }
-func ^ <T: RawOptionSet>(a: T, b: T) -> T {
+@public func ^ <T: RawOptionSet>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() ^ b.toRaw())
 }
-@prefix func ~ <T: RawOptionSet>(a: T) -> T {
+@prefix @public func ~ <T: RawOptionSet>(a: T) -> T {
   return T.fromMask(~a.toRaw())
 }
 
@@ -167,7 +167,7 @@ func ^ <T: RawOptionSet>(a: T, b: T) -> T {
 //===----------------------------------------------------------------------===//
 
 // Equatable types can be matched in patterns by value equality.
-@transparent @infix
+@transparent @infix @public
 func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b
 }

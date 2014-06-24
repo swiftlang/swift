@@ -21,7 +21,7 @@
 /// execution in a debuggable state after printing a message.  When
 /// assertions are disabled in release and fast builds, `condition` is not even
 /// evaluated.
-@transparent
+@transparent @public
 func assert(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -33,7 +33,7 @@ func assert(
     }
   }
 }
-@transparent
+@transparent @public
 func assert<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -48,8 +48,7 @@ func assert<T : LogicValue>(
 
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
-@transparent
-@noreturn
+@transparent @noreturn @public
 func fatalError(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -66,7 +65,7 @@ func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@transparent
+@transparent @public
 func _precondition(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -81,7 +80,7 @@ func _precondition(
     Builtin.condfail(error.value)
   }
 }
-@transparent
+@transparent @public
 func _precondition<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -97,8 +96,7 @@ func _precondition<T : LogicValue>(
   }
 }
 
-@transparent
-@noreturn
+@transparent @public @noreturn
 func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
@@ -111,7 +109,7 @@ func _preconditionFailure(
 /// If `error` is true, prints an error message in debug mode, traps in release
 /// mode, and returns an undefined error otherwise.
 /// Otherwise returns `result`.
-@transparent
+@transparent @public
 func _overflowChecked<T>(
   args: (T, Bool),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -135,7 +133,7 @@ func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@transparent
+@transparent @public
 func _debugPrecondition(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -148,7 +146,7 @@ func _debugPrecondition(
   }
 }
 
-@transparent
+@transparent @public
 func _debugPrecondition<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -161,8 +159,7 @@ func _debugPrecondition<T : LogicValue>(
   }
 }
 
-@transparent
-@noreturn
+@transparent @noreturn @public
 func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
@@ -178,7 +175,7 @@ func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@transparent
+@transparent @public
 func _sanityCheck(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -190,7 +187,7 @@ func _sanityCheck(
 #endif
 }
 
-@transparent
+@transparent @public
 func _sanityCheck<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
@@ -202,8 +199,7 @@ func _sanityCheck<T : LogicValue>(
 #endif
 }
 
-@transparent
-@noreturn
+@transparent @noreturn @public
 func _fatalError(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__

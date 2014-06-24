@@ -126,26 +126,26 @@ def getInfinityExponent(bits):
 % for bits in allFloatBits:
 %   Self = floatName(bits)
 
-struct ${Self} {
+@public struct ${Self} {
   var value: Builtin.FPIEEE${bits}
 
-  @transparent
+  @transparent @public
   init() {
     var zero: Int64 = 0
     value = Builtin.uitofp_Int64_FPIEEE${bits}(zero.value)
   }
 
-  @transparent
+  @transparent 
   init(_ v: Builtin.FPIEEE${bits}) {
     value = v
   }
 
-  @transparent
+  @transparent @public
   init(_ value: ${Self}) { self = value }
 }
 
 extension ${Self} : Printable {
-  var description: String {
+  @public var description: String {
 % if bits == 64:
     return _doubleToString(self)
 % else:
@@ -158,13 +158,13 @@ extension ${Self} : Printable {
 // Not transparent because the compiler crashes in that case.
 //@transparent
 extension ${Self} : FloatingPointNumber {
-  typealias _BitsType = UInt${bits}
+  @public typealias _BitsType = UInt${bits}
 
-  static func _fromBitPattern(bits: _BitsType) -> ${Self} {
+  @public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
     return ${Self}(Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
   }
 
-  func _toBitPattern() -> _BitsType {
+  @public func _toBitPattern() -> _BitsType {
     return _BitsType(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
   }
 
@@ -181,39 +181,39 @@ extension ${Self} : FloatingPointNumber {
     return _toBitPattern() & mask
   }
 
-  static var infinity: ${Self} {
+  @public static var infinity: ${Self} {
     return _fromBitPattern(${getInfBitPattern(bits)})
   }
 
-  static var NaN: ${Self} {
+  @public static var NaN: ${Self} {
     return quietNaN
   }
 
-  static var quietNaN: ${Self} {
+  @public static var quietNaN: ${Self} {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  var isSignMinus: Bool {
+  @public var isSignMinus: Bool {
     return __getSignBit() == 1
   }
 
-  var isNormal:  Bool {
+  @public var isNormal:  Bool {
     var biasedExponent = __getBiasedExponent()
     return biasedExponent != ${getInfinityExponent(bits)} &&
            biasedExponent != 0
   }
 
-  var isFinite:  Bool {
+  @public var isFinite:  Bool {
     return __getBiasedExponent() != ${getInfinityExponent(bits)}
   }
 
-  var isZero:  Bool {
+  @public var isZero:  Bool {
     // Mask out the sign bit.
     var mask: _BitsType = (1 << (${bits} - 1)) - 1
     return (_toBitPattern() & mask) == 0
   }
 
-  var isSubnormal:  Bool {
+  @public var isSubnormal:  Bool {
     if __getBiasedExponent() == 0 {
       return __getSignificand() != 0
     }
@@ -228,7 +228,7 @@ extension ${Self} : FloatingPointNumber {
     // condition is going to be faster.
   }
 
-  var isInfinite:  Bool {
+  @public var isInfinite:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() == 0
     }
@@ -238,7 +238,7 @@ extension ${Self} : FloatingPointNumber {
     // return abs(self) == ${Self}.infinity()
   }
 
-  var isNaN:  Bool {
+  @public var isNaN:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() != 0
     }
@@ -248,7 +248,7 @@ extension ${Self} : FloatingPointNumber {
     // return self != self
   }
 
-  var isSignaling: Bool {
+  @public var isSignaling: Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded
       // with the first bit of the trailing significand being 0.  If the first
@@ -266,7 +266,7 @@ extension ${Self} : FloatingPointNumber {
 
 // Not @transparent because the function is too complex.
 extension ${Self} /* : FloatingPointNumber */ {
-  var floatingPointClass: FloatingPointClassification {
+  @public var floatingPointClass: FloatingPointClassification {
     get {
       var biasedExponent = __getBiasedExponent()
       if biasedExponent == ${getInfinityExponent(bits)} {
@@ -301,7 +301,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
     return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
-  static func convertFromIntegerLiteral(value: Int64) -> ${Self} {
+  @public static func convertFromIntegerLiteral(value: Int64) -> ${Self} {
     return ${Self}(Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
   }
 }
@@ -322,17 +322,17 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 
 @transparent
 extension ${Self} : FloatLiteralConvertible {
-  static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
+  @public static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 }
 
-@transparent
+@transparent @public
 func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
-@transparent
+@transparent @public
 func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
 }
@@ -342,7 +342,7 @@ extension ${Self} : Comparable {
 }
 
 extension ${Self} : Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
     var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
 %   if bits >= 64:
     return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
@@ -357,12 +357,12 @@ extension ${Self} : Hashable {
 @transparent
 extension ${Self} : AbsoluteValuable {
   @transparent
-  static func abs(x: ${Self}) -> ${Self} {
+  @public static func abs(x: ${Self}) -> ${Self} {
     return ${Self}(Builtin.int_fabs_FPIEEE${bits}(x.value))
   }
 }
 
-@prefix @transparent 
+@prefix @transparent @public
 func -(x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.fneg_FPIEEE${bits}(x.value))
 }
@@ -378,7 +378,7 @@ extension ${Self} {
 %    That = intName(srcBits, srcSigned)
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
-  init(_ v: ${That}) {
+  @public init(_ v: ${That}) {
     value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v.value)
   }
 % end
@@ -390,7 +390,7 @@ extension ${Self} {
 % for srcBits in allFloatBits:
 %   That = floatName(srcBits)
 %   if Self != That:
-  init(_ v: ${That}) {
+  @public init(_ v: ${That}) {
 %     if srcBits > bits:
     value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
 %     else:
@@ -406,37 +406,37 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Unary plus
-@transparent @prefix
+@transparent @prefix @public
 func + (rhs: ${Self}) -> ${Self} { return rhs }
 
-@transparent @prefix @assignment
+@transparent @prefix @assignment @public
 func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
-@transparent @prefix @assignment
+@transparent @prefix @assignment @public
 func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
-@transparent @postfix @assignment
+@transparent @postfix @assignment @public
 func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
-@transparent @postfix @assignment
+@transparent @postfix @assignment @public
 func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
 
 @transparent
 extension ${Self} : RandomAccessIndex {
-  @transparent
+  @transparent @public
   func successor() -> ${Self} {
     return self + 1.0
   }
-  @transparent
+  @transparent @public
   func predecessor() -> ${Self} {
     return self - 1.0
   }
   
-  @transparent
+  @transparent @public
   func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
     return Int(other-self)
   }
   
-  @transparent
+  @transparent @public
   func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
     return self + ${Self}(amount)
   }
@@ -445,7 +445,7 @@ extension ${Self} : RandomAccessIndex {
 
 
 % for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
-@transparent
+@transparent @public
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
@@ -456,7 +456,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // 1) This is consistent with '%' in C#, D, Java, and JavaScript
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
-@asmname("fmod${cFuncSuffix(bits)}")
+@asmname("fmod${cFuncSuffix(bits)}")@public
 func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||
@@ -467,7 +467,7 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 // In C, 90 is =, *=, += etc.
 
 % for op in '+', '-', '*', '/', '%':
-@transparent @assignment
+@transparent @assignment @public
 func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 % end
 
@@ -482,7 +482,7 @@ func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 extension ${Self} {
 %   for srcBits in allFloatBits:
 %     That = floatName(srcBits)
-  init(_ v: ${That}) {
+  @public init(_ v: ${That}) {
     _precondition(v >= ${That}(${Self}.min),
         "floating point value can not be converted to ${Self} because it is greater than ${Self}.min")
     _precondition(v <= ${That}(${Self}.max),

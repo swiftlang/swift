@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct String {
-  init() {
+@public struct String {
+  @public init() {
     core = _StringCore()
   }
 
@@ -75,7 +75,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : ExtendedGraphemeClusterLiteralConvertible {
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
     value: String
   ) -> String {
     return value
@@ -122,13 +122,13 @@ extension String : _BuiltinStringLiteralConvertible {
 }
 
 extension String : StringLiteralConvertible {
-  static func convertFromStringLiteral(value: String) -> String {
+  @public static func convertFromStringLiteral(value: String) -> String {
     return value
   }
 }
 
 extension String : DebugPrintable {
-  var debugDescription: String {
+  @public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
       result += us.escape(asASCII: false)
@@ -168,7 +168,7 @@ extension String {
 extension String: Equatable {
 }
 
-func ==(lhs: String, rhs: String) -> Bool {
+@public func ==(lhs: String, rhs: String) -> Bool {
   // FIXME: Compares UnicodeScalars, but should eventually do proper
   // Unicode string comparison. This is above the level of the
   // standard equal algorithm because even the largest units
@@ -180,7 +180,7 @@ func ==(lhs: String, rhs: String) -> Bool {
   return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)  
 }
 
-func <(lhs: String, rhs: String) -> Bool {
+@public func <(lhs: String, rhs: String) -> Bool {
   // FIXME: Does lexicographical ordering on component UnicodeScalars,
   // but should eventually do a proper unicode String collation.  See
   // the comment on == for more information.
@@ -208,7 +208,7 @@ extension String {
 }
 
 extension String : Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
     var r : Int = 5381
     _encode(
       UTF8.self,
@@ -221,6 +221,7 @@ extension String : Hashable {
 }
 
 extension String : StringInterpolationConvertible {
+  @public
   static func convertFromStringInterpolation(strings: String...) -> String {
     var result = String()
     for str in strings {
@@ -229,12 +230,13 @@ extension String : StringInterpolationConvertible {
     return result
   }
 
+  @public
   static func convertFromStringInterpolationSegment<T>(expr: T) -> String {
     return toString(expr)
   }
 }
 
-func +(var lhs: String, rhs: String) -> String {
+@public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
   }
@@ -242,16 +244,16 @@ func +(var lhs: String, rhs: String) -> String {
   return lhs
 }
 
-func +(var lhs: String, rhs: Character) -> String {
+@public func +(var lhs: String, rhs: Character) -> String {
   lhs._append(String(rhs))
   return lhs
 }
-func +(lhs: Character, rhs: String) -> String {
+@public func +(lhs: Character, rhs: String) -> String {
   var result = String(lhs)
   result._append(rhs)
   return result
 }
-func +(lhs: Character, rhs: Character) -> String {
+@public func +(lhs: Character, rhs: Character) -> String {
   var result = String(lhs)
   result += String(rhs)
   return result
@@ -259,7 +261,7 @@ func +(lhs: Character, rhs: Character) -> String {
 
 
 // String append
-@assignment func += (inout lhs: String, rhs: String) {
+@assignment @public func += (inout lhs: String, rhs: String) {
   if (lhs.isEmpty) {
     lhs = rhs
   }
@@ -268,7 +270,7 @@ func +(lhs: Character, rhs: Character) -> String {
   }
 }
 
-@assignment func += (inout lhs: String, rhs: Character) {
+@assignment @public func += (inout lhs: String, rhs: Character) {
   lhs += String(rhs)
 }
 
@@ -295,16 +297,16 @@ extension String {
 /// String is a Collection of Character
 extension String : Collection {
   // An adapter over UnicodeScalarView that advances by whole Character
-  struct Index : BidirectionalIndex {
+  @public struct Index : BidirectionalIndex {
     init(_ _base: UnicodeScalarView.IndexType) {
       self._base = _base
     }
 
-    func successor() -> Index {
+    @public func successor() -> Index {
        // For now, each Character will just be a single UnicodeScalar
       return Index(_base.successor())
     }
-    func predecessor() -> Index {
+    @public func predecessor() -> Index {
        // For now, each Character will just be a single UnicodeScalar
       return Index(_base.predecessor())
     }
@@ -316,29 +318,29 @@ extension String : Collection {
     }
   }
 
-  var startIndex: Index {
+  @public var startIndex: Index {
     return Index(unicodeScalars.startIndex)
   }
   
-  var endIndex: Index {
+  @public var endIndex: Index {
     return Index(unicodeScalars.endIndex)
   }
   
-  subscript(i: Index) -> Character {
+  @public subscript(i: Index) -> Character {
     return Character(unicodeScalars[i._base])
   }
 
-  func generate() -> IndexingGenerator<String> {
+  @public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
   }
 }
 
-func == (lhs: String.Index, rhs: String.Index) -> Bool {
+@public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
 
 extension String : Sliceable {
-  subscript(subRange: Range<Index>) -> String {
+  @public subscript(subRange: Range<Index>) -> String {
     return String(
       unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._base)
   }
@@ -346,7 +348,7 @@ extension String : Sliceable {
 
 // Algorithms
 extension String {
-  func join<
+  @public func join<
       S : Sequence where S.GeneratorType.Element == String
   >(elements: S) -> String{
     return Swift.join(self, elements)

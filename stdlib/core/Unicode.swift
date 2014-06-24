@@ -29,7 +29,7 @@ enum UTFDecodeResult {
   }
 }
 
-protocol UnicodeCodec {
+@public protocol UnicodeCodec {
   typealias CodeUnit
 
   init()
@@ -53,7 +53,7 @@ protocol UnicodeCodec {
   >(input: UnicodeScalar, inout output: S)
 }
 
-struct UTF8 : UnicodeCodec {
+@public struct UTF8 : UnicodeCodec {
 
   typealias CodeUnit = UInt8
 
@@ -439,9 +439,11 @@ struct UTF8 : UnicodeCodec {
     }
     output.put(buf3)
   }
+
+  var _value =  UInt8()
 }
 
-struct UTF16 : UnicodeCodec {
+@public struct UTF16 : UnicodeCodec {
   typealias CodeUnit = UInt16
 
   init() {}
@@ -568,7 +570,7 @@ struct UTF16 : UnicodeCodec {
   var _value = UInt16()
 }
 
-struct UTF32 : UnicodeCodec {
+@public struct UTF32 : UnicodeCodec {
   typealias CodeUnit = UInt32
 
   init() {}
@@ -599,7 +601,7 @@ struct UTF32 : UnicodeCodec {
   }
 }
 
-func transcode<
+@public func transcode<
   Input : Generator,
   Output : Sink,
   InputEncoding : UnicodeCodec,

@@ -13,7 +13,7 @@
 /// Invokes `body` with an `UnsafePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer
-func withUnsafePointer<T, Result>(
+@public func withUnsafePointer<T, Result>(
   inout arg: T,
   body: (UnsafePointer<T>)->Result
 ) -> Result
@@ -22,7 +22,7 @@ func withUnsafePointer<T, Result>(
 }
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
-func withUnsafePointers<A0, A1, Result>(
+@public func withUnsafePointers<A0, A1, Result>(
   inout arg0: A0,
   inout arg1: A1,
   body: (UnsafePointer<A0>, UnsafePointer<A1>)->Result
@@ -36,7 +36,7 @@ func withUnsafePointers<A0, A1, Result>(
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
-func withUnsafePointers<A0, A1, A2, Result>(
+@public func withUnsafePointers<A0, A1, A2, Result>(
   inout arg0: A0,
   inout arg1: A1,
   inout arg2: A2,
@@ -57,7 +57,7 @@ func withUnsafePointers<A0, A1, A2, Result>(
 ///
 /// Useful for calling Objective-C APIs that take class instances by
 /// pointer as `@autorelease` "out" parameters.
-func withUnsafePointerToObject<T: AnyObject, Result>(
+@public func withUnsafePointerToObject<T: AnyObject, Result>(
   inout arg: T?,
   body: (UnsafePointer<ImplicitlyUnwrappedOptional<T>>)->Result
 ) -> Result {
@@ -73,7 +73,7 @@ func withUnsafePointerToObject<T: AnyObject, Result>(
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling bridgeToObjectiveC
 /// on each elmeent of the source container.
-protocol _BridgedToObjectiveC {
+@public protocol _BridgedToObjectiveC {
   typealias ObjectiveCType: AnyObject
 
   // Workaround: right now protocol witness tables don't include associated
@@ -95,7 +95,7 @@ protocol _BridgedToObjectiveC {
 /// Whether a given type conforming to this protocol bridges to
 /// ObjectiveC is only knowable at runtime.  Array<T> is an example;
 /// it bridges to ObjectiveC iff T does.
-protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
+@public protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
   class func isBridgedToObjectiveC() -> Bool
 
   /// Try to bridge from an Objective-C object of the bridged class
@@ -126,14 +126,14 @@ protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
 ///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
 ///   + otherwise, returns the result of `x.bridgeToObjectiveC()`;
 /// - otherwise, the result is empty.
-func bridgeToObjectiveC<T>(x: T) -> AnyObject? {
+@public func bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return reinterpretCast(x) as AnyObject
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
 
-func bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
+@public func bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
   let optResult: AnyObject? = bridgeToObjectiveC(x)
   _precondition(optResult, "value failed to bridge from Swift type to a Objective-C type")
   return optResult!
@@ -153,7 +153,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///     or a subclass of it, trap
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveC(x)`;
 /// - otherwise, trap
-func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
+@public func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as T
   }
@@ -173,7 +173,7 @@ func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveCConditional(x)`;
 /// - otherwise, the result is empty.
-func bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
+@public func bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as? T
   }
@@ -194,7 +194,7 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject,
 /// - otherwise, `T` conforms to `_ConditionallyBridgedToObjectiveC`, returns
 ///   `T.isBridgedToObjectiveC()`;
 /// - otherwise, if `T` conforms to `_BridgedToObjectiveC`, returns `true`.
-func isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
+@public func isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
   }
@@ -208,12 +208,12 @@ func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 /// _BridgedToObjectiveC, and can have its bits reinterpreted as an
 /// AnyObject.  When this function returns true, the storage of an
 /// Array<T> can be reinterpretCast as an array of AnyObject
-func isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
+@public func isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
   return _isClassOrObjCExistential(T.self)
 }
 
 /// Retrieve the Objective-C type to which the given type is bridged.
-func getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?  {
+@public func getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?  {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
   }
@@ -225,11 +225,11 @@ func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@transparent
+@transparent @internal
 var _nilNativeObject: AnyObject? {
   return nil
 }
-@transparent
+@transparent @internal
 var _nilRawPointer: Builtin.RawPointer {
   return Builtin.inttoptr_Word(0.value)
 }
@@ -258,12 +258,13 @@ var _nilRawPointer: Builtin.RawPointer {
 /// this type; they instead get mapped to
 /// `AutoreleasingUnsafePointer<T>`. `void*` pointers are mapped to
 /// CMutableVoidPointer.
-struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
+@public struct CMutablePointer<T> : Equatable, LogicValue,
+                                    NilLiteralConvertible {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
   /// Conversion from an inout scalar.
-  @transparent
+  @transparent @public
   static func __inout_conversion(inout scalar: T) -> CMutablePointer {
     // No owner pointer for an inout scalar; the lifetime guarantee of writeback
     // is sufficient.
@@ -272,7 +273,7 @@ struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
   }
 
   /// Conversion from an inout array.
-  @transparent
+  @transparent @public
   static func __inout_conversion(inout a: Array<T>) -> CMutablePointer {
     _debugPrecondition(a._elementStorageIfContiguous != nil || a.count == 0)
 
@@ -286,13 +287,13 @@ struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
 
   /// True if this is a scoped pointer, meaning it has a owner reference
   /// that guarantees the lifetime of the referenced memory.
-  @transparent
+  @transparent @public
   var scoped: Bool {
     return owner.getLogicValue()
   }
 
   /// Make the pointer available as an UnsafePointer within a closure.
-  @transparent
+  @transparent @public
   func withUnsafePointer<U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer<T>(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
@@ -301,7 +302,7 @@ struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
   }  
 
   /// Return true if self was not constructed with nil
-  @transparent
+  @transparent @public
   func getLogicValue() -> Bool {
     return reinterpretCast(value) != 0
   }
@@ -335,24 +336,24 @@ struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
     }
   }
   
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> CMutablePointer<T> {
     return CMutablePointer<T>(owner: _nilNativeObject, value: _nilRawPointer)
   }
 }
 
-@transparent
+@transparent @public
 func == <T> (lhs: CMutablePointer<T>, rhs: CMutablePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
 // Also make CMutablePointer comparable to CConstPointer.
-@transparent
+@transparent @public
 func == <T> (lhs: CMutablePointer<T>, rhs: CConstPointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
-@transparent
+@transparent @public
 func == <T> (lhs: CConstPointer<T>, rhs: CMutablePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
@@ -376,7 +377,7 @@ func == <T> (lhs: CConstPointer<T>, rhs: CMutablePointer<T>) -> Bool {
 /// types that own heap storage, such as Array, to convert themselves to
 /// a pointer and still guarantee that their storage will be held for the
 /// duration of the call.
-struct CMutableVoidPointer : Equatable, NilLiteralConvertible {
+@public struct CMutableVoidPointer : Equatable, NilLiteralConvertible {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
@@ -407,13 +408,13 @@ struct CMutableVoidPointer : Equatable, NilLiteralConvertible {
 
   /// True if this is a scoped pointer, meaning it has a owner reference
   /// that guarantees the lifetime of the referenced memory.
-  @transparent
+  @transparent @public
   var scoped: Bool {
     return owner.getLogicValue()
   }
 
   /// Make the pointer available as an UnsafePointer within a closure.
-  @transparent
+  @transparent @public
   func withUnsafePointer<T, U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
@@ -421,13 +422,13 @@ struct CMutableVoidPointer : Equatable, NilLiteralConvertible {
     return result
   }
   
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> CMutableVoidPointer {
     return CMutableVoidPointer(owner: _nilNativeObject,value: _nilRawPointer)
   }
 }
 
-@transparent
+@transparent @public
 func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
@@ -451,7 +452,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-struct AutoreleasingUnsafePointer<T /* TODO : class */>
+@public struct AutoreleasingUnsafePointer<T /* TODO : class */>
   : Equatable, LogicValue, NilLiteralConvertible, _Pointer {
   let value: Builtin.RawPointer
 
@@ -493,14 +494,14 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */>
     return UnsafePointer<T>(self)._isNull
   }
   
-  @transparent
+  @transparent @public
   func getLogicValue() -> Bool {
     return !_isNull
   }
 
   /// Access the underlying raw memory, getting and
   /// setting values.
-  var memory : T {
+  @public var memory : T {
     /// Retrieve the value the pointer points to.
     @transparent get {
       _debugPrecondition(!_isNull)
@@ -525,13 +526,13 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */>
     }
   }
   
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> AutoreleasingUnsafePointer {
     return AutoreleasingUnsafePointer(_nilRawPointer)
   }
 }
 
-@transparent
+@transparent @public
 func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
@@ -554,9 +555,7 @@ func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer
 /// types that own heap storage, such as Array, to convert themselves to
 /// a pointer and still guarantee that their storage will be held for the
 /// duration of the call.
-struct CConstPointer<T> : Equatable, NilLiteralConvertible {
-  // TODO: Owner should become AnyObject? when the new Array implementation
-  // comes online.
+@public struct CConstPointer<T> : Equatable, NilLiteralConvertible {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
@@ -576,13 +575,13 @@ struct CConstPointer<T> : Equatable, NilLiteralConvertible {
 
   /// True if this is a scoped pointer, meaning it has a owner reference
   /// that guarantees the lifetime of the referenced memory.
-  @transparent
+  @transparent @public
   var scoped: Bool {
     return owner.getLogicValue()
   }
 
   /// Make the pointer available as an UnsafePointer within a closure.
-  @transparent
+  @transparent @public
   func withUnsafePointer<U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer<T>(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
@@ -590,18 +589,18 @@ struct CConstPointer<T> : Equatable, NilLiteralConvertible {
     return result
   }
   
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> CConstPointer<T> {
     return CConstPointer<T>(_nilNativeObject, _nilRawPointer)
   }
 }
 
-@transparent
+@transparent @public
 func == <T> (lhs: CConstPointer<T>, rhs: CConstPointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
-struct CConstVoidPointer : Equatable, NilLiteralConvertible {
+@public struct CConstVoidPointer : Equatable, NilLiteralConvertible {
   // TODO: Owner should become AnyObject? when the new Array implementation
   // comes online.
   let owner: AnyObject?
@@ -623,26 +622,26 @@ struct CConstVoidPointer : Equatable, NilLiteralConvertible {
 
   /// True if this is a scoped pointer, meaning it has a owner reference
   /// that guarantees the lifetime of the referenced memory.
-  @transparent
+  @transparent @public
   var scoped: Bool {
     return owner.getLogicValue()
   }
 
   /// Make the pointer available as an UnsafePointer within a closure.
-  @transparent
+  @transparent @public
   func withUnsafePointer<T, U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
     _fixLifetime(owner)
     return result
   }
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> CConstVoidPointer {
     return CConstVoidPointer(_nilNativeObject, _nilRawPointer)
   }
 }
 
-@transparent
+@transparent @public
 func ==(lhs: CConstVoidPointer, rhs: CConstVoidPointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
@@ -652,12 +651,12 @@ func ==(lhs: CConstVoidPointer, rhs: CConstVoidPointer) -> Bool {
 //
 
 extension COpaquePointer {
-  @transparent @conversion
+  @transparent @conversion @public
   func __conversion() -> CMutableVoidPointer {
     return CMutableVoidPointer(owner: _nilNativeObject, value: value)
   }
 
-  @transparent @conversion
+  @transparent @conversion @public
   func __conversion() -> CConstVoidPointer {
     return CConstVoidPointer(_nilNativeObject, value)
   }

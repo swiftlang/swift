@@ -67,10 +67,10 @@ def otherIntName(name, signed):
     return ('U' if signed else '') + baseIntName(name)
 }%
 
-typealias IntMax = Int${maxBits}
-typealias UIntMax = UInt${maxBits}
+@public typealias IntMax = Int${maxBits}
+@public typealias UIntMax = UInt${maxBits}
 
-protocol _Integer
+@public protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     Printable,
@@ -82,38 +82,38 @@ protocol _Integer
 {
 }
 
-protocol Integer : _Integer, RandomAccessIndex {
+@public protocol Integer : _Integer, RandomAccessIndex {
 }
 
-protocol _SignedInteger : _Integer, SignedNumber {
+@public protocol _SignedInteger : _Integer, SignedNumber {
   func toIntMax() -> IntMax
   class func from(IntMax) -> Self
 }
 
-protocol SignedInteger : _SignedInteger, Integer {
+@public protocol SignedInteger : _SignedInteger, Integer {
 }
 
-protocol _UnsignedInteger : _Integer {
+@public protocol _UnsignedInteger : _Integer {
   func toUIntMax() -> UIntMax
   class func from(UIntMax) -> Self
 }
 
-protocol UnsignedInteger : _UnsignedInteger, Integer {
+@public protocol UnsignedInteger : _UnsignedInteger, Integer {
 }
 
-func numericCast<T : _SignedInteger, U : _SignedInteger>(x: T) -> U {
+@public func numericCast<T : _SignedInteger, U : _SignedInteger>(x: T) -> U {
   return .from(x.toIntMax())
 }
 
-func numericCast<T : _UnsignedInteger, U : _UnsignedInteger>(x: T) -> U {
+@public func numericCast<T : _UnsignedInteger, U : _UnsignedInteger>(x: T) -> U {
   return .from(x.toUIntMax())
 }
 
-func numericCast<T : _SignedInteger, U : _UnsignedInteger>(x: T) -> U {
+@public func numericCast<T : _SignedInteger, U : _UnsignedInteger>(x: T) -> U {
   return .from(UIntMax(x.toIntMax()))
 }
 
-func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
+@public func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
   return .from(IntMax(x.toUIntMax()))
 }
 
@@ -124,10 +124,10 @@ func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
 %   OtherSelf = otherIntName(name, signed)
 %   ConstructIntType = 'Int' if Self != 'Int' else ''
 
-struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
+@public struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   var value: Builtin.${BuiltinName}
 
-  @transparent
+  @transparent @public
   init() {
     var maxWidthZero: IntMax = 0
     value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
@@ -138,13 +138,13 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
     value = v
   }
 
-  @transparent
+  @transparent @public
   init(_ value: ${Self}) { self = value }
 
 %  if bits > 8:
   /// Creates an integer from its big-endian representation, changing the
   /// byte order if necessary.
-  @transparent
+  @transparent @public
   init(bigEndian value: ${Self}) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value.value) )
@@ -155,7 +155,7 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 
   /// Creates an integer from its little-endian representation, changing the
   /// byte order if necessary.
-  @transparent
+  @transparent @public
   init(littleEndian value: ${Self}) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     self = value
@@ -170,7 +170,7 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
     return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
 
-  @transparent
+  @transparent @public
   static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
     return value
   }
@@ -187,15 +187,15 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 %  end
   }
 
-  typealias ArrayBoundType = ${Self}
-  func getArrayBoundValue() -> ${Self} {
+  @public typealias ArrayBoundType = ${Self}
+  @public func getArrayBoundValue() -> ${Self} {
     return self
   }
 
 %  if bits > 8:
   /// Returns the big-endian representation of the integer, changing the
   /// byte order if necessary.
-  var bigEndian: ${Self} {
+  @public var bigEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
 #else
@@ -204,7 +204,7 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   }
   /// Returns the little-endian representation of the integer, changing the
   /// byte order if necessary.
-  var littleEndian: ${Self} {
+  @public var littleEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return self
 #else
@@ -215,20 +215,20 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 
 %  if bits > 8:
   /// Returns the current integer with the byte order swapped.
-  var byteSwapped: ${Self} {
+  @public var byteSwapped: ${Self} {
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value))
   }
 % end
 
 % max = maskBits((bits - 1) if signed else bits)
-  @transparent
+  @transparent @public
   static var max: ${Self} { return ${max} }
-  @transparent
+  @transparent @public
   static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
 }
 
 extension ${Self} : Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
 % if bits < wordBits: 
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
 % elif bits > wordBits:
@@ -246,7 +246,7 @@ extension ${Self} : Hashable {
 }
 
 extension ${Self} : Printable {
-  var description: String {
+  @public var description: String {
 % if signed:
     return _int64ToString(self.toIntMax())
 % else:
@@ -257,27 +257,27 @@ extension ${Self} : Printable {
 
 @transparent
 extension ${Self} : RandomAccessIndex {
-  @transparent
+  @transparent @public
   func successor() -> ${Self} {
     return self + 1
   }
-  @transparent
+  @transparent @public
   func predecessor() -> ${Self} {
     return self - 1
   }
   
-  @transparent
+  @transparent @public
   func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
   
-  @transparent
+  @transparent @public
   func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) + numericCast(amount))
   }
 
 % for Method,op in [('Add', 'add'), ('Subtract', 'sub'), ('Multiply', 'mul')]:
-  @transparent
+  @transparent @public
   static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
     return (${Self}(tmp.0), Bool(tmp.1))
@@ -285,7 +285,7 @@ extension ${Self} : RandomAccessIndex {
 % end
   
 % for Method,op in [('Divide', 'div'), ('Modulus', 'rem')]:
-  @transparent
+  @transparent @public
   static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
     if rhs == 0 {
       return (0, true)
@@ -303,7 +303,7 @@ extension ${Self} : RandomAccessIndex {
 %end
 
 % U = '' if signed else 'U'
-  @transparent
+  @transparent @public
   func to${U}IntMax() -> ${U}IntMax {
     return ${'self' if Self == U+'Int%s'%maxBits else U+'IntMax(self)'}
   }
@@ -312,7 +312,7 @@ extension ${Self} : RandomAccessIndex {
     return IntMax(toUIntMax())
   }
 % end
-  @transparent
+  @transparent @public
   static func from(x: ${U}IntMax) -> ${Self} {
     return ${'x' if Self == U+'Int%s'%maxBits else Self+'(x)'}
   }
@@ -332,7 +332,7 @@ extension ${Self} {
 %    srcBuiltinName = builtinIntName(srcName)
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
-  init(_ v: ${Src}) {
+  @public init(_ v: ${Src}) {
 %
 %       if srcBuiltinName == 'Word':
     var srcNotWord = Builtin.${CastFromWord}(v.value)
@@ -371,7 +371,7 @@ extension ${Self} {
 
 %    end
 % end
-  func as${'Unsigned' if signed else 'Signed'}() -> ${OtherSelf} {
+  @public func as${'Unsigned' if signed else 'Signed'}() -> ${OtherSelf} {
     return ${OtherSelf}(value)
   }
 }
@@ -382,7 +382,7 @@ extension ${Self} {
 // overflowChecked, pending <rdar://problem/16271923> so that we don't
 // foil static checking for numeric overflows.
 % for op,method in ('+','add'), ('*','mul'), ('-','sub'):
-@transparent
+@transparent @public
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
     lhs.value, rhs.value, true.value)
@@ -393,7 +393,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % end
 
 % for op,inst in [('/', 'div'), ('%', 'rem')]:
-@transparent
+@transparent @public
 func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     Builtin.condfail((rhs == 0).value)
 % if signed:
@@ -407,7 +407,7 @@ func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 %end
 
 // Bitwise negate
-@transparent @prefix
+@transparent @prefix @public
 func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.uncheckedSubtract(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
@@ -417,14 +417,14 @@ func ~(rhs: ${Self}) -> ${Self} {
 %  ('==','eq'), ('!=','ne'),
 %  ('<',sign+'lt'), ('<=',sign+'le'),
 %  ('>',sign+'gt'), ('>=',sign+'ge')):
-@transparent
+@transparent @public
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs.value, rhs.value))
 }
 % end
 
 % for op, name in (('<<','shl'), ('>>','ashr' if signed else 'lshr')):
-@transparent
+@transparent @public
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % if signed:
   _precondition(U${Self}(rhs) < U${Self}(sizeofValue(rhs) * 8),
@@ -438,7 +438,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % end
 
 % for op, name in (('&','and'), ('^','xor'), ('|','or')):
-@transparent
+@transparent @public
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
 }
@@ -447,20 +447,20 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // bitwise operations
 @transparent
 extension ${Self} : BitwiseOperations {
-  static var allZeros: ${Self} { return 0 }
+  @public static var allZeros: ${Self} { return 0 }
 }
 
 // Compound assignments
 % for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
-@transparent @assignment
+@transparent @assignment @public
 func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 % end
 % end  # for bits in allInts
 
-typealias Word = Int
-typealias UWord = UInt
+@public typealias Word = Int
+@public typealias UWord = UInt
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

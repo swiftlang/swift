@@ -17,7 +17,7 @@ import Foundation
 // argument that gets mapped to UnsafePointer<UnsafePointer<CChar>> by the
 // importer, with one that takes UnsafePointer<CString> instead, matching the
 // type of C_ARGV.
-@asmname("UIApplicationMain")
+@asmname("UIApplicationMain") @public
 func UIApplicationMain(argc: CInt,
                        argv: UnsafePointer<CString>,
                        principalClassName: NSString?,
@@ -25,7 +25,7 @@ func UIApplicationMain(argc: CInt,
 
 // These are un-imported macros in UIKit.
 
-extension UIDeviceOrientation {
+@public extension UIDeviceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
   }
@@ -50,14 +50,17 @@ extension UIDeviceOrientation {
   }
 }
 
+@public
 func UIDeviceOrientationIsLandscape(orientation: UIDeviceOrientation) -> Bool {
   return orientation.isLandscape
 }
 
+@public
 func UIDeviceOrientationIsPortrait(orientation: UIDeviceOrientation) -> Bool {
   return orientation.isPortrait 
 }
 
+@public
 func UIDeviceOrientationIsValidInterfaceOrientation(
   orientation: UIDeviceOrientation) -> Bool 
 {
@@ -65,7 +68,7 @@ func UIDeviceOrientationIsValidInterfaceOrientation(
 }
 
 
-extension UIInterfaceOrientation {
+@public extension UIInterfaceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
   }
@@ -75,12 +78,14 @@ extension UIInterfaceOrientation {
   }
 }
 
+@public
 func UIInterfaceOrientationIsPortrait(orientation: UIInterfaceOrientation) 
   -> Bool 
 {
   return orientation.isPortrait
 }
 
+@public
 func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation) 
   -> Bool 
 {
@@ -89,7 +94,7 @@ func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation)
 
 // Overlays for variadic initializers.
 
-extension UIActionSheet {
+@public extension UIActionSheet {
   convenience init(title: String?,
        delegate: UIActionSheetDelegate?,
        cancelButtonTitle: String?,
@@ -109,7 +114,7 @@ extension UIActionSheet {
   }
 }
 
-extension UIAlertView {
+@public extension UIAlertView {
   convenience init(title: String,
        message: String,
        delegate: UIAlertViewDelegate?,
@@ -180,7 +185,7 @@ struct _UIViewMirror : Mirror {
 }
 
 extension UIView : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _UIViewMirror(self)
   }
 }

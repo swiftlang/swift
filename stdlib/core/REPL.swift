@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // FIXME: Function types don't work yet as generic parameters
-struct _REPLExitHandler {
+@public struct _REPLExitHandler {
   var f : () -> ()
 
   init(_ f: () -> ()) {
@@ -21,11 +21,11 @@ struct _REPLExitHandler {
 
 var _replExitHandlers = _REPLExitHandler[]()
 
-func _atREPLExit(handler: () -> ()) {
+@public func _atREPLExit(handler: () -> ()) {
   _replExitHandlers.append(_REPLExitHandler(handler))
 }
 
-func _replExit() {
+@internal func _replExit() {
   for handler in reverse(_replExitHandlers) {
     handler.f()
   }

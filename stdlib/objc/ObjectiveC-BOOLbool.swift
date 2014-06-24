@@ -21,20 +21,20 @@ import ObjectiveC
 /// The compiler has special knowledge of this type.
 ///
 /// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
-struct ObjCBool {
+@public struct ObjCBool {
   var value : Bool
 
-  init(_ value: Bool) {
+  @public init(_ value: Bool) {
     self.value = value
   }
 
   /// Allow use in a Boolean context.
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     return value == true
   }
 
   /// Implicit conversion from C Boolean type to Swift Boolean type.
-  @conversion func __conversion() -> Bool {
+  @conversion @public func __conversion() -> Bool {
     return self.getLogicValue()
   }
 }
@@ -42,7 +42,7 @@ struct ObjCBool {
 extension Bool {
   /// Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
-  @conversion func __conversion() -> ObjCBool {
+  @conversion @public func __conversion() -> ObjCBool {
     return ObjCBool(self ? Bool.true : Bool.false)
   }
 }

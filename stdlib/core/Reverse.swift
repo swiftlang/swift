@@ -11,49 +11,49 @@
 //===----------------------------------------------------------------------===//
 /// A wrapper for a BidirectionalIndex that reverses its
 /// direction of traversal
-struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
+@public struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
   var _base: I
 
   init(_ _base: I) { self._base = _base }
 
-  func successor() -> ReverseIndex {
+  @public func successor() -> ReverseIndex {
     return ReverseIndex(_base.predecessor())
   }
   
-  func predecessor() -> ReverseIndex {
+  @public func predecessor() -> ReverseIndex {
     return ReverseIndex(_base.successor())
   }
 }
 
-func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
+@public func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
   return lhs._base == rhs._base
 }
 
 /// The lazy `Collection` returned by `reverse(c)` where `c` is a
 /// `Collection`
-struct ReverseView<
+@public struct ReverseView<
   T: Collection where T.IndexType: BidirectionalIndex
 > : Collection {
-  typealias IndexType = ReverseIndex<T.IndexType>
-  typealias GeneratorType = IndexingGenerator<ReverseView>
+  @public typealias IndexType = ReverseIndex<T.IndexType>
+  @public typealias GeneratorType = IndexingGenerator<ReverseView>
 
   init(_ _base: T) {
     self._base = _base 
   }
 
-  func generate() -> IndexingGenerator<ReverseView> {
+  @public func generate() -> IndexingGenerator<ReverseView> {
     return IndexingGenerator(self)
   }
   
-  var startIndex: IndexType {
+  @public var startIndex: IndexType {
     return ReverseIndex(_base.endIndex)
   }
   
-  var endIndex: IndexType {
+  @public var endIndex: IndexType {
     return ReverseIndex(_base.startIndex)
   }
 
-  subscript(i: IndexType) -> T.GeneratorType.Element {
+  @public subscript(i: IndexType) -> T.GeneratorType.Element {
     return _base[i._base.predecessor()]
   }
   
@@ -62,7 +62,7 @@ struct ReverseView<
 
 /// Return a lazy Collection containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
-func reverse<
+@public func reverse<
   C: Collection where C.IndexType: BidirectionalIndex
 >(source: C) -> ReverseView<C> {
   return ReverseView(source)

@@ -10,16 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct GeneratorOfOne<T> : Generator, Sequence {
-  init(_ elements: T?) {
+@public struct GeneratorOfOne<T> : Generator, Sequence {
+  @public init(_ elements: T?) {
     self.elements = elements
   }
 
-  func generate() -> GeneratorOfOne {
+  @public func generate() -> GeneratorOfOne {
     return self
   }
   
-  mutating func next() -> T? {
+  @public mutating func next() -> T? {
     let result = elements
     elements = .None
     return result
@@ -28,26 +28,26 @@ struct GeneratorOfOne<T> : Generator, Sequence {
   var elements: T?
 }
 
-struct CollectionOfOne<T> : Collection {
-  typealias IndexType = Bit
+@public struct CollectionOfOne<T> : Collection {
+  @public typealias IndexType = Bit
 
-  init(_ element: T) { 
+  @public init(_ element: T) { 
     self.element = element 
   }
 
-  var startIndex: IndexType {
+  @public var startIndex: IndexType {
     return .zero
   }
   
-  var endIndex: IndexType {
+  @public var endIndex: IndexType {
     return .one
   }
 
-  func generate() -> GeneratorOfOne<T> {
+  @public func generate() -> GeneratorOfOne<T> {
     return GeneratorOfOne(element)
   }
 
-  subscript(i: IndexType) -> T {
+  @public subscript(i: IndexType) -> T {
     _precondition(i == .zero, "Index out of range")
     return element
   }
@@ -56,8 +56,6 @@ struct CollectionOfOne<T> : Collection {
 }
 
 // Specialization of countElements for CollectionOfOne<T>
-func ~> <T>(x:CollectionOfOne<T>, _:(_CountElements, ())) -> Int {
+@public func ~> <T>(x:CollectionOfOne<T>, _:(_CountElements, ())) -> Int {
   return 1
 }
-
-  

@@ -13,33 +13,33 @@
 //  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
-enum Bit : Int, RandomAccessIndex {
+@public enum Bit : Int, RandomAccessIndex {
   case zero = 0, one = 1
 
-  func successor() -> Bit {
+  @public func successor() -> Bit {
     _precondition(self == .zero, "Can't increment past one")
     return .one
   }
 
-  func predecessor() -> Bit {
+  @public func predecessor() -> Bit {
     _precondition(self == .one, "Can't decrement past zero")
     return .zero
   }
 
-  func distanceTo(other: Bit) -> Int {
+  @public func distanceTo(other: Bit) -> Int {
     return toRaw().distanceTo(other.toRaw())
   }
 
-  func advancedBy(distance: Int) -> Bit {
+  @public func advancedBy(distance: Int) -> Bit {
     return toRaw().advancedBy(distance) > 0 ? one : zero
   }
 }
 
-func == (lhs: Bit, rhs: Bit) -> Bool {
+@public func == (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() == rhs.toRaw()
 }
 
-func < (lhs: Bit, rhs: Bit) -> Bool {
+@public func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() < rhs.toRaw()
 }
 
@@ -48,27 +48,27 @@ extension Bit : IntegerArithmetic {
     return (Bit.fromRaw(x)!, b)
   }
   
-  static func uncheckedAdd(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func uncheckedAdd(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
     return _withOverflow(Int.uncheckedAdd(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func uncheckedSubtract(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func uncheckedSubtract(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
     return _withOverflow(Int.uncheckedSubtract(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func uncheckedMultiply(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func uncheckedMultiply(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
     return _withOverflow(Int.uncheckedMultiply(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func uncheckedDivide(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func uncheckedDivide(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
     return _withOverflow(Int.uncheckedDivide(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func uncheckedModulus(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func uncheckedModulus(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
     return _withOverflow(Int.uncheckedModulus(lhs.toRaw(), rhs.toRaw()))
   }
 
-  func toIntMax() -> IntMax {
+  @public func toIntMax() -> IntMax {
     return IntMax(toRaw())
   }
 }

@@ -15,8 +15,7 @@
 // be a drop-in replacement for String
 //
 extension String {
-
-  init(count sz: Int, repeatedValue c: Character) {
+  @public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_StringBuffer(capacity: s.core.count * sz, 
                                 initialSize: 0, 
@@ -26,7 +25,7 @@ extension String {
     }
   }
 
-  init(count: Int, repeatedValue c: UnicodeScalar) {
+  @public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
   }
@@ -40,13 +39,13 @@ extension String {
     return scalarSlices.map { $0 as String }
   }
   
-  var isEmpty : Bool {
+  @public var isEmpty : Bool {
     return core.count == 0
   }
 }
 
 extension String {
-  var uppercaseString : String {
+  @public var uppercaseString : String {
     let end = utf8.endIndex
     var resultArray = ContiguousArray<UTF8.CodeUnit>(
       count: countElements(utf8), repeatedValue: 0)
@@ -83,7 +82,7 @@ extension String {
         input: resultArray)
   }
 
-  var lowercaseString : String {
+  @public var lowercaseString : String {
     let end = utf8.endIndex
     var resultArray = ContiguousArray<UTF8.CodeUnit>(
       count: countElements(utf8), repeatedValue: 0)
@@ -130,11 +129,11 @@ extension String {
     return true
   }
 
-  func hasPrefix(prefix: String) -> Bool {
+  @public func hasPrefix(prefix: String) -> Bool {
     return Swift.startsWith(self, prefix)
   }
   
-  func hasSuffix(suffix: String) -> Bool {
+  @public func hasSuffix(suffix: String) -> Bool {
     return Swift.startsWith(reverse(self), reverse(suffix))
   }
 
@@ -187,7 +186,7 @@ func _formatSignedInteger(
 // Conversions to string from other types.
 extension String {
 
-  init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
+  @public init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatSignedInteger(v, UInt64(radix), 
                                       ten: _uppercase ? "A" : "a")
     var asciiCount = 0
@@ -200,7 +199,7 @@ extension String {
   }
 
   // FIXME: This function assumes UTF16
-  init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
+  @public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatPositiveInteger(v, UInt64(radix), 
                                         ten: _uppercase ? "A" : "a")
     var asciiCount = v == 0 ? 1 : 0
@@ -215,28 +214,28 @@ extension String {
     self = String(buffer)
   }
 
-  init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
+  @public init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
 
@@ -265,7 +264,7 @@ extension String {
 extension String {
   /// If the string represents an integer that fits into an Int, returns
   /// the corresponding integer.
-  func toInt() -> Int? {
+  @public func toInt() -> Int? {
     var scalars = self.unicodeScalars
 
     var start = scalars.startIndex

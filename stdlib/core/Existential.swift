@@ -17,49 +17,49 @@
 // This file contains "existentials" for the protocols defined in
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
-struct GeneratorOf<T> : Generator, Sequence {
-  init(_ next: ()->T?) {
+@public struct GeneratorOf<T> : Generator, Sequence {
+  @public init(_ next: ()->T?) {
     self._next = next
   }
   
-  init<G: Generator where G.Element == T>(var _ self_: G) {
+  @public init<G: Generator where G.Element == T>(var _ self_: G) {
     self._next = { self_.next() }
   }
   
-  mutating func next() -> T? {
+  @public mutating func next() -> T? {
     return _next()
   }
 
-  func generate() -> GeneratorOf {
+  @public func generate() -> GeneratorOf {
     return self
   }
   let _next: ()->T?
 }
 
-struct SequenceOf<T> : Sequence {
-  init<G: Generator where G.Element == T>(_ generate: ()->G) {
+@public struct SequenceOf<T> : Sequence {
+  @public init<G: Generator where G.Element == T>(_ generate: ()->G) {
     _generate = { GeneratorOf(generate()) }
   }
-  init<S: Sequence where S.GeneratorType.Element == T>(_ self_: S) {
+  @public init<S: Sequence where S.GeneratorType.Element == T>(_ self_: S) {
     self = SequenceOf({ self_.generate() })
   }
 
-  func generate() -> GeneratorOf<T> {
+  @public func generate() -> GeneratorOf<T> {
     return _generate()
   }
   
   let _generate: ()->GeneratorOf<T>
 }
 
-struct SinkOf<T> : Sink {
-  init(_ put: (T)->()) {
+@public struct SinkOf<T> : Sink {
+  @public init(_ put: (T)->()) {
     _put = put
   }
 
-  init<S: Sink where S.Element == T>(var _ base: S) {
+  @public init<S: Sink where S.Element == T>(var _ base: S) {
     _put = { base.put($0) }
   }
-  func put(x: T) {
+  @public func put(x: T) {
     _put(x)
   }
   let _put: (T)->()

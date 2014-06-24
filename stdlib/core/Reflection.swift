@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A protocol that produces a reflection interface for a value.
-protocol Reflectable {
+@public protocol Reflectable {
   // The runtime has inappropriate knowledge of this protocol and how its
   // witness tables are laid out. Changing this protocol requires a
   // corresponding change to Reflection.cpp.
@@ -25,23 +25,23 @@ protocol Reflectable {
 ///
 /// In Swift, only class instances have unique identities. There is no notion
 /// of identity for structs, enums, or tuples.
-struct ObjectIdentifier : Hashable {
+@public struct ObjectIdentifier : Hashable {
   let value: Builtin.RawPointer
 
-  func uintValue() -> UInt {
+  @public func uintValue() -> UInt {
     return UInt(Builtin.ptrtoint_Word(value))
   }
 
   // FIXME: Better hashing algorithm
-  var hashValue: Int {
+  @public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
 
-  init(_ x: AnyObject) {
+  @public init(_ x: AnyObject) {
     self.value = reinterpretCast(x)
   }
 }
-func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
+@public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
 }
 
@@ -54,7 +54,7 @@ func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
 /// NB: This type is somewhat carefully laid out to *suppress* enum layout
 /// optimization so that it is easier to manufacture in the C++ runtime
 /// implementation.
-enum QuickLookObject {
+@public enum QuickLookObject {
   /// Plain text.
   case Text(String)
 
@@ -122,7 +122,7 @@ enum QuickLookObject {
 }
 
 /// How children of this value should be presented in the IDE.
-enum MirrorDisposition {
+@public enum MirrorDisposition {
   /// As a struct.
   case Struct
   /// As a class.
@@ -146,7 +146,7 @@ enum MirrorDisposition {
 }
 
 /// A protocol that provides a reflection interface to an underlying value.
-protocol Mirror {
+@public protocol Mirror {
   /// Copy the value out as an Any.
   var value: Any { get }
 
@@ -179,7 +179,8 @@ protocol Mirror {
 /// An entry point that can be called from C++ code to get the summary string
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
-@asmname("swift_getSummary") func _getSummary<T>(out: UnsafePointer<String>,
+@asmname("swift_getSummary")
+func _getSummary<T>(out: UnsafePointer<String>,
                                                  x: T) {
   out.initialize(reflect(x).summary)
 }
@@ -187,20 +188,20 @@ protocol Mirror {
 /// Produce a mirror for any value. If the value's type conforms to Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
-@asmname("swift_reflectAny") func reflect<T>(x: T) -> Mirror
+@asmname("swift_reflectAny")@public func reflect<T>(x: T) -> Mirror
 
 /// Unsafely produce a mirror for a value in memory whose lifetime is
 /// guaranteed by holding a strong reference to a heap object.
 /// This lets containers with heap storage vend mirrors for their elements
 /// without unnecessary copying of the underlying value.
-@asmname("swift_unsafeReflectAny") func unsafeReflect<T>(
+@asmname("swift_unsafeReflectAny")func unsafeReflect<T>(
   owner: Builtin.NativeObject,
   ptr: UnsafePointer<T>
 ) -> Mirror
 
 
 /// Dump an object's contents using its mirror to the specified output stream.
-func dump<T, TargetStream : OutputStream>(
+@public func dump<T, TargetStream : OutputStream>(
     x: T, name: String? = nil, indent: Int = 0,
     maxDepth: Int = .max, maxItems: Int = .max,
     inout targetStream: TargetStream
@@ -213,7 +214,7 @@ func dump<T, TargetStream : OutputStream>(
 }
 
 /// Dump an object's contents using its mirror to standard output.
-func dump<T>(x: T, name: String? = nil, indent: Int = 0,
+@public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
              maxDepth: Int = .max, maxItems: Int = .max) -> T {
   var stdoutStream = _Stdout()
   return dump(x, name: name, indent: indent, maxDepth: maxDepth,
@@ -288,7 +289,7 @@ func _formatNumChildren(count: Int) -> String {
 
 /// A mirror for a value that is represented as a simple value with no
 /// children.
-struct _LeafMirror<T>: Mirror {
+@internal struct _LeafMirror<T>: Mirror {
   let _value: T
   let summaryFunction: T -> String
   let quickLookFunction: T -> QuickLookObject?
@@ -315,23 +316,23 @@ struct _LeafMirror<T>: Mirror {
 @asmname("swift_MagicMirrorData_summary")
 func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
 
-struct _MagicMirrorData {
+@public struct _MagicMirrorData {
   let owner: Builtin.NativeObject
   let ptr: Builtin.RawPointer
   let metadata: Any.Type
 
   var value: Any {
-    @asmname("swift_MagicMirrorData_value") get
+    @asmname("swift_MagicMirrorData_value")get
   }
   var valueType: Any.Type {
-    @asmname("swift_MagicMirrorData_valueType") get
+    @asmname("swift_MagicMirrorData_valueType")get
   }
 
   var objcValue: Any {
-    @asmname("swift_MagicMirrorData_objcValue") get
+    @asmname("swift_MagicMirrorData_objcValue")get
   }
   var objcValueType: Any.Type {
-    @asmname("swift_MagicMirrorData_objcValueType") get
+    @asmname("swift_MagicMirrorData_objcValueType")get
   }
   
   var summary: String {
@@ -360,17 +361,17 @@ struct _OpaqueMirror: Mirror {
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
-struct _TupleMirror: Mirror {
+@internal struct _TupleMirror: Mirror {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @asmname("swift_TupleMirror_count") get
+    @asmname("swift_TupleMirror_count")get
   }
   subscript(i: Int) -> (String, Mirror) {
-    @asmname("swift_TupleMirror_subscript") get
+    @asmname("swift_TupleMirror_subscript")get
   }
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: QuickLookObject? { return nil }
@@ -384,10 +385,10 @@ struct _StructMirror: Mirror {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int {
-    @asmname("swift_StructMirror_count") get
+    @asmname("swift_StructMirror_count")get
   }
   subscript(i: Int) -> (String, Mirror) {
-    @asmname("swift_StructMirror_subscript") get
+    @asmname("swift_StructMirror_subscript")get
   }
 
   var summary: String {
@@ -402,7 +403,7 @@ func _getClassCount(_MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")
 func _getClassChild(Int, _MagicMirrorData) -> (String, Mirror)
 
-@asmname("swift_ClassMirror_quickLookObject")
+@asmname("swift_ClassMirror_quickLookObject")@public
 func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
 
 struct _ClassMirror: Mirror {

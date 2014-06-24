@@ -18,8 +18,8 @@
 /// This type stores a pointer to an object of type T. It provides no
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
-struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
-                    LogicValue, NilLiteralConvertible, _Pointer {
+@public struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
+                            LogicValue, NilLiteralConvertible, _Pointer {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -324,34 +324,34 @@ struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
   }
 }
 
-@transparent
+@transparent @public
 func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
-@transparent
+@transparent @public
 func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs.value, rhs.value))
 }
 
-@transparent
+@transparent @public
 func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return ${Self}(
     Builtin.gep_Word(lhs.value, (rhs * Int(Builtin.strideof(T.self))).value))
 }
 
-@transparent
+@transparent @public
 func + <T>(lhs: Int,
            rhs: ${Self}<T>) -> ${Self}<T> {
   return rhs + lhs
 }
 
-@transparent
+@transparent @public
 func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return lhs + -rhs
 }
 
-@transparent
+@transparent @public
 func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
@@ -359,18 +359,18 @@ func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
     / Int(Builtin.strideof(T.self))
 }
 
-@transparent
+@transparent @public
 @assignment func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
-@transparent
+@transparent @public
 @assignment func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
 }
 
 extension ${Self} : Printable {
-  var description: String {
+  @public var description: String {
     return ""
   }
 }
@@ -379,6 +379,6 @@ extension ${Self} : Printable {
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to UnsafePointer when
 /// you just want to do bytewise pointer arithmetic.
-struct RawByte {
+@public struct RawByte {
   let _inaccessible: UInt8
 }

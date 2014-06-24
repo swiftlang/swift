@@ -19,27 +19,27 @@ import ObjectiveC
 /// importer imports it as ObjCBool.
 ///
 /// The compiler has special knowledge of this type.
-struct ObjCBool {
+@public struct ObjCBool {
   var value : Int8
 
-  init(_ value: Int8) {
+  @public init(_ value: Int8) {
     self.value = value
   }
 
   /// Allow use in a Boolean context.
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     return value != 0
   }
 
   /// Implicit conversion from C Boolean type to Swift Boolean type.
-  @conversion func __conversion() -> Bool {
+  @conversion @public func __conversion() -> Bool {
     return self.getLogicValue()
   }
 }
 
 extension Bool {
   /// Implicit conversion from Swift Boolean type to Objective-C Boolean type.
-  @conversion func __conversion() -> ObjCBool {
+  @conversion @public func __conversion() -> ObjCBool {
     return ObjCBool(self ? 1 : 0)
   }
 }

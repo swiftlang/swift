@@ -10,25 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 extension String {
-  struct UTF16View : Sliceable {
-    var startIndex: Int {
+  @public struct UTF16View : Sliceable {
+    @public var startIndex: Int {
       return _core.startIndex
     }
-    var endIndex: Int {
+    @public var endIndex: Int {
       return _core.endIndex
     }
 
     // This is to avoid printing "func generate() -> IndexingGenerator<_StringCore>"
-    typealias _GeneratorType = _StringCore.GeneratorType
-    typealias GeneratorType = _GeneratorType
+    @public typealias _GeneratorType = _StringCore.GeneratorType
+    @public typealias GeneratorType = _GeneratorType
 
-    func generate() -> GeneratorType {
+    @public func generate() -> GeneratorType {
       return _core.generate()
     }
-    subscript(i: Int) -> GeneratorType.Element {
+    @public subscript(i: Int) -> GeneratorType.Element {
       return _core[i]
     }
-    subscript(subRange: Range<Int>) -> UTF16View {
+    @public subscript(subRange: Range<Int>) -> UTF16View {
       return UTF16View(_core[subRange])
     }
     
@@ -39,7 +39,7 @@ extension String {
     let _core: _StringCore
   }
 
-  var utf16: UTF16View {
+  @public var utf16: UTF16View {
     return UTF16View(core)
   }
 }

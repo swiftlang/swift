@@ -18,7 +18,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
 // The class that implements the storage for a ContiguousArray<T>
-@final class ContiguousArrayStorage<T> : _NSSwiftArray {
+@final @internal class ContiguousArrayStorage<T> : _NSSwiftArray {
   typealias Buffer = ContiguousArrayBuffer<T>
   
   deinit {
@@ -47,12 +47,12 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
 }
 
-struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
+@public struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
   /// result's .elementStorage or set the result's .count to zero.
-  init(count: Int, minimumCapacity: Int)
+  @public init(count: Int, minimumCapacity: Int)
   {
     _base = HeapBuffer(
       ContiguousArrayStorage<T>.self,
@@ -72,13 +72,13 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     _base = reinterpretCast(storage)
   }
   
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     return _base.getLogicValue()
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafePointer<T> {
+  @public var elementStorage: UnsafePointer<T> {
     return _base ? _base.elementStorage : nil
   }
 
@@ -88,12 +88,12 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     return _base.elementStorage
   }
 
-  func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+  @public func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
     let p = _base.elementStorage
     return withExtendedLifetime(_base) { body(p) }
   }
 
-  mutating func take() -> ContiguousArrayBuffer {
+  @public mutating func take() -> ContiguousArrayBuffer {
     if !_base {
       return ContiguousArrayBuffer()
     }
@@ -105,37 +105,37 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
 
   //===--- ArrayBufferType conformance ------------------------------------===//
   /// The type of elements stored in the buffer
-  typealias Element = T
+  @public typealias Element = T
 
   /// create an empty buffer
-  init() {
+  @public init() {
     _base = HeapBuffer()
   }
 
   /// Adopt the storage of x
-  init(_ buffer: ContiguousArrayBuffer) {
+  @public init(_ buffer: ContiguousArrayBuffer) {
     self = buffer
   }
   
-  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+  @public mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
     -> ContiguousArrayBuffer<Element>?
   {
     return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil
   }
 
-  mutating func isMutableAndUniquelyReferenced() -> Bool {
+  @public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
   
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
-  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
+  @public func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
     return self
   }
   
   /// Get/set the value of the ith element
-  subscript(i: Int) -> T {
+  @public subscript(i: Int) -> T {
     get {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
@@ -156,7 +156,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
 
   /// How many elements the buffer stores
-  var count: Int {
+  @public var count: Int {
     get {
       return _base ? _base.value.count : 0
     }
@@ -176,7 +176,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
 
   /// How many elements the buffer can store without reallocation
-  var capacity: Int {
+  @public var capacity: Int {
     return _base ? _base.value.capacity : 0
   }
 
@@ -201,7 +201,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
-  subscript(subRange: Range<Int>) -> SliceBuffer<T>
+  @public subscript(subRange: Range<Int>) -> SliceBuffer<T>
   {
     return SliceBuffer(
       owner: _base.storage,
@@ -214,13 +214,13 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// NOTE: this does not mean the buffer is mutable.  Other factors
   /// may need to be considered, such as whether the buffer could be
   /// some immutable Cocoa container.
-  mutating func isUniquelyReferenced() -> Bool {
+  @public mutating func isUniquelyReferenced() -> Bool {
     return _base.isUniquelyReferenced()
   }
 
   /// Returns true iff this buffer is mutable. NOTE: a true result
   /// does not mean the buffer is uniquely-referenced.
-  func isMutable() -> Bool {
+  @public func isMutable() -> Bool {
     return true
   }
 
@@ -295,7 +295,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
 }
 
 /// Append the elements of rhs to lhs
-func += <
+@public func += <
   T, C: Collection where C._Element == T
 > (
   inout lhs: ContiguousArrayBuffer<T>, rhs: C
@@ -323,35 +323,35 @@ func += <
 }
 
 /// Append rhs to lhs
-func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
+@public func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
 
-func === <T>(
+@public func === <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base == rhs._base
 }
 
-func !== <T>(
+@public func !== <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base != rhs._base
 }
 
 extension ContiguousArrayBuffer : Collection {
-  var startIndex: Int {
+  @public var startIndex: Int {
     return 0
   }
-  var endIndex: Int {
+  @public var endIndex: Int {
     return count
   }
-  func generate() -> IndexingGenerator<ContiguousArrayBuffer> {
+  @public func generate() -> IndexingGenerator<ContiguousArrayBuffer> {
     return IndexingGenerator(self)
   }
 }
 
-func ~> <
+@public func ~> <
   S: _Sequence_
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
@@ -367,7 +367,7 @@ func ~> <
   return result.take()
 }
 
-func ~> <  
+@public func ~> <  
   C: protocol<_Collection,_Sequence_>
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
@@ -376,9 +376,9 @@ func ~> <
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
-func _copyCollectionToNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
-  source: C
-) -> ContiguousArrayBuffer<C.GeneratorType.Element>
+@internal func _copyCollectionToNativeArrayBuffer<
+  C: protocol<_Collection,_Sequence_>
+>(source: C) -> ContiguousArrayBuffer<C.GeneratorType.Element>
 {
   let count = countElements(source)
   if count == 0 {
@@ -398,7 +398,7 @@ func _copyCollectionToNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
   return result
 }
 
-protocol _ArrayType : Collection {
+@public protocol _ArrayType : Collection {
   var count: Int {get}
 
   typealias _Buffer : ArrayBufferType

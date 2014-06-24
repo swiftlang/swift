@@ -25,18 +25,18 @@
 /// * it may not contain well-formed UTF-8.  Because of this, comparison
 ///   operators `<` and `==` on `CString` use `strcmp` instead of Unicode
 ///   comparison algorithms.
-struct CString :
+@public struct CString :
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible,
     LogicValue {
   var _bytesPtr: UnsafePointer<UInt8>
 
-  init(_ bytesPtr: UnsafePointer<UInt8>) {
+  @public init(_ bytesPtr: UnsafePointer<UInt8>) {
     self._bytesPtr = bytesPtr
   }
 
-  init(_ bytesPtr: UnsafePointer<CChar>) {
+  @public init(_ bytesPtr: UnsafePointer<CChar>) {
     self._bytesPtr = UnsafePointer<UInt8>(bytesPtr)
   }
 
@@ -49,7 +49,7 @@ struct CString :
                                             isASCII: isASCII)
   }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
     value: CString) -> CString {
 
     return convertFromStringLiteral(value)
@@ -61,7 +61,7 @@ struct CString :
     return CString(UnsafePointer<CChar>(start))
   }
 
-  static func convertFromStringLiteral(value: CString) -> CString {
+  @public static func convertFromStringLiteral(value: CString) -> CString {
     return value
   }
 
@@ -70,7 +70,7 @@ struct CString :
     return _bytesPtr._isNull
   }
 
-  @transparent
+  @transparent @public
   func getLogicValue() -> Bool {
     return !_isNull
   }
@@ -78,7 +78,7 @@ struct CString :
   /// From a non-`nil` `CString` with possibly-transient lifetime, create a
   /// nul-terminated array of 'C' char.
   /// Returns `nil` if the `CString` was created from a null pointer.
-  func persist() -> CChar[]? {
+  @public func persist() -> CChar[]? {
     if !self {
       return .None
     }
@@ -93,7 +93,7 @@ struct CString :
 }
 
 extension CString : DebugPrintable {
-  var debugDescription: String {
+  @public var debugDescription: String {
     let (optionalString, hadError) =
         String.fromCStringRepairingIllFormedUTF8(self)
     if let s = optionalString {
@@ -110,19 +110,19 @@ func _strcpy(dest: CString, src: CString) -> CString
 @asmname("strcmp")
 func _strcmp(dest: CString, src: CString) -> CInt
 
-@transparent
+@transparent @public
 func ==(lhs: CString, rhs: CString) -> Bool {
   if lhs._bytesPtr == rhs._bytesPtr { return true }
   return _strcmp(lhs, rhs) == 0
 }
 
-@transparent
+@transparent @public
 func <(lhs: CString, rhs: CString) -> Bool {
   return _strcmp(lhs, rhs) < 0
 }
 
 extension CString : Equatable, Hashable, Comparable {
-  @transparent
+  @transparent @public
   var hashValue: Int {
     if let s = String.fromCStringRepairingIllFormedUTF8(self).0 {
       return s.hashValue
@@ -137,7 +137,7 @@ extension String {
   ///
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
   /// UTF-8 code unit sequences.
-  static func fromCString(cs: CString) -> String? {
+  @public static func fromCString(cs: CString) -> String? {
     if cs._isNull {
       return .None
     }
@@ -152,7 +152,7 @@ extension String {
   /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
   /// ill-formed UTF-8 code unit sequences, replaces them with replacement
   /// characters (U+FFFD).
-  static func fromCStringRepairingIllFormedUTF8(cs: CString)
+  @public static func fromCStringRepairingIllFormedUTF8(cs: CString)
       -> (String?, hadError: Bool) {
     if cs._isNull {
       return (.None, hadError: false)

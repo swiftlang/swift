@@ -16,6 +16,7 @@
 
 import SwiftShims
 
+@internal
 func _makeSwiftNSFastEnumerationState() -> _SwiftNSFastEnumerationState {
   return _SwiftNSFastEnumerationState(state: 0, itemsPtr: nil, mutationsPtr: nil,
       extra: (0, 0, 0, 0, 0))
@@ -27,6 +28,7 @@ var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
+@internal
 var _fastEnumerationStorageMutationsPtr: UnsafePointer<CUnsignedLong> {
   return UnsafePointer(
       Builtin.addressof(&_fastEnumerationStorageMutationsTarget))

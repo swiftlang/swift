@@ -215,7 +215,7 @@ protocol _DictionaryStorage {
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@transparent
+@transparent 
 var _dictionaryDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
@@ -263,7 +263,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
   }
 }
 
-struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
+@public struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     _DictionaryStorage, Printable {
 
   typealias Owner = _NativeDictionaryStorageOwner<KeyType, ValueType>
@@ -1363,7 +1363,7 @@ func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
   return lhs.nextKeyIndex == rhs.nextKeyIndex
 }
 
-enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
+@public enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -1401,9 +1401,9 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
     }
   }
 
-  typealias Index = DictionaryIndex<KeyType, ValueType>
+  @public typealias Index = DictionaryIndex<KeyType, ValueType>
 
-  func predecessor() -> Index {
+  @public func predecessor() -> Index {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.predecessor())
     }
@@ -1416,7 +1416,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
     }
   }
 
-  func successor() -> Index {
+  @public func successor() -> Index {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.successor())
     }
@@ -1430,7 +1430,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
   }
 }
 
-func == <KeyType : Hashable, ValueType> (
+@public func == <KeyType : Hashable, ValueType> (
   lhs: DictionaryIndex<KeyType, ValueType>,
   rhs: DictionaryIndex<KeyType, ValueType>
 ) -> Bool {
@@ -1545,7 +1545,7 @@ class _CocoaDictionaryGenerator : Generator {
   }
 }
 
-enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
+@public enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
   // Dictionary has a separate Generator and Index because of efficiency
   // and implementability reasons.
   //
@@ -1580,7 +1580,7 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
     }
   }
 
-  mutating func next() -> (KeyType, ValueType)? {
+  @public mutating func next() -> (KeyType, ValueType)? {
     if _fastPath(_guaranteedNative) {
       return _nativeNext()
     }
@@ -1600,20 +1600,21 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
   }
 }
 
+@public
 struct Dictionary<KeyType : Hashable, ValueType> : Collection,
                                                    DictionaryLiteralConvertible {
   typealias _Self = Dictionary<KeyType, ValueType>
   typealias _VariantStorage = _VariantDictionaryStorage<KeyType, ValueType>
   typealias _NativeStorage = _NativeDictionaryStorage<KeyType, ValueType>
-  typealias Element = (KeyType, ValueType)
-  typealias Index = DictionaryIndex<KeyType, ValueType>
+  @public typealias Element = (KeyType, ValueType)
+  @public typealias Index = DictionaryIndex<KeyType, ValueType>
 
   var _variantStorage: _VariantStorage
 
   /// Create a dictionary with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
   /// smallest power of 2 that's >= `minimumCapacity`.
-  init(minimumCapacity: Int = 2) {
+  @public init(minimumCapacity: Int = 2) {
     _variantStorage =
         .Native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
   }
@@ -1635,13 +1636,13 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   // additional processing.
   //
 
-  var startIndex: Index {
+  @public var startIndex: Index {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
     // NSDictionary.
     return _variantStorage.startIndex
   }
 
-  var endIndex: Index {
+  @public var endIndex: Index {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
     // NSDictionary.
     return _variantStorage.endIndex
@@ -1649,7 +1650,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
 
   /// Returns the `Index` for the given key, or `nil` if the key is not
   /// present in the dictionary.
-  func indexForKey(key: KeyType) -> Index? {
+  @public func indexForKey(key: KeyType) -> Index? {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
     // NSDictionary.
     return _variantStorage.indexForKey(key)
@@ -1658,11 +1659,11 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   /// Access the key-value pair referenced by the given index.
   ///
   /// Complexity: O(1)
-  subscript(i: Index) -> Element {
+  @public subscript(i: Index) -> Element {
     return _variantStorage.assertingGet(i)
   }
 
-  subscript(key: KeyType) -> ValueType? {
+  @public subscript(key: KeyType) -> ValueType? {
     get {
       return _variantStorage.maybeGet(key)
     }
@@ -1683,25 +1684,25 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
   /// was added.
-  mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
+  @public mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
     return _variantStorage.updateValue(value, forKey: key)
   }
 
   /// Remove the key-value pair referenced by the given index.
-  mutating func removeAtIndex(index: Index) {
+  @public mutating func removeAtIndex(index: Index) {
     _variantStorage.removeAtIndex(index)
   }
 
   /// Remove a given key and the associated value from the dictionary.
   /// Returns the value that was removed, or `nil` if the key was not present
   /// in the dictionary.
-  mutating func removeValueForKey(key: KeyType) -> ValueType? {
+  @public mutating func removeValueForKey(key: KeyType) -> ValueType? {
     return _variantStorage.removeValueForKey(key)
   }
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not decrease.
-  mutating func removeAll(keepCapacity: Bool = false) {
+  @public mutating func removeAll(keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
     // native storage.
@@ -1711,7 +1712,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   /// The number of entries in the dictionary.
   ///
   /// Complexity: O(1)
-  var count: Int {
+  @public var count: Int {
     return _variantStorage.count
   }
 
@@ -1719,13 +1720,14 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   // `Sequence` conformance
   //
 
-  func generate() -> DictionaryGenerator<KeyType, ValueType> {
+  @public func generate() -> DictionaryGenerator<KeyType, ValueType> {
     return _variantStorage.generate()
   }
 
   //
   // DictionaryLiteralConvertible conformance
   //
+  @public
   static func convertFromDictionaryLiteral(elements: (KeyType, ValueType)...)
                 -> Dictionary<KeyType, ValueType> {
     return Dictionary<KeyType, ValueType>(
@@ -1742,16 +1744,16 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   // API itself.
   //
 
-  var keys: MapCollectionView<Dictionary, KeyType> {
+  @public var keys: MapCollectionView<Dictionary, KeyType> {
     return map(self) { $0.0 }
   }
 
-  var values: MapCollectionView<Dictionary, ValueType> {
+  @public var values: MapCollectionView<Dictionary, ValueType> {
     return map(self) { $0.1 }
   }
 }
 
-func == <KeyType : Equatable, ValueType : Equatable>(
+@public func == <KeyType : Equatable, ValueType : Equatable>(
   lhs: Dictionary<KeyType, ValueType>,
   rhs: Dictionary<KeyType, ValueType>
 ) -> Bool {
@@ -1817,7 +1819,7 @@ func == <KeyType : Equatable, ValueType : Equatable>(
   }
 }
 
-func != <KeyType : Equatable, ValueType : Equatable>(
+@public func != <KeyType : Equatable, ValueType : Equatable>(
   lhs: Dictionary<KeyType, ValueType>,
   rhs: Dictionary<KeyType, ValueType>
 ) -> Bool {
@@ -1854,11 +1856,11 @@ extension Dictionary : Printable, DebugPrintable {
     return result
   }
 
-  var description: String {
+  @public var description: String {
     return _makeDescription(isDebug: false)
   }
 
-  var debugDescription: String {
+  @public var debugDescription: String {
     return _makeDescription(isDebug: true)
   }
 }
@@ -1947,7 +1949,7 @@ class _DictionaryMirror<Key : Hashable,Value> : Mirror {
 }
 
 extension Dictionary : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _DictionaryMirror(self)
   }
 }
@@ -2025,7 +2027,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   ) -> Int
 }
 
-@objc @unsafe_no_objc_tagged_pointer
+@objc @unsafe_no_objc_tagged_pointer 
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
   var allKeys: _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool
@@ -2045,7 +2047,7 @@ func _stdlib_NSDictionary_isEqual(
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
-@objc
+@objc @public
 class _NSSwiftDictionary {}
 
 /// This class is derived from `_NSSwiftEnumeratorBase` (through runtime magic),
@@ -2066,6 +2068,7 @@ class _NSSwiftEnumerator {}
 ///
 /// FIXME: This crappy implementation is O(n) because it copies the
 /// data; a proper implementation would be O(1).
+@public
 func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
        source: Dictionary<DerivedKey, DerivedValue>
      ) -> Dictionary<BaseKey, BaseValue> {
@@ -2087,6 +2090,7 @@ func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 /// Objective-C, and at least one of them requires bridging.
 ///
 /// 
+@public
 func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
        source: Dictionary<BridgesToKey, BridgesToValue>
      ) -> Dictionary<Key, Value> {
@@ -2136,6 +2140,7 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
 /// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
 /// a subtype of BaseValue, and all of these types are objects.
 ///
+@public
 func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
        source: Dictionary<BaseKey, BaseValue>
      ) -> Dictionary<DerivedKey, DerivedValue> {
@@ -2154,6 +2159,7 @@ func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 /// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
 /// a subtype of BaseValue, and all of these types are objects.
 ///
+@public
 func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
                                     DerivedValue>(
        source: Dictionary<BaseKey, BaseValue>
@@ -2185,6 +2191,7 @@ func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
 /// Precondition: at least one of BridgesToKey or BridgesToValue is an
 /// object type, and at least one of Key or Value is a bridged value
 /// type.
+@public
 func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
        source: Dictionary<Key, Value>
      ) -> Dictionary<BridgesToKey, BridgesToValue> {
@@ -2200,6 +2207,7 @@ func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
 /// Precondition: at least one of BridgesToKey or BridgesToValue is an
 /// object type, and at least one of Key or Value is a bridged value
 /// type.
+@public
 func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey, 
                                                 BridgesToValue>(
        source: Dictionary<Key, Value>

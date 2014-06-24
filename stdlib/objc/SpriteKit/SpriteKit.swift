@@ -3,9 +3,9 @@
 // SpriteKit defines SKColor using a macro.
 
 #if os(OSX)
-typealias SKColor = NSColor
+@public typealias SKColor = NSColor
 #elseif os(iOS)
-typealias SKColor = UIColor
+@public typealias SKColor = UIColor
 #endif
 
 #if os(OSX)
@@ -161,23 +161,23 @@ struct _SKTextureMirror : Mirror {
 }
 
 extension SKShapeNode : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _SKShapeNodeMirror(self)
   }
 }
 
 extension SKSpriteNode : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _SKSpriteNodeMirror(self)
   }
 }
 extension SKTextureAtlas : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _SKTextureAtlasMirror(self)
   }
 }
 extension SKTexture : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _SKTextureMirror(self)
   }
 }
@@ -186,7 +186,7 @@ extension SKTexture : Reflectable {
 #endif
 
 extension SKNode {
-  subscript (name: String) -> SKNode[] {
+  @public subscript (name: String) -> SKNode[] {
      var nodes = SKNode[]()
      enumerateChildNodesWithName(name) { node, stop in
        if let n = node { nodes.append(n) }

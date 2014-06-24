@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Models an object into into which we can stream text.
-protocol OutputStream {
+@public protocol OutputStream {
   mutating
   func write(string: String)
 }
@@ -24,28 +24,28 @@ protocol OutputStream {
 /// immediately obvious, way.
 ///
 /// For example: `String`, `Character`, `UnicodeScalar`.
-protocol Streamable {
+@public protocol Streamable {
   func writeTo<Target : OutputStream>(inout target: Target)
 }
 
 /// This protocol should be adopted by types that wish to customize their
 /// textual representation.  This textual representation is used when objects
 /// are written to an `OutputStream`.
-protocol Printable {
+@public protocol Printable {
   var description: String { get }
 }
 
 /// This protocol should be adopted by types that wish to customize their
 /// textual representation used for debugging purposes.  This textual
 /// representation is used when objects are written to an `OutputStream`.
-protocol DebugPrintable {
+@public protocol DebugPrintable {
   var debugDescription: String { get }
 }
 
 // This protocol is adopted only by NSObject.  This is a workaround for:
 // <rdar://problem/16883288> Property of type 'String!' does not satisfy
 // protocol requirement of type 'String'
-protocol _PrintableNSObject {
+@public protocol _PrintableNSObject {
   var description: String! { get }
   var debugDescription: String! { get }
 }
@@ -93,7 +93,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-func print<T, TargetStream : OutputStream>(
+@public func print<T, TargetStream : OutputStream>(
     object: T, inout target: TargetStream
 ) {
   if let streamableObject =
@@ -132,7 +132,7 @@ func print<T, TargetStream : OutputStream>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-func println<T, TargetStream : OutputStream>(
+@public func println<T, TargetStream : OutputStream>(
     object: T, inout target: TargetStream
 ) {
   print(object, &target)
@@ -147,7 +147,7 @@ func println<T, TargetStream : OutputStream>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-func print<T>(object: T) {
+@public func print<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
 }
@@ -161,19 +161,19 @@ func print<T>(object: T) {
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-func println<T>(object: T) {
+@public func println<T>(object: T) {
   var stdoutStream = _Stdout()
   print(object, &stdoutStream)
   stdoutStream.write("\n")
 }
 
 /// Writes a single newline character into stdout.
-func println() {
+@public func println() {
   var stdoutStream = _Stdout()
   stdoutStream.write("\n")
 }
 
-func toString<T>(object: T) -> String {
+@public func toString<T>(object: T) -> String {
   var result = ""
   print(object, &result)
   return result
@@ -183,7 +183,7 @@ func toString<T>(object: T) -> String {
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
-func debugPrint<T, TargetStream : OutputStream>(
+@public func debugPrint<T, TargetStream : OutputStream>(
     object: T, inout target: TargetStream
 ) {
   if let debugPrintableObject =
@@ -213,19 +213,19 @@ func debugPrint<T, TargetStream : OutputStream>(
   _adHocPrint(object, &target)
 }
 
-func debugPrintln<T, TargetStream : OutputStream>(
+@public func debugPrintln<T, TargetStream : OutputStream>(
     object: T, inout target: TargetStream
 ) {
   debugPrint(object, &target)
   target.write("\n")
 }
 
-func debugPrint<T>(object: T) {
+@public func debugPrint<T>(object: T) {
   var stdoutStream = _Stdout()
   debugPrint(object, &stdoutStream)
 }
 
-func debugPrintln<T>(object: T) {
+@public func debugPrintln<T>(object: T) {
   var stdoutStream = _Stdout()
   debugPrint(object, &stdoutStream)
   stdoutStream.write("\n")
@@ -261,7 +261,7 @@ func _doubleToStringImpl(
     buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: Double
 ) -> UWord
 
-func _doubleToString(value: Double) -> String {
+@internal func _doubleToString(value: Double) -> String {
   _sanityCheck(sizeof(_Buffer32.self) == 32)
   _sanityCheck(sizeof(_Buffer72.self) == 72)
 
@@ -282,7 +282,7 @@ func _int64ToStringImpl(
     radix: Int64, uppercase: Bool
 ) -> UWord
 
-func _int64ToString(
+@internal func _int64ToString(
     value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
@@ -316,7 +316,7 @@ func _uint64ToStringImpl(
     radix: Int64, uppercase: Bool
 ) -> UWord
 
-func _uint64ToString(
+@internal func _uint64ToString(
     value: UInt64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
@@ -348,7 +348,7 @@ func _uint64ToString(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-struct _Stdout : OutputStream {
+@internal struct _Stdout : OutputStream {
   mutating func write(string: String) {
     // FIXME: buffering?
     // It is important that we use stdio routines in order to correctly
@@ -360,7 +360,7 @@ struct _Stdout : OutputStream {
 }
 
 extension String : OutputStream {
-  mutating
+  @public mutating
   func write(string: String) {
     self += string
   }
@@ -371,19 +371,19 @@ extension String : OutputStream {
 //===----------------------------------------------------------------------===//
 
 extension String : Streamable {
-  func writeTo<Target : OutputStream>(inout target: Target) {
+  @public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
-  func writeTo<Target : OutputStream>(inout target: Target) {
+  @public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
-  func writeTo<Target : OutputStream>(inout target: Target) {
+  @public func writeTo<Target : OutputStream>(inout target: Target) {
     target.write(String(Character(self)))
   }
 }
@@ -391,7 +391,7 @@ extension UnicodeScalar : Streamable {
 extension CString : Streamable {
   /// Writes the `CString` to the output stream.  If the `CString` does not
   /// contain well-formed UTF-8, invokes a runtime trap.
-  func writeTo<Target : OutputStream>(inout target: Target) {
+  @public func writeTo<Target : OutputStream>(inout target: Target) {
     if _isNull {
       return
     }

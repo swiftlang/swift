@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct _CountElements {}
-func _countElements<Args>(a: Args) -> (_CountElements, Args) {
+@public struct _CountElements {}
+@internal func _countElements<Args>(a: Args) -> (_CountElements, Args) {
   return (_CountElements(), a)
 }
 // Default implementation of countElements for Collections
 // Do not use this operator directly; call countElements(x) instead
-func ~> <T: _Collection>(x:T, _:(_CountElements,()))
+@public func ~> <T: _Collection>(x:T, _:(_CountElements,()))
   -> T.IndexType.DistanceType
 {
   return distance(x.startIndex, x.endIndex)
@@ -24,11 +24,11 @@ func ~> <T: _Collection>(x:T, _:(_CountElements,()))
 
 /// Return the number of elements in x.  O(1) if T.IndexType is
 /// RandomAccessIndex; O(N) otherwise.
-func countElements <T: _Collection>(x: T) -> T.IndexType.DistanceType {
+@public func countElements <T: _Collection>(x: T) -> T.IndexType.DistanceType {
   return x~>_countElements()
 }
 
-protocol _Collection : _Sequence {
+@public protocol _Collection : _Sequence {
   typealias IndexType : ForwardIndex
 
   var startIndex: IndexType {get}
@@ -46,7 +46,7 @@ protocol _Collection : _Sequence {
   subscript(i: IndexType) -> _Element {get}
 }
 
-protocol Collection : _Collection, Sequence {
+@public protocol Collection : _Collection, Sequence {
   subscript(i: IndexType) -> GeneratorType.Element {get}
   
   // Do not use this operator directly; call countElements(x) instead
@@ -55,26 +55,26 @@ protocol Collection : _Collection, Sequence {
 
 // Default implementation of underestimateCount for Collections.  Do not
 // use this operator directly; call underestimateCount(s) instead
-func ~> <T: _Collection>(x:T,_:(_UnderestimateCount,())) -> Int {
+@public func ~> <T: _Collection>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_countElements())
 }
 
 // Default implementation of `preprocessingPass` for Collections.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
-func ~> <T: _Collection, R>(
+@public func ~> <T: _Collection, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
 ) -> R? {
   return args.1(s)
 }
 
 
-protocol MutableCollection : Collection {
+@public protocol MutableCollection : Collection {
   subscript(i: IndexType) -> GeneratorType.Element {get set}
 }
 
 /// A stream type that could serve for a Collection given that
 /// it already had an IndexType.
-struct IndexingGenerator<C: _Collection> : Generator, Sequence {
+@public struct IndexingGenerator<C: _Collection> : Generator, Sequence {
   // Because of <rdar://problem/14396120> we've had to factor _Collection out
   // of Collection to make it useful.
 
@@ -95,40 +95,40 @@ struct IndexingGenerator<C: _Collection> : Generator, Sequence {
   var _position: C.IndexType
 }
 
-func indices<
+@public func indices<
     Seq : Collection>(seq: Seq) -> Range<Seq.IndexType> {
   return Range(start: seq.startIndex, end: seq.endIndex)
 }
 
-struct PermutationGenerator<
+@public struct PermutationGenerator<
   C: Collection, Indices: Sequence
   where C.IndexType == Indices.GeneratorType.Element
 > : Generator, Sequence {
   var seq : C
   var indices : Indices.GeneratorType
 
-  typealias Element = C.GeneratorType.Element
+  @public typealias Element = C.GeneratorType.Element
 
-  mutating func next() -> Element? {
+  @public mutating func next() -> Element? {
     var result = indices.next()
     return result ? seq[result!] : .None
   }
 
   // Every Generator is also a single-pass Sequence
-  typealias GeneratorType = PermutationGenerator
-  func generate() -> GeneratorType {
+  @public typealias GeneratorType = PermutationGenerator
+  @public func generate() -> GeneratorType {
     return self
   }
 
-  init(elements seq: C, indices: Indices) {
+  @public init(elements seq: C, indices: Indices) {
     self.seq = seq
     self.indices = indices.generate()
   }
 }
 
-protocol _Sliceable : Collection {}
+@public protocol _Sliceable : Collection {}
 
-protocol Sliceable : _Sliceable {
+@public protocol Sliceable : _Sliceable {
   // FIXME: SliceType should also be Sliceable but we can't express
   // that constraint (<rdar://problem/14375973> Include associated
   // type information in protocol witness tables) Instead we constrain
@@ -137,15 +137,15 @@ protocol Sliceable : _Sliceable {
   subscript(_: Range<IndexType>) -> SliceType {get}
 }
 
-protocol MutableSliceable : Sliceable, MutableCollection {
+@public protocol MutableSliceable : Sliceable, MutableCollection {
   subscript(_: Range<IndexType>) -> SliceType {get set}
 }
 
-func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SliceType {
+@public func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SliceType {
   return seq[seq.startIndex.successor()..<seq.endIndex]
 }
 
-func dropLast<
+@public func dropLast<
   Seq: Sliceable 
   where Seq.IndexType: BidirectionalIndex
 >(seq: Seq) -> Seq.SliceType {

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct IntEncoder : Sink {
+@internal struct IntEncoder : Sink {
   var asInt: UInt64 = 0
   var shift: UInt64 = 0
   mutating func put(x: UTF8.CodeUnit) {
@@ -22,7 +22,7 @@ struct IntEncoder : Sink {
 /// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
-enum Character :
+@public enum Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
   ExtendedGraphemeClusterLiteralConvertible, Equatable {
 
@@ -38,7 +38,7 @@ enum Character :
   case LargeRepresentation(OnHeap<String>)
   case SmallRepresentation(Builtin.Int63)
 
-  init(_ scalar: UnicodeScalar) {
+  @public init(_ scalar: UnicodeScalar) {
     var IE  = IntEncoder()
     UTF8.encode(scalar, output: &IE)
     IE.asInt |= (~0) << IE.shift
@@ -54,12 +54,12 @@ enum Character :
             start, byteSize: byteSize, isASCII: isASCII))
   }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
       value: Character) -> Character {
     return value
   }
 
-  init(_ s: String) {
+  @public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
     // last byte is used for the enum's discriminator, we have to
@@ -102,7 +102,7 @@ enum Character :
 }
 
 extension String {
-  init(_ c: Character) {
+  @public init(_ c: Character) {
     switch c {
     case .SmallRepresentation(var _63bits):
       var value = Character._smallValue(_63bits)
@@ -118,7 +118,7 @@ extension String {
   }
 }
 
-func ==(lhs: Character, rhs: Character) -> Bool {
+@public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs, rhs) {
   case (.LargeRepresentation(let lhsValue), .LargeRepresentation(let rhsValue)):
     return lhsValue == rhsValue

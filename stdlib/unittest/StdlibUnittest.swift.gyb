@@ -18,7 +18,7 @@ import Darwin
 
 var _anyExpectFailed = false
 
-func expectEqual<T : Equatable>(
+@public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -31,7 +31,7 @@ func expectEqual<T : Equatable>(
   }
 }
 
-func expectEqual<T : Equatable>(
+@public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     collectMoreInfo: () -> String,
     file: String = __FILE__, line: UWord = __LINE__
@@ -46,7 +46,7 @@ func expectEqual<T : Equatable>(
   }
 }
 
-func expectNotEqual<T : Equatable>(
+@public func expectNotEqual<T : Equatable>(
     expected: T, actual: T,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -60,7 +60,7 @@ func expectNotEqual<T : Equatable>(
 
 // Can not write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
-func expectOptionalEqual<T : Equatable>(
+@public func expectOptionalEqual<T : Equatable>(
     expected: T, actual: T?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -82,7 +82,7 @@ func expectOptionalEqual<T : Equatable>(
 %    ('<T, U : Equatable>', 'Dictionary<T, U>'),
 %    ('<T : ForwardIndex>', 'T')]:
 
-func expectEqual${Generic}(
+@public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -111,7 +111,7 @@ func _expectNotEqual${Generic}(
 
 %for ComparableType in ['Int']:
 
-func expectLE(
+@public func expectLE(
     expected: ${ComparableType}, actual: ${ComparableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -124,7 +124,7 @@ func expectLE(
   }
 }
 
-func expectGE(
+@public func expectGE(
     expected: ${ComparableType}, actual: ${ComparableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -139,7 +139,7 @@ func expectGE(
 
 %end
 
-struct AssertionResult : Printable, LogicValue {
+@public struct AssertionResult : Printable, LogicValue {
   init(isPass: Bool) {
     self._isPass = isPass
   }
@@ -158,17 +158,17 @@ struct AssertionResult : Printable, LogicValue {
   var description: String = ""
 }
 
-func assertionSuccess() -> AssertionResult {
+@public func assertionSuccess() -> AssertionResult {
   return AssertionResult(isPass: true)
 }
 
-func assertionFailure() -> AssertionResult {
+@public func assertionFailure() -> AssertionResult {
   return AssertionResult(isPass: false)
 }
 
 %for BoolType in ['Bool', 'AssertionResult']:
 
-func expectTrue(
+@public func expectTrue(
     actual: ${BoolType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -181,7 +181,7 @@ func expectTrue(
   }
 }
 
-func expectFalse(
+@public func expectFalse(
     actual: ${BoolType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -196,7 +196,7 @@ func expectFalse(
 
 %end
 
-func expectEmpty<T>(
+@public func expectEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -209,7 +209,7 @@ func expectEmpty<T>(
   }
 }
 
-func expectNotEmpty<T>(
+@public func expectNotEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -221,16 +221,16 @@ func expectNotEmpty<T>(
   }
 }
 
-struct TestCase {
-  init(_ name: String) {
+@public struct TestCase {
+  @public init(_ name: String) {
     self.name = name
   }
 
-  mutating func test(name: String, testFunction: () -> ()) {
+  @public mutating func test(name: String, testFunction: () -> ()) {
     _tests.append(_Test(name: name, code: testFunction))
   }
 
-  mutating func run() {
+  @public mutating func run() {
     var anyTestFailed = false
     for t in _tests {
       var fullTestName = "\(name).\(t.name)"
@@ -264,14 +264,14 @@ struct TestCase {
 // These APIs don't really belong in a unittesting library, but are useful
 // in tests, and stdlib does not have such facilities yet.
 
-func asHex(a: UInt8[]) -> String {
+@public func asHex(a: UInt8[]) -> String {
   // FIXME: commented out because of:
   // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
   // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
   return toString(a)
 }
 
-func asHex(a: UInt32[]) -> String {
+@public func asHex(a: UInt32[]) -> String {
   // FIXME: commented out because of:
   // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
   // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"

@@ -16,7 +16,7 @@ typealias _HeapObject = SwiftShims.HeapObject
 // Provides a common type off of which to hang swift_bufferAllocate.
 // If you introduce a new most-derived subclass of this, you need
 // to define __deallocate in it.
-@objc class HeapBufferStorageBase {}
+@objc @public class HeapBufferStorageBase {}
 
 @asmname("swift_bufferAllocate")
 func swift_bufferAllocate(
@@ -44,7 +44,7 @@ func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
-@objc class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
+@objc @public class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
   typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
@@ -78,11 +78,11 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 // to be in that case, without affecting its reference count.  Instead
 // we accept everything; reinterpretCast will at least catch
 // inappropriately-sized things at runtime.
-func isUniquelyReferenced<T>(inout x: T) -> Bool {
+@public func isUniquelyReferenced<T>(inout x: T) -> Bool {
   return _swift_isUniquelyReferenced(reinterpretCast(x))
 }
 
-struct HeapBuffer<Value, Element> : LogicValue, Equatable {
+@public struct HeapBuffer<Value, Element> : LogicValue, Equatable {
   typealias Storage = HeapBufferStorage<Value, Element>
   let storage: Storage?
   
@@ -203,7 +203,7 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
 }
 
 // HeapBuffers are equal when they reference the same buffer
-func == <Value, Element> (
+@internal func == <Value, Element> (
   lhs: HeapBuffer<Value, Element>,
   rhs: HeapBuffer<Value, Element>) -> Bool {
   return (lhs as Builtin.NativeObject) == (rhs as Builtin.NativeObject)
@@ -214,7 +214,7 @@ func == <Value, Element> (
 // A way to store a value on the heap.  These values are likely to be
 // implicitly shared, so it's safest if they're immutable.
 //
-struct OnHeap<T> {
+@internal struct OnHeap<T> {
   typealias Buffer = HeapBuffer<T, Void>
   
   init(_ value: T) {

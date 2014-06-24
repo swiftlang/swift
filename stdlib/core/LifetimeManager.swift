@@ -13,7 +13,7 @@
 // This function should be opaque to the optimizer.
 // BLOCKED: <rdar://problem/16464507> This function will be unnecessary when
 // fix_lifetime is honored by the ARC optimizer.
-@asmname("swift_keepAlive")
+@asmname("swift_keepAlive")@internal
 func swift_keepAlive<T>(inout _: T)
 
 /// An instance of this struct keeps the references registered with it
@@ -25,7 +25,7 @@ func swift_keepAlive<T>(inout _: T)
 ///
 /// This class can be used to extend lifetime of objects to pass UnsafePointers
 /// to them to C APIs.
-class LifetimeManager {
+@internal class LifetimeManager {
   var _managedRefs : Builtin.NativeObject[]
   var _releaseCalled : Bool
 
@@ -58,7 +58,7 @@ class LifetimeManager {
 
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
-func withExtendedLifetime<T, Result>(
+@public func withExtendedLifetime<T, Result>(
   x: T, f: ()->Result
 ) -> Result {
   let result = f()
@@ -68,7 +68,7 @@ func withExtendedLifetime<T, Result>(
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
-func withExtendedLifetime<T, Result>(
+@public func withExtendedLifetime<T, Result>(
   x: T, f: (T)->Result
 ) -> Result {
   let result = f(x)
@@ -84,7 +84,7 @@ func withExtendedLifetime<T, Result>(
 /// calling CoreFoundation functions on NS types that are toll-free
 /// bridged; you have to declare these functions as taking
 /// COpaquePointer, obviously.
-func withObjectAtPlusZero<Result>(x: AnyObject, f: (COpaquePointer)->Result) -> Result {
+@internal func withObjectAtPlusZero<Result>(x: AnyObject, f: (COpaquePointer)->Result) -> Result {
   return withExtendedLifetime(x) {
     return f(
       COpaquePointer(UnsafePointer<Void>(Builtin.bridgeToRawPointer(Builtin.castToNativeObject(x)))))
@@ -96,7 +96,7 @@ extension String {
   /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
-  func withCString<Result>(
+  @public func withCString<Result>(
     f: (CString)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafePointerToElements {
@@ -107,7 +107,7 @@ extension String {
   /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
-  func withCString<Result>(
+  @public func withCString<Result>(
     f: (UnsafePointer<CChar>)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafePointerToElements {
@@ -116,7 +116,7 @@ extension String {
   }
 }
 
-@transparent
+@transparent @public
 func _fixLifetime<T>(var x: T) {
   swift_keepAlive(&x)
 }

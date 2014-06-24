@@ -20,14 +20,14 @@
 /// The compiler has special knowledge of the existence of
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
 /// library intrinsics below.
-enum ImplicitlyUnwrappedOptional<T>
+@public enum ImplicitlyUnwrappedOptional<T>
   : LogicValue, Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
-  init() { self = .None }
-  init(_ some : T) { self = .Some(some) }
-  init(_ v : T?) {
+  @public init() { self = .None }
+  @public init(_ some : T) { self = .Some(some) }
+  @public init(_ v : T?) {
     switch v {
     case .Some(let some):
       self = .Some(some)
@@ -37,13 +37,13 @@ enum ImplicitlyUnwrappedOptional<T>
   }
 
   // Make nil work with ImplicitlyUnwrappedOptional
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> ImplicitlyUnwrappedOptional<T> {
     return .None
   }
 
   /// Allow use in a Boolean context.
-  @transparent
+  @transparent @public
   func getLogicValue() -> Bool {
     switch self {
     case .Some:
@@ -54,7 +54,7 @@ enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// Haskell's fmap, which was mis-named
-  func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
+  @public func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):
       return .Some(f(y))
@@ -63,7 +63,7 @@ enum ImplicitlyUnwrappedOptional<T>
     }
   }
 
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     // FIXME: This should probably use _OptionalMirror in both cases.
     if let value = self {
       return reflect(value)
@@ -74,7 +74,7 @@ enum ImplicitlyUnwrappedOptional<T>
 }
 
 extension ImplicitlyUnwrappedOptional : Printable {
-  var description: String {
+  @public var description: String {
     switch self {
     case .Some(let value):
       return toString(value)
@@ -85,12 +85,12 @@ extension ImplicitlyUnwrappedOptional : Printable {
 }
 
 // Intrinsics for use by language features.
-@transparent
+@transparent @internal
 func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
   return v.getLogicValue().value
 }
 
-@transparent
+@transparent @internal
 func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
   switch v {
   case .Some(let x):
@@ -101,24 +101,24 @@ func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
   }
 }
 
-@transparent
+@transparent @internal
 func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
   return .Some(v)
 }
 
-@transparent
+@transparent @internal
 func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None
 }
 
 extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
-  typealias ObjectiveCType = AnyObject
+  @public typealias ObjectiveCType = AnyObject
 
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return getBridgedObjectiveCType(T.self)!
   }
 
-  func bridgeToObjectiveC() -> AnyObject {
+  @public func bridgeToObjectiveC() -> AnyObject {
     switch self {
     case .None:
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
@@ -128,11 +128,11 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
     }
   }
 
-  static func bridgeFromObjectiveC(x: AnyObject) -> T! {
+  @public static func bridgeFromObjectiveC(x: AnyObject) -> T! {
     return Swift.bridgeFromObjectiveC(x, T.self)
   }
 
-  static func bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {
+  @public static func bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {
     let bridged: T? = Swift.bridgeFromObjectiveCConditional(x, T.self)
     if let value = bridged {
       return value
@@ -141,7 +141,7 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
     return .None
   }
 
-  static func isBridgedToObjectiveC() -> Bool {
+  @public static func isBridgedToObjectiveC() -> Bool {
     return Swift.isBridgedToObjectiveC(T.self)
   }
 }

@@ -12,23 +12,23 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
+@public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
 
   var _value: Builtin.Int32
 
-  var value: UInt32 {
+  @public var value: UInt32 {
     get {
       return UInt32(_value)
     }
   }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
       value: String) -> UnicodeScalar {
     let unicodeScalars = value.unicodeScalars
     return unicodeScalars[unicodeScalars.startIndex]
   }
 
-  init() {
+  @public init() {
     self._value = Int32(0).value
   }
 
@@ -36,7 +36,7 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     self._value = value
   }
 
-  init(_ v : UInt32) {
+  @public init(_ v : UInt32) {
     // Unicode 6.3.0:
     //
     //     D9.  Unicode codespace: A range of integers from 0 to 10FFFF.
@@ -54,13 +54,13 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     self._value = v.value
   }
 
-  init(_ v: UnicodeScalar) {
+  @public init(_ v: UnicodeScalar) {
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
     self = v
   }
 
-  func escape(#asASCII: Bool) -> String {
+  @public func escape(#asASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       var nibble = v & 15
       if nibble < 10 {
@@ -116,22 +116,22 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
 
   /// \returns true if this is an ASCII character (code point 0 to 127
   /// inclusive).
-  func isASCII() -> Bool {
+  @public func isASCII() -> Bool {
     return value <= 127
   }
 
   // FIXME: Locales make this interesting
-  func isAlpha() -> Bool {
+  @public func isAlpha() -> Bool {
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
   // FIXME: Locales make this interesting
-  func isDigit() -> Bool {
+  @public func isDigit() -> Bool {
     return self >= "0" && self <= "9"
   }
 
   // FIXME: Locales make this interesting
-  var uppercase : UnicodeScalar {
+  @public var uppercase : UnicodeScalar {
     if self >= "a" && self <= "z" {
       return UnicodeScalar(UInt32(self) - 32)
     } else if self >= "à" && self <= "þ" && self != "÷" {
@@ -141,7 +141,7 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 
   // FIXME: Locales make this interesting
-  var lowercase : UnicodeScalar {
+  @public var lowercase : UnicodeScalar {
     if self >= "A" && self <= "Z" {
       return UnicodeScalar(UInt32(self) + 32)
     } else if self >= "À" && self <= "Þ" && self != "×" {
@@ -151,7 +151,7 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 
   // FIXME: Locales make this interesting.
-  func isSpace() -> Bool {
+  @public func isSpace() -> Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,
     // until we can optimize the constraint solver better.
@@ -162,73 +162,73 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension UnicodeScalar : Printable, DebugPrintable {
-  var description: String {
+  @public var description: String {
     return "\"\(escape(asASCII: false))\""
   }
-  var debugDescription: String {
+  @public var debugDescription: String {
     return "\"\(escape(asASCII: true))\""
   }
 }
 
 extension UnicodeScalar : Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
     return Int(self.value)
   }
 }
 
 extension UnicodeScalar {
-  init(_ v : Int) {
+  @public init(_ v : Int) {
     self = UnicodeScalar(UInt32(v))
   }
 }
 
 extension UInt8 {
-  init(_ v : UnicodeScalar) {
+  @public init(_ v : UnicodeScalar) {
     _precondition(v.value <= UInt32(UInt8.max),
         "Code point value does not fit into UInt8")
     self = UInt8(v.value)
   }
 }
 extension UInt32 {
-  init(_ v : UnicodeScalar) {
+  @public init(_ v : UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
-  init(_ v : UnicodeScalar) {
+  @public init(_ v : UnicodeScalar) {
     self = UInt64(v.value)
   }
 }
 
-func - (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Int {
+@public func - (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Int {
   return Int(lhs.value) - Int(rhs.value)
 }
 
-func - (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
+@public func - (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
   return UnicodeScalar(Int(lhs.value) - rhs)
 }
 
-func + (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
+@public func + (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
   return UnicodeScalar(Int(lhs.value) + rhs)
 }
 
-func + (lhs: Int, rhs: UnicodeScalar) -> UnicodeScalar {
+@public func + (lhs: Int, rhs: UnicodeScalar) -> UnicodeScalar {
   return rhs + lhs
 }
 
-func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+@public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value == rhs.value
 }
 
 extension UnicodeScalar : Comparable {
 }
 
-func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+@public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
 }
 
 extension UnicodeScalar {
-  func isPrint() -> Bool {
+  @public func isPrint() -> Bool {
     return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
   }
 }
@@ -239,10 +239,10 @@ extension UnicodeScalar {
 func _asUnicodeCodePoint(us: UnicodeScalar) -> Builtin.Int32 {
   return us._value
 }
-func _asUnicodeCodePoint(us: UnicodeScalar) -> UInt32 {
+@public func _asUnicodeCodePoint(us: UnicodeScalar) -> UInt32 {
   return us.value
 }
-func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
+@public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
   var codePoint = us.value
   _precondition(codePoint <= UInt32(UInt16.max))
   return UTF16.CodeUnit(codePoint)

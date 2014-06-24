@@ -17,37 +17,37 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct EmptyGenerator<T> : Generator, Sequence {
-  func generate() -> EmptyGenerator {
+@public struct EmptyGenerator<T> : Generator, Sequence {
+  @public func generate() -> EmptyGenerator {
     return self
   }
   
-  mutating func next() -> T? {
+  @public mutating func next() -> T? {
     return nil
   }
 }
 
-struct EmptyCollection<T> : Collection {
-  typealias IndexType = Int
+@public struct EmptyCollection<T> : Collection {
+  @public typealias IndexType = Int
   
-  var startIndex: IndexType {
+  @public var startIndex: IndexType {
     return 0
   }
   
-  var endIndex: IndexType {
+  @public var endIndex: IndexType {
     return 0
   }
 
-  func generate() -> EmptyGenerator<T> {
+  @public func generate() -> EmptyGenerator<T> {
     return EmptyGenerator()
   }
 
-  subscript(i: IndexType) -> T {
+  @public subscript(i: IndexType) -> T {
     _preconditionFailure("Index out of range")
   }
 }
 
 // Specialization of countElements for EmptyCollection<T>
-func ~> <T>(x:EmptyCollection<T>, _:(_CountElements, ())) -> Int {
+@public func ~> <T>(x:EmptyCollection<T>, _:(_CountElements, ())) -> Int {
   return 0
 }

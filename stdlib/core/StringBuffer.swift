@@ -42,13 +42,13 @@ struct _StringBufferIVars {
 // HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
-struct _StringBuffer {
+@public struct _StringBuffer {
 
   // Make this a buffer of UTF16 code units so that it's properly
   // aligned for them if that's what we store.
   typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
-  @conversion
+  @conversion 
   func __conversion() -> _Storage {
     return _storage
   }

@@ -27,7 +27,7 @@
 /// Otherwise, requires that end is reachable from start by
 /// incrementation, and executes in O(N), where N is the function's
 /// result.
-func distance<T: ForwardIndex>(start: T, end: T) -> T.DistanceType {
+@public func distance<T: ForwardIndex>(start: T, end: T) -> T.DistanceType {
   return start~>_distanceTo(end)
 }
 
@@ -35,7 +35,7 @@ func distance<T: ForwardIndex>(start: T, end: T) -> T.DistanceType {
 /// RandomAccessIndex, executes in O(1).  Otherwise, executes in
 /// O(abs(n)).  If T does not model BidirectionalIndex, requires that n
 /// is non-negative.
-func advance<T: ForwardIndex>(start: T, n: T.DistanceType) -> T {
+@public func advance<T: ForwardIndex>(start: T, n: T.DistanceType) -> T {
   return start~>_advance(n)
 }
 
@@ -43,7 +43,7 @@ func advance<T: ForwardIndex>(start: T, n: T.DistanceType) -> T {
 /// equals end.  If T models RandomAccessIndex, executes in O(1).
 /// Otherwise, executes in O(abs(n)).  If T does not model
 /// BidirectionalIndex, requires that n is non-negative.
-func advance<T: ForwardIndex>(start: T, n: T.DistanceType, end: T) -> T {
+@public func advance<T: ForwardIndex>(start: T, n: T.DistanceType, end: T) -> T {
   return start~>_advance(n, end)
 }
 
@@ -53,16 +53,16 @@ func advance<T: ForwardIndex>(start: T, n: T.DistanceType, end: T) -> T {
 /// dispatching every generic function with a default implementation.
 /// Only authors of specialized distance implementations need to touch
 /// this tag.
-struct _Distance {}
-func _distanceTo<I>(end: I) -> (_Distance, (I)) {
+@internal struct _Distance {}
+@internal func _distanceTo<I>(end: I) -> (_Distance, (I)) {
   return (_Distance(), (end))
 }
 
-struct _Advance {}
-func _advance<D>(n: D) -> (_Advance, (D)) {
+@internal struct _Advance {}
+@internal func _advance<D>(n: D) -> (_Advance, (D)) {
   return (_Advance(), (n: n))
 }
-func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
+@internal func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
   return (_Advance(), (n, end))
 }
 
@@ -76,28 +76,28 @@ func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 // to break otherwise-cyclic protocol dependencies, which the compiler
 // isn't yet smart enough to handle.
 
-protocol _Incrementable : Equatable {
+@public protocol _Incrementable : Equatable {
   func successor() -> Self
 }
 
-protocol _ForwardIndex : _Incrementable {
+@public protocol _ForwardIndex : _Incrementable {
   typealias DistanceType : _SignedInteger = Int
 }
 
-@prefix @assignment @transparent
+@prefix @assignment @transparent @public
 func ++ <T : _Incrementable> (inout x: T) -> T {
   x = x.successor()
   return x
 }
 
-@postfix @assignment @transparent
+@postfix @assignment @transparent @public
 func ++ <T : _Incrementable> (inout x: T) -> T {
   var ret = x
   x = x.successor()
   return ret
 }
 
-protocol ForwardIndex : _ForwardIndex {
+@public protocol ForwardIndex : _ForwardIndex {
   // This requirement allows generic distance() to find default
   // implementations.  Only the author of F and the author of a
   // refinement of F having a non-default distance implementation need
@@ -114,6 +114,7 @@ protocol ForwardIndex : _ForwardIndex {
 // advance and distance implementations
 
 /// Do not use this operator directly; call distance(start, end) instead
+@public
 func ~> <T: _ForwardIndex>(start:T, rest: (_Distance, T)) -> T.DistanceType {
   var p = start
   var count: T.DistanceType = 0
@@ -126,7 +127,7 @@ func ~> <T: _ForwardIndex>(start:T, rest: (_Distance, T)) -> T.DistanceType {
 }
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent
+@transparent @public
 func ~> <T: _ForwardIndex>(
   start: T, rest: (_Advance, T.DistanceType)
 ) -> T {
@@ -134,6 +135,7 @@ func ~> <T: _ForwardIndex>(
   return _advanceForward(start, n)
 }
 
+@internal
 func _advanceForward<T: _ForwardIndex>(start: T, n: T.DistanceType) -> T {
   _precondition(n >= 0, "Only BidirectionalIndex can be advanced by a negative amount")
   var p = start
@@ -144,13 +146,14 @@ func _advanceForward<T: _ForwardIndex>(start: T, n: T.DistanceType) -> T {
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent
+@transparent @public
 func ~> <T: _ForwardIndex>(
   start:T, rest: ( _Advance, (T.DistanceType, T))
 ) -> T {
   return _advanceForward(start, rest.1.0, rest.1.1)
 }
 
+@internal
 func _advanceForward<T: _ForwardIndex>(
   start: T, n: T.DistanceType, end: T
 ) -> T {
@@ -164,21 +167,21 @@ func _advanceForward<T: _ForwardIndex>(
 
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndex -----------------------------------------------===//
-protocol _BidirectionalIndex : _ForwardIndex {
+@public protocol _BidirectionalIndex : _ForwardIndex {
   func predecessor() -> Self
 }
 
-protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
+@public protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
 }
 
-@prefix @assignment @transparent
+@prefix @assignment @transparent @public
 func -- <T: _BidirectionalIndex> (inout x: T) -> T {
   x = x.predecessor()
   return x
 }
 
 
-@postfix @assignment @transparent
+@postfix @assignment @transparent @public
 func -- <T: _BidirectionalIndex> (inout x: T) -> T {
   var ret = x
   x = x.predecessor()
@@ -188,7 +191,7 @@ func -- <T: _BidirectionalIndex> (inout x: T) -> T {
 // advance implementation
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent
+@transparent @public
 func ~> <T: _BidirectionalIndex>(
   start:T , rest: (_Advance, T.DistanceType)
 ) -> T {
@@ -204,7 +207,7 @@ func ~> <T: _BidirectionalIndex>(
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent
+@transparent @public
 func ~> <T: _BidirectionalIndex>(
   start:T, rest: (_Advance, (T.DistanceType, T))
 ) -> T {
@@ -223,19 +226,19 @@ func ~> <T: _BidirectionalIndex>(
 
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndex ------------------------------------------------===//
-protocol _RandomAccessIndex : _BidirectionalIndex {
+@public protocol _RandomAccessIndex : _BidirectionalIndex {
   func distanceTo(Self) -> DistanceType
   func advancedBy(DistanceType) -> Self
 }
 
-protocol RandomAccessIndex : BidirectionalIndex, _RandomAccessIndex {
+@public protocol RandomAccessIndex : BidirectionalIndex, _RandomAccessIndex {
   /* typealias DistanceType : IntegerArithmetic*/
 }
 
 // advance and distance implementations
 
 /// Do not use this operator directly; call distance(start, end) instead
-@transparent
+@transparent @public
 func ~> <T: _RandomAccessIndex>(start:T, rest:(_Distance, (T)))
 -> T.DistanceType {
   let end = rest.1
@@ -243,7 +246,7 @@ func ~> <T: _RandomAccessIndex>(start:T, rest:(_Distance, (T)))
 }
 
 /// Do not use this operator directly; call advance(start, n) instead
-@transparent
+@transparent @public
 func ~> <T: _RandomAccessIndex>(
   start:T, rest:(_Advance, (T.DistanceType))
 ) -> T {
@@ -252,7 +255,7 @@ func ~> <T: _RandomAccessIndex>(
 }
 
 /// Do not use this operator directly; call advance(start, n, end) instead
-@transparent
+@transparent @public
 func ~> <T: _RandomAccessIndex>(
   start:T, rest:(_Advance, (T.DistanceType, T))
 ) -> T {

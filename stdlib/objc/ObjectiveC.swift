@@ -20,7 +20,7 @@ import ObjectiveC
 // libraries, not here.
 
 extension ObjCBool : Printable {
-  var description: String {
+  @public var description: String {
     return self.getLogicValue().description
   }
 }
@@ -32,16 +32,16 @@ extension ObjCBool : Printable {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-struct Selector : StringLiteralConvertible, NilLiteralConvertible {
+@public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   var ptr : COpaquePointer
 
   /// Create a selector from a string.
-  init(_ str : String) {
+  @public init(_ str : String) {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
   /// Construct a selector from a string literal.
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
     value: CString) -> Selector {
 
     return convertFromStringLiteral(value)
@@ -51,32 +51,32 @@ struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
-  static func convertFromStringLiteral(value: CString) -> Selector {
+  @public static func convertFromStringLiteral(value: CString) -> Selector {
     return sel_registerName(value)
   }
 
-  init() {
+  @public init() {
     ptr = nil
   }
   
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> Selector {
     return Selector()
   }
 }
 
-func ==(lhs: Selector, rhs: Selector) -> Bool {
+@public func ==(lhs: Selector, rhs: Selector) -> Bool {
   return sel_isEqual(lhs, rhs)
 }
 
 extension Selector : Equatable, Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
     return ptr.hashValue
   }
 }
 
 extension Selector : Printable {
-  var description: String {
+  @public var description: String {
     if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
       return s
     }
@@ -86,7 +86,7 @@ extension Selector : Printable {
 
 extension String {
   /// Construct the C string representation of an Objective-C selector.
-  init(_sel: Selector) {
+  @public init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
     self = String.fromCString(sel_getName(_sel))!
   }
@@ -94,24 +94,26 @@ extension String {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+@internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return x
 }
-func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+@internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
 }
 
-func ~=(x: NSObject, y: NSObject) -> Bool {
+@public func ~=(x: NSObject, y: NSObject) -> Bool {
   return x.isEqual(y)
 }
 
 //===----------------------------------------------------------------------===//
 // FIXME: @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
-@asmname("objc_autoreleasePoolPush") func __pushAutoreleasePool() -> COpaquePointer
-@asmname("objc_autoreleasePoolPop") func __popAutoreleasePool(pool: COpaquePointer)
+@asmname("objc_autoreleasePoolPush") 
+func __pushAutoreleasePool() -> COpaquePointer
+@asmname("objc_autoreleasePoolPop") 
+func __popAutoreleasePool(pool: COpaquePointer)
 
-func autoreleasepool(code: () -> ()) {
+@public func autoreleasepool(code: () -> ()) {
   var pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
@@ -121,6 +123,8 @@ func autoreleasepool(code: () -> ()) {
 // Mark YES and NO unavailable.
 //===----------------------------------------------------------------------===//
 
-@availability(*, unavailable, message="Use 'Bool' value 'true' instead") var YES : ObjCBool = Bool.true
-@availability(*, unavailable, message="Use 'Bool' value 'false' instead") var NO : ObjCBool = Bool.false
+@availability(*, unavailable, message="Use 'Bool' value 'true' instead") @public
+var YES : ObjCBool = Bool.true
+@availability(*, unavailable, message="Use 'Bool' value 'false' instead") @public
+var NO : ObjCBool = Bool.false
 

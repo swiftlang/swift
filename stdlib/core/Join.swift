@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-protocol _ExtensibleCollection : Collection {
+@public protocol _ExtensibleCollection : Collection {
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
@@ -36,7 +36,7 @@ protocol _ExtensibleCollection : Collection {
   >(_: S)
 }
 
-protocol ExtensibleCollection : _ExtensibleCollection {
+@public protocol ExtensibleCollection : _ExtensibleCollection {
 /*
   We could have these operators with default implementations, but the compiler
   crashes:
@@ -66,7 +66,7 @@ protocol ExtensibleCollection : _ExtensibleCollection {
 */
 }
 
-func +<
+@public func +<
     C : _ExtensibleCollection,
     S : Sequence
     where S.GeneratorType.Element == C.GeneratorType.Element
@@ -76,7 +76,7 @@ func +<
   return lhs
 }
 
-func +<
+@public func +<
     C : _ExtensibleCollection,
     S : Sequence
     where S.GeneratorType.Element == C.GeneratorType.Element
@@ -89,7 +89,7 @@ func +<
   return result
 }
 
-func +<
+@public func +<
     C : _ExtensibleCollection,
     S : Collection
     where S.GeneratorType.Element == C.GeneratorType.Element
@@ -100,7 +100,7 @@ func +<
   return lhs
 }
 
-func +<
+@public func +<
     EC1 : _ExtensibleCollection,
     EC2 : _ExtensibleCollection
     where EC1.GeneratorType.Element == EC2.GeneratorType.Element
@@ -112,12 +112,12 @@ func +<
 }
 
 extension String : ExtensibleCollection {
-  mutating func reserveCapacity(n: Int) {
+  @public mutating func reserveCapacity(n: Int) {
     // FIXME: implement.
     // <rdar://problem/16970908> Implement String.reserveCapacity
   }
 
-  mutating func extend<
+  @public mutating func extend<
       S : Sequence
       where S.GeneratorType.Element == Character
   >(seq: S) {
@@ -135,7 +135,7 @@ extension String : ExtensibleCollection {
 /// output::
 ///
 ///   println(join(" ", [ "here", "be", "dragons" ]))
-func join<
+@public func join<
     C : ExtensibleCollection, S : Sequence where S.GeneratorType.Element == C
 >(
   separator: C, elements: S

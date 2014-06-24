@@ -17,7 +17,7 @@
 // CGGeometry
 //===----------------------------------------------------------------------===//
 
-extension CGPoint : Equatable {
+@public extension CGPoint : Equatable {
   static var zeroPoint: CGPoint { get { return CGPoint(x: 0, y: 0) } }
 
   init() {
@@ -60,17 +60,17 @@ struct _CGPointMirror : Mirror {
 }
 
 extension CGPoint : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _CGPointMirror(self)
   }
 }
 
-func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
+@public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
 
 
-extension CGSize : Equatable {
+@public extension CGSize : Equatable {
   static var zeroSize: CGSize { return CGSize(width: 0, height: 0) }
 
   init() {
@@ -113,17 +113,17 @@ struct _CGSizeMirror : Mirror {
 }
 
 extension CGSize : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _CGSizeMirror(self)
   }
 }
 
-func == (lhs: CGSize, rhs: CGSize) -> Bool {
+@public func == (lhs: CGSize, rhs: CGSize) -> Bool {
   return lhs.width == rhs.width  &&  lhs.height == rhs.height
 }
 
 
-extension CGVector : Equatable {
+@public extension CGVector : Equatable {
   static var zeroVector: CGVector { get { return CGVector(0, 0) } }
 
   init(_ dx: CGFloat, _ dy: CGFloat) {
@@ -135,12 +135,12 @@ extension CGVector : Equatable {
   }
 }
 
-func == (lhs: CGVector, rhs: CGVector) -> Bool {
+@public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
 
 
-extension CGRect : Equatable {
+@public extension CGRect : Equatable {
   static var zeroRect:     CGRect { 
     return CGRect(x: 0, y: 0, width: 0, height: 0) 
   }
@@ -282,12 +282,12 @@ struct _CGRectMirror : Mirror {
 }
 
 extension CGRect : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _CGRectMirror(self)
   }
 }
 
-func == (lhs: CGRect, rhs: CGRect) -> Bool {
+@public func == (lhs: CGRect, rhs: CGRect) -> Bool {
   return CGRectEqualToRect(lhs, rhs)
 }
 

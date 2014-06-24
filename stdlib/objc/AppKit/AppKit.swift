@@ -17,7 +17,7 @@ class REPLApplication : NSApplication {
 }
 
 /// Initializes and runs a REPLApplication on the main thread asynchronously.
-func replApplicationMain() {
+@internal func replApplicationMain() {
   _precondition(NSApp === nil)
   // Create a REPLApplication as the NSApp.
   let app = REPLApplication.sharedApplication() as REPLApplication
@@ -73,14 +73,14 @@ struct _NSViewMirror : Mirror {
 }
 
 extension NSView : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _NSViewMirror(self)
   }
 }
 
 // Overlays for variadics.
 
-extension NSGradient {
+@public extension NSGradient {
   convenience init(colorsAndLocations objects: (NSColor, CGFloat)...) {
     let colors = new NSColor[objects.count] { objects[$0].0 }
     let locations = new CGFloat[objects.count] { objects[$0].1 }

@@ -9,32 +9,32 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-struct Repeat<T> : Collection {
-  typealias IndexType = Int
+@public struct Repeat<T> : Collection {
+  @public typealias IndexType = Int
 
-  init(count: Int, repeatedValue: T) {
+  @public init(count: Int, repeatedValue: T) {
     self.count = count
     self.repeatedValue = repeatedValue
   }
   
-  var startIndex: IndexType {
+  @public var startIndex: IndexType {
     return 0
   }
   
-  var endIndex: IndexType {
+  @public var endIndex: IndexType {
     return count
   }
 
-  func generate() -> IndexingGenerator<Repeat> {
+  @public func generate() -> IndexingGenerator<Repeat> {
     return IndexingGenerator(self)
   }
 
-  subscript(i: Int) -> T {
+  @public subscript(i: Int) -> T {
     _precondition(i < count, "Index out of range")
     return repeatedValue
   }
 
-  var count: Int
-  let repeatedValue: T
+  @public var count: Int
+  @public let repeatedValue: T
 }
 

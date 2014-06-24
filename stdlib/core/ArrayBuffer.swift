@@ -19,7 +19,7 @@ import SwiftShims
 
 enum _ArrayCastKind { case Up, Down, DeferredDown }
 
-@final
+@final @internal
 class IndirectArrayBuffer {
   
   init<T>(
@@ -87,7 +87,7 @@ class IndirectArrayBuffer {
   }
 }
 
-struct ArrayBuffer<T> : ArrayBufferType {
+@public struct ArrayBuffer<T> : ArrayBufferType {
   var storage: Builtin.NativeObject?
 
   var indirect: IndirectArrayBuffer {

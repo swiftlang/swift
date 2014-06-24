@@ -19,7 +19,7 @@
 
 /// An extremely simple string designed to represent something
 /// "statically knowable".
-struct StaticString
+@public struct StaticString
   : _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible {
@@ -27,7 +27,7 @@ struct StaticString
   var byteSize: Builtin.Word
   var isASCII: Builtin.Int1
 
-  init() {
+  @public init() {
     self = ""
   }
 
@@ -48,7 +48,7 @@ struct StaticString
         start, byteSize: byteSize, isASCII: isASCII)
   }
 
-  static func convertFromExtendedGraphemeClusterLiteral(
+  @public static func convertFromExtendedGraphemeClusterLiteral(
       value: StaticString) -> StaticString {
     return value
   }
@@ -59,6 +59,7 @@ struct StaticString
     return StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
 
+  @public
   static func convertFromStringLiteral(value: StaticString) -> StaticString {
     return value
   }

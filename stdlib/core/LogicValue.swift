@@ -12,7 +12,7 @@
 // LogicValue
 //===----------------------------------------------------------------------===//
 
-@prefix func !<T : LogicValue>(a: T) -> Bool {
+@prefix @public func !<T : LogicValue>(a: T) -> Bool {
   return !a.getLogicValue()
 }
 
@@ -27,12 +27,12 @@
 // bool-specific operators.  BLOCKED ON: <rdar://problem/11510876>
 // [Implement overload resolution].
 
-@transparent
+@transparent @public
 func &&(lhs: LogicValue, rhs: @auto_closure () -> LogicValue) -> Bool {
   return lhs.getLogicValue() ? rhs().getLogicValue() : false
 }
 
-@transparent
+@transparent @public
 func ||(lhs: LogicValue, rhs: @auto_closure () -> LogicValue) -> Bool {
   return lhs.getLogicValue() ? true : rhs().getLogicValue()
 }

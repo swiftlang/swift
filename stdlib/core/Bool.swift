@@ -13,23 +13,23 @@
 //===----------------------------------------------------------------------===//
 
 // Bool is the standard way to reason about truth values.
-struct Bool {
+@public struct Bool {
   var value: Builtin.Int1
 
   /// Default-initialize Boolean value to `false`.
-  @transparent
+  @transparent @public 
   init() { value = Builtin.trunc_Word_Int1(0.value) }
 
   @transparent
   init(_ v : Builtin.Int1) { value = v }
 
-  static var false : Bool {
+  @public static var false : Bool {
     @transparent
     get {
       return Bool()
     }
   }
-  static var true : Bool {
+  @public static var true : Bool {
     @transparent
     get {
       return Bool(Builtin.trunc_Word_Int1(1.value))
@@ -37,13 +37,13 @@ struct Bool {
   }
 }
 
-var true : Bool {
+@public var true : Bool {
   @transparent
   get {
     return Bool.true
   }
 }
-var false : Bool {
+@public var false : Bool {
   @transparent
   get {
     return Bool.false
@@ -55,16 +55,16 @@ extension Bool : LogicValue {
     return value
   }
 
-  @transparent func getLogicValue() -> Bool { return self }
+  @transparent @public func getLogicValue() -> Bool { return self }
 
   // Bool can be constructed from LogicValue
-  init(_ v : LogicValue) {
+  @public init(_ v : LogicValue) {
     self = v.getLogicValue()
   }
 }
 
 extension Bool : Printable {
-  var description: String {
+  @public var description: String {
     return self ? "true" : "false"
   }
 }
@@ -77,54 +77,59 @@ extension Bool : Printable {
 //===----------------------------------------------------------------------===//
 
 // Unary bitwise complement.
-@prefix @transparent func ~(a: Bool) -> Bool {
+@prefix @transparent @public
+func ~(a: Bool) -> Bool {
   return a ^ true
 }
 
 // Unary logical complement.
-@prefix @transparent func !(a: Bool) -> Bool {
+@prefix @transparent @public
+func !(a: Bool) -> Bool {
   return ~a
 }
 
-@transparent
+@transparent @public
 func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
 }
 
 @transparent
 extension Bool : Equatable, Hashable {
-  var hashValue: Int {
+  @public var hashValue: Int {
     return self ? 1 : 0
   }
 }
 
 // Bitwise 'and'.
-@transparent func & (lhs: Bool, rhs: Bool) -> Bool {
+@transparent @public func & (lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.and_Int1(lhs.value, rhs.value))
 }
 
 // Bitwise 'xor'.
-@transparent func ^ (lhs: Bool, rhs: Bool) -> Bool {
+@transparent @public func ^ (lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.xor_Int1(lhs.value, rhs.value))
 }
 
 // Bitwise 'or'.
-@transparent func | (lhs: Bool, rhs: Bool) -> Bool {
+@transparent @public func | (lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.or_Int1(lhs.value, rhs.value))
 }
 
 // Compound assignment (with bitwise and)
-@assignment @transparent func &= (inout lhs: Bool, rhs: Bool) {
+@assignment @transparent @public
+func &= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs & rhs
 }
 
 // Compound assignment (with bitwise or)
-@assignment @transparent func |= (inout lhs: Bool, rhs: Bool) {
+@assignment @transparent @public
+func |= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs | rhs
 }
 
 // Compound assignment (with bitwise xor)
-@assignment @transparent func ^= (inout lhs: Bool, rhs: Bool) {
+@assignment @transparent @public
+func ^= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs ^ rhs
 }
 

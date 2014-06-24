@@ -131,14 +131,14 @@ extension _StringCore {
 }
 
 extension String {
-  struct UTF8View : Collection {
+  @public struct UTF8View : Collection {
     let _core: _StringCore
     
     init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    struct Index : ForwardIndex {
+    @public struct Index : ForwardIndex {
       init(_ _core: _StringCore, _ _coreIndex: Int, 
            _ _buffer: _StringCore.UTF8Chunk) {
         self._core = _core
@@ -148,7 +148,7 @@ extension String {
         _sanityCheck(_coreIndex <= _core.count)
       }
       
-      func successor() -> Index {
+      @public func successor() -> Index {
         let newBuffer0 = (_buffer >> 8) | (
           0xFF << numericCast((sizeofValue(_buffer) - 1) * 8)
         )
@@ -168,7 +168,7 @@ extension String {
       let _buffer: _StringCore.UTF8Chunk
     }
   
-    var startIndex: Index {
+    @public var startIndex: Index {
       if _fastPath(_core.count != 0) {
         let (coreIndex, buffer) = _core._encodeSomeUTF8(0)
         return Index(_core, coreIndex, buffer)
@@ -176,20 +176,20 @@ extension String {
       return endIndex
     }
     
-    var endIndex: Index {
+    @public var endIndex: Index {
       return Index(_core, _core.endIndex, ~0)
     }
 
-    subscript(i: Index) -> UTF8.CodeUnit {
+    @public subscript(i: Index) -> UTF8.CodeUnit {
       return numericCast(i._buffer & 0xFF)
     }
 
-    func generate() -> IndexingGenerator<UTF8View> {
+    @public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
     }
   }
 
-  var utf8: UTF8View {
+  @public var utf8: UTF8View {
     return UTF8View(self.core)
   }
 
@@ -197,7 +197,7 @@ extension String {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 
-  var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+  @public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
     result.reserveCapacity(countElements(utf8) + 1)
     result += utf8
@@ -206,6 +206,7 @@ extension String {
   }
 }
 
+@public
 func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
   return lhs._coreIndex == rhs._coreIndex && lhs._buffer == rhs._buffer
 }

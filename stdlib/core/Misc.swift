@@ -19,11 +19,11 @@ func _putchar(value: Int32) -> Int32
 
 // Some file stuff
 
-@transparent func countLeadingZeros(value: Int64) -> Int64 {
+@transparent @public func countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
-@transparent func _autorelease(x: AnyObject) {
+@transparent @public func _autorelease(x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
 }
@@ -32,7 +32,7 @@ func _putchar(value: Int32) -> Int32
 /// protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_conformsToProtocol")
+@asmname("swift_stdlib_conformsToProtocol")@public
 func _stdlib_conformsToProtocol<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> Bool
@@ -41,7 +41,7 @@ func _stdlib_conformsToProtocol<SourceType, DestType>(
 /// type.  Traps if the object does not conform to the protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1Unconditional")
+@asmname("swift_stdlib_dynamicCastToExistential1Unconditional")@public
 func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> DestType
@@ -50,7 +50,7 @@ func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
 /// type.  Returns `.None` if the object does not conform to the protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1")
+@asmname("swift_stdlib_dynamicCastToExistential1")@public
 func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> DestType?
@@ -59,7 +59,7 @@ func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
 func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafePointer<String>)
 
 /// Returns the mangled type name for the given value.
-func _stdlib_getTypeName<T>(value: T) -> String {
+@public func _stdlib_getTypeName<T>(value: T) -> String {
   var resultPtr = UnsafePointer<String>.alloc(1)
   _stdlib_getTypeNameImpl(value, resultPtr)
   let result = resultPtr.memory
