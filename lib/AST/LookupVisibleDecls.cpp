@@ -786,7 +786,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
                                NLKind::QualifiedLookup,
                                ResolutionKind::Overloadable,
-                               TypeResolver, extraImports);
+                               TypeResolver, DC, extraImports);
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 

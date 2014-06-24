@@ -143,6 +143,8 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            ResolutionKind resolutionKind, bool canReturnEarly,
                            LazyResolver *typeResolver,
                            ModuleLookupCache &cache,
+                           const DeclContext *moduleScopeContext,
+                           bool respectAccessControl,
                            ArrayRef<Module::ImportedModule> extraImports,
                            CallbackTy callback) {
   ModuleLookupCache::iterator iter;
@@ -157,9 +159,32 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
 
   SmallVector<ValueDecl *, 4> localDecls;
   callback(module, accessPath, localDecls);
+  if (respectAccessControl) {
+    auto newEndIter = std::remove_if(localDecls.begin(), localDecls.end(),
+                                    [=](ValueDecl *VD) {
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(VD);
+
+      if (!VD->hasAccessibility())
+        return false;
+      if (!moduleScopeContext)
+        return VD->getAccessibility() != Accessibility::Public;
+
+      switch (VD->getAccessibility()) {
+      case Accessibility::Private: {
+        const DeclContext *DC = VD->getDeclContext();
+        return moduleScopeContext != DC->getModuleScopeContext();
+      }
+      case Accessibility::Internal:
+        return moduleScopeContext->getParentModule() != VD->getModuleContext();
+      case Accessibility::Public:
+        return false;
+      }
+    });
+    localDecls.erase(newEndIter, localDecls.end());
+  }
 
   OverloadSetTy overloads;
-  // FIXME: Pass TypeResolver down instead of getting it from the AST.
   resolutionKind = recordImportDecls(typeResolver, decls, localDecls,
                                      overloads, resolutionKind);
 
@@ -192,7 +217,8 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
       lookupInModule<OverloadSetTy>(next.second, combinedAccessPath,
                                     resultSet, resolutionKind, canReturnEarly,
-                                    typeResolver, cache, {}, callback);
+                                    typeResolver, cache, nullptr,
+                                    respectAccessControl, {}, callback);
     }
 
     // Add the results from scoped imports.
@@ -225,11 +251,15 @@ void namelookup::lookupInModule(Module *startModule,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
                                 LazyResolver *typeResolver,
+                                const DeclContext *moduleScopeContext,
                                 ArrayRef<Module::ImportedModule> extraImports) {
+  assert(!moduleScopeContext || moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
+  bool respectAccessControl = startModule->Ctx.LangOpts.EnableAccessControl;
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
                                resolutionKind, /*canReturnEarly=*/true,
-                               typeResolver, cache, extraImports,
+                               typeResolver, cache, moduleScopeContext,
+                               respectAccessControl, extraImports,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       module->lookupValue(path, name, lookupKind, localDecls);
@@ -244,11 +274,15 @@ void namelookup::lookupVisibleDeclsInModule(
     NLKind lookupKind,
     ResolutionKind resolutionKind,
     LazyResolver *typeResolver,
+    const DeclContext *moduleScopeContext,
     ArrayRef<Module::ImportedModule> extraImports) {
+  assert(!moduleScopeContext || moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
+  bool respectAccessControl = M->Ctx.LangOpts.EnableAccessControl;
   ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,
                                     resolutionKind, /*canReturnEarly=*/false,
-                                    typeResolver, cache, extraImports,
+                                    typeResolver, cache, moduleScopeContext,
+                                    respectAccessControl, extraImports,
     [=](Module *module, Module::AccessPathTy path,
         SmallVectorImpl<ValueDecl *> &localDecls) {
       VectorDeclConsumer consumer(localDecls);

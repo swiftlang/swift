@@ -98,6 +98,11 @@ def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
 def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
 HelpText<"Remove runtime asserts.">;
 
+def disable_access_control : Flag<["-"], "disable-access-control">,
+  HelpText<"Don't respect access control restrictions">;
+def enable_access_control : Flag<["-"], "enable-access-control">,
+  HelpText<"Respect access control restrictions">;
+
 def disable_all_runtime_checks : Flag<["-"], "disable-all-runtime-checks">,
   HelpText<"Disable all intrinsic runtime safety checks">;
 

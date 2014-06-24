@@ -540,6 +540,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
 
+  if (auto A = Args.getLastArg(OPT_enable_access_control,
+                               OPT_disable_access_control)) {
+    Opts.EnableAccessControl
+      = A->getOption().matches(OPT_enable_access_control);
+  }
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);

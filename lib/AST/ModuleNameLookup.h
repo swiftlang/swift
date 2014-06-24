@@ -31,11 +31,15 @@ namespace namelookup {
 /// \param resolutionKind What sort of decl is expected.
 /// \param typeResolver The type resolver for decls that need to be
 ///        type-checked. This is needed for shadowing resolution.
+/// \param moduleScopeContext The top-level context from which the lookup is
+///        being performed, for checking accessibility. This must be either a
+///        FileUnit or a Module.
 /// \param extraImports Private imports to include in this search.
 void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     LazyResolver *typeResolver,
+                    const DeclContext *moduleScopeContext = nullptr,
                     ArrayRef<Module::ImportedModule> extraImports = {});
 
 } // end namespace namelookup

@@ -366,8 +366,6 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
-  //llvm::errs() << "unqualified lookup for: " << Name << '\n';
-  
   typedef UnqualifiedLookupResult Result;
 
   Module &M = *DC->getParentModule();
@@ -579,7 +577,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   auto resolutionKind =
     IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, extraImports);
+                 resolutionKind, TypeResolver, DC, extraImports);
 
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
@@ -951,6 +949,8 @@ bool DeclContext::lookupQualified(Type type,
                                   unsigned options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
+  using namespace namelookup;
+
   if (type->is<ErrorType>())
     return false;
 
@@ -968,19 +968,25 @@ bool DeclContext::lookupQualified(Type type,
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
     Module *module = moduleTy->getModule();
-    // Perform the lookup in all imports of this module.
-    forAllVisibleModules(this,
-                         [&](const Module::ImportedModule &import) -> bool {
-      using namespace namelookup;
-      if (import.second != module)
-        return true;
-      lookupInModule(import.second, import.first, name, decls,
+    auto topLevelScope = getModuleScopeContext();
+    if (module == topLevelScope->getParentModule()) {
+      lookupInModule(module, /*accessPath=*/{}, name, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     typeResolver);
-      // If we're able to do an unscoped lookup, we see everything. No need
-      // to keep going.
-      return !import.first.empty();
-    });
+                     typeResolver, topLevelScope);
+    } else {
+      // Perform the lookup in all imports of this module.
+      forAllVisibleModules(this,
+                           [&](const Module::ImportedModule &import) -> bool {
+        if (import.second != module)
+          return true;
+        lookupInModule(import.second, import.first, name, decls,
+                       NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                       typeResolver);
+        // If we're able to do an unscoped lookup, we see everything. No need
+        // to keep going.
+        return !import.first.empty();
+      });
+    }
 
     std::sort(decls.begin(), decls.end());
     auto afterUnique = std::unique(decls.begin(), decls.end());

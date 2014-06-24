@@ -30,7 +30,6 @@ namespace swift {
   class DeclName;
   class Expr;
   class LazyResolver;
-  class Module;
   class TupleType;
   class Type;
   class TypeDecl;
@@ -198,6 +197,9 @@ public:
 
   /// \brief Look up an identifier \p Name in the module named \p Module.
   ///
+  /// This should \em never be used for user-level name lookup, because it
+  /// does not take accessibility into account in a useful way.
+  ///
   /// Note that this will not resolve types.
   static Optional<UnqualifiedLookup> forModuleAndName(ASTContext &C,
                                                       StringRef Module,
@@ -356,6 +358,7 @@ lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
                            LazyResolver *typeResolver,
+                           const DeclContext *moduleScopeContext = nullptr,
                            ArrayRef<Module::ImportedModule> extraImports = {});
 } // end namespace namelookup
 } // end namespace swift
