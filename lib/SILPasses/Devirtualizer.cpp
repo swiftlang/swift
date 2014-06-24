@@ -473,6 +473,9 @@ processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
 
   // HACK: work around the fact that the substitution below might fail (there
   // are more dependent types than substitutions).
+  //
+  // Note: This is probably problem in the AST generics code. It is not an issue
+  // of the devirtualizer.
   if (isSubstitutionGoingToFailHack(Subs, GenCalleeType))
     return false;
 
