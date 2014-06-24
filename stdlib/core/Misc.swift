@@ -19,12 +19,6 @@ func _putchar(value: Int32) -> Int32
 
 // Some file stuff
 
-@asmname("write")
-func posix_write(fd: Int32, buf: Builtin.RawPointer, sz: Int) -> Int
-
-@asmname("read")
-func posix_read(fd: Int32, buf: Builtin.RawPointer, sz: Int) -> Int
-
 @transparent func countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }

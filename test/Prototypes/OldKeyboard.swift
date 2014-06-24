@@ -14,6 +14,12 @@
 
 // XXX FIXME -- replace and flush this out with parsing logic
 
+@asmname("write")
+func posix_write(fd: Int32, buf: CConstVoidPointer, sz: UInt) -> Int
+
+@asmname("read")
+func posix_read(fd: Int32, buf: CMutableVoidPointer, sz: UInt) -> Int
+
 @final class Keyboard {
   init() {  }
 
@@ -21,7 +27,7 @@
     // ensure uniqueness before we allow buf to be modified
     buf.reserveCapacity(0) 
     var r = buf.withUnsafePointerToElements {
-      posix_read(0, $0.value, buf.count)
+      posix_read(0, $0, UInt(buf.count))
     }
     if r < 0 {
       _preconditionFailure("read failed")
@@ -69,7 +75,7 @@ var kbd : Keyboard = Keyboard()
     for var start = 0; start < count; start += 1024 {
       let slice = buf[start..<min(start + 1024, count)]
       r = slice.withUnsafePointerToElements {
-        posix_write(1, $0.value, slice.count)
+        posix_write(1, $0, UInt(slice.count))
       }
       if r == -1 {
         break
@@ -83,7 +89,7 @@ var kbd : Keyboard = Keyboard()
     let p = buf._contiguousUTF8
 
     if p != nil {
-      let r = posix_write(1, p.value, buf.core.count)
+      let r = posix_write(1, p, UInt(buf.core.count))
     }
     else {
       var a = ContiguousArray<UInt8>(count: 1024, repeatedValue: 0)
@@ -93,7 +99,7 @@ var kbd : Keyboard = Keyboard()
         a[count++] = u
         if count == a.count {
           r = a.withUnsafePointerToElements {
-            posix_write(1, $0.value, count)
+            posix_write(1, $0, UInt(count))
           }
           if r == -1 {
             break
@@ -103,7 +109,7 @@ var kbd : Keyboard = Keyboard()
 
       if count != 0 {
         r = a.withUnsafePointerToElements {
-          posix_write(1, $0.value, count)
+          posix_write(1, $0, UInt(count))
         }
       }
     }
