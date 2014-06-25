@@ -284,6 +284,14 @@ public:
   void printName(raw_ostream &OS) const;
   
   ASTContext &getASTContext() const;
+
+  /// This function is meant for use from the debugger.  You can just say 'call
+  /// F->viewCFG()' and a ghostview window should pop up from the program,
+  /// displaying the CFG of the current function with the code for each basic
+  /// block inside.  This depends on there being a 'dot' and 'gv' program in
+  /// your path.
+  void viewCFG() const;
+
 };
   
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
