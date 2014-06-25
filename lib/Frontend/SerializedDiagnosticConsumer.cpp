@@ -441,8 +441,9 @@ emitDiagnosticMessage(SourceManager &SM,
   RecordData &Record = State->Record;
   AbbreviationMap &Abbrevs = State->Abbrevs;
 
-  StringRef filename =
-    SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+  StringRef filename = "";
+  if (Loc.isValid())
+    filename = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
 
   // Emit the RECORD_DIAG record.
   Record.clear();
