@@ -215,7 +215,12 @@ namespace {
           pointeeType = Impl.SwiftContext.TheEmptyTupleType;
         else
           pointeeType = Impl.importType(pointeeQualType, ImportTypeKind::Pointee);
-        
+
+        // If the pointed-to type is unrepresentable in Swift, import as
+        // COpaquePointer.
+        if (!pointeeType)
+          return getOpaquePointerType();
+
         auto quals = pointeeQualType.getQualifiers();
         
         if (quals.hasConst())

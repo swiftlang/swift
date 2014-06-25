@@ -38,3 +38,7 @@ void decay_param_const_array(const int p[]);
 void decay_param_func(void g(int));
 void decay_param_nested(void g(int p[]));
 
+struct not_importable;
+
+void opaque_pointer_param(struct not_importable *);
+

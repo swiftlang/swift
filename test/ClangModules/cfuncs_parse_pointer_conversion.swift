@@ -36,6 +36,9 @@ func test_pointer() {
   param_const_void_pointer(&f)
   param_const_void_pointer(fa)
   // FIXME param_const_void_pointer([1.0, 2.0, 3.0])
+
+  var op = COpaquePointer()
+  opaque_pointer_param(op)
 }
 
 func test_decay() {
