@@ -1047,8 +1047,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: {{^}}  var var_UnsafePointer11: UnsafePointer<PlainProtocol>
 // CHECK-LABEL: @objc var var_UnsafePointer12: UnsafePointer<AnyObject>
 // CHECK-LABEL: @objc var var_UnsafePointer13: UnsafePointer<AnyObject.Type>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer100: UnsafePointer<()>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer101: UnsafePointer<Void>
+// CHECK-LABEL: {{^}} @objc var var_UnsafePointer100: UnsafePointer<()>
+// CHECK-LABEL: {{^}} @objc var var_UnsafePointer101: UnsafePointer<Void>
 // CHECK-LABEL: {{^}}  var var_UnsafePointer102: UnsafePointer<(Int, Int)>
 
   var var_Optional1: Class_ObjC1?
@@ -1530,22 +1530,42 @@ class HasNSManaged {
   func constCPointer(p: CConstPointer<Int>) {}
   // CHECK-LABEL: @objc func constCPointer(p: CConstPointer<Int>) {
 
+  func constUnsafePointer(p: ConstUnsafePointer<Int>) {}
+  // CHECK-LABEL: @objc func constUnsafePointer(p: ConstUnsafePointer<Int>) {
+
   func constCPointerToAnyObject(p: CConstPointer<AnyObject>) {}
   // CHECK-LABEL: @objc func constCPointerToAnyObject(p: CConstPointer<AnyObject>) {
+
+  func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: @objc func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {
 
   func constCPointerToClass(p: CConstPointer<TakesCPointers>) {}
   // CHECK-LABEL: @objc func constCPointerToClass(p: CConstPointer<TakesCPointers>) {
 
+  func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {}
+  // CHECK-LABEL: @objc func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {
+
   func mutableCPointer(p: CMutablePointer<Int>) {}
   // CHECK-LABEL: @objc func mutableCPointer(p: CMutablePointer<Int>) {
 
+  func mutableUnsafePointer(p: UnsafePointer<Int>) {}
+  // CHECK-LABEL: @objc func mutableUnsafePointer(p: UnsafePointer<Int>) {
+
   // CMutablePointer of ObjC class type is not bridged! Another type is needed
   // for the strong-to-autoreleased writeback.
+  // FIXME: There's no reason for that; T* __strong* is representable in ObjC.
   func mutableCPointerToAnyObject(p: CMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} func mutableCPointerToAnyObject(p: CMutablePointer<AnyObject>) {
 
+  func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {
+
   func mutableCPointerToClass(p: CMutablePointer<TakesCPointers>) {}
   // CHECK-LABEL: {{^}} func mutableCPointerToClass(p: CMutablePointer<TakesCPointers>) {
+
+  func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {
+
 }
 
 // @objc with nullary names

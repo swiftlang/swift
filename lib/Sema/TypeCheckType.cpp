@@ -2048,11 +2048,23 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     if (NTD->hasClangNode())
       return true;
 
-    // An UnsafePointer<T> is representable in Objective-C if T is a
-    // trivially representable type.
-    if (NTD == Context.getUnsafePointerDecl()) {
-      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
-      return isTriviallyRepresentableInObjC(DC, T);
+    // Pointers may be representable in ObjC.
+    PointerTypeKind PTK;
+    if (auto pointerElt = T->getAnyPointerElementType(PTK)) {
+      switch (PTK) {
+      case PTK_UnsafePointer:
+      case PTK_ConstUnsafePointer: {
+        // An UnsafePointer<T> or ConstUnsafePointer<T> is representable in
+        // Objective-C if T is a trivially representable type or Void.
+        return pointerElt->isEqual(Context.TheEmptyTupleType)
+          || isTriviallyRepresentableInObjC(DC, pointerElt);
+      }
+      case PTK_AutoreleasingUnsafePointer: {
+        // An AutoreleasingUnsafePointer<T> is representable in ObjC if T
+        // is a (potentially optional) ObjC pointer type.
+        return isUnknownObjectOrOptionalType(pointerElt);
+      }
+      }
     }
     // A CConstPointer<T> is representable in ObjC if T
     // is a trivially representable type.
@@ -2067,16 +2079,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isTriviallyRepresentableInObjC(DC, T)
         && !isUnknownObjectType(T);
-    }
-    
-    // An AutoreleasingUnsafePointer<T> is representable in ObjC if T
-    // is a (potentially optional) ObjC pointer type.
-    if (NTD == Context.getAutoreleasingUnsafePointerDecl()) {
-      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
-      return isUnknownObjectOrOptionalType(T);
-    }
-    
-    // TODO: C*VoidPointer
+    }    
   }
 
   // If it's a mapped type, it's representable.
