@@ -208,9 +208,43 @@ namespace {
       }
       
       // All other C pointers to concrete types map to UnsafePointer<T> or
-      // COpaquePointer, except in parameter position.
+      // COpaquePointer (FIXME:, except in parameter position under the pre-
+      // intrinsic-pointer-conversion regime.)
       auto pointeeQualType = type->getPointeeType();
 
+      // With pointer conversions enabled, map to the normal pointer types
+      // without special hints.
+      if (Impl.SwiftContext.LangOpts.EnablePointerConversions) {
+        Type pointeeType;
+        if (pointeeQualType->isVoidType())
+          pointeeType = Impl.SwiftContext.TheEmptyTupleType;
+        else
+          pointeeType = Impl.importType(pointeeQualType, ImportTypeKind::Pointee);
+        
+        auto quals = pointeeQualType.getQualifiers();
+        
+        if (quals.hasConst())
+          return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                       "ConstUnsafePointer",
+                                                       pointeeType),
+                  ImportHint::None};
+        // Mutable pointers with __autoreleasing or __unsafe_unretained
+        // ownership map to AutoreleasingUnsafePointer<T>.
+        else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
+              || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
+        // TODO: Special case NSError**. Need to update the NSErrorPointer
+        // typedef after we transition to intrinsic pointer conversions.
+          return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                  "AutoreleasingUnsafePointer",
+                                                  pointeeType),
+                  ImportHint::None};
+        // All other mutable pointers map to UnsafePointer.
+        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                     "UnsafePointer",
+                                                     pointeeType),
+                ImportHint::None};
+      }
+      
       // Import void* as COpaquePointer.
       if (pointeeQualType->isVoidType()) {
         return { getOpaquePointerType(), ImportHint::CPointer };
@@ -563,6 +597,34 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
       quals.getObjCLifetime() == clang::Qualifiers::OCL_Weak)
     return abstractImportedType;
 
+  // With pointer conversions enabled, map to the normal pointer types.
+  if (impl.SwiftContext.LangOpts.EnablePointerConversions) {
+    Type pointeeType;
+    if (clangPointeeType->isVoidType())
+      pointeeType = impl.SwiftContext.TheEmptyTupleType;
+    else
+      pointeeType =
+        abstractImportedType->castTo<BoundGenericType>()->getGenericArgs()[0];
+
+    if (quals.hasConst())
+      return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                  "ConstUnsafePointer",
+                                                  pointeeType);
+    // Mutable pointers with __autoreleasing or __unsafe_unretained
+    // ownership map to AutoreleasingUnsafePointer<T>.
+    else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
+             quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
+    // TODO: Special case NSError**. Need to update the NSErrorPointer
+    // typedef after we transition to intrinsic pointer conversions.
+      return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                  "AutoreleasingUnsafePointer",
+                                                  pointeeType);
+    // All other mutable pointers map to UnsafePointer.
+    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                "UnsafePointer",
+                                                pointeeType);
+  }
+  
   if (clangPointeeType->isVoidType()) {
     // Pointers to unmappable or void types map to C*VoidPointer.
     if (quals.hasConst())
