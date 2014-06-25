@@ -844,10 +844,10 @@ static bool simplifySwitchEnumCondBrPattern(
   auto *OtherBlock = OnlyEnumBB == B1 ? B2 : B1;
   BranchInst *OtherBlockBr = cast<BranchInst>(OtherBlock->getTerminator());
   EnumInst *OtherBlockEnum =
-      cast<EnumInst>(OtherBlockBr->getArg(EnumMergeIdx));
+    dyn_cast<EnumInst>(OtherBlockBr->getArg(EnumMergeIdx));
 
   // The two enum tags need to be different.
-  if (OtherBlockEnum->getElement() == OnlyEnum->getElement())
+  if (!OtherBlockEnum || OtherBlockEnum->getElement() == OnlyEnum->getElement())
     return false;
 
   // TODO: Implement the logic for handling this case.
