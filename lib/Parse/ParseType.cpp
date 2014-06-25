@@ -622,8 +622,13 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
 
     if (NestedType.isParseError())
       return makeParserErrorResult(ATR);
-    else
+    else {
+      diagnose(lsquareLoc, diag::new_array_syntax)
+        .fixItInsert(Base->getStartLoc(), "[")
+        .fixItRemove(lsquareLoc);
+
       return makeParserResult(ATR);
+    }
   }
 
   SourceLoc rsquareLoc;

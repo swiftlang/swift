@@ -577,6 +577,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
                                      Indexes->getSourceRange(),
                                      /*OldSyntax=*/true);
+
+    TC.diagnose(Indexes->getStartLoc(), diag::new_array_syntax)
+      .fixItInsert(SE->getStartLoc(), "[")
+      .fixItRemove(Indexes->getStartLoc());
+
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   

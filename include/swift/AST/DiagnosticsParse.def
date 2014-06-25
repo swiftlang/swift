@@ -542,7 +542,6 @@ ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
 ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
       "expected element type", ())
 
-
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())
