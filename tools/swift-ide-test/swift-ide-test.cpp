@@ -136,6 +136,10 @@ static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
 static llvm::cl::opt<std::string>
+ResourceDir("resource-dir",
+            llvm::cl::desc("The directory that holds the compiler resource files"));
+
+static llvm::cl::opt<std::string>
 ImportObjCHeader("import-objc-header", llvm::cl::desc("header to implicitly import"));
 
 static llvm::cl::opt<bool>
@@ -1614,6 +1618,10 @@ int main(int argc, char *argv[]) {
     options::ImplicitProperties;
   InitInvok.getClangImporterOptions().ImportWithTighterObjCPointerTypes =
     options::ImportWithTighterObjCPointerTypes;
+  if (!options::ResourceDir.empty()) {
+    InitInvok.setRuntimeResourcePath(options::ResourceDir);
+  }
+
   InitInvok.getLangOptions().ImplicitObjCWith = options::ImplicitObjCWith;
 
   for (auto ConfigName : options::BuildConfigs)
