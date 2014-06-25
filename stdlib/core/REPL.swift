@@ -19,7 +19,7 @@
   }
 }
 
-var _replExitHandlers = _REPLExitHandler[]()
+var _replExitHandlers = [_REPLExitHandler]()
 
 @public func _atREPLExit(handler: () -> ()) {
   _replExitHandlers.append(_REPLExitHandler(handler))

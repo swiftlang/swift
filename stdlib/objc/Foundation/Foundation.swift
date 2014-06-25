@@ -564,17 +564,17 @@ extension NSArray : ArrayLiteralConvertible {
 /// The entry point for converting `NSArray` to `Array` in bridge
 /// thunks.  Used, for example, to expose ::
 ///
-///   func f(NSView[]) {}
+///   func f([NSView]) {}
 ///
 /// to Objective-C code as a method that accepts an NSArray.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
-@public func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
+@public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
     return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   }
 
-  var anyObjectArr: AnyObject[]
+  var anyObjectArr: [AnyObject]
     = Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   return _arrayBridgeFromObjectiveC(anyObjectArr)
 }
@@ -582,10 +582,10 @@ extension NSArray : ArrayLiteralConvertible {
 /// The entry point for converting `Array` to `NSArray` in bridge
 /// thunks.  Used, for example, to expose ::
 ///
-///   func f() -> NSView[] { return [] }
+///   func f() -> [NSView] { return [] }
 ///
 /// to Objective-C code as a method that returns an NSArray.
-@public func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
+@public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return arr.bridgeToObjectiveC()
 }
 
@@ -610,8 +610,8 @@ extension Array : _ConditionallyBridgedToObjectiveC {
       return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     }
 
-    var anyObjectArr: AnyObject[]
-      = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    var anyObjectArr: [AnyObject]
+      = [AnyObject](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
@@ -619,7 +619,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
-      = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      = [AnyObject](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     if isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }
@@ -634,7 +634,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 
 extension NSArray : Reflectable {
   @public func getMirror() -> Mirror {
-    return reflect(self as AnyObject[])
+    return reflect(self as [AnyObject])
   }
 }
 
@@ -795,7 +795,7 @@ extension NSDictionary : Reflectable {
 //===----------------------------------------------------------------------===//
 
 extension NSObject : CVarArg {
-  @public func encode() -> Word[] {
+  @public func encode() -> [Word] {
     _autorelease(self)
     return encodeBitsAsWords(self)
   }
@@ -822,7 +822,7 @@ extension NSFastEnumerationState {
 // to implement it both correctly and efficiently.
 @public class NSFastGenerator : Generator {
   var enumerable: NSFastEnumeration
-  var state: NSFastEnumerationState[]
+  var state: [NSFastEnumerationState]
   var n: Int
   var count: Int
 
@@ -834,7 +834,7 @@ extension NSFastEnumerationState {
     var buf = (COpaquePointer(), COpaquePointer(),
                COpaquePointer(), COpaquePointer())
   }
-  var objects: ObjectsBuffer[]
+  var objects: [ObjectsBuffer]
 
   @public func next() -> AnyObject? {
     if n == count {
@@ -1281,7 +1281,7 @@ extension NSArray {
   }
 
   @final @conversion @public
-  func __conversion() -> AnyObject[] {
+  func __conversion() -> [AnyObject] {
     return Array(
              ArrayBuffer(reinterpretCast(self.copyWithZone(nil)) as _CocoaArray))
   }
@@ -1292,8 +1292,8 @@ extension NSDictionary {
   @public
   convenience init(objectsAndKeys objects: AnyObject...) {
     // - (instancetype)initWithObjects:(NSArray *)objects forKeys:(NSArray *)keys;
-    var values: AnyObject[] = []
-    var keys:   AnyObject[] = []
+    var values: [AnyObject] = []
+    var keys:   [AnyObject] = []
     for var i = 0; i < objects.count; i += 2 {
       values.append(objects[i])
       keys.append(objects[i+1])

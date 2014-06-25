@@ -216,7 +216,7 @@ func ~= <
 extension Range {
   /// Return an array containing the results of calling
   /// `transform(x)` on each element `x` of `self`.
-  @public func map<U>(transform: (T)->U) -> U[] {
-    return U[](Swift.map(self, transform))
+  @public func map<U>(transform: (T)->U) -> [U] {
+    return [U](Swift.map(self, transform))
   }
 }

@@ -118,7 +118,7 @@
   case URL(String)
 
   /// Raw data that has already been encoded in a format the IDE understands.
-  case _Raw(UInt8[], String)
+  case _Raw([UInt8], String)
 }
 
 /// How children of this value should be presented in the IDE.

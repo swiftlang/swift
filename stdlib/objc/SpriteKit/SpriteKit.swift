@@ -186,8 +186,8 @@ extension SKTexture : Reflectable {
 #endif
 
 extension SKNode {
-  @public subscript (name: String) -> SKNode[] {
-     var nodes = SKNode[]()
+  @public subscript (name: String) -> [SKNode] {
+     var nodes = [SKNode]()
      enumerateChildNodesWithName(name) { node, stop in
        if let n = node { nodes.append(n) }
      }

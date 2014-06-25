@@ -30,11 +30,11 @@ extension String {
         input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  var _lines : String[] {
+  var _lines : [String] {
     return _split("\n")
   }
   
-  func _split(separator: UnicodeScalar) -> String[] {
+  func _split(separator: UnicodeScalar) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
     return scalarSlices.map { $0 as String }
   }
@@ -362,7 +362,7 @@ extension String {
   /// Split the given string at each occurrence of a character for which
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
-  func _splitIf(predecessor: (UnicodeScalar) -> Bool) -> String[] {
+  func _splitIf(predecessor: (UnicodeScalar) -> Bool) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, predecessor)
     return scalarSlices.map { $0 as String }
   }

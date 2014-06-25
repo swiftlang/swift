@@ -194,7 +194,7 @@ struct Less<T: Comparable> {
   quickSort(&collection, indices(collection))
 }
 
-@public func sort<T>(inout array: T[], predicate: (T, T) -> Bool) {
+@public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
   return array.withMutableStorage {
     a in sort(&a, predicate)
     return
@@ -204,7 +204,7 @@ struct Less<T: Comparable> {
 /// The functions below are a copy of the functions above except that
 /// they don't accept a predicate and they are hardcoded to use the less-than
 /// comparator.
-@public func sort<T : Comparable>(inout array: T[]) {
+@public func sort<T : Comparable>(inout array: [T]) {
   return array.withMutableStorage {
     a in sort(&a)
     return
@@ -236,7 +236,7 @@ struct Less<T: Comparable> {
 >(
   source: S,
   predicate: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
-) -> S.GeneratorType.Element[] {
+) -> [S.GeneratorType.Element] {
   var result = Array(source)
   sort(&result, predicate)
   return result
@@ -247,7 +247,7 @@ struct Less<T: Comparable> {
     where S.GeneratorType.Element: Comparable
 >(
   source: S
-) -> S.GeneratorType.Element[] {
+) -> [S.GeneratorType.Element] {
   var result = Array(source)
   sort(&result)
   return result
@@ -435,7 +435,7 @@ func _quickSort<
   isSeparator: (Seq.GeneratorType.Element)->R, 
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false
-  ) -> Seq.SliceType[] {
+  ) -> [Seq.SliceType] {
 
   var result = Array<Seq.SliceType>()
 

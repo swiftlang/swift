@@ -13,7 +13,7 @@
 @public struct _Process {
   // Use lazy initialization of static properties to safely initialize the
   // public 'arguments' property on first use.
-  static var _arguments: String[] = {
+  static var _arguments: [String] = {
     // FIXME: Use a by-index-initializing constructor of Array here when we
     // have that, so we don't need this awkward closure initialization.
     var _args = new String[Int(C_ARGC)]
@@ -27,7 +27,7 @@
     return _args
   }()
 
-  @public var arguments : String[] {
+  @public var arguments : [String] {
     return _Process._arguments
   }
 }

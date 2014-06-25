@@ -304,17 +304,16 @@ func _expectNotEqual${Generic}(
   }
 
   var name: String
-  var _tests: _Test[] = []
+  var _tests: [_Test] = []
 }
 
 // These APIs don't really belong in a unittesting library, but are useful
 // in tests, and stdlib does not have such facilities yet.
 
-@public func asHex(a: UInt8[]) -> String {
+@public func asHex(a: [UInt8]) -> String {
   return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 
-@public func asHex(a: UInt32[]) -> String {
+@public func asHex(a: [UInt32]) -> String {
   return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
-

@@ -78,7 +78,7 @@
   /// From a non-`nil` `CString` with possibly-transient lifetime, create a
   /// nul-terminated array of 'C' char.
   /// Returns `nil` if the `CString` was created from a null pointer.
-  @public func persist() -> CChar[]? {
+  @public func persist() -> [CChar]? {
     if !self {
       return .None
     }

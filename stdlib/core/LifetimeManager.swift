@@ -26,11 +26,11 @@ func swift_keepAlive<T>(inout _: T)
 /// This class can be used to extend lifetime of objects to pass UnsafePointers
 /// to them to C APIs.
 @internal class LifetimeManager {
-  var _managedRefs : Builtin.NativeObject[]
+  var _managedRefs : [Builtin.NativeObject]
   var _releaseCalled : Bool
 
   init() {
-    _managedRefs = Array<Builtin.NativeObject>()
+    _managedRefs = []
     _releaseCalled = false
   }
 

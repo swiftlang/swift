@@ -807,10 +807,10 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
   return Array(a._buffer.castToBufferOf(Base.self))
 }
 
-/// Implements the semantics of `x as Derived[]` where `x` has type
-/// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
+/// Implements the semantics of `x as [Derived]` where `x` has type
+/// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
-@public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> Derived[] {
+@public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
   _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
 
@@ -825,13 +825,13 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
   }
 
   // FIXME: Make these checks deferred.
-  let result: Derived[]? = _arrayDownCastConditional(a)
+  let result: [Derived]? = _arrayDownCastConditional(a)
   _precondition(result, "array cannot be downcast to array of derived")
   return result!
 }
 
-/// Implements the semantics of `x as? Derived[]` where `x` has type
-/// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
+/// Implements the semantics of `x as? [Derived]` where `x` has type
+/// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
 ///
 /// Returns an Array<Derived> containing the same elements as a in
@@ -839,7 +839,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// type Derived or a type derived from Derived.
 @public func _arrayDownCastConditional<Base, Derived>(
   a: Array<Base>
-) -> Derived[]? {
+) -> [Derived]? {
   _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
   

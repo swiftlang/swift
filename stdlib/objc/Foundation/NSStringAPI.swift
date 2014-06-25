@@ -20,7 +20,7 @@
 // Property Lists need to be properly bridged
 //
 
-func _toNSArray<T, U:AnyObject>(a: T[], f: (T)->U) -> NSArray {
+func _toNSArray<T, U:AnyObject>(a: [T], f: (T)->U) -> NSArray {
   var result = NSMutableArray(capacity: a.count)
   for s in a {
     result.addObject(f(s))
@@ -123,8 +123,8 @@ extension String {
 
   /// Returns an Array of the encodings string objects support
   /// in the application’s environment.
-  @public static func availableStringEncodings() -> NSStringEncoding[] {
-    var result = NSStringEncoding[]()
+  @public static func availableStringEncodings() -> [NSStringEncoding] {
+    var result = [NSStringEncoding]()
     var p = NSString.availableStringEncodings()
     while p.memory != 0 {
       result.append(p.memory)
@@ -165,7 +165,7 @@ extension String {
 
   /// Returns a string built from the strings in a given array
   /// by concatenating them with a path separator between each pair.
-  @public static func pathWithComponents(components: String[]) -> String {
+  @public static func pathWithComponents(components: [String]) -> String {
     return NSString.pathWithComponents(components)
   }
 
@@ -382,8 +382,8 @@ extension String {
   @public func completePathIntoString(
     _ outputName: CMutablePointer<String> = nil,
     caseSensitive: Bool,
-    matchesIntoArray: CMutablePointer<String[]> = nil,
-    filterTypes: String[]? = nil
+    matchesIntoArray: CMutablePointer<[String]> = nil,
+    filterTypes: [String]? = nil
   ) -> Int {
     var nsMatches: NSArray?
     var nsOutputName: NSString?
@@ -417,7 +417,7 @@ extension String {
   /// that have been divided by characters in a given set.
   @public func componentsSeparatedByCharactersInSet(
     separator: NSCharacterSet
-  ) -> String[] {
+  ) -> [String] {
     // FIXME: two steps due to <rdar://16971181>
     let nsa = _ns.componentsSeparatedByCharactersInSet(separator)
     // Since this function is effectively a bridge thunk, use the
@@ -430,7 +430,7 @@ extension String {
 
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
-  @public func componentsSeparatedByString(separator: String) -> String[] {
+  @public func componentsSeparatedByString(separator: String) -> [String] {
     let nsa = _ns.componentsSeparatedByString(separator)
     // Since this function is effectively a bridge thunk, use the
     // bridge thunk semantics for the NSArray conversion
@@ -441,9 +441,9 @@ extension String {
 
   /// Returns a representation of the `String` as a C string
   /// using a given encoding.
-  @public func cStringUsingEncoding(encoding: NSStringEncoding) -> CChar[]? {
+  @public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
-      (s: NSString) -> CChar[]? in
+      (s: NSString) -> [CChar]? in
       s.cStringUsingEncoding(encoding).persist()
     }
   }
@@ -587,7 +587,7 @@ extension String {
   // - (const char *)fileSystemRepresentation
 
   /// Returns a file system-specific representation of the `String`.
-  @public func fileSystemRepresentation() -> CChar[] {
+  @public func fileSystemRepresentation() -> [CChar] {
     return _ns.fileSystemRepresentation.persist()!
   }
 
@@ -606,7 +606,7 @@ extension String {
   /// Gets a given range of characters as bytes in a specified encoding.
   /// Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   @public func getBytes(
-    inout buffer: UInt8[],
+    inout buffer: [UInt8],
     maxLength: Int,
     usedLength: CMutablePointer<Int>,
     encoding: NSStringEncoding,
@@ -635,7 +635,7 @@ extension String {
   /// stores them in a buffer. Note: will store a maximum of
   /// `min(buffer.count, maxLength)` bytes.
   @public func getCString(
-    inout buffer: CChar[], maxLength: Int, encoding: NSStringEncoding
+    inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
     return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength), 
                           encoding: encoding)
@@ -650,7 +650,7 @@ extension String {
   /// for use with file-system calls. Note: will store a maximum of
   /// `min(buffer.count, maxLength)` bytes.
   @public func getFileSystemRepresentation(
-    inout buffer: CChar[], maxLength: Int) -> Bool {
+    inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
       &buffer, maxLength: min(buffer.count, maxLength))
   }
@@ -728,7 +728,7 @@ extension String {
   /// given encoding.  Note: will store a maximum of
   /// `min(bytes.count, length)` bytes.
   @public static func stringWithBytes(
-    var bytes: UInt8[], 
+    var bytes: [UInt8], 
     length: Int, 
     encoding: NSStringEncoding
   ) -> String? {
@@ -838,7 +838,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user’s default locale.
-  @public init(format: String, arguments: CVarArg[]) {
+  @public init(format: String, arguments: [CVarArg]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
   
@@ -859,7 +859,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  @public init(format: String, locale: NSLocale?, arguments: CVarArg[]) {
+  @public init(format: String, locale: NSLocale?, arguments: [CVarArg]) {
     _precondition(
       _countFormatSpecifiers(format) <= arguments.count,
       "Too many format specifiers (%<letter>) provided for the argument list"
@@ -930,8 +930,8 @@ extension String {
     scheme tagScheme: String, 
     options opts: NSLinguisticTaggerOptions = nil,
     orthography: NSOrthography? = nil, 
-    tokenRanges: CMutablePointer<Range<Index>[]> = nil // FIXME:Can this be nil?
-  ) -> String[] {
+    tokenRanges: CMutablePointer<[Range<Index>]> = nil // FIXME:Can this be nil?
+  ) -> [String] {
     var nsTokenRanges: NSArray? = nil
     let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
       self._ns.linguisticTagsInRange(
@@ -941,7 +941,7 @@ extension String {
     
     if nsTokenRanges {
       tokenRanges._setIfNonNil {
-        (nsTokenRanges! as AnyObject[]).map {
+        (nsTokenRanges! as [AnyObject]).map {
           self._range($0.rangeValue)
         }
       }
@@ -1005,8 +1005,8 @@ extension String {
 
   /// Returns an array of NSString objects containing, in
   /// order, each path component of the `String`.
-  @public var pathComponents: String[] {
-    return _ns.pathComponents as String[]
+  @public var pathComponents: [String] {
+    return _ns.pathComponents as [String]
   }
 
   // @property NSString* pathExtension;
@@ -1360,8 +1360,8 @@ extension String {
 
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in in a given array.
-  @public func stringsByAppendingPaths(paths: String[]) -> String[] {
-    return _ns.stringsByAppendingPaths(paths) as String[]
+  @public func stringsByAppendingPaths(paths: [String]) -> [String] {
+    return _ns.stringsByAppendingPaths(paths) as [String]
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex
