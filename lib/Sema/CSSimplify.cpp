@@ -1330,6 +1330,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
         if (rep1 == rep2) {
+          if (kind == TypeMatchKind::BindToPointerType) {
+            increaseScore(ScoreKind::SK_ScalarPointerConversion);
+          }
           // We already merged these two types, so this constraint is
           // trivially solved.
           return SolutionKind::Solved;
@@ -1340,6 +1343,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (rep1->getImpl().canBindToLValue()
               != rep2->getImpl().canBindToLValue()) {
           if (flags & TMF_GenerateConstraints) {
+            if (kind == TypeMatchKind::BindToPointerType) {
+              increaseScore(ScoreKind::SK_ScalarPointerConversion);
+            }
+
             // Add a new constraint between these types. We consider the current
             // type-matching problem to the "solved" by this addition, because
             // this new constraint will be solved at a later point.
@@ -1765,6 +1772,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           // We can potentially convert from an UnsafePointer of a different
           // type, if we're a void pointer.
           if (bgt1 && bgt1->getDecl() == getASTContext().getUnsafePointerDecl()) {
+            // Favor an UnsafePointer-to-UnsafePointer conversion.
+            if (bgt2->getDecl() == getASTContext().getUnsafePointerDecl())
+              increaseScore(ScoreKind::SK_ScalarPointerConversion);
             conversionsOrFixes.push_back(
                                    ConversionRestrictionKind::PointerToPointer);
           }

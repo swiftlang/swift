@@ -150,3 +150,13 @@ func autoreleasingPointerArguments(p: UnsafePointer<Int>,
   // Should fail once the existing __conversions are removed
   //var x: AutoreleasingUnsafePointer<C> = &c // e/xpected-error{{}}
 }
+
+func pointerConstructor(x: UnsafePointer<Int>) -> UnsafePointer<Float> {
+  return UnsafePointer(x)
+}
+
+func pointerArithmetic(x: UnsafePointer<Int>, y: UnsafePointer<Int>,
+                       i: Int) {
+  let p = x + i
+  let d = x - y
+}
