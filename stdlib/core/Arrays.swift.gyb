@@ -49,20 +49,7 @@
         _buffer[index] = newValue
       }
       else {
-        // Slow path is written in a closure to put it out of line and prevent
-        // performance inliner from inlining it back.
-        // FIXME: extract into a '@noretun' function.
-        {
-          (inout buffer: _Buffer, e: Element)->() in
-          var newBuffer = ContiguousArrayBuffer<T>(
-            count: buffer.count, minimumCapacity: buffer.count)
-          let target = buffer._uninitializedCopy(
-            0..<index, target: newBuffer.elementStorage)
-          target.initialize(e)
-          buffer._uninitializedCopy(
-            (index + 1)..<buffer.count, target: target + 1)
-          buffer = _Buffer(newBuffer)
-        }(&_buffer, newValue)
+        makeUnique(&_buffer, e: newValue, index: index)
       }
     }
   }
@@ -84,6 +71,19 @@
   }
 
   //===--- private --------------------------------------------------------===//
+
+  // TODO: mark as @noinline.
+  func makeUnique(inout buffer: _Buffer, e: Element, index : Int) {
+    var newBuffer = ContiguousArrayBuffer<T>(
+      count: buffer.count, minimumCapacity: buffer.count)
+    let target = buffer._uninitializedCopy(
+      0..<index, target: newBuffer.elementStorage)
+    target.initialize(e)
+    buffer._uninitializedCopy(
+      (index + 1)..<buffer.count, target: target + 1)
+    buffer = _Buffer(newBuffer)
+  }
+
   typealias _Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
 
   init(_ buffer: _Buffer) {
