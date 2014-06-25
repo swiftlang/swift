@@ -81,61 +81,87 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
+  if (Options.DebugSerialization) {
     SILPassManager PM(&Module, Options);
     registerAnalysisPasses(PM, &Module);
     PM.add(createSILLinker());
-    if (Options.DebugSerialization) {
-      PM.run();
-      return;
-    }
-    PM.add(createGenericSpecializer());
-    PM.add(createPerfInliner());
-    PM.add(createSILCombine());
-    PM.add(createDeadFunctionElimination());
-    PM.add(createGlobalOpt());
-    PM.add(createLowerAggregate());
-    PM.add(createSROA());
-    PM.add(createMem2Reg());
-    PM.add(createPerformanceConstantPropagation());
-    PM.add(createDCE());
-    PM.add(createCSE());
-    PM.add(createSILCombine());
-    PM.add(createLoadStoreOpts());
-    PM.add(createCodeMotion());
-    PM.add(createSimplifyCFG());
-    PM.add(createDevirtualization());
-    PM.add(createEnumSimplification());
-    PM.add(createGlobalARCOpts());
-    PM.add(createAllocBoxToStack());
-    PM.add(createDeadObjectElimination());
-    PM.add(createDCE());
     PM.run();
+    return;
+  }
 
-    // Run the laste passes.
-    SILPassManager PM2(&Module, Options);
-    registerAnalysisPasses(PM2, &Module);
-    PM2.add(createInlineCaches());
-    PM2.runOneIteration();
-    PM.runOneIteration();
+  // Start by specializing generics and by cloning functions from stdlib.
+  SILPassManager GenericsPM(&Module, Options);
+  registerAnalysisPasses(GenericsPM, &Module);
+  GenericsPM.add(createSILLinker());
+  GenericsPM.add(createGenericSpecializer());
+  GenericsPM.run();
 
-    // We have a tradeoff here on how often we should clean up the deserialized
-    // SILFunctions. We can remove them at dead function elimination of each
-    // optimization iteration, the down side is that we will pay the cost of
-    // deserializing them again if they are needed later on; the plus side is
-    // that passes have fewer function to process.
-    // We first release the reference from the deserializer.
-    Module.invalidateSILLoader();
+  // Construct SSA and optimize it.
+  SILPassManager SSAPM(&Module, Options);
+  registerAnalysisPasses(SSAPM, &Module);
+  SSAPM.add(createSimplifyCFG());
+  SSAPM.add(createAllocBoxToStack());
+  SSAPM.add(createLowerAggregate());
+  SSAPM.add(createSILCombine());
+  SSAPM.add(createSROA());
+  SSAPM.add(createMem2Reg());
 
-    // Remove unused SIL Functions, VTables and WitnessTables.
-    performSILElimination(&Module);
+  // Perform classsic SSA optimizations.
+  SSAPM.add(createPerformanceConstantPropagation());
+  SSAPM.add(createDCE());
+  SSAPM.add(createCSE());
+  SSAPM.add(createSILCombine());
+  SSAPM.add(createSimplifyCFG());
 
-    // Gather instruction counts if we are asked to do so.
-    if (Options.PrintInstCounts) {
-      SILPassManager PM3(&Module, Options);
-      PM3.add(createSILInstCount());
-      PM3.runOneIteration();
-    }
+  // Perform retain/release code motion and run the first ARC optimizer.
+  SSAPM.add(createLoadStoreOpts());
+  SSAPM.add(createCodeMotion());
+  SSAPM.add(createEnumSimplification());
+  SSAPM.add(createGlobalARCOpts());
 
-    DEBUG(Module.verify());
+  // Devirtualize.
+  SSAPM.add(createDevirtualization());
+  SSAPM.add(createGenericSpecializer());
+  SSAPM.add(createSILLinker());
+
+  // Inline.
+  SSAPM.add(createPerfInliner());
+  SSAPM.add(createGlobalARCOpts());
+
+  // Run three iteration of the SSA pass mananger.
+  SSAPM.runOneIteration();
+  SSAPM.runOneIteration();
+  SSAPM.runOneIteration();
+
+  // Perform lowering optimizations.
+  SILPassManager LoweringPM(&Module, Options);
+  registerAnalysisPasses(LoweringPM, &Module);
+  LoweringPM.add(createDeadFunctionElimination());
+  LoweringPM.add(createDeadObjectElimination());
+
+  // Hoist globals out of loops.
+  LoweringPM.add(createGlobalOpt());
+
+  // Insert inline caches for virtual calls.
+  LoweringPM.add(createDevirtualization());
+  LoweringPM.add(createInlineCaches());
+  LoweringPM.run();
+
+  // Run another iteration of the SSA optimizations to optimize th
+  // devirtualized inline caches.
+  SSAPM.invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+  SSAPM.runOneIteration();
+
+  // Invalidate the SILLoader and allow it to drop references to SIL functions.
+  Module.invalidateSILLoader();
+  performSILElimination(&Module);
+
+  // Gather instruction counts if we are asked to do so.
+  if (Options.PrintInstCounts) {
+    SILPassManager PrinterPM(&Module, Options);
+    PrinterPM.add(createSILInstCount());
+    PrinterPM.runOneIteration();
+  }
+
+  DEBUG(Module.verify());
 }
-

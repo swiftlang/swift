@@ -5,14 +5,11 @@
 
 // CHECK-LABEL: sil private @top_level_code
 // CHECK: bb0:
-// CHECK-NEXT: alloc_ref
-// CHECK-NEXT: function_ref unknown1
-// CHECK-NEXT: function_ref @unknown1
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: alloc_ref
+// CHECK: function_ref @unknown1
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
 
 struct Int32 {}
 

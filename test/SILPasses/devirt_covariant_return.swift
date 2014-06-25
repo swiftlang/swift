@@ -6,28 +6,24 @@
 
 // CHECK-LABEL: sil @_TF23devirt_covariant_return6driverFT_T_ : $@thin () -> () {
 // CHECK: bb0
-// CHECK-NEXT: alloc_ref
-// CHECK-NEXT: alloc_ref
-// CHECK-NEXT: alloc_ref
-// CHECK-NEXT: function_ref unknown1a
-// CHECK-NEXT: function_ref @unknown1a : $@thin () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref defrenestrate
-// CHECK-NEXT: function_ref @defrenestrate : $@thin () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref unknown2a
-// CHECK-NEXT: function_ref @unknown2a : $@thin () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref unknown3a
-// CHECK-NEXT: function_ref @unknown3a : $@thin () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: alloc_ref
+// CHECK: alloc_ref
+// CHECK: alloc_ref
+// CHECK: function_ref @unknown1a : $@thin () -> ()
+// CHECK: apply
+// CHECK: function_ref @defrenestrate : $@thin () -> ()
+// CHECK: apply
+// CHECK: function_ref @unknown2a : $@thin () -> ()
+// CHECK: apply
+// CHECK: apply
+// CHECK: function_ref @unknown3a : $@thin () -> ()
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: tuple
+// CHECK: return
 
 @asmname("unknown1a")
 func unknown1a() -> ()
