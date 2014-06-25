@@ -80,6 +80,8 @@ func constPointerArguments(p: UnsafePointer<Int>,
   takesConstPointer(&ff) // expected-error{{}}
   takesConstPointer(ii)
   takesConstPointer(ff) // expected-error{{}}
+  takesConstPointer([0, 1, 2])
+  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{}}
 
   // We don't allow these conversions outside of function arguments.
   var x: ConstUnsafePointer<Int> = &i // expected-error{{}}
@@ -112,6 +114,8 @@ func constVoidPointerArguments(p: UnsafePointer<Int>,
   takesConstVoidPointer(&ff)
   takesConstVoidPointer(ii)
   takesConstVoidPointer(ff)
+  // TODO: takesConstVoidPointer([0, 1, 2])
+  // TODO: takesConstVoidPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
   var x: ConstUnsafePointer<Void> = &i // expected-error{{}}
