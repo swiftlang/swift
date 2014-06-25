@@ -643,6 +643,23 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
   }
 
+  // Fold [T] into an array type.
+  if (auto *AE = dyn_cast<ArrayExpr>(E)) {
+    if (AE->getElements().size() != 1)
+      return nullptr;
+
+    TypeExpr *TyExpr = dyn_cast<TypeExpr>(AE->getElements()[0]);
+    if (!TyExpr)
+      return nullptr;
+
+    auto *NewTypeRepr =
+      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), nullptr,
+                                     SourceRange(AE->getLBracketLoc(),
+                                                 AE->getRBracketLoc()),
+                                     /*OldSyntax=*/false);
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
   return nullptr;
 }
 

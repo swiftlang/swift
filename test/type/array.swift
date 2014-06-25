@@ -20,3 +20,12 @@ struct X<T> { }
 func testGenericSpec() {
   let x = X<[Int]>()
 }
+
+// Array types for construction.
+func constructArray(n: Int) {
+  var ones = [Int](count: n, repeatedValue: 1)
+  ones[5] = 0
+
+  var matrix = [[Float]]()
+  matrix[1][2] = 3.14159
+}
