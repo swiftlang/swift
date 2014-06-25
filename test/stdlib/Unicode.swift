@@ -2305,9 +2305,32 @@ func checkUTF8View(expected: UInt8[], stringUnderTest: String) {
   expectEqual(expected, utf8Bytes)
 }
 
-var StringUTFViews = TestCase("StringUTFViews")
+func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
+  for (name, batch) in UTF16Tests {
+    println("Batch: \(name)")
+    for test in batch {
+      test.encoded.withUnsafePointerToElements {
+        (ptr) -> () in
+        let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
+            ptr, test.encoded.count, kCFAllocatorNull)
+        if !test.encoded.isEmpty {
+          // Exclude the empty testcase from this check because it will fail --
+          // CoreFoundation will return NULL for character data of an empty
+          // string.
+          expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
+        }
+        let subject: String = cfstring
 
-StringUTFViews.test("UTF8NativeImplementation") {
+        checkClosure(test, subject)
+        return ()
+      }
+    }
+  }
+}
+
+var StringCookedViews = TestCase("StringCookedViews")
+
+StringCookedViews.test("UTF8ForContiguousUTF16") {
   for test in UTF8TestsSmokeTest {
     // Add a non-ASCII character at the beginning to force Swift String and
     // CoreFoundation off the ASCII fast path.
@@ -2335,32 +2358,18 @@ StringUTFViews.test("UTF8NativeImplementation") {
     }
   }
 
-  for (name, batch) in UTF16Tests {
-    println("Batch: \(name)")
-    for test in batch {
-      var expected: UInt8[] = []
-      var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
-      var g = expectedScalars.generate()
-      transcode(UTF32.self, UTF8.self, g,
-          SinkOf {
-            expected += $0
-          },
-          stopOnError: false)
+  forStringsWithUnpairedSurrogates {
+    (test: UTF16Test, subject: String) -> () in
+    var expected: UInt8[] = []
+    var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
+    var g = expectedScalars.generate()
+    transcode(UTF32.self, UTF8.self, g,
+        SinkOf {
+          expected += $0
+        },
+        stopOnError: false)
 
-      test.encoded.withUnsafePointerToElements {
-        (ptr) -> () in
-        let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-            ptr, test.encoded.count, kCFAllocatorNull)
-        if !test.encoded.isEmpty {
-          // Exclude the empty testcase from this check because it will fail --
-          // CoreFoundation will return NULL for character data of an empty
-          // string.
-          expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
-        }
-        checkUTF8View(expected, cfstring)
-        return ()
-      }
-    }
+    checkUTF8View(expected, subject)
   }
 }
 
@@ -2385,15 +2394,13 @@ func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
   assert(!CFStringGetCharactersPtr(copy))
 }
 
-StringUTFViews.test("UTF8CocoaImplementation") {
+StringCookedViews.test("UTF8ForNonContiguousUTF16") {
   for test in UTF8TestsSmokeTest {
     var nss = NonContiguousNSString(test.scalars)
     verifyThatStringIsOpaqueForCoreFoundation(nss)
     checkUTF8View(test.encoded, nss)
   }
 
-  /*
-  FIXME: This crashes now.
   for (name, batch) in UTF16Tests {
     println("Batch: \(name)")
     for test in batch {
@@ -2406,16 +2413,14 @@ StringUTFViews.test("UTF8CocoaImplementation") {
           },
           stopOnError: false)
 
-      dump(test.encoded)
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
       checkUTF8View(expected, nss)
     }
   }
-  */
 }
 
-StringUTFViews.test("UTF8CocoaImplementationExtra") {
+StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   // These tests don't add much additional value as long as tests above
   // actually test the code path we care about.
   if true {
@@ -2459,7 +2464,31 @@ StringUTFViews.test("UTF8CocoaImplementationExtra") {
   }
 }
 
+StringCookedViews.test("UnicodeScalars") {
+  forStringsWithUnpairedSurrogates {
+    (test: UTF16Test, subject: String) -> () in
+    let expected = test.scalarsHead + test.scalarsRepairedTail
+    let actual: UInt32[] = Array(map(subject.unicodeScalars) { $0.value })
+    expectEqual(expected, actual)
+  }
+}
 
-StringUTFViews.run()
-// CHECK: {{^}}StringUTFViews: All tests passed
+StringCookedViews.run()
+// CHECK: {{^}}StringCookedViews: All tests passed
+
+var StringTests = TestCase("StringTests")
+
+StringTests.test("StreamableConformance") {
+  forStringsWithUnpairedSurrogates {
+    (test: UTF16Test, subject: String) -> () in
+    let expected = test.scalarsHead + test.scalarsRepairedTail
+    let printedSubject = toString(subject)
+    let actual: UInt32[] =
+        Array(map(printedSubject.unicodeScalars) { $0.value })
+    expectEqual(expected, actual)
+  }
+}
+
+StringTests.run()
+// CHECK: {{^}}StringTests: All tests passed
 

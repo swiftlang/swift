@@ -637,6 +637,99 @@ enum UTFDecodeResult {
   return (hadError: hadError)
 }
 
+/// Transcode UTF-16 to UTF-8, replacing ill-formed sequences with U+FFFD.
+///
+/// Returns the index of the first unhandled code unit and the UTF-8 data
+/// that was encoded.
+@internal func _transcodeSomeUTF16AsUTF8<
+  Input : Collection
+  where Input.GeneratorType.Element == UInt16>(
+  input: Input, startIndex: Input.IndexType
+) -> (Input.IndexType, _StringCore.UTF8Chunk) {
+  typealias UTF8Chunk = _StringCore.UTF8Chunk
+
+  let endIndex = input.endIndex
+  let utf8Max = sizeof(UTF8Chunk.self)
+  var result: UTF8Chunk = 0
+  var utf8Count = 0
+  var nextIndex = startIndex
+  while nextIndex != input.endIndex && utf8Count != utf8Max {
+    let u = UInt(input[nextIndex])
+    let shift = UTF8Chunk(utf8Count * 8)
+    var utf16Length: Input.IndexType.DistanceType = 1
+
+    if _fastPath(u <= 0x7f) {
+      result |= UTF8Chunk(u) << shift
+      ++utf8Count
+    } else {
+      var scalarUtf8Length: Int
+      var r: UInt
+      if _fastPath((u >> 11) != 0b1101_1) {
+        // Neither high-surrogate, nor low-surrogate -- sequence of 1 code
+        // unit, decoding is trivial.
+        if u < 0x800 {
+          r = 0b10__00_0000__110__0_0000
+          r |= u >> 6
+          r |= (u & 0b11_1111) << 8
+          scalarUtf8Length = 2
+        }
+        else {
+          r = 0b10__00_0000__10__00_0000__1110__0000
+          r |= u >> 12
+          r |= ((u >> 6) & 0b11_1111) << 8
+          r |= (u        & 0b11_1111) << 16
+          scalarUtf8Length = 3
+        }
+      } else {
+        var unit0 = u
+        if _slowPath((unit0 >> 10) == 0b1101_11) {
+          // `unit0` is a low-surrogate.  We have an ill-formed sequence.
+          // Replace it with U+FFFD.
+          r = 0xbdbfef
+          scalarUtf8Length = 3
+        } else if _slowPath(advance(nextIndex, 1) == endIndex) {
+          // We have seen a high-surrogate and EOF, so we have an ill-formed
+          // sequence.  Replace it with U+FFFD.
+          r = 0xbdbfef
+          scalarUtf8Length = 3
+        } else {
+          let unit1 = UInt(input[advance(nextIndex, 1)])
+          if _fastPath((unit1 >> 10) == 0b1101_11) {
+            // `unit1` is a low-surrogate.  We have a well-formed surrogate
+            // pair.
+            let v = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+
+            r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
+            r |= v >> 18
+            r |= ((v >> 12) & 0b11_1111) << 8
+            r |= ((v >> 6) & 0b11_1111) << 16
+            r |= (v        & 0b11_1111) << 24
+            scalarUtf8Length = 4
+            utf16Length = 2
+          } else {
+            // Otherwise, we have an ill-formed sequence.  Replace it with
+            // U+FFFD.
+            r = 0xbdbfef
+            scalarUtf8Length = 3
+          }
+        }
+      }
+      // Don't overrun the buffer
+      if utf8Count + scalarUtf8Length > utf8Max {
+        break
+      }
+      result |= numericCast(r) << shift
+      utf8Count += scalarUtf8Length
+    }
+    nextIndex = advance(nextIndex, utf16Length)
+  }
+  // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
+  if utf8Count < sizeofValue(result) {
+    result |= ~0 << numericCast(utf8Count * 8)
+  }
+  return (nextIndex, result)
+}
+
 protocol StringElement {
   class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self

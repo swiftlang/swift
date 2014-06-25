@@ -51,6 +51,36 @@
   let _generate: ()->GeneratorOf<T>
 }
 
+@internal struct _CollectionOf<IndexType_ : ForwardIndex, T> : Collection {
+  init(startIndex: IndexType_, endIndex: IndexType_,
+      _ subscriptImpl: (IndexType_)->T) {
+    self.startIndex = startIndex
+    self.endIndex = endIndex
+    _subscriptImpl = subscriptImpl
+  }
+
+  func generate() -> GeneratorOf<T> {
+    var index = startIndex
+    return GeneratorOf {
+      () -> T? in
+      if _fastPath(index != self.endIndex) {
+        ++index
+        return self._subscriptImpl(index)
+      }
+      return .None
+    }
+  }
+
+  let startIndex: IndexType_
+  let endIndex: IndexType_
+
+  subscript(i: IndexType_) -> T {
+    return _subscriptImpl(i)
+  }
+
+  let _subscriptImpl: (IndexType_)->T
+}
+
 @public struct SinkOf<T> : Sink {
   @public init(_ put: (T)->()) {
     _put = put

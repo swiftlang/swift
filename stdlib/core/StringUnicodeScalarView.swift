@@ -106,7 +106,7 @@ extension String {
         case .EmptyInput:
           return .None
         case .Error:
-          _fatalError("unpaired surrogates are ill-formed in UTF-16")
+          return UnicodeScalar(0xfffd)
         }
       }
       var _decoder: UTF16 = UTF16()

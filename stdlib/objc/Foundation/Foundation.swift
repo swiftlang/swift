@@ -135,7 +135,6 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
   _cocoaStringLength = _cocoaStringLengthImpl
   _cocoaStringSlice = _cocoaStringSliceImpl
   _cocoaStringSubscript = _cocoaStringSubscriptImpl
-  _cocoaStringEncodeSomeUTF8 = _cocoaStringEncodeSomeUTF8Impl
   return COpaquePointer()
 }
 
@@ -203,28 +202,11 @@ func _cocoaStringSliceImpl(
 
 func _cocoaStringSubscriptImpl(
   target: _StringCore, position: Int) -> UTF16.CodeUnit {
-  // FIXME: implement this in terms of CFString
-  return (target.cocoaBuffer! as NSString).characterAtIndex(position)
-}
-
-func _cocoaStringEncodeSomeUTF8Impl(
-  target: _StringCore, position: Int
-) -> (_StringCore.IndexType, _StringCore.UTF8Chunk) {
   let cfSelf: CFString = reinterpretCast(target.cocoaBuffer!)
-  let utf16Length = CFStringGetLength(cfSelf)
-  var buffer: _StringCore.UTF8Chunk = ~0
-  let utf16CodeUnitsConverted = withUnsafePointer(&buffer) {
-    (bufferPtr: UnsafePointer<_StringCore.UTF8Chunk>) -> CFIndex
-  in
-    let uint8Buffer: CMutablePointer<UInt8> = UnsafePointer(bufferPtr)
-    let range = CFRange(location: position,
-        length: min(sizeofValue(buffer), utf16Length - position))
-    return CFStringGetBytes(
-        cfSelf, range, CFStringBuiltInEncodings.UTF8.toRaw(),
-        /*lossByte:*/ 0, /*isExternalRepresentation:*/ 0, uint8Buffer,
-        /*maxBufLen:*/ sizeofValue(buffer), nil)
-  }
-  return (position + utf16CodeUnitsConverted, buffer)
+  _sanityCheck(CFStringGetCharactersPtr(cfSelf)._isNull,
+    "Known contiguously-stored strings should already be converted to Swift")
+
+  return CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
 //

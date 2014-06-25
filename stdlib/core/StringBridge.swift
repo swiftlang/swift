@@ -76,14 +76,3 @@ func _cocoaStringSubscriptNotInitialized(
   _fatalError("_cocoaStringSubscript not initialized")
 }
 
-@public var _cocoaStringEncodeSomeUTF8: (
-  target: _StringCore, position: Int
-) -> (_StringCore.IndexType, _StringCore.UTF8Chunk)
-  = _cocoaStringEncodeSomeUTF8NotInitialized
-
-func _cocoaStringEncodeSomeUTF8NotInitialized(
-  target: _StringCore, position: Int 
-) -> (_StringCore.IndexType, _StringCore.UTF8Chunk) {
-  _fatalError("_cocoaStringEncodeSomeUTF8 not initialized")
-}
-

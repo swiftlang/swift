@@ -43,104 +43,35 @@ extension _StringCore {
         size: numericCast(utf16Count))
       
       return (i + utf16Count, result)
-    }
-    else {
-      return _encodeSomeUTF16AsUTF8(i)
+    } else if _fastPath(!_baseAddress._isNull) {
+      return _encodeSomeContiguousUTF16AsUTF8(i)
+    } else {
+      return _encodeSomeNonContiguousUTF16AsUTF8(i)
     }
   }
 
-  /// Helper for _encodeSomeUTF8, above.  Handles the case where we
-  /// don't have contiguous ASCII storage.
-  func _encodeSomeUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+  /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
+  /// storage is contiguous UTF-16.
+  func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
+    _sanityCheck(!_baseAddress._isNull)
 
-    if _fastPath(!_baseAddress._isNull) {
-      let utf16Count = self.count
-      let utf8Max = sizeof(UTF8Chunk.self)
-      var result: UTF8Chunk = 0
-      var utf8Count = 0
-      var nextIndex = i
-      while (nextIndex < utf16Count && utf8Count != utf8Max) {
-        let u = UInt(startUTF16[nextIndex])
-        let shift = UTF8Chunk(utf8Count * 8)
-        var utf16Length = 1
+    let storage = UnsafeArray(start: startUTF16, length: self.count)
+    return _transcodeSomeUTF16AsUTF8(storage, i)
+  }
 
-        if _fastPath(u <= 0x7f) {
-          result |= UTF8Chunk(u) << shift
-          ++utf8Count
-        }
-        else {
-          var scalarUtf8Length: Int
-          var r: UInt
-          if _fastPath((u >> 11) != 0b1101_1) {
-            // Neither high-surrogate, nor low-surrogate -- sequence of 1 code
-            // unit, decoding is trivial.
-            if u < 0x800 {
-              r = 0b10__00_0000__110__0_0000
-              r |= u >> 6
-              r |= (u & 0b11_1111) << 8
-              scalarUtf8Length = 2
-            }
-            else {
-              r = 0b10__00_0000__10__00_0000__1110__0000
-              r |= u >> 12
-              r |= ((u >> 6) & 0b11_1111) << 8
-              r |= (u        & 0b11_1111) << 16
-              scalarUtf8Length = 3
-            }
-          }
-          else {
-            var unit0 = u
-            if _slowPath((unit0 >> 10) == 0b1101_11) {
-              // `unit0` is a low-surrogate.  We have an ill-formed sequence.
-              // Replace it with U+FFFD.
-              r = 0xbdbfef
-              scalarUtf8Length = 3
-            } else if _slowPath(nextIndex + 1 == utf16Count) {
-              // We have seen a high-surrogate and EOF, so we have an
-              // ill-formed sequence.  Replace it with U+FFFD.
-              r = 0xbdbfef
-              scalarUtf8Length = 3
-            } else {
-              let unit1 = UInt(startUTF16[nextIndex + 1])
-              if _fastPath((unit1 >> 10) == 0b1101_11) {
-                // `unit1` is a low-surrogate.  We have a well-formed surrogate
-                // pair.
-                let v = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+  /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
+  /// storage is non-contiguous UTF-16.
+  func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
+    _sanityCheck(elementWidth == 2)
+    _sanityCheck(_baseAddress._isNull)
 
-                r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
-                r |= v >> 18
-                r |= ((v >> 12) & 0b11_1111) << 8
-                r |= ((v >> 6) & 0b11_1111) << 16
-                r |= (v        & 0b11_1111) << 24
-                scalarUtf8Length = 4
-                utf16Length = 2
-              } else {
-                // Otherwise, we have an ill-formed sequence.  Replace it with
-                // U+FFFD.
-                r = 0xbdbfef
-                scalarUtf8Length = 3
-              }
-            }
-          }
-          // Don't overrun the buffer
-          if utf8Count + scalarUtf8Length > utf8Max {
-            break
-          }
-          result |= numericCast(r) << shift
-          utf8Count += scalarUtf8Length
-        }
-        nextIndex += utf16Length
-      }
-      // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
-      if utf8Count < sizeofValue(result) {
-        result |= ~0 << numericCast(utf8Count * 8)
-      }
-      return (nextIndex, result)
+    let storage = _CollectionOf<Int, UInt16>(
+      startIndex: 0, endIndex: self.count) {
+      (i: Int) -> UInt16 in
+      return _cocoaStringSubscript(target: self, position: i)
     }
-    else {
-      return _cocoaStringEncodeSomeUTF8(target: self, position: i)
-    }
+    return _transcodeSomeUTF16AsUTF8(storage, i)
   }
 }
 

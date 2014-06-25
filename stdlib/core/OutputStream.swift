@@ -353,9 +353,9 @@ func _uint64ToStringImpl(
     // FIXME: buffering?
     // It is important that we use stdio routines in order to correctly
     // interoperate with stdio buffering.
-    string._encode(UTF8.self, output: SinkOf<UTF8.CodeUnit> {
-      _putchar(Int32($0)); return
-    })
+    for c in string.utf8 {
+      _putchar(Int32(c))
+    }
   }
 }
 
@@ -390,12 +390,13 @@ extension UnicodeScalar : Streamable {
 
 extension CString : Streamable {
   /// Writes the `CString` to the output stream.  If the `CString` does not
-  /// contain well-formed UTF-8, invokes a runtime trap.
+  /// contain well-formed UTF-8, replaces ill-formed code unit sequences
+  /// with U+FFFD.
   @public func writeTo<Target : OutputStream>(inout target: Target) {
     if _isNull {
       return
     }
-    target.write(String.fromCString(self)!)
+    target.write(String.fromCStringRepairingIllFormedUTF8(self).0!)
   }
 }
 
