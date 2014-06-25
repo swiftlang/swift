@@ -278,26 +278,76 @@ INSTANCE_METHOD(NSWindow,
 
 INSTANCE_METHOD(NSWindowController, (1, "initWithWindow"), DesignatedInit)
 
-// Optional type annotations for NSView
+// Optional type annotations for NSView.
+// Consider all parameter types in NSView methods to be non-optional and
+// the return optional.
 OBJC_CONTEXT(NSView, OptionalTypeAdjustment(1, OTK_Optional))
-INSTANCE_METHOD(NSView, (1, "setSubviews"), OptionalTypeAdjustment(2, OTK_None, OTK_None))
+INSTANCE_METHOD(NSView, (1, "setSubviews"),
+                OptionalTypeAdjustment(2, OTK_None, OTK_None))
 INSTANCE_METHOD(NSView, (1, "addSubview"), OptionalTypeAdjustment(0))
-INSTANCE_METHOD(NSView, (3, "addSubview", "positioned", "relativeTo"), OptionalTypeAdjustment(4, OTK_None, OTK_None, OTK_None, OTK_Optional));
-INSTANCE_METHOD(NSView, (2, "convertPoint", "fromView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "convertPoint", "toView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "convertSize", "fromView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "convertSize", "toView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "convertRect", "fromView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "convertRect", "toView"), OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
-INSTANCE_METHOD(NSView, (3, "beginDraggingSessionWithItems", "event", "source"), OptionalTypeAdjustment(3, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional))
-INSTANCE_METHOD(NSView, (7, "dragImage", "at", "offset", "event", "pasteboard", "source", "slideBack"), OptionalTypeAdjustment(6, OTK_ImplicitlyUnwrappedOptional, OTK_None, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional))
-INSTANCE_METHOD(NSView, (4, "dragFile", "fromRect", "slideBack", "event"), OptionalTypeAdjustment(5, OTK_ImplicitlyUnwrappedOptional, OTK_None, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional))
-INSTANCE_METHOD(NSView, (5, "dragPromisedFilesOfTypes", "fromRect", "source", "slideBack", "event"), OptionalTypeAdjustment(6, OTK_ImplicitlyUnwrappedOptional, OTK_None, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional, OTK_ImplicitlyUnwrappedOptional))
-INSTANCE_METHOD(NSView, (2, "enterFullScreenMode", "withOptions"), OptionalTypeAdjustment(3, OTK_ImplicitlyUnwrappedOptional, OTK_Optional, OTK_Optional))
-INSTANCE_METHOD(NSView, (1, "exitFullScreenModeWithOptions"), OptionalTypeAdjustment(2, OTK_ImplicitlyUnwrappedOptional, OTK_Optional))
-INSTANCE_METHOD(NSView, (2, "showDefinitionForAttributedString", "atPoint"), OptionalTypeAdjustment(2, OTK_ImplicitlyUnwrappedOptional, OTK_Optional))
-INSTANCE_METHOD(NSView, (4, "showDefinitionForAttributedString", "range", "options", "baselineOriginProvider"), OptionalTypeAdjustment(4, OTK_ImplicitlyUnwrappedOptional, OTK_Optional, OTK_ImplicitlyUnwrappedOptional, OTK_Optional))
-INSTANCE_METHOD(NSView, (1, "constraintsAffectingLayoutForOrientation"), OptionalTypeAdjustment(1, OTK_None))
+INSTANCE_METHOD(NSView, (3, "addSubview", "positioned", "relativeTo"),
+                OptionalTypeAdjustment(4, OTK_None, OTK_None, OTK_None,
+                                          OTK_Optional));
+INSTANCE_METHOD(NSView, (2, "convertPoint", "fromView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "convertPoint", "toView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "convertSize", "fromView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "convertSize", "toView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "convertRect", "fromView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "convertRect", "toView"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView, (3, "beginDraggingSessionWithItems", "event", "source"),
+                OptionalTypeAdjustment(3, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional))
+INSTANCE_METHOD(NSView,
+                (7, "dragImage", "at", "offset", "event", "pasteboard",
+                    "source", "slideBack"),
+                OptionalTypeAdjustment(6, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_None,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional))
+INSTANCE_METHOD(NSView, (4, "dragFile", "fromRect", "slideBack", "event"),
+                OptionalTypeAdjustment(5, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_None,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional))
+INSTANCE_METHOD(NSView,
+                (5, "dragPromisedFilesOfTypes", "fromRect", "source",
+                    "slideBack", "event"),
+                OptionalTypeAdjustment(6, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_None,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_ImplicitlyUnwrappedOptional))
+INSTANCE_METHOD(NSView, (2, "enterFullScreenMode", "withOptions"),
+                OptionalTypeAdjustment(3, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_Optional, OTK_Optional))
+INSTANCE_METHOD(NSView, (1, "exitFullScreenModeWithOptions"),
+                OptionalTypeAdjustment(2, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_Optional))
+INSTANCE_METHOD(NSView, (2, "showDefinitionForAttributedString", "atPoint"),
+                OptionalTypeAdjustment(2, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_Optional))
+INSTANCE_METHOD(NSView,
+                (4, "showDefinitionForAttributedString", "range", "options",
+                    "baselineOriginProvider"),
+                OptionalTypeAdjustment(4, OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_Optional,
+                                          OTK_ImplicitlyUnwrappedOptional,
+                                          OTK_Optional))
+INSTANCE_METHOD(NSView,
+                (1, "constraintsAffectingLayoutForOrientation"),
+                OptionalTypeAdjustment(1, OTK_None))
+
 OBJC_PROPERTY(NSView, nextKeyView, OTK_Optional)
 OBJC_PROPERTY(NSView, trackingAreas, OTK_None)
 
@@ -343,6 +393,35 @@ INSTANCE_METHOD(UIView, (1, "initWithFrame"), DesignatedInit)
 
 INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"), 
                 DesignatedInit)
+
+// Consider all types in UIFont methods to be non-optional.
+OBJC_CONTEXT(UIFont, OptionalTypeAdjustment(0))
+CLASS_METHOD(UIFont, (2, "fontWithName", "size"),
+             OptionalTypeAdjustment(1, OTK_ImplicitlyUnwrappedOptional));
+
+// Consider all parameter types in NSView methods to be non-optional and the
+// return optional.
+OBJC_CONTEXT(UIApplicationDelegate, OptionalTypeAdjustment(1, OTK_Optional))
+INSTANCE_METHOD(UIApplicationDelegate,
+                (2, "application", "willFinishLaunchingWithOptions"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None,
+                                          OTK_ImplicitlyUnwrappedOptional));
+INSTANCE_METHOD(UIApplicationDelegate,
+                (2, "application", "didFinishLaunchingWithOptions"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None,
+                                          OTK_ImplicitlyUnwrappedOptional));
+INSTANCE_METHOD(UIApplicationDelegate,
+                (4,"application", "openURL", "sourceApplication", "annotation"),
+                OptionalTypeAdjustment(4, OTK_None, OTK_None, OTK_None,
+                                       OTK_ImplicitlyUnwrappedOptional));
+INSTANCE_METHOD(UIApplicationDelegate,
+                (4, "application", "handleActionWithIdentifier",
+                    "forLocalNotification", "completionHandler"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional));
+INSTANCE_METHOD(UIApplicationDelegate,
+                (4, "application", "handleActionWithIdentifier",
+                    "forRemoteNotification", "completionHandler"),
+                OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional));
 
 #undef INSTANCE_METHOD
 #undef CLASS_METHOD
