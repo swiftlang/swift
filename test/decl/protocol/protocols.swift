@@ -212,7 +212,7 @@ struct HasIntMax : IntMaxable {
 }
 
 struct NotIntMax1 : IntMaxable  { // expected-error{{type 'NotIntMax1' does not conform to protocol 'IntMaxable'}}
-  func intmax(#first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int[]) -> Int'}}
+  func intmax(#first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
 }
 
 struct NotIntMax2 : IntMaxable { // expected-error{{type 'NotIntMax2' does not conform to protocol 'IntMaxable'}}

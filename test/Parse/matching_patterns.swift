@@ -284,7 +284,7 @@ class Derived : Base { }
 
 
 switch [Derived(), Derived(), Base()] {
-case let ds as [Derived]: // expected-error{{downcast pattern value of type 'Derived[]' cannot be used}}
+case let ds as [Derived]: // expected-error{{downcast pattern value of type '[Derived]' cannot be used}}
   ()
 
 default:

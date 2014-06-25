@@ -28,7 +28,7 @@ var cas: [C] = [c1]
 var das: [D] = [d1]
 
 cas = das
-das = cas // expected-error{{cannot convert the expression's type '()' to type 'D[]'}}
+das = cas // expected-error{{cannot convert the expression's type '()' to type '[D]'}}
 
 // Slice<T>
 var cs = ca[0...0]

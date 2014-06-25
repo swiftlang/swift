@@ -1823,8 +1823,9 @@ public:
       auto *NT = T->getDecl();
       auto &Ctx = T->getASTContext();
       if (NT == Ctx.getArrayDecl()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "[]";
+        Printer << "[";
+        visit(T->getGenericArgs()[0]);
+        Printer << "]";
         return;
       }
       if (NT == Ctx.getOptionalDecl()) {
@@ -2063,8 +2064,9 @@ public:
   }
 
   void visitArraySliceType(ArraySliceType *T) {
-    printWithParensIfNotSimple(T->getBaseType());
-    Printer << "[]";
+    Printer << "[";
+    visit(T->getBaseType());
+    Printer << "]";
   }
 
   void visitOptionalType(OptionalType *T) {

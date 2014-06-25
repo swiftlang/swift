@@ -193,7 +193,7 @@ pr = "foo"
 pr.foo()
 
 var _ : ([Int]).Type = [4].dynamicType
-// CHECK: : (Int[]).Type
+// CHECK: : ([Int]).Type
 var _ : (Int -> Int)? = .None
 // CHECK: : (Int -> Int)?
 func chained(#f: Int -> ()) -> Int { return 0 }

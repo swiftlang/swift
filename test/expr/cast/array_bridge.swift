@@ -20,12 +20,12 @@ var a: [A] = []
 var b: [B] = []
 
 a = b
-b = a // expected-error {{cannot convert the expression's type '()' to type 'B[]'}}
+b = a // expected-error {{cannot convert the expression's type '()' to type '[B]'}}
 
 var aa: [[A]] = []
 var bb: [[B]] = []
 
-aa = bb // expected-error {{cannot convert the expression's type '()' to type 'A[][]'}}
+aa = bb // expected-error {{cannot convert the expression's type '()' to type '[[A]]'}}
 
 class C {
 }
@@ -51,7 +51,7 @@ var e: [E] = []
 var f: [F] = []
 
 e = f
-f = e // expected-error {{cannot convert the expression's type '()' to type 'F[]'}}
+f = e // expected-error {{cannot convert the expression's type '()' to type '[F]'}}
 
 class G {
   var x = 0
@@ -97,4 +97,4 @@ var aoa: [AnyObject] = []
 var i: [I] = []
 
 aoa = i
-i = aoa // expected-error {{cannot convert the expression's type '()' to type 'I[]'}}
+i = aoa // expected-error {{cannot convert the expression's type '()' to type '[I]'}}

@@ -49,30 +49,18 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
 
   var slice1 = new Int[42]
-// CHECK: VarDecl '''slice1''' Int[]{{$}}
-// CHECK:   NewArrayExpr:[[@LINE-2]] '''new Int[42]''' Int[]{{$}}
-// FULL:  VarDecl '''slice1''' Swift.Int[]{{$}}
-// FULL:    NewArrayExpr:[[@LINE-4]] '''new Int[42]''' Swift.Int[]{{$}}
-
-  var slice2 = new Int[42][]
-// CHECK: VarDecl '''slice2''' Int[][]{{$}}
-// CHECK:   NewArrayExpr:[[@LINE-2]] '''new Int[42][]''' Int[][]{{$}}
-// FULL:  VarDecl '''slice2''' Swift.Int[][]{{$}}
-// FULL:    NewArrayExpr:[[@LINE-4]] '''new Int[42][]''' Swift.Int[][]{{$}}
-
-  var slice3 = new Int[42][][]
-// CHECK: VarDecl '''slice3''' Int[][][]{{$}}
-// CHECK:   NewArrayExpr:[[@LINE-2]] '''new Int[42][][]''' Int[][][]{{$}}
-// FULL:  VarDecl '''slice3''' Swift.Int[][][]{{$}}
-// FULL:    NewArrayExpr:[[@LINE-4]] '''new Int[42][][]''' Swift.Int[][][]{{$}}
+// CHECK: VarDecl '''slice1''' [Int]{{$}}
+// CHECK:   NewArrayExpr:[[@LINE-2]] '''new Int[42]''' [Int]{{$}}
+// FULL:  VarDecl '''slice1''' [Swift.Int]{{$}}
+// FULL:    NewArrayExpr:[[@LINE-4]] '''new Int[42]''' [Swift.Int]{{$}}
 
   var optional1 = Optional<Int>.None
 // CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
 // FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}
 
   var optional2 = Optional<[Int]>.None
-// CHECK: VarDecl '''optional2''' Optional<Int[]>{{$}}
-// FULL:  VarDecl '''optional2''' Swift.Optional<Swift.Int[]>{{$}}
+// CHECK: VarDecl '''optional2''' Optional<[Int]>{{$}}
+// FULL:  VarDecl '''optional2''' Swift.Optional<[Swift.Int]>{{$}}
 }
 
 func testFuncType1() {}

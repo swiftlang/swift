@@ -1101,13 +1101,13 @@ struct d2900_TypeSugar1 {
 // PASS_COMMON-LABEL: {{^}}struct d2900_TypeSugar1 {{{$}}
 // SYNTHESIZE_SUGAR_ON_TYPES-LABEL: {{^}}struct d2900_TypeSugar1 {{{$}}
 
-  func f1(x: Int[]) {}
-// PASS_COMMON-NEXT: {{^}}  func f1(x: Int[]){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f1(x: Int[]){{$}}
+  func f1(x: [Int]) {}
+// PASS_COMMON-NEXT: {{^}}  func f1(x: [Int]){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f1(x: [Int]){{$}}
 
   func f2(x: Array<Int>) {}
 // PASS_COMMON-NEXT: {{^}}  func f2(x: Array<Int>){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f2(x: Int[]){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f2(x: [Int]){{$}}
 
   func f3(x: Int?) {}
 // PASS_COMMON-NEXT: {{^}}  func f3(x: Int?){{$}}
@@ -1117,13 +1117,13 @@ struct d2900_TypeSugar1 {
 // PASS_COMMON-NEXT: {{^}}  func f4(x: Optional<Int>){{$}}
 // SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f4(x: Int?){{$}}
 
-  func f5(x: Int[]...) {}
-// PASS_COMMON-NEXT: {{^}}  func f5(x: Int[]...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f5(x: Int[]...){{$}}
+  func f5(x: [Int]...) {}
+// PASS_COMMON-NEXT: {{^}}  func f5(x: [Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f5(x: [Int]...){{$}}
 
   func f6(x: Array<Int>...) {}
 // PASS_COMMON-NEXT: {{^}}  func f6(x: Array<Int>...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(x: Int[]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(x: [Int]...){{$}}
 }
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
