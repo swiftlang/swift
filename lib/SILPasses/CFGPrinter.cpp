@@ -22,6 +22,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/Support/GraphWriter.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
@@ -159,6 +160,10 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 };
 } // end llvm namespace
 
+llvm::cl::opt<std::string>
+TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
+               llvm::cl::desc("Only print out the cfg for this function"));
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -170,6 +175,11 @@ class SILCFGPrinter : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
+
+    // If we have a target function, only print that function out.
+    if (!TargetFunction.empty() && !(F->getName().str() == TargetFunction))
+      return;
+
     ViewGraph(F, "cfg" + F->getName().str());
   }
 };
