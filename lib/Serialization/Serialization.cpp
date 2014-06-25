@@ -1746,7 +1746,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_conversion, AK_infix,
       AK_optional, AK_postfix, AK_prefix, AK_transparent,
-      AK_mutating
+      AK_mutating, AK_noinline
     >(fn);
     verifyAttrSerializable(fn);
 
