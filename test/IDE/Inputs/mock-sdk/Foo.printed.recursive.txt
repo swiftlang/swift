@@ -68,6 +68,7 @@ func fooFunc1(a: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
 func fooFunc3(a: CInt, b: CFloat, c: CDouble, d: CMutablePointer<CInt>) -> CInt
 func fooFuncWithBlock(blk: ((CFloat) -> CInt)!)
+func fooFuncWithFunctionPointer(fptr: CFunctionPointer<((CFloat) -> CInt)>)
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
 

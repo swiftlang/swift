@@ -224,3 +224,20 @@ func testNoReturnStuff() {
 
   couldReturnFunction()  // dead
 }
+
+func testFunctionPointersAsOpaquePointers() {
+  let fp = getFunctionPointer()
+  useFunctionPointer(fp)
+
+  let explicitFP: CFunctionPointer<(CInt) -> CInt> = fp
+  let opaque = COpaquePointer(explicitFP)
+  let reExplicitFP = CFunctionPointer<(CInt) -> CInt>(opaque)
+
+  let wrapper = FunctionPointerWrapper(a: nil, b: nil)
+  useFunctionPointer(wrapper.a)
+  let _: CFunctionPointer<(CInt) -> CInt> = wrapper.b
+
+  var anotherFP: CFunctionPointer<(CInt, CLong, CMutableVoidPointer) -> Void> = getFunctionPointer2()
+  useFunctionPointer2(anotherFP)
+  anotherFP = fp // expected-error {{'(CInt, CLong, CMutableVoidPointer)' is not identical to 'CInt'}}
+}

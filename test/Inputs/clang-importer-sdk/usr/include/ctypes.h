@@ -157,3 +157,21 @@ STDLIB_TYPEDEF(signed long, CFIndex);
 void noreturnFunction() __attribute__((noreturn));
 void couldReturnFunction() __attribute__((noreturn));
 
+
+//===---
+// Function pointers
+//===---
+
+typedef int (*fptr)(int);
+fptr getFunctionPointer(void);
+void useFunctionPointer(fptr);
+
+struct FunctionPointerWrapper {
+  fptr a;
+  fptr b;
+};
+
+typedef void (*fptr2)(int, long, void *);
+fptr2 getFunctionPointer2(void);
+void useFunctionPointer2(fptr2);
+

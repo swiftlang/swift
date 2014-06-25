@@ -68,6 +68,7 @@ func <loc/>fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></
 <decl:Func>func <loc/>fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func <loc/>fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func <loc/>fooFuncWithBlock(blk: ((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)!)</decl>
+<decl:Func>func <loc/>fooFuncWithFunctionPointer(fptr: <ref:Struct>CFunctionPointer</ref><((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)>)</decl>
 <decl:Func>@noreturn func <loc/>fooFuncNoreturn1()</decl>
 <decl:Func>@noreturn func <loc/>fooFuncNoreturn2()</decl>
 

@@ -147,7 +147,7 @@ func testCompleteModuleQualifiedFoo2() {
   Foo#^CLANG_QUAL_FOO_2^#
 // If the number of results below changes, then you need to add a result to the
 // list below.
-// CLANG_QUAL_FOO_2: Begin completions, 57 items
+// CLANG_QUAL_FOO_2: Begin completions, 58 items
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassBase[#FooClassBase#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassDerived[#FooClassDerived#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .ClassWithInternalProt[#ClassWithInternalProt#]{{$}}
@@ -160,6 +160,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn1()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn2()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithBlock({#(blk): ((CFloat) -> CInt)?#})[#Void#]{{$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithFunctionPointer({#(fptr): CFunctionPointer<((CFloat) -> CInt)>#})[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment1()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment2()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment3()[#Void#]{{$}}

@@ -128,6 +128,47 @@ extension COpaquePointer {
   }
 }
 
+@public struct CFunctionPointer<T> : Equatable, Hashable, LogicValue,
+                                     NilLiteralConvertible {
+  var value: COpaquePointer
+
+  @public init() {
+    value = COpaquePointer()
+  }
+
+  @public init(_ value: COpaquePointer) {
+    self.value = value
+  }
+
+  @public static func null() -> CFunctionPointer {
+    return CFunctionPointer()
+  }
+
+  @transparent @public
+  func getLogicValue() -> Bool {
+    return value.getLogicValue()
+  }
+
+  @public var hashValue: Int {
+    return value.hashValue
+  }
+
+  @transparent @public
+  static func convertFromNilLiteral() -> CFunctionPointer {
+    return CFunctionPointer()
+  }
+}
+
+@public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
+  return lhs.value == rhs.value
+}
+
+extension COpaquePointer {
+  @public init<T>(_ from: CFunctionPointer<T>) {
+    self = from.value
+  }
+}
+
 
 // The C va_list type
 @public struct CVaListPointer {

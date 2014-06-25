@@ -89,6 +89,8 @@ func fooFunc3(a: CInt, b: CFloat, c: CDouble, d: CMutablePointer<CInt>) -> CInt
 */
 func fooFuncWithBlock(blk: ((CFloat) -> CInt)!)
 
+func fooFuncWithFunctionPointer(fptr: CFunctionPointer<((CFloat) -> CInt)>)
+
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
 

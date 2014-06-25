@@ -180,22 +180,18 @@ namespace {
     }
     
     ImportResult VisitPointerType(const clang::PointerType *type) {      
-      // FIXME: Function pointer types can be mapped to Swift function types
-      // once we have the notion of a "thin" function that does not capture
-      // anything.
-      if (type->getPointeeType()->isFunctionType())
-        return Type();
-      
+      auto pointeeQualType = type->getPointeeType();
+
       // "const char *" maps to Swift's CString.
       // FIXME: Map to a bridged type in parameter context?
       clang::ASTContext &clangContext = Impl.getClangASTContext();
-      if (clangContext.hasSameType(type->getPointeeType(),
+      if (clangContext.hasSameType(pointeeQualType,
                                    clangContext.CharTy.withConst())) {
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
       }
       
       // Special case for NSZone*, which has its own Swift wrapper.
-      if (auto pointee = type->getPointeeType()->getAs<clang::TypedefType>()) {
+      if (auto pointee = pointeeQualType->getAs<clang::TypedefType>()) {
         const clang::RecordType *pointeeStruct = pointee->getAsStructureType();
         if (pointeeStruct &&
             !pointeeStruct->getDecl()->isCompleteDefinition() &&
@@ -210,7 +206,6 @@ namespace {
       // All other C pointers to concrete types map to UnsafePointer<T> or
       // COpaquePointer (FIXME:, except in parameter position under the pre-
       // intrinsic-pointer-conversion regime.)
-      auto pointeeQualType = type->getPointeeType();
 
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
@@ -257,7 +252,16 @@ namespace {
       // COpaquePointer (and don't hint to the adjuster).
       if (!pointeeType)
         return getOpaquePointerType();
-      
+
+      if (pointeeQualType->isFunctionType()) {
+        // FIXME: Function pointer types can be mapped to Swift function types
+        // once we have the notion of a "thin" function that does not capture
+        // anything.
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                    "CFunctionPointer",
+                                                    pointeeType);
+      }
+
       // Non-parameter pointers map to UnsafePointer.
       return { Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                "UnsafePointer", pointeeType),
