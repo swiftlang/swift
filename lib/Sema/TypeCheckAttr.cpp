@@ -258,14 +258,14 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (VD->isLet())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
 
-  // It only works with stored properties.
-  if (!VD->hasStorage())
-    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
-
   // @lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
   if (isa<ProtocolDecl>(varDC))
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
+
+  // It only works with stored properties.
+  if (!VD->hasStorage() && VD->getGetter() && !VD->getGetter()->isImplicit())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
   // @lazy is not allowed on a lazily initiailized global variable or on a
   // static property (which is already lazily initialized).

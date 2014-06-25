@@ -186,13 +186,14 @@ static Type getDeclaredType(Decl *decl) {
 }
 
 
-static void addMemberToContext(Decl *D, DeclContext *DC) {
+static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC) {
   if (auto *ntd = dyn_cast<NominalTypeDecl>(DC))
     ntd->addMember(D);
   else if (auto *ed = dyn_cast<ExtensionDecl>(DC))
     ed->addMember(D);
   else
-    assert(isa<AbstractFunctionDecl>(DC) && "Unknown declcontext");
+    assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
+           "Unknown declcontext");
 }
 
 // Add implicit conformances to the given declaration.
@@ -1357,7 +1358,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   
   // We've added some members to our containing class, add them to the members
   // list.
-  addMemberToContext(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Get, VD->getDeclContext());
 
   // Type check the getter declaration.
   TC.typeCheckDecl(VD->getGetter(), true);
@@ -1596,9 +1597,9 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
 
   // We've added some members to our containing type, add them to the
   // members list.
-  addMemberToContext(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Get, VD->getDeclContext());
   if (Set)
-    addMemberToContext(Set, VD->getDeclContext());
+    addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 
@@ -1743,8 +1744,8 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 
   // We've added some members to our containing class/extension, add them to
   // the members list.
-  addMemberToContext(Get, VD->getDeclContext());
-  addMemberToContext(Set, VD->getDeclContext());
+  addMemberToContextIfNeeded(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 
@@ -1784,8 +1785,8 @@ namespace {
 
 /// Synthesize the getter for an @lazy property with the specified storage
 /// vardecl.
-static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
-                                          TypeChecker &TC) {
+static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
+                                            TypeChecker &TC) {
   auto &Ctx = VD->getASTContext();
 
   // The getter checks the optional, storing the initial value in if nil.  The
@@ -1799,7 +1800,8 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //     storage = tmp2
   //     return tmp2
   //   }
-  auto *Get = createGetterPrototype(VD, TC);
+  auto *Get = VD->getGetter();
+  TC.validateDecl(Get);
   VarDecl *SelfDecl = Get->getImplicitSelfDecl();
 
   SmallVector<ASTNode, 6> Body;
@@ -1880,24 +1882,14 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   Get->setBody(BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
                                  /*implicit*/true));
 
-  // Mark it transparent, there is no user benefit to this actually existing, we
-  // just want it for abstraction purposes (i.e., to make access to the variable
-  // uniform and to be able to put the getter in a vtable).
-  Get->getMutableAttrs().setAttr(AK_transparent, VD->getLoc());
-
-  // If the var is marked @final, then so is the getter.
-  if (VD->isFinal())
-    Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
-
-  // @lazy getters are mutating on an enclosing struct.
-  Get->setMutating();
   return Get;
 }
 
 
 /// @lazy properties get a storage variable synthesized for them.
-static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
-  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
+  assert(VD->getStorageKind() == AbstractStorageDecl::Computed &&
+         "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
   auto &Ctx = VD->getASTContext();
 
@@ -1915,7 +1907,7 @@ static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
     Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
   
-  addMemberToContext(Storage, VD->getDeclContext());
+  addMemberToContextIfNeeded(Storage, VD->getDeclContext());
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
@@ -1929,32 +1921,28 @@ static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
                                            PBDPattern, /*init*/nullptr,
                                            /*isConditional*/false,
                                            VD->getDeclContext());
-  addMemberToContext(PBD, VD->getDeclContext());
+  addMemberToContextIfNeeded(PBD, VD->getDeclContext());
 
 
   // Now that we've got the storage squared away, synthesize the getter.
-  auto *Get = createLazyPropertyGetter(VD, Storage, TC);
+  auto *Get = completeLazyPropertyGetter(VD, Storage, TC);
 
 
   // The setter just forwards on to storage without materializing the initial
   // value.
-  VarDecl *SetValueDecl = nullptr;
-  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+  auto *Set = VD->getSetter();
+  TC.validateDecl(Set);
+  auto params = cast<TuplePattern>(Set->getBodyParamPatterns().back());
+  auto firstParamPattern = params->getFields().front().getPattern();
+  VarDecl *SetValueDecl = firstParamPattern->getSingleVar();
   // FIXME: This is wrong for observed properties.
   synthesizeTrivialSetter(Set, Storage, SetValueDecl, TC);
-
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
-
 
   TC.typeCheckDecl(Get, true);
   TC.typeCheckDecl(Get, false);
 
   TC.typeCheckDecl(Set, true);
   TC.typeCheckDecl(Set, false);
-
-  addMemberToContext(Get, VD->getDeclContext());
-  addMemberToContext(Set, VD->getDeclContext());
 }
 
 
@@ -2262,9 +2250,9 @@ public:
       VD->setInvalid();
     }
 
+    TC.validateDecl(VD);
     validateAttributes(TC, VD);
     TC.checkDeclAttributesEarly(VD);
-    computeAccessibility(TC, VD);
 
     // The instance var requires ObjC interop if it has an @objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
@@ -2324,8 +2312,9 @@ public:
       convertNSManagedStoredVarToComputed(VD, TC);
 
     // Synthesize accessors for @lazy, all checking already been performed.
-    if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->getGetter())
-      convertLazyStoredVarToComputed(VD, TC);
+    if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
+        !VD->getGetter()->hasBody())
+      completeLazyVarImplementation(VD, TC);
 
     // If this is a non-final stored property in a class, then synthesize getter
     // and setter accessors and change its storage kind.  This allows it to be
@@ -4834,46 +4823,68 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Var:
   case DeclKind::Param: {
     computeAccessibility(*this, D);
-    if (D->hasType())
-      return;
 
     auto VD = cast<VarDecl>(D);
+    if (!VD->hasType()) {
+      // Make sure the getter and setter have valid types, since they will be
+      // used by SILGen for any accesses to this variable.
+      if (auto getter = VD->getGetter())
+        validateDecl(getter);
+      if (auto setter = VD->getSetter())
+        validateDecl(setter);
 
-    // Make sure the getter and setter have valid types, since they will be
-    // used by SILGen for any accesses to this variable.
-    if (auto getter = VD->getGetter())
-      validateDecl(getter);
-    if (auto setter = VD->getSetter())
-      validateDecl(setter);
-
-    if (PatternBindingDecl *PBD = VD->getParentPattern()) {
-      validatePatternBindingDecl(*this, PBD);
-      if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
-        PBD->getPattern()->setType(ErrorType::get(Context));
-        setBoundVarsTypeError(PBD->getPattern(), Context);
-        return;
-      }
-    } else if (VD->isImplicit() &&
-               (VD->getName() == Context.Id_self)) {
-      // If the variable declaration is for a 'self' parameter, it may be
-      // because the self variable was reverted whilst validating the function
-      // signature.  In that case, reset the type.
-      if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
-        if (auto funcDeclContext =
-                dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
-          GenericParamList *outerGenericParams = nullptr;
-          configureImplicitSelf(funcDeclContext, outerGenericParams);
+      if (PatternBindingDecl *PBD = VD->getParentPattern()) {
+        validatePatternBindingDecl(*this, PBD);
+        if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
+          PBD->getPattern()->setType(ErrorType::get(Context));
+          setBoundVarsTypeError(PBD->getPattern(), Context);
+          return;
         }
+      } else if (VD->isImplicit() &&
+                 (VD->getName() == Context.Id_self)) {
+        // If the variable declaration is for a 'self' parameter, it may be
+        // because the self variable was reverted whilst validating the function
+        // signature.  In that case, reset the type.
+        if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
+          if (auto funcDeclContext =
+                  dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
+            GenericParamList *outerGenericParams = nullptr;
+            configureImplicitSelf(funcDeclContext, outerGenericParams);
+          }
+        } else {
+          D->setType(ErrorType::get(Context));
+        }      
       } else {
+        // FIXME: This case is hit when code completion occurs in a function
+        // parameter list. Previous parameters are definitely in scope, but
+        // we don't really know how to type-check them.
+        assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
+               isa<TopLevelCodeDecl>(D->getDeclContext()));
         D->setType(ErrorType::get(Context));
-      }      
-    } else {
-      // FIXME: This case is hit when code completion occurs in a function
-      // parameter list. Previous parameters are definitely in scope, but
-      // we don't really know how to type-check them.
-      assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
-             isa<TopLevelCodeDecl>(D->getDeclContext()));
-      D->setType(ErrorType::get(Context));
+      }
+    }
+
+    // Synthesize accessors for @lazy.
+    if (!VD->getGetter() && VD->getAttrs().hasAttribute<LazyAttr>() &&
+        !VD->isStatic() && !VD->isBeingTypeChecked()) {
+      VD->setIsBeingTypeChecked();
+
+      auto *getter = createGetterPrototype(VD, *this);
+      // If the var is marked @final, then so is the getter.
+      if (VD->isFinal()) {
+        ASTContext &ctx = VD->getASTContext();
+        getter->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+      }
+      // @lazy getters are mutating on an enclosing struct.
+      getter->setMutating();
+
+      VarDecl *newValueParam = nullptr;
+      auto *setter = createSetterPrototype(VD, newValueParam, *this);
+      VD->makeComputed(VD->getLoc(), getter, setter, VD->getLoc());
+      VD->setIsBeingTypeChecked(false);
+
+      addMemberToContextIfNeeded(getter, VD->getDeclContext());
+      addMemberToContextIfNeeded(setter, VD->getDeclContext());
     }
     break;
   }
@@ -4951,6 +4962,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
     // Computed and static properties are not initialized.
     for (auto var : decl->getStoredProperties()) {
+      if (var->isImplicit())
+        continue;
       tc.validateDecl(var);
       accessLevel = std::min(accessLevel, var->getAccessibility());
 

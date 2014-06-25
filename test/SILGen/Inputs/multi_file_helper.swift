@@ -9,3 +9,11 @@ extension Range {
     return loc + length
   }
 }
+
+struct LazyContainer {
+  @lazy var lazyVar = 42
+}
+
+class LazyContainerClass {
+  @lazy var lazyVar = 42
+}

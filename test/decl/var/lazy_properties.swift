@@ -9,9 +9,8 @@ struct S {
 }
 
 protocol SomeProtocol {
-  @lazy var x : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} \
-                     // expected-error {{'lazy' attribute isn't allowed on a protocol requirement}}
-  @lazy var y : Int { get } // expected-error {{'lazy' attribute may not be used on a computed property}}
+  @lazy var x : Int  // expected-error {{'lazy' attribute isn't allowed on a protocol requirement}}
+  @lazy var y : Int { get } // expected-error {{'lazy' attribute isn't allowed on a protocol requirement}}
 }
 
 

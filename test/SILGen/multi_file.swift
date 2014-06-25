@@ -6,3 +6,15 @@ func rdar16016713(r: Range) {
   // CHECK: {{%[0-9]+}} = apply [[LIMIT]]({{%[0-9]+}}) : $@cc(method) @thin (Range) -> Int
   println(r.limit)
 }
+
+// CHECK-LABEL: sil @_TF10multi_file26lazyPropertiesAreNotStored
+func lazyPropertiesAreNotStored(var container: LazyContainer) {
+  // CHECK: {{%[0-9]+}} = function_ref @_TFV10multi_file13LazyContainerg7lazyVarSi : $@cc(method) @thin (@inout LazyContainer) -> Int
+  println(container.lazyVar)
+}
+
+// CHECK-LABEL: sil @_TF10multi_file29lazyRefPropertiesAreNotStored
+func lazyRefPropertiesAreNotStored(container: LazyContainerClass) {
+  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@cc(method) @thin (@owned LazyContainerClass) -> Int
+  println(container.lazyVar)
+}
