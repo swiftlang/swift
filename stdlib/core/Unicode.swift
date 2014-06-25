@@ -665,8 +665,8 @@ enum UTFDecodeResult {
       var scalarUtf8Length: Int
       var r: UInt
       if _fastPath((u >> 11) != 0b1101_1) {
-        // Neither high-surrogate, nor low-surrogate -- sequence of 1 code
-        // unit, decoding is trivial.
+        // Neither high-surrogate, nor low-surrogate -- well-formed sequence
+        // of 1 code unit, decoding is trivial.
         if u < 0x800 {
           r = 0b10__00_0000__110__0_0000
           r |= u >> 6

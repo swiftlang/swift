@@ -20,11 +20,15 @@ var _anyExpectFailed = false
 
 @public func expectEqual<T : Equatable>(
     expected: T, actual: T,
+    extraLoc: SourceLoc? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    if let el = extraLoc {
+      println("extra loc: \(el.file), line \(el.line)")
+    }
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
     println()
@@ -33,12 +37,16 @@ var _anyExpectFailed = false
 
 @public func expectEqual<T : Equatable>(
     expected: T, actual: T,
+    extraLoc: SourceLoc? = nil,
     collectMoreInfo: () -> String,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    if let el = extraLoc {
+      println("extra loc: \(el.file), line \(el.line)")
+    }
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
     println(collectMoreInfo())
@@ -84,16 +92,40 @@ var _anyExpectFailed = false
 
 @public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
+    extraLoc: SourceLoc? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    if let el = extraLoc {
+      println("extra loc: \(el.file), line \(el.line)")
+    }
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
+
+@public func expectEqual${Generic}(
+    expected: ${EquatableType}, actual: ${EquatableType},
+    extraLoc: SourceLoc? = nil,
+    collectMoreInfo: () -> String,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    if let el = extraLoc {
+      println("extra loc: \(el.file), line \(el.line)")
+    }
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    println(collectMoreInfo())
+    println()
+  }
+}
+
 
 func _expectNotEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -279,16 +311,10 @@ func _expectNotEqual${Generic}(
 // in tests, and stdlib does not have such facilities yet.
 
 @public func asHex(a: UInt8[]) -> String {
-  // FIXME: commented out because of:
-  // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
-  // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
-  return toString(a)
+  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 
 @public func asHex(a: UInt32[]) -> String {
-  // FIXME: commented out because of:
-  // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
-  // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
-  return toString(a)
+  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 

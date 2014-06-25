@@ -2301,8 +2301,48 @@ class NonContiguousNSString : NSString {
 }
 
 func checkUTF8View(expected: UInt8[], stringUnderTest: String) {
-  var utf8Bytes: UInt8[] = Array(stringUnderTest.utf8)
+  let utf8Bytes: UInt8[] = Array(stringUnderTest.utf8)
   expectEqual(expected, utf8Bytes)
+}
+
+func checkUTF16View(expected: UInt16[], stringUnderTest: String,
+    extraLoc: SourceLoc) {
+  if true {
+    // Test .generate() method.
+    var utf16Words: UInt16[] = []
+    var g = stringUnderTest.utf16.generate()
+    while let u = g.next() {
+      utf16Words += u
+    }
+    expectEqual(expected, utf16Words, extraLoc: extraLoc)
+  }
+
+  if true {
+    // Test subscript(Int).
+    var utf16Words: UInt16[] = []
+    var view = stringUnderTest.utf16
+    for var i = view.startIndex; i != view.endIndex; ++i {
+      utf16Words += view[i]
+    }
+    expectEqual(expected, utf16Words, extraLoc: extraLoc)
+  }
+
+  if true {
+    // Test subscript(Range<Int>).
+    for start in 0...expected.count {
+      for end in start...expected.count {
+        var utf16Words: UInt16[] = []
+        var view = stringUnderTest.utf16[start..<end]
+        for var i = view.startIndex; i != view.endIndex; ++i {
+          utf16Words += view[i]
+        }
+        expectEqual(Array(expected[start..<end]), utf16Words,
+            extraLoc: extraLoc) {
+          "start=\(start) end=\(end)"
+        }
+      }
+    }
+  }
 }
 
 func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
@@ -2461,6 +2501,36 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
 
       checkUTF8View(bytes, cfstring)
     }
+  }
+}
+
+StringCookedViews.test("UTF16") {
+  for test in UTF8TestsSmokeTest {
+    var expected: UInt16[] = []
+    var expectedScalars = test.scalars
+    var g = expectedScalars.generate()
+    transcode(UTF32.self, UTF16.self, g,
+        SinkOf {
+          expected += $0
+        },
+        stopOnError: false)
+
+    var nss = NonContiguousNSString(test.scalars)
+    checkUTF16View(expected, nss, test.loc)
+  }
+
+  forStringsWithUnpairedSurrogates {
+    (test: UTF16Test, subject: String) -> () in
+    var expected: UInt16[] = []
+    var expectedScalars = test.scalarsHead + test.scalarsRepairedTail
+    var g = expectedScalars.generate()
+    transcode(UTF32.self, UTF16.self, g,
+        SinkOf {
+          expected += $0
+        },
+        stopOnError: false)
+
+    checkUTF16View(expected, subject, test.loc)
   }
 }
 
