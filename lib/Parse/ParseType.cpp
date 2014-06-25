@@ -617,7 +617,8 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     
     // Just build a normal array slice type.
     ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
-                                           SourceRange(lsquareLoc, rsquareLoc));
+                                           SourceRange(lsquareLoc, rsquareLoc),
+                                      /*OldSyntax=*/true);
 
     if (NestedType.isParseError())
       return makeParserErrorResult(ATR);
@@ -650,7 +651,8 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     ATR = new (Context) ArrayTypeRepr(NestedType.get(),
                                       nullptr,
                                       SourceRange(lsquareLoc,
-                                                  getEndOfPreviousLoc()));
+                                                  getEndOfPreviousLoc()),
+                                      /*OldSyntax=*/true);
     return makeParserErrorResult(ATR);
   }
 
@@ -669,7 +671,8 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   NestedType = makeParserErrorResult(Base);
   ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
                                     SourceRange(lsquareLoc,
-                                                getEndOfPreviousLoc()));
+                                                getEndOfPreviousLoc()),
+                                    /*OldSyntax=*/true);
   return makeParserErrorResult(ATR);
 }
 
@@ -696,7 +699,8 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                           new (Context) ArrayTypeRepr(elementTy.get(),
                                                       nullptr,
                                                       SourceRange(lsquareLoc,
-                                                                  rsquareLoc)));
+                                                                  rsquareLoc),
+                                                      /*OldSyntax=*/false));
 }
 
 /// Parse a single optional suffix, given that we are looking at the

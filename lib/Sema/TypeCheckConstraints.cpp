@@ -575,7 +575,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *NewTypeRepr =
       new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
-                                     Indexes->getSourceRange());
+                                     Indexes->getSourceRange(),
+                                     /*OldSyntax=*/true);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   

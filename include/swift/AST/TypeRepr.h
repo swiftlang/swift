@@ -373,17 +373,20 @@ class ArrayTypeRepr : public TypeRepr {
   // FIXME: Tail allocation. Use bits to determine whether Base/Size are
   // availble.
   TypeRepr *Base;
-  ExprHandle *Size;
+  llvm::PointerIntPair<ExprHandle *, 1, bool> SizeAndOldSyntax;
   SourceRange Brackets;
 
 public:
-  ArrayTypeRepr(TypeRepr *Base, ExprHandle *Size, SourceRange Brackets)
-    : TypeRepr(TypeReprKind::Array), Base(Base), Size(Size), Brackets(Brackets){
-  }
+  ArrayTypeRepr(TypeRepr *Base, ExprHandle *Size, SourceRange Brackets,
+                bool OldSyntax)
+    : TypeRepr(TypeReprKind::Array), Base(Base),
+      SizeAndOldSyntax(Size, OldSyntax), Brackets(Brackets) { }
 
   TypeRepr *getBase() const { return Base; }
-  ExprHandle *getSize() const { return Size; }
+  ExprHandle *getSize() const { return SizeAndOldSyntax.getPointer(); }
   SourceRange getBrackets() const { return Brackets; }
+
+  bool usesOldSyntax() const { return SizeAndOldSyntax.getInt(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Array;
@@ -391,12 +394,17 @@ public:
   static bool classof(const ArrayTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getStartLocImpl() const {
+    if (usesOldSyntax())
+      return Base->getStartLoc();
+
+    return Brackets.Start;
+  }
   SourceLoc getEndLocImpl() const {
     // This test is necessary because the type Int[4][2] is represented as
     // ArrayTypeRepr(ArrayTypeRepr(Int, 2), 4), so the range needs to cover both
     // sets of brackets.
-    if (isa<ArrayTypeRepr>(Base))
+    if (usesOldSyntax() && isa<ArrayTypeRepr>(Base))
       return Base->getEndLoc();
     return Brackets.End;
   }
