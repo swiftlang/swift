@@ -50,12 +50,12 @@ class X<T> {
   func f() -> T {}
 }
 
-class Y<T> : X<T[]> {
+class Y<T> : X<[T]> {
 }
 
 func testGenericInherit() {
   var yi : Y<Int>
-  var ia : Int[] = yi.f()
+  var ia : [Int] = yi.f()
 }
 
 

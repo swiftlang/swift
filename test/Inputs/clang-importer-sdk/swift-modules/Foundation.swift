@@ -19,11 +19,11 @@ func == (lhs: NSObject, rhs: NSObject) -> Bool {
 let NSUTF8StringEncoding: UInt = 8
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
-  return T[]()
+func _convertNSArrayToArray<T>(nsarr: NSArray) -> [T] {
+  return [T]()
 }
 
-func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
+func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return NSArray()
 }
 

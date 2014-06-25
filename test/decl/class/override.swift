@@ -56,8 +56,8 @@ class C<T> {
   func ret_T() -> T {} 
 }
 
-class D<T> : C<T[]> {
-  override func ret_T() -> T[] {} 
+class D<T> : C<[T]> {
+  override func ret_T() -> [T] {} 
 }
 
 class E {

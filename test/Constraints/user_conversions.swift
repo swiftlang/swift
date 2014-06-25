@@ -126,7 +126,7 @@ func floatConvert() {
 // User-defined conversion based on contextual type.
 struct Proxy<T> {
   @conversion func __conversion() -> T { return value[0] }
-  var value: T[]
+  var value: [T]
 }
 
 class OutputStreamWrapper<T> {
@@ -161,7 +161,7 @@ protocol P { }
 
 class GenericBase<T> { }
 
-class GenericDerived<U> : GenericBase<U[]> {
+class GenericDerived<U> : GenericBase<[U]> {
   @conversion func __conversion() -> GenericBase<U> { }
 }
 

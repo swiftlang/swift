@@ -168,15 +168,15 @@ func dynamic_lookup_cast(dl: AnyObject) {
 
 // Cast to subclass with generic parameter inference
 class C2<T> : B { }
-class C3<T> : C2<T[]> { 
+class C3<T> : C2<[T]> { 
   func f(x: T) { }
 }
-var c2i : C2<Int[]> = C3()
+var c2i : C2<[Int]> = C3()
 var c3iOpt = c2i as? C3
 c3iOpt?.f(5)
 var b1 = c2i is C3
 var c2f: C2<Float>? = b as? C2
-var c2f2: C2<Float[]>? = b as C3
+var c2f2: C2<[Float]>? = b as C3
 
 
 // <rdar://problem/15633178>

@@ -77,7 +77,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   for (i = 7, f) in gtr {} // expected-error{{default argument is only permitted for a non-curried function parameter}}
 }
 
-func slices(i_s: Int[], ias: Int[][]) {
+func slices(i_s: [Int], ias: [[Int]]) {
   var sum = 0
   for i in i_s { sum = sum + i }
 

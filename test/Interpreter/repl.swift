@@ -152,18 +152,18 @@ var vec = Array<String>()
 // CHECK: vec : Array<String> = []
 
 // Error recovery
-var a : int[]
-var a = Int[]()
+var a : [int]
+var a = [Int]()
 var b = a.slice[3..<5]
 
 struct Inner<T> {}
 struct Outer<T> { var inner : Inner<T> }
 Outer<Int>(inner: Inner()) // CHECK: Outer<Int> = V4REPL5Outer (has 1 child)
 
-struct ContainsSlice { var slice : Int[] }
+struct ContainsSlice { var slice : [Int] }
 ContainsSlice(slice: [1, 2, 3]) // CHECK: ContainsSlice = V4REPL13ContainsSlice (has 1 child)
 
-struct ContainsGenericSlice<T> { var slice : T[] }
+struct ContainsGenericSlice<T> { var slice : [T] }
 ContainsGenericSlice(slice: [1, 2, 3]) // CHECK: ContainsGenericSlice<Int> = V4REPL20ContainsGenericSlice (has 1 child)
 ContainsGenericSlice(slice: [(1, 2), (3, 4)]) // CHECK: ContainsGenericSlice<(Int, Int)> = V4REPL20ContainsGenericSlice (has 1 child)
 
@@ -192,7 +192,7 @@ pr = "foo"
 // CHECK: String: foo
 pr.foo()
 
-var _ : (Int[]).Type = [4].dynamicType
+var _ : ([Int]).Type = [4].dynamicType
 // CHECK: : (Int[]).Type
 var _ : (Int -> Int)? = .None
 // CHECK: : (Int -> Int)?

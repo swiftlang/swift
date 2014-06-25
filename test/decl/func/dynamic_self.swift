@@ -136,7 +136,7 @@ class GX<T> {
   func produceGX() -> GX { }
 }
 
-class GY<T> : GX<T[]> { 
+class GY<T> : GX<[T]> { 
   func produceGY() -> GY { }
 }
 

@@ -12,7 +12,7 @@ extension Int : Showable {
 
 /*FIXME crashes irgen
 
-func show_slice<T : Showable>(xs: T[]) {
+func show_slice<T : Showable>(xs: [T]) {
   for x in xs {
     x.show()
   }

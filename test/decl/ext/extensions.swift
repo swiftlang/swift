@@ -100,11 +100,11 @@ extension protocol<P1> { // expected-error {{non-nominal type 'protocol<P1>' can
   }
 }
 
-extension S1[] {} // expected-error {{non-nominal type 'S1[]' cannot be extended}}
+extension [S1] {} // expected-error {{non-nominal type '[S1]' cannot be extended}}
 
-extension S1[]? {} // expected-error {{non-nominal type 'S1[]?' cannot be extended}}
+extension [S1]? {} // expected-error {{non-nominal type '[S1]?' cannot be extended}}
 
-extension S1?[] {} // expected-error {{non-nominal type 'S1?[]' cannot be extended}}
+extension [S1?] {} // expected-error {{non-nominal type '[S1?]' cannot be extended}}
 
 extension (S1) -> () {} // expected-error {{non-nominal type '(S1) -> ()' cannot be extended}}
 

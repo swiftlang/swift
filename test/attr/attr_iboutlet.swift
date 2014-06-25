@@ -110,29 +110,29 @@ class NonObjC {}
   @IBOutlet var outlet37: (X, X)  // expected-error{{'IBOutlet' property cannot have non-object type}}
   @IBOutlet var outlet38: Int  // expected-error{{'IBOutlet' property cannot have non-object type}}
 
-  @IBOutlet var collection1a: AnyObject[]
-  @IBOutlet var collection1b: (AnyObject[])?
-  @IBOutlet var collection1c: (AnyObject[])!
+  @IBOutlet var collection1a: [AnyObject]
+  @IBOutlet var collection1b: ([AnyObject])?
+  @IBOutlet var collection1c: ([AnyObject])!
 
-  @IBOutlet var collection2a: X[]
-  @IBOutlet var collection2b: (X[])?
-  @IBOutlet var collection2c: (X[])!
+  @IBOutlet var collection2a: [X]
+  @IBOutlet var collection2b: ([X])?
+  @IBOutlet var collection2c: ([X])!
 
-  @IBOutlet var collection3a: OP1[]
-  @IBOutlet var collection3b: (OP1[])?
-  @IBOutlet var collection3c: (OP1[])!
+  @IBOutlet var collection3a: [OP1]
+  @IBOutlet var collection3b: ([OP1])?
+  @IBOutlet var collection3c: ([OP1])!
 
-  @IBOutlet var collection4a: CP1[] // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
-  @IBOutlet var collection4b: (CP1[])? // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
-  @IBOutlet var collection4c: (CP1[])! // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
+  @IBOutlet var collection4a: [CP1] // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
+  @IBOutlet var collection4b: ([CP1])? // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
+  @IBOutlet var collection4c: ([CP1])! // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
 
-  @IBOutlet var collection5a: String[]    // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
-  @IBOutlet var collection5b: (String[])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
-  @IBOutlet var collection5c: (String[])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var collection5a: [String]    // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var collection5b: ([String])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var collection5c: ([String])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
 
-  @IBOutlet var collection6a: NonObjC[] // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
-  @IBOutlet var collection6b: (NonObjC[])? // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
-  @IBOutlet var collection6c: (NonObjC[])! // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
+  @IBOutlet var collection6a: [NonObjC] // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
+  @IBOutlet var collection6b: ([NonObjC])? // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
+  @IBOutlet var collection6c: ([NonObjC])! // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
 
   init() { }
 }
@@ -175,9 +175,9 @@ class NonObjC {}
 
 class SwiftGizmo {
   @IBOutlet var a : C
-  @IBOutlet var b : C[]
+  @IBOutlet var b : [C]
   @IBOutlet var c : String
-  @IBOutlet var d : String[]  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var d : [String]  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var e : Proto
 
   @IBOutlet var f : C?

@@ -32,19 +32,19 @@ enum MembersReferenceRawType : Int {
   }
 }
 
-func serialize<T : RawRepresentable>(values: T[]) -> T.RawType[] {
+func serialize<T : RawRepresentable>(values: [T]) -> [T.RawType] {
   return new T.RawType[values.count] { values[$0].toRaw() }
 }
 
-func deserialize<T : RawRepresentable>(serialized: T.RawType[]) -> T[] {
+func deserialize<T : RawRepresentable>(serialized: [T.RawType]) -> [T] {
   return new T[serialized.count] { T.fromRaw(serialized[$0])! }
 }
 
-var ints: Int[] = serialize([Foo.A, .B, .C])
-var doubles: Double[] = serialize([Bar.A, .B, .C])
+var ints: [Int] = serialize([Foo.A, .B, .C])
+var doubles: [Double] = serialize([Bar.A, .B, .C])
 
-var foos: Foo[] = deserialize([1, 2, 3])
-var bars: Bar[] = deserialize([1.2, 3.4, 5.6])
+var foos: [Foo] = deserialize([1, 2, 3])
+var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
 // Infer RawType from witnesses.
 enum Color : Int, RawRepresentable {

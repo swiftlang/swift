@@ -588,9 +588,6 @@ func newTest() {
   var t1 = new Int[5]
 
   var i: Int
-  var t2 = new Int[5][]
-  var t3 = new Int[] // expected-error {{must specify length of array to allocate}}
-  var t4 = new Int[5][i] // expected-error {{sized multidimensional arrays are not supported}}
   var t5 = new Int[i]
 
   var i2: Dummy
@@ -601,7 +598,7 @@ func newTest() {
   var t10 = new Int[5][5] // expected-error{{sized multidimensional arrays are not supported}}
 }
 
-func arraySubscript(inout a: Int[], i: Int, inout value: Int, inout aa: Int[][]) {
+func arraySubscript(inout a: [Int], i: Int, inout value: Int, inout aa: [[Int]]) {
   a[i] = value
   value = a[i+1]
 
@@ -665,7 +662,7 @@ _ // expected-error{{'_' can only appear in a pattern or on the left side of an 
 
 func arrayLiterals() { 
   var a = [1,2,3]
-  var b : Int[] = []
+  var b : [Int] = []
   var c = []  // expected-error {{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}}
 }
 

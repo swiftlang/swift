@@ -6,9 +6,9 @@ import cfuncs
 
 func test_pointer() {
   var i: CInt = 0
-  var ia: CInt[] = [1, 2, 3]
+  var ia: [CInt] = [1, 2, 3]
   var f: CFloat = 0
-  var fa: CFloat[] = [1, 2, 3]
+  var fa: [CFloat] = [1, 2, 3]
 
   param_pointer(UnsafePointer<CInt>())
   param_pointer(&i)
@@ -44,7 +44,7 @@ func test_pointer() {
 func test_decay() {
   decay_param_array(UnsafePointer<CInt>())
   var i: CInt = 0
-  var a: CInt[] = [1, 2, 3]
+  var a: [CInt] = [1, 2, 3]
   decay_param_array(&i)
   decay_param_array(&a)
   decay_param_const_array(UnsafePointer<CInt>())

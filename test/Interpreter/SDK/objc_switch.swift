@@ -10,11 +10,11 @@ func testAnyObjectIsa(obj: AnyObject) {
   case is Int:
     println("Int")
     
-  case is NSString[]:
-    println("NSString[]")
+  case is [NSString]:
+    println("[NSString]")
 
-  case is Int[]:
-    println("Int[]")
+  case is [Int]:
+    println("[Int]")
 
   case is Dictionary<String, Int>:
     println("Dictionary<String, Int>")
@@ -30,10 +30,10 @@ testAnyObjectIsa("hello")
 // CHECK: Int
 testAnyObjectIsa(5)
 
-// CHECK: NSString[]
+// CHECK: [NSString]
 testAnyObjectIsa(["hello", "swift", "world"])
 
-// CHECK: Int[]
+// CHECK: [Int]
 testAnyObjectIsa([1, 2, 3, 4, 5])
 
 // CHECK: Dictionary<String, Int>
@@ -41,21 +41,21 @@ testAnyObjectIsa(["hello" : 1, "world" : 2])
 
 func testNSArrayIsa(nsArr: NSArray) {
   switch nsArr {
-  case is String[]:
-    println("String[]")
+  case is [String]:
+    println("[String]")
 
-  case is Int[]:
-    println("Int[]")
+  case is [Int]:
+    println("[Int]")
 
   default:
     println("Did not match");
   }
 }
 
-// CHECK: String[]
+// CHECK: [String]
 testNSArrayIsa(["a", "b", "c"])
 
-// CHECK: Int[]
+// CHECK: [Int]
 testNSArrayIsa([1, 2, 3])
 
 // CHECK: Did not match
@@ -63,21 +63,21 @@ testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsa(arr: Array<AnyObject>) {
   switch arr {
-  case is NSString[]:
-    println("NSString[]")
+  case is [NSString]:
+    println("[NSString]")
 
-  case is NSNumber[]:
-    println("NSNumber[]")
+  case is [NSNumber]:
+    println("[NSNumber]")
 
   default:
     println("Did not match");
   }
 }
 
-// CHECK: String[]
+// CHECK: [NSString]
 testArrayIsa(["a", "b", "c"])
 
-// CHECK: NSNumber[]
+// CHECK: [NSNumber]
 testArrayIsa([1, 2, 3])
 
 // CHECK: Did not match
@@ -85,21 +85,21 @@ testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsaBridged(arr: Array<AnyObject>) {
   switch arr {
-  case is String[]:
-    println("String[]")
+  case is [String]:
+    println("[String]")
 
-  case is Int[]:
-    println("Int[]")
+  case is [Int]:
+    println("[Int]")
 
   default:
     println("Did not match");
   }
 }
 
-// CHECK: String[]
+// CHECK: [String]
 testArrayIsaBridged(["a", "b", "c"])
 
-// CHECK: Int[]
+// CHECK: [Int]
 testArrayIsaBridged([1, 2, 3])
 
 // CHECK: Did not match

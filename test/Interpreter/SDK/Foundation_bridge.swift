@@ -45,7 +45,7 @@ if let obj: AnyObject = bridgeToObjectiveC(a) {
 // CHECK:     2
 // CHECK:     3
 // CHECK: )
-var aui: UInt[] = [1, 2, 3]
+var aui: [UInt] = [1, 2, 3]
 if let obj: AnyObject = bridgeToObjectiveC(aui) {
   println("uint array bridges to \(obj.description!)")
 } else {
@@ -57,7 +57,7 @@ if let obj: AnyObject = bridgeToObjectiveC(aui) {
 // CHECK:     2.5
 // CHECK:     3.5
 // CHECK: )
-var af: Float[] = [1.5, 2.5, 3.5]
+var af: [Float] = [1.5, 2.5, 3.5]
 if let obj: AnyObject = bridgeToObjectiveC(af) {
   println("float array bridges to \(obj.description!)")
 } else {

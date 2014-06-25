@@ -27,7 +27,7 @@ func getXY() -> (X, Y) {}
 var ift : (X, Y)
 var ovl = WithOverloadedSubscript()
 
-var slice: X[]
+var slice: [X]
 
 i = j
 (i, f) = getXY()

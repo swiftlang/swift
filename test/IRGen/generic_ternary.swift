@@ -7,5 +7,5 @@ struct OptionalStreamAdaptor<T: Generator> {
   func next() -> Optional<T.Element> {
     return x[0].next()
   }
-  var x: T[]
+  var x: [T]
 }

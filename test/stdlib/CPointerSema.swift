@@ -7,8 +7,8 @@ func takeConstPointer(p: CConstPointer<Int>) {} // expected-note{{}}
 var mutable: Int = 0
 let immutable: Int = 0
 var differentType: Double = 0
-var arr: Int[] = [0]
-var arrDifferentType: Double[] = [0]
+var arr: [Int] = [0]
+var arrDifferentType: [Double] = [0]
 let ptr: UnsafePointer<Int> = nil
 let ptrDifferentType: UnsafePointer<Double> = nil
 

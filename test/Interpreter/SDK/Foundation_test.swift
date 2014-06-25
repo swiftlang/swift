@@ -94,7 +94,7 @@ var aoa2: Array<AnyObject> = nsa2
 
 var nsaoa = aoa as NSArray
 
-func nsArrayToAnyObjectArray(nsa: NSArray) -> AnyObject[] {
+func nsArrayToAnyObjectArray(nsa: NSArray) -> [AnyObject] {
   return nsa
 }
 

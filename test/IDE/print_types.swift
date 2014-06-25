@@ -70,7 +70,7 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
 // FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}
 
-  var optional2 = Optional<Int[]>.None
+  var optional2 = Optional<[Int]>.None
 // CHECK: VarDecl '''optional2''' Optional<Int[]>{{$}}
 // FULL:  VarDecl '''optional2''' Swift.Optional<Swift.Int[]>{{$}}
 }

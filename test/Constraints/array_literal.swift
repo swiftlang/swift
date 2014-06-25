@@ -61,12 +61,12 @@ useDict(["Niners" => 31, "Ravens" => 34])
 useDict(["Niners" => 31, "Ravens" => 34.0])
 useDict(["Niners" => 31.0, "Ravens" => 34.0])
 
-// Fall back to T[] if no context is otherwise available.
+// Fall back to [T] if no context is otherwise available.
 var a = [1,2,3]
-var a2 : Int[] = a
+var a2 : [Int] = a
 
 var b = [1,2,3.0]
-var b2 : Double[] = b
+var b2 : [Double] = b
 
 var arrayOfStreams = [1..<2, 3..<4]
 

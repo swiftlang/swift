@@ -6,7 +6,7 @@ class C : B { }
 class D : B { }
 
 class E<T> : D { }
-class F<T> : E<T[]> { }
+class F<T> : E<[T]> { }
 
 var a : A
 var b : B

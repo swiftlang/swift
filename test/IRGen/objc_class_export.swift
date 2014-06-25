@@ -97,7 +97,7 @@ struct BigStructWithNativeObjects {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
   // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
 
-  func doStuffToSwiftSlice(#f: Int[]) {
+  func doStuffToSwiftSlice(#f: [Int]) {
   }
   // This function is not representable in Objective-C, so don't emit the objc entry point.
   // CHECK-NOT: @_TToFC17objc_class_export3Foo19doStuffToSwiftSlicefS_FT1fGSaSi__T_

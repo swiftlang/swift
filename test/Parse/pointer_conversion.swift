@@ -22,8 +22,8 @@ func mutablePointerArguments(p: UnsafePointer<Int>,
   takesMutablePointer(&f) // expected-error{{}}
   takesMutablePointer(i) // expected-error{{}}
   takesMutablePointer(f) // expected-error{{}}
-  var ii: Int[] = [0, 1, 2]
-  var ff: Float[] = [0, 1, 2]
+  var ii: [Int] = [0, 1, 2]
+  var ff: [Float] = [0, 1, 2]
   takesMutablePointer(&ii)
   takesMutablePointer(&ff) // expected-error{{}}
   takesMutablePointer(ii) // expected-error{{}}
@@ -49,8 +49,8 @@ func mutableVoidPointerArguments(p: UnsafePointer<Int>,
   takesMutableVoidPointer(&f)
   takesMutableVoidPointer(i) // expected-error{{}}
   takesMutableVoidPointer(f) // expected-error{{}}
-  var ii: Int[] = [0, 1, 2]
-  var ff: Int[] = [0, 1, 2]
+  var ii: [Int] = [0, 1, 2]
+  var ff: [Int] = [0, 1, 2]
   takesMutableVoidPointer(&ii)
   takesMutableVoidPointer(&ff)
   takesMutableVoidPointer(ii) // expected-error{{}}
@@ -74,8 +74,8 @@ func constPointerArguments(p: UnsafePointer<Int>,
   var f: Float = 0
   takesConstPointer(&i)
   takesConstPointer(&f) // expected-error{{}}
-  var ii: Int[] = [0, 1, 2]
-  var ff: Float[] = [0, 1, 2]
+  var ii: [Int] = [0, 1, 2]
+  var ff: [Float] = [0, 1, 2]
   takesConstPointer(&ii)
   takesConstPointer(&ff) // expected-error{{}}
   takesConstPointer(ii)
@@ -108,8 +108,8 @@ func constVoidPointerArguments(p: UnsafePointer<Int>,
   var f: Float = 0
   takesConstVoidPointer(&i)
   takesConstVoidPointer(&f)
-  var ii: Int[] = [0, 1, 2]
-  var ff: Float[] = [0, 1, 2]
+  var ii: [Int] = [0, 1, 2]
+  var ff: [Float] = [0, 1, 2]
   takesConstVoidPointer(&ii)
   takesConstVoidPointer(&ff)
   takesConstVoidPointer(ii)
@@ -142,8 +142,8 @@ func autoreleasingPointerArguments(p: UnsafePointer<Int>,
   var d: D = D()
   takesAutoreleasingPointer(&d) // expected-error{{}}
   takesAutoreleasingPointer(d) // expected-error{{}}
-  var cc: C[] = [C(), C()]
-  var dd: D[] = [D(), D()]
+  var cc: [C] = [C(), C()]
+  var dd: [D] = [D(), D()]
   takesAutoreleasingPointer(&cc) // expected-error{{}}
   takesAutoreleasingPointer(&dd) // expected-error{{}}
 

@@ -48,7 +48,7 @@ protocol P9 {
 
 // Never inheritable: method with 'Self' in a non-contravariant position.
 protocol P10 {
-  func f10(arr: Self[])
+  func f10(arr: [Self])
 }
 
 // Never inheritable: method with 'Self' in curried position.
@@ -94,7 +94,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   init(int: Int) { }
 
   // P10
-  func f10(arr: A[]) { }
+  func f10(arr: [A]) { }
 
   // P11
   func f11()(x: A) -> Int { return 5 }

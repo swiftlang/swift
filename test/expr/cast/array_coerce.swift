@@ -24,8 +24,8 @@ var daa = [da]
 caa = daa // expected-error{{cannot convert the expression's type '()' to type 'Array<Array<C>>'}}
 
 // Array slice type
-var cas: C[] = [c1]
-var das: D[] = [d1]
+var cas: [C] = [c1]
+var das: [D] = [d1]
 
 cas = das
 das = cas // expected-error{{cannot convert the expression's type '()' to type 'D[]'}}

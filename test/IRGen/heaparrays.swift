@@ -3,7 +3,7 @@
 // CHECK: [[REFCOUNT:%.*]] = type { [[TYPE:%swift.type]]*, i32, i32 }
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 
-func make_array<T>(var n: Int, var x: T) -> T[] {
+func make_array<T>(var n: Int, var x: T) -> [T] {
   return new T[n] {i in x}
 }
 
@@ -101,7 +101,7 @@ func make_array<T>(var n: Int, var x: T) -> T[] {
 
 
 // CHECK: define [[arrayLayout]] @_TF10heaparrays22make_array_enumerators{{.*}}(i64, %swift.opaque* noalias, %swift.type* [[T:%[0-9a-zA-Z]*]],
-func make_array_enumerators<T : Generator>(n: Int, x: T) -> T[] {
+func make_array_enumerators<T : Generator>(n: Int, x: T) -> [T] {
   // CHECK: call [[arrayLayout]] @_TFSa20convertFromHeapArray{{.*}}(i8* [[STORAGE:%[0-9a-zA-Z]*]], %swift.refcounted* [[OWNER:%[0-9a-zA-Z]*]], i64 [[LENGTH:%[0-9a-zA-Z]*]], %swift.type* [[T]])
   return new T[n] { i in x }
 }

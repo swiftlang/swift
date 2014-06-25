@@ -128,7 +128,7 @@ var d : Double
 d = z[0]
 
 // regressions with subscripts that return generic types
-var xs:X[]
+var xs:[X]
 var _ = xs[0].property
 
 struct A<T> {

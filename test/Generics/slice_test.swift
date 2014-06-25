@@ -86,7 +86,7 @@ protocol Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func sort<T : Comparable>(inout array: T[]) {
+func sort<T : Comparable>(inout array: [T]) {
   for i in 0..<array.count {
     for j in i+1..<array.count {
       if array[j] < array[i] {
@@ -98,7 +98,7 @@ func sort<T : Comparable>(inout array: T[]) {
   }
 }
 
-func find<T : Eq>(array: T[], value: T) -> Int {
+func find<T : Eq>(array: [T], value: T) -> Int {
   var idx = 0
   for elt in array {
      if (elt == value) { return idx }
@@ -107,7 +107,7 @@ func find<T : Eq>(array: T[], value: T) -> Int {
   return -1
 }
 
-func findIf<T>(array: T[], fn: (T) -> Bool) -> Int {
+func findIf<T>(array: [T], fn: (T) -> Bool) -> Int {
   var idx = 0
   for elt in array {
      if (fn(elt)) { return idx }
@@ -121,7 +121,7 @@ protocol Eq {
   func !=(lhs: Self, rhs: Self) -> Bool
 }
 
-func map<T1, T2>(array: T1[], fn: (T1) -> T2) -> T2[] {
+func map<T1, T2>(array: [T1], fn: (T1) -> T2) -> [T2] {
   var result = new T2[array.count] { fn(array[$0]) }
   return result
 }

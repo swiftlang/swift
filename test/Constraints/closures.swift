@@ -1,8 +1,8 @@
 // RUN: %swift -parse -verify %s
 
-func myMap<T1, T2>(array: T1[], fn: (T1) -> T2) -> T2[] {}
+func myMap<T1, T2>(array: [T1], fn: (T1) -> T2) -> [T2] {}
 
-var intArray : Int[]
+var intArray : [Int]
 
 myMap(intArray, { String($0) })
 myMap(intArray, { x -> String in String(x) } )
@@ -12,9 +12,9 @@ func foo(x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{cannot convert the expression's type '()' to type 'Int'}}
 
 struct X {}
-func mySort(array: String[], predicate: (String, String) -> Bool) -> String[] {}
-func mySort(array: X[], predicate: (X, X) -> Bool) -> X[] {}
-var strings : String[]
+func mySort(array: [String], predicate: (String, String) -> Bool) -> [String] {}
+func mySort(array: [X], predicate: (X, X) -> Bool) -> [X] {}
+var strings : [String]
 mySort(strings, { x, y in x < y })
 
 // Closures with inout arguments.

@@ -6,28 +6,28 @@
 import Foundation
 
 func testDowncastObjectToArray(obj: AnyObject, objImplicit: AnyObject!) {
-  var nsstrArr1 = (obj as NSString[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}{{38-39=}}
-  var strArr1 = (obj as String[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}{{34-35=}}
+  var nsstrArr1 = (obj as [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}{{38-39=}}
+  var strArr1 = (obj as [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}{{34-35=}}
 
-  var nsstrArr2 = (objImplicit as NSString[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}{{46-47=}}
-  var strArr2 = (objImplicit as String[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}{{42-43=}}
+  var nsstrArr2 = (objImplicit as [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}{{46-47=}}
+  var strArr2 = (objImplicit as [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}{{42-43=}}
 }
 
-func testArrayDowncast(arr: AnyObject[], arrImplicit: AnyObject[]!) {
-  var nsstrArr1 = (arr as NSString[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}
-  var strArr1 = (arr as String[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}
+func testArrayDowncast(arr: [AnyObject], arrImplicit: [AnyObject]!) {
+  var nsstrArr1 = (arr as [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}
+  var strArr1 = (arr as [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}
 
-  var nsstrArr2 = (arrImplicit as NSString[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}
-  var strArr2 = (arrImplicit as String[])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}
+  var nsstrArr2 = (arrImplicit as [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'NSString[]'}}
+  var strArr2 = (arrImplicit as [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type 'String[]'}}
 }
 
 func testDowncastNSArrayToArray(nsarray: NSArray) {
-  var nsstrArr1 = nsarray as NSString[]
-  var strArr1 = nsarray as String[]
+  var nsstrArr1 = nsarray as [NSString]
+  var strArr1 = nsarray as [String]
 }
 
 // CHECK-LABEL: testDowncastOptionalObject
-func testDowncastOptionalObject(obj: AnyObject?!) -> String[]? {
+func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
   // CHECK: (optional_evaluation_expr implicit type='String[]?'
   // CHECK-NEXT: (inject_into_optional implicit type='String[]?'
   // CHECK-NEXT: (call_expr implicit type='String[]'
@@ -38,11 +38,11 @@ func testDowncastOptionalObject(obj: AnyObject?!) -> String[]? {
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (force_value_expr implicit type='AnyObject?'
   // CHECK-NEXT: (declref_expr type='AnyObject?!' 
-  return obj as String[]?
+  return obj as [String]?
 }
 
 // CHECK-LABEL: testDowncastOptionalObjectConditional
-func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> String[]?? {
+func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
   // CHECK: (optional_evaluation_expr implicit type='String[]??'
   // CHECK-NEXT: (inject_into_optional implicit type='String[]??'
   // CHECK-NEXT: (optional_evaluation_expr implicit type='String[]?'
@@ -58,6 +58,6 @@ func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> String[]?? {
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject?'
   // CHECK-NEXT: (declref_expr type='AnyObject?!'
-  return obj as? String[]?
+  return obj as? [String]?
 }
 

@@ -16,14 +16,14 @@ struct B : _BridgedToObjectiveC {
   }
 }
 
-var a: A[] = []
-var b: B[] = []
+var a: [A] = []
+var b: [B] = []
 
 a = b
 b = a // expected-error {{cannot convert the expression's type '()' to type 'B[]'}}
 
-var aa: A[][] = []
-var bb: B[][] = []
+var aa: [[A]] = []
+var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot convert the expression's type '()' to type 'A[][]'}}
 
@@ -47,8 +47,8 @@ struct F : _BridgedToObjectiveC {
   }
 }
 
-var e: E[] = []
-var f: F[] = []
+var e: [E] = []
+var f: [F] = []
 
 e = f
 f = e // expected-error {{cannot convert the expression's type '()' to type 'F[]'}}
@@ -75,8 +75,8 @@ struct H : _ConditionallyBridgedToObjectiveC {
   }
 }
 
-var g: G[] = []
-var h: H[] = []
+var g: [G] = []
+var h: [H] = []
 
 g = h // should type check, but cause a failure at runtime
 
@@ -93,8 +93,8 @@ struct I : _BridgedToObjectiveC {
   }
 }
 
-var aoa: AnyObject[] = []
-var i: I[] = []
+var aoa: [AnyObject] = []
+var i: [I] = []
 
 aoa = i
 i = aoa // expected-error {{cannot convert the expression's type '()' to type 'I[]'}}

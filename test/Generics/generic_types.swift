@@ -156,7 +156,7 @@ struct SequenceY : Sequence, Generator {
   func generate() -> GeneratorType { return self }
 }
 
-func useRangeOfPrintables(roi : RangeOfPrintables<Int[]>) {
+func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {
   var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
   var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' does not conform to protocol 'MyFormattedPrintable'}}
 }

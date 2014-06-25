@@ -234,8 +234,8 @@ if objImplicitOpt is String {
 }
 
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-obj = ["Hello", "Swift", "World"] as String[]
-if let strArr = obj as? String[] {
+obj = ["Hello", "Swift", "World"] as [String]
+if let strArr = obj as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
   println("Object-to-bridged-array cast failed")
@@ -243,24 +243,24 @@ if let strArr = obj as? String[] {
 
 // Check downcast from the bridged type itself.
 // CHECK-NEXT: NSArray-to-bridged-array cast produced [Hello, Swift, World]
-var nsarr: NSArray = ["Hello", "Swift", "World"] as String[]
-if let strArr = nsarr as? String[] {
+var nsarr: NSArray = ["Hello", "Swift", "World"] as [String]
+if let strArr = nsarr as? [String] {
   println("NSArray-to-bridged-array cast produced \(strArr)")
 } else {
   println("NSArray-to-bridged-array cast failed")
 }
 
 // CHECK-NEXT: NSArray?-to-bridged-array cast produced [Hello, Swift, World]
-var nsarrOpt: NSArray? = ["Hello", "Swift", "World"] as String[]
-if let strArr = nsarrOpt as? String[] {
+var nsarrOpt: NSArray? = ["Hello", "Swift", "World"] as [String]
+if let strArr = nsarrOpt as? [String] {
   println("NSArray?-to-bridged-array cast produced \(strArr)")
 } else {
   println("NSArray?-to-bridged-array cast failed")
 }
 
 // CHECK-NEXT: NSArray!-to-bridged-array cast produced [Hello, Swift, World]
-var nsarrImplicitOpt: NSArray! = ["Hello", "Swift", "World"] as String[]
-if let strArr = nsarrImplicitOpt as? String[] {
+var nsarrImplicitOpt: NSArray! = ["Hello", "Swift", "World"] as [String]
+if let strArr = nsarrImplicitOpt as? [String] {
   println("NSArray!-to-bridged-array cast produced \(strArr)")
 } else {
   println("NSArray!-to-bridged-array cast failed")
@@ -269,73 +269,73 @@ if let strArr = nsarrImplicitOpt as? String[] {
 // Check downcast from a superclass of the bridged type.
 // CHECK-NEXT: NSObject-to-bridged-array cast produced [Hello, Swift, World]
 var nsobj: NSObject = nsarr
-if let strArr = nsobj as? String[] {
+if let strArr = nsobj as? [String] {
   println("NSObject-to-bridged-array cast produced \(strArr)")
 } else {
   println("NSObject-to-bridged-array cast failed")
 }
 
-// CHECK-NEXT: NSArray is String[]
-if nsarr is String[] {
-  println("NSArray is String[]")
+// CHECK-NEXT: NSArray is [String]
+if nsarr is [String] {
+  println("NSArray is [String]")
 } else {
-  println("NSArray is not a String[]")
+  println("NSArray is not a [String]")
 }
 
-// CHECK-NEXT: NSArray? is String[]
-if nsarrOpt is String[] {
-  println("NSArray? is String[]")
+// CHECK-NEXT: NSArray? is [String]
+if nsarrOpt is [String] {
+  println("NSArray? is [String]")
 } else {
-  println("NSArray? is not a String[]")
+  println("NSArray? is not a [String]")
 }
 
-// CHECK-NEXT: NSArray! is String[]
-if nsarrImplicitOpt is String[] {
-  println("NSArray! is String[]")
+// CHECK-NEXT: NSArray! is [String]
+if nsarrImplicitOpt is [String] {
+  println("NSArray! is [String]")
 } else {
-  println("NSArray! is not a String[]")
+  println("NSArray! is not a [String]")
 }
 
-// CHECK-NEXT: NSObject is String[]
-if nsobj is String[] {
-  println("NSObject is String[]")
+// CHECK-NEXT: NSObject is [String]
+if nsobj is [String] {
+  println("NSObject is [String]")
 } else {
-  println("NSObject is not a String[]")
+  println("NSObject is not a [String]")
 }
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-var forcedStrArray: String[] = obj as String[]
+var forcedStrArray: [String] = obj as [String]
 println("Forced to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray to string array [Hello, Swift, World]
-forcedStrArray = nsarr as String[]
+forcedStrArray = nsarr as [String]
 println("Forced NSArray to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray? to string array [Hello, Swift, World]
-forcedStrArray = nsarrOpt as String[]
+forcedStrArray = nsarrOpt as [String]
 println("Forced NSArray? to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Forced NSArray! to string array [Hello, Swift, World]
-forcedStrArray = nsarrImplicitOpt as String[]
+forcedStrArray = nsarrImplicitOpt as [String]
 println("Forced NSArray! to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
-if let strArr = obj as? NSString[] {
+if let strArr = obj as? [NSString] {
   println("Object-to-array cast produced \(strArr)")
 } else {
   println("Object-to-array cast failed")
 }
 
 // CHECK-NEXT: Object-to-bridged-array cast failed due to bridge mismatch
-if let strArr = obj as? Int[] {
+if let strArr = obj as? [Int] {
   println("Object-to-bridged-array cast should not have succedded")
 } else {
   println("Object-to-bridged-array cast failed due to bridge mismatch")
 }
 
 // CHECK-NEXT: Array of strings is not an array of ints
-if obj is Int[] {
+if obj is [Int] {
   println("Array of strings should not be an array of ints!")
 } else {
   println("Array of strings is not an array of ints")
@@ -343,8 +343,8 @@ if obj is Int[] {
 
 // Implicitly unwrapped optional of object to array casts.
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-objOpt = ["Hello", "Swift", "World"] as String[]
-if let strArr = objOpt as? String[] {
+objOpt = ["Hello", "Swift", "World"] as [String]
+if let strArr = objOpt as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
   println("Object-to-bridged-array cast failed")
@@ -352,18 +352,18 @@ if let strArr = objOpt as? String[] {
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-let forcedStrArrayOpt: String[] = objOpt as String[]
+let forcedStrArrayOpt: [String] = objOpt as [String]
 println("Forced to string array \(forcedStrArrayOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
-if let strArr = objOpt as? NSString[] {
+if let strArr = objOpt as? [NSString] {
   println("Object-to-array cast produced \(strArr)")
 } else {
   println("Object-to-array cast failed")
 }
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
-if let intArr = objOpt as? Int[] {
+if let intArr = objOpt as? [Int] {
   println("Object-to-bridged-array cast should not have succedded")
 } else {
   println("Object-to-bridged-array cast failed due to bridge mismatch")
@@ -371,7 +371,7 @@ if let intArr = objOpt as? Int[] {
 
 // CHECK: Object-to-bridged-array cast failed due to nil
 objOpt = nil
-if let strArr = objOpt as? String[] {
+if let strArr = objOpt as? [String] {
   println("Cast from nil succeeded?")
 } else {
   println("Object-to-bridged-array cast failed due to nil")
@@ -379,8 +379,8 @@ if let strArr = objOpt as? String[] {
 
 // Optional of object to array casts.
 // CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
-objImplicitOpt = ["Hello", "Swift", "World"] as String[]
-if let strArr = objImplicitOpt as? String[] {
+objImplicitOpt = ["Hello", "Swift", "World"] as [String]
+if let strArr = objImplicitOpt as? [String] {
   println("Object-to-bridged-array cast produced \(strArr)")
 } else {
   println("Object-to-bridged-array cast failed")
@@ -388,18 +388,18 @@ if let strArr = objImplicitOpt as? String[] {
 
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-let forcedStrArrayImplicitOpt: String[] = objImplicitOpt as String[]
+let forcedStrArrayImplicitOpt: [String] = objImplicitOpt as [String]
 println("Forced to string array \(forcedStrArrayImplicitOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
-if let strArr = objImplicitOpt as? NSString[] {
+if let strArr = objImplicitOpt as? [NSString] {
   println("Object-to-array cast produced \(strArr)")
 } else {
   println("Object-to-array cast failed")
 }
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
-if let intArr = objImplicitOpt as? Int[] {
+if let intArr = objImplicitOpt as? [Int] {
   println("Object-to-bridged-array cast should not have succedded")
 } else {
   println("Object-to-bridged-array cast failed due to bridge mismatch")
@@ -407,7 +407,7 @@ if let intArr = objImplicitOpt as? Int[] {
 
 // CHECK: Object-to-bridged-array cast failed due to nil
 objImplicitOpt = nil
-if let strArr = objImplicitOpt as? String[] {
+if let strArr = objImplicitOpt as? [String] {
   println("Cast from nil succeeded?")
 } else {
   println("Object-to-bridged-array cast failed due to nil")
@@ -415,29 +415,29 @@ if let strArr = objImplicitOpt as? String[] {
 
 // Casting an array of numbers to different numbers.
 // CHECK: Numbers-as-doubles cast produces [3.14159, 2.71828, 0.0]
-obj = [3.14159, 2.71828, 0] as Double[]
-if let doubleArr = obj as? Double[] {
+obj = [3.14159, 2.71828, 0] as [Double]
+if let doubleArr = obj as? [Double] {
   println("Numbers-as-doubles cast produces \(doubleArr)")
 } else {
   println("Numbers-as-doubles failed")
 }
 
 // CHECK: Numbers-as-floats cast produces [3.14159{{.*}}, 2.71828{{.*}}, 0.0]
-if let floatArr = obj as? Float[] {
+if let floatArr = obj as? [Float] {
   println("Numbers-as-floats cast produces \(floatArr)")
 } else {
   println("Numbers-as-floats failed")
 }
 
 // CHECK: Numbers-as-ints cast produces [3, 2, 0]
-if let intArr = obj as? Int[] {
+if let intArr = obj as? [Int] {
   println("Numbers-as-ints cast produces \(intArr)")
 } else {
   println("Numbers-as-ints failed")
 }
 
 // CHECK: Numbers-as-bools cast produces [true, true, false]
-if let boolArr = obj as? Bool[] {
+if let boolArr = obj as? [Bool] {
   println("Numbers-as-bools cast produces \(boolArr)")
 } else {
   println("Numbers-as-bools failed")
@@ -456,14 +456,14 @@ class Derived : Base {
 
 // CHECK: Array-of-base cast produces [Derived, Derived, Base]
 obj = [Derived(), Derived(), Base()]
-if let baseArr = obj as? Base[] {
+if let baseArr = obj as? [Base] {
   println("Array-of-base cast produces \(baseArr)")
 } else {
   println("Not an array of base")
 }
 
 // CHECK: Not an array of derived
-if let derivedArr = obj as? Derived[] {
+if let derivedArr = obj as? [Derived] {
   println("Array-of-derived cast produces \(derivedArr)")
 } else {
   println("Not an array of derived")
@@ -498,74 +498,74 @@ let dictArray: AnyObject = [["hello" : 1, "world" : 2],
 
 // CHECK: Dictionary<String, AnyObject> is
 obj = ["a" : strArray, "b" : intArray, "c": dictArray]
-if let dict = obj as? Dictionary<String, AnyObject[]> {
+if let dict = obj as? Dictionary<String, [AnyObject]> {
   println("Dictionary<String, AnyObject> is \(dict)")
 } else {
   println("Not a Dictionary<String, AnyObject>")
 }
 
 // CHECK: Not a Dictionary<String, String>
-if let dict = obj as? Dictionary<String, String[]> {
+if let dict = obj as? Dictionary<String, [String]> {
   println("Dictionary<String, String> is \(dict)")
 } else {
   println("Not a Dictionary<String, String>")
 }
 
 // CHECK: Not a Dictionary<String, Int>
-if let dict = obj as? Dictionary<String, Int[]> {
+if let dict = obj as? Dictionary<String, [Int]> {
   println("Dictionary<String, Int> is \(dict)")
 } else {
   println("Not a Dictionary<String, Int>")
 }
 
-// CHECK: Dictionary<String, Int>[] is 
+// CHECK: [Dictionary<String, Int>] is 
 obj = dictArray
-if let array = obj as? Dictionary<String, Int>[] {
-  println("Dictionary<String, Int>[] is \(array)")
+if let array = obj as? [Dictionary<String, Int>] {
+  println("[Dictionary<String, Int>] is \(array)")
 } else {
-  println("Not a Dictionary<String, Int>[]")
+  println("Not a [Dictionary<String, Int>]")
 }
 
-// CHECK: Not a Dictionary<String, String>[]
-if let array = obj as? Dictionary<String, String>[] {
-  println("Dictionary<String, String>[] is \(array)")
+// CHECK: Not a [Dictionary<String, String>]
+if let array = obj as? [Dictionary<String, String>] {
+  println("[Dictionary<String, String>] is \(array)")
 } else {
-  println("Not a Dictionary<String, String>[]")
+  println("Not a [Dictionary<String, String>]")
 }
 
-// CHECK: Dictionary<String, Dictionary<String, Int>[]> is [a: [
+// CHECK: Dictionary<String, [Dictionary<String, Int>]> is [a: [
 obj = ["a" : dictArray]
-if let dict = obj as? Dictionary<String, Dictionary<String, Int>[]> {
-  println("Dictionary<String, Dictionary<String, Int>[]> is \(dict)")
+if let dict = obj as? Dictionary<String, [Dictionary<String, Int>]> {
+  println("Dictionary<String, [Dictionary<String, Int>]> is \(dict)")
 } else {
-  println("Not a Dictionary<String, Dictionary<String, Int>[]>")
+  println("Not a Dictionary<String, [Dictionary<String, Int>]>")
 }
 
-// CHECK: Not a Dictionary<String, Dictionary<String, String>[]>
-if let dict = obj as? Dictionary<String, Dictionary<String, String>[]> {
-  println("Dictionary<String, Dictionary<String, String>[]> is \(dict)")
+// CHECK: Not a Dictionary<String, [Dictionary<String, String>]>
+if let dict = obj as? Dictionary<String, [Dictionary<String, String>]> {
+  println("Dictionary<String, [Dictionary<String, String>]> is \(dict)")
 } else {
-  println("Not a Dictionary<String, Dictionary<String, String>[]>")
+  println("Not a Dictionary<String, [Dictionary<String, String>]>")
 }
 
-// CHECK: Dictionary<String, Dictionary<String, Int>[]>[] is
+// CHECK: [Dictionary<String, [Dictionary<String, Int>]>] is
 obj = [obj, obj, obj]
-if let array = obj as? Dictionary<String, Dictionary<String, Int>[]>[] {
-  println("Dictionary<String, Dictionary<String, Int>[]>[] is \(array)")
+if let array = obj as? [Dictionary<String, [Dictionary<String, Int>]>] {
+  println("[Dictionary<String, [Dictionary<String, Int>]>] is \(array)")
 } else {
-  println("Not a Dictionary<String, Dictionary<String, Int>[]>[]")
+  println("Not a [Dictionary<String, [Dictionary<String, Int>]>]")
 }
 
-// CHECK: Not a Dictionary<String, Dictionary<String, String>[]>[]
-if let array = obj as? Dictionary<String, Dictionary<String, String>[]> {
-  println("Dictionary<String, Dictionary<String, String>[]>[] is \(array)")
+// CHECK: Not a Dictionary<String, [Dictionary<String, String>]>[]
+if let array = obj as? Dictionary<String, [Dictionary<String, String>]> {
+  println("Dictionary<String, [Dictionary<String, String>]>[] is \(array)")
 } else {
-  println("Not a Dictionary<String, Dictionary<String, String>[]>[]")
+  println("Not a Dictionary<String, [Dictionary<String, String>]>[]")
 }
 
 // Helper function that downcasts 
 func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
-  if let strArrOptOpt = obj as? String[]?? {
+  if let strArrOptOpt = obj as? [String]?? {
     if let strArrOpt = strArrOptOpt {
       if let strArr = strArrOpt {
         println("some(some(some(\(strArr))))")

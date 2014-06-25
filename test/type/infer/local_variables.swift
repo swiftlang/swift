@@ -1,6 +1,6 @@
 // RUN: %swift -parse %s -verify
 
-func dict_to_array(_: Dictionary<String, Int>) -> (String, Int)[] {
+func dict_to_array(_: Dictionary<String, Int>) -> [(String, Int)] {
   return Array<(String, Int)>()
 }
 
@@ -29,6 +29,6 @@ func infer_generic_args() {
 
   // Function types
   var f : (Dictionary) -> Array = dict_to_array
-  var asi : (String, Int)[] = f(d)
+  var asi : [(String, Int)] = f(d)
 }
 

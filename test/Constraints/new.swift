@@ -2,7 +2,7 @@
 
 struct X<T> { }
 var i : Int
-func acceptXIntArray(xia: X<Int>[]) {}
+func acceptXIntArray(xia: [X<Int>]) {}
 
 class SlowPoint {
   init(i : Int, s : String) {}

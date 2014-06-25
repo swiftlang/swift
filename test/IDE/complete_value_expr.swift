@@ -608,7 +608,7 @@ struct FooGenericStruct<T> {
   init(t: T) { fooInstanceVarT = t }
 
   var fooInstanceVarT: T
-  var fooInstanceVarTBrackets: T[]
+  var fooInstanceVarTBrackets: [T]
   mutating
   func fooVoidInstanceFunc1(a: T) {}
   mutating
@@ -617,7 +617,7 @@ struct FooGenericStruct<T> {
   func fooUInstanceFunc1<U>(a: U) -> U { return a }
 
   static var fooStaticVarT: Int = 0
-  static var fooStaticVarTBrackets: Int[] = [0]
+  static var fooStaticVarTBrackets: [Int] = [0]
   static func fooVoidStaticFunc1(a: T) {}
   static func fooTStaticFunc1(a: T) -> T { return a }
   static func fooUInstanceFunc1<U>(a: U) -> U { return a }
