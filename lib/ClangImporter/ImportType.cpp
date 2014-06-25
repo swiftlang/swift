@@ -664,7 +664,7 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
             }
           }
     return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                "AutoreleasingUnsafePointer", pointeeType);
+                                     "AutoreleasingUnsafePointer", pointeeType);
   // All other mutable pointers map to CMutablePointer<T>.
   } else {
     return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
