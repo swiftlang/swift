@@ -148,6 +148,8 @@ SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
                  OnProtocol, 18)
 
+SIMPLE_DECL_ATTR(noinline, Noinline, OnFunc, 19)
+
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
                   OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor,
@@ -167,7 +169,6 @@ VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment,
 ATTR(conversion)
 ATTR(infix)
 ATTR(mutating)
-ATTR(noinline)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(optional)

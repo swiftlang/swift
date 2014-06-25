@@ -1912,7 +1912,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawStaticSpelling, rawAccessLevel;
     bool isAssignmentOrConversion;
     bool isObjC, isTransparent, isMutating, hasDynamicSelf;
-    bool isOptional, isNoinline;
+    bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1927,7 +1927,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         isAssignmentOrConversion,
                                         isObjC, isTransparent,
                                         isMutating, hasDynamicSelf, isOptional,
-                                        isNoinline,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
@@ -2030,8 +2029,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setDynamicSelf(hasDynamicSelf);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    if (isNoinline)
-      fn->getMutableAttrs().setAttr(AK_noinline, SourceLoc());
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);

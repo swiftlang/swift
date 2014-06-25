@@ -1746,7 +1746,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_conversion, AK_infix,
       AK_optional, AK_postfix, AK_prefix, AK_transparent,
-      AK_mutating, AK_noinline
+      AK_mutating
     >(fn);
     verifyAttrSerializable(fn);
 
@@ -1772,7 +1772,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
                            fn->getAttrs().isOptional(),
-                           fn->getAttrs().isNoinline(),
                            fn->getBodyParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),

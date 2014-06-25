@@ -67,6 +67,7 @@ public:
   void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
+  void visitNoinlineAttr(NoinlineAttr *attr);
 };
 } // end anonymous namespace
 
@@ -92,6 +93,13 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   if (!VD || !VD->getDeclContext()->isClassOrClassExtensionContext() ||
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
+
+}
+
+void AttributeEarlyChecker::visitNoinlineAttr(NoinlineAttr *attr) {
+  // Only functions can be marked with 'Noinline'.
+  if (!isa<AbstractFunctionDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::invalid_noinline_decl);
 
 }
 
@@ -350,6 +358,7 @@ public:
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Lazy)      // checked early.
     UNINTERESTING_ATTR(NSManaged) // checked early.
+    UNINTERESTING_ATTR(Noinline)
 
 #undef UNINTERESTING_ATTR
 

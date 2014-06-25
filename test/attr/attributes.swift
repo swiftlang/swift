@@ -217,3 +217,19 @@ func func_result_attr() -> @xyz Int {       // expected-error {{unknown attribut
 // @thin and @cc are only accepted in SIL.
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}}
+
+@noinline func nolineFunc() {}
+@noinline var noinlineVar : Int // expected-error {{'noinline' attribute cannot be applied to this declaration}}
+@noinline class FooClass { // expected-error {{'noinline' attribute cannot be applied to this declaration}}
+}
+
+class A {
+  @noinline init(a : Int) {}
+  var b : Int {
+    @noinline get {
+      return 42
+    }
+    @noinline set {
+    }
+  }
+}
