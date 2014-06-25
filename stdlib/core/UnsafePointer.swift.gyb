@@ -235,6 +235,7 @@
     return self - 1
   }
 
+#if !ENABLE_POINTER_CONVERSIONS
   //
   // Conversion to C argument pointers
   //
@@ -322,6 +323,7 @@
       "scoped CMutableVoidPointers must be converted using withUnsafePointer")
     self.value = cp.value
   }
+#endif
 }
 
 @transparent @public

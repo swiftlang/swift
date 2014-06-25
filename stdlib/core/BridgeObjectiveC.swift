@@ -234,6 +234,7 @@ var _nilRawPointer: Builtin.RawPointer {
   return Builtin.inttoptr_Word(0.value)
 }
 
+#if !ENABLE_POINTER_CONVERSIONS
 /// A mutable C pointer argument.
 ///
 /// This type has no operations of its own, but has implicit conversions
@@ -432,6 +433,7 @@ func == <T> (lhs: CConstPointer<T>, rhs: CMutablePointer<T>) -> Bool {
 func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
+#endif 
 
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
@@ -443,7 +445,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 ///   to a writeback temporary with autoreleasing ownership semantics,
 /// - an UnsafePointer<T>, which is passed as-is.
 ///
-/// Unlike CMutablePointer, passing pointers to mutable arrays of ObjC class
+/// Passing pointers to mutable arrays of ObjC class
 /// pointers is not directly supported. Unlike UnsafePointer<T>,
 /// AutoreleasingUnsafePointer must reference storage that does not own a reference
 /// count to the referenced value. UnsafePointer's operations, by contrast,
@@ -537,6 +539,7 @@ func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
+#if !ENABLE_POINTER_CONVERSIONS
 /// A const C pointer argument.
 ///
 /// This type has no operations of its own, but has implicit conversions
@@ -735,4 +738,4 @@ func _convertUnsafePointerToAutoreleasingUnsafePointer<T>(
 ) -> AutoreleasingUnsafePointer<T> {
   return AutoreleasingUnsafePointer(p.value)
 }
-
+#endif

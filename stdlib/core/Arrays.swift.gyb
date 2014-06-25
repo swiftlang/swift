@@ -325,6 +325,7 @@ extension ${Self} {
     return (n.owner, n.elementStorage.value)
   }
   
+#if !ENABLE_POINTER_CONVERSIONS
   // Conversion to C pointer arguments
   @transparent @conversion @public
   func __conversion() -> CConstPointer<T> {
@@ -335,6 +336,7 @@ extension ${Self} {
   func __conversion() -> CConstVoidPointer {
     return CConstVoidPointer(_cPointerArgs())
   }
+#endif
 }
 
 extension ${Self} {

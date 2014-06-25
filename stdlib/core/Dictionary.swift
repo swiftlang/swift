@@ -580,6 +580,16 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
   }
 }
 
+// FIXME: Remove these typealiases when the pointer conversions transition is
+// done.
+#if ENABLE_POINTER_CONVERSIONS
+typealias _DictionaryObjectsPointer = ConstUnsafePointer<AnyObject?>
+typealias _DictionaryKeysPointer = ConstUnsafePointer<Void>
+#else
+typealias _DictionaryObjectsPointer = CConstPointer<AnyObject?>
+typealias _DictionaryKeysPointer = CConstVoidPointer
+#endif
+
 /// This class existis only to work around a compiler limitation.
 /// Specifically, we can not have @objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
@@ -624,7 +634,7 @@ class _NativeDictionaryStorageOwnerBase
   //
 
   @objc
-  init(objects: CConstPointer<AnyObject?>, forKeys: CConstVoidPointer,
+  init(objects: _DictionaryObjectsPointer, forKeys: _DictionaryKeysPointer,
        count: Int) {
     _fatalError("don't call this designated initializer")
   }
@@ -2011,7 +2021,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   // NSDictionary subclass.
 
   // The designated initializer of `NSDictionary`.
-  init(objects: CConstPointer<AnyObject?>, forKeys: CConstVoidPointer,
+  init(objects: _DictionaryObjectsPointer, forKeys: _DictionaryKeysPointer,
        count: Int)
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?

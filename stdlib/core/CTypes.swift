@@ -178,10 +178,12 @@ extension COpaquePointer {
     value = from
   }
 
+#if !ENABLE_POINTER_CONVERSIONS
   @conversion
   func __conversion() -> CMutableVoidPointer {
     return CMutableVoidPointer(owner: _nilNativeObject, value: value.value)
   }
+#endif
 }
 
 /// Access to the raw argc value from C.
