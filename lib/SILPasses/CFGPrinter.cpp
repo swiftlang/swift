@@ -26,7 +26,44 @@
 
 using namespace swift;
 
-template<typename InstTy, typename CaseValueTy>
+//===----------------------------------------------------------------------===//
+//                                  Options
+//===----------------------------------------------------------------------===//
+
+llvm::cl::opt<std::string>
+TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
+               llvm::cl::desc("Only print out the cfg for this function"));
+
+llvm::cl::opt<unsigned>
+MaxColumns("view-cfg-max-columns", llvm::cl::init(80),
+           llvm::cl::desc("Maximum width of a printed node"));
+
+namespace {
+enum class LongLineBehavior { None, Truncate, Wrap };
+} // end anonymous namespace
+llvm::cl::opt<LongLineBehavior>
+LLBehavior("view-cfg-long-line-behavior",
+           llvm::cl::init(LongLineBehavior::Wrap),
+           llvm::cl::desc("Behavior when line width is greater than the "
+                          "value provided my -view-cfg-max-columns "
+                          "option"),
+           llvm::cl::values(
+               clEnumValN(LongLineBehavior::None, "none", "Print everything"),
+               clEnumValN(LongLineBehavior::Truncate, "truncate",
+                          "Truncate long lines"),
+               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
+               clEnumValEnd));
+
+llvm::cl::opt<bool>
+RemoveUseListComments("view-cfg-remove-use-list-comments",
+                      llvm::cl::init(false),
+                      llvm::cl::desc("Should use list comments be removed"));
+
+//===----------------------------------------------------------------------===//
+//                               Implementation
+//===----------------------------------------------------------------------===//
+
+template <typename InstTy, typename CaseValueTy>
 inline CaseValueTy getCaseValueForBB(const InstTy *Inst,
                                      const SILBasicBlock *BB) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i) {
@@ -39,10 +76,10 @@ inline CaseValueTy getCaseValueForBB(const InstTy *Inst,
 }
 
 namespace llvm {
-template<>
+template <>
 struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
-  DOTGraphTraits (bool isSimple=false) : DefaultDOTGraphTraits(isSimple) {}
+  DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
 
   static std::string getGraphName(const SILFunction *F) {
     return "CFG for '" + F->getName().str() + "' function";
@@ -58,37 +95,46 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
   static std::string getCompleteNodeLabel(const SILBasicBlock *Node,
                                           const SILFunction *F) {
-    enum { MaxColumns = 80 };
     std::string Str;
     raw_string_ostream OS(Str);
 
     OS << *Node;
     std::string OutStr = OS.str();
-    if (OutStr[0] == '\n') OutStr.erase(OutStr.begin());
+    if (OutStr[0] == '\n')
+      OutStr.erase(OutStr.begin());
 
     // Process string output to make it nicer...
     unsigned ColNum = 0;
     unsigned LastSpace = 0;
     for (unsigned i = 0; i != OutStr.length(); ++i) {
-      if (OutStr[i] == '\n') {                            // Left justify
+      if (OutStr[i] == '\n') { // Left justify
         OutStr[i] = '\\';
-        OutStr.insert(OutStr.begin()+i+1, 'l');
+        OutStr.insert(OutStr.begin() + i + 1, 'l');
         ColNum = 0;
         LastSpace = 0;
-      } else if (OutStr[i] == ';') {                      // Delete comments!
-        unsigned Idx = OutStr.find('\n', i+1);            // Find end of line
-        OutStr.erase(OutStr.begin()+i, OutStr.begin()+Idx);
+      } else if (RemoveUseListComments && OutStr[i] == '/' &&
+                 i != (OutStr.size() - 1) && OutStr[i + 1] == '/') {
+        unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
+        OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
         --i;
-      } else if (ColNum == MaxColumns) {                  // Wrap lines.
-        if (LastSpace) {
-          OutStr.insert(LastSpace, "\\l...");
-          ColNum = i - LastSpace;
-          LastSpace = 0;
-          i += 3; // The loop will advance 'i' again.
+
+      } else if (ColNum == MaxColumns) { // Handle long lines.
+
+        if (LLBehavior == LongLineBehavior::Wrap) {
+          if (LastSpace) {
+            OutStr.insert(LastSpace, "\\l...");
+            ColNum = i - LastSpace;
+            LastSpace = 0;
+            i += 3; // The loop will advance 'i' again.
+          }
+        } else if (LLBehavior == LongLineBehavior::Truncate) {
+          unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
+          OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
+          --i;
         }
+
         // Else keep trying to find a space.
-      }
-      else
+      } else
         ++ColNum;
       if (OutStr[i] == ' ')
         LastSpace = i;
@@ -111,7 +157,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
     // Label source of conditional branches with "T" or "F"
     if (auto *CBI = dyn_cast<CondBranchInst>(Term))
-        return (Succ == CBI->getTrueBB()) ? "T" : "F";
+      return (Succ == CBI->getTrueBB()) ? "T" : "F";
 
     // Label source of switch edges with the associated value.
     if (auto *SI = dyn_cast<SwitchIntInst>(Term)) {
@@ -131,7 +177,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       raw_string_ostream OS(Str);
 
       EnumElementDecl *E =
-        getCaseValueForBB<SwitchEnumInst, EnumElementDecl *>(SEIB, Succ);
+          getCaseValueForBB<SwitchEnumInst, EnumElementDecl *>(SEIB, Succ);
       OS << E->getFullName();
       return OS.str();
     }
@@ -141,28 +187,24 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       raw_string_ostream OS(Str);
 
       EnumElementDecl *E =
-        getCaseValueForBB<SwitchEnumAddrInst, EnumElementDecl *>(SEIB, Succ);
+          getCaseValueForBB<SwitchEnumAddrInst, EnumElementDecl *>(SEIB, Succ);
       OS << E->getFullName();
       return OS.str();
     }
 
     if (auto *DMBI = dyn_cast<DynamicMethodBranchInst>(Term))
-        return (Succ == DMBI->getHasMethodBB()) ? "T" : "F";
+      return (Succ == DMBI->getHasMethodBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(Term))
-        return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
+      return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 
     if (auto *CCBI = dyn_cast<CheckedCastAddrBranchInst>(Term))
-        return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
+      return (Succ == CCBI->getSuccessBB()) ? "T" : "F";
 
     return "";
   }
 };
 } // end llvm namespace
-
-llvm::cl::opt<std::string>
-TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
-               llvm::cl::desc("Only print out the cfg for this function"));
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
@@ -185,7 +227,4 @@ class SILCFGPrinter : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-
-SILTransform *swift::createSILCFGPrinter() {
-  return new SILCFGPrinter();
-}
+SILTransform *swift::createSILCFGPrinter() { return new SILCFGPrinter(); }
