@@ -1,6 +1,13 @@
 Latest
 ------
 
+* C function pointer types are now imported as CFunctionPointer<T>, where 'T'
+  is a Swift function type. CFunctionPointer and COpaquePointer can be
+  explicitly constructed from one another, but they do not freely convert, nor
+  is CFunctionPointer compatible with Swift closures.
+  
+  Example: "int (*)(void)" becomes "CFunctionPointer<(Int) -> Void>".
+
 2014-06-23
 ---------
 
