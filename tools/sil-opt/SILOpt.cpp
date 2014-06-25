@@ -72,6 +72,7 @@ enum class PassKind {
   EnumSimplification,
   LoopInfoPrinter,
   FunctionSignatureOpts,
+  ViewCFG,
 };
 
 enum class OptGroup {
@@ -233,6 +234,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::FunctionSignatureOpts,
                                    "function-signature-opts",
                                    "Optimize function signatures."),
+                        clEnumValN(PassKind::ViewCFG,
+                                   "view-cfg",
+                                   "View the CFG of all passed in functions."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -408,6 +412,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::FunctionSignatureOpts:
       PM.add(createFunctionSignatureOpts());
+      break;
+    case PassKind::ViewCFG:
+      PM.add(createSILCFGPrinter());
       break;
     }
   }
