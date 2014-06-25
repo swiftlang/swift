@@ -348,8 +348,19 @@ INSTANCE_METHOD(NSView,
                 (1, "constraintsAffectingLayoutForOrientation"),
                 OptionalTypeAdjustment(1, OTK_None))
 
-OBJC_PROPERTY(NSView, nextKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, window, OTK_Optional)
+OBJC_PROPERTY(NSView, superview, OTK_Optional)
+OBJC_PROPERTY(NSView, opaqueAncestor, OTK_Optional)
+OBJC_PROPERTY(NSView, makeBackingLayer, OTK_None)
 OBJC_PROPERTY(NSView, trackingAreas, OTK_None)
+OBJC_PROPERTY(NSView, enclosingScrollView, OTK_Optional)
+OBJC_PROPERTY(NSView, toolTip, OTK_Optional)
+OBJC_PROPERTY(NSView, nextKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, previousKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, nextValidKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, previousValidKeyView, OTK_Optional)
+OBJC_PROPERTY(NSView, printJobTitle, OTK_None)
+OBJC_PROPERTY(NSView, registeredDraggedTypes, OTK_Optional)
 
 // NotificationCenter
 CLASS_METHOD(NCWidgetController, (0, "widgetController"), FactoryAsClassMethod)
@@ -398,6 +409,9 @@ INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"),
 OBJC_CONTEXT(UIFont, OptionalTypeAdjustment(0))
 CLASS_METHOD(UIFont, (2, "fontWithName", "size"),
              OptionalTypeAdjustment(1, OTK_ImplicitlyUnwrappedOptional));
+OBJC_PROPERTY(UIFont, familyName, OTK_None)
+OBJC_PROPERTY(UIFont, fontName, OTK_None)
+
 
 // Consider all parameter types in NSView methods to be non-optional and the
 // return optional.
@@ -422,6 +436,7 @@ INSTANCE_METHOD(UIApplicationDelegate,
                 (4, "application", "handleActionWithIdentifier",
                     "forRemoteNotification", "completionHandler"),
                 OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional));
+OBJC_PROPERTY(UIApplicationDelegate, window, OTK_Optional)
 
 #undef INSTANCE_METHOD
 #undef CLASS_METHOD
