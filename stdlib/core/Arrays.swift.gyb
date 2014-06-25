@@ -72,7 +72,7 @@
 
   //===--- private --------------------------------------------------------===//
 
-  // TODO: mark as @noinline.
+  @noinline
   func makeUnique(inout buffer: _Buffer, e: Element, index : Int) {
     var newBuffer = ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
