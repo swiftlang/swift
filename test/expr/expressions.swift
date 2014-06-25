@@ -212,7 +212,7 @@ func test_as_1() {
 }
 func test_as_2() {
   var x: Int
-  x as [] // expected-error {{expected type after 'as'}}
+  x as [] // expected-error {{expected element type}}
 }
 
 func test_lambda() {

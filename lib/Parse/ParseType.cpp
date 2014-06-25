@@ -47,6 +47,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-simple '.Type'
 ///     type-simple '.Protocol'
 ///     type-simple '?'
+//      type-collection
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
@@ -86,6 +87,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     consumeToken();
     // FIXME: we could try to continue to parse.
     return ty;
+  case tok::l_square:
+    return parseTypeCollection();
   default:
     checkForInputIncomplete();
     diagnose(Tok, MessageID);
@@ -670,6 +673,32 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   return makeParserErrorResult(ATR);
 }
 
+ParserResult<TypeRepr> Parser::parseTypeCollection() {
+  // Parse the leading '['.
+  assert(Tok.is(tok::l_square));
+  Parser::StructureMarkerRAII parsingCollection(*this, Tok);
+  SourceLoc lsquareLoc = consumeToken();
+
+  // Parse the element type.
+  ParserResult<TypeRepr> elementTy = parseType(diag::expected_element_type);
+
+  // Parse the closing ']'.
+  SourceLoc rsquareLoc;
+  parseMatchingToken(tok::r_square, rsquareLoc,
+                     diag::expected_rbracket_array_type, lsquareLoc);
+
+  // If we couldn't parse anything for the inner type, propagate the error.
+  if (elementTy.isNull())
+    return makeParserError();
+
+  // Form the array type.
+  return makeParserResult(elementTy,
+                          new (Context) ArrayTypeRepr(elementTy.get(),
+                                                      nullptr,
+                                                      SourceRange(lsquareLoc,
+                                                                  rsquareLoc)));
+}
+
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
@@ -775,6 +804,15 @@ bool Parser::canParseType() {
       return false;
     return canParseType();
   }
+  case tok::l_square:
+    consumeToken();
+    if (!canParseType())
+      return false;
+    if (!consumeIf(tok::r_square))
+      return false;
+    break;
+
+
   default:
     return false;
   }

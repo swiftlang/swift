@@ -772,6 +772,7 @@ public:
   ParserResult<ProtocolCompositionTypeRepr> parseTypeComposition();
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
+  ParserResult<TypeRepr> parseTypeCollection();
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
 
   ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>

@@ -539,7 +539,10 @@ ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
       "expected expression for size of array type", ())
 ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
       "expected ']' in array type", ())
-      
+ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
+      "expected element type", ())
+
+
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())

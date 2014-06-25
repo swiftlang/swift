@@ -387,7 +387,10 @@ ArrayRef<Expr *> CollectionExpr::getElements() const {
     return llvm::makeArrayRef(&paren->SubExpr, 1);
   }
 
-  return cast<TupleExpr>(SubExpr)->getElements();
+  if (auto tuple = dyn_cast<TupleExpr>(SubExpr))
+    return tuple->getElements();
+
+  return llvm::makeArrayRef(&SubExpr, 1);
 }
 
 static ValueDecl *getCalledValue(Expr *E) {
