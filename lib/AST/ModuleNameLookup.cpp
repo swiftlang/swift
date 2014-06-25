@@ -234,9 +234,13 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
     }
   }
 
-  std::sort(decls.begin() + initialCount, decls.end());
-  auto afterUnique = std::unique(decls.begin() + initialCount, decls.end());
-  decls.erase(afterUnique, decls.end());
+  // Remove duplicated declarations.
+  llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
+  decls.erase(std::remove_if(decls.begin() + initialCount, decls.end(),
+                             [&](ValueDecl *d) -> bool { 
+                               return !knownDecls.insert(d);
+                             }),
+              decls.end());
 
   auto &cachedValues = cache[{accessPath, module}];
   cachedValues.insert(cachedValues.end(),
