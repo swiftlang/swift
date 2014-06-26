@@ -438,6 +438,8 @@ void Mangler::mangleTypeForDebugger(Type Ty, DeclContext *DC) {
              decl->getASTContext().TheBuiltinModule);
       ContextStack context(*this);
       Buffer << "_Tta";
+      while (DC && !DC->isInnermostContextGeneric()) DC = DC->getParent();
+      DeclCtx = DC;
       mangleContextOf(decl, BindGenerics::None);
       mangleIdentifier(decl->getName());
     }
