@@ -1888,7 +1888,8 @@ private:
   enum class SugarType {
     None,
     Optional,
-    Array
+    Array,
+    Dictionary
   };
   
   /// Determine whether this is a "simple" type, from the type-simple
@@ -2006,7 +2007,8 @@ private:
   }
 
   SugarType findSugar(NodePointer pointer) {
-    if (pointer->getNumChildren() == 1 && pointer->getKind() == Node::Kind::Type)
+    if (pointer->getNumChildren() == 1 && 
+        pointer->getKind() == Node::Kind::Type)
       return findSugar(pointer->getChild(0));
     
     if (pointer->getNumChildren() != 2)
@@ -2026,14 +2028,24 @@ private:
           isSwiftModule(unboundType->getChild(0))) {
         return SugarType::Optional;
       }
+
+      return SugarType::None;
     }
-    else { /*if (pointer->getKind() == Node::Kind::BoundGenericStructure)*/
-      // Swift.Array
-      if (isIdentifier(unboundType->getChild(1), "Array") &&
-          typeArgs->getNumChildren() == 1 &&
-          isSwiftModule(unboundType->getChild(0))) {
-        return SugarType::Array;
-      }
+
+    assert(pointer->getKind() == Node::Kind::BoundGenericStructure);
+
+    // Array
+    if (isIdentifier(unboundType->getChild(1), "Array") &&
+        typeArgs->getNumChildren() == 1 &&
+        isSwiftModule(unboundType->getChild(0))) {
+      return SugarType::Array;
+    }
+
+    // Dictionary
+    if (isIdentifier(unboundType->getChild(1), "Dictionary") &&
+        typeArgs->getNumChildren() == 2 &&
+        isSwiftModule(unboundType->getChild(0))) {
+      return SugarType::Dictionary;
     }
 
     return SugarType::None;
@@ -2071,16 +2083,25 @@ private:
         if (needs_parens)
           Printer << ")";
         Printer << "?";
-      }
         break;
+      }
       case SugarType::Array: {
         Node *type = pointer->getChild(1)->getChild(0);
-        (void)findSugar(type);
         Printer << "[";
         print(type);
         Printer << "]";
-      }
         break;
+      }
+      case SugarType::Dictionary: {
+        Node *keyType = pointer->getChild(1)->getChild(0);
+        Node *valueType = pointer->getChild(1)->getChild(1);
+        Printer << "[";
+        print(keyType);
+        Printer << " : ";
+        print(valueType);
+        Printer << "]";
+        break;
+      }
     }
   }
 
