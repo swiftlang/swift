@@ -17,7 +17,7 @@ import ctypes
 // CLANG_CTYPES: End completions
 
 // CLANG_MACROS: Begin completions
-// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule: USES_MACRO_FROM_OTHER_MODULE_1[#CInt#]{{$}}
+// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{$}}
 // CLANG_MACROS: End completions
 
 func testClangModule() {
@@ -28,8 +28,8 @@ func testCompleteModuleQualifiedMacros1() {
   macros.#^CLANG_QUAL_MACROS_1^#
 // CLANG_QUAL_MACROS_1: Begin completions, 15 items
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: A_PI[#CDouble#]{{$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: EOF[#CInt#]{{$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_FALSE[#CInt#]{{$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: EOF[#Int32#]{{$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_FALSE[#Int32#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_RGBA[#CInt#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: GL_RGB[#CInt#]{{$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule: INT64_MAX[#CLongLong#]{{$}}

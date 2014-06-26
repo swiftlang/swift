@@ -4,27 +4,27 @@
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
 struct <loc/>FooEnum1 {
-  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+  <decl:Constructor><loc/>init(_ value: <ref:Struct>UInt32</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:Struct>UInt32</ref></decl>
 }</decl>
 
 <decl:Var>/// Aaa.  FooEnum1X.  Bbb.
 var <loc/>FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
 <decl:Struct>struct <loc/>FooEnum2 {
-  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+  <decl:Constructor><loc/>init(_ value: <ref:Struct>UInt32</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:Struct>UInt32</ref></decl>
 }</decl>
 <decl:Var>var <loc/>FooEnum2X: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Var>var <loc/>FooEnum2Y: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Struct>struct <loc/>FooEnum3 {
-  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+  <decl:Constructor><loc/>init(_ value: <ref:Struct>UInt32</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:Struct>UInt32</ref></decl>
 }</decl>
 <decl:Var>var <loc/>FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
 <decl:Var>var <loc/>FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
 
 <decl:Enum>/// Aaa.  FooComparisonResult.  Bbb.
-enum <loc/>FooComparisonResult : <ref:TypeAlias>CLong</ref> {
+enum <loc/>FooComparisonResult : <ref:Struct>Int</ref> {
   <decl:EnumElement>case OrderedAscending</decl>
   <decl:EnumElement>case OrderedSame</decl>
   <decl:EnumElement>case OrderedDescending</decl>
@@ -33,42 +33,42 @@ enum <loc/>FooComparisonResult : <ref:TypeAlias>CLong</ref> {
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
 struct <loc/>FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
   <decl:Constructor><loc/>init()</decl>
-  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CLong</ref>)</decl>
-  <decl:Var>var <loc/>value: <ref:TypeAlias>CLong</ref></decl>
+  <decl:Constructor><loc/>init(_ value: <ref:Struct>Int</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:Struct>Int</ref></decl>
   <decl:Var>static var <loc/>EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Var>static var <loc/>EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Func>static func <loc/>fromMask(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
-  <decl:Func>static func <loc/>fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
-  <decl:Func>func <loc/>toRaw() -> <ref:TypeAlias>CLong</ref></decl>
+  <decl:Func>static func <loc/>fromMask(raw: <ref:Struct>Int</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
+  <decl:Func>static func <loc/>fromRaw(raw: <ref:Struct>Int</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
+  <decl:Func>func <loc/>toRaw() -> <ref:Struct>Int</ref></decl>
   <decl:Func>func <loc/>getLogicValue() -> <ref:Struct>Bool</ref></decl>
   <decl:Func>static func <loc/>convertFromNilLiteral() -> <ref:Struct>FooRuncingOptions</ref></decl>
 }</decl>
 <decl:Struct>struct <loc/>FooStruct1 {
-  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
+  <decl:Var>var <loc/>x: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc/>y: <ref:Struct>Double</ref></decl>
 }</decl>
 <decl:Struct>struct <loc/>FooStruct2 {
-  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
+  <decl:Var>var <loc/>x: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc/>y: <ref:Struct>Double</ref></decl>
 }</decl>
 <decl:TypeAlias>typealias <loc/>FooStructTypedef1 = <ref:Struct>FooStruct2</ref></decl>
 <decl:Struct>struct <loc/>FooStructTypedef2 {
-  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
+  <decl:Var>var <loc/>x: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc/>y: <ref:Struct>Double</ref></decl>
 }</decl>
 
 <decl:TypeAlias>/// Aaa.  FooTypedef1.  Bbb.
-typealias <loc/>FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
+typealias <loc/>FooTypedef1 = <ref:Struct>Int32</ref></decl>
 
 <decl:Var>/// Aaa.  fooIntVar.  Bbb.
-var <loc/>fooIntVar: <ref:TypeAlias>CInt</ref></decl>
+var <loc/>fooIntVar: <ref:Struct>Int32</ref></decl>
 
 <decl:Func>/// Aaa.  fooFunc1.  Bbb.
-func <loc/>fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func <loc/>fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func <loc/>fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func <loc/>fooFuncWithBlock(blk: ((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)!)</decl>
-<decl:Func>func <loc/>fooFuncWithFunctionPointer(fptr: <ref:Struct>CFunctionPointer</ref><((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)>)</decl>
+func <loc/>fooFunc1(a: <ref:Struct>Int32</ref>) -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc/>fooFunc1AnonymousParam(_: <ref:Struct>Int32</ref>) -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc/>fooFunc3(a: <ref:Struct>Int32</ref>, b: <ref:Struct>Float</ref>, c: <ref:Struct>Double</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:Struct>Int32</ref>>) -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc/>fooFuncWithBlock(blk: ((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!)</decl>
+<decl:Func>func <loc/>fooFuncWithFunctionPointer(fptr: <ref:Struct>CFunctionPointer</ref><((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)>)</decl>
 <decl:Func>@noreturn func <loc/>fooFuncNoreturn1()</decl>
 <decl:Func>@noreturn func <loc/>fooFuncNoreturn2()</decl>
 
@@ -106,7 +106,7 @@ func <loc/>fooFuncWithComment4()</decl>
 func <loc/>fooFuncWithComment5()</decl>
 
 <decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func <loc/>redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func <loc/>redeclaredInMultipleModulesFunc1(a: <ref:Struct>Int32</ref>) -> <ref:Struct>Int32</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
 protocol <loc/>FooProtocolBase {
@@ -125,9 +125,9 @@ protocol <loc/>FooProtocolBase {
    */
   func <loc/>fooProtoFuncWithExtraIndentation2()</decl>
   <decl:Func>class func <loc/>fooProtoClassFunc()</decl>
-  <decl:Var>var <loc/>fooProperty1: <ref:TypeAlias>CInt</ref> { get set }</decl>
-  <decl:Var>var <loc/>fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
-  <decl:Var>var <loc/>fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  <decl:Var>var <loc/>fooProperty1: <ref:Struct>Int32</ref> { get set }</decl>
+  <decl:Var>var <loc/>fooProperty2: <ref:Struct>Int32</ref> { get set }</decl>
+  <decl:Var>var <loc/>fooProperty3: <ref:Struct>Int32</ref> { get }</decl>
 }</decl>
 <decl:Protocol>protocol <loc/>FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
 }</decl>
@@ -137,7 +137,7 @@ protocol <loc/>FooProtocolBase {
   <decl:Func>class func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
   <decl:Func>func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
   <decl:Constructor><loc/>init()</decl>
-  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:TypeAlias>CFloat</ref>)</decl>
+  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:Struct>Float</ref>)</decl>
   <decl:Func>class func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func <loc/>fooBaseClassFunc0()</decl>
@@ -162,16 +162,16 @@ protocol <loc/>FooProtocolBase {
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
 class <loc/>FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
-  <decl:Var>var <loc/>fooProperty1: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var <loc/>fooProperty2: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var <loc/>fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  <decl:Var>var <loc/>fooProperty1: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc/>fooProperty2: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc/>fooProperty3: <ref:Struct>Int32</ref> { get }</decl>
   <decl:Func>func <loc/>fooInstanceFunc0()</decl>
-  <decl:Func>func <loc/>fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
-  <decl:Func>func <loc/>fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>, withB b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl:Func>func <loc/>fooInstanceFunc1(a: <ref:Struct>Int32</ref>)</decl>
+  <decl:Func>func <loc/>fooInstanceFunc2(a: <ref:Struct>Int32</ref>, withB b: <ref:Struct>Int32</ref>)</decl>
   <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func <loc/>fooClassFunc0()</decl>
   <decl:Constructor><loc/>init()</decl>
-  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:TypeAlias>CFloat</ref>)</decl>
+  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:Struct>Float</ref>)</decl>
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -188,17 +188,17 @@ class <loc/>FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooPr
   func <loc/>fooProtoFuncWithExtraIndentation2()</decl>
   <decl:Func>class func <loc/>fooProtoClassFunc()</decl>
 }</decl>
-<decl:Var>var <loc/>FOO_MACRO_1: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_2: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_3: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_4: <ref:TypeAlias>CUnsignedInt</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_5: <ref:TypeAlias>CUnsignedLongLong</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_REDEF_1: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var <loc/>FOO_MACRO_REDEF_2: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_1: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_2: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_3: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_4: <ref:Struct>UInt32</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_5: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_REDEF_1: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_REDEF_2: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Func>func <loc/>theLastDeclInFoo()</decl>
 <decl:Func>func <loc/>_internalTopLevelFunc()</decl>
 <decl:Struct>struct <loc/>_InternalStruct {
-  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>x: <ref:Struct>Int32</ref></decl>
 }</decl>
 <decl:Protocol>protocol <loc/>_InternalProt {
 }</decl>

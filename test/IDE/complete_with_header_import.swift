@@ -4,4 +4,4 @@ func foo() {
   #^TOP^#
 }
 
-// CHECK-TOP: Decl[FreeFunction]/OtherModule:     doSomethingInHead({#(arg): CInt#})[#Void#]{{$}}
+// CHECK-TOP: Decl[FreeFunction]/OtherModule:     doSomethingInHead({#(arg): Int32#})[#Void#]{{$}}

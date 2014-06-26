@@ -239,5 +239,5 @@ func testFunctionPointersAsOpaquePointers() {
 
   var anotherFP: CFunctionPointer<(CInt, CLong, CMutableVoidPointer) -> Void> = getFunctionPointer2()
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{'(CInt, CLong, CMutableVoidPointer)' is not identical to 'CInt'}}
+  anotherFP = fp // expected-error {{'(CInt, CLong, CMutableVoidPointer)' is not identical to 'Int32'}}
 }

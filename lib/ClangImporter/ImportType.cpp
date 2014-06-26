@@ -118,15 +118,26 @@ namespace {
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
     
+    // Given a loaded type like CInt, look through the name alias sugar that the
+    // stdlib uses to show the underlying type.  We want to import the signature
+    // of the exit(3) libc function as "func exit(Int32)", not as
+    // "func exit(CInt)".
+    static Type unwrapCType(Type T) {
+      if (auto *NAT = dyn_cast_or_null<NameAliasType>(T.getPointer()))
+        return NAT->getSinglyDesugaredType();
+      return T;
+    }
+    
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
         return { Type(), ImportHint::Void };
 
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)  \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:             \
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(),  \
-                                        #SWIFT_TYPE_NAME);
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)             \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
+        return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
+                                        #SWIFT_TYPE_NAME));
+          
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.

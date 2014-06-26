@@ -18,40 +18,40 @@
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct2 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}typealias FooStructTypedef1 = FooStruct2{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStructTypedef2 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct3 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct4 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct5 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct6 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
@@ -83,7 +83,7 @@
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
-// APPKIT-NEXT: func addSubview(aView: NSView, positioned place: CUnsignedInt, relativeTo otherView: NSView?)
+// APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]!
 // APPKIT:      extension NSView {
