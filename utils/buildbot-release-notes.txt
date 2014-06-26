@@ -8,6 +8,15 @@ Latest
   
   Example: "int (*)(void)" becomes "CFunctionPointer<(Int) -> Void>".
 
+* The interop model for pointers in C APIs has been simplified. Most code that
+  calls C functions by passing arrays, UnsafePointers, or the addresses of
+  variables with '&x' does not need to change. However, the CConstPointer and
+  CMutablePointer bridging types have been removed, and functions and methods 
+  are now imported as and overridden by taking UnsafePointer and
+  ConstUnsafePointer directly. Void pointers are now imported as
+  (Const)UnsafePointer<Void>; COpaquePointer is only imported for opaque types
+  now.
+
 * Array types are now spelled with the brackets surrounding the
   element type. For example, an array of Int is written as::
 
