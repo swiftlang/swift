@@ -547,6 +547,12 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
   static func null() -> AutoreleasingUnsafePointer {
     return AutoreleasingUnsafePointer(_nilRawPointer)
   }
+
+  /// Initialize to a null pointer.
+  @transparent
+  init() {
+    self.value = _nilRawPointer
+  }
   
   /// Explicit construction from an UnsafePointer.
   ///
