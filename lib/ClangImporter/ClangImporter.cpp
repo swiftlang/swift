@@ -1856,19 +1856,20 @@ void ClangModuleUnit::getImportedModules(
   clangModule->getExportedModules(imported);
   if (filter != Module::ImportFilter::Public) {
     if (filter == Module::ImportFilter::All) {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
       imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      llvm::array_pod_sort(imported.begin(), imported.end(),
-                           pointerPODSortComparator);
-      imported.erase(std::unique(imported.begin(), imported.end()),
+      imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                    [&](clang::Module *mod) -> bool {
+                                      return !knownModules.insert(mod);
+                                    }),
                      imported.end());
     } else {
-      llvm::array_pod_sort(imported.begin(), imported.end(),
-                           pointerPODSortComparator);
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                         imported.end());
       SmallVector<clang::Module *, 8> privateImports;
       std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
                    std::back_inserter(privateImports), [&](clang::Module *mod) {
-        return !std::binary_search(imported.begin(), imported.end(), mod,
-                                   std::less<clang::Module *>());
+                     return knownModules.count(mod) == 0;
       });
       imported.swap(privateImports);
     }
