@@ -81,6 +81,8 @@ struct SimpleValue {
     case ValueKind::CondFailInst:
     case ValueKind::EnumInst:
     case ValueKind::UncheckedEnumDataInst:
+    case ValueKind::UncheckedRefBitCastInst:
+    case ValueKind::UncheckedTrivialBitCastInst:
         return true;
     default:
         return false;
@@ -109,6 +111,14 @@ class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
 public:
   hash_code visitValueBase(ValueBase *) {
     llvm_unreachable("No hash implemented for the given type");
+  }
+
+  hash_code visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
+  hash_code visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {

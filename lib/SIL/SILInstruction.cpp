@@ -379,6 +379,16 @@ namespace {
       return X->getElement() == RHS->getElement();
     }
 
+    bool visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *RHS) {
+      // We already checked operands and types.
+      return true;
+    }
+
+    bool visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *RHS) {
+      // We already checked operands and types.
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };
