@@ -671,11 +671,7 @@ class _NativeDictionaryStorageOwnerBase
 
 /// TODO: Remove this #if and typealias when pointer conversion has been phased
 /// in.
-#if ENABLE_POINTER_CONVERSIONS
 typealias _FastEnumerationItemsPtr = AutoreleasingUnsafePointer<AnyObject?>
-#else
-typealias _FastEnumerationItemsPtr = UnsafePointer<AnyObject?>
-#endif
 
 /// This class is an artifact of the COW implementation.  This class only
 /// exists to keep separate retain counts separate for:
