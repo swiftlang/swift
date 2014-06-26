@@ -197,7 +197,7 @@ func disambiguateGetSet4Attr() {
 }
 
 // Disambiguated as stored property with a trailing closure in the initializer.
-var disambiguateImplicitGet1: Int = 0 { // expected-error {{cannot convert the expression's type '$T2' to type 'Int'}}
+var disambiguateImplicitGet1: Int = 0 { // expected-error {{'(() -> () -> $T1) -> $T2' is not identical to 'Int'}}
   return 42
 }
 var disambiguateImplicitGet2: Int = takeIntTrailingClosure {

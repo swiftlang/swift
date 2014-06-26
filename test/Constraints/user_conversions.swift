@@ -26,7 +26,7 @@ fa(x)
 fy(b)
 
 // FIXME: Awful diagnostic.
-fy(x) // expected-error{{cannot convert the expression's type '()' to type 'Y'}}
+fy(x) // expected-error{{'B' is not a subtype of 'Y'}}
 
 
 func do_auto_close(f: @auto_closure () -> Y) {}

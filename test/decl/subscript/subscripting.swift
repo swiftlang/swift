@@ -179,7 +179,7 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   value = ovl[(i, j)]
   ovl[(i, j)] = value
 
-  value = ovl[(i, j, i)] // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+  value = ovl[(i, j, i)] // expected-error{{'(Int, Int, Int)' is not convertible to 'Int'}}
 
   // FIXME: <rdar://problem/11510876> Implement overload resolution
   ret[i] // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}

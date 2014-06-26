@@ -10,7 +10,7 @@ func acceptInOutX1(inout x1: X1) { }
 
 var x1: X1 = .AnX1
 x1 = .AnX1
-x1 = .NotAnX1 // expected-error{{could not find member 'NotAnX1'}}
+x1 = .NotAnX1 // expected-error{{'X1' is not identical to '@lvalue Int'}}
 
 // Delayed identifier expressions as lvalues
 .AnX1 = x1
@@ -24,7 +24,7 @@ struct X2<T> {
 
 var x2: X2<Int> = .AnX2  // expected-error {{'X2<Int>.Type' does not have a member named 'AnX2'}}
 x2 = .AnX2     // expected-error {{'X2<Int>.Type' does not have a member named 'AnX2'}}
-x2 = .NotAnX2 // expected-error{{could not find member 'NotAnX2'}}
+x2 = .NotAnX2 // expected-error{{'X2<Int>' is not identical to '@lvalue Int'}}
 
 // Static variables through operators.
 struct Foo {

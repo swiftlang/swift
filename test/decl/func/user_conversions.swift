@@ -84,17 +84,17 @@ func getChain1() -> Chain1 {}
 
 func test_chain(var c1: Chain1, inout c2: Chain2, inout c3: Chain3) {
   c2 = c1; // okay
-  c3 = c1; // expected-error{{cannot convert the expression's type '()' to type 'Chain3'}}
+  c3 = c1; // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
   var c3a : Chain2 = c1; // okay
-  var c3b : Chain3 = c1; // expected-error{{cannot convert the expression's type '@lvalue Chain1' to type 'Chain3'}}
+  var c3b : Chain3 = c1; // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
   c2 = getChain1(); // okay
   c3 = getChain1(); // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
 }
 
-func acceptYReference(inout y: Y) {} // expected-note {{in initialization of parameter 'y'}}
+func acceptYReference(inout y: Y) {} // expected-note {{}}
 
 func testInOut(x: X) {
   var x2 = x
-  acceptYReference(x2) // expected-error{{cannot convert the expression's type '()' to type 'inout Y'}}
+  acceptYReference(x2) // expected-error{{'Y' is not a subtype of 'inout Y'}}
   acceptYReference(&x2) // expected-error{{'X' is not identical to 'Y'}}
 }

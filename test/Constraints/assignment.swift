@@ -40,7 +40,7 @@ i = j
 _ = (i, f)
 slice[7] = i
 
-slice[7] = f // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+slice[7] = f // expected-error{{'Y' is not convertible to 'X'}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

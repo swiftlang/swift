@@ -103,14 +103,14 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{could not find an overload for 'f1' that accepts the supplied arguments}}
+  other.f1(a) // expected-error{{'Ovl.A' is not convertible to 'OtherOvl.A'}}
   
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3f : (Float) -> Float = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{could not find an overload for 'f3' that accepts the supplied arguments}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{'Ovl' is not a subtype of 'Int'}}
 
   // FIXME: Should not be inout. <rdar://problem/15821762>
   var f3i_unbound : (inout Ovl) -> (Int) -> Int = Ovl.f3       // expected-error{{partial application of generic method is not allowed}}

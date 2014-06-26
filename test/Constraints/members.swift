@@ -79,7 +79,7 @@ struct GZ<T> {
 
 // Members of literals
 // FIXME: Crappy diagnostic
-"foo".lower() // expected-error{{could not find member 'lower'}}
+"foo".lower() // expected-error{{'String' does not have a member named 'lower'}}
 var tmp = "foo".lowercaseString
 
 // Members of modules

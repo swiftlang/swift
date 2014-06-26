@@ -46,7 +46,7 @@ func instanceMethods(b: B) {
   // Both class and instance methods exist.
   b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert the expression's type 'Void' to type 'AnyObject!'}}
+  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{type 'AnyObject!' does not conform to protocol 'FloatLiteralConvertible'}}
 
 }
 
@@ -61,7 +61,7 @@ func classMethods(b: B, other: NSObject) {
   // Both class and instance methods exist.
   B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
-  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{could not find an overload for 'instanceTakesObjectClassTakesFloat' that accepts the supplied arguments}}
+  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{'NSObject' is not convertible to 'Float'}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning

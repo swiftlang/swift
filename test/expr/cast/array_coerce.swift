@@ -16,30 +16,30 @@ var ca: Array<C> = [c1]
 var da: Array<D> = [d1]
 
 ca = da
-da = ca // expected-error{{cannot convert the expression's type '()' to type 'Array<D>'}}
+da = ca // expected-error{{C' is not identical to 'D'}}
 
 var caa = [ca]
 var daa = [da]
 
-caa = daa // expected-error{{cannot convert the expression's type '()' to type 'Array<Array<C>>'}}
+caa = daa // expected-error{{'D' is not identical to 'C'}}
 
 // Array slice type
 var cas: [C] = [c1]
 var das: [D] = [d1]
 
 cas = das
-das = cas // expected-error{{cannot convert the expression's type '()' to type '[D]'}}
+das = cas // expected-error{{'C' is not identical to 'D'}}
 
 // Slice<T>
 var cs = ca[0...0]
 var ds = da[0...0]
 
-cs = ds // expected-error{{cannot convert the expression's type '()' to type 'Slice<C>'}}
-ds = cs // expected-error{{cannot convert the expression's type '()' to type 'Slice<D>'}}
+cs = ds // expected-error{{'D' is not identical to 'C'}}
+ds = cs // expected-error{{'C' is not identical to 'D'}}
 
 // ContiguousArray<T>
 var cna: ContiguousArray<C> = [c1]
 var dna: ContiguousArray<D> = [d1]
 
-cna = dna // expected-error{{cannot convert the expression's type '()' to type 'ContiguousArray<C>'}}
-dna = cna // expected-error{{cannot convert the expression's type '()' to type 'ContiguousArray<D>'}}
+cna = dna // expected-error{{'D' is not identical to 'C'}}
+dna = cna // expected-error{{'C' is not identical to 'D'}}

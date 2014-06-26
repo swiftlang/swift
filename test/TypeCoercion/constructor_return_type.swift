@@ -6,7 +6,7 @@ struct S {
   }
 
   init(b:Bool) {
-    return 1 // expected-error {{cannot convert the expression's type 'Int' to type '()'}}
+    return 1 // expected-error {{type '()' does not conform to protocol 'IntegerLiteralConvertible'}}
   }
 }
 

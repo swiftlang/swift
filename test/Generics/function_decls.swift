@@ -14,7 +14,7 @@ func f4<T>(x: T, y: T) { }
 func f5<T, U>(x: T, y: U) {
   struct Local {
     func f() {
-      var t : T = 17 // expected-error{{cannot convert the expression's type 'Int' to type 'T'}}
+      var t : T = 17 // expected-error{{type 'T' does not conform to protocol 'IntegerLiteralConvertible'}}
       var u : U = 17 // okay: refers to 'U' declared within the local class
     }
     typealias U = Int

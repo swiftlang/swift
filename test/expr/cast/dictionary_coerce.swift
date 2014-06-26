@@ -24,11 +24,11 @@ dictCC = dictDC
 dictCC = dictDD
 
 dictCD = dictDD
-dictCD = dictCC // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<C, D>'}}
+dictCD = dictCC // expected-error{{'C' is not identical to 'D'}}
 
 
 dictDC = dictDD
-dictDC = dictCD // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<D, C>'}}
+dictDC = dictCD // expected-error{{'C' is not identical to 'D'}}
 
-dictDD = dictCC // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<D, D>'}}
+dictDD = dictCC // expected-error{{'C' is not identical to 'D'}}
 

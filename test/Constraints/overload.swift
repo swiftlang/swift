@@ -22,7 +22,7 @@ f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{could not find an overload for 'f0' that accepts the supplied arguments}}
+f0(x) // expected-error{{'X' is not convertible to 'Float'}}
 
 f + 1
 f2(i)

@@ -171,7 +171,7 @@ enum RawTypeWithCharacterValues : Character {
 }
 
 enum RawTypeWithCharacterValues_Error1 : Character {
-  case First = "abc" // expected-error {{cannot convert the expression's type 'String' to type 'Character'}}
+  case First = "abc" // expected-error {{'Character' does not conform to protocol 'StringLiteralConvertible'}}
 }
 
 enum RawTypeWithFloatValues : Float {

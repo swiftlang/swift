@@ -57,11 +57,11 @@ func chaining() {
   var length : meters = 17;
   // FIXME: missing truncation warning <rdar://problem/14070127>.
   var long_length : meters = 500;
-  var really_long_length : supermeters = 10 // expected-error{{cannot convert the expression's type 'Int32' to type 'supermeters'}}
+  var really_long_length : supermeters = 10
 }
 
 func memberaccess() {
   Int32(5.value)
   // FIXME: This should work
-  var x : Int32 = 7.value // expected-error{{could not find member 'value'}}
+  var x : Int32 = 7.value // expected-error{{'Int32' is not convertible to 'Int32'}}
 }

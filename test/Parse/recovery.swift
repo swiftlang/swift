@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  return a + "a" // expected-error{{'Int' is not convertible to 'UInt8'}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  return a() + "a" // expected-error{{'Int' is not convertible to 'UInt8'}}
 }
 
 
@@ -347,7 +347,7 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0] // expected-error {{cannot convert the expression's type 'Array' to type 'IntegerLiteralConvertible'}}
+    return [0] // expected-error {{'CConstPointer<$T2>' is not a subtype of '()'}}
   }
 }
 

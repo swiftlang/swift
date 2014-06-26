@@ -36,12 +36,12 @@ func testInstanceTypeFactoryMethodInherited() {
   var of3 = NSObjectFactorySub(double: 314159)
   // FIXME: Awful diagnostic
   var of4 = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
-  var of5 = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+  var of5 = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{extra argument 'buildingWidgets' in call}}
 }
 
 func testNSErrorFactoryMethod(path: String) {
   var error: NSError?
-  var s1 = NSString(contentsOfFile: path, error: &error)  // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+  var s1 = NSString(contentsOfFile: path, error: &error)  // expected-error{{extra argument 'contentsOfFile' in call}}
 }
 
 func testNonInstanceTypeFactoryMethod(s: String) {

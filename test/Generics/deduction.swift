@@ -24,8 +24,8 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   // FIXME: Is this actually the behavior we want? It's strange that these
   // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
-  xx = identity2(yy) // expected-error{{could not find an overload for 'identity2' that accepts the supplied arguments}}
+  xx = identity(yy) // expected-error{{'Y' is not convertible to 'X'}}
+  xx = identity2(yy) // expected-error{{'Y' is not convertible to 'X'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -40,7 +40,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot convert the expression's type '@lvalue Float' to type '@lvalue Int'}}
+  twoIdentical(x, y) // expected-error{{'Float' is not convertible to 'Int'}}
 }
 
 func mySwap<T>(inout x: T,   // expected-note{{in initialization of parameter 'x'}}
@@ -66,7 +66,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert the expression's type '()' to type 'Float'}}
+  takeTuples((x, y), (x, y)) // expected-error{{'Float' is not convertible to 'Int'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -76,7 +76,7 @@ func acceptFunction<T, U>(f: (T) -> U, t: T, u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert the expression's type '()' to type 'Float'}}
+   acceptFunction(f, y, y) // expected-error{{'Float' is not convertible to 'Int'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { }
@@ -85,7 +85,7 @@ func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{cannot convert the expression's type '(T, U)' to type 'T'}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type '(T, U)' to type 'Float'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{'Float' is not convertible to 'Int'}}
 }
 
 
@@ -220,7 +220,7 @@ protocol Addable {
   func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
-  u + u // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  u + u // expected-error{{'U' is not convertible to 'UInt8'}}
   return x+y
 }
 
@@ -273,4 +273,4 @@ struct True : Bool_ {}
 class Test<C: Bool_> : MetaFunction {} // picks first <*>
 typealias Inty = Test<True>.Result 
 var iy : Inty = 5 // okay, because we picked the first <*>
-var iy2 : Inty = "hello" // expected-error{{cannot convert the expression's type 'String' to type 'Inty'}}
+var iy2 : Inty = "hello" // expected-error{{type 'Inty' does not conform to protocol 'StringLiteralConvertible'}}

@@ -1,10 +1,10 @@
 // RUN: %swift -verify -parse %s
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var b: UInt16 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var c: UInt32 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
-  var d: UInt64 = -(1) // expected-error {{could not find an overload for '-' that accepts the supplied arguments}}
+  var a: UInt8 = -(1) // expected-error {{'Float' is not convertible to 'UInt8'}}
+  var b: UInt16 = -(1) // expected-error {{'Float' is not convertible to 'UInt16'}}
+  var c: UInt32 = -(1) // expected-error {{'Float' is not convertible to 'UInt32'}}
+  var d: UInt64 = -(1) // expected-error {{'Float' is not convertible to 'UInt64'}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type

@@ -19,7 +19,7 @@ func ovlLitB(_: Int64) -> Int64 {}
 func testLiteralOverloadinovlLitB() {
   var y32 : Int32 = ovlLitA(ovlLitB(0))
   var y64 : Int64 = ovlLitA(ovlLitB(0))
-  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{could not find an overload for 'ovlLitA' that accepts the supplied arguments}}
+  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{'Int' is not convertible to 'Int32'}}
 }
 
 func literalOverloadSameReturn(i: Int) -> Int {}
@@ -43,6 +43,6 @@ func doWibble(_: CanWibble) {}
 
 func testWibble() {
   doWibble(1)
-  doWibble(3.14) // expected-error{{cannot convert the expression's type '()' to type 'CanWibble'}}
+  doWibble(3.14) // expected-error{{type 'CanWibble' does not conform to protocol 'FloatLiteralConvertible'}}
 }
 

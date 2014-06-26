@@ -21,9 +21,9 @@ var d3 : @auto_closure () -> Float =
 
 var d4 : @auto_closure () -> Int =
    d2 // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
-   
+
 var e0 : [Int]
-e0[] // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
+e0[] // expected-error {{missing argument for parameter #1 in call}}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]

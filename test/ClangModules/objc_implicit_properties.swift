@@ -18,7 +18,7 @@ func acceptsInt(_: UInt) {}
 func badImplicitProperties(obj: BadImplicitProperties) {
   acceptsInt(obj.nonVoidReturn) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
   acceptsInt(obj.nonMatchingType) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
-  acceptsInt(obj.wrongGetterArgs) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.wrongGetterArgs) // expected-error {{'(Int32) -> Int32' is not convertible to 'Int'}}
   acceptsInt(obj.wrongSetterArgs) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
   acceptsInt(obj.wrongSetterArgs2) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
   acceptsInt(obj.getterOnly) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}

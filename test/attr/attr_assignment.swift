@@ -15,8 +15,8 @@ operator infix +- {
 func use_assignments(var i: Int, var j: Int) {
  ++i
  i += j
- ++(&i)  // expected-error {{could not find an overload for '++' that accepts the supplied arguments}}
- &i += j // expected-error {{could not find an overload for '+=' that accepts the supplied arguments}}
+ ++(&i)  // expected-error {{reference to 'Float' not used to initialize a inout parameter}}
+ &i += j // expected-error {{reference to 'UInt8' not used to initialize a inout parameter}}
 }
 
 

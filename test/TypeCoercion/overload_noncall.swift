@@ -16,7 +16,7 @@ func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
 func test_conv() {
   var a1 : (x1 : X, x2 : X) -> X = f0;
   var a2 : (X, X) -> X = f0;
-  var a5 : (Y, X) -> X = f0; // expected-error{{could not find an overload for 'f0' that accepts the supplied arguments}}
+  var a5 : (Y, X) -> X = f0; // expected-error{{Y' is not a subtype of 'X'}}
   var a6 : (X) -> X = f1;
   var a7 : (X) -> (X) = f1;
   var a8 : (x2 : X) -> (x : X) = f1;

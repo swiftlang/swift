@@ -1,11 +1,11 @@
 // RUN: %swift %s -verify
 
 var t1a: (Int...) = ()
-var t1b: (Int, Int...) = () // expected-error {{cannot convert the expression's type '()' to type '(Int, Int...)'}}
+var t1b: (Int, Int...) = () // expected-error {{tuple types '()' and '(Int, Int...)' have a different number of elements (0 vs. 2)}}
 
 var t2a: (Int...) = 1
 var t2b: (Int, Int ...) = 1
-var t2c: (Int, Int, Int...) = 1  // expected-error {{cannot convert the expression's type 'Int' to type '(Int, Int, Int...)'}}
+var t2c: (Int, Int, Int...) = 1  // expected-error {{type '(Int, Int, Int...)' does not conform to protocol 'IntegerLiteralConvertible'}}
 var t2d: (Double = 0.0, Int...) = 1 // expected-error {{default argument not permitted in a tuple type}}
 
 var t3a: (Int...) = (1,2)

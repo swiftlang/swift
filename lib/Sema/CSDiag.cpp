@@ -685,7 +685,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
                 failure.getFirstType(),
                 failure.getSecondType())
       .highlight(range1).highlight(range2);
-    if (targetLocator)
+    if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
 
@@ -1257,10 +1257,10 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     // Fall through to produce diagnostics.
   }
 
-  if (failures.size() == 1) {
+  if (failures.size()) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
-    if (diagnoseFailure(*this, failure, expr, false))
+    if (diagnoseFailure(*this, failure, expr, failures.size() > 1))
       return true;
   }
   

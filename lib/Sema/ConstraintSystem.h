@@ -552,6 +552,8 @@ private:
   }
 
   /// \brief Profile a failure involving two types.
+  /// Note that because FoldingSet hashes on pointers are unstable, we need
+  /// to hash on each type's string representation to preserve ordering.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
                       FailureKind kind,
                       ResolvedOverloadSetListItem *resolvedOverloadSets,
@@ -559,8 +561,8 @@ private:
     id.AddPointer(locator);
     id.AddInteger(kind);
     id.AddPointer(resolvedOverloadSets);
-    id.AddPointer(type1.getPointer());
-    id.AddPointer(type2.getPointer());
+    id.AddString(type1.getString());
+    id.AddString(type2.getString());
   }
 
   /// \brief Profile a failure involving two types and a value.
@@ -571,8 +573,8 @@ private:
     id.AddPointer(locator);
     id.AddInteger(kind);
     id.AddPointer(resolvedOverloadSets);
-    id.AddPointer(type1.getPointer());
-    id.AddPointer(type2.getPointer());
+    id.AddString(type1.getString());
+    id.AddString(type2.getString());
     id.AddInteger(value);
   }
 
@@ -1109,7 +1111,7 @@ private:
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
-  llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
+  llvm::FoldingSetVector<ConstraintLocator> ConstraintLocators;
 
   /// \brief Folding set containing all of the failures that have occurred
   /// while building and initially simplifying this constraint system.
@@ -1123,7 +1125,7 @@ private:
   /// FIXME: We really need to track overload sets and type variable bindings
   /// to make any sense of this data. Also, it probably belongs within
   /// SolverState.
-  llvm::FoldingSet<Failure> failures;
+  llvm::FoldingSetVector<Failure> failures;
 
   /// \brief The overload sets that have been resolved along the current path.
   ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
@@ -1428,7 +1430,7 @@ private:
     llvm::FoldingSetNodeID id;
     Failure::Profile(id, locator, kind, resolvedOverloadSets, args...);
     void *insertPos = nullptr;
-    auto failure = failures.FindNodeOrInsertPos(id, insertPos);
+    Failure *failure = failures.FindNodeOrInsertPos(id, insertPos);
     if (!failure) {
       // Allocate a new failure and record it.
       failure = Failure::create(getAllocator(), locator, kind,

@@ -9,7 +9,7 @@ myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(x: (Int, Int) -> Int) {}
-foo({$0}) // expected-error{{cannot convert the expression's type '()' to type 'Int'}}
+foo({$0}) // expected-error{{'(Int, Int)' is not convertible to 'Int'}}
 
 struct X {}
 func mySort(array: [String], predicate: (String, String) -> Bool) -> [String] {}
@@ -27,7 +27,7 @@ struct X2 {
   func g() -> Float { return 0 }  
 }
 
-f0(X2(), {$0.g()})  // expected-error {{could not find member 'g'}}
+f0(X2(), {$0.g()})  // expected-error {{'inout X2' is not identical to 'X2'}}
 
 // Autoclosure
 func f1(#f: @auto_closure () -> Int) { }

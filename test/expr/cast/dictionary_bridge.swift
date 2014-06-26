@@ -66,12 +66,12 @@ func testUpcastBridge() {
   dictBO = dictBB
   dictOB = dictBB
 
-  dictBB = dictBO // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
-  dictBB = dictOB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictBO // expected-error{{'ObjC' is not identical to 'BridgedToObjC'}}
+  dictBB = dictOB // expected-error{{'ObjC' is not identical to 'BridgedToObjC'}}
 
-  dictDO = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<DerivesObjC, ObjC>'}}
-  dictOD = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<ObjC, DerivesObjC>'}}
-  dictDD = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
+  dictDO = dictBB // expected-error{{'BridgedToObjC' is not identical to 'DerivesObjC'}}
+  dictOD = dictBB // expected-error{{'BridgedToObjC' is not identical to 'ObjC'}}
+  dictDD = dictBB // expected-error{{'BridgedToObjC' is not identical to 'DerivesObjC'}}
 }
 
 func testDowncastBridge() {
@@ -100,7 +100,7 @@ func testDowncastBridge() {
   dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
 
   // We don't do mixed down/upcasts.
-  dictDO as Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictDO as Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'DerivesObjC' is not identical to 'BridgedToObjC'}}
 }
 
 func testConditionalDowncastBridge() {

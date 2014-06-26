@@ -45,12 +45,12 @@ let immStr = String()
 
 takeIntArgPointer(&mutInt)
 takeIntArgPointer(&immInt) // expected-error{{not a subtype of '@lvalue}}
-takeIntArgPointer(&mutStr) // expected-error{{cannot convert the expression's type '()' to type 'inout String'}}
+takeIntArgPointer(&mutStr) // expected-error{{'inout String' is not convertible to 'ArgPointer<Int>'}}
 takeIntArgPointer(&immStr) // expected-error{{not a subtype of '@lvalue}}
 takeIntArgPointer(&mutFlo)
 takeIntArgPointer(&immFlo) // expected-error{{not a subtype of '@lvalue}}
 
-takeStringArgPointer(&mutInt) // expected-error{{cannot convert the expression's type '()' to type 'inout Int'}}
+takeStringArgPointer(&mutInt) // expected-error{{'inout Int' is not convertible to 'ArgPointer<String>'}}
 takeStringArgPointer(&immInt) // expected-error{{not a subtype of '@lvalue}}
 takeStringArgPointer(&mutStr)
 takeStringArgPointer(&immStr) // expected-error{{not a subtype of '@lvalue}}
@@ -58,11 +58,11 @@ takeStringArgPointer(&mutFlo)
 takeStringArgPointer(&immFlo) // expected-error{{not a subtype of '@lvalue}}
 
 takeIntWritebackPointer(&mutInt)
-takeIntWritebackPointer(&mutStr) // expected-error{{cannot convert the expression's type '()' to type 'inout String'}}
+takeIntWritebackPointer(&mutStr) // expected-error{{'inout String' is not convertible to 'WritebackPointer<Int>'}}
 takeIntWritebackPointer(&immInt) // expected-error{{not a subtype of '@lvalue}}
 takeIntWritebackPointer(&immStr) // expected-error{{not a subtype of '@lvalue}}
 
-takeStringWritebackPointer(&mutInt) // expected-error{{cannot convert the expression's type '()' to type 'inout Int'}}
+takeStringWritebackPointer(&mutInt) // expected-error{{'inout Int' is not convertible to 'WritebackPointer<String>'}}
 takeStringWritebackPointer(&mutStr)
 takeStringWritebackPointer(&immInt) // expected-error{{not a subtype of '@lvalue}}
 takeStringWritebackPointer(&immStr) // expected-error{{not a subtype of '@lvalue}}

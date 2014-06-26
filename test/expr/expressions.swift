@@ -33,7 +33,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{cannot convert the expression's type 'Int' to type 'Bool'}}
+        4 // expected-error {{type 'Bool' does not conform to protocol 'IntegerLiteralConvertible'}}
 
   //var x6 : Float = 4+5
 
@@ -44,8 +44,8 @@ func basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
-  var x9 : Int16 = x8 + 1 // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  1.0 + x8 // expected-error{{'Int8' is not convertible to 'UInt8'}}
+  var x9 : Int16 = x8 + 1 // expected-error{{'Int8' is not convertible to 'UInt8'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -109,7 +109,7 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({  // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  testfunc2({  // expected-error{{'UInt8' is not a subtype of 'Int'}}
      $0 + 1})
 
   enum union1 {
@@ -245,7 +245,7 @@ func test_floating_point() {
 
 func test_nonassoc(x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{could not find an overload for '==' that accepts the supplied arguments}}
+  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{'Int' is not convertible to 'union1'}}
 }
 
 func test_module_member() {
@@ -268,7 +268,7 @@ func fib(n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{cannot convert the expression's type 'Int' to type 'Bool'}}
+   il_a: Bool = 4  // expected-error {{type 'Bool' does not conform to protocol 'IntegerLiteralConvertible'}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
@@ -278,7 +278,7 @@ struct int_test1 {
   static func convertFromIntegerLiteral() {}
 }
 
-var il_d: int_test1 = 4 // expected-error{{cannot convert the expression's type 'Int' to type 'int_test1'}}
+var il_d: int_test1 = 4 // expected-error{{type 'int_test1' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 
 struct int_test2 {
@@ -286,13 +286,13 @@ struct int_test2 {
   static func convertFromIntegerLiteral(_: Int8) {}
 }
 
-var il_e: int_test2 = 4 // expected-error {{cannot convert the expression's type 'Int' to type 'int_test2'}}
+var il_e: int_test2 = 4 // expected-error {{type 'int_test2' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 struct int_test3 {
   func convertFromIntegerLiteral() {}
 }
 
-var il_f: int_test3 = 4  // expected-error{{cannot convert the expression's type 'Int' to type 'int_test3'}}
+var il_f: int_test3 = 4  // expected-error{{type 'int_test3' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 struct int_test4 : IntegerLiteralConvertible {
   typealias IntegerLiteralType = Int
@@ -308,7 +308,7 @@ struct int_test5 {
 }
 
 var il_h: int_test5 =
-   4 //expected-error {{cannot convert the expression's type 'Int' to type 'int_test5'}}
+   4 //expected-error {{type 'int_test5' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 // This just barely fits in Int64.
 var il_i: Int64  = 18446744073709551615
@@ -471,7 +471,7 @@ func testInOut(inout arg: Int) {
   var z = &arg // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{cannot convert the expression's type '()' to type 'inout Int'}}
+  takesExplicitInt(5) // expected-error {{type 'inout Int' does not conform to protocol 'IntegerLiteralConvertible'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -539,7 +539,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{cannot convert the expression's type '()' to type 'ExtendedGraphemeClusterLiteralConvertible'}}
+ruleVar = Rule("a") // expected-error {{type '(target: String, dependencies: String)' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
 
 
 class C {
@@ -559,7 +559,7 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   --i8
 
   // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
+  ++Int64(5) // expected-error{{'Int64' is not convertible to '@lvalue Float'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -663,7 +663,7 @@ _ // expected-error{{'_' can only appear in a pattern or on the left side of an 
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}}
+  var c = []  // expected-error {{'CConstPointer<$T1>' is not a subtype of 'Array<$T1>'}}
 }
 
 func dictionaryLiterals() {
@@ -687,5 +687,5 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/.None comparisons
 //===----------------------------------------------------------------------===//
-.None == nil // expected-error {{could not find member 'None'}}
-nil == .None // expected-error {{could not find member 'None'}}
+.None == nil // expected-error {{'union1.Type' does not have a member named 'None'}}
+nil == .None // expected-error {{type 'union1' does not conform to protocol 'NilLiteralConvertible'}}
