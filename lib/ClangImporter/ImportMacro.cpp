@@ -155,7 +155,7 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   assert(isStringToken(tok));
 
   clang::ActionResult<clang::Expr*> result =
-    Impl.getClangSema().ActOnStringLiteral(&tok, /*numToks*/1);
+    Impl.getClangSema().ActOnStringLiteral(tok);
   if (!result.isUsable())
     return nullptr;
 
