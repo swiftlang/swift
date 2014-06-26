@@ -1177,3 +1177,18 @@ bb3:
   %2 = tuple()
   return %2 : $()
 }
+
+// Just make sure we don't crash on this.
+// CHECK-LABEL: sil @unreachable_pred : $@thin (Builtin.NativeObject) -> () {
+sil @unreachable_pred : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %1 = tuple()
+  return %1 : $()
+}

@@ -439,15 +439,26 @@ swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
     // Otherwise, lookup the BBState associated with the predecessor and merge
     // the predecessor in.
     auto I = TopDownBBStates.find(PredBB);
-    assert(I != TopDownBBStates.end());
-    if (!I->second.isTrapBB()) {
-      if (!HasAtLeastOnePred) {
-        BBState.initPredTopDown(I->second);
-      } else {
-        BBState.mergePredTopDown(I->second);
-      }
-      HasAtLeastOnePred = true;
+
+    // If we can not lookup the BBState then the BB was not in the post order
+    // implying that it is unreachable. LLVM will ensure that the BB is removed
+    // if we do not reach it at the SIL level. Since it is unreachable, ignore
+    // it.
+    if (I == TopDownBBStates.end())
+      continue;
+
+    // If we found the state but the state is for a trap BB, skip it. Trap BBs
+    // leak all reference counts and do not reference reference semantic objects
+    // in any manner.
+    if (I->second.isTrapBB())
+      continue;
+
+    if (!HasAtLeastOnePred) {
+      BBState.initPredTopDown(I->second);
+    } else {
+      BBState.mergePredTopDown(I->second);
     }
+    HasAtLeastOnePred = true;
   }
 }
 
@@ -620,14 +631,16 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
     // the successor in.
     auto I = BottomUpBBStates.find(SuccBB);
     assert(I != BottomUpBBStates.end());
-    if (!I->second.isTrapBB()) {
-      if (!HasAtLeastOneSucc) {
-        BBState.initSuccBottomUp(I->second);
-      } else {
-        BBState.mergeSuccBottomUp(I->second);
-      }
-      HasAtLeastOneSucc = true;
+
+    if (I->second.isTrapBB())
+      continue;
+
+    if (!HasAtLeastOneSucc) {
+      BBState.initSuccBottomUp(I->second);
+    } else {
+      BBState.mergeSuccBottomUp(I->second);
     }
+    HasAtLeastOneSucc = true;
   }
 }
 
