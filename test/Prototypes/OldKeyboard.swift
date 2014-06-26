@@ -15,10 +15,10 @@
 // XXX FIXME -- replace and flush this out with parsing logic
 
 @asmname("write")
-func posix_write(fd: Int32, buf: CConstVoidPointer, sz: UInt) -> Int
+func posix_write(fd: Int32, buf: ConstUnsafePointer<Void>, sz: UInt) -> Int
 
 @asmname("read")
-func posix_read(fd: Int32, buf: CMutableVoidPointer, sz: UInt) -> Int
+func posix_read(fd: Int32, buf: UnsafePointer<Void>, sz: UInt) -> Int
 
 @final class Keyboard {
   init() {  }

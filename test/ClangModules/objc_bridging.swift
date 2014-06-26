@@ -34,7 +34,7 @@ func foo() {
   NSArray().dictProperty.onlyOnDictionary()
 }
 
-func allocateMagic(zone: NSZone) -> COpaquePointer {
+func allocateMagic(zone: NSZone) -> UnsafePointer<Void> {
   return allocate(zone)
 }
 

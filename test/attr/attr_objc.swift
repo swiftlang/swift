@@ -1527,41 +1527,20 @@ class HasNSManaged {
 
 @objc class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
-  func constCPointer(p: CConstPointer<Int>) {}
-  // CHECK-LABEL: @objc func constCPointer(p: CConstPointer<Int>) {
-
   func constUnsafePointer(p: ConstUnsafePointer<Int>) {}
   // CHECK-LABEL: @objc func constUnsafePointer(p: ConstUnsafePointer<Int>) {
-
-  func constCPointerToAnyObject(p: CConstPointer<AnyObject>) {}
-  // CHECK-LABEL: @objc func constCPointerToAnyObject(p: CConstPointer<AnyObject>) {
 
   func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {}
   // CHECK-LABEL: @objc func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {
 
-  func constCPointerToClass(p: CConstPointer<TakesCPointers>) {}
-  // CHECK-LABEL: @objc func constCPointerToClass(p: CConstPointer<TakesCPointers>) {
-
   func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {}
   // CHECK-LABEL: @objc func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {
-
-  func mutableCPointer(p: CMutablePointer<Int>) {}
-  // CHECK-LABEL: @objc func mutableCPointer(p: CMutablePointer<Int>) {
 
   func mutableUnsafePointer(p: UnsafePointer<Int>) {}
   // CHECK-LABEL: @objc func mutableUnsafePointer(p: UnsafePointer<Int>) {
 
-  // CMutablePointer of ObjC class type is not bridged! Another type is needed
-  // for the strong-to-autoreleased writeback.
-  // FIXME: There's no reason for that; T* __strong* is representable in ObjC.
-  func mutableCPointerToAnyObject(p: CMutablePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} func mutableCPointerToAnyObject(p: CMutablePointer<AnyObject>) {
-
   func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {
-
-  func mutableCPointerToClass(p: CMutablePointer<TakesCPointers>) {}
-  // CHECK-LABEL: {{^}} func mutableCPointerToClass(p: CMutablePointer<TakesCPointers>) {
 
   func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {

@@ -178,13 +178,13 @@ func applyBlock(f: @objc_block Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
   return f(x)
 }
 
-func useInnerPointer(p: COpaquePointer) {}
+func useInnerPointer(p: UnsafePointer<Void>) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.
 // CHECK-LABEL: sil @_TF26objc_ownership_conventions18innerPointerMethod
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
 // CHECK:         strong_retain %0
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> COpaquePointer , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer COpaquePointer
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> UnsafePointer<()> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafePointer<()>
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])
@@ -196,7 +196,7 @@ func innerPointerMethod(g: Gizmo) {
 // CHECK-LABEL: sil @_TF26objc_ownership_conventions20innerPointerProperty
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
 // CHECK:         strong_retain %0
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> COpaquePointer , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer COpaquePointer
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : Gizmo -> () -> UnsafePointer<()> , $@cc(objc_method) @thin (Gizmo) -> @unowned_inner_pointer UnsafePointer<()>
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])

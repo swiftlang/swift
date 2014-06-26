@@ -663,7 +663,7 @@ _ // expected-error{{'_' can only appear in a pattern or on the left side of an 
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{'CConstPointer<$T1>' is not a subtype of 'Array<$T1>'}}
+  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}}
 }
 
 func dictionaryLiterals() {

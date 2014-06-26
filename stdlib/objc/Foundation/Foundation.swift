@@ -14,21 +14,12 @@
 import CoreFoundation
 
 // TODO: Eliminate this monstrosity when pointer conversions are staged in.
-#if ENABLE_POINTER_CONVERSIONS
 struct _CPointerTo<T> {
   typealias Mutable = UnsafePointer<T>
   typealias Const = ConstUnsafePointer<T>
 }
 typealias _CMutableVoidPointer = UnsafePointer<Void>
 typealias _CConstVoidPointer = ConstUnsafePointer<Void>
-#else
-struct _CPointerTo<T> {
-  typealias Mutable = CMutablePointer<T>
-  typealias Const = CConstPointer<T>
-}
-typealias _CMutableVoidPointer = CMutableVoidPointer
-typealias _CConstVoidPointer = CConstVoidPointer
-#endif
 
 //===----------------------------------------------------------------------===//
 // Enums

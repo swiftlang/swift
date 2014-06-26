@@ -3,12 +3,12 @@
 class C {}
 class D {}
 
-func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
-func takesMutableVoidPointer(x: UnsafePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}
+func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
+func takesMutableVoidPointer(x: UnsafePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 func takesMutableArrayPointer(x: UnsafePointer<[Int]>) {} // expected-note{{}}
-func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}
+func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}
 func takesConstVoidPointer(x: ConstUnsafePointer<Void>) {}
-func takesAutoreleasingPointer(x: AutoreleasingUnsafePointer<C>) {} // expected-note{{}}expected-note{{}}
+func takesAutoreleasingPointer(x: AutoreleasingUnsafePointer<C>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 
 func mutablePointerArguments(p: UnsafePointer<Int>,
                              cp: ConstUnsafePointer<Int>,
@@ -153,8 +153,7 @@ func autoreleasingPointerArguments(p: UnsafePointer<Int>,
   takesAutoreleasingPointer(&cc) // expected-error{{}}
   takesAutoreleasingPointer(&dd) // expected-error{{}}
 
-  // Should fail once the existing __conversions are removed
-  //var x: AutoreleasingUnsafePointer<C> = &c // e/xpected-error{{}}
+  var x: AutoreleasingUnsafePointer<C> = &c // expected-error{{}}
 }
 
 func pointerConstructor(x: UnsafePointer<Int>) -> UnsafePointer<Float> {

@@ -80,7 +80,7 @@ namespace swift {
     bool StrictKeywordArguments = true;
     
     /// Enable intrinsic pointer conversions.
-    bool EnablePointerConversions = false;
+    bool EnablePointerConversions = true;
 
     /// Should access control be respected?
     bool EnableAccessControl = false;

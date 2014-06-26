@@ -241,7 +241,6 @@
     return self ? body(&buffer) : body(nil)
   }
 
-#if ENABLE_POINTER_CONVERSIONS
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of buffer
@@ -251,7 +250,6 @@
   ) -> R {
     return self ? body(&buffer) : body(nil)
   }
-#endif
 % end
 
   // TODO: Remove this when staging is complete.
@@ -271,96 +269,6 @@
   func predecessor() -> ${Self} {
     return self - 1
   }
-
-#if !ENABLE_POINTER_CONVERSIONS
-  //
-  // Conversion to C argument pointers
-  //
-
-  // FIXME: Should be in an extension, but that doesn't work yet.
-  @transparent @conversion
-  func __conversion() -> CMutablePointer<T> {
-    return CMutablePointer(owner: _nilNativeObject, value: value)
-  }
-  func __conversion() -> CMutableVoidPointer {
-    return CMutableVoidPointer(owner: _nilNativeObject, value: value)
-  }
-  @transparent @conversion
-  func __conversion() -> CConstPointer<T> {
-    return CConstPointer(_nilNativeObject, value)
-  }
-  @transparent @conversion
-  func __conversion() -> CConstVoidPointer {
-    return CConstVoidPointer(_nilNativeObject, value)
-  }
-  @transparent @conversion
-  func __conversion() -> AutoreleasingUnsafePointer<T> {
-    return AutoreleasingUnsafePointer(value)
-  }
-
-  /// Construct from a CConstPointer.
-  ///
-  /// This is an explicit construction because it is not always safe.
-  /// It is only allowed to convert an unscoped pointer, that is, one
-  /// that does not have a lifetime-guaranteeing owner reference. To use
-  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
-  /// must be used instead.
-  init(_ cp: CConstPointer<T>) {
-    _precondition(!cp.scoped,
-      "scoped CConstPointers must be converted using withUnsafePointer")
-    self.value = cp.value
-  }
-
-  /// Construct from a CMutablePointer.
-  ///
-  /// This is an explicit construction because it is not always safe.
-  /// It is only allowed to convert an unscoped pointer, that is, one
-  /// that does not have a lifetime-guaranteeing owner reference. To use
-  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
-  /// must be used instead.
-  init(_ cm: CMutablePointer<T>) {
-    _precondition(!cm.scoped,
-      "scoped CMutablePointers must be converted using withUnsafePointer")
-    self.value = cm.value
-  }
-
-  /// Construct from an AutoreleasingUnsafePointer.
-  ///
-  /// This is an explicit construction
-  /// because it is unsafe--UnsafePointer's store operations assume that
-  /// the pointed-to storage has strong ownership, whereas AutoreleasingUnsafePointers
-  /// reference +0 storage. Any values stored through the resulting
-  /// UnsafePointer must be autoreleased.
-  init(_ op: AutoreleasingUnsafePointer<T>) {
-    self.value = op.value
-  }
-
-  /// Construct from a CConstVoidPointer.
-  ///
-  /// This is an explicit construction because it is not always safe.
-  /// It is only allowed to convert an unscoped pointer, that is, one
-  /// that does not have a lifetime-guaranteeing owner reference. To use
-  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
-  /// must be used instead.
-  init(_ cp: CConstVoidPointer) {
-    _precondition(!cp.scoped,
-      "scoped CConstPointers must be converted using withUnsafePointer")
-    self.value = cp.value
-  }
-
-  /// Construct from a CMutableVoidPointer.
-  ///
-  /// This is an explicit construction because it is not always safe.
-  /// It is only allowed to convert an unscoped pointer, that is, one
-  /// that does not have a lifetime-guaranteeing owner reference. To use
-  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
-  /// must be used instead.
-  init(_ cp: CMutableVoidPointer) {
-    _precondition(!cp.scoped,
-      "scoped CMutableVoidPointers must be converted using withUnsafePointer")
-    self.value = cp.value
-  }
-#endif
 }
 
 @transparent @public

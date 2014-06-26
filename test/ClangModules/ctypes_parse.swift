@@ -237,7 +237,7 @@ func testFunctionPointersAsOpaquePointers() {
   useFunctionPointer(wrapper.a)
   let _: CFunctionPointer<(CInt) -> CInt> = wrapper.b
 
-  var anotherFP: CFunctionPointer<(CInt, CLong, CMutableVoidPointer) -> Void> = getFunctionPointer2()
+  var anotherFP: CFunctionPointer<(CInt, CLong, UnsafePointer<Void>) -> Void> = getFunctionPointer2()
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{'(CInt, CLong, CMutableVoidPointer)' is not identical to 'Int32'}}
+  anotherFP = fp // expected-error {{'(CInt, CLong, UnsafePointer<Void>)' is not identical to 'Int32'}}
 }

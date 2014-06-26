@@ -353,8 +353,8 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared @_TFCSo7NSArrayCfMS_FT7objectsGVSs13CConstPointerGSqPSs9AnyObject___5countVSs5Int32_S_
+// CHECK-LABEL: sil shared @_TFCSo7NSArrayCfMS_FT7objectsGVSs18ConstUnsafePointerGSqPSs9AnyObject___5countVSs5Int32_S_
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
-// CHECK:         [[METHOD:%.*]] = function_ref @_TTOFCSo7NSArraycfMS_FT7objectsGVSs13CConstPointerGSqPSs9AnyObject___5countVSs5Int32_S_
+// CHECK:         [[METHOD:%.*]] = function_ref @_TTOFCSo7NSArraycfMS_FT7objectsGVSs18ConstUnsafePointerGSqPSs9AnyObject___5countVSs5Int32_S_
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
