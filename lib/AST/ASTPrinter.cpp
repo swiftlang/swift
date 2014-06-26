@@ -1828,6 +1828,14 @@ public:
         Printer << "]";
         return;
       }
+      if (NT == Ctx.getDictionaryDecl()) {
+        Printer << "[";
+        visit(T->getGenericArgs()[0]);
+        Printer << " : ";
+        visit(T->getGenericArgs()[1]);
+        Printer << "]";
+        return;
+      }
       if (NT == Ctx.getOptionalDecl()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "?";
