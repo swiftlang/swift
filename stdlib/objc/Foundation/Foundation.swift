@@ -13,6 +13,23 @@
 @exported import Foundation // Clang module
 import CoreFoundation
 
+// TODO: Eliminate this monstrosity when pointer conversions are staged in.
+#if ENABLE_POINTER_CONVERSIONS
+struct _CPointerTo<T> {
+  typealias Mutable = UnsafePointer<T>
+  typealias Const = ConstUnsafePointer<T>
+}
+typealias _CMutableVoidPointer = UnsafePointer<Void>
+typealias _CConstVoidPointer = ConstUnsafePointer<Void>
+#else
+struct _CPointerTo<T> {
+  typealias Mutable = CMutablePointer<T>
+  typealias Const = CConstPointer<T>
+}
+typealias _CMutableVoidPointer = CMutableVoidPointer
+typealias _CConstVoidPointer = CConstVoidPointer
+#endif
+
 //===----------------------------------------------------------------------===//
 // Enums
 //===----------------------------------------------------------------------===//
@@ -233,18 +250,18 @@ class _NSContiguousString : NSString {
     return value[index]
   }
 
-  override func getCharacters(buffer: CMutablePointer<unichar>,
+  override func getCharacters(buffer: _CPointerTo<unichar>.Mutable,
                               range aRange: NSRange) {
     _precondition(aRange.location + aRange.length <= Int(value.count))
 
     if value.elementWidth == 2 {
       UTF16.copy(
-        value.startUTF16 + aRange.location, destination: UnsafePointer(buffer),
+        value.startUTF16 + aRange.location, destination: UnsafePointer<unichar>(buffer),
         count: aRange.length)
     }
     else {
       UTF16.copy(
-        value.startASCII + aRange.location, destination: UnsafePointer(buffer),
+        value.startASCII + aRange.location, destination: UnsafePointer<unichar>(buffer),
         count: aRange.length)
     }
   }
@@ -290,7 +307,7 @@ class _NSOpaqueString : NSString {
     return owner.characterAtIndex(index + subRange.location)
   }
 
-  override func getCharacters(buffer: CMutablePointer<unichar>,
+  override func getCharacters(buffer: _CPointerTo<unichar>.Mutable,
                               range aRange: NSRange) {
 
     owner.getCharacters(
@@ -1274,7 +1291,7 @@ extension NSArray {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // Use Imported:
     // @objc(initWithObjects:count:)
-    //    init(withObjects objects: CConstPointer<AnyObject?>,
+    //    init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //    count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
@@ -1311,7 +1328,7 @@ extension NSOrderedSet {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)
-    // init(withObjects objects: CConstPointer<AnyObject?>,
+    // init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //      count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
@@ -1326,7 +1343,7 @@ extension NSSet {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)
-    // init(withObjects objects: CConstPointer<AnyObject?>, count cnt: Int)
+    // init(withObjects objects: ConstUnsafePointer<AnyObject?>, count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }
