@@ -122,6 +122,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_UIApplicationMain:
   case DAK_Lazy:
   case DAK_LLDBDebuggerFunction:
+  case DAK_Noinline:
     Printer << "@" << getAttrName();
     break;
 
