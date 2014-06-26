@@ -2086,17 +2086,6 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   }
 };
 
-static bool isCPointerType(TypeConverter &TC,
-                           Type ty) {
-  auto nom = ty->getNominalOrBoundGenericNominal();
-  return nom && (nom == TC.getCMutablePointerDecl()
-    // AutoreleasingUnsafePointer is not bridged when intrinsic conversions are
-    // enabled.
-    || (!TC.Context.LangOpts.EnablePointerConversions
-        && nom == TC.Context.getAutoreleasingUnsafePointerDecl())
-    || nom == TC.getCConstPointerDecl());
-}
-
 Type TypeConverter::getLoweredCBridgedType(Type t) {
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType, Opt) \
   { auto nativeType = get##NativeType##Type();                               \
@@ -2121,14 +2110,6 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
     }
   }
   
-  // C*Pointer arguments bridge to UnsafePointer.
-  if (isCPointerType(*this, t)) {
-    auto args = t->castTo<BoundGenericType>()->getGenericArgs();
-    assert(args.size() == 1 && "pointer type has more than one arg?!");
-    return BoundGenericType::get(Context.getUnsafePointerDecl(),
-                                 Type(), args);
-  }
-
   if (auto funTy = t->getAs<FunctionType>()) {
     switch (funTy->getRepresentation()) {
     case AnyFunctionType::Representation::Block:

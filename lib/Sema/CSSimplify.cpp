@@ -1732,8 +1732,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
     
     // Pointer arguments can be converted from pointer-compatible types.
-    if (kind >= TypeMatchKind::ArgumentConversion
-        && getASTContext().LangOpts.EnablePointerConversions) {
+    if (kind >= TypeMatchKind::ArgumentConversion) {
       if (auto bgt2 = type2->getAs<BoundGenericType>()) {
         if (bgt2->getDecl() == getASTContext().getUnsafePointerDecl()
             || bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()) {

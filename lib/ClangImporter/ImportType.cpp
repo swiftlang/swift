@@ -66,9 +66,6 @@ namespace {
     /// The source type is 'NSUInteger'.
     NSUInteger,
 
-    /// The source type is a C pointer type.
-    CPointer,
-
     /// The source type is an Objective-C object pointer type.
     ObjCPointer,
 
@@ -220,64 +217,17 @@ namespace {
 
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
-      if (Impl.SwiftContext.LangOpts.EnablePointerConversions) {
-        Type pointeeType;
-        if (pointeeQualType->isVoidType())
-          pointeeType = Impl.SwiftContext.TheEmptyTupleType;
-        else
-          pointeeType = Impl.importType(pointeeQualType, ImportTypeKind::Pointee);
+      Type pointeeType;
+      if (pointeeQualType->isVoidType())
+        pointeeType = Impl.SwiftContext.TheEmptyTupleType;
+      else
+        pointeeType = Impl.importType(pointeeQualType, ImportTypeKind::Pointee);
 
-        // If the pointed-to type is unrepresentable in Swift, import as
-        // COpaquePointer.
-        if (!pointeeType)
-          return getOpaquePointerType();
-        
-        if (pointeeQualType->isFunctionType()) {
-          // FIXME: Function pointer types can be mapped to Swift function types
-          // once we have the notion of a "thin" function that does not capture
-          // anything.
-          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                      "CFunctionPointer",
-                                                      pointeeType);
-        }
-
-        auto quals = pointeeQualType.getQualifiers();
-        
-        if (quals.hasConst())
-          return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                       "ConstUnsafePointer",
-                                                       pointeeType),
-                  ImportHint::None};
-        // Mutable pointers with __autoreleasing or __unsafe_unretained
-        // ownership map to AutoreleasingUnsafePointer<T>.
-        else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
-              || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
-        // TODO: Special case NSError**. Need to update the NSErrorPointer
-        // typedef after we transition to intrinsic pointer conversions.
-          return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                  "AutoreleasingUnsafePointer",
-                                                  pointeeType),
-                  ImportHint::None};
-        // All other mutable pointers map to UnsafePointer.
-        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                     "UnsafePointer",
-                                                     pointeeType),
-                ImportHint::None};
-      }
-      
-      // Import void* as COpaquePointer.
-      if (pointeeQualType->isVoidType()) {
-        return { getOpaquePointerType(), ImportHint::CPointer };
-      }
-      
-      auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Pointee);
-      
       // If the pointed-to type is unrepresentable in Swift, import as
-      // COpaquePointer (and don't hint to the adjuster).
+      // COpaquePointer.
       if (!pointeeType)
         return getOpaquePointerType();
-
+      
       if (pointeeQualType->isFunctionType()) {
         // FIXME: Function pointer types can be mapped to Swift function types
         // once we have the notion of a "thin" function that does not capture
@@ -287,10 +237,28 @@ namespace {
                                                     pointeeType);
       }
 
-      // Non-parameter pointers map to UnsafePointer.
-      return { Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                               "UnsafePointer", pointeeType),
-               ImportHint::CPointer };
+      auto quals = pointeeQualType.getQualifiers();
+      
+      if (quals.hasConst())
+        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                     "ConstUnsafePointer",
+                                                     pointeeType),
+                ImportHint::None};
+      // Mutable pointers with __autoreleasing or __unsafe_unretained
+      // ownership map to AutoreleasingUnsafePointer<T>.
+      else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
+            || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
+      // TODO: Special case NSError**. Need to update the NSErrorPointer
+      // typedef after we transition to intrinsic pointer conversions.
+        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                "AutoreleasingUnsafePointer",
+                                                pointeeType),
+                ImportHint::None};
+      // All other mutable pointers map to UnsafePointer.
+      return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                   "UnsafePointer",
+                                                   pointeeType),
+              ImportHint::None};
     }
 
     Type getOpaquePointerType() {
@@ -609,94 +577,6 @@ namespace {
   };
 }
 
-/// Import a C pointer type as a function parameter.
-///
-/// This function assumes that the abstract imported type is either
-/// COpaquePointer or UnsafePointer<T> for some T.
-static Type importParameterPointerType(ClangImporter::Implementation &impl,
-                                       clang::QualType clangType,
-                                       Type abstractImportedType) {
-  auto clangPointeeType = clangType->getPointeeType();
-  clang::Qualifiers quals = clangPointeeType.getQualifiers();
-
-  // Give no special treatment to volatile or __weak pointers.
-  // FIXME: we really shouldn't even import __weak pointers as
-  // UnsafePointer<>.
-  if (quals.hasVolatile() ||
-      quals.getObjCLifetime() == clang::Qualifiers::OCL_Weak)
-    return abstractImportedType;
-
-  // With pointer conversions enabled, map to the normal pointer types.
-  if (impl.SwiftContext.LangOpts.EnablePointerConversions) {
-    Type pointeeType;
-    if (clangPointeeType->isVoidType())
-      pointeeType = impl.SwiftContext.TheEmptyTupleType;
-    else
-      pointeeType =
-        abstractImportedType->castTo<BoundGenericType>()->getGenericArgs()[0];
-
-    if (quals.hasConst())
-      return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                  "ConstUnsafePointer",
-                                                  pointeeType);
-    // Mutable pointers with __autoreleasing or __unsafe_unretained
-    // ownership map to AutoreleasingUnsafePointer<T>.
-    else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
-             quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
-    // TODO: Special case NSError**. Need to update the NSErrorPointer
-    // typedef after we transition to intrinsic pointer conversions.
-      return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                  "AutoreleasingUnsafePointer",
-                                                  pointeeType);
-    // All other mutable pointers map to UnsafePointer.
-    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                "UnsafePointer",
-                                                pointeeType);
-  }
-  
-  if (clangPointeeType->isVoidType()) {
-    // Pointers to unmappable or void types map to C*VoidPointer.
-    if (quals.hasConst())
-      return impl.getNamedSwiftType(impl.getStdlibModule(),
-                                    "CConstVoidPointer");
-    else
-      return impl.getNamedSwiftType(impl.getStdlibModule(),
-                                    "CMutableVoidPointer");
-  }
-
-  // Otherwise, we should have an UnsafePointer<T>.
-  Type pointeeType =
-    abstractImportedType->castTo<BoundGenericType>()->getGenericArgs()[0];
-
-  // Const pointers map to CConstPointer<T>.
-  if (quals.hasConst()) {
-    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                "CConstPointer", pointeeType);
-
-  // Mutable pointers with __autoreleasing or __unsafe_unretained
-  // ownership map to AutoreleasingUnsafePointer<T>.
-  } else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
-             quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
-    // Special case NSError**.
-    if (impl.hasFoundationModule())
-      if (auto OP = clangPointeeType->getAs<clang::ObjCObjectPointerType>())
-        if (auto OI = OP->getPointeeType()->getAs<clang::ObjCInterfaceType>())
-          if (OI->getDecl()->getName() == "NSError") {
-            auto FM = impl.getFoundationModule();
-            auto Ty = impl.getNamedSwiftType(FM, "NSErrorPointer");
-            if (Ty) {
-              return Ty;
-            }
-          }
-    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                     "AutoreleasingUnsafePointer", pointeeType);
-  // All other mutable pointers map to CMutablePointer<T>.
-  } else {
-    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                "CMutablePointer", pointeeType);
-  }
-}
-
 /// True if we're converting a function parameter, property type, or
 /// function result type, and can thus safely apply representation
 /// conversions for bridged types.
@@ -808,12 +688,6 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // abstractly, give up now.
   if (!importedType)
     return Type();
-
-  // Pointer parameters have a number of special cases.
-  if (importKind == ImportTypeKind::Parameter &&
-      hint == ImportHint::CPointer) {
-    return importParameterPointerType(impl, clangType, importedType);
-  }
 
   // Turn block pointer types back into normal function types in any
   // context where bridging is possible, unless the block has a typedef.
