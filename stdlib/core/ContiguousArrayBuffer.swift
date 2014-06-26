@@ -117,7 +117,7 @@ let emptyNSSwiftArray : _NSSwiftArray
     self = buffer
   }
   
-  @public mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+  @public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> ContiguousArrayBuffer<Element>?
   {
     return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil

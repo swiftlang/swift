@@ -167,7 +167,7 @@ extension ${Self} : ArrayType {
   /// minimumCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
   @public mutating func reserveCapacity(minimumCapacity: Int) {
-    if !_buffer.requestUniqueMutableBuffer(minimumCapacity) {
+    if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
       
       var newBuffer = ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
@@ -417,7 +417,7 @@ func _arrayReplace2<
   let oldCount = target.count
   let eraseCount = countElements(subRange)
   let insertCount = numericCast(countElements(newValues)) as Int
-  var newBuffer = _demandUniqueMutableBuffer(
+  var newBuffer = _createUniqueMutableBuffer(
     &target._buffer, oldCount + insertCount - eraseCount)
 
   if _fastPath(!newBuffer) {
@@ -565,7 +565,7 @@ func += <
 /// the buffer that satisfies the capacity request now has a count
 /// that does not match its number of initialized elements, and that
 /// needs to be corrected before the buffer can go back into circulation.
-func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
+func _createUniqueMutableBuffer<_Buffer: ArrayBufferType>(
   inout source: _Buffer, newCount: Int, minimumCapacity: Int = 0)
 -> ContiguousArrayBuffer<_Buffer.Element>? {
 
@@ -573,7 +573,7 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
   
   let requiredCapacity = max(newCount, minimumCapacity)
   
-  if let b = source.requestUniqueMutableBuffer(requiredCapacity) {
+  if let b = source.requestUniqueMutableBackingBuffer(requiredCapacity) {
     source.count = newCount
     return nil
   }
@@ -623,7 +623,7 @@ func _arrayOutOfPlaceUpdate<
   let newEnd = newStart + newCount
   
   // Check to see if we have storage we can move from
-  if let backing = source.requestUniqueMutableBuffer(sourceCount) {
+  if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
     let sourceStart = source.elementStorage
     let oldStart = sourceStart + headCount
     
@@ -678,7 +678,7 @@ func _arrayAppend<_Buffer: ArrayBufferType>(
   inout buffer: _Buffer, newValue: _Buffer.Element
 ) {
   let oldCount = buffer.count
-  var newBuffer = _demandUniqueMutableBuffer(&buffer, oldCount + 1)
+  var newBuffer = _createUniqueMutableBuffer(&buffer, oldCount + 1)
   if _fastPath(!newBuffer) {
     (buffer.elementStorage + oldCount).initialize(newValue)
   }
@@ -696,7 +696,7 @@ func _arrayReserve<_Buffer: ArrayBufferType>(
   inout buffer: _Buffer, minimumCapacity: Int
 ) {
   let oldCount = buffer.count
-  var newBuffer = _demandUniqueMutableBuffer(
+  var newBuffer = _createUniqueMutableBuffer(
     &buffer, oldCount, minimumCapacity: minimumCapacity)
   if _slowPath(newBuffer) {
     _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 0, _IgnorePointer())

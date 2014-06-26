@@ -83,7 +83,7 @@
     return _extractOrCopyToNativeArrayBuffer(self)._asCocoaArray()
   }
 
-  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
     _invariantCheck()

@@ -44,7 +44,7 @@
   /// Note: this function must remain mutating; otherwise the buffer
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
-  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> ContiguousArrayBuffer<Element>?
 
   /// Returns true iff this buffer is backed by a uniquely-referenced mutable

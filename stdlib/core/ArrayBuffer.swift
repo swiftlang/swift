@@ -174,7 +174,7 @@ extension ArrayBuffer {
   /// ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil
-  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
     if _fastPath(Swift.isUniquelyReferenced(&storage) && _hasMutableBuffer) {
