@@ -1756,12 +1756,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             
             if (isWrappedArray) {
               conversionsOrFixes.push_back(
-                                           ConversionRestrictionKind::
-                                                                ArrayToPointer);
-            } else {
-              conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::InoutToPointer);
+                                     ConversionRestrictionKind::ArrayToPointer);
             }
+            conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::InoutToPointer);
           }
           
           auto bgt1 = type1->getAs<BoundGenericType>();
@@ -3322,7 +3320,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto baseType1 = this->getBaseTypeForArrayType(t1);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
-    increaseScore(SK_ArrayPointerConversion);
     return matchTypes(baseType1, baseType2,
                       TypeMatchKind::BindToPointerType,
                       subFlags, locator);

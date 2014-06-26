@@ -695,16 +695,12 @@ enum ScoreKind {
   SK_CollectionBridgedConversion,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
-  /// A conversion from an array to a pointer of matching element type.
-  SK_ArrayPointerConversion,
   /// A conversion from an inout to a pointer of matching element type.
   SK_ScalarPointerConversion,
-  /// A conversion from an array to a void pointer.
-  SK_ArrayVoidPointerConversion,
-  /// A conversion from an inout to a void pointer.
-  SK_ScalarVoidPointerConversion,
+  /// A conversion from an array to a pointer of matching element type.
+  SK_ArrayPointerConversion,
   
-  SK_LastScoreKind = SK_ScalarVoidPointerConversion,
+  SK_LastScoreKind = SK_ArrayPointerConversion,
 };
 
 /// The number of score kinds.

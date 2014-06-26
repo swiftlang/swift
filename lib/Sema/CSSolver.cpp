@@ -1215,15 +1215,22 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (constraint->getFix() && !successfulConstraint->getFix())
     return true;
 
-  // Non-optional conversions are better than optional-to-optional
-  // conversions.
   if (auto restriction = constraint->getRestriction()) {
+    // Non-optional conversions are better than optional-to-optional
+    // conversions.
     if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
         *restriction
           == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
         *restriction
           == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
       return true;
+    
+    // Array-to-pointer conversions are better than inout-to-pointer conversions.
+    if (auto successfulRestriction = successfulConstraint->getRestriction()) {
+      if (*successfulRestriction == ConversionRestrictionKind::ArrayToPointer
+          && *restriction == ConversionRestrictionKind::InoutToPointer)
+        return true;
+    }
   }
 
   // Implicit conversions are better than checked casts.

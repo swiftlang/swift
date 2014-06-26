@@ -3,9 +3,10 @@
 class C {}
 class D {}
 
-func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
+func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 func takesMutableVoidPointer(x: UnsafePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}
-func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}
+func takesMutableArrayPointer(x: UnsafePointer<[Int]>) {} // expected-note{{}}
+func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}
 func takesConstVoidPointer(x: ConstUnsafePointer<Void>) {}
 func takesAutoreleasingPointer(x: AutoreleasingUnsafePointer<C>) {} // expected-note{{}}expected-note{{}}
 
@@ -29,6 +30,9 @@ func mutablePointerArguments(p: UnsafePointer<Int>,
   takesMutablePointer(ii) // expected-error{{}}
   takesMutablePointer(ff) // expected-error{{}}
 
+  takesMutableArrayPointer(&i) // expected-error{{}}
+  takesMutableArrayPointer(&ii)
+
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error{{}}
   x = &ii // expected-error{{}}
@@ -50,8 +54,10 @@ func mutableVoidPointerArguments(p: UnsafePointer<Int>,
   takesMutableVoidPointer(i) // expected-error{{}}
   takesMutableVoidPointer(f) // expected-error{{}}
   var ii: [Int] = [0, 1, 2]
+  var dd: [CInt] = [1, 2, 3]
   var ff: [Int] = [0, 1, 2]
   takesMutableVoidPointer(&ii)
+  takesMutableVoidPointer(&dd)
   takesMutableVoidPointer(&ff)
   takesMutableVoidPointer(ii) // expected-error{{}}
   takesMutableVoidPointer(ff) // expected-error{{}}
