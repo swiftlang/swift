@@ -1,4 +1,7 @@
-// RUN: %swift -enable-pointer-conversions -emit-silgen %s | FileCheck %s
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -emit-silgen -enable-pointer-conversions -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+
+import Foundation
 
 func takesMutablePointer(x: UnsafePointer<Int>) {}
 func takesConstPointer(x: ConstUnsafePointer<Int>) {}
@@ -118,4 +121,12 @@ func classInoutToPointer() {
 
   var cq: C? = C()
   takesPlusZeroOptionalPointer(&cq)
+}
+
+// Check that pointer types don't bridge anymore.
+@objc class ObjCMethodBridging {
+  // CHECK-LABEL: sil @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGVSs13UnsafePointerSi_1yGVSs18ConstUnsafePointerSi_1zGVSs26AutoreleasingUnsafePointerS0___T_ : $@cc(objc_method) @thin (UnsafePointer<Int>, ConstUnsafePointer<Int>, AutoreleasingUnsafePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  @objc func pointerArgs(x: UnsafePointer<Int>,
+                         y: ConstUnsafePointer<Int>,
+                         z: AutoreleasingUnsafePointer<ObjCMethodBridging>) {}
 }

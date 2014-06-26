@@ -2090,7 +2090,10 @@ static bool isCPointerType(TypeConverter &TC,
                            Type ty) {
   auto nom = ty->getNominalOrBoundGenericNominal();
   return nom && (nom == TC.getCMutablePointerDecl()
-    || nom == TC.Context.getAutoreleasingUnsafePointerDecl()
+    // AutoreleasingUnsafePointer is not bridged when intrinsic conversions are
+    // enabled.
+    || (!TC.Context.LangOpts.EnablePointerConversions
+        && nom == TC.Context.getAutoreleasingUnsafePointerDecl())
     || nom == TC.getCConstPointerDecl());
 }
 
