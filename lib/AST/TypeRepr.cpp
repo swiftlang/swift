@@ -138,6 +138,11 @@ TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
                                  T->getBrackets(), T->usesOldSyntax());
 }
 
+TypeRepr *CloneVisitor::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
+  return new (Ctx) DictionaryTypeRepr(visit(T->getKey()), visit(T->getValue()),
+                                      T->getColonLoc(), T->getBrackets());
+}
+
 TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   return new (Ctx) OptionalTypeRepr(visit(T->getBase()), T->getQuestionLoc());
 }
@@ -291,6 +296,15 @@ void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
     Base->print(Printer, Opts);
     Printer << "]";
   }
+}
+
+void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,
+                                   const PrintOptions &Opts) const {
+  Printer << "[";
+  Key->print(Printer, Opts);
+  Printer << " : ";
+  Value->print(Printer, Opts);
+  Printer << "]";
 }
 
 void OptionalTypeRepr::printImpl(ASTPrinter &Printer,

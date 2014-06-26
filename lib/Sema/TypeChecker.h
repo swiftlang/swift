@@ -313,6 +313,7 @@ public:
   }
 
   Type getArraySliceType(SourceLoc loc, Type elementType);
+  Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
   Type getNSStringType(DeclContext *dc);

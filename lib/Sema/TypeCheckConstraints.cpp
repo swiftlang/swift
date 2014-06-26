@@ -663,6 +663,30 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                                  AE->getRBracketLoc()),
                                      /*OldSyntax=*/false);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+
+  }
+
+  // Fold [K : V] into a dictionary type.
+  if (auto *DE = dyn_cast<DictionaryExpr>(E)) {
+    if (DE->getElements().size() != 1)
+      return nullptr;
+
+    auto EltTuple = cast<TupleExpr>(DE->getElements()[0]);
+    TypeExpr *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
+    if (!KeyTyExpr)
+      return nullptr;
+
+    TypeExpr *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
+    if (!ValueTyExpr)
+      return nullptr;
+
+    auto *NewTypeRepr =
+      new (TC.Context) DictionaryTypeRepr(KeyTyExpr->getTypeRepr(), 
+                                          ValueTyExpr->getTypeRepr(),
+                                          /*FIXME:colonLoc=*/SourceLoc(),
+                                          SourceRange(DE->getLBracketLoc(),
+                                                      DE->getRBracketLoc()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   return nullptr;

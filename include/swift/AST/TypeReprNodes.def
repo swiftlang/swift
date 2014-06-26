@@ -42,6 +42,7 @@ ABSTRACT_TYPEREPR(Ident, TypeRepr)
 
 TYPEREPR(Function, TypeRepr)
 TYPEREPR(Array, TypeRepr)
+TYPEREPR(Dictionary, TypeRepr)
 TYPEREPR(Optional, TypeRepr)
 TYPEREPR(ImplicitlyUnwrappedOptional, TypeRepr)
 TYPEREPR(Tuple, TypeRepr)

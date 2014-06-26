@@ -534,13 +534,17 @@ ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
 ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
 
-// Array Types
+// Collection Types
 ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
       "expected expression for size of array type", ())
 ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
       "expected ']' in array type", ())
 ERROR(expected_element_type,type_parsing,PointsToFirstBadToken,
       "expected element type", ())
+ERROR(expected_dictionary_value_type,type_parsing,PointsToFirstBadToken,
+      "expected dictionary value type", ())
+ERROR(expected_rbracket_dictionary_type,type_parsing,PointsToFirstBadToken,
+      "expected ']' in dictionary type", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,

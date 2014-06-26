@@ -688,23 +688,44 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   SourceLoc lsquareLoc = consumeToken();
 
   // Parse the element type.
-  ParserResult<TypeRepr> elementTy = parseType(diag::expected_element_type);
+  ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
+
+  // If there is a ':', this is a dictionary type.
+  SourceLoc colonLoc;
+  ParserResult<TypeRepr> secondTy;
+  if (Tok.is(tok::colon)) {
+    colonLoc = consumeToken();
+
+    // Parse the second type.
+    secondTy = parseType(diag::expected_dictionary_value_type);
+  }
 
   // Parse the closing ']'.
   SourceLoc rsquareLoc;
   parseMatchingToken(tok::r_square, rsquareLoc,
-                     diag::expected_rbracket_array_type, lsquareLoc);
+                     colonLoc.isValid()
+                       ? diag::expected_rbracket_dictionary_type
+                       : diag::expected_rbracket_array_type, 
+                     lsquareLoc);
 
-  // If we couldn't parse anything for the inner type, propagate the error.
-  if (elementTy.isNull())
+  // If we couldn't parse anything for one of the types, propagate the error.
+  if (firstTy.isNull() || (colonLoc.isValid() && secondTy.isNull()))
     return makeParserError();
 
+  // Form the dictionary type.
+  SourceRange brackets(lsquareLoc, rsquareLoc);
+  if (colonLoc.isValid())
+    return makeParserResult(ParserStatus(firstTy) | ParserStatus(secondTy),
+                            new (Context) DictionaryTypeRepr(firstTy.get(),
+                                                             secondTy.get(),
+                                                             colonLoc,
+                                                             brackets));
+    
   // Form the array type.
-  return makeParserResult(elementTy,
-                          new (Context) ArrayTypeRepr(elementTy.get(),
+  return makeParserResult(firstTy,
+                          new (Context) ArrayTypeRepr(firstTy.get(),
                                                       nullptr,
-                                                      SourceRange(lsquareLoc,
-                                                                  rsquareLoc),
+                                                      brackets,
                                                       /*OldSyntax=*/false));
 }
 
@@ -817,6 +838,10 @@ bool Parser::canParseType() {
     consumeToken();
     if (!canParseType())
       return false;
+    if (consumeIf(tok::colon)) {
+      if (!canParseType())
+        return false;
+    }
     if (!consumeIf(tok::r_square))
       return false;
     break;

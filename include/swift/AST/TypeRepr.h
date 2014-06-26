@@ -367,7 +367,7 @@ private:
 
 /// \brief An array type.
 /// \code
-///   Foo[]
+///   [Foo]
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
   // FIXME: Tail allocation. Use bits to determine whether Base/Size are
@@ -408,6 +408,39 @@ private:
       return Base->getEndLoc();
     return Brackets.End;
   }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// \brief A dictionary type.
+/// \code
+///   [K : V]
+/// \endcode
+class DictionaryTypeRepr : public TypeRepr {
+  TypeRepr *Key;
+  TypeRepr *Value;
+  SourceLoc ColonLoc;
+  SourceRange Brackets;
+
+public:
+  DictionaryTypeRepr(TypeRepr *key, TypeRepr *value,
+                     SourceLoc colonLoc, SourceRange brackets)
+    : TypeRepr(TypeReprKind::Dictionary), Key(key), Value(value),
+      ColonLoc(colonLoc), Brackets(brackets) { }
+
+  TypeRepr *getKey() const { return Key; }
+  TypeRepr *getValue() const { return Value; }
+  SourceRange getBrackets() const { return Brackets; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Dictionary;
+  }
+  static bool classof(const DictionaryTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -668,7 +701,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:
   case TypeReprKind::Function:
-  case TypeReprKind::Array:
   case TypeReprKind::InOut:
     return false;
   case TypeReprKind::SimpleIdent:
@@ -677,11 +709,15 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::Named:
+  case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
     return true;
+
+  case TypeReprKind::Array:
+    return !cast<ArrayTypeRepr>(this)->usesOldSyntax();
   }
   llvm_unreachable("bad TypeRepr kind");
 }

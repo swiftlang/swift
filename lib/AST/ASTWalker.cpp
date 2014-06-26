@@ -1123,6 +1123,14 @@ bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
+  if (doIt(T->getKey()))
+    return true;
+  if (doIt(T->getValue()))
+    return true;
+  return false;
+}
+
 bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   if (doIt(T->getBase()))
     return true;

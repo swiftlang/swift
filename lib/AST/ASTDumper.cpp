@@ -1808,6 +1808,14 @@ public:
     OS << ')';
   }
 
+  void visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
+    printCommon(T, "type_dictionary") << '\n';
+    printRec(T->getKey());
+    OS << '\n';
+    printRec(T->getValue());
+    OS << ')';
+  }
+
   void visitTupleTypeRepr(TupleTypeRepr *T) {
     printCommon(T, "type_tuple");
     for (auto elem : T->getElements()) {

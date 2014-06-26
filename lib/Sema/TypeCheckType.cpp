@@ -41,6 +41,18 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return ArraySliceType::get(elementType);
 }
 
+Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType, 
+                                    Type valueType) {
+  auto dictDecl = Context.getDictionaryDecl();
+  if (!dictDecl) {
+    diagnose(loc, diag::sugar_type_not_found, 3);
+    return Type();
+  }
+
+  // FIXME: Add sugared type.
+  return BoundGenericType::get(dictDecl, Type(), { keyType, valueType });
+}
+
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   if (!Context.getOptionalDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 1);
@@ -920,6 +932,8 @@ namespace {
                           TypeResolutionOptions options);
     Type resolveArrayType(ArrayTypeRepr *repr,
                           TypeResolutionOptions options);
+    Type resolveDictionaryType(DictionaryTypeRepr *repr,
+                               TypeResolutionOptions options);
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
     Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
@@ -982,6 +996,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
+
+  case TypeReprKind::Dictionary:
+    return resolveDictionaryType(cast<DictionaryTypeRepr>(repr), options);
 
   case TypeReprKind::Optional:
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
@@ -1465,6 +1482,24 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
     return ErrorType::get(Context);
 
   return sliceTy;
+}
+
+Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
+                                         TypeResolutionOptions options) {
+  // FIXME: diagnose non-materializability of key/value type?
+  Type keyTy = resolveType(repr->getKey(), withoutContext(options));
+  if (keyTy->is<ErrorType>())
+    return keyTy;
+
+  Type valueTy = resolveType(repr->getValue(), withoutContext(options));
+  if (valueTy->is<ErrorType>())
+    return valueTy;
+  
+  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
+                                         valueTy))
+    return dictTy;
+
+  return ErrorType::get(Context);
 }
 
 Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
