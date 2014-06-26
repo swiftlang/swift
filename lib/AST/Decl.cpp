@@ -2055,10 +2055,15 @@ SourceRange VarDecl::getSourceRange() const {
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
-  if (!getParentPattern())
+  Pattern *Pat = nullptr;
+  if (auto PatBind = ParentPattern.dyn_cast<PatternBindingDecl *>())
+    Pat = PatBind->getPattern();
+  else
+    Pat = ParentPattern.dyn_cast<Pattern *>();
+
+  if (!Pat || Pat->isImplicit())
     return getSourceRange();
 
-  auto *Pat = getParentPattern()->getPattern();
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))

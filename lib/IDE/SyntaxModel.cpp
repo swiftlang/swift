@@ -459,6 +459,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                      PD->getArgumentName().getLength());
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
+    SN.TypeRange = charSourceRangeFromSourceRange(SM,
+                                      PD->getTypeSourceRangeForDiagnostics());
     pushStructureNode(SN, PD);
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
