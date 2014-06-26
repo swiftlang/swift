@@ -1,6 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target arm64-apple-ios7.0 %s
-// REQUIRES: CPU=arm64, OS=ios
+// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-ios7.0 %s
+// REQUIRES: CPU=x86_64, OS=ios
+// XFAIL: *
 
 import Foundation
 
