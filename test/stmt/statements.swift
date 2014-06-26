@@ -140,7 +140,6 @@ func tuple_assign() {
 }
 
 func missing_semicolons() {
-  var a = new Int[4]a[0]  // expected-error{{expression resolves to an unused l-value}} expected-error{{consecutive statements}} {{21-21=;}}
   var w = 321
   func g() {}
   g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}

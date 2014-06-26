@@ -654,14 +654,12 @@ extension NSDictionary : DictionaryLiteralConvertible {
   @public class func convertFromDictionaryLiteral(
     elements: (NSCopying, AnyObject)...
   ) -> Self {
-    var keys = new (NSCopying?)[elements.count] {elements[$0].0}
-    var objects = new (AnyObject?)[elements.count] {elements[$0].1}
-
-    // FIXME: init closures currently ignored <rdar://problem/15024561>
-    for i in 0..<elements.count {
-      keys[i] = elements[i].0
-      objects[i] = elements[i].1
-    }
+    let keys = [NSCopying?](map(0..<elements.count) { i in 
+      return elements[i].0 
+    })
+    let objects = [AnyObject?](map(0..<elements.count) { i in 
+      return elements[i].1 
+    })
 
     return self(objects: objects, forKeys: keys, count: elements.count)
   }
@@ -867,9 +865,9 @@ extension NSFastEnumerationState {
 
   @public init(_ enumerable: NSFastEnumeration) {
     self.enumerable = enumerable
-    self.state = new NSFastEnumerationState[1]
+    self.state = [NSFastEnumerationState](count: 1, repeatedValue: NSFastEnumerationState())
     self.state[0].state = 0
-    self.objects = new ObjectsBuffer[1]
+    self.objects = [ObjectsBuffer](count: 1, repeatedValue: ObjectsBuffer())
     self.n = -1
     self.count = -1
   }

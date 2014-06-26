@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 func test() {
-  var array = new String[5]
+  var array = [String](count: 5, repeatedValue: "")
   array[0] = "ysmwbgmrqlmqspzcgbgxvkebesoetqcimoaemfhfzzsamgju"
   array[1] = "nqbvcxdahvxzmvnqjmoilinznqyfniufgsfoeok"
   array[2] = "bsqdunldltkxripsaxkaojfiovnxulshiohbumirjzgfmovowiv"

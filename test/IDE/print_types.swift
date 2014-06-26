@@ -48,12 +48,6 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // FULL:  VarDecl '''typealias1''' swift_ide_test.MyInt{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
 
-  var slice1 = new Int[42]
-// CHECK: VarDecl '''slice1''' [Int]{{$}}
-// CHECK:   NewArrayExpr:[[@LINE-2]] '''new Int[42]''' [Int]{{$}}
-// FULL:  VarDecl '''slice1''' [Swift.Int]{{$}}
-// FULL:    NewArrayExpr:[[@LINE-4]] '''new Int[42]''' [Swift.Int]{{$}}
-
   var optional1 = Optional<Int>.None
 // CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
 // FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}

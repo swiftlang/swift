@@ -14,17 +14,12 @@
   // Use lazy initialization of static properties to safely initialize the
   // public 'arguments' property on first use.
   static var _arguments: [String] = {
-    // FIXME: Use a by-index-initializing constructor of Array here when we
-    // have that, so we don't need this awkward closure initialization.
-    var _args = new String[Int(C_ARGC)]
-    for i in 0..<Int(C_ARGC) {
+    return [String](map(0..<Int(C_ARGC)) { i in 
       if let s = String.fromCStringRepairingIllFormedUTF8(C_ARGV[i]).0 {
-        _args[i] = s
-      } else {
-        _args[i] = ""
+          return s
       }
-    }
-    return _args
+      return ""
+    })
   }()
 
   @public var arguments : [String] {

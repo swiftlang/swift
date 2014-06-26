@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // Create a new array
-var arr = new Int[10]
+var arr = [Int](count: 10, repeatedValue: 0)
 for i in 0..<10 { arr[i] = i % 7 + 2 }
 println(arr)
 // CHECK: [2, 3, 4, 5, 6, 7, 8, 2, 3, 4]

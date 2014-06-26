@@ -47,12 +47,6 @@ var h10 : Int?.Type?.Type
 
 var i = Int?(42)
 
-var j0 = new Int?[4]
-var j1 = new Int.Type[4] {i in Int.self}
-var j2 = new (Int -> Int)[4] {i in {$0}}
-var j3 = new ([Int])[4]
-
-
 var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' is only valid in parameter lists}}
 
 func bad_io2(a: (inout Int, Int)) {}    // expected-error {{'inout' is only valid in parameter lists}}

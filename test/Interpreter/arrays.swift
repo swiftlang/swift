@@ -1,13 +1,13 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // Create a new array
-var a = new Int[10]
+var a = [Int](count: 10, repeatedValue: 0)
 for i in 0..<10 { a[i] = i }
 println(a)
 // CHECK: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 // Create a new unsigned array
-var u = new UInt64[10]
+var u = [UInt64](count: 10, repeatedValue: 0)
 for i in 0..<10 { u[i] = UInt64(i) }
 println(u)
 // CHECK: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -23,15 +23,15 @@ println(a)
 // CHECK: [0, 5, 6, 3, 6, 7, 8, 9, 8, 9]
 
 // Create another array and copy in a slice
-var b = new Int[10]
+var b = [Int](count: 10, repeatedValue: 0)
 b[3...6] = a[5..<9]
 println(b)
 // CHECK: [0, 0, 0, 7, 8, 9, 8, 0, 0, 0]
 
 // Create a 2D array
-var aa = new Int[10][]
+var aa = [[Int]](count: 10, repeatedValue: [])
 for i in 0..<10 {
-  var a = new Int[10]
+  var a = [Int](count: 10, repeatedValue: 0)
   for j in 0..<10 {
     a[j] = i*10 + j
   }

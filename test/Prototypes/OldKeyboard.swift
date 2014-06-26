@@ -36,7 +36,7 @@ func posix_read(fd: Int32, buf: UnsafePointer<Void>, sz: UInt) -> Int
   }
 
   func read() -> Int {
-    var c = new UInt8[1]
+    var c = [0 as UInt8]
     if read(&c) != 1 {
       return -1
     }
@@ -119,8 +119,7 @@ var kbd : Keyboard = Keyboard()
   }
 
   func write(c: UInt8) {
-    var buf = new UInt8[1]
-    buf[0] = c
+    var buf = [c]
     var r = write(&buf)
     _precondition(r == 1)
   }

@@ -33,11 +33,11 @@ enum MembersReferenceRawType : Int {
 }
 
 func serialize<T : RawRepresentable>(values: [T]) -> [T.RawType] {
-  return new T.RawType[values.count] { values[$0].toRaw() }
+  return values.map { $0.toRaw() }
 }
 
 func deserialize<T : RawRepresentable>(serialized: [T.RawType]) -> [T] {
-  return new T[serialized.count] { T.fromRaw(serialized[$0])! }
+  return serialized.map { T.fromRaw($0)! }
 }
 
 var ints: [Int] = serialize([Foo.A, .B, .C])

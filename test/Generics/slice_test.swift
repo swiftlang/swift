@@ -120,8 +120,3 @@ protocol Eq {
   func ==(lhs: Self, rhs: Self) -> Bool
   func !=(lhs: Self, rhs: Self) -> Bool
 }
-
-func map<T1, T2>(array: [T1], fn: (T1) -> T2) -> [T2] {
-  var result = new T2[array.count] { fn(array[$0]) }
-  return result
-}

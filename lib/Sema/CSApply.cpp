@@ -2274,7 +2274,6 @@ namespace {
         return nullptr;
       expr->getBounds()[0].Value = outerBound;
 
-
       // Dig out the element type of the new array expression.
       auto resultType = simplifyType(expr->getType());
       auto elementType = resultType->castTo<BoundGenericType>()
@@ -2343,6 +2342,7 @@ namespace {
         expr->setConstructionFunction(applyExpr);
       }
       
+      tc.diagnose(expr->getLoc(), diag::array_new_removed);
       return expr;
     }
 

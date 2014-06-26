@@ -83,7 +83,7 @@
       return .None
     }
     var length = _strlen(self)
-    var result = new CChar[length + 1]
+    var result = [CChar](count: length + 1, repeatedValue: 0)
     for var i = 0; i < length; ++i {
       // FIXME: this will not compile on platforms where 'CChar' is unsigned.
       result[i] = _bytesPtr[i].asSigned()

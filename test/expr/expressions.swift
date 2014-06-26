@@ -576,39 +576,6 @@ func iterators() {
 }
 
 //===----------------------------------------------------------------------===//
-// New expressions
-//===----------------------------------------------------------------------===//
-
-struct TypeWithoutSlice {}
-struct TypeWithBadSlice {}
-struct SliceTypeWithBadSlice {}
-struct Dummy {}
-
-func newTest() {
-  var t1 = new Int[5]
-
-  var i: Int
-  var t5 = new Int[i]
-
-  var i2: Dummy
-  var t6 = new Int[i2] // expected-error {{type 'Dummy' does not conform to protocol 'ArrayBound'}}
-
-  var t9 = new Int[100+1]
-
-  var t10 = new Int[5][5] // expected-error{{sized multidimensional arrays are not supported}}
-}
-
-func arraySubscript(inout a: [Int], i: Int, inout value: Int, inout aa: [[Int]]) {
-  a[i] = value
-  value = a[i+1]
-
-  aa[i][i+1] = value
-  value = aa[i+1][i]
-  aa[i] = a
-  a = aa[i+1]
-}
-
-//===----------------------------------------------------------------------===//
 // Magic literal expressions
 //===----------------------------------------------------------------------===//
 

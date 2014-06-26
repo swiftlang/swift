@@ -156,11 +156,6 @@ func scalar_to_tuple() {
   var c : (Int, Int...) = 42
 }
 
-// CHECK-LABEL: sil  @_TF11expressions11array_alloc
-func array_alloc(n: Int) {
-  var a: [Int] = new Int[n]
-}
-
 struct SomeStruct {
  mutating
   func a() {}

@@ -19,13 +19,7 @@ func show_slice<T : Showable>(xs: [T]) {
 }
 */
 
-var s = new Int[6]
-s[0] = 6
-s[1] = 0
-s[2] = 2
-s[3] = 2
-s[4] = 1
-s[5] = 4
+var s = [ 6, 0, 2, 2, 1, 4]
 for x in s {
   x.show()
 }
