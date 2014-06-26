@@ -204,6 +204,9 @@ enum UTFDecodeResult {
   @noinline
   static func _findMaximalSubpartOfIllFormedUTF8Sequence(
       var buffer: UInt32, var validBytes: UInt8) -> UInt8 {
+    // This function is '@noinline' because it is used only in the error
+    // handling path.
+
     // Clear EOF flag, we don't care about it.
     validBytes &= 0b0000_1111
 
