@@ -8,6 +8,19 @@ Latest
   
   Example: "int (*)(void)" becomes "CFunctionPointer<(Int) -> Void>".
 
+* Array types are now spelled with the brackets surrounding the
+  element type. For example, an array of Int is written as::
+
+    var array: [Int]
+
+* Dictionary types can now be spelled with the syntax [K : V], where K
+  is the key type and V is the value type. For example:
+
+    var dict: [String : Int] = ["Hello" : 1, "World" : 2]
+
+  The type [K : V] is syntactic sugar for Dictionary<K, V>; nothing
+  else has changed.
+
 2014-06-23
 ---------
 
