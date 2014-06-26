@@ -475,10 +475,14 @@ void IRGenModule::emitAutolinkInfo() {
   static const char * const LinkerOptionsFlagName = "Linker Options";
 
   // Remove duplicates.
-  llvm::array_pod_sort(AutolinkEntries.begin(), AutolinkEntries.end(),
-                       pointerPODSortComparator);
-  auto newEnd = std::unique(AutolinkEntries.begin(), AutolinkEntries.end());
-  AutolinkEntries.erase(newEnd, AutolinkEntries.end());
+  llvm::SmallPtrSet<llvm::Value*, 4> knownAutolinkEntries;
+  AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
+                                       AutolinkEntries.end(),
+                                       [&](llvm::Value *entry) -> bool {
+                                         return !knownAutolinkEntries.insert(
+                                                   entry);
+                                       }),
+                        AutolinkEntries.end());
 
   llvm::LLVMContext &ctx = Module.getContext();
   Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
