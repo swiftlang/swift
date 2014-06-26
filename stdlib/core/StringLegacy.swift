@@ -347,12 +347,12 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
-  func _splitFirstIf(predecessor: (UnicodeScalar) -> Bool)
+  func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars
     for i in indices(rng) {
-      if predecessor(rng[i]) {
+      if predicate(rng[i]) {
         return (rng[rng.startIndex..<i], rng[i], rng[i.successor()..<rng.endIndex], true)
       }
     }
@@ -362,8 +362,8 @@ extension String {
   /// Split the given string at each occurrence of a character for which
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
-  func _splitIf(predecessor: (UnicodeScalar) -> Bool) -> [String] {
-    var scalarSlices = Swift.split(unicodeScalars, predecessor)
+  func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
+    var scalarSlices = Swift.split(unicodeScalars, predicate)
     return scalarSlices.map { $0 as String }
   }
 }

@@ -157,8 +157,8 @@ struct CloseOverAddressOnlyConstant<T>  {
 }
 
 // CHECK-LABEL: sil @{{.*}}callThroughLet
-func callThroughLet(predecessor: (Int, Int) -> Bool) {
-  let p = predecessor
+func callThroughLet(predicate: (Int, Int) -> Bool) {
+  let p = predicate
   if p(1, 2) {
   }
 }
