@@ -138,7 +138,7 @@
 ; CHECK: _TtXwC10attributes10SwiftClass ---> @weak attributes.SwiftClass
 ; CHECK: _TtXoC10attributes10SwiftClass ---> @unowned attributes.SwiftClass
 ; CHECK: _TtERR ---> <ERROR TYPE>
-; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> ([sugar.MyClass])?
+; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> [sugar.MyClass]?
 ; CHECK: _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
 ; CHECK: _TtGV12generic_args7WrapperQq_FS0_4initUS_9AProtocol__FMGS0_Q__US1___FT4fromGS0_Q___GS0_Qd____ ---> generic_args.Wrapper<(archetype 0 of generic_args.Wrapper.init <A : generic_args.AProtocol>(generic_args.Wrapper<A>.Type) -> <B : generic_args.AProtocol>(from : generic_args.Wrapper<B>) -> generic_args.Wrapper<A>)>
 ; CHECK: _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF

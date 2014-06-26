@@ -1891,6 +1891,120 @@ private:
     Array
   };
   
+  /// Determine whether this is a "simple" type, from the type-simple
+  /// production.
+  bool isSimpleType(NodePointer pointer) {
+    switch (pointer->getKind()) {
+    case Node::Kind::ArchetypeAndProtocol:
+    case Node::Kind::ArchetypeRef:
+    case Node::Kind::AssociatedTypeRef:
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BuiltinTypeName:
+    case Node::Kind::Class:
+    case Node::Kind::DependentGenericType:
+    case Node::Kind::DependentMemberType:
+    case Node::Kind::DependentGenericParamType:
+    case Node::Kind::DynamicSelf:
+    case Node::Kind::Enum:
+    case Node::Kind::ErrorType:
+    case Node::Kind::ExistentialMetatype:
+    case Node::Kind::Metatype:
+    case Node::Kind::Module:
+    case Node::Kind::NonVariadicTuple:
+    case Node::Kind::Protocol:
+    case Node::Kind::QualifiedArchetype:
+    case Node::Kind::ReturnType:
+    case Node::Kind::SelfTypeRef:
+    case Node::Kind::Structure:
+    case Node::Kind::TupleElementName:
+    case Node::Kind::TupleElementType:
+    case Node::Kind::Type:
+    case Node::Kind::TypeAlias:
+    case Node::Kind::TypeList:
+    case Node::Kind::VariadicTuple:
+      return true;
+
+    case Node::Kind::Failure:
+    case Node::Kind::Addressor:
+    case Node::Kind::Allocator:
+    case Node::Kind::ArgumentTuple:
+    case Node::Kind::AutoClosureType:
+    case Node::Kind::Constructor:
+    case Node::Kind::Deallocator:
+    case Node::Kind::DeclContext:
+    case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::DependentGenericSignature:
+    case Node::Kind::DependentGenericParamCount:
+    case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentProtocolWitnessTableGenerator:
+    case Node::Kind::DependentProtocolWitnessTableTemplate:
+    case Node::Kind::Destructor:
+    case Node::Kind::DidSet:
+    case Node::Kind::Directness:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::FieldOffset:
+    case Node::Kind::Function:
+    case Node::Kind::FunctionType:
+    case Node::Kind::Generics:
+    case Node::Kind::GenericType:
+    case Node::Kind::GenericTypeMetadataPattern:
+    case Node::Kind::Getter:
+    case Node::Kind::Global:
+    case Node::Kind::Identifier:
+    case Node::Kind::IVarInitializer:
+    case Node::Kind::IVarDestroyer:
+    case Node::Kind::ImplConvention:
+    case Node::Kind::ImplFunctionAttribute:
+    case Node::Kind::ImplFunctionType:
+    case Node::Kind::ImplicitClosure:
+    case Node::Kind::ImplParameter:
+    case Node::Kind::ImplResult:
+    case Node::Kind::InOut:
+    case Node::Kind::InfixOperator:
+    case Node::Kind::Initializer:
+    case Node::Kind::LazyProtocolWitnessTableAccessor:
+    case Node::Kind::LazyProtocolWitnessTableTemplate:
+    case Node::Kind::LocalDeclName:
+    case Node::Kind::Metaclass:
+    case Node::Kind::NominalTypeDescriptor:
+    case Node::Kind::NonObjCAttribute:
+    case Node::Kind::Number:
+    case Node::Kind::ObjCAttribute:
+    case Node::Kind::ObjCBlock:
+    case Node::Kind::PartialApplyForwarder:
+    case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::PostfixOperator:
+    case Node::Kind::PrefixOperator:
+    case Node::Kind::ProtocolConformance:
+    case Node::Kind::ProtocolList:
+    case Node::Kind::ProtocolWitness:
+    case Node::Kind::ProtocolWitnessTable:
+    case Node::Kind::ReabstractionThunk:
+    case Node::Kind::ReabstractionThunkHelper:
+    case Node::Kind::Setter:
+    case Node::Kind::SpecializedAttribute:
+    case Node::Kind::SpecializationParam:
+    case Node::Kind::Subscript:
+    case Node::Kind::Suffix:
+    case Node::Kind::TupleElement:
+    case Node::Kind::TypeMetadata:
+    case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::Unknown:
+    case Node::Kind::Unmanaged:
+    case Node::Kind::Unowned:
+    case Node::Kind::ValueWitness:
+    case Node::Kind::ValueWitnessTable:
+    case Node::Kind::Variable:
+    case Node::Kind::Weak:
+    case Node::Kind::WillSet:
+    case Node::Kind::WitnessTableOffset:
+      return false;
+    }
+  }
+
   SugarType findSugar(NodePointer pointer) {
     if (pointer->getNumChildren() == 1 && pointer->getKind() == Node::Kind::Type)
       return findSugar(pointer->getChild(0));
@@ -1950,9 +2064,7 @@ private:
         break;
       case SugarType::Optional: {
         Node *type = pointer->getChild(1)->getChild(0);
-        bool needs_parens = false;
-        if (findSugar(type) != SugarType::None)
-          needs_parens = true;
+        bool needs_parens = !isSimpleType(type);
         if (needs_parens)
           Printer << "(";
         print(type);
