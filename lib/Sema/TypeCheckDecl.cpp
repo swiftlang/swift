@@ -760,7 +760,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
 
     // Infer requirements from the "inherited" types.
     for (auto &inherited : TypeParam->getInherited()) {
-      builder.inferRequirements(inherited.getTypeRepr());
+      builder.inferRequirements(inherited);
     }
   }
 
@@ -3638,7 +3638,7 @@ public:
 
         // Infer requirements from the result type.
         if (!FD->getBodyResultTypeLoc().isNull()) {
-          builder.inferRequirements(FD->getBodyResultTypeLoc().getTypeRepr());
+          builder.inferRequirements(FD->getBodyResultTypeLoc());
         }
 
         // Revert all of the types within the signature of the function.

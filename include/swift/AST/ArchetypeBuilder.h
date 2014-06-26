@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -180,7 +181,7 @@ public:
   bool addImplicitConformance(GenericTypeParamDecl *Param,
                               ProtocolDecl *Proto);
 
-  /// Infer requirements from the given type representation, recursively.
+  /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
   /// signature of a generic function. For example, given:
@@ -194,7 +195,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(TypeRepr *type);
+  bool inferRequirements(TypeLoc type);
 
   /// Infer requirements from the given pattern, recursively.
   ///

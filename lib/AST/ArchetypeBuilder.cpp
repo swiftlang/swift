@@ -18,13 +18,13 @@
 
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -761,7 +761,7 @@ bool ArchetypeBuilder::addImplicitConformance(GenericTypeParamDecl *Param,
 }
 
 /// AST walker that infers requirements from type representations.
-class ArchetypeBuilder::InferRequirementsWalker : public ASTWalker {
+class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
   ArchetypeBuilder &Builder;
   bool HadError = false;
 
@@ -771,67 +771,46 @@ public:
 
   bool hadError() const { return HadError; }
 
-  bool walkToTypeReprPost(TypeRepr *T) override {
-    if (HadError)
-      return false;
+  virtual Action walkToTypePost(Type ty) override { 
+    auto boundGeneric = ty->getAs<BoundGenericType>();
+    if (!boundGeneric)
+      return Action::Continue; 
 
-    auto identRepr = dyn_cast<IdentTypeRepr>(T);
-    if (!identRepr)
-      return true;
+    auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
+    auto args = boundGeneric->getGenericArgs();
+    for (unsigned i = 0, n = params.size(); i != n; ++i) {
+      auto arg = args[i];
+      auto param = params[i].getAsTypeParam();
 
-    // For each of the components...
-    for (auto comp : identRepr->getComponentRange()) {
-      // If there is no type binding, we don't care.
-      if (!comp->isBoundType())
+      // Try to resolve the argument to a potential archetype.
+      auto argPA = Builder.resolveArchetype(arg);
+      if (!argPA)
         continue;
-
-      // If there are no generic arguments, we don't care.
-      if (!isa<GenericIdentTypeRepr>(comp))
-        continue;
-
-      // If it's not a bound generic type, we don't care.
-      auto boundGeneric = comp->getBoundType()->getAs<BoundGenericType>();
-      if (!boundGeneric)
-        continue;
-
-      // Infer superclass and protocol-conformance requirements from the
-      // generic parameters.
-      auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
-      auto args = boundGeneric->getGenericArgs();
-      for (unsigned i = 0, n = params.size(); i != n; ++i) {
-        auto arg = args[i];
-        auto param = params[i].getAsTypeParam();
-
-        // Try to resolve the argument to a potential archetype.
-        auto argPA = Builder.resolveArchetype(arg);
-        if (!argPA)
-          continue;
-
-        // Add implicit conformances for all of the protocol requirements on
-        // FIXME: This won't capture same-type requirements that map down to
-        // fixed types, although that isn't permitted yet.
-        for (auto proto : param->getArchetype()->getConformsTo()) {
-          if (Builder.addConformanceRequirement(argPA, proto)) {
-            HadError = true;
-            return false;
-          }
+      
+      // Add implicit conformances for all of the protocol requirements on
+      // FIXME: This won't capture same-type requirements that map down to
+      // fixed types, although that isn't permitted yet.
+      for (auto proto : param->getArchetype()->getConformsTo()) {
+        if (Builder.addConformanceRequirement(argPA, proto)) {
+          HadError = true;
+          return Action::Stop;
         }
       }
     }
 
-    return true;
+    return Action::Continue;
   }
 };
 
-bool ArchetypeBuilder::inferRequirements(TypeRepr *type) {
+bool ArchetypeBuilder::inferRequirements(TypeLoc type) {
   InferRequirementsWalker walker(*this);
-  type->walk(walker);
+  type.getType().walk(walker);
   return walker.hadError();
 }
 
 bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
   InferRequirementsWalker walker(*this);
-  pattern->walk(walker);
+  pattern->getType().walk(walker);
   return walker.hadError();
 }
 

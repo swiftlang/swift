@@ -230,7 +230,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       // FIXME: This doesn't actually do what we want for outer generic
       // parameters, because they've been resolved to archetypes too eagerly.
       for (const auto &inherited : typeParam->getInherited()) {
-        if (builder->inferRequirements(inherited.getTypeRepr()))
+        if (builder->inferRequirements(inherited))
           invalid = true;
       }
     }
@@ -559,7 +559,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
       // Infer requirements from it.
       if (builder && fn->getBodyResultTypeLoc().getTypeRepr()) {
-        builder->inferRequirements(fn->getBodyResultTypeLoc().getTypeRepr());
+        builder->inferRequirements(fn->getBodyResultTypeLoc());
       }
     }
   }
