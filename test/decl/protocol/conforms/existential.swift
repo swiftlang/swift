@@ -34,8 +34,8 @@ func nsc2<T : NonSelfConforming2>(x: T) { }
 func nsc3<T : NonSelfConforming3>(x: T) { }
 func nsc4<T : NonSelfConforming4>(x: T) { }
 
-func testNonSelfConforming(c1: NonSelfConforming1, c2: NonSelfConforming2, // expected-error{{has associated type requirements}} expected-error{{has associated type requirements}}
-                           c3: NonSelfConforming3, c4: NonSelfConforming4) { // expected-error{{has associated type requirements}} expected-error{{has associated type requirements}}
+func testNonSelfConforming(c1: NonSelfConforming1, c2: NonSelfConforming2, // expected-error{{has Self or associated type requirements}} expected-error{{has Self or associated type requirements}}
+                           c3: NonSelfConforming3, c4: NonSelfConforming4) { // expected-error{{has Self or associated type requirements}} expected-error{{has Self or associated type requirements}}
   nsc1(c1) // expected-error{{type 'NonSelfConforming1' does not conform to protocol 'NonSelfConforming1'}}
   nsc2(c2) // expected-error{{type 'NonSelfConforming2' does not conform to protocol 'NonSelfConforming2'}}
   nsc3(c3) // expected-error{{type 'NonSelfConforming3' does not conform to protocol 'NonSelfConforming3'}}

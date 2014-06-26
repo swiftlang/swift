@@ -238,7 +238,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: Sequence) { // expected-error{{has associated type requirements}}
+func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Need a more specific diagnostic here.
   var x = e.generate() // expected-error{{'Sequence' does not have a member named 'generate'}}
   x.next()
@@ -250,7 +250,7 @@ protocol HasSequenceAndStream {
   func getR() -> R
 }
 
-func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has associated type requirements}}
+func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{'HasSequenceAndStream' does not have a member named 'getR'}}
   x.generate()
@@ -279,7 +279,7 @@ struct DictionaryIntInt {
   }
 }
 
-func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has associated type requirements}}
+func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17]
   // FIXME: Crummy diagnostics.
   var i2 = i_s[17] // expected-error{{'IntSubscriptable' does not have a member named 'subscript'}}

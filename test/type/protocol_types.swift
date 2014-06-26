@@ -20,7 +20,7 @@ func useBarAsType(x: Bar) {}
 typealias Compo = protocol<HasSelfRequirements, Bar>
 
 struct CompoAssocType {
-  typealias Compo = protocol<HasSelfRequirements, Bar> // expected-error{{use of protocol 'HasSelfRequirements' as a type is not supported because it has associated type requirements}}
+  typealias Compo = protocol<HasSelfRequirements, Bar> // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 }
 
 func useAsRequirement<T: HasSelfRequirements>(x: T) { }
@@ -31,9 +31,9 @@ func useAsWhereRequirement<T where T: HasSelfRequirements>(x: T) { }
 func useCompoAsWhereRequirement<T where T: protocol<HasSelfRequirements, Bar>>(x: T) { }
 func useCompoAliasAsWhereRequirement<T where T: Compo>(x: T) { }
 
-func useAsType(x: HasSelfRequirements) { } // expected-error{{use of protocol 'HasSelfRequirements' as a type is not supported because it has associated type requirements}}
-func useCompoAsType(x: protocol<HasSelfRequirements, Bar>) { } // expected-error{{use of protocol 'HasSelfRequirements' as a type is not supported because it has associated type requirements}}
-func useCompoAliasAsType(x: Compo) { } // expected-error{{use of protocol 'HasSelfRequirements' as a type is not supported because it has associated type requirements}}
+func useAsType(x: HasSelfRequirements) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+func useCompoAsType(x: protocol<HasSelfRequirements, Bar>) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
+func useCompoAliasAsType(x: Compo) { } // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint}}
 
 struct TypeRequirement<T: HasSelfRequirements> {}
 struct CompoTypeRequirement<T: protocol<HasSelfRequirements, Bar>> {}

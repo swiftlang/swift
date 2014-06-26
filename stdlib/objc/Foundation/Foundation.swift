@@ -852,7 +852,7 @@ extension NSFastEnumerationState {
     n = 0
     count = enumerable.countByEnumeratingWithState(
       state._elementStorageIfContiguous,
-      objects: UnsafePointer<AnyObject?>(
+      objects: _FastEnumerationItemsPtr(
         objects._elementStorageIfContiguous),
       count: STACK_BUF_SIZE)
   }
