@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
+@public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence, Reflectable {
   @public typealias Element = T
 
   @public @transparent
@@ -34,9 +34,45 @@
 
   @public var startIndex: T
   @public var endIndex: T
+
+	@public func getMirror() -> Mirror {
+		return _RangeGeneratorMirror(self)
+	}
 }
 
-@public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
+@internal struct _RangeGeneratorMirror<T: ForwardIndex>: Mirror {
+	var _value: RangeGenerator<T>
+
+	init(_ x : RangeGenerator<T>) {
+	  _value = x
+	}
+
+	var value: Any { return _value }
+
+	var valueType: Any.Type { return (_value as Any).dynamicType }
+
+	var objectIdentifier: ObjectIdentifier? { return .None }
+
+	var count: Int { return 2 }
+
+	subscript(i: Int) -> (String, Mirror) {
+	  switch i {
+		case 0:	return ("startIndex",reflect(_value.startIndex))
+		case 1:	return ("endIndex",reflect(_value.endIndex))
+	  default: _preconditionFailure("cannot extract this child index")
+	  }
+	}
+
+	var summary: String { 
+		return "RangeGenerator(\( reflect(_value.startIndex).summary ) to \( reflect(_value.endIndex).summary))"
+	}
+
+	var quickLookObject: QuickLookObject? { return .None }
+
+	var disposition: MirrorDisposition { return .Struct }
+}
+
+@public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence, Reflectable {
   @public typealias Element = T
 
   @transparent @public
@@ -62,9 +98,46 @@
 
   var _bounds: Range<T>
   var _stride: T.DistanceType
+
+	@public func getMirror() -> Mirror {
+		return _StridedRangeGeneratorMirror(self)
+	}
 }
 
-@public struct Range<T: ForwardIndex> : LogicValue, Sliceable {  
+@internal struct _StridedRangeGeneratorMirror<T: ForwardIndex>: Mirror {
+	var _value: StridedRangeGenerator<T>
+
+	init(_ x : StridedRangeGenerator<T>) {
+	  _value = x
+	}
+
+	var value: Any { return _value }
+
+	var valueType: Any.Type { return (_value as Any).dynamicType }
+
+	var objectIdentifier: ObjectIdentifier? { return .None }
+
+	var count: Int { return 3 }
+
+	subscript(i: Int) -> (String, Mirror) {
+	  switch i {
+		case 0:	return ("startIndex",reflect(_value._bounds.startIndex))
+		case 1:	return ("endIndex",reflect(_value._bounds.endIndex))
+		case 2: return ("_stride",reflect(_value._stride))
+	  default: _preconditionFailure("cannot extract this child index")
+	  }
+	}
+
+	var summary: String { 
+		return "RangeGenerator(\( reflect(_value._bounds.startIndex).summary ) to \( reflect(_value._bounds.endIndex).summary) with stride \( reflect(_value._stride).summary ))"
+	}
+
+	var quickLookObject: QuickLookObject? { return .None }
+
+	var disposition: MirrorDisposition { return .Struct }
+}
+
+@public struct Range<T: ForwardIndex> : LogicValue, Sliceable, Reflectable {  
   @transparent @public
   init(start: T, end: T) {
     _startIndex = start
@@ -116,6 +189,42 @@
   
   var _startIndex: T
   var _endIndex: T
+
+	@public func getMirror() -> Mirror {
+		return _RangeMirror(self)
+	}
+}
+
+@internal struct _RangeMirror<T: ForwardIndex>: Mirror {
+	var _value: Range<T>
+
+	init(_ x : Range<T>) {
+	  _value = x
+	}
+
+	var value: Any { return _value }
+
+	var valueType: Any.Type { return (_value as Any).dynamicType }
+
+	var objectIdentifier: ObjectIdentifier? { return .None }
+
+	var count: Int { return 2 }
+
+	subscript(i: Int) -> (String, Mirror) {
+	  switch i {
+		case 0:	return ("startIndex",reflect(_value._startIndex))
+		case 1:	return ("endIndex",reflect(_value._endIndex))
+	  default: _preconditionFailure("cannot extract this child index")
+	  }
+	}
+
+	var summary: String { 
+		return "Range(\( reflect(_value._startIndex).summary ) to \( reflect(_value._endIndex).summary))"
+	}
+
+	var quickLookObject: QuickLookObject? { return .None }
+
+	var disposition: MirrorDisposition { return .Struct }
 }
 
 @public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
@@ -144,7 +253,8 @@ func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
 }
 
 @public struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, 
-                                                              Sequence {
+                                                              Sequence,
+ 																															Reflectable {
   @public typealias Element = T
 
   @transparent @public
@@ -165,9 +275,45 @@ func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   }
 
   var _bounds: (T, T)
+
+	@public func getMirror() -> Mirror {
+		return _ReverseRangeGeneratorMirror(self)
+	}
 }
 
-@public struct ReverseRange<T: BidirectionalIndex> : Sequence {
+@internal struct _ReverseRangeGeneratorMirror<T: BidirectionalIndex>: Mirror {
+	var _value: ReverseRangeGenerator<T>
+
+	init(_ x : ReverseRangeGenerator<T>) {
+	  _value = x
+	}
+
+	var value: Any { return _value }
+
+	var valueType: Any.Type { return (_value as Any).dynamicType }
+
+	var objectIdentifier: ObjectIdentifier? { return .None }
+
+	var count: Int { return 2 }
+
+	subscript(i: Int) -> (String, Mirror) {
+	  switch i {
+		case 0:	return ("startIndex",reflect(_value._bounds.0))
+		case 1:	return ("endIndex",reflect(_value._bounds.1))
+	  default: _preconditionFailure("cannot extract this child index")
+	  }
+	}
+
+	var summary: String { 
+		return "ReverseRangeGenerator(\( reflect(_value._bounds.0).summary ) to \( reflect(_value._bounds.1).summary))"
+	}
+
+	var quickLookObject: QuickLookObject? { return .None }
+
+	var disposition: MirrorDisposition { return .Struct }
+}
+
+@public struct ReverseRange<T: BidirectionalIndex> : Sequence, Reflectable {
   @public init(start: T, pastEnd: T) {
     self._bounds = (start, pastEnd)
   }
@@ -190,6 +336,42 @@ func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   }
 
   var _bounds: (T, T)
+
+	@public func getMirror() -> Mirror {
+		return _ReverseRangeMirror(self)
+	}
+}
+
+@internal struct _ReverseRangeMirror<T: BidirectionalIndex>: Mirror {
+	var _value: ReverseRange<T>
+
+	init(_ x : ReverseRange<T>) {
+	  _value = x
+	}
+
+	var value: Any { return _value }
+
+	var valueType: Any.Type { return (_value as Any).dynamicType }
+
+	var objectIdentifier: ObjectIdentifier? { return .None }
+
+	var count: Int { return 2 }
+
+	subscript(i: Int) -> (String, Mirror) {
+	  switch i {
+		case 0:	return ("startIndex",reflect(_value._bounds.0))
+		case 1:	return ("endIndex",reflect(_value._bounds.1))
+	  default: _preconditionFailure("cannot extract this child index")
+	  }
+	}
+
+	var summary: String { 
+		return "ReverseRange(\( reflect(_value._bounds.0).summary ) to \( reflect(_value._bounds.1).summary))"
+	}
+
+	var quickLookObject: QuickLookObject? { return .None }
+
+	var disposition: MirrorDisposition { return .Struct }
 }
 
 //
