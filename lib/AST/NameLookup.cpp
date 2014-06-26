@@ -988,9 +988,12 @@ bool DeclContext::lookupQualified(Type type,
       });
     }
 
-    std::sort(decls.begin(), decls.end());
-    auto afterUnique = std::unique(decls.begin(), decls.end());
-    decls.erase(afterUnique, decls.end());
+    llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
+    decls.erase(std::remove_if(decls.begin(), decls.end(),
+                               [&](ValueDecl *vd) -> bool {
+                                 return !knownDecls.insert(vd);
+                               }),
+                decls.end());
     return !decls.empty();
   }
 
