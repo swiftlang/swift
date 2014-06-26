@@ -535,7 +535,9 @@ where C.GeneratorType.Element == A._Buffer.Element
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
   lhs.reserveCapacity(
-    newCount > capacity ? max(newCount, _growArrayCapacity(capacity)) : newCount)
+    newCount > capacity ?
+    max(newCount, _growArrayCapacity(capacity))
+    : newCount)
   
   var p = lhs._buffer.elementStorage + oldCount
   for x in rhs {
