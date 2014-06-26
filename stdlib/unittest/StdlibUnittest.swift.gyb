@@ -431,25 +431,34 @@ func checkSliceableWithBidirectionalIndex<
   // A `Sliceable` is a `Collection`.
   checkCollection(expected, sliceable, stackTrace.withCurrentLoc())
 
-  var startNumericIndex = 0
-  for var start = sliceable.startIndex; start != sliceable.endIndex; ++start {
-    ++start
-    --start
-    ++start
-    --start
-    var endNumericIndex = startNumericIndex
-    for var end = start; end != sliceable.endIndex; ++end {
-      ++end
-      --end
-      ++end
-      --end
+  var start = sliceable.startIndex
+  for startNumericIndex in 0...expected.count {
+    if start != sliceable.endIndex {
+      ++start
+      --start
+      ++start
+      --start
+    }
+    var end = start
+    for endNumericIndex in startNumericIndex...expected.count {
+      if end != sliceable.endIndex {
+        ++end
+        --end
+        ++end
+        --end
+      }
       let expectedSlice: [Element] =
           Array(expected[startNumericIndex..<endNumericIndex])
       let slice = sliceable[start..<end]
       checkCollection(expectedSlice, slice, stackTrace.withCurrentLoc())
-      ++endNumericIndex
+
+      if end != sliceable.endIndex {
+        ++end
+      }
     }
-    ++startNumericIndex
+    if start != sliceable.endIndex {
+      ++start
+    }
   }
 }
 
