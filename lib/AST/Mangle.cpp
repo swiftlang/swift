@@ -1320,6 +1320,8 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
     if (decl->getDeclContext()->isTypeContext())
       shouldBindParent = BindGenerics::Enclosing;
   }
+
+  if (!DeclCtx) DeclCtx = decl->getDeclContext();
   mangleContextOf(decl, shouldBindParent);
   mangleDeclName(decl);
   mangleDeclType(decl, explosion, uncurryLevel);
