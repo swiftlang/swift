@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 108;
+const uint16_t VERSION_MINOR = 109;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -573,6 +573,12 @@ namespace decls_block {
   using OptionalTypeLayout = SyntaxSugarTypeLayout<OPTIONAL_TYPE>;
   using ImplicitlyUnwrappedOptionalTypeLayout =
     SyntaxSugarTypeLayout<UNCHECKED_OPTIONAL_TYPE>;
+
+  using DictionaryTypeLayout = BCRecordLayout<
+    DICTIONARY_TYPE,
+    TypeIDField, // key type
+    TypeIDField  // value type
+  >;
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,

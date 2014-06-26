@@ -1743,6 +1743,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return getOrCreateDesugaredType(CanTy, DbgTy);
   }
 
+  case TypeKind::Dictionary: {
+    auto DictionaryTy = cast<DictionaryType>(BaseTy);
+    auto CanTy = DictionaryTy->getDesugaredType();
+    return getOrCreateDesugaredType(CanTy, DbgTy);
+  }
+    
   case TypeKind::GenericTypeParam: {
     auto ParamTy = cast<GenericTypeParamType>(BaseTy);
     // FIXME: Provide a more meaningful debug type.

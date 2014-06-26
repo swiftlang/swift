@@ -2308,6 +2308,16 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::Dictionary: {
+    auto dictTy = cast<DictionaryType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[DictionaryTypeLayout::Code];
+    DictionaryTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addTypeRef(dictTy->getKeyType()),
+                                     addTypeRef(dictTy->getValueType()));
+    break;
+  }
+
   case TypeKind::Optional: {
     auto sliceTy = cast<OptionalType>(ty.getPointer());
 
@@ -2483,6 +2493,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
     registerDeclTypeAbbr<SILFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
+    registerDeclTypeAbbr<DictionaryTypeLayout>();
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();

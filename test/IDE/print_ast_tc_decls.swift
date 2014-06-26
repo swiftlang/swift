@@ -1124,6 +1124,10 @@ struct d2900_TypeSugar1 {
   func f6(x: Array<Int>...) {}
 // PASS_COMMON-NEXT: {{^}}  func f6(x: Array<Int>...){{$}}
 // SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(x: [Int]...){{$}}
+
+  func f7(x: [Int : Int]...) {}
+// PASS_COMMON-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
 }
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}

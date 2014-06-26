@@ -1103,6 +1103,24 @@ Type SyntaxSugarType::getImplementationType() {
   return ImplOrContext.get<Type>();
 }
 
+TypeBase *DictionaryType::getSinglyDesugaredType() {
+  return getImplementationType().getPointer();
+}
+
+Type DictionaryType::getImplementationType() {
+  if (ImplOrContext.is<Type>())
+    return ImplOrContext.get<Type>();
+
+  // Find the generic type that implements this syntactic sugar type.
+  auto &ctx = *ImplOrContext.get<const ASTContext *>();
+  NominalTypeDecl *implDecl = ctx.getDictionaryDecl();
+  assert(implDecl && "Dictionary type has not been set yet");
+
+  // Record the implementation type.
+  ImplOrContext = BoundGenericType::get(implDecl, Type(), { Key, Value });
+  return ImplOrContext.get<Type>();
+}
+
 TypeBase *SubstitutedType::getSinglyDesugaredType() {
   return getReplacementType().getPointer();
 }
@@ -1296,6 +1314,12 @@ bool TypeBase::isSpelledLike(Type other) {
     auto aMe = cast<SyntaxSugarType>(me);
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
+  }
+  case TypeKind::Dictionary: {
+    auto aMe = cast<DictionaryType>(me);
+    auto aThem = cast<DictionaryType>(them);
+    return aMe->getKeyType()->isSpelledLike(aThem->getKeyType()) &&
+           aMe->getValueType()->isSpelledLike(aThem->getValueType());
   }
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
@@ -2618,6 +2642,23 @@ case TypeKind::Id:
       return *this;
 
     return ImplicitlyUnwrappedOptionalType::get(baseTy);
+  }
+
+  case TypeKind::Dictionary: {
+    auto dict = cast<DictionaryType>(base);
+    auto keyTy = dict->getKeyType().transform(fn);
+    if (!keyTy)
+      return Type();
+
+    auto valueTy = dict->getValueType().transform(fn);
+    if (!valueTy)
+      return Type();
+
+    if (keyTy.getPointer() == dict->getKeyType().getPointer() &&
+        valueTy.getPointer() == dict->getValueType().getPointer())
+      return *this;
+
+    return DictionaryType::get(keyTy, valueTy);
   }
 
   case TypeKind::LValue: {

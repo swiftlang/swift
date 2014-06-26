@@ -43,14 +43,12 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
 
 Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType, 
                                     Type valueType) {
-  auto dictDecl = Context.getDictionaryDecl();
-  if (!dictDecl) {
+  if (!Context.getDictionaryDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 3);
     return Type();
   }
 
-  // FIXME: Add sugared type.
-  return BoundGenericType::get(dictDecl, Type(), { keyType, valueType });
+    return DictionaryType::get(keyType, valueType);
 }
 
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {

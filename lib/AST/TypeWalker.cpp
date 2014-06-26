@@ -116,6 +116,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getBaseType());
   }
 
+  bool visitDictionaryType(DictionaryType *ty) {
+    return doIt(ty->getKeyType()) || doIt(ty->getValueType());
+  }
+
   bool visitProtocolCompositionType(ProtocolCompositionType *ty) {
     for (auto proto : ty->getProtocols())
       if (doIt(proto))

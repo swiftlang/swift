@@ -2069,6 +2069,14 @@ public:
     Printer << "]";
   }
 
+  void visitDictionaryType(DictionaryType *T) {
+    Printer << "[";
+    visit(T->getKeyType());
+    Printer << " : ";
+    visit(T->getValueType());
+    Printer << "]";
+  }
+
   void visitOptionalType(OptionalType *T) {
     printWithParensIfNotSimple(T->getBaseType());
     Printer << "?";

@@ -156,6 +156,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
       FunctionTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
@@ -1276,6 +1277,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(ExistentialMetatypeTypes) +
     llvm::capacity_in_bytes(FunctionTypes) +
     llvm::capacity_in_bytes(ArraySliceTypes) +
+    llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
     llvm::capacity_in_bytes(ImplicitlyUnwrappedOptionalTypes) +
     llvm::capacity_in_bytes(ParenTypes) +
@@ -2023,6 +2025,21 @@ ArraySliceType *ArraySliceType::get(Type base) {
   if (entry) return entry;
 
   return entry = new (C, arena) ArraySliceType(C, base, properties);
+}
+
+DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
+  auto properties = keyType->getRecursiveProperties() 
+                  + valueType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = keyType->getASTContext();
+
+  DictionaryType *&entry
+    = C.Impl.getArena(arena).DictionaryTypes[{keyType, valueType}];
+  if (entry) return entry;
+
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+                                               properties);
 }
 
 Type OptionalType::get(OptionalTypeKind which, Type valueType) {

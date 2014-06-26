@@ -3257,6 +3257,15 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::DICTIONARY_TYPE: {
+    TypeID keyID, valueID;
+    decls_block::DictionaryTypeLayout::readRecord(scratch, keyID, valueID);
+
+    auto dictTy = DictionaryType::get(getType(keyID), getType(valueID));
+    typeOrOffset = dictTy;
+    break;
+  }
+
   case decls_block::OPTIONAL_TYPE: {
     TypeID baseID;
     decls_block::OptionalTypeLayout::readRecord(scratch, baseID);

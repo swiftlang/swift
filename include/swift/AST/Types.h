@@ -2608,6 +2608,44 @@ public:
   }
 };
 
+/// The dictionary type [K : V], which is syntactic sugar for Dictionary<K, V>.
+///
+/// Example:
+/// \code
+/// var dict: [String : Int] = ["hello" : 0, "world" : 1]
+/// \endcode
+class DictionaryType : public TypeBase {
+  Type Key;
+  Type Value;
+  llvm::PointerUnion<Type, const ASTContext *> ImplOrContext;
+
+protected:
+  // Syntax sugar types are never canonical.
+  DictionaryType(const ASTContext &ctx, Type key, Type value,
+                 RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::Dictionary, nullptr, properties), 
+      Key(key), Value(value), ImplOrContext(&ctx) {}
+
+public:
+  /// Return a uniqued dicitonary type with the specified key and value types.
+  static DictionaryType *get(Type keyTy, Type valueTy);
+
+  Type getKeyType() const { return Key; }
+  Type getValueType() const { return Value; }
+
+  TypeBase *getSinglyDesugaredType();
+
+  Type getImplementationType();
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Dictionary;
+  }
+
+  static bool classof(const DictionaryType *T) {
+    return true;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {
