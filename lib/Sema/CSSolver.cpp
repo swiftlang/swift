@@ -70,6 +70,26 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
+/// Reconsistitute type sugar, e.g., for array types, dictionary
+/// types, optionals, etc.
+static Type reconstituteSugar(Type type) {
+  if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
+    auto &ctx = type->getASTContext();
+    if (boundGeneric->getDecl() == ctx.getArrayDecl())
+      return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
+    if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
+      return DictionaryType::get(boundGeneric->getGenericArgs()[0],
+                                 boundGeneric->getGenericArgs()[1]);
+    if (boundGeneric->getDecl() == ctx.getOptionalDecl())
+      return OptionalType::get(boundGeneric->getGenericArgs()[0]);
+    if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
+      return ImplicitlyUnwrappedOptionalType::get(
+               boundGeneric->getGenericArgs()[0]);
+  }
+
+  return type;
+}
+
 Solution ConstraintSystem::finalize(
            FreeTypeVariableBinding allowFreeTypeVariables) {
   // Create the solution.
@@ -104,7 +124,7 @@ Solution ConstraintSystem::finalize(
 
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
-    solution.typeBindings[tv] = simplifyType(tv);
+    solution.typeBindings[tv] = reconstituteSugar(simplifyType(tv));
   }
 
   // For each of the overload sets, get its overload choice.

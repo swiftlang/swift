@@ -666,6 +666,12 @@ Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
     }
   }
 
+  if (auto dict = isDictionaryType(type)) {
+    if (auto replacement = getTypeChecker().getDictionaryType(
+                             SourceLoc(), dict->first, dict->second))
+      return replacement;
+  }
+
   return result;
 }
 
