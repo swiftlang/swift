@@ -26,6 +26,7 @@
 #include "swift/Basic/Optional.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/AST/Attr.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -309,7 +310,8 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+                 const llvm::Triple &triple);
   ~Implementation();
 
   /// \brief Swift AST context.
@@ -563,6 +565,21 @@ private:
       Impl.finishedImportingEntity();
     }
   };
+
+public:
+  /// A predicate that indicates if the given platform should be
+  /// considered for availability.
+  std::function<bool (StringRef PlatformName)>
+    PlatformAvailabilityFilter;
+
+  /// A predicate that indicates if the given platform version should
+  /// should be included in the cutoff of deprecated APIs marked unavailable.
+  std::function<bool (unsigned major, llvm::Optional<unsigned> minor)>
+    DeprecatedAsUnavailableFilter;
+
+  /// The message to embed for implicitly unavailability if a deprecated
+  /// API is now unavailable.
+  std::string DeprecatedAsUnavailableMessage;
 
 public:
   void registerExternalDecl(Decl *D) {

@@ -4466,6 +4466,7 @@ void ClangImporter::Implementation::importAttributes(
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
       MappedDecl->getMutableAttrs().add(attr);
       IsUnavailable = true;
+      continue;
     }
     //
     // __attribute__((deprecated))
@@ -4484,6 +4485,44 @@ void ClangImporter::Implementation::importAttributes(
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
       MappedDecl->getMutableAttrs().add(attr);
       IsUnavailable = true;
+      continue;
+    }
+
+    // __attribute__((availability))
+    //
+    // FIXME: this currently maps unavailability, but should
+    // also map availability and deprecated.
+    if (auto avail = dyn_cast<clang::AvailabilityAttr>(*AI)) {
+      // Does this availability attribute map to the platform we are
+      // currently targeting?
+      if (!PlatformAvailabilityFilter ||
+          !PlatformAvailabilityFilter(avail->getPlatform()->getName()))
+        continue;
+
+      // Is this declaration marked unconditionally unavailable?
+      if (avail->getUnavailable()) {
+        auto Message = avail->getMessage();
+        auto attr =
+          AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
+        MappedDecl->getMutableAttrs().add(attr);
+        IsUnavailable = true;
+        continue;
+      }
+
+      const auto &deprecated = avail->getDeprecated();
+      if (!deprecated.empty()) {
+        if (DeprecatedAsUnavailableFilter &&
+            DeprecatedAsUnavailableFilter(deprecated.getMajor(),
+                                          deprecated.getMinor())) {
+          auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
+                         DeprecatedAsUnavailableMessage);
+          MappedDecl->getMutableAttrs().add(attr);
+          IsUnavailable = true;
+          continue;
+        }
+
+        // FIXME: Mark remaining declarations as deprecated.
+      }
     }
   }
 

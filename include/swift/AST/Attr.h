@@ -29,6 +29,7 @@ namespace swift {
 class ASTPrinter;
 class ASTContext;
 struct PrintOptions;
+class Decl;
 
 /// The associativity of a binary operator.
 enum class Associativity {
@@ -565,6 +566,10 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;
   }
+
+  /// Determine if a given declaration has been marked unavailable.
+  static bool isUnavailable(const Decl *D);
+
 };
 
 /// Indicates that the given declaration is visible to Objective-C.

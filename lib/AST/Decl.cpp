@@ -1665,6 +1665,9 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   if (resolver)
     resolver->resolveImplicitConstructors(superclassDecl);
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
+    if (AvailabilityAttr::isUnavailable(member))
+      continue;
+
     // We only care about designated initializers.
     auto ctor = dyn_cast<ConstructorDecl>(member);
     if (!ctor || !ctor->isDesignatedInit() || ctor->hasStubImplementation())

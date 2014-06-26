@@ -18,6 +18,10 @@
 
 #include "swift/AST/ClangModuleLoader.h"
 
+namespace llvm {
+  class Triple;
+}
+
 namespace clang {
   class ASTContext;
   class Module;
@@ -50,6 +54,7 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+                const llvm::Triple &triple,
                 DependencyTracker *tracker);
 
 public:

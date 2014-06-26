@@ -145,9 +145,10 @@ namespace {
 
 ClangImporter::ClangImporter(ASTContext &ctx,
                              const ClangImporterOptions &clangImporterOpts,
+                             const llvm::Triple &triple,
                              DependencyTracker *tracker)
   : ClangModuleLoader(tracker),
-    Impl(*new Implementation(ctx, clangImporterOpts))
+    Impl(*new Implementation(ctx, clangImporterOpts, triple))
 {
 }
 
@@ -170,12 +171,14 @@ ClangImporter::create(ASTContext &ctx,
                       const ClangImporterOptions &importerOpts,
                       const IRGenOptions &irGenOpts,
                       DependencyTracker *tracker) {
+
+  llvm::Triple triple(irGenOpts.Triple);
+
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, importerOpts, tracker)
+    new ClangImporter(ctx, importerOpts, triple, tracker)
   };
 
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-  llvm::Triple triple(irGenOpts.Triple);
 
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
@@ -523,13 +526,55 @@ Module *ClangImporter::getImportedHeaderModule() {
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts)
+                                              const ClangImporterOptions &opts,
+                                              const llvm::Triple &triple)
   : SwiftContext(ctx),
     SplitPrepositions(ctx.LangOpts.SplitPrepositions),
     InferImplicitProperties(opts.InferImplicitProperties),
     ImportWithTighterObjCPointerTypes(opts.ImportWithTighterObjCPointerTypes)
 {
+  // Add filters to determine if a Clang availability attribute
+  // applies in Swift, and if so, what is the cutoff for deprecated
+  // declarations that are now considered unavailable in Swift.
+  if (triple.isiOS()) {
+    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) { return Platform == "ios"; };
+    }
+    else {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) {
+          return Platform == "ios" ||
+                 Platform == "ios_app_extension"; };
+    }
+    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
+    DeprecatedAsUnavailableFilter =
+      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    DeprecatedAsUnavailableMessage =
+      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  }
+  else if (triple.isMacOSX()) {
+    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
+      PlatformAvailabilityFilter =
+      [](StringRef Platform) { return Platform == "macosx"; };
+    }
+    else {
+      PlatformAvailabilityFilter =
+      [](StringRef Platform) {
+        return Platform == "macosx" ||
+               Platform == "macosx_app_extension"; };
+    }
+    // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
+    DeprecatedAsUnavailableFilter =
+      [](unsigned major, llvm::Optional<unsigned> minor) {
+        return minor.hasValue() && minor.getValue() <= 9;
+    };
+    DeprecatedAsUnavailableMessage =
+      "APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift";
+  }
 }
+
+
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
 }

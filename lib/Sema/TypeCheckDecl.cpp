@@ -5528,6 +5528,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 
     auto superclassTy = classDecl->getSuperclass();
     for (auto member : lookupConstructors(superclassTy, classDecl)) {
+      if (AvailabilityAttr::isUnavailable(member))
+        continue;
+
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit()
           || superclassCtor->isRequired() || superclassCtor->isInvalid())

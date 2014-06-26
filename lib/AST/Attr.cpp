@@ -342,3 +342,13 @@ AvailabilityAttr::platformFromString(StringRef Name) {
     .Default(Optional<AvailabilityAttr::PlatformKind>());
 }
 
+bool AvailabilityAttr::isUnavailable(const Decl *D) {
+  for (auto Attr : D->getAttrs())
+    if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
+      if (AvailAttr->IsUnvailable)
+        return true;
+
+  return false;
+}
+
+

@@ -32,3 +32,7 @@ func test_class_avail(x:NSObject, obj: AnyObject) {
   NSObject.`class`() // expected-error {{'class()' is unavailable: use 'self' instead}}
   obj.`class`!() // expected-error {{'class()' is unavailable: use 'dynamicType' instead}}
 }
+
+func test_unavailable_because_deprecated() {
+  println(NSRealMemoryAvailable()) // expected-error {{'NSRealMemoryAvailable()' is unavailable: APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift}}
+}

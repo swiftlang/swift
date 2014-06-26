@@ -11,6 +11,7 @@ typedef struct objc_object { void *isa; } *id;
 typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
 
+extern NSUInteger NSRealMemoryAvailable(void) __attribute__((availability(macosx,introduced=10.0 ,deprecated=10.8,message="" )));
 
 @class NSString, NSArray, NSDictionary, NSEnumerator;
 

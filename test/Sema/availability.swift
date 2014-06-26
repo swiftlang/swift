@@ -23,7 +23,7 @@ class ClassWithUnavailable {
 
   // FIXME: extraneous diagnostic here
   @availability(*, unavailable)
-  init(int _: Int) {} // expected-note 3 {{'init(int:)' has been explicitly marked unavailable here}}
+  init(int _: Int) {} // expected-note 2 {{'init(int:)' has been explicitly marked unavailable here}}
 
   convenience init(otherInt: Int) {
     self.init(int: otherInt) // expected-error {{'init(int:)' is unavailable}}
