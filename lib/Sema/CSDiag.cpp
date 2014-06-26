@@ -942,6 +942,10 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
   auto type1 = expr->getType();
   auto type2 = constraint->getSecondType();
   
+  if (type1->isEqual(type2))
+    if (auto firstType = constraint->getFirstType())
+      type1 = firstType;
+  
   if (auto typeVariableType =
       dyn_cast<TypeVariableType>(type2.getPointer())) {
     SmallVector<Type, 4> bindings;

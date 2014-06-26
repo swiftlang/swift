@@ -64,3 +64,10 @@ if let p = cc as P { // expected-error{{downcast from 'Any' to unrelated type 'P
 // Test that 'as?' coercion fails.
 let strImplicitOpt: String! = nil
 strImplicitOpt as? String // expected-error{{conditional downcast from 'String!' to 'String' always succeeds}}
+
+class C3 {}
+class C4 : C3 {}
+
+var c: AnyObject = C3()
+
+if let castX = c as C4? {} // expected-error {{cannot convert the expression's type '@lvalue AnyObject' to type 'C4?'}}
