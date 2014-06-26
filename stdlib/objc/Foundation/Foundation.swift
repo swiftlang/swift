@@ -679,13 +679,13 @@ extension NSDictionary : DictionaryLiteralConvertible {
 /// The entry point for bridging `NSDictionary` to `Dictionary`.
 @public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
        d: NSDictionary
-     ) -> Dictionary<K, V> {
-  return Dictionary<K, V>(_cocoaDictionary: reinterpretCast(d))
+     ) -> [K : V] {
+  return [K : V](_cocoaDictionary: reinterpretCast(d))
 }
 
 /// The entry point for bridging `Dictionary` to `NSDictionary`.
 @public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
-    d: Dictionary<KeyType, ValueType>
+    d: [KeyType : ValueType]
 ) -> NSDictionary {
   switch d._variantStorage {
   case .Native(let nativeOwner):
@@ -771,7 +771,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   @public static func bridgeFromObjectiveCConditional(
     x: NSDictionary
   ) -> Dictionary? {
-    let anyDict = x as Dictionary<NSObject, AnyObject>
+    let anyDict = x as [NSObject : AnyObject]
     if isBridgedVerbatimToObjectiveC(KeyType.self) &&
        isBridgedVerbatimToObjectiveC(ValueType.self) {
       return Swift._dictionaryDownCastConditional(anyDict)
@@ -788,7 +788,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 
 extension NSDictionary {
   @conversion @public
-  func __conversion() -> Dictionary<NSObject, AnyObject> {
+  func __conversion() -> [NSObject : AnyObject] {
     return _convertNSDictionaryToDictionary(reinterpretCast(self))
   }
 }
@@ -802,7 +802,7 @@ extension Dictionary {
 
 extension NSDictionary : Reflectable {
   @public func getMirror() -> Mirror {
-    let dict : Dictionary<NSObject,AnyObject> = _convertNSDictionaryToDictionary(self)
+    let dict : [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return reflect(dict)
   }
 }

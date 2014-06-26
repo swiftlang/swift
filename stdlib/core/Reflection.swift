@@ -207,7 +207,7 @@ func _getSummary<T>(out: UnsafePointer<String>,
     inout targetStream: TargetStream
 ) -> T {
   var maxItemCounter = maxItems
-  var visitedItems = Dictionary<ObjectIdentifier, Int>()
+  var visitedItems = [ObjectIdentifier : Int]()
   _dumpWithMirror(reflect(x), name, indent, maxDepth,
                   &maxItemCounter, &visitedItems, &targetStream)
   return x
@@ -225,7 +225,7 @@ func _getSummary<T>(out: UnsafePointer<String>,
 func _dumpWithMirror<TargetStream : OutputStream>(
     mirror: Mirror, name: String?, indent: Int, maxDepth: Int,
     inout maxItemCounter: Int,
-    inout visitedItems: Dictionary<ObjectIdentifier, Int>,
+    inout visitedItems: [ObjectIdentifier : Int],
     inout targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }

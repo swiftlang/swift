@@ -1772,8 +1772,8 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
 }
 
 @public func == <KeyType : Equatable, ValueType : Equatable>(
-  lhs: Dictionary<KeyType, ValueType>,
-  rhs: Dictionary<KeyType, ValueType>
+  lhs: [KeyType : ValueType],
+  rhs: [KeyType : ValueType]
 ) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
@@ -1838,8 +1838,8 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
 }
 
 @public func != <KeyType : Equatable, ValueType : Equatable>(
-  lhs: Dictionary<KeyType, ValueType>,
-  rhs: Dictionary<KeyType, ValueType>
+  lhs: [KeyType : ValueType],
+  rhs: [KeyType : ValueType]
 ) -> Bool {
   return !(lhs == rhs)
 }
