@@ -58,6 +58,43 @@
     _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(owner as? NativeStorage)
   }
+
+  /// Replace the given subRange with the first newCount elements of
+  /// the given collection.
+  ///
+  /// Requires: this buffer is backed by a uniquely-referenced
+  /// ContiguousArrayBuffer,
+  ///
+  /// Requires: insertCount <= numericCast(countElements(newValues))
+  /// 
+  mutating func replace<C: Collection where C.GeneratorType.Element == T>(
+    #subRange: Range<Int>, with insertCount: Int, elementsOf newValues: C
+  ) {
+    _invariantCheck()
+    // FIXME: <rdar://problem/17464946> with
+    // -DSWIFT_STDLIB_INTERNAL_CHECKS=OFF, enabling this sanityCheck
+    // actually causes leaks in the stdlib/NewArray.swift.gyb test
+    /* _sanityCheck(insertCount <= numericCast(countElements(newValues))) */
+    
+    _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
+    
+    var native = reinterpretCast(owner) as NativeBuffer
+    let offset = start - native.elementStorage
+    let eraseCount = countElements(subRange)
+    let growth = insertCount - eraseCount
+    
+    let oldCount = count
+    
+    _sanityCheck(native.count + growth <= native.capacity)
+
+    native.replace(
+      subRange: (subRange.startIndex+offset)..<(subRange.endIndex + offset),
+      with: insertCount,
+      elementsOf: newValues)
+    
+    setLocalCount(oldCount + growth)
+    _invariantCheck()
+  }
   
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
@@ -87,16 +124,33 @@
     -> NativeBuffer?
   {
     _invariantCheck()
-    if _fastPath(_hasNativeBuffer && Swift.isUniquelyReferenced(&owner)) {
+    if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
       if capacity >= minimumCapacity {
-        return reinterpretCast(owner) as NativeBuffer
+        // Since we have the last reference, drop any inaccessible
+        // trailing elements in the underlying storage.  That will
+        // tend to reduce shuffling of later elements.  Since this
+        // function isn't called for subscripting, this won't slow
+        // down that case.
+        var backing = reinterpretCast(owner) as NativeBuffer
+        let offset = self.elementStorage - backing.elementStorage
+        let backingCount = backing.count
+        let myCount = count
+
+        if _slowPath(backingCount > myCount + offset) {
+          backing.replace(
+            subRange: (myCount+offset)..<backingCount,
+            with: 0,
+            elementsOf: EmptyCollection())
+        }
+        _invariantCheck()
+        return backing
       }
     }
     return nil
   }
 
   mutating func isMutableAndUniquelyReferenced() -> Bool {
-    return _hasNativeBuffer && Swift.isUniquelyReferenced(&owner)
+    return _hasNativeBuffer && isUniquelyReferenced()
   }
 
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
@@ -132,14 +186,21 @@
       return Int(_countAndFlags >> 1)
     }
     set {
-      _invariantCheck()
       let growth = newValue - count
-      if growth == 0 {
-        return
+      if growth != 0 {
+        nativeBuffer.count += growth
+        setLocalCount(newValue)
       }
-      nativeBuffer.count += growth
-      _countAndFlags = (UInt(newValue) << 1) | (_countAndFlags & 1)
+      _invariantCheck()
     }
+  }
+
+  /// Modify the count in this buffer without a corresponding change
+  /// in the underlying nativeBuffer.  The implementation of replace()
+  /// uses this, because it does a wholesale replace in the underlying
+  /// buffer.
+  mutating func setLocalCount(newValue: Int) {
+    _countAndFlags = (UInt(newValue) << 1) | (_countAndFlags & 1)
   }
   
   var capacity: Int {

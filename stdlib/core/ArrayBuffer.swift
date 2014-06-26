@@ -197,6 +197,18 @@ extension ArrayBuffer {
     return nil
   }
 
+  /// Replace the given subRange with the first newCount elements of
+  /// the given collection.
+  ///
+  /// Requires: this buffer is backed by a uniquely-referenced
+  /// ContiguousArrayBuffer
+  @public
+  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+  ) {
+    _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
+  }
+  
   func _typeCheck(subRange: Range<Int>) {
     if !_isClassOrObjCExistential(T.self) {
       return
@@ -299,12 +311,6 @@ extension ArrayBuffer {
       return _fastPath(_isNative) ? _native.count : _nonNative!.count
     }
     set {
-      // Allow zero here for the case where elements have been moved
-      // out of the buffer during reallocation
-      _sanityCheck(
-        newValue == 0 || newValue >= count,
-        "We don't yet know how to shrink an array")
-      
       _sanityCheck(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
     }

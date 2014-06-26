@@ -51,12 +51,22 @@
   /// Append newElement to the Array in O(1) (amortized)
   mutating func append(newElement: Self.GeneratorType.Element)
 
+  /// Operator form of append
+  @assignment 
+  func += (inout lhs: Self, rhs: Self.GeneratorType.Element)
+
   /// Append elements from `sequence` to the Array
   mutating func extend<
       S : Sequence
       where S.GeneratorType.Element == Self.GeneratorType.Element
   >(sequence: S)
 
+  /// Operator form of extend
+  @assignment
+  func += <
+    S: Sequence where S.GeneratorType.Element == Self.GeneratorType.Element
+  >(inout lhs: Self, rhs: S)
+  
   /// Remove an element from the end of the Array in O(1).  Returns:
   /// the removed element. Requires: count > 0
   mutating func removeLast() -> Self.GeneratorType.Element
@@ -91,8 +101,6 @@
 
   typealias _Buffer : ArrayBufferType
   init(_ buffer: _Buffer)
-  
-  var _buffer: _Buffer {get set}
 }
 
 @internal struct _ArrayTypeMirror<T : ArrayType> : Mirror {

@@ -134,6 +134,18 @@ let emptyNSSwiftArray : _NSSwiftArray
     return self
   }
   
+  /// Replace the given subRange with the first newCount elements of
+  /// the given collection.
+  ///
+  /// Requires: this buffer is backed by a uniquely-referenced
+  /// ContiguousArrayBuffer
+  @public
+  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+  ) {
+    _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
+  }
+  
   /// Get/set the value of the ith element
   @public subscript(i: Int) -> T {
     get {

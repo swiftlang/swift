@@ -60,6 +60,15 @@
   /// not match ours, if we are a SliceBuffer.
   func requestNativeBuffer() -> ContiguousArrayBuffer<Element>?
   
+  /// Replace the given subRange with the first newCount elements of
+  /// the given collection.
+  ///
+  /// Requires: this buffer is backed by a uniquely-referenced
+  /// ContiguousArrayBuffer
+  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+  )
+  
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
   subscript(subRange: Range<Int>) -> SliceBuffer<Element> {get}

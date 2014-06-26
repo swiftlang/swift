@@ -168,7 +168,7 @@ extension ${Self} : ArrayType {
   /// Complexity: O(N)
   @public mutating func reserveCapacity(minimumCapacity: Int) {
     if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
-      
+
       var newBuffer = ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
       
@@ -396,11 +396,98 @@ struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
   var newValues: C
 }
 
-func _arrayReplace2<
-  A: ArrayType, C: Collection
-  where C.GeneratorType.Element == A._Buffer.Element, A.IndexType == Int
+@noinline
+func _arrayOutOfPlaceReplace<
+  B: ArrayBufferType, C: Collection
+    where C.GeneratorType.Element == B.Element, B.IndexType == Int
+>(
+  inout source: B, subRange: Range<Int>, newValues: C, insertCount: Int
+) {
+  let growth = insertCount - countElements(subRange)
+  let newCount = source.count + growth
+  var newBuffer = Optional(
+    _forceCreateUniqueMutableBuffer(&source, newCount, newCount))
+  
+  _arrayOutOfPlaceUpdate(
+    &source, &newBuffer,
+    subRange.startIndex, insertCount,
+    _InitializeMemoryFromCollection(newValues)
+  )
+}
+
+func _arrayNonSliceInPlaceReplace<
+  B: ArrayBufferType, C: Collection
+  where C.GeneratorType.Element == B.Element, B.IndexType == Int
+>(inout target: B, subRange: Range<Int>, insertCount: Int, newValues: C) {
+  let oldCount = target.count
+  let eraseCount = countElements(subRange)
+
+  let growth = insertCount - eraseCount
+  target.count = oldCount + growth
+  
+  let elements = target.elementStorage
+  _sanityCheck(elements != nil)
+  
+  let oldTailIndex = subRange.endIndex
+  let oldTailStart = elements + oldTailIndex
+  let newTailIndex = oldTailIndex + growth
+  let newTailStart = oldTailStart + growth
+  let tailCount = oldCount - subRange.endIndex
+
+  if growth > 0 {
+    // Slide the tail part of the buffer forwards, in reverse order
+    // so as not to self-clobber.
+    newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
+
+    // Assign over the original subRange
+    var i = newValues.startIndex
+    for j in subRange {
+      elements[j] = newValues[i++]
+    }
+    // Initialize the hole left by sliding the tail forward
+    for j in oldTailIndex..<newTailIndex {
+      (elements + j).initialize(newValues[i++])
+    }
+  }
+  else { // We're not growing the buffer
+    // Assign all the new elements into the start of the subRange
+    var i = subRange.startIndex
+    for j in indices(newValues) {
+      elements[i++] = newValues[j]
+    }
+
+    // If the size didn't change, we're done.
+    if growth == 0 {
+      return
+    }
+
+    // Move the tail backward to cover the shrinkage.  
+    let shrinkage = -growth
+    if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
+
+      // Assign over the rest of the replaced range with the first
+      // part of the tail.
+      newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
+      
+      //  slide the rest of the tail back
+      oldTailStart.moveInitializeFrom(
+        oldTailStart + shrinkage, count: tailCount - shrinkage)
+    }
+    else {                      // tail fits within erased elements
+      // Assign over the start of the replaced range with the tail
+      newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
+
+      // destroy elements remaining after the tail in subRange
+      (newTailStart + tailCount).destroy(shrinkage - tailCount)
+    }
+  }
+}
+
+func _arrayReplace<
+  B: ArrayBufferType, C: Collection
+  where C.GeneratorType.Element == B.Element, B.IndexType == Int
   >(
-  inout target: A, subRange: Range<Int>, newValues: C
+  inout target: B, subRange: Range<Int>, newValues: C
 ) {
   _precondition(
     subRange.startIndex >= 0,
@@ -412,120 +499,57 @@ func _arrayReplace2<
   
   _precondition(
     subRange.endIndex <= target.endIndex,
-    "${Self} replace: subRange is inside-out")
+    "${Self} replace: subRange extends past the end")
   
   let oldCount = target.count
   let eraseCount = countElements(subRange)
   let insertCount = numericCast(countElements(newValues)) as Int
-  var newBuffer = _createUniqueMutableBuffer(
-    &target._buffer, oldCount + insertCount - eraseCount)
-
-  if _fastPath(!newBuffer) {
-    let growth = insertCount - eraseCount
-    
-    let elements = target._buffer.elementStorage
-    _sanityCheck(elements != nil)
-    
-    let oldTailIndex = subRange.endIndex
-    let oldTailStart = elements + oldTailIndex
-    let newTailIndex = oldTailIndex + growth
-    let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.endIndex
-
-    if growth > 0 {
-      // Slide the tail part of the buffer forwards, in reverse order
-      // so as not to self-clobber.
-      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
-
-      // Assign over the original subRange
-      var i = newValues.startIndex
-      for j in subRange {
-        elements[j] = newValues[i++]
-      }
-      // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(newValues[i++])
-      }
-    }
-    else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subRange
-      var i = subRange.startIndex
-      for j in indices(newValues) {
-        elements[i++] = newValues[j]
-      }
-
-      // If the size didn't change, we're done.
-      if growth == 0 {
-        return
-      }
-
-      // Move the tail backward to cover the shrinkage.  
-      let shrinkage = -growth
-      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
-
-        // Assign over the rest of the replaced range with the first
-        // part of the tail.
-        newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
-        
-        //  slide the rest of the tail back
-        oldTailStart.moveInitializeFrom(
-          oldTailStart + shrinkage, count: tailCount - shrinkage)
-      }
-      else {                      // tail fits within erased elements
-        // Assign over the start of the replaced range with the tail
-        newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
-
-        // destroy elements remaining after the tail in subRange
-        (newTailStart + tailCount).destroy(shrinkage - tailCount)
-      }
-    }
+  let growth = insertCount - eraseCount
+  
+  if target.requestUniqueMutableBackingBuffer(oldCount + growth) {
+    target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
   }
   else {
-    _arrayOutOfPlaceUpdate(
-      &target._buffer, &newBuffer,
-      subRange.startIndex, insertCount,
-      _InitializeMemoryFromCollection(newValues)
-    )
+    _arrayOutOfPlaceReplace(&target, subRange, newValues, insertCount)
   }
-}
-
-% for Self in arrayTypes:
-func _arrayReplace1<
-  T, C: Collection where C.GeneratorType.Element == T
-  >(
-  inout target: ${Self}<T>, subRange: Range<Int>, newValues: C
-) {
-  _arrayReplace2(&target, subRange, newValues)
-}
-
-extension ${Self} {
-  @public mutating func replaceRange<
-    C: Collection where C.GeneratorType.Element == _Buffer.Element
-  >(
-    subRange: Range<Int>, with newValues: C
-  ) {
-    _arrayReplace1(&self, subRange, newValues) 
-  }
-}
-% end
-
-@assignment @public
-func += <
-  A: ArrayType, S: Sequence
-  where S.GeneratorType.Element == A._Buffer.Element
->(inout lhs: A, rhs: S) {
-  _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
 func _growArrayCapacity(capacity: Int) -> Int {
   return capacity * 2
 }
 
+% for Self in arrayTypes:
+extension ${Self} {
+  @public mutating func replaceRange<
+    C: Collection where C.GeneratorType.Element == _Buffer.Element
+  >(
+    subRange: Range<Int>, with newValues: C
+  ) {
+    _arrayReplace(&self._buffer, subRange, newValues) 
+  }
+}
+
 @assignment @public
 func += <
-  A: ArrayType, C: Collection
-where C.GeneratorType.Element == A._Buffer.Element
->(inout lhs: A, rhs: C) {
+  T, S: Sequence
+where S.GeneratorType.Element == T
+>(inout lhs: ${Self}<T>, rhs: S) {
+  let oldCount = lhs.count
+  let capacity = lhs.capacity
+  let newCount = oldCount + underestimateCount(rhs)
+
+  if newCount > capacity {
+    lhs.reserveCapacity(
+      max(newCount, _growArrayCapacity(capacity)))
+  }
+  _arrayAppendSequence(&lhs._buffer, rhs)
+}
+
+@assignment @public
+func += <
+  T, C: Collection
+where C.GeneratorType.Element == T
+>(inout lhs: ${Self}<T>, rhs: C) {
   let rhsCount = numericCast(countElements(rhs)) as Int
   
   let oldCount = lhs.count
@@ -547,11 +571,10 @@ where C.GeneratorType.Element == A._Buffer.Element
 }
 
 @assignment @public
-func += <
-  A: ArrayType
->(inout lhs: A, rhs: A._Buffer.Element) {
-  lhs += CollectionOfOne(rhs)
+func += <T>(inout lhs: ${Self}<T>, rhs: T) {
+  _arrayAppend(&lhs._buffer, rhs)
 }
+% end
 
 //===--- generic helpers --------------------------------------------------===//
 /// Ensure there's a ContiguousArrayBuffer capable of storing
@@ -577,7 +600,16 @@ func _createUniqueMutableBuffer<_Buffer: ArrayBufferType>(
     source.count = newCount
     return nil
   }
+  
+  return _forceCreateUniqueMutableBuffer(&source, newCount, requiredCapacity)
+}
 
+func _forceCreateUniqueMutableBuffer<_Buffer: ArrayBufferType>(
+  inout source: _Buffer, newCount: Int, requiredCapacity: Int
+) -> ContiguousArrayBuffer<_Buffer.Element> {
+  _sanityCheck(newCount >= 0)
+  _sanityCheck(requiredCapacity >= newCount)
+  
   let minimumCapacity = max(
     requiredCapacity,
     newCount > source.capacity
@@ -648,7 +680,7 @@ func _arrayOutOfPlaceUpdate<
     // its real last element
     let backingEnd = backingStart + backing.count
     let sourceEnd = sourceStart + sourceCount
-    sourceEnd.destroy(sourceEnd - backingEnd)
+    sourceEnd.destroy(backingEnd - sourceEnd)
     backing.count = 0
   }
   else {
