@@ -50,11 +50,11 @@ extension String {
 
       @public func predecessor() -> IndexType {
         var i = _position
-        let codeUnit = self._base[--i]
-        // FIXME: consider adding:
-        // assert(!(codeUnit >= 0xD800 && codeUnit <= 0xDBFF), "unpaired surrogates are ill-formed")
-        if codeUnit >= 0xDC00 && codeUnit <= 0xDFFF {
-          --i
+        let codeUnit = _base[--i]
+        if _slowPath((codeUnit >> 10) == 0b1101_11) {
+          if i != 0 && (_base[i - 1] >> 10) == 0b1101_10 {
+            --i
+          }
         }
         return IndexType(i, _base)
       }
@@ -80,13 +80,8 @@ extension String {
       case .EmptyInput:
         _fatalError("can not subscript using an endIndex")
       case .Error:
-        _fatalError("unpaired surrogates are ill-formed in UTF-16")
+        return UnicodeScalar(0xfffd)
       }
-    }
-
-    
-    func __slice__(start: IndexType, end: IndexType) -> UnicodeScalarView {
-      return UnicodeScalarView(_base[start._position..<end._position])
     }
 
     @public subscript(r: Range<IndexType>) -> UnicodeScalarView {

@@ -16,19 +16,76 @@
 
 import Darwin
 
+@public struct SourceLoc {
+  let file: String
+  let line: UWord
+  let comment: String?
+
+  init(_ file: String, _ line: UWord, comment: String? = nil) {
+    self.file = file
+    self.line = line
+    self.comment = comment
+  }
+
+  func withCurrentLoc(
+      file: String = __FILE__, line: UWord = __LINE__
+  ) -> SourceLocStack {
+    return SourceLocStack(self).with(SourceLoc(file, line))
+  }
+}
+
+@public struct SourceLocStack {
+  let locs: [SourceLoc] = []
+
+  init() {}
+
+  init(_ loc: SourceLoc) {
+    locs = [ loc ]
+  }
+
+  init(_locs: [SourceLoc]) {
+    locs = _locs
+  }
+
+  var isEmpty: Bool {
+    return locs.isEmpty
+  }
+
+  func with(loc: SourceLoc) -> SourceLocStack {
+    var locs = self.locs
+    locs += loc
+    return SourceLocStack(_locs: locs)
+  }
+
+  func withCurrentLoc(
+      file: String = __FILE__, line: UWord = __LINE__
+  ) -> SourceLocStack {
+    return with(SourceLoc(file, line))
+  }
+}
+
+@internal func _printStackTrace(stackTrace: SourceLocStack?) {
+  if let s = stackTrace {
+    println("stacktrace:")
+    for i in 0..<s.locs.count {
+      let loc = s.locs[s.locs.count - i - 1]
+      let comment = loc.comment ? " ; \(loc.comment!)" : ""
+      println("  #\(i): \(loc.file):\(loc.line)\(comment)")
+    }
+  }
+}
+
 var _anyExpectFailed = false
 
 @public func expectEqual<T : Equatable>(
     expected: T, actual: T,
-    extraLoc: SourceLoc? = nil,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    if let el = extraLoc {
-      println("extra loc: \(el.file), line \(el.line)")
-    }
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
     println()
@@ -37,16 +94,14 @@ var _anyExpectFailed = false
 
 @public func expectEqual<T : Equatable>(
     expected: T, actual: T,
-    extraLoc: SourceLoc? = nil,
+    stackTrace: SourceLocStack? = nil,
     collectMoreInfo: () -> String,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    if let el = extraLoc {
-      println("extra loc: \(el.file), line \(el.line)")
-    }
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
     println(collectMoreInfo())
@@ -92,15 +147,13 @@ var _anyExpectFailed = false
 
 @public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
-    extraLoc: SourceLoc? = nil,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    if let el = extraLoc {
-      println("extra loc: \(el.file), line \(el.line)")
-    }
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
@@ -109,16 +162,14 @@ var _anyExpectFailed = false
 
 @public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
-    extraLoc: SourceLoc? = nil,
+    stackTrace: SourceLocStack? = nil,
     collectMoreInfo: () -> String,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    if let el = extraLoc {
-      println("extra loc: \(el.file), line \(el.line)")
-    }
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println(collectMoreInfo())
@@ -198,29 +249,17 @@ func _expectNotEqual${Generic}(
   return AssertionResult(isPass: false)
 }
 
-@public struct SourceLoc {
-  let file: String
-  let line: UWord
-
-  init(_ file: String, _ line: UWord) {
-    self.file = file
-    self.line = line
-  }
-}
-
 %for BoolType in ['Bool', 'AssertionResult']:
 
 @public func expectTrue(
     actual: ${BoolType},
-    extraLoc: SourceLoc? = nil,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if !actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    if let el = extraLoc {
-      println("extra loc: \(el.file), line \(el.line)")
-    }
+    _printStackTrace(stackTrace)
     println("expected: true")
     println("actual: \(actual)")
     println()
@@ -244,11 +283,13 @@ func _expectNotEqual${Generic}(
 
 @public func expectEmpty<T>(
     value: Optional<T>,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if value {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected optional to be empty")
     println("actual: \"\(value)\"")
     println()
@@ -317,3 +358,99 @@ func _expectNotEqual${Generic}(
 @public func asHex(a: [UInt32]) -> String {
   return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
+
+//
+// Helpers that verify invariants of various stdlib types.
+//
+
+func checkGenerator<
+    Element : Equatable, G : Generator
+    where G.Element == Element>(
+    expected: [Element], generator: G, stackTrace: SourceLocStack) {
+
+  // Copying a `Generator` is allowed.
+  var mutableGen = generator
+  var actual: [Element] = []
+  while let e = mutableGen.next() {
+    actual += e
+  }
+  expectEqual(expected, actual, stackTrace: stackTrace.withCurrentLoc())
+
+  // Having returned `.None` once, a `Generator` should not generate more
+  // elements.
+  for i in 0..<10 {
+    expectEmpty(mutableGen.next(), stackTrace: stackTrace.withCurrentLoc())
+  }
+}
+
+func checkSequence<
+    Element : Equatable, S : Sequence
+    where S.GeneratorType.Element == Element>(
+    expected: [Element], sequence: S, stackTrace: SourceLocStack) {
+  checkGenerator(expected, sequence.generate(), stackTrace.withCurrentLoc())
+  expectGE(expected.count, underestimateCount(sequence))
+}
+
+func checkCollection<
+    Element : Equatable, C : Collection
+    where C.GeneratorType.Element == Element>(
+    expected: [Element], collection: C, stackTrace: SourceLocStack) {
+  // A `Collection` is a multi-pass `Sequence`.
+  for i in 0..<3 {
+    checkSequence(expected, collection, stackTrace.withCurrentLoc())
+  }
+
+  expectEqual(expected.count.toIntMax(), countElements(collection).toIntMax(),
+      stackTrace: stackTrace.withCurrentLoc())
+
+  for i in 0..<3 {
+    let startIndex = collection.startIndex
+    let endIndex = collection.endIndex
+
+    var actual: [Element] = []
+    var index = collection.startIndex
+    while index != collection.endIndex {
+      // Iteration should not change `startIndex` or `endIndex`.
+      expectEqual(startIndex, collection.startIndex)
+      expectEqual(endIndex, collection.endIndex)
+
+      actual += collection[index]
+      ++index
+    }
+
+    expectEqual(expected, actual, stackTrace: stackTrace.withCurrentLoc())
+  }
+}
+
+func checkSliceableWithBidirectionalIndex<
+    Element : Equatable, S : Sliceable
+    where S.GeneratorType.Element == Element,
+    S.SliceType.GeneratorType.Element == Element,
+    S.IndexType : BidirectionalIndex>(
+    expected: [Element], sliceable: S, stackTrace: SourceLocStack) {
+  // A `Sliceable` is a `Collection`.
+  checkCollection(expected, sliceable, stackTrace.withCurrentLoc())
+
+  var startNumericIndex = 0
+  for var start = sliceable.startIndex; start != sliceable.endIndex; ++start {
+    ++start
+    --start
+    ++start
+    --start
+    var endNumericIndex = startNumericIndex
+    for var end = start; end != sliceable.endIndex; ++end {
+      ++end
+      --end
+      ++end
+      --end
+      let expectedSlice: [Element] =
+          Array(expected[startNumericIndex..<endNumericIndex])
+      let slice = sliceable[start..<end]
+      checkCollection(expectedSlice, slice, stackTrace.withCurrentLoc())
+      ++endNumericIndex
+    }
+    ++startNumericIndex
+  }
+}
+
+

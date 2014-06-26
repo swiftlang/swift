@@ -414,7 +414,7 @@ struct UTF8Test {
        file: String = __FILE__, line: UWord = __LINE__) {
     self.scalars = scalars
     self.encoded = encoded
-    self.loc = SourceLoc(file, line)
+    self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
 
@@ -622,7 +622,7 @@ struct UTF16Test {
     self.scalarsHead = scalarsHead
     self.scalarsRepairedTail = scalarsRepairedTail
     self.encoded = encoded
-    self.loc = SourceLoc(file, line)
+    self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
 
@@ -994,7 +994,7 @@ UTF8Decoder.test("Empty") {
 UTF8Decoder.test("SmokeTest") {
   for test in UTF8TestsSmokeTest {
     expectTrue(checkDecodeUTF8(test.scalars, [], test.encoded),
-        extraLoc: test.loc)
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
@@ -2086,7 +2086,7 @@ UTF16Decoder.test("Test") {
     println("Batch: \(name)")
     for test in batch {
       expectTrue(checkDecodeUTF16(test.scalarsHead, test.scalarsRepairedTail,
-          test.encoded), extraLoc: test.loc)
+          test.encoded), stackTrace: test.loc.withCurrentLoc())
     }
   }
 }
@@ -2241,7 +2241,7 @@ var UTF8Encoder = TestCase("UTF8Encoder")
 UTF8Encoder.test("SmokeTest") {
   for test in UTF8TestsSmokeTest {
     expectTrue(checkEncodeUTF8(test.encoded, test.scalars),
-        extraLoc: test.loc)
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
@@ -2300,49 +2300,15 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
-func checkUTF8View(expected: [UInt8], stringUnderTest: String) {
-  let utf8Bytes: [UInt8] = Array(stringUnderTest.utf8)
-  expectEqual(expected, utf8Bytes)
+func checkUTF8View(expected: [UInt8], subject: String,
+    stackTrace: SourceLocStack) {
+  checkCollection(expected, subject.utf8, stackTrace.withCurrentLoc())
 }
 
-func checkUTF16View(expected: [UInt16], stringUnderTest: String,
-    extraLoc: SourceLoc) {
-  if true {
-    // Test .generate() method.
-    var utf16Words: [UInt16] = []
-    var g = stringUnderTest.utf16.generate()
-    while let u = g.next() {
-      utf16Words += u
-    }
-    expectEqual(expected, utf16Words, extraLoc: extraLoc)
-  }
-
-  if true {
-    // Test subscript(Int).
-    var utf16Words: [UInt16] = []
-    var view = stringUnderTest.utf16
-    for var i = view.startIndex; i != view.endIndex; ++i {
-      utf16Words += view[i]
-    }
-    expectEqual(expected, utf16Words, extraLoc: extraLoc)
-  }
-
-  if true {
-    // Test subscript(Range<Int>).
-    for start in 0...expected.count {
-      for end in start...expected.count {
-        var utf16Words: [UInt16] = []
-        var view = stringUnderTest.utf16[start..<end]
-        for var i = view.startIndex; i != view.endIndex; ++i {
-          utf16Words += view[i]
-        }
-        expectEqual(Array(expected[start..<end]), utf16Words,
-            extraLoc: extraLoc) {
-          "start=\(start) end=\(end)"
-        }
-      }
-    }
-  }
+func checkUTF16View(expected: [UInt16], subject: String,
+    stackTrace: SourceLocStack) {
+  checkSliceableWithBidirectionalIndex(expected, subject.utf16,
+      stackTrace.withCurrentLoc())
 }
 
 func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
@@ -2393,7 +2359,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.toRaw()).getLogicValue())
       expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
-      checkUTF8View(expected, cfstring)
+      checkUTF8View(expected, cfstring, test.loc.withCurrentLoc())
       return ()
     }
   }
@@ -2409,7 +2375,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
         },
         stopOnError: false)
 
-    checkUTF8View(expected, subject)
+    checkUTF8View(expected, subject, test.loc.withCurrentLoc())
   }
 }
 
@@ -2438,7 +2404,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
   for test in UTF8TestsSmokeTest {
     var nss = NonContiguousNSString(test.scalars)
     verifyThatStringIsOpaqueForCoreFoundation(nss)
-    checkUTF8View(test.encoded, nss)
+    checkUTF8View(test.encoded, nss, test.loc.withCurrentLoc())
   }
 
   for (name, batch) in UTF16Tests {
@@ -2455,7 +2421,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
 
       var nss = NonContiguousNSString(test.encoded)
       verifyThatStringIsOpaqueForCoreFoundation(nss)
-      checkUTF8View(expected, nss)
+      checkUTF8View(expected, nss, test.loc.withCurrentLoc())
     }
   }
 }
@@ -2478,7 +2444,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
         CFStringBuiltInEncodings.UTF8.toRaw()))
     assert(!CFStringGetCharactersPtr(cfstring))
 
-    checkUTF8View(bytes, cfstring)
+    checkUTF8View(bytes, cfstring, SourceLocStack().withCurrentLoc())
     _fixLifetime(bytes)
   }
 
@@ -2499,7 +2465,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
           CFStringBuiltInEncodings.UTF8.toRaw()))
       assert(!CFStringGetCharactersPtr(cfstring))
 
-      checkUTF8View(bytes, cfstring)
+      checkUTF8View(bytes, cfstring, SourceLocStack().withCurrentLoc())
     }
   }
 }
@@ -2516,7 +2482,7 @@ StringCookedViews.test("UTF16") {
         stopOnError: false)
 
     var nss = NonContiguousNSString(test.scalars)
-    checkUTF16View(expected, nss, test.loc)
+    checkUTF16View(expected, nss, test.loc.withCurrentLoc())
   }
 
   forStringsWithUnpairedSurrogates {
@@ -2530,16 +2496,26 @@ StringCookedViews.test("UTF16") {
         },
         stopOnError: false)
 
-    checkUTF16View(expected, subject, test.loc)
+    checkUTF16View(expected, subject, test.loc.withCurrentLoc())
   }
 }
 
 StringCookedViews.test("UnicodeScalars") {
+  for test in UTF8TestsSmokeTest {
+    let expectedScalars: [UnicodeScalar] =
+        Array(map(test.scalars) { UnicodeScalar($0) })
+    let subject: String = NonContiguousNSString(test.scalars)
+    checkSliceableWithBidirectionalIndex(expectedScalars,
+        subject.unicodeScalars, test.loc.withCurrentLoc())
+  }
+
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> () in
-    let expected = test.scalarsHead + test.scalarsRepairedTail
-    let actual: [UInt32] = Array(map(subject.unicodeScalars) { $0.value })
-    expectEqual(expected, actual)
+    let expectedScalars: [UnicodeScalar] =
+        Array(map(test.scalarsHead + test.scalarsRepairedTail) {
+            UnicodeScalar($0) })
+    checkSliceableWithBidirectionalIndex(expectedScalars,
+        subject.unicodeScalars, test.loc.withCurrentLoc())
   }
 }
 
