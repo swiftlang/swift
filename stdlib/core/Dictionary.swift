@@ -674,6 +674,14 @@ class _NativeDictionaryStorageOwnerBase
   }
 }
 
+/// TODO: Remove this #if and typealias when pointer conversion has been phased
+/// in.
+#if ENABLE_POINTER_CONVERSIONS
+typealias _FastEnumerationItemsPtr = AutoreleasingUnsafePointer<AnyObject?>
+#else
+typealias _FastEnumerationItemsPtr = UnsafePointer<AnyObject?>
+#endif
+
 /// This class is an artifact of the COW implementation.  This class only
 /// exists to keep separate retain counts separate for:
 /// - `Dictionary` and `NSDictionary`,
@@ -743,7 +751,7 @@ class _NativeDictionaryStorageOwnerBase
     var theState = state.memory
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = UnsafePointer<AnyObject?>(objects)
+      theState.itemsPtr = _FastEnumerationItemsPtr(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       theState.extra.0 = CUnsignedLong(nativeStorage.startIndex.offset)
     }
