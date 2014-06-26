@@ -982,6 +982,8 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
       for (; relativeDepth > 0; --relativeDepth)
         DC = DC->getParent();
+      assert(DC && "no decl context for archetype found");
+      if (!DC) return;
       ContextMangler.mangleContext(DC, BindGenerics::None);
     } else {
       if (relativeDepth != 0) {
