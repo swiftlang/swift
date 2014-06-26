@@ -924,8 +924,8 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 ElementwiseBridging:
   do {
     for object: Base in source {
-      let value = Swift.bridgeFromObjectiveCConditional(reinterpretCast(object), 
-                                                        BridgesToDerived.self)
+      let value = Swift.bridgeFromObjectiveCConditional(
+        reinterpretCast(object), BridgesToDerived.self)
       if _slowPath(!value) {
         break ElementwiseBridging
       }
