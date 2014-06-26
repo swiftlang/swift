@@ -309,7 +309,7 @@ class Bas : NSObject {
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
   // CHECK:   return [[RESULT]] : $()
-  func arrayArg(array: AnyObject[]) { }
+  func arrayArg(array: [AnyObject]) { }
   
   // CHECK-LABEL: sil @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
@@ -318,11 +318,11 @@ class Bas : NSObject {
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@owned Bas) -> @owned Array<AnyObject>
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
-  func arrayResult() -> AnyObject[] { return [] }
+  func arrayResult() -> [AnyObject] { return [] }
 
   // CHECK-LABEL: sil [transparent] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray
   // CHECK-LABEL: sil [transparent] @_TToFC13objc_bridging3Bass9arrayPropGSaSS_ : $@cc(objc_method) @thin (NSArray, Bas) -> ()
-  var arrayProp: String[] = []
+  var arrayProp: [String] = []
 }
 
 // CHECK-LABEL: sil @_TF13objc_bridging16applyStringBlock

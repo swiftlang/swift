@@ -20,7 +20,7 @@ func Pročprostěnemluvíčesky() { }
 // non-variadic tuples.
 
 // CHECK-LABEL: sil  @_TF8mangling9r13757744FT1xGSaSi__T_
-func r13757744(#x: Int[]) {}
+func r13757744(#x: [Int]) {}
 // CHECK-LABEL: sil  @_TF8mangling9r13757744Ft1xGSaSi__T_
 func r13757744(#x: Int...) {}
 

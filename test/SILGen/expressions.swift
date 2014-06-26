@@ -158,7 +158,7 @@ func scalar_to_tuple() {
 
 // CHECK-LABEL: sil  @_TF11expressions11array_alloc
 func array_alloc(n: Int) {
-  var a: Int[] = new Int[n]
+  var a: [Int] = new Int[n]
 }
 
 struct SomeStruct {
@@ -354,7 +354,7 @@ struct Spoon : Runcible, Mincible {
 }
 
 struct Hat<T> : Runcible {
-  typealias U = T[]
+  typealias U = [T]
   var free: Int { return 1 }
   var associated: U { get {} }
 
@@ -426,7 +426,7 @@ func tuple_element(var x: (Int, Float)) {
 }
 
 // CHECK-LABEL: sil  @_TF11expressions10containers
-func containers() -> (Int[], Dictionary<String, Int>) {
+func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 

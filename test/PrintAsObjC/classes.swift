@@ -127,9 +127,9 @@ class NotObjC {}
   func testIgnoredParam(_: Int) {}
   func testIgnoredParams(_: Int, again _: Int) {}
 
-  func testArrayBridging(a: Methods[]) {}
-  func testArrayBridging2(a: AnyObject[]) {}
-  func testArrayBridging3(a: String[]) {}
+  func testArrayBridging(a: [Methods]) {}
+  func testArrayBridging2(a: [AnyObject]) {}
+  func testArrayBridging3(a: [String]) {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -239,7 +239,7 @@ class MyObject : NSObject {}
   @IBOutlet var outlet: AnyObject
 
   var string = "abc"
-  var array: AnyObject[] = []
+  var array: [AnyObject] = []
   var dictionary: Dictionary<String, String> = [:]
 }
 
@@ -248,7 +248,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
-  override var bees : (AnyObject[])! {
+  override var bees : [AnyObject]! {
     get {
       return super.bees
     }
@@ -312,7 +312,7 @@ class MyObject : NSObject {}
   }
   
   // <rdar://problem/17165953> Swift: @lazy property reflects back into Objective-C with two properties, one for underlying storage
-  @lazy var cardPaths : String[] = []
+  @lazy var cardPaths : [String] = []
 }
 
 // CHECK-LABEL: @interface Subscripts3

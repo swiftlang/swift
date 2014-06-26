@@ -1170,7 +1170,7 @@ func uniformRandom(max: Int) -> Int {
   return random() % max
 }
 
-func pickRandom<T>(a: T[]) -> T {
+func pickRandom<T>(a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
@@ -1201,7 +1201,7 @@ func testDeleteChainCollisionRandomized() {
 
   let chainLength = 7
 
-  var knownKeys: TestKeyTy[] = []
+  var knownKeys: [TestKeyTy] = []
   func getKey(value: Int) -> TestKeyTy {
     for k in knownKeys {
       if k.value == value {
@@ -2783,7 +2783,7 @@ func test_BridgedFromObjC_Verbatim_ArrayOfDictionaries() {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = nsa as AnyObject[] as Dictionary<NSObject, AnyObject>[]
+  var a = nsa as [AnyObject] as [Dictionary<NSObject, AnyObject>]
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
@@ -2807,7 +2807,7 @@ func test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries() {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = nsa as AnyObject[] as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>[]
+  var a = nsa as [AnyObject] as [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()

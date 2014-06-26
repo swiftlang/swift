@@ -60,7 +60,7 @@ println()
 
 // Create an array of (String, Bool) pairs. <rdar://problem/16916422>
 do {
-  let x: (String, Bool)[] = [("foo", true)]
+  let x: [(String, Bool)] = [("foo", true)]
   println(x[0].0) // CHECK: foo
   println(x[0].1) // CHECK: true
 } while false
@@ -125,7 +125,7 @@ class Spoon: Runcible {
   let x: Int
   init(x: Int) { self.x = x }
 }
-let runceArray: Runcible[] = [Spoon(x: 219)]
+let runceArray: [Runcible] = [Spoon(x: 219)]
 // CHECK:      1 element
 // CHECK-NEXT:   {{.*}}Spoon
 // CHECK-NEXT:     x: 219

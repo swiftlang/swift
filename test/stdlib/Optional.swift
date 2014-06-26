@@ -84,7 +84,7 @@ println("forced extraction use: \(x!.successor()).")
 func testRelation(p: (Int?, Int?) -> Bool) {
   typealias optPair = (Int?, Int?)
   
-  let relationships: optPair[] = [
+  let relationships: [optPair] = [
     (1, 1), (1, 2), (2, 1), (1, .None), (.None, 1), (.None, .None)
   ]
 

@@ -47,7 +47,7 @@ println("Active X objects = \(activeXObjects)")
 // Bridge an array of an implicitly unwrapped bridged value type.
 func testConvertArrayOfImplicitUnwrappedValue() {
   println("Converting array of IOU of String to NSArray...")
-  var stringArr1: (String!)[] = ["Hello", "World"]
+  var stringArr1: [String!] = ["Hello", "World"]
 
   let stringNSArr1: NSArray = stringArr1
 
@@ -72,10 +72,10 @@ testConvertArrayOfImplicitUnwrappedValue()
 // Bridge an array of an implicitly unwrapped array value type.
 func testConvertArrayOfImplicitUnwrappedArray() {
   println("Converting array of IUO of Arrays of String to NSArray...")
-  var stringArr1: (String!)[] = ["Hello", "World"]
+  var stringArr1: [String!] = ["Hello", "World"]
   var stringArr2 = [getIUO("Welcome"), getIUO("Swift")]
 
-  var stringArrArr: (((String!)[])!)[] = []
+  var stringArrArr: [[String!]!] = []
   stringArrArr.append(getIUO(stringArr1))
   stringArrArr.append(getIUO(stringArr2))
 
@@ -99,7 +99,7 @@ func testConvertArrayOfImplicitUnwrappedArray() {
       println("Element \(index) is not an NSArray")
     }
 
-    // FIXME: Downcast to (String!)[]
+    // FIXME: Downcast to [String!]
   }
 }
 
@@ -112,7 +112,7 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
   nsarr.addObject(X(value: 1))
   nsarr.addObject(X(value: 2))
 
-  var arr: (X!)[] = _convertNSArrayToArray(nsarr)
+  var arr: [X!] = _convertNSArrayToArray(nsarr)
   
   // CHECK: Class array count = 2
   // CHECK: Element 0 has value X(1)
@@ -136,7 +136,7 @@ func testConvertToArrayOfImplicitUnwrappedString() {
   nsarr.addObject(NSString(string: "Hello"))
   nsarr.addObject(NSString(string: "World"))
 
-  var arr: (String!)[] = _convertNSArrayToArray(nsarr)
+  var arr: [String!] = _convertNSArrayToArray(nsarr)
   
   // CHECK: String array count = 2
   // CHECK: Element 0 has value Hello

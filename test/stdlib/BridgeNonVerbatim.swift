@@ -101,7 +101,7 @@ func testScope() {
 
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
-  let objects: Word[] = [0, 0]
+  let objects: [Word] = [0, 0]
 
   objects.withUnsafePointerToElements {
     nsx.getObjects(

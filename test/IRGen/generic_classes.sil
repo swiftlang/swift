@@ -117,7 +117,7 @@ sil @_TFC15generic_classes11RootGenericD : $@cc(method) @thin <T> (RootGeneric<T
 
 class RootGenericFixedLayout<T> {
   var x : UInt8
-  var y : T[]
+  var y : [T]
   var z : UInt8
 
   init()

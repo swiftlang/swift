@@ -70,7 +70,7 @@ func test() {
     var object = NSObject()
 
     var arrayInt = [10, 20, 30]
-    var arrayOptionalInt : Int?[] = [10, .None, 30, .None, 20]
+    var arrayOptionalInt : [Int?] = [10, .None, 30, .None, 20]
     var arrayString = ["Kate", "Sean", "Barry"]
     var arrayPerson = [Person(), Person()]
     var dictionary = [1 : "Kate", 2 : "Sean", 3 : "Barry"]

@@ -28,7 +28,7 @@ func testTakeActualArray() {
   for x in primes0 { primes1.append(x) }
 
   // Take the elements of primes1 in an Array
-  var primes2 : Int[] = primes1
+  var primes2 : [Int] = primes1
 
   // Check that the copy worked
   // CHECK-NEXT: <2> <3> <5> <7> <11> .

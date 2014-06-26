@@ -23,37 +23,37 @@ JoinTestCase.test("${ArrayType}") {
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[]]
+      let seq: [ArrayType] = [[]]
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[], []]
+      let seq: [ArrayType] = [[], []]
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[], [], []]
+      let seq: [ArrayType] = [[], [], []]
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ]]
+      let seq: [ArrayType] = [[ 1 ]]
       let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 2 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 2, 3 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 2, 3, 4, 5, 6 ], r)
     }
@@ -63,42 +63,42 @@ JoinTestCase.test("${ArrayType}") {
   if true {
     let separator: ArrayType = [ 42 ]
     if true {
-      let seq: ArrayType[] = []
+      let seq: [ArrayType] = []
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[]]
+      let seq: [ArrayType] = [[]]
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[], []]
+      let seq: [ArrayType] = [[], []]
       let r = join(separator, seq)
       expectEqual([ 42 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[], [], []]
+      let seq: [ArrayType] = [[], [], []]
       let r = join(separator, seq)
       expectEqual([ 42, 42 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ]]
+      let seq: [ArrayType] = [[ 1 ]]
       let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 42, 2 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 42, 2, 42, 3 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 2, 42, 3, 4, 42, 5, 6 ], r)
     }
@@ -108,42 +108,42 @@ JoinTestCase.test("${ArrayType}") {
   if true {
     let separator: ArrayType = [ 42, 4242 ]
     if true {
-      let seq: ArrayType[] = []
+      let seq: [ArrayType] = []
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[]]
+      let seq: [ArrayType] = [[]]
       let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
-      let seq: ArrayType[] = [[], []]
+      let seq: [ArrayType] = [[], []]
       let r = join(separator, seq)
       expectEqual([ 42, 4242 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[], [], []]
+      let seq: [ArrayType] = [[], [], []]
       let r = join(separator, seq)
       expectEqual([ 42, 4242, 42, 4242 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ]]
+      let seq: [ArrayType] = [[ 1 ]]
       let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 42, 4242, 2 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 42, 4242, 2, 42, 4242, 3 ], r)
     }
     if true {
-      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
       let r = join(separator, seq)
       expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
     }
@@ -155,7 +155,7 @@ JoinTestCase.test("${ArrayType}") {
 
   if true {
     let separator: ArrayType = [ 42, 4242 ]
-    let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+    let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
     let r = separator.join(seq)
     expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
   }
@@ -300,131 +300,131 @@ struct MinimalCollection : Collection {
 JoinTestCase.test("OperatorPlus") {
   // ExtensibleCollection + Sequence
   if true {
-    var ec: Int[] = []
-    var s = SequenceOf(Int[]())
-    var r: Int[] = ec + s
+    var ec: [Int] = []
+    var s = SequenceOf([Int]())
+    var r: [Int] = ec + s
     expectEqual([], r)
   }
   if true {
-    var ec: Int[] = []
+    var ec: [Int] = []
     var s = SequenceOf([ 4, 5, 6, 7 ])
-    var r: Int[] = ec + s
+    var r: [Int] = ec + s
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
-    var ec: Int[] = [ 1, 2, 3 ]
-    var s = SequenceOf(Int[]())
-    var r: Int[] = ec + s
+    var ec: [Int] = [ 1, 2, 3 ]
+    var s = SequenceOf([Int]())
+    var r: [Int] = ec + s
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
-    var ec: Int[] = [ 1, 2, 3 ]
+    var ec: [Int] = [ 1, 2, 3 ]
     var s = SequenceOf([ 4, 5, 6, 7 ])
-    var r: Int[] = ec + s
+    var r: [Int] = ec + s
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
   // Sequence + ExtensibleCollection
   if true {
-    var s = SequenceOf(Int[]())
-    var ec: Int[] = []
-    var r: Int[] = s + ec
+    var s = SequenceOf([Int]())
+    var ec: [Int] = []
+    var r: [Int] = s + ec
     expectEqual([], r)
   }
   if true {
-    var s = SequenceOf(Int[]())
-    var ec: Int[] = [ 4, 5, 6, 7 ]
-    var r: Int[] = s + ec
+    var s = SequenceOf([Int]())
+    var ec: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = s + ec
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var s = SequenceOf([ 1, 2, 3 ])
-    var ec: Int[] = []
-    var r: Int[] = s + ec
+    var ec: [Int] = []
+    var r: [Int] = s + ec
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var s = SequenceOf([ 1, 2, 3 ])
-    var ec: Int[] = [ 4, 5, 6, 7]
-    var r: Int[] = s + ec
+    var ec: [Int] = [ 4, 5, 6, 7]
+    var r: [Int] = s + ec
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
   // ExtensibleCollection + Collection
   if true {
-    var ec: Int[] = []
-    var c = MinimalCollection(Int[]())
-    var r: Int[] = ec + c
+    var ec: [Int] = []
+    var c = MinimalCollection([Int]())
+    var r: [Int] = ec + c
     expectEqual([], r)
   }
   if true {
-    var ec: Int[] = []
+    var ec: [Int] = []
     var c = MinimalCollection([ 4, 5, 6, 7 ])
-    var r: Int[] = ec + c
+    var r: [Int] = ec + c
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
-    var ec: Int[] = [ 1, 2, 3 ]
-    var c = MinimalCollection(Int[]())
-    var r: Int[] = ec + c
+    var ec: [Int] = [ 1, 2, 3 ]
+    var c = MinimalCollection([Int]())
+    var r: [Int] = ec + c
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
-    var ec: Int[] = [ 1, 2, 3 ]
+    var ec: [Int] = [ 1, 2, 3 ]
     var c = MinimalCollection([ 4, 5, 6, 7 ])
-    var r: Int[] = ec + c
+    var r: [Int] = ec + c
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
   // ExtensibleCollection + same ExtensibleCollection
   if true {
-    var ec1: Int[] = []
-    var ec2: Int[] = []
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = []
+    var ec2: [Int] = []
+    var r: [Int] = ec1 + ec2
     expectEqual([], r)
   }
   if true {
-    var ec1: Int[] = []
-    var ec2: Int[] = [ 4, 5, 6, 7 ]
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = []
+    var ec2: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = ec1 + ec2
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
-    var ec1: Int[] = [ 1, 2, 3 ]
-    var ec2: Int[] = []
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2: [Int] = []
+    var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
-    var ec1: Int[] = [ 1, 2, 3 ]
-    var ec2: Int[] = [ 4, 5, 6, 7 ]
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
   // ExtensibleCollection + other ExtensibleCollection
   if true {
-    var ec1: Int[] = []
-    var ec2 = MockExtensibleCollection(Int[]())
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = []
+    var ec2 = MockExtensibleCollection([Int]())
+    var r: [Int] = ec1 + ec2
     expectEqual([], r)
   }
   if true {
-    var ec1: Int[] = []
+    var ec1: [Int] = []
     var ec2 = MockExtensibleCollection([ 4, 5, 6, 7 ])
-    var r: Int[] = ec1 + ec2
+    var r: [Int] = ec1 + ec2
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
-    var ec1: Int[] = [ 1, 2, 3 ]
-    var ec2 = MockExtensibleCollection(Int[]())
-    var r: Int[] = ec1 + ec2
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2 = MockExtensibleCollection([Int]())
+    var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
-    var ec1: Int[] = [ 1, 2, 3 ]
+    var ec1: [Int] = [ 1, 2, 3 ]
     var ec2 = MockExtensibleCollection([ 4, 5, 6, 7 ])
-    var r: Int[] = ec1 + ec2
+    var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 }

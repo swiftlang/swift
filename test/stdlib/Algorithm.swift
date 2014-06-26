@@ -11,7 +11,7 @@ extension CodePoints {
 func print(x: CodePoints) { print(String(x._base)) }
 func println(x: CodePoints) { println(String(x._base)) }
 
-func println(x: CodePoints[]) {
+func println(x: [CodePoints]) {
   print("[ ")
   var prefix=""
   for s in x {
@@ -53,7 +53,7 @@ testSplit()
 // generic algorithms that work on Sequences, so need a lightweight
 // way to get Streams out of them.
 operator prefix ^ {}
-@prefix func ^ (x: Int[]) -> Array<Int>.GeneratorType
+@prefix func ^ (x: [Int]) -> Array<Int>.GeneratorType
 { return x.generate() }
 
 // FIXME: This class is a temporary workaround for
@@ -61,7 +61,7 @@ operator prefix ^ {}
 struct VecIntStream : Generator, Sequence {
   typealias Element = Int
 
-  init(_ owner: Int[]) {
+  init(_ owner: [Int]) {
     self.owner = owner
     self.value = owner.generate()
   }
@@ -71,12 +71,12 @@ struct VecIntStream : Generator, Sequence {
   func generate() -> VecIntStream {
     return self
   }
-  var owner: Int[]
+  var owner: [Int]
   var value: Array<Int>.GeneratorType
 }
 
 operator prefix ^^ {}
-@prefix func ^^ (x: Int[]) -> VecIntStream
+@prefix func ^^ (x: [Int]) -> VecIntStream
 { 
   var result = Array<Int>()
   

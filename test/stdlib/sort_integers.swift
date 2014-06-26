@@ -3,8 +3,8 @@
 // Generate all possible permutes.
 func _permuteInternal(
   elem: Int, size : Int,
-  inout perm : Int[], inout visited : Bool[],
-  verify : (Int[]) -> ()
+  inout perm : [Int], inout visited : [Bool],
+  verify : ([Int]) -> ()
 ) {
   if (elem == size) {
     verify(perm)
@@ -23,16 +23,16 @@ func _permuteInternal(
 }
 
 // Convenience wrapper for the permute method.
-func permute(size : Int, verify : (Int[]) -> ()) {
-  var perm = Int[](count: size, repeatedValue: 0)
-  var visited = Bool[](count: size, repeatedValue: false)
+func permute(size : Int, verify : ([Int]) -> ()) {
+  var perm = [Int](count: size, repeatedValue: 0)
+  var visited = [Bool](count: size, repeatedValue: false)
   _permuteInternal(0, size, &perm, &visited, verify)
 }
 
 
 // A simple random number generator.
-func randomize(size : Int, verify : (Int[]) -> ()) {
-  var arr : Int[] = []
+func randomize(size : Int, verify : ([Int]) -> ()) {
+  var arr : [Int] = []
   var N = 1
   var M = 1
   for i in 0..<size {
@@ -47,7 +47,7 @@ func randomize(size : Int, verify : (Int[]) -> ()) {
 }
 
 // Verify the permute method itself:
-let printer : (Int[]) -> () = {
+let printer : ([Int]) -> () = {
   println($0)
 }
 //CHECK: [0, 1, 2]
@@ -59,7 +59,7 @@ let printer : (Int[]) -> () = {
 permute(3, printer)
 
 // Now, let's verify the sort.
-let sort_verifier : (Int[]) -> () = {
+let sort_verifier : ([Int]) -> () = {
     var y = sorted($0)
     for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
@@ -77,7 +77,7 @@ permute(7, sort_verifier)
 println("Test1 - Done")
 
 // Now, let's verify the sort.
-let partition_verifier : (Int[]) -> () = {
+let partition_verifier : ([Int]) -> () = {
     var y = $0
     // Partition() returns the index to the pivot value.
     let idx = partition(&y, 0..<y.count)

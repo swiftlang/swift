@@ -21,7 +21,7 @@ println("NSData:")
 autoreleasepool {
   var bytes: UnsafePointer<UInt8>
   do {
-    let data = NSData(bytes: [2, 3, 5, 7] as UInt8[], length: 4)
+    let data = NSData(bytes: [2, 3, 5, 7] as [UInt8], length: 4)
     hangCanary(data)
     bytes = UnsafePointer<UInt8>(data.bytes)
   } while false // CHECK-NOT: died
@@ -36,7 +36,7 @@ println("AnyObject:")
 autoreleasepool {
   var bytes: UnsafePointer<UInt8>
   do {
-    let data = NSData(bytes: [11, 13, 17, 19] as UInt8[], length: 4)
+    let data = NSData(bytes: [11, 13, 17, 19] as [UInt8], length: 4)
     hangCanary(data)
     let dataAsAny: AnyObject = data
     bytes = UnsafePointer<UInt8>(dataAsAny.bytes!)

@@ -506,7 +506,7 @@ test_ObjectPrinting()
 // CHECK: test_ObjectPrinting done
 
 func test_ArrayPrinting() {
-  var arrayOfInts: Int[] = []
+  var arrayOfInts: [Int] = []
   printedIs(arrayOfInts, "[]")
 
   printedIs([ 1 ], "[1]")

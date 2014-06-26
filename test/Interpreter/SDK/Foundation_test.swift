@@ -172,7 +172,7 @@ for nsd: NSDictionary! in nsa3 {
   let p:NSDictionary = nsd
 }
 
-var nsa4: NSDictionary![] = []
+var nsa4: [NSDictionary!] = []
 for nsd2: NSDictionary! in nsa4 {
   let p:NSDictionary = nsd2
 }

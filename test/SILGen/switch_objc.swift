@@ -40,7 +40,7 @@ func bridgedIs(obj: AnyObject) {
 
     // CHECK: [[ARRAY_BRIDGE_FN:%[0-9]+]] = function_ref @_TFSa20bridgeFromObjectiveCU__fMGSaQ__FCSo7NSArrayGSaQ__
     // CHECK: apply [[ARRAY_BRIDGE_FN]]<NSString>
-    case is NSString[]:
+    case is [NSString]:
       ()
 
     default:

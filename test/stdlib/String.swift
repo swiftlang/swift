@@ -9,12 +9,12 @@ StringTests.test("sizeof") {
 }
 
 func checkUnicodeScalarViewIteration(
-    expectedScalars: UInt32[], str: String) -> AssertionResult {
+    expectedScalars: [UInt32], str: String) -> AssertionResult {
   if true {
     var us = str.unicodeScalars
     var i = us.startIndex
     var end = us.endIndex
-    var decoded: UInt32[] = []
+    var decoded: [UInt32] = []
     while i != end {
       decoded += us[i].value
       i = i.successor()
@@ -30,7 +30,7 @@ func checkUnicodeScalarViewIteration(
     var us = str.unicodeScalars
     var start = us.startIndex
     var i = us.endIndex
-    var decoded: UInt32[] = []
+    var decoded: [UInt32] = []
     while i != start {
       i = i.predecessor()
       decoded += us[i].value
@@ -123,7 +123,7 @@ func testStringToInt() {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     initialValue: Int, 
-    modification: (inout chars: UTF8.CodeUnit[]) -> () ) 
+    modification: (inout chars: [UTF8.CodeUnit]) -> () ) 
   {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
@@ -135,7 +135,7 @@ func testStringToInt() {
   var minChars = String(Int.min).utf8
 
   testConvertabilityOfStringWithModification(Int.min) { 
-    (inout chars: UTF8.CodeUnit[]) in ()
+    (inout chars: [UTF8.CodeUnit]) in ()
   }
   // CHECK-NEXT: {{-9223372036854775808|-2147483648}} is an Int
 
@@ -161,7 +161,7 @@ func testStringToInt() {
 
 
   testConvertabilityOfStringWithModification(Int.max) { 
-    (inout chars: UTF8.CodeUnit[]) in ()
+    (inout chars: [UTF8.CodeUnit]) in ()
   }
   // CHECK-NEXT: {{9223372036854775807|2147483647}} is an Int
 

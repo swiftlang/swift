@@ -15,7 +15,7 @@ struct Print<T : Printable> : Sink {
 
 var z = [ 1, 2, 3 ]
 
-func printArray<T : Printable>(x: T[]) {
+func printArray<T : Printable>(x: [T]) {
   pipe(SequenceOf(x), SinkOf(Print<T>()))
   println()
 }

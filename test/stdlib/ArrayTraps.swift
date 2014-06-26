@@ -37,7 +37,7 @@ if arg == "OutOfBounds3" {
 }
 
 if arg == "OutOfBounds4" {
-  var a: Int[] = []
+  var a: [Int] = []
   println("OK")
   a.removeLast()
 }
@@ -46,23 +46,23 @@ class Base { }
 class Derived : Base { }
 
 if arg == "Downcast1" {
-  let ba: Base[] = [Derived(), Base()]
+  let ba: [Base] = [Derived(), Base()]
   // <rdar://problem/17340393> Array downcast should do deferred checking
   // FIXME: The "OK" should be moved after "let d0 = da[0]" when we
   // get deferred checking.
   println("OK")
-  let da: Derived[] = _arrayDownCast(ba)
+  let da: [Derived] = _arrayDownCast(ba)
   let d0 = da[0]
   let d1 = da[1]
 }
 
 if arg == "Downcast2" {
-  let a: AnyObject[] = ["String", 1]
+  let a: [AnyObject] = ["String", 1]
   // <rdar://problem/17340393> Array downcast should do deferred checking
   // FIXME: The "OK" should be moved after "let s0 = sa[0]" when we
   // get deferred checking.
   println("OK")
-  let sa: NSString[] = _arrayBridgeFromObjectiveC(a)
+  let sa: [NSString] = _arrayBridgeFromObjectiveC(a)
   let s0 = sa[0]
   let s1 = sa[1]
 }

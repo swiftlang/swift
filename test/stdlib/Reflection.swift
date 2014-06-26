@@ -587,7 +587,7 @@ struct Pear<T, U> { let fst: T; let snd: U }
 class SubScene: SKScene {
   let foo = 12_131_415
   let bar = "boom"
-  let bas: Pear<Int, Any?[]> = Pear(fst: 219, snd: ["boom", 123, 456.0])
+  let bas: Pear<Int, [Any?]> = Pear(fst: 219, snd: ["boom", 123, 456.0])
   let zim = 20721
 }
 

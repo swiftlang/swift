@@ -10,11 +10,11 @@ func _convertStringToNSString(string: String) -> NSString
 func _convertNSStringToString(nsstring: NSString) -> String
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
-  return T[]()
+func _convertNSArrayToArray<T>(nsarr: NSArray) -> [T] {
+  return [T]()
 }
 
-func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
+func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return NSArray()
 }
 

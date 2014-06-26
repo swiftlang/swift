@@ -73,10 +73,10 @@ println(tuple)
 // Arrays are represented as an instantiation of Array.
 // CHECK-DAG: null, null, metadata ![[Array:.*]]} ; [ DW_TAG_structure_type ] [Array]
 // CHECK-DAG: metadata ![[Array]], i32 0,{{.*}}[ DW_TAG_variable ] [array_of_tuples] [line [[@LINE+1]]] [def]
-var array_of_tuples : (a : Int, b : Int)[] = [(1,2)]
-var twod : [Int][] = [[1]]
+var array_of_tuples : [(a : Int, b : Int)] = [(1,2)]
+var twod : [[Int]] = [[1]]
 
-func bar( x: (a : Int, b : Int)[], y: [Int][] ) {
+func bar( x: [(a : Int, b : Int)], y: [[Int]] ) {
 }
 
 

@@ -121,7 +121,7 @@ func testAddressOnlyLet<T>(a : T) {
 }
 
 
-func produceSubscriptableRValue() -> String[] {}
+func produceSubscriptableRValue() -> [String] {}
 
 // CHECK-LABEL: sil @{{.*}}subscriptRValue
 func subscriptRValue() {

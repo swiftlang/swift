@@ -245,7 +245,7 @@ tryRunce(Optionable(Spoon()))
 tryRunce(Optionable(Hat()))
 
 func optionableInts() {
-  var optionables: Optionable<Int>[] = [
+  var optionables: [Optionable<Int>] = [
     .Mere(219),
     .Nought,
     .Nought,
@@ -285,7 +285,7 @@ func println(suit: Suit) {
 }
 
 func optionableSuits() {
-  var optionables: Optionable<Suit>[] = [
+  var optionables: [Optionable<Suit>] = [
     .Mere(.Spades),
     .Mere(.Diamonds),
     .Nought,
@@ -309,7 +309,7 @@ func optionableSuits() {
 optionableSuits()
 
 func optionableRuncibles<T : Runcible>(x: T) {
-  var optionables: Optionable<T>[] = [
+  var optionables: [Optionable<T>] = [
     .Mere(x),
     .Nought,
     .Mere(x),

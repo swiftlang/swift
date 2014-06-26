@@ -23,7 +23,7 @@ func posix_read(fd: Int32, buf: CMutableVoidPointer, sz: UInt) -> Int
 @final class Keyboard {
   init() {  }
 
-  func read(inout buf: UInt8[]) -> Int {
+  func read(inout buf: [UInt8]) -> Int {
     // ensure uniqueness before we allow buf to be modified
     buf.reserveCapacity(0) 
     var r = buf.withUnsafePointerToElements {
@@ -69,7 +69,7 @@ var kbd : Keyboard = Keyboard()
 @final class Console {
   init() { }
 
-  func write(inout buf: UInt8[]) -> Int {
+  func write(inout buf: [UInt8]) -> Int {
     let count = buf.count
     var r = 0
     for var start = 0; start < count; start += 1024 {

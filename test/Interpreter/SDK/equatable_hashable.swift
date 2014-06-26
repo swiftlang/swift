@@ -58,7 +58,7 @@ func testEquatable<E: Equatable>(x: E) {}
 
 func test_Equatable() {
   // CHECK-NEXT: Found 2.5 at index 1
-  let array: NSNumber[] = [1, 2.5, 3.14159]
+  let array: [NSNumber] = [1, 2.5, 3.14159]
   if let index = find(array, 2.5) {
     println("Found \(array[index]) at index \(index)")
   } else {

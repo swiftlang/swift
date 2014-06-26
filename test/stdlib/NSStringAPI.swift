@@ -13,7 +13,7 @@ import Foundation
 var NSStringAPIs = TestCase("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
-  let availableEncodings: NSStringEncoding[] = String.availableStringEncodings()
+  let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
   expectNotEqual(0, availableEncodings.count)
 
   let defaultCStringEncoding = String.defaultCStringEncoding()
@@ -250,7 +250,7 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
 
   if true {
     var outputName = "None Found"
-    var outputArray: String[] = [ "foo", "bar" ]
+    var outputArray: [String] = [ "foo", "bar" ]
     var count = nonExistentPath.completePathIntoString(
         &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
 
@@ -275,7 +275,7 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
 
   if true {
     var outputName = "None Found"
-    var outputArray: String[] = [ "foo", "bar" ]
+    var outputArray: [String] = [ "foo", "bar" ]
     var count = existingPath.completePathIntoString(
         &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
 
@@ -308,8 +308,8 @@ NSStringAPIs.test("componentsSeparatedByString(_:)") {
 NSStringAPIs.test("cStringUsingEncoding(_:)") {
   expectEmpty("абв".cStringUsingEncoding(NSASCIIStringEncoding))
 
-  let expectedBytes: UInt8[] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
-  var expectedStr: CChar[] = expectedBytes.map { $0.asSigned() }
+  let expectedBytes: [UInt8] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
+  var expectedStr: [CChar] = expectedBytes.map { $0.asSigned() }
   expectEqual(expectedStr,
       "абв".cStringUsingEncoding(NSUTF8StringEncoding)!)
 }
@@ -321,7 +321,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
     let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
     let bytes = Array(UnsafeArray(
         start: UnsafePointer<UInt8>(data!.bytes), length: data!.length))
-    let expectedBytes: UInt8[] = [
+    let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]
     expectTrue(equal(expectedBytes, bytes))
@@ -340,7 +340,7 @@ NSStringAPIs.test("decomposedStringWithCompatibilityMapping") {
 }
 
 NSStringAPIs.test("enumerateLines(_:)") {
-  var lines: String[] = []
+  var lines: [String] = []
   "abc\n\ndefghi\njklm".enumerateLines {
     (line: String, inout stop: Bool)
   in
@@ -356,9 +356,9 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = advance(s.startIndex, 5)
   let endIndex = advance(s.startIndex, 62)
-  var tags: String[] = []
-  var tokens: String[] = []
-  var sentences: String[] = []
+  var tags: [String] = []
+  var tokens: [String] = []
+  var sentences: [String] = []
   s.enumerateLinguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: NSLinguisticTaggerOptions(0),
@@ -387,7 +387,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   // FIXME: this might need to be adjusted to 5 when we implement
   // grapheme clusters properly.
   let endIndex = advance(s.startIndex, 7)
-  var substrings: String[] = []
+  var substrings: [String] = []
   s.enumerateSubstringsInRange(startIndex..<endIndex,
       options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
     (substring: String, substringRange: Range<String.Index>,
@@ -401,20 +401,20 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
 }
 
 NSStringAPIs.test("fastestEncoding") {
-  let availableEncodings: NSStringEncoding[] = String.availableStringEncodings()
+  let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
   expectTrue(contains(availableEncodings, "abc".fastestEncoding))
 }
 
 NSStringAPIs.test("fileSystemRepresentation()") {
   if true {
-    let expectedStr: CChar[] = Array(map("abc\0".utf8) { $0.asSigned() })
+    let expectedStr: [CChar] = Array(map("abc\0".utf8) { $0.asSigned() })
     expectEqual(expectedStr, "abc".fileSystemRepresentation())
   }
 
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr: CChar[] =
+    let expectedStr: [CChar] =
         Array(map("\u305f\u3099くてん\0".utf8) { $0.asSigned() })
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
@@ -427,11 +427,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
   if true {
     // 'maxLength' is limiting.
     let bufferLength = 100
-    var expectedStr: UInt8[] = Array("def где ".utf8)
+    var expectedStr: [UInt8] = Array("def где ".utf8)
     while (expectedStr.count != bufferLength) {
       expectedStr += 0xff
     }
-    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -448,11 +448,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     // 'bufferLength' is limiting.  Note that the buffer is not filled
     // completely, since doing that would break a UTF sequence.
     let bufferLength = 5
-    var expectedStr: UInt8[] = Array("def ".utf8)
+    var expectedStr: [UInt8] = Array("def ".utf8)
     while (expectedStr.count != bufferLength) {
       expectedStr += 0xff
     }
-    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
@@ -468,11 +468,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
   if true {
     // 'range' is converted completely.
     let bufferLength = 100
-    var expectedStr: UInt8[] = Array("def где gh жз ".utf8)
+    var expectedStr: [UInt8] = Array("def где gh жз ".utf8)
     while (expectedStr.count != bufferLength) {
       expectedStr += 0xff
     }
-    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -488,11 +488,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
   if true {
     // Inappropriate encoding.
     let bufferLength = 100
-    var expectedStr: UInt8[] = Array("def ".utf8)
+    var expectedStr: [UInt8] = Array("def ".utf8)
     while (expectedStr.count != bufferLength) {
       expectedStr += 0xff
     }
-    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
@@ -511,18 +511,18 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   if true {
     let bufferLength = 16
-    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     var result = s.getCString(&buffer, maxLength: 100,
         encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
   if true {
     let bufferLength = 17
-    var expectedStr: CChar[] = Array(map("abc あかさた\0".utf8) { $0.asSigned() })
+    var expectedStr: [CChar] = Array(map("abc あかさた\0".utf8) { $0.asSigned() })
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
-    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     var result = s.getCString(&buffer, maxLength: 100,
         encoding: NSUTF8StringEncoding)
     expectTrue(result)
@@ -530,7 +530,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   }
   if true {
     let bufferLength = 100
-    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     var result = s.getCString(&buffer, maxLength: 8,
         encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -543,18 +543,18 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   var s = "abc だくてん"
   if true {
     let bufferLength = 16
-    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     var result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
     expectFalse(result)
   }
   if true {
     let bufferLength = 100
-    var expectedStr: CChar[] =
+    var expectedStr: [CChar] =
         Array(map("abc \u305f\u3099くてん\0".utf8) { $0.asSigned() })
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
-    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     expectTrue(s.getFileSystemRepresentation(&buffer, maxLength: bufferLength))
     expectTrue(equal(expectedStr, buffer))
   }
@@ -600,7 +600,7 @@ NSStringAPIs.test("hash") {
 
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
   var s: String = "abc あかさた"
-  var bytes: UInt8[] = Array(s.utf8)
+  var bytes: [UInt8] = Array(s.utf8)
   expectOptionalEqual(s, String.stringWithBytes(bytes, length: bytes.count,
       encoding: NSUTF8StringEncoding))
 
@@ -617,7 +617,7 @@ NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
 
 NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
   var s: String = "abc あかさた"
-  var bytes: UInt8[] = Array(s.utf8)
+  var bytes: [UInt8] = Array(s.utf8)
   expectOptionalEqual(s, String.stringWithBytesNoCopy(&bytes,
       length: bytes.count, encoding: NSUTF8StringEncoding,
       freeWhenDone: false))
@@ -635,14 +635,14 @@ NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
 
 NSStringAPIs.test("init(utf16CodeUnits:count:)") {
   let expected = "abc абв \U0001F60A"
-  let chars: unichar[] = Array(expected.utf16)
+  let chars: [unichar] = Array(expected.utf16)
 
   expectEqual(expected, String(utf16CodeUnits: chars, count: chars.count))
 }
 
 NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
   let expected = "abc абв \U0001F60A"
-  let chars: unichar[] = Array(expected.utf16)
+  let chars: [unichar] = Array(expected.utf16)
 
   expectEqual(expected, String(utf16CodeUnitsNoCopy: chars,
       count: chars.count, freeWhenDone: false))
@@ -656,7 +656,7 @@ NSStringAPIs.test("init(format:_:...)") {
 
 NSStringAPIs.test("init(format:arguments:)") {
   let world: NSString = "world"
-  let args: CVarArg[] = [ world, 42 ]
+  let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42",
       String(format: "Hello, %@!%%%ld", arguments: args))
 }
@@ -671,7 +671,7 @@ NSStringAPIs.test("init(format:locale:_:...)") {
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
   let world: NSString = "world"
-  let args: CVarArg[] = [ world, 42 ]
+  let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
@@ -706,7 +706,7 @@ NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRange
   let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = advance(s.startIndex, 5)
   let endIndex = advance(s.startIndex, 17)
-  var tokenRanges: Range<String.Index>[] = []
+  var tokenRanges: [Range<String.Index>] = []
   var tags = s.linguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: NSLinguisticTaggerOptions(0),
@@ -816,7 +816,7 @@ NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
 
 NSStringAPIs.test("propertyList()") {
   expectEqual([ "foo", "bar" ],
-      "(\"foo\", \"bar\")".propertyList() as String[])
+      "(\"foo\", \"bar\")".propertyList() as [String])
 }
 
 NSStringAPIs.test("propertyListFromStringsFileFormat()") {
@@ -1066,7 +1066,7 @@ func getIllFormedUTF8String2() -> (CString, dealloc: ()->()) {
   return (CString(up), { up.dealloc(100) })
 }
 
-func asCCharArray(a: UInt8[]) -> CChar[] {
+func asCCharArray(a: [UInt8]) -> [CChar] {
   return a.map { $0.asSigned() }
 }
 

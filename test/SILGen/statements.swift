@@ -190,7 +190,7 @@ class C {}
 
 func use(c: C) {}
 
-func for_each_loop(x: C[]) {
+func for_each_loop(x: [C]) {
   for i in x {
     use(i)
   }

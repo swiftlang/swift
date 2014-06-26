@@ -9,7 +9,7 @@
 // CHECK: 30
 // CHECK: hello world
 func main() {
-	var arrOpt : (Int?)[] = [10,.None,20,.None,30]
+	var arrOpt : [Int?] = [10,.None,20,.None,30]
 	for item in arrOpt {
 		switch item {
 			case .None:

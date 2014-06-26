@@ -8,7 +8,7 @@ struct Bundle {
     locations = Array()
   }
   var name = String()
-  var locations: String[]
+  var locations: [String]
 }
 
 var a = HeapBuffer<Bundle,Int>(HeapBufferStorage<Bundle,Int>.self, Bundle(), 10)

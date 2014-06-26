@@ -13,6 +13,6 @@
 // As a workaround the devirtualizer checks that the array size match as
 // expected an bail if this is not the case.
 
-func asHex(a: UInt8[]) -> String {
+func asHex(a: [UInt8]) -> String {
   return "".join(a.map { "0x" + String($0, radix: 16)})
 }

@@ -6,7 +6,7 @@
 //CHECK-NOT: strong_retain
 //CHECK-NOT: strong_release
 //CHECK: return
-func swapByIndex(inout A : Int8[], x : Int, y : Int) {
+func swapByIndex(inout A : [Int8], x : Int, y : Int) {
   swap(&A[x],&A[y])
 }
 

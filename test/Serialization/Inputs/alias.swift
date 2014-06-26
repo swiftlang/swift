@@ -17,7 +17,7 @@ extension Int {
   typealias EspeciallyMagicalInt = Int64
 }
 
-typealias IntSlice = Int[]
+typealias IntSlice = [Int]
 
 
 struct Base {

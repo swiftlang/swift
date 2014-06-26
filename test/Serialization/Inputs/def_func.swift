@@ -14,7 +14,7 @@ func useNested((x: Int, y: Int), #n: Int) {}
 
 func variadic(#x: Double, y: Int...) {}
 
-func slice(#x: Int[]) {}
+func slice(#x: [Int]) {}
 func optional(#x: Int?) {}
 
 func overloaded(#x: Int) {}

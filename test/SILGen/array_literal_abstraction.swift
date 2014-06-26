@@ -5,7 +5,7 @@
 
 // CHECK-LABEL: sil @_TF25array_literal_abstraction14array_of_funcsFT_GSaFT_T__
 // CHECK:         alloc_array $@callee_owned (@out (), @in ()) -> ()
-func array_of_funcs() -> (() -> ())[] {
+func array_of_funcs() -> [(() -> ())] {
   return [{}, {}]
 }
 
