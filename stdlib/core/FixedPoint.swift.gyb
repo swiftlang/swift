@@ -278,7 +278,7 @@ extension ${Self} : RandomAccessIndex {
 
 % for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   @transparent @public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     var tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
@@ -288,7 +288,7 @@ extension ${Self} : RandomAccessIndex {
   /// Operations that return an overflow bit in addition to a partial result,
   /// helpful for checking for overflow when you want to handle it.
   @transparent @public
-  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
     if rhs == 0 {
       return (0, true)
     }

@@ -44,27 +44,27 @@
 }
 
 extension Bit : IntegerArithmetic {
-  static func _withOverflow(x: Int, _ b: Bool) -> (Bit, Bool) {
-    return (Bit.fromRaw(x)!, b)
+  static func _withOverflow(v: (Int, overflow: Bool)) -> (Bit, overflow: Bool) {
+    return (Bit.fromRaw(v.0)!, v.overflow)
   }
   
-  @public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.addWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.subtractWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.multiplyWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func modulusWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+  @public static func modulusWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.modulusWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 

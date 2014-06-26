@@ -21,7 +21,7 @@
 
 @public protocol _IntegerArithmetic {
 % for name,_ in integerBinaryOps:
-  class func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, Bool)
+  class func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
 
