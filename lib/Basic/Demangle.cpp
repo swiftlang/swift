@@ -1963,15 +1963,10 @@ private:
         break;
       case SugarType::Array: {
         Node *type = pointer->getChild(1)->getChild(0);
-        bool needs_parens = false;
-        if (findSugar(type) != SugarType::None)
-          needs_parens = true;
-        if (needs_parens)
-          Printer << "(";
+        (void)findSugar(type);
+        Printer << "[";
         print(type);
-        if (needs_parens)
-          Printer << ")";
-        Printer << "[]";
+        Printer << "]";
       }
         break;
     }

@@ -22,7 +22,7 @@
 ; CHECK: _TtSq ---> Swift.Optional
 ; CHECK: _TtSS ---> Swift.String
 ; CHECK: _TtSu ---> Swift.UInt
-; CHECK: _TtGSaSS_ ---> Swift.String[]
+; CHECK: _TtGSaSS_ ---> [Swift.String]
 ; CHECK: _TtGSqSS_ ---> Swift.String?
 ; CHECK: _TtGCSs10DictionarySSSi_ ---> Swift.Dictionary<Swift.String, Swift.Int>
 ; CHECK: _TtVSs7CString ---> Swift.CString
@@ -138,8 +138,8 @@
 ; CHECK: _TtXwC10attributes10SwiftClass ---> @weak attributes.SwiftClass
 ; CHECK: _TtXoC10attributes10SwiftClass ---> @unowned attributes.SwiftClass
 ; CHECK: _TtERR ---> <ERROR TYPE>
-; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> (sugar.MyClass[])?
-; CHECK: _TtGSaGSqC5sugar7MyClass__ ---> (sugar.MyClass?)[]
+; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> ([sugar.MyClass])?
+; CHECK: _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
 ; CHECK: _TtGV12generic_args7WrapperQq_FS0_4initUS_9AProtocol__FMGS0_Q__US1___FT4fromGS0_Q___GS0_Qd____ ---> generic_args.Wrapper<(archetype 0 of generic_args.Wrapper.init <A : generic_args.AProtocol>(generic_args.Wrapper<A>.Type) -> <B : generic_args.AProtocol>(from : generic_args.Wrapper<B>) -> generic_args.Wrapper<A>)>
 ; CHECK: _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF
 ; CHECK: _TtaSs3Int ---> Swift.Int
@@ -148,8 +148,8 @@
 ; CHECK: _TTRG0_R_XFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__ ---> reabstraction thunk helper <T_0_0> from @callee_owned (@in switch_abstraction.A) -> (@out T_0_0) to @callee_owned (@unowned switch_abstraction.A) -> (@out T_0_0)
 ; CHECK: _TFCF5types1gFT1bSb_T_L0_10Collection3zimfS0_FT_T_ ---> types.(g (b : Swift.Bool) -> ()).(Collection #2).zim (types.(g (b : Swift.Bool) -> ()).(Collection #2))() -> ()
 ; CHECK: _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> capture_promotion.(test_capture_promotion () -> () -> Swift.Int).(closure #1) with unmangled suffix "_promote0"
-; CHECK: _TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> Swift._Process.(variable initialization expression)._arguments : Swift.String[] with unmangled suffix "U_FT_GSaSS_"
-; CHECK: _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : Swift.String[]).(variable initialization expression).(closure #1)
+; CHECK: _TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> Swift._Process.(variable initialization expression)._arguments : [Swift.String] with unmangled suffix "U_FT_GSaSS_"
+; CHECK: _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : [Swift.String]).(variable initialization expression).(closure #1)
 ; CHECK: _TFCSo1AE ---> ObjectiveC.A.__ivar_destroyer
 ; CHECK: _TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
 ; CHECK: _TTWC13call_protocol1CS_1PFS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (@inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P
