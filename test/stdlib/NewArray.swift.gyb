@@ -134,7 +134,33 @@ where T.GeneratorType.Element == T._Buffer.Element,
   x[x.endIndex.predecessor()] = 17
   let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
-  
+
+  func checkReallocations(
+    var a: T, growthDescription: String, growBy1: (inout _: T)->()
+  ) -> () {
+    var reallocations = 0
+
+    // Note: right now this test is dependent on a growth factor of 2.
+    // It's possible that factor will change, but (cursory) testing
+    // has shown that using 1.5, the other popular growth factor,
+    // slows things down.
+    for _ in a.count..<(a.capacity * 4) {
+      let oldId = bufferID(a)
+      growBy1(&a)
+      if oldId != bufferID(a) {
+        ++reallocations
+      }
+    }
+    
+    if reallocations > 3 {
+      println(
+        "Unexpectedly found \(reallocations) reallocations "
+        + "of \(label) when growing via \(growthDescription)")
+    }
+  }
+
+  checkReallocations(x, "append") { (inout x: T)->() in x.append(42) }
+  checkReallocations(x, "+=") { (inout x: T)->() in x += 42 }
   println("done.")
 }
 
