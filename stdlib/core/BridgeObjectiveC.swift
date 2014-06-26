@@ -463,6 +463,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
     self.value = value
   }
 
+#if !ENABLE_POINTER_CONVERSIONS
   /// Create the writeback temporary for inout conversion.
   @transparent
   static func __writeback_conversion_get(x: T) -> Builtin.RawPointer {
@@ -490,6 +491,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
   ) -> AutoreleasingUnsafePointer {
     return AutoreleasingUnsafePointer(Builtin.addressof(&autoreleasingTemp))
   }
+#endif
 
   @transparent
   var _isNull : Bool {
