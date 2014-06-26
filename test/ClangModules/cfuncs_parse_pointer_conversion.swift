@@ -3,6 +3,7 @@
 // RUN: %swift -enable-pointer-conversions %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -I %S/Inputs %s
 
 import cfuncs
+import ctypes
 
 func test_pointer() {
   var i: CInt = 0
@@ -51,4 +52,9 @@ func test_decay() {
   decay_param_const_array(&i)
   decay_param_const_array(a)
   decay_param_const_array([1, 2, 3])
+}
+
+func testFunctionPointers() {
+  let fp: CFunctionPointer = getFunctionPointer()
+  useFunctionPointer(fp)
 }

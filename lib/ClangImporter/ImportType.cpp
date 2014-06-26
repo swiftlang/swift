@@ -231,6 +231,15 @@ namespace {
         // COpaquePointer.
         if (!pointeeType)
           return getOpaquePointerType();
+        
+        if (pointeeQualType->isFunctionType()) {
+          // FIXME: Function pointer types can be mapped to Swift function types
+          // once we have the notion of a "thin" function that does not capture
+          // anything.
+          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                      "CFunctionPointer",
+                                                      pointeeType);
+        }
 
         auto quals = pointeeQualType.getQualifiers();
         
