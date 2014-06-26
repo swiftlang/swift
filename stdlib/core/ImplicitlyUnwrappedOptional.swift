@@ -11,11 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An optional type that allows implicit member access (via compiler
-/// magic).  We call it 'unchecked' because:
-///   - from the user's perspective, it doesn't need an explicit check
-///     to use
-///   - it's introduced when importing code where the library author
-///     hasn't checked whether a type should be null or not
+/// magic).
 ///
 /// The compiler has special knowledge of the existence of
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the

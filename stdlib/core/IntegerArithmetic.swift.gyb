@@ -17,11 +17,11 @@
 
 % integerBinaryOps = [
 %    (x[:-1], x[-1]) for x in 
-%     'Add+ Subtract- Multiply* Divide/ Modulus%'.split()]
+%     'add+ subtract- multiply* divide/ modulus%'.split()]
 
 @public protocol _IntegerArithmetic {
 % for name,_ in integerBinaryOps:
-  class func unchecked${name}(lhs: Self, _ rhs: Self) -> (Self, Bool)
+  class func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, Bool)
 % end
 }
 
@@ -39,12 +39,12 @@
 % for name,op in integerBinaryOps:
 @transparent @public
 func ${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
-  return _overflowChecked(T.unchecked${name}(lhs, rhs))
+  return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
 @transparent @public
 func &${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
-  return T.unchecked${name}(lhs, rhs).0
+  return T.${name}WithOverflow(lhs, rhs).0
 }
 
 @assignment @transparent @public

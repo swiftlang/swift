@@ -48,24 +48,24 @@ extension Bit : IntegerArithmetic {
     return (Bit.fromRaw(x)!, b)
   }
   
-  @public static func uncheckedAdd(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.uncheckedAdd(lhs.toRaw(), rhs.toRaw()))
+  @public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.addWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func uncheckedSubtract(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.uncheckedSubtract(lhs.toRaw(), rhs.toRaw()))
+  @public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.subtractWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func uncheckedMultiply(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.uncheckedMultiply(lhs.toRaw(), rhs.toRaw()))
+  @public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.multiplyWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func uncheckedDivide(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.uncheckedDivide(lhs.toRaw(), rhs.toRaw()))
+  @public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func uncheckedModulus(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.uncheckedModulus(lhs.toRaw(), rhs.toRaw()))
+  @public static func modulusWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.modulusWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
   @public func toIntMax() -> IntMax {

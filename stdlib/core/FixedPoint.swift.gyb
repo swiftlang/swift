@@ -276,17 +276,19 @@ extension ${Self} : RandomAccessIndex {
     return numericCast((numericCast(self) as IntMax) + numericCast(amount))
   }
 
-% for Method,op in [('Add', 'add'), ('Subtract', 'sub'), ('Multiply', 'mul')]:
+% for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   @transparent @public
-  static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
 % end
   
-% for Method,op in [('Divide', 'div'), ('Modulus', 'rem')]:
+% for Method,op in [('divide', 'div'), ('modulus', 'rem')]:
+  /// Operations that return an overflow bit in addition to a partial result,
+  /// helpful for checking for overflow when you want to handle it.
   @transparent @public
-  static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+  static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
     if rhs == 0 {
       return (0, true)
     }
@@ -409,7 +411,7 @@ func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 @transparent @prefix @public
 func ~(rhs: ${Self}) -> ${Self} {
-  let mask = ${Self}.uncheckedSubtract(0, 1).0
+  let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
 }
 
