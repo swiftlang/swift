@@ -40,13 +40,12 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 /// insts and return the last such inst.
 static SILValue
 findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
-                                      LoadInst *Load) {
+                                      SILInstruction *Inst, SILValue InstOp) {
   // Attempt to find the projection path from Address -> Load->getOperand().
-  SILValue LIOp = Load->getOperand();
   llvm::SmallVector<Projection, 4> ProjectionPath;
 
   // If we failed to find the path, return an empty value early.
-  if (!findAddressProjectionPathBetweenValues(Address, LIOp, ProjectionPath))
+  if (!findAddressProjectionPathBetweenValues(Address, InstOp, ProjectionPath))
     return SILValue();
 
   // If we found a projection path, but there are no projections, then the two
@@ -57,12 +56,12 @@ findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
   // Ok, at this point we know that we can construct our aggregate projections
   // from our list of address projections.
   SILValue LastExtract = StoredValue;
-  SILBuilder Builder(Load);
+  SILBuilder Builder(Inst);
   while (!ProjectionPath.empty()) {
     auto P = ProjectionPath.pop_back_val();
     if (ValueDecl *D = P.getDecl()) {
       if (P.getNominalType() == Projection::NominalType::Struct) {
-        LastExtract = Builder.createStructExtract(Load->getLoc(), LastExtract,
+        LastExtract = Builder.createStructExtract(Inst->getLoc(), LastExtract,
                                                   cast<VarDecl>(D),
                                                   P.getType().getObjectType());
         assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
@@ -72,13 +71,13 @@ findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
                "Expected an enum decl here. Only other possibility is a "
                "class which we do not support");
         LastExtract = Builder.createUncheckedEnumData(
-            Load->getLoc(), LastExtract, cast<EnumElementDecl>(D),
+            Inst->getLoc(), LastExtract, cast<EnumElementDecl>(D),
             P.getType().getObjectType());
         assert(cast<UncheckedEnumDataInst>(*LastExtract).getElement() &&
                "Instruction must have an enum element decl!");
       }
     } else {
-      LastExtract = Builder.createTupleExtract(Load->getLoc(), LastExtract,
+      LastExtract = Builder.createTupleExtract(Inst->getLoc(), LastExtract,
                                                P.getIndex(),
                                                P.getType().getObjectType());
       assert(cast<TupleExtractInst>(*LastExtract).getTupleType() &&
@@ -239,17 +238,28 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
   Stores.insert(SI);
 }
 
+/// Given an unchecked_addr_cast with various address projections using it,
+/// rewrite the forwarding stored value to a bitcast + the relevant extract
+/// operations.
 static SILValue
 tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
                                               SILValue StoredValue,
                                               LoadInst *LI,
                                               UncheckedAddrCastInst *UADCI) {
+  assert(LI->getOperand().stripAddressProjections() == UADCI &&
+         "We assume that the UADCI is the load's address stripped of "
+         "address projections.");
+
+  // First grab the address operand of our UADCI.
   SILValue UADCIOp = UADCI->getOperand();
-  if (Address != UADCIOp)
+
+  // Make sure that this is equal to our address. If not, bail.
+  if (UADCIOp != Address)
     return SILValue();
 
+  // Construct the relevant bitcast.
   SILModule &Mod = UADCI->getModule();
-  SILType InputTy = UADCIOp.getType();
+  SILType InputTy = UADCI->getOperand().getType();
   SILType OutputTy = UADCI->getType();
 
   // If OutputTy is not layout compatible with InputTy, there is nothing we can
@@ -260,27 +270,37 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   bool InputIsTrivial = InputTy.isTrivial(Mod);
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
-  // If one is trivial and the other is not, bail.
-  if (InputIsTrivial != OutputIsTrivial)
-    return SILValue();
-
   // If either are generic, bail.
   if (InputTy.hasArchetype() || OutputTy.hasArchetype())
     return SILValue();
 
   SILBuilder B(LI);
+  SILValue CastValue;
 
-  // If both input and output are trivial types, return an
-  // unchecked_trivial_bit_cast.
-  if (InputIsTrivial && OutputIsTrivial) {
-    return B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
-                                           OutputTy.getObjectType());
+  // If the output is trivial, we have a trivial bit cast.
+  if (InputIsTrivial || OutputIsTrivial) {
+    CastValue =  B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
+                                                 OutputTy.getObjectType());
+  } else {
+    // Otherwise, both must have some sort of reference counts on them. Insert
+    // the ref count cast.
+    CastValue = B.createUncheckedRefBitCast(UADCI->getLoc(), StoredValue,
+                                            OutputTy.getObjectType());
   }
 
-  // Otherwise, both must have some sort of reference counts on them. Insert the
-  // ref count cast.
-  return B.createUncheckedRefBitCast(UADCI->getLoc(), StoredValue,
-                                     OutputTy.getObjectType());
+  // Then try to construct an extract path from the UADCI to the Address.
+  SILValue ExtractPath =
+    findExtractPathFromAddressValueToLoad(UADCI, CastValue,
+                                          LI, LI->getOperand());
+
+  // If we can not construct the extract path, bail.
+  if (!ExtractPath)
+    return SILValue();
+
+  assert(ExtractPath.getType() == UADCIOp.getType().getObjectType() &&
+         "Must have same types here.");
+
+  return ExtractPath;
 }
 
 /// Given an address \p Address and a value \p Value stored there that is then
@@ -291,13 +311,15 @@ static SILValue tryToForwardAddressValueToLoad(SILValue Address,
                                                LoadInst *LI) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
-  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LI->getOperand()))
+  SILValue LIOpWithoutProjs = LI->getOperand().stripAddressProjections();
+  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LIOpWithoutProjs))
     return tryToForwardAddressValueToUncheckedAddrToLoad(Address, StoredValue,
                                                          LI, UADCI);
 
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
-  return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI);  
+  return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI,
+                                               LI->getOperand());  
 }
 
 void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {  
