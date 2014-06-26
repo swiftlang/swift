@@ -150,6 +150,14 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   // Construct our context once.
   auto *Ctx =  createARCMatchingSetComputationContext(F, AA);
 
+  // If Ctx is null, we failed to initialize and can not do anything so just
+  // return false.
+  if (!Ctx) {
+    DEBUG(llvm::dbgs() << "    Failed to initialize matching set computation "
+          "context! Bailing!\n");
+    return false;
+  }
+
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while(true) {

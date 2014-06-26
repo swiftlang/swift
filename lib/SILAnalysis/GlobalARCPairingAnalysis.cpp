@@ -336,10 +336,10 @@ struct ARCMatchingSetComputationContext {
   BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
   ARCSequenceDataflowEvaluator Evaluator;
 
-  ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) :
-    DecToIncStateMap(), IncToDecStateMap(), Evaluator(F, AA, F.size(),
-                                                      DecToIncStateMap,
-                                                      IncToDecStateMap) {}
+  ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
+                                   unsigned Size)
+    : DecToIncStateMap(), IncToDecStateMap(),
+      Evaluator(F, AA, Size, DecToIncStateMap, IncToDecStateMap) {}
 };
 
 } // end namespace arc
@@ -348,7 +348,15 @@ struct ARCMatchingSetComputationContext {
 ARCMatchingSetComputationContext *
 swift::arc::
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) {
-  auto *C = new ARCMatchingSetComputationContext(F, AA);
+  unsigned Size = F.size();
+
+  // We do not handle CFGs with more than INT_MAX BBs. Fail gracefully.
+  if (Size > unsigned(INT_MAX))
+    return nullptr;
+
+  // We pass in size to avoid expensively recomputing size over and over
+  // again. Currently F has to do a walk to perform that computation.
+  auto *C = new ARCMatchingSetComputationContext(F, AA, Size);
   C->Evaluator.init();
   return C;
 }
