@@ -56,6 +56,16 @@ public:
     initializeTrapStatus();
   }
 
+  /// Is this BB a BB that fits the canonical form of a trap?
+  ///
+  /// The canonical form of a trap is:
+  ///
+  ///   %0 = builtin_function_ref "int_trap"
+  ///   apply %0()
+  ///   unreachable
+  ///
+  /// This can not have any uses of reference counted values since the frontend
+  /// just leaks at that point.
   bool isTrapBB() const { return IsTrapBB; }
 
   /// Top Down Iterators
