@@ -160,3 +160,14 @@ func pointerArithmetic(x: UnsafePointer<Int>, y: UnsafePointer<Int>,
   let p = x + i
   let d = x - y
 }
+
+func genericPointerArithmetic<T>(x: UnsafePointer<T>, i: Int, t: T) -> UnsafePointer<T> {
+  let p = x + i
+  p.initialize(t)
+}
+
+func passPointerToClosure(f: UnsafePointer<Float> -> Int) -> Int { }
+
+func pointerInClosure(f: UnsafePointer<Int> -> Int) -> Int {
+  return passPointerToClosure { f(UnsafePointer($0)) }
+}

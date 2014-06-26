@@ -1330,9 +1330,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
         if (rep1 == rep2) {
-          if (kind == TypeMatchKind::BindToPointerType) {
-            increaseScore(ScoreKind::SK_ScalarPointerConversion);
-          }
           // We already merged these two types, so this constraint is
           // trivially solved.
           return SolutionKind::Solved;
@@ -1773,7 +1770,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           // type, if we're a void pointer.
           if (bgt1 && bgt1->getDecl() == getASTContext().getUnsafePointerDecl()) {
             // Favor an UnsafePointer-to-UnsafePointer conversion.
-            if (bgt2->getDecl() == getASTContext().getUnsafePointerDecl())
+            if (bgt1->getDecl() != bgt2->getDecl())
               increaseScore(ScoreKind::SK_ScalarPointerConversion);
             conversionsOrFixes.push_back(
                                    ConversionRestrictionKind::PointerToPointer);
