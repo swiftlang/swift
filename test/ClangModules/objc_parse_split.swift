@@ -30,7 +30,7 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", object:b) // expected-error {{'performSelector' is unavailable: 'performSelector' methods are unavailable}}
+  b.performSelector("isEqual:", object:b) // expected-error {{'performSelector(_:object:)' is unavailable: 'performSelector' methods are unavailable}}
 
   // Renaming of redundant parameters.
   b.performAdd(1, value:2, value2:3, value:4) // expected-error{{argument 'value' must precede argument 'value2'}}

@@ -1,10 +1,10 @@
 // RUN: %swift %s -verify
 
 @availability(*, unavailable)
-func unavailable_foo() {} // expected-note {{'unavailable_foo' has been explicitly marked unavailable here}}
+func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
 
 func test() {
-  unavailable_foo() // expected-error {{'unavailable_foo' is unavailable}}
+  unavailable_foo() // expected-error {{'unavailable_foo()' is unavailable}}
 }
 
 // FIXME: This will be moved to the Foundation overlay
@@ -23,10 +23,10 @@ class ClassWithUnavailable {
 
   // FIXME: extraneous diagnostic here
   @availability(*, unavailable)
-  init(int _: Int) {} // expected-note 3 {{'init' has been explicitly marked unavailable here}}
+  init(int _: Int) {} // expected-note 3 {{'init(int:)' has been explicitly marked unavailable here}}
 
   convenience init(otherInt: Int) {
-    self.init(int: otherInt) // expected-error {{'init' is unavailable}}
+    self.init(int: otherInt) // expected-error {{'init(int:)' is unavailable}}
   }
 
   @availability(*, unavailable)
@@ -40,7 +40,7 @@ class ClassWithOverride : ClassWithUnavailable {
 }
 
 func testInit() {
-  ClassWithUnavailable(int: 0) // expected-error {{'init' is unavailable}}
+  ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}}
 }
 
 func testSuvscript(cwu: ClassWithUnavailable) {

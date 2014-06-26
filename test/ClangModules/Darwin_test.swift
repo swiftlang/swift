@@ -6,8 +6,8 @@ import ObjectiveC
 errno = 0
 assert(errno == 0)
 
-fork() // expected-error{{'fork' is unavailable}}
-vfork() // expected-error{{'vfork' is unavailable}}
+fork() // expected-error{{'fork()' is unavailable}}
+vfork() // expected-error{{'vfork()' is unavailable}}
 
 
 // Test YES and NO.

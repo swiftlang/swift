@@ -1358,13 +1358,13 @@ ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, sema_avail, none,
-  "%0 is unavailable", (Identifier))
+  "%0 is unavailable", (DeclName))
 
 ERROR(availability_decl_unavailable_msg, sema_avail, none,
-  "%0 is unavailable: %1", (Identifier, StringRef))
+  "%0 is unavailable: %1", (DeclName, StringRef))
 
 NOTE(availability_marked_unavailable, sema_avail, none,
-  "%0 has been explicitly marked unavailable here", (Identifier))
+  "%0 has been explicitly marked unavailable here", (DeclName))
 
 
 #ifndef DIAG_NO_UNDEF

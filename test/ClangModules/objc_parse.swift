@@ -35,7 +35,7 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b) // expected-error {{'performSelector' is unavailable: 'performSelector' methods are unavailable}}
+  b.performSelector("isEqual:", withObject:b) // expected-error {{'performSelector(_:withObject:)' is unavailable: 'performSelector' methods are unavailable}}
 
   // Renaming of redundant parameters.
   b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}}
@@ -192,7 +192,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
 }
 
 func testId(x: AnyObject) {
-  x.performSelector!("foo:", withObject: x) // expected-error{{'performSelector' is unavailable: 'performSelector' methods are unavailable}}
+  x.performSelector!("foo:", withObject: x) // expected-error{{'performSelector(_:withObject:)' is unavailable: 'performSelector' methods are unavailable}}
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
@@ -409,7 +409,7 @@ func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
 }
 
 func testDealloc(obj: NSObject) {
-  obj.dealloc() // expected-error{{'dealloc' is unavailable: use 'deinit' to define a de-initializer}}
+  obj.dealloc() // expected-error{{'dealloc()' is unavailable: use 'deinit' to define a de-initializer}}
 }
 
 func testConstantGlobals() {

@@ -482,7 +482,7 @@ static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
     return false;
 
   if (Attr->IsUnvailable) {
-    auto Name = D->getName();
+    auto Name = D->getFullName();
     auto Message = Attr->Message;
     SourceLoc Loc = R.Start;
 
