@@ -532,6 +532,25 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
   static func convertFromNilLiteral() -> AutoreleasingUnsafePointer {
     return AutoreleasingUnsafePointer(_nilRawPointer)
   }
+  
+  /// Explicit construction from an UnsafePointer.
+  ///
+  /// This is inherently unsafe; UnsafePointer assumes the referenced memory
+  /// has +1 strong ownership semantics, whereas AutoreleasingUnsafePointer
+  /// implies +0 semantics.
+  @transparent
+  init<U>(_ ptr: UnsafePointer<U>) {
+    self.value = ptr.value
+  }
+
+  /// Explicit construction from a ConstUnsafePointer.
+  ///
+  /// This is inherently unsafe because ConstUnsafePointers do not imply
+  /// mutability.
+  @transparent
+  init<U>(_ ptr: ConstUnsafePointer<U>) {
+    self.value = ptr.value
+  }
 }
 
 @transparent @public
