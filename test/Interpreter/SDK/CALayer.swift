@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // <rdar://problem/17014037>
+// REQUIRES: OS=macosx
 
 import QuartzCore
 
