@@ -14,7 +14,9 @@
 
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSString -function-definitions=false > %t/Foundation.NSString.printed.txt
 // RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_NSSTRING %s
+// RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_DICTIONARY %s
 
 // Make sure that we don't qualify 'NSErrorPointer'.
 // CHECK_NSSTRING: init(withContentsOfFile path: String!, encoding enc: UInt, error: NSErrorPointer)
 
+// CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject : AnyObject]!

@@ -851,7 +851,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
 
   // When NSArray* is the type of a function parameter or a function
-  // result type, map it to AnyObject[].
+  // result type, map it to [AnyObject].
   if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
       impl.hasFoundationModule()) {
     Type anyObject = impl.getNamedSwiftType(impl.getStdlibModule(), 
@@ -860,14 +860,13 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // When NSDictionary* is the type of a function parameter or a function
-  // result type, map it to Dictionary<NSObject, AnyObject>.
+  // result type, map it to [NSObject : AnyObject].
   if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
       impl.hasFoundationModule()) {
-    importedType = impl.getNamedSwiftTypeSpecialization(
-                     impl.getStdlibModule(), "Dictionary",
-                     { impl.getNSObjectType(),
-                       impl.getNamedSwiftType(impl.getStdlibModule(),
-                                              "AnyObject") });
+    importedType = DictionaryType::get(
+                     impl.getNSObjectType(),
+                     impl.getNamedSwiftType(impl.getStdlibModule(),
+                                            "AnyObject"));
   }
 
   // Wrap class, class protocol, function, and metatype types in an
