@@ -28,6 +28,8 @@ func constructArray(n: Int) {
 
   var matrix = [[Float]]()
   matrix[1][2] = 3.14159
+
+  var opts: [Int?] = [Int?]()
 }
 
 // Fix-Its from the old syntax to the new.

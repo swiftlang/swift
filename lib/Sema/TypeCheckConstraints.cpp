@@ -626,6 +626,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
     
+    // The optional evaluation is passed through.
+    if (isa<OptionalEvaluationExpr>(E))
+      return TyExpr;
+
     auto *NewTypeRepr =
       new (TC.Context) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
