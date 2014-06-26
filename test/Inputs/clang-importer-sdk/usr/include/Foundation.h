@@ -12,6 +12,7 @@ typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
 
 extern NSUInteger NSRealMemoryAvailable(void) __attribute__((availability(macosx,introduced=10.0 ,deprecated=10.8,message="" )));
+extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void) __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")));
 
 @class NSString, NSArray, NSDictionary, NSEnumerator;
 

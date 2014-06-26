@@ -36,3 +36,8 @@ func test_class_avail(x:NSObject, obj: AnyObject) {
 func test_unavailable_because_deprecated() {
   println(NSRealMemoryAvailable()) // expected-error {{'NSRealMemoryAvailable()' is unavailable: APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift}}
 }
+
+func test_unavailable_app_extension() {
+  // No expected error here.  See corresponding App extension test.
+  println(SomeCrazyAppExtensionForbiddenAPI()) // no-error
+}
