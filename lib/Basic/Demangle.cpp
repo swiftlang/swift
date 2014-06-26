@@ -1888,6 +1888,7 @@ private:
   enum class SugarType {
     None,
     Optional,
+    ImplicitlyUnwrappedOptional,
     Array,
     Dictionary
   };
@@ -2029,6 +2030,14 @@ private:
         return SugarType::Optional;
       }
 
+      // Swift.ImplicitlyUnwrappedOptional
+      if (isIdentifier(unboundType->getChild(1), 
+                       "ImplicitlyUnwrappedOptional") &&
+          typeArgs->getNumChildren() == 1 &&
+          isSwiftModule(unboundType->getChild(0))) {
+        return SugarType::ImplicitlyUnwrappedOptional;
+      }
+
       return SugarType::None;
     }
 
@@ -2069,12 +2078,12 @@ private:
 
     SugarType sugarType = findSugar(pointer);
     
-    switch (sugarType)
-    {
+    switch (sugarType) {
       case SugarType::None:
         printBoundGenericNoSugar(pointer);
         break;
-      case SugarType::Optional: {
+      case SugarType::Optional:
+      case SugarType::ImplicitlyUnwrappedOptional: {
         Node *type = pointer->getChild(1)->getChild(0);
         bool needs_parens = !isSimpleType(type);
         if (needs_parens)
@@ -2082,7 +2091,7 @@ private:
         print(type);
         if (needs_parens)
           Printer << ")";
-        Printer << "?";
+        Printer << (sugarType == SugarType::Optional ? "?" : "!");
         break;
       }
       case SugarType::Array: {

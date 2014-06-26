@@ -24,6 +24,7 @@
 ; CHECK: _TtSu ---> Swift.UInt
 ; CHECK: _TtGSaSS_ ---> [Swift.String]
 ; CHECK: _TtGSqSS_ ---> Swift.String?
+; CHECK: _TtGSQSS_ ---> Swift.String!
 ; CHECK: _TtGVSs10DictionarySSSi_ ---> [Swift.String : Swift.Int]
 ; CHECK: _TtVSs7CString ---> Swift.CString
 ; CHECK: _TtCSo8NSObject ---> ObjectiveC.NSObject
