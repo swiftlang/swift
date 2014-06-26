@@ -527,9 +527,24 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
       p.memory = reinterpretCast(newValue)
     }
   }
+
+  // Allow read-only subscripting through an AutoreleasingUnsafePointer.t
+  @public subscript(i: Int) -> T {
+    @transparent
+    get {
+      _debugPrecondition(!_isNull)
+      // We can do a strong load normally.
+      return (ConstUnsafePointer<T>(self) + i).memory
+    }
+  }
   
   @transparent @public
   static func convertFromNilLiteral() -> AutoreleasingUnsafePointer {
+    return AutoreleasingUnsafePointer(_nilRawPointer)
+  }
+  
+  @transparent @public
+  static func null() -> AutoreleasingUnsafePointer {
     return AutoreleasingUnsafePointer(_nilRawPointer)
   }
   
