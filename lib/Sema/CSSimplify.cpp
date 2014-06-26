@@ -1762,38 +1762,39 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                      ConversionRestrictionKind::InoutToPointer);
           }
           
-          auto bgt1 = type1->getAs<BoundGenericType>();
+          if (!(flags & TMF_ApplyingOperatorParameter)) {
+            auto bgt1 = type1->getAs<BoundGenericType>();
 
-          // We can potentially convert from an UnsafePointer of a different
-          // type, if we're a void pointer.
-          if (bgt1 && bgt1->getDecl() == getASTContext().getUnsafePointerDecl()) {
-            // Favor an UnsafePointer-to-UnsafePointer conversion.
-            if (bgt1->getDecl() != bgt2->getDecl())
-              increaseScore(ScoreKind::SK_ScalarPointerConversion);
-            conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
+            // We can potentially convert from an UnsafePointer of a different
+            // type, if we're a void pointer.
+            if (bgt1 && bgt1->getDecl() == getASTContext().getUnsafePointerDecl()) {
+              // Favor an UnsafePointer-to-UnsafePointer conversion.
+              if (bgt1->getDecl() != bgt2->getDecl())
+                increaseScore(ScoreKind::SK_ScalarPointerConversion);
+              conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::PointerToPointer);
+            }
+            
+            // ConstUnsafePointer can also be converted from an array value, or
+            // a ConstUnsafePointer or AutoreleasingUnsafePointer.
+            if (bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()) {
+              if (isArrayType(type1)) {
+                conversionsOrFixes.push_back(
+                                       ConversionRestrictionKind::ArrayToPointer);
+              }
+              if (bgt1 && bgt1->getDecl()
+                                 == getASTContext().getConstUnsafePointerDecl()) {
+                conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::PointerToPointer);
+              }
+              if (bgt1
+                  && bgt1->getDecl()
+                         == getASTContext().getAutoreleasingUnsafePointerDecl()) {
+                conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::PointerToPointer);
+              }
+            }
           }
-          
-          // ConstUnsafePointer can also be converted from an array value, or
-          // a ConstUnsafePointer or AutoreleasingUnsafePointer.
-          if (bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()) {
-            if (isArrayType(type1)) {
-              conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::ArrayToPointer);
-            }
-            if (bgt1 && bgt1->getDecl()
-                               == getASTContext().getConstUnsafePointerDecl()) {
-              conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
-            }
-            if (bgt1
-                && bgt1->getDecl()
-                       == getASTContext().getAutoreleasingUnsafePointerDecl()) {
-              conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
-            }
-          }
-          
           // TODO: Strings
         } else if (bgt2->getDecl()
                        == getASTContext().getAutoreleasingUnsafePointerDecl()) {

@@ -177,3 +177,16 @@ func passPointerToClosure(f: UnsafePointer<Float> -> Int) -> Int { }
 func pointerInClosure(f: UnsafePointer<Int> -> Int) -> Int {
   return passPointerToClosure { f(UnsafePointer($0)) }
 }
+
+struct NotEquatable {}
+
+func arrayComparison(x: [NotEquatable], y: [NotEquatable], p: UnsafePointer<NotEquatable>) {
+  // Don't allow implicit array-to-pointer conversions in operators.
+  let a: Bool = x == y // expected-error{{}}
+  // FIXME: Should be allowed.
+  // let b: Bool = p == &x
+}
+
+func addressConversion(p: UnsafePointer<Int>, var x: Int) {
+  let a: Bool = p == &x
+}
