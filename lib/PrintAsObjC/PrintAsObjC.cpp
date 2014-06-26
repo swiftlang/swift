@@ -39,8 +39,9 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
   Identifier cConstPointerID;
   Identifier cMutablePointerID;
-  Identifier objcMutablePointerID;
+  Identifier autoreleasingUnsafePointerID;
   Identifier unsafePointerID;
+  Identifier constUnsafePointerID;
   Identifier unmanagedID;
 
   ASTContext &ctx;
@@ -445,15 +446,17 @@ private:
     if (unsafePointerID.empty()) {
       cConstPointerID = ctx.getIdentifier("CConstPointer");
       cMutablePointerID = ctx.getIdentifier("CMutablePointer");
-      objcMutablePointerID = ctx.getIdentifier("AutoreleasingUnsafePointer");
+      autoreleasingUnsafePointerID = ctx.getIdentifier("AutoreleasingUnsafePointer");
       unsafePointerID = ctx.getIdentifier("UnsafePointer");
+      constUnsafePointerID = ctx.getIdentifier("ConstUnsafePointer");
     }
 
     bool isConst;
-    if (SD->getName() == cConstPointerID) {
+    if (SD->getName() == cConstPointerID ||
+        SD->getName() == constUnsafePointerID) {
       isConst = true;
     } else if (SD->getName() == cMutablePointerID ||
-               SD->getName() == objcMutablePointerID ||
+               SD->getName() == autoreleasingUnsafePointerID ||
                SD->getName() == unsafePointerID) {
       isConst = false;
     } else {
