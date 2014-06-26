@@ -352,7 +352,7 @@ extension ${Self} {
 }
 
 extension ${Self} {
-  @public mutating func withMutableStorage<R>(
+  @public mutating func withUnsafeMutableStorage<R>(
     body: (inout UnsafeMutableArray<T>)->R
   ) -> R {
     _arrayReserve(&_buffer, 0)

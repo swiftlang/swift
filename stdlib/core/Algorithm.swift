@@ -195,7 +195,7 @@ struct Less<T: Comparable> {
 }
 
 @public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
-  return array.withMutableStorage {
+  return array.withUnsafeMutableStorage {
     a in sort(&a, predicate)
     return
   }
@@ -205,7 +205,7 @@ struct Less<T: Comparable> {
 /// they don't accept a predicate and they are hardcoded to use the less-than
 /// comparator.
 @public func sort<T : Comparable>(inout array: [T]) {
-  return array.withMutableStorage {
+  return array.withUnsafeMutableStorage {
     a in sort(&a)
     return
   }
