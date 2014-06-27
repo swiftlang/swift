@@ -7,5 +7,5 @@
 
 import Foundation
 
-// CHECK: func loadAndReturnError(error: AutoreleasingUnsafePointer<NSError?>) -> Bool
+// CHECK: func loadAndReturnError(error: NSErrorPointer) -> Bool
 

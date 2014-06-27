@@ -248,8 +248,6 @@ namespace {
       // ownership map to AutoreleasingUnsafePointer<T>.
       else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
             || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
-      // TODO: Special case NSError**. Need to update the NSErrorPointer
-      // typedef after we transition to intrinsic pointer conversions.
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                 "AutoreleasingUnsafePointer",
                                                 pointeeType),
@@ -688,6 +686,22 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // abstractly, give up now.
   if (!importedType)
     return Type();
+
+  // Special case AutoreleasingUnsafePointer<NSError?> parameters.
+  PointerTypeKind PTK;
+  if (importKind == ImportTypeKind::Parameter)
+    if (auto elementType = importedType->getAnyPointerElementType(PTK))
+      if (PTK == PTK_AutoreleasingUnsafePointer)
+        if (auto elementObj = elementType->getAnyOptionalObjectType())
+          if (auto elementClass = elementObj->getClassOrBoundGenericClass())
+            if (elementClass->getName() == impl.SwiftContext.getIdentifier("NSError")
+                && elementClass->getModuleContext()->Name
+                     == impl.SwiftContext.getIdentifier("Foundation")
+                && impl.hasFoundationModule()) {
+              auto FM = impl.getFoundationModule();
+              if (auto Ty = impl.getNamedSwiftType(FM, "NSErrorPointer"))
+                return Ty;
+            }
 
   // Turn block pointer types back into normal function types in any
   // context where bridging is possible, unless the block has a typedef.
