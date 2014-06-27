@@ -90,8 +90,8 @@ extension String {
   /// non-`nil`, convert the buffer to an `Index` and write it into the
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
-    index: _CPointerTo<Index>.Mutable,
-    body: (_CPointerTo<Int>.Mutable)->Result
+    index: UnsafePointer<Index>,
+    body: (UnsafePointer<Int>)->Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = index._withBridgeValue(&utf16Index) {
@@ -105,8 +105,8 @@ extension String {
   /// from non-`nil`, convert the buffer to a `Range<Index>` and write
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
-    range: _CPointerTo<Range<Index>>.Mutable,
-    body: (_CPointerTo<NSRange>.Mutable)->Result
+    range: UnsafePointer<Range<Index>>,
+    body: (UnsafePointer<NSRange>)->Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = range._withBridgeValue(&nsRange) {
@@ -206,7 +206,7 @@ extension String {
   /// interpret the file.
   @public static func stringWithContentsOfFile(
     path: String,
-    usedEncoding: _CPointerTo<NSStringEncoding>.Mutable = nil,
+    usedEncoding: UnsafePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
     return usedEncoding.withUnsafePointer {
@@ -238,7 +238,7 @@ extension String {
   /// data.  Errors are written into the inout `error` argument.
   @public static func stringWithContentsOfURL(
     url: NSURL,
-    usedEncoding enc: _CPointerTo<NSStringEncoding>.Mutable = nil,
+    usedEncoding enc: UnsafePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
     return enc.withUnsafePointer {
@@ -380,9 +380,9 @@ extension String {
   /// reference the longest path that matches the `String`.
   /// Returns the actual number of matching paths.
   @public func completePathIntoString(
-    _ outputName: _CPointerTo<String>.Mutable = nil,
+    _ outputName: UnsafePointer<String> = nil,
     caseSensitive: Bool,
-    matchesIntoArray: _CPointerTo<[String]>.Mutable = nil,
+    matchesIntoArray: UnsafePointer<[String]> = nil,
     filterTypes: [String]? = nil
   ) -> Int {
     var nsMatches: NSArray?
@@ -495,7 +495,7 @@ extension String {
   /// Enumerates all the lines in a string.
   @public func enumerateLines(body: (line: String, inout stop: Bool)->()) {
     _ns.enumerateLinesUsingBlock {
-      (line: String?, stop: _CPointerTo<ObjCBool>.Mutable)
+      (line: String?, stop: UnsafePointer<ObjCBool>)
     in
       var stop_ = false
       body(line: line!, stop: &stop_)
@@ -608,11 +608,11 @@ extension String {
   @public func getBytes(
     inout buffer: [UInt8],
     maxLength: Int,
-    usedLength: _CPointerTo<Int>.Mutable,
+    usedLength: UnsafePointer<Int>,
     encoding: NSStringEncoding,
     options: NSStringEncodingConversionOptions,
     range: Range<Index>,
-    remainingRange: _CPointerTo<Range<Index>>.Mutable
+    remainingRange: UnsafePointer<Range<Index>>
   ) -> Bool {
     return _withOptionalOutParameter(remainingRange) {
       self._ns.getBytes(
@@ -664,9 +664,9 @@ extension String {
   /// Returns by reference the beginning of the first line and
   /// the end of the last line touched by the given range.
   @public func getLineStart(
-    start: _CPointerTo<Index>.Mutable,
-    end: _CPointerTo<Index>.Mutable,
-    contentsEnd: _CPointerTo<Index>.Mutable,
+    start: UnsafePointer<Index>,
+    end: UnsafePointer<Index>,
+    contentsEnd: UnsafePointer<Index>,
     forRange: Range<Index>
   ) {
     _withOptionalOutParameter(start) {
@@ -690,9 +690,9 @@ extension String {
   /// Returns by reference the beginning of the first paragraph
   /// and the end of the last paragraph touched by the given range.
   @public func getParagraphStart(
-    start: _CPointerTo<Index>.Mutable,
-    end: _CPointerTo<Index>.Mutable,
-    contentsEnd: _CPointerTo<Index>.Mutable,
+    start: UnsafePointer<Index>,
+    end: UnsafePointer<Index>,
+    contentsEnd: UnsafePointer<Index>,
     forRange: Range<Index>
   ) {
     _withOptionalOutParameter(start) {
@@ -748,7 +748,7 @@ extension String {
   /// in a given encoding, and optionally frees the buffer.  WARNING:
   /// this method is not memory-safe!
   @public static func stringWithBytesNoCopy(
-    bytes: _CMutableVoidPointer, length: Int,
+    bytes: UnsafePointer<Void>, length: Int,
     encoding: NSStringEncoding, freeWhenDone flag: Bool
   ) -> String? {
     return NSString(
@@ -766,7 +766,7 @@ extension String {
   /// given number of characters from a given array of Unicode
   /// characters.
   @public init(
-    utf16CodeUnits: _CPointerTo<unichar>.Const, 
+    utf16CodeUnits: ConstUnsafePointer<unichar>,
     count: Int
   ) {
     self = NSString(characters: utf16CodeUnits, length: count)
@@ -780,7 +780,7 @@ extension String {
   /// Returns an initialized `String` object that contains a given
   /// number of characters from a given array of UTF16 Code Units
   @public init(
-    utf16CodeUnitsNoCopy: _CPointerTo<unichar>.Const, 
+    utf16CodeUnitsNoCopy: ConstUnsafePointer<unichar>,
     count: Int, 
     freeWhenDone flag: Bool
   ) {
@@ -930,7 +930,7 @@ extension String {
     scheme tagScheme: String, 
     options opts: NSLinguisticTaggerOptions = nil,
     orthography: NSOrthography? = nil, 
-    tokenRanges: _CPointerTo<[Range<Index>]>.Mutable = nil // FIXME:Can this be nil?
+    tokenRanges: UnsafePointer<[Range<Index>]> = nil // FIXME:Can this be nil?
   ) -> [String] {
     var nsTokenRanges: NSArray? = nil
     let result = tokenRanges._withBridgeObject(&nsTokenRanges) {

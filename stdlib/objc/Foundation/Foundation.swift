@@ -13,14 +13,6 @@
 @exported import Foundation // Clang module
 import CoreFoundation
 
-// TODO: Eliminate this monstrosity when pointer conversions are staged in.
-struct _CPointerTo<T> {
-  typealias Mutable = UnsafePointer<T>
-  typealias Const = ConstUnsafePointer<T>
-}
-typealias _CMutableVoidPointer = UnsafePointer<Void>
-typealias _CConstVoidPointer = ConstUnsafePointer<Void>
-
 //===----------------------------------------------------------------------===//
 // Enums
 //===----------------------------------------------------------------------===//
@@ -241,7 +233,7 @@ class _NSContiguousString : NSString {
     return value[index]
   }
 
-  override func getCharacters(buffer: _CPointerTo<unichar>.Mutable,
+  override func getCharacters(buffer: UnsafePointer<unichar>,
                               range aRange: NSRange) {
     _precondition(aRange.location + aRange.length <= Int(value.count))
 
@@ -298,7 +290,7 @@ class _NSOpaqueString : NSString {
     return owner.characterAtIndex(index + subRange.location)
   }
 
-  override func getCharacters(buffer: _CPointerTo<unichar>.Mutable,
+  override func getCharacters(buffer: UnsafePointer<unichar>,
                               range aRange: NSRange) {
 
     owner.getCharacters(
@@ -858,7 +850,7 @@ extension NSFastEnumerationState {
     n = 0
     count = enumerable.countByEnumeratingWithState(
       state._elementStorageIfContiguous,
-      objects: _FastEnumerationItemsPtr(
+      objects: AutoreleasingUnsafePointer(
         objects._elementStorageIfContiguous),
       count: STACK_BUF_SIZE)
   }

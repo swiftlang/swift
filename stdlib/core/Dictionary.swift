@@ -580,11 +580,6 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
   }
 }
 
-// FIXME: Remove these typealiases when the pointer conversions transition is
-// done.
-typealias _DictionaryObjectsPointer = ConstUnsafePointer<AnyObject?>
-typealias _DictionaryKeysPointer = ConstUnsafePointer<Void>
-
 /// This class existis only to work around a compiler limitation.
 /// Specifically, we can not have @objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
@@ -629,7 +624,7 @@ class _NativeDictionaryStorageOwnerBase
   //
 
   @objc
-  init(objects: _DictionaryObjectsPointer, forKeys: _DictionaryKeysPointer,
+  init(objects: ConstUnsafePointer<AnyObject?>, forKeys: ConstUnsafePointer<Void>,
        count: Int) {
     _fatalError("don't call this designated initializer")
   }
@@ -668,10 +663,6 @@ class _NativeDictionaryStorageOwnerBase
         state, objects: objects, count: count, dummy: ())
   }
 }
-
-/// TODO: Remove this #if and typealias when pointer conversion has been phased
-/// in.
-typealias _FastEnumerationItemsPtr = AutoreleasingUnsafePointer<AnyObject?>
 
 /// This class is an artifact of the COW implementation.  This class only
 /// exists to keep separate retain counts separate for:
@@ -742,7 +733,7 @@ typealias _FastEnumerationItemsPtr = AutoreleasingUnsafePointer<AnyObject?>
     var theState = state.memory
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = _FastEnumerationItemsPtr(objects)
+      theState.itemsPtr = AutoreleasingUnsafePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       theState.extra.0 = CUnsignedLong(nativeStorage.startIndex.offset)
     }
@@ -2020,7 +2011,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   // NSDictionary subclass.
 
   // The designated initializer of `NSDictionary`.
-  init(objects: _DictionaryObjectsPointer, forKeys: _DictionaryKeysPointer,
+  init(objects: ConstUnsafePointer<AnyObject?>, forKeys: ConstUnsafePointer<Void>,
        count: Int)
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?
