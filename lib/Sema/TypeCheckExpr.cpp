@@ -578,27 +578,6 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   return *type;
 }
 
-static NominalTypeDecl *getKnownPointerDecl(Module *Stdlib,
-                                          ASTContext &Context,
-                                          Optional<NominalTypeDecl*> &cacheSlot,
-                                          StringRef name) {
-  return cacheSlot.cache([&] {
-    UnqualifiedLookup lookup(Context.getIdentifier(name),
-                             Stdlib, nullptr);
-    return cast_or_null<NominalTypeDecl>(lookup.getSingleTypeResult());
-  });
-}
-
-NominalTypeDecl *TypeChecker::getCConstPointerDecl(const DeclContext *DC) {
-  return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             CConstPointerDecl, "CConstPointer");
-}
-
-NominalTypeDecl *TypeChecker::getCMutablePointerDecl(const DeclContext *DC) {
-  return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             CMutablePointerDecl, "CMutablePointer");
-}
-
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");

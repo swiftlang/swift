@@ -2204,18 +2204,6 @@ public:
     }
     #include "swift/SIL/BridgedTypes.def"
     
-    if (Module *module = TC.Context.LoadedModules.lookup("Swift")) {
-      checkObjCBridgingFunctions(module, "AutoreleasingUnsafePointer",
-                                 "_convertUnsafePointerToAutoreleasingUnsafePointer",
-                                 "_convertAutoreleasingUnsafePointerToUnsafePointer");
-      checkObjCBridgingFunctions(module, "CMutablePointer",
-                                 "_convertUnsafePointerToCMutablePointer",
-                                 "_convertCMutablePointerToUnsafePointer");
-      checkObjCBridgingFunctions(module, "CConstPointer",
-                                 "_convertUnsafePointerToCConstPointer",
-                                 "_convertCConstPointerToUnsafePointer");
-    }
-
     if (Module *module = TC.Context.LoadedModules.lookup("Foundation")) {
       checkObjCBridgingFunctions(module, "NSArray",
                                  "_convertNSArrayToArray",

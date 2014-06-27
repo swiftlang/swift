@@ -117,47 +117,6 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   }
 #include "swift/SIL/BridgedTypes.def"
 
-static NominalTypeDecl *getKnownNominalPointerType(
-                                         Optional<NominalTypeDecl*> &cacheSlot,
-                                         ASTContext &C,
-                                         StringRef moduleName,
-                                         StringRef typeName) {
-  return cacheSlot.cache([&]()->NominalTypeDecl* {
-    Optional<UnqualifiedLookup> lookup
-      = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
-    if (!lookup)
-      return nullptr;
-    if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
-      assert(typeDecl->getDeclaredType() &&
-             "bridged type must be type-checked");
-      NominalTypeDecl *nomDecl = dyn_cast<NominalTypeDecl>(typeDecl);
-      if (!nomDecl)
-        return nullptr;
-      // Pointer types should have one unbounded type parameter.
-      auto params = nomDecl->getGenericParams();
-      if (!params)
-        return nullptr;
-      if (params->size() != 1)
-        return nullptr;
-      if (!params->getParams()[0].getAsTypeParam()->getConformances().empty())
-        return nullptr;
-      return nomDecl;
-    }
-    return nullptr;
-    
-  });
-}
-
-NominalTypeDecl *TypeConverter::getCMutablePointerDecl() {
-  return getKnownNominalPointerType(CMutablePointerDecl, M.getASTContext(),
-                                    "Swift", "CMutablePointer");
-}
-
-NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
-  return getKnownNominalPointerType(CConstPointerDecl, M.getASTContext(),
-                                    "Swift", "CConstPointer");
-}
-
 AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
   if (!MostGeneralArchetype) {
     MostGeneralArchetype =

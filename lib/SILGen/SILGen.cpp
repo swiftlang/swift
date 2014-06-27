@@ -221,76 +221,7 @@ SILDeclRef SILGenModule::getNSDictionaryToDictionaryFn() {
 
 STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, Bool, ObjCBool)
 STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, ObjCBool, Bool)
-STANDARD_GET_BRIDGING_FN(STDLIB_NAME, CMutableVoidPointer, COpaquePointer)
-STANDARD_GET_BRIDGING_FN(STDLIB_NAME, CConstVoidPointer, COpaquePointer)
-STANDARD_GET_BRIDGING_FN(STDLIB_NAME, COpaquePointer, CMutableVoidPointer)
-STANDARD_GET_BRIDGING_FN(STDLIB_NAME, COpaquePointer, CConstVoidPointer)
-
 #undef STANDARD_GET_BRIDGING_FN
-
-static SILType getPointerInterfaceType(NominalTypeDecl *pointerDecl) {
-  return SILType::getPrimitiveObjectType(pointerDecl->getDeclaredInterfaceType()
-                                                    ->getCanonicalType());
-}
-
-static SILType getCConstPointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.Types.getCConstPointerDecl());
-}
-
-static SILType getCMutablePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.Types.getCMutablePointerDecl());
-}
-
-static SILType getAutoreleasingUnsafePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.getASTContext()
-                                   .getAutoreleasingUnsafePointerDecl());
-}
-
-static SILType getUnsafePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.getASTContext().getUnsafePointerDecl());
-}
-
-SILDeclRef SILGenModule::getCConstPointerToUnsafePointerFn() {
-  return getBridgingFn(CConstPointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "_convertCConstPointerToUnsafePointer",
-                       {getCConstPointerInterfaceType(*this)},
-                       getUnsafePointerInterfaceType(*this));
-}
-
-SILDeclRef SILGenModule::getCMutablePointerToUnsafePointerFn() {
-  return getBridgingFn(CMutablePointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "_convertCMutablePointerToUnsafePointer",
-                       {getCMutablePointerInterfaceType(*this)},
-                       getUnsafePointerInterfaceType(*this));
-}
-
-SILDeclRef SILGenModule::getAutoreleasingUnsafePointerToUnsafePointerFn() {
-  return getBridgingFn(AutoreleasingUnsafePointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "_convertAutoreleasingUnsafePointerToUnsafePointer",
-                       {getAutoreleasingUnsafePointerInterfaceType(*this)},
-                       getUnsafePointerInterfaceType(*this));
-}
-
-SILDeclRef SILGenModule::getUnsafePointerToCConstPointerFn() {
-  return getBridgingFn(UnsafePointerToCConstPointerFn, *this,
-                       STDLIB_NAME, "_convertUnsafePointerToCConstPointer",
-                       {getUnsafePointerInterfaceType(*this)},
-                       getCConstPointerInterfaceType(*this));
-}
-
-SILDeclRef SILGenModule::getUnsafePointerToCMutablePointerFn() {
-  return getBridgingFn(UnsafePointerToCMutablePointerFn, *this,
-                       STDLIB_NAME, "_convertUnsafePointerToCMutablePointer",
-                       {getUnsafePointerInterfaceType(*this)},
-                       getCMutablePointerInterfaceType(*this));
-}
-
-SILDeclRef SILGenModule::getUnsafePointerToAutoreleasingUnsafePointerFn() {
-  return getBridgingFn(UnsafePointerToAutoreleasingUnsafePointerFn, *this,
-                       STDLIB_NAME, "_convertUnsafePointerToAutoreleasingUnsafePointer",
-                       {getUnsafePointerInterfaceType(*this)},
-                       getAutoreleasingUnsafePointerInterfaceType(*this));
-}
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();

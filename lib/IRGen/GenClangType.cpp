@@ -224,8 +224,6 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     UnsafePointer,
     ConstUnsafePointer,
     AutoreleasingUnsafePointer,
-    CMutablePointer,
-    CConstPointer,
     Array,
     Dictionary,
     Unmanaged,
@@ -233,8 +231,6 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case("ConstUnsafePointer", StructKind::ConstUnsafePointer)
     .Case("AutoreleasingUnsafePointer", StructKind::AutoreleasingUnsafePointer)
-    .Case("CMutablePointer", StructKind::CMutablePointer)
-    .Case("CConstPointer", StructKind::CConstPointer)
     .Case("Array", StructKind::Array)
     .Case("Dictionary", StructKind::Dictionary)
     .Case("Unmanaged", StructKind::Unmanaged)
@@ -249,16 +245,14 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
       
   case StructKind::UnsafePointer: // Assume UnsafePointer is mutable
   case StructKind::Unmanaged:
-  case StructKind::AutoreleasingUnsafePointer:
-  case StructKind::CMutablePointer: {
+  case StructKind::AutoreleasingUnsafePointer: {
     assert(args.size() == 1 &&
            "*Pointer<T> should have a single generic argument!");
     auto clangCanTy = Converter.convert(IGM, args.front());
     if (!clangCanTy) return clang::CanQualType();
     return getClangASTContext().getPointerType(clangCanTy);
   }
-  case StructKind::ConstUnsafePointer:
-  case StructKind::CConstPointer: {
+  case StructKind::ConstUnsafePointer: {
     assert(args.size() == 1 &&
            "*Pointer<T> should have a single generic argument!");
     clang::QualType clangTy

@@ -4800,21 +4800,6 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   }
 }
 
-static bool isCPointerType(SILGenFunction &gen,
-                           CanType ty) {
-  auto nom = ty->getNominalOrBoundGenericNominal();
-  
-  return nom == gen.SGM.Types.getCMutablePointerDecl()
-    || nom == gen.getASTContext().getAutoreleasingUnsafePointerDecl()
-    || nom == gen.SGM.Types.getCConstPointerDecl();
-}
-
-static bool isUnsafePointerType(SILGenFunction &gen,
-                                CanType ty) {
-  return ty->getNominalOrBoundGenericNominal()
-    == gen.getASTContext().getUnsafePointerDecl();
-}
-
 namespace {
   // A cleanup that emits a fix_lifetime instruction on a value.
   class FixLifetimeCleanup : public Cleanup {
@@ -4825,182 +4810,6 @@ namespace {
       gen.B.emitFixLifetime(l, value);
     }
   };
-}
-
-static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
-                                                      SILLocation loc,
-                                                      ManagedValue v) {
-  // C*Pointer types in Swift contain a strong reference field we need to
-  // lifetime-extend for the duration of the bridge call.
-  {
-    auto copy = v.copyUnmanaged(gen, loc);
-    gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
-  }
-  
-  // func convertC*PointerToUnsafePointer<T>(C*Pointer<T>) -> UnsafePointer<T>
-  SILValue cToUnsafePointer;
-  auto nativeNom = v.getType().getNominalOrBoundGenericNominal();
-  if (nativeNom == gen.SGM.Types.getCMutablePointerDecl())
-    cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getCMutablePointerToUnsafePointerFn());
-  else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
-    cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getCConstPointerToUnsafePointerFn());
-  else if (nativeNom == gen.getASTContext().getAutoreleasingUnsafePointerDecl())
-    cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getAutoreleasingUnsafePointerToUnsafePointerFn());
-  else
-    llvm_unreachable("unhandled C pointer type");
-  
-  auto subs = v.getType().castTo<BoundGenericType>()
-    ->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  assert(subs.size() == 1 && "more than one substitution for pointer type?!");
-  
-  auto unsafePtrTy = BoundGenericType::get(gen.getASTContext().getUnsafePointerDecl(),
-                                           Type(), subs[0].Replacement)
-    ->getCanonicalType();
-  
-  ParameterConvention convention = gen.getTypeLowering(v.getType()).isTrivial()
-    ? ParameterConvention::Direct_Unowned
-    : ParameterConvention::Direct_Owned;
-  
-  auto substFnTy = SILFunctionType::get(nullptr,
-                      AnyFunctionType::ExtInfo()
-                        .withRepresentation(FunctionType::Representation::Thin),
-                      ParameterConvention::Direct_Unowned,
-                      SILParameterInfo(v.getType().getSwiftRValueType(),
-                                       convention),
-                      SILResultInfo(unsafePtrTy,
-                                    ResultConvention::Unowned),
-                      gen.getASTContext());
-  
-  auto ptr = gen.B.createApply(loc, cToUnsafePointer,
-                               SILType::getPrimitiveObjectType(substFnTy),
-                               SILType::getPrimitiveObjectType(unsafePtrTy),
-                               subs,
-                               v.forward(gen),
-                               /*transparent*/ true);
-  
-  return ManagedValue::forUnmanaged(ptr);
-}
-
-static ManagedValue
-emitBridgeCVoidPointerToCOpaquePointer(SILGenFunction &gen,
-                                       SILLocation loc,
-                                       ManagedValue v,
-                                       SILDeclRef conversionFn) {
-  // C*Pointer types in Swift contain a strong reference field we need to
-  // lifetime-extend for the duration of the bridge call.
-  {
-    auto copy = v.copyUnmanaged(gen, loc);
-    gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
-  }
-  SILValue conversionFnRef
-    = gen.emitGlobalFunctionRef(loc, conversionFn);
-  
-  SILType resultTy =gen.getLoweredLoadableType(
-                                         gen.SGM.Types.getCOpaquePointerType());
-  
-  SILValue result = gen.B.createApply(loc, conversionFnRef,
-                                      conversionFnRef.getType(),
-                                      resultTy, {}, v.forward(gen));
-  return gen.emitManagedRValueWithCleanup(result);
-}
-
-static ManagedValue
-emitBridgeCMutableVoidPointerToCOpaquePointer(SILGenFunction &gen,
-                                              SILLocation loc,
-                                              ManagedValue v) {
-  return emitBridgeCVoidPointerToCOpaquePointer(gen, loc, v,
-                            gen.SGM.getCMutableVoidPointerToCOpaquePointerFn());
-}
-
-static ManagedValue
-emitBridgeCConstVoidPointerToCOpaquePointer(SILGenFunction &gen,
-                                            SILLocation loc,
-                                            ManagedValue v) {
-  return emitBridgeCVoidPointerToCOpaquePointer(gen, loc, v,
-                              gen.SGM.getCConstVoidPointerToCOpaquePointerFn());
-}
-
-static ManagedValue
-emitBridgeCOpaquePointerToCVoidPointer(SILGenFunction &gen,
-                                       SILLocation loc,
-                                       ManagedValue v,
-                                       SILDeclRef conversionFn,
-                                       CanType resultTy) {
-  SILValue conversionFnRef
-    = gen.emitGlobalFunctionRef(loc, conversionFn);
-  
-  SILValue result = gen.B.createApply(loc, conversionFnRef,
-                                      conversionFnRef.getType(),
-                                      SILType::getPrimitiveObjectType(resultTy),
-                                      {}, v.forward(gen));
-  return gen.emitManagedRValueWithCleanup(result);
-}
-
-static ManagedValue
-emitBridgeCOpaquePointerToCMutableVoidPointer(SILGenFunction &gen,
-                                              SILLocation loc,
-                                              ManagedValue v) {
-  return emitBridgeCOpaquePointerToCVoidPointer(gen, loc, v,
-                            gen.SGM.getCOpaquePointerToCMutableVoidPointerFn(),
-                            gen.SGM.Types.getCMutableVoidPointerType());
-}
-
-static ManagedValue
-emitBridgeCOpaquePointerToCConstVoidPointer(SILGenFunction &gen,
-                                            SILLocation loc,
-                                            ManagedValue v) {
-  return emitBridgeCOpaquePointerToCVoidPointer(gen, loc, v,
-                            gen.SGM.getCOpaquePointerToCConstVoidPointerFn(),
-                            gen.SGM.Types.getCConstVoidPointerType());
-}
-
-static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
-                                                      SILLocation loc,
-                                                      ManagedValue v,
-                                                      CanType nativeTy) {
-  // func _convertUnsafePointerToC*Pointer<T>(UnsafePointer<T>) -> C*Pointer<T>
-  SILValue unsafeToCPointer;
-  auto nativeNom = nativeTy->getNominalOrBoundGenericNominal();
-  if (nativeNom == gen.SGM.Types.getCMutablePointerDecl())
-    unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getUnsafePointerToCMutablePointerFn());
-  else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
-    unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getUnsafePointerToCConstPointerFn());
-  else if (nativeNom == gen.getASTContext().getAutoreleasingUnsafePointerDecl())
-    unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getUnsafePointerToAutoreleasingUnsafePointerFn());
-  else
-    llvm_unreachable("unhandled C pointer type");
-  
-  auto subs = v.getType().castTo<BoundGenericType>()
-    ->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  assert(subs.size() == 1 && "more than one substitution for pointer type?!");
-  
-  ResultConvention convention = gen.getTypeLowering(nativeTy).isTrivial()
-    ? ResultConvention::Unowned
-    : ResultConvention::Owned;
-  
-  auto substFnTy = SILFunctionType::get(nullptr,
-                            AnyFunctionType::ExtInfo()
-                              .withRepresentation(FunctionType::Representation::Thin),
-                            ParameterConvention::Direct_Unowned,
-                            SILParameterInfo(v.getType().getSwiftRValueType(),
-                                             ParameterConvention::Direct_Unowned),
-                            SILResultInfo(nativeTy, convention),
-                            gen.getASTContext());
-  
-  auto ptr = gen.B.createApply(loc, unsafeToCPointer,
-                               SILType::getPrimitiveObjectType(substFnTy),
-                               SILType::getPrimitiveObjectType(nativeTy),
-                               subs,
-                               v.forward(gen),
-                               /*transparent*/ true);
-  
-  return gen.emitManagedRValueWithCleanup(ptr);
 }
 
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
@@ -5032,12 +4841,6 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
                            SILType::getPrimitiveObjectType(loweredBridgedTy));
       return ManagedValue(native, v.getCleanup());
     }
-  }
-  
-  // Bridge C*Pointer types to UnsafePointer.
-  if (isUnsafePointerType(gen, loweredBridgedTy)
-      && isCPointerType(gen, loweredNativeTy)) {
-    return emitBridgeCPointerToUnsafePointer(gen, loc, v);
   }
   
   // Bridge native functions to blocks.
@@ -5116,12 +4919,6 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
                                         gen.getLoweredType(loweredNativeTy));
       return ManagedValue(native, v.getCleanup());
     }
-  }
-  
-  // Bridge UnsafePointer types back to C*Pointer.
-  if (isUnsafePointerType(gen, loweredBridgedTy)
-      && isCPointerType(gen, loweredNativeTy)) {
-    return emitBridgeUnsafePointerToCPointer(gen, loc, v, loweredNativeTy);
   }
   
   // Bridge blocks back into native function types.
