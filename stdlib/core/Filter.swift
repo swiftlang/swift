@@ -68,11 +68,29 @@
   return lhs._pos == rhs._pos
 }
 
-/// The lazy `Collection` returned by `filter(c)` where `c` is a
-/// `Collection`
+/// A lazy `Collection` wrapper that includes the elements of an
+/// underlying collection that satisfy a predicate.  Not
+/// automatically returned by `filter(x)` for two reasons:
+///
+/// * The O(1) guarantee of our `IndexType` would be iffy at best, since
+///   it advances an underlying `Index` until the predicate is
+///   satisfied.  Be aware that a `FilterCollectionView` may not offer
+///   the expected efficiency for this reason.
+///
+/// * Constructing an `Array` from a `Collection` measures the length
+///   of the collection before traversing it to read the elements.
+///   This causes the filter predicate to be called twice for each
+///   element of the underlying collection, which is surprising.
 @public struct FilterCollectionView<Base: Collection> : Collection {
 
   @public typealias IndexType = FilterCollectionViewIndex<Base>
+
+  @public
+  init(_ base: Base, includeElement: (Base.GeneratorType.Element)->Bool) {
+    self._base = base
+    self._include = includeElement
+  }
+
   @public var startIndex: IndexType {
     var first = _base.startIndex
     while first != _base.endIndex {
@@ -111,6 +129,10 @@
   return FilterSequenceView(_base: source, _include: includeElement)
 }
 
+/*
+// No overload for collections; see the comment on
+// FilterCollectionView for an explanation.
+
 /// Return a lazy Collection containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
 @public func filter<C:Collection>(
@@ -118,3 +140,4 @@
 ) -> FilterCollectionView<C> {
   return FilterCollectionView(_base: source, _include: includeElement)
 }
+*/
