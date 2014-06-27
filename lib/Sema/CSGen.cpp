@@ -1392,9 +1392,6 @@ namespace {
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-    Type visitInOutConversionExpr(InOutConversionExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

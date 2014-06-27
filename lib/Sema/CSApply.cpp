@@ -2196,7 +2196,7 @@ namespace {
         
         // Wrap the call in an InOutConversion node to mark its special
         // writeback semantics.
-        return new (C) InOutConversionExpr(expr->getLoc(), conversion);
+        llvm_unreachable("it's dead, jim");
       };
       
       auto lvTy = expr->getSubExpr()->getType()->castTo<LValueType>();
@@ -2249,15 +2249,8 @@ namespace {
                                            ConstraintLocatorBuilder(locator),
                                            /*implicit*/ true,
                                            /*directPropertyAccess*/ false);
-        
-        auto lvConversion = new (C) LValueConversionExpr(expr->getSubExpr(),
-                                                   LValueType::get(writebackTy),
-                                                   getMemberRef,
-                                                   setMemberRef);
-        
-        // Convert the converted lvalue.
-        return buildInOutConversionExpr(conversionChoice, resultTy,
-                                        lvConversion);
+
+        llvm_unreachable("it's dead, jim");
       }
       }
     }
@@ -2981,9 +2974,6 @@ namespace {
     }
 
     Expr *visitOpenExistentialExpr(OpenExistentialExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Expr *visitInOutConversionExpr(InOutConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     

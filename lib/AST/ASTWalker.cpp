@@ -263,22 +263,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-
-  Expr *visitLValueConversionExpr(LValueConversionExpr *E) {
-    Expr *E2 = doIt(E->getSubExpr());
-    if (!E2) return nullptr;
-    E->setSubExpr(E2);
-    
-    Expr *From2 = doIt(E->getFromConversionFn());
-    if (!From2) return nullptr;
-    E->setFromConversionFn(From2);
-    
-    Expr *To2 = doIt(E->getToConversionFn());
-    if (!To2) return nullptr;
-    E->setToConversionFn(To2);
-    
-    return E;
-  }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
@@ -305,14 +289,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
   
-  Expr *visitInOutConversionExpr(InOutConversionExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
-      return E;
-    }
-    return nullptr;
-  }
-
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))

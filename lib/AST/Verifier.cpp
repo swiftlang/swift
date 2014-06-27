@@ -1166,75 +1166,6 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
     
-    void verifyChecked(LValueConversionExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying LValueConversionExpr", E);
-
-      if (!E->getSubExpr()->getType()->is<LValueType>()) {
-        Out << "LValueConversion subexpression must be an lvalue\n";
-        abort();
-      }
-      
-      if (!E->getType()->is<LValueType>()) {
-        Out << "LValueConversion result type must be an lvalue\n";
-        abort();
-      }
-      
-      Type origType = E->getSubExpr()->getType()->getLValueOrInOutObjectType();
-      Type convertedType = E->getType()->getLValueOrInOutObjectType();
-      
-      auto fromFnType = E->getFromConversionFn()->getType()->getAs<FunctionType>();
-      if (!fromFnType) {
-        Out << "LValueConversion from-conversion function must be of function "
-               "type\n";
-        abort();
-      }
-      if (!fromFnType->getResult()->isEqual(convertedType)) {
-        Out << "LValueConversion from-conversion function must return the "
-               "converted type\n";
-        abort();
-      }
-      
-      auto inputTypeMatches = [&](Type input, Type expected) -> bool {
-        if (input->isEqual(expected))
-          return true;
-        
-        auto tup = input->getAs<TupleType>();
-        if (!tup)
-          return false;
-        if (tup->getNumElements() != 1)
-          return false;
-        if (tup->getFields()[0].isVararg())
-          return false;
-        return tup->getFields()[0].getType()->isEqual(expected);
-      };
-      
-      if (!inputTypeMatches(fromFnType->getInput(), origType)) {
-        Out << "LValueConversion from-conversion function must take the "
-               "original type as its parameter\n";
-        abort();
-      }
-      
-      auto toFnType = E->getToConversionFn()->getType()->getAs<FunctionType>();
-      if (!toFnType) {
-        Out << "LValueConversion to-conversion function must be of function "
-        "type\n";
-        abort();
-      }
-      if (!toFnType->getResult()->isEqual(origType)) {
-        Out << "LValueConversion to-conversion function must return the "
-               "orig type\n";
-        abort();
-      }
-      
-      if (!inputTypeMatches(toFnType->getInput(), convertedType)) {
-        Out << "LValueConversion to-conversion function must take the "
-               "converted type as its parameter\n";
-        abort();
-      }
-      
-      verifyCheckedBase(E);
-    }
-    
     void verifyChecked(LValueToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying LValueToPointerExpr", E);
 
@@ -1251,16 +1182,6 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
     
-    void verifyChecked(InOutConversionExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying InOutConversionExpr", E);
-
-      if (!E->getSubExpr()->getType()->isEqual(E->getType())) {
-        Out << "InOutConversionExpr must have the same type as its subexpression\n";
-        abort();
-      }
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 

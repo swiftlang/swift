@@ -162,7 +162,6 @@ public:
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
-  LValue visitLValueConversionExpr(LValueConversionExpr *e);
   
   // Expressions that wrap lvalues
   
@@ -444,55 +443,6 @@ namespace {
     }
   };
   
-  /// Convert an lvalue to a different type through a pair of conversion
-  /// functions.
-  class LValueConversionComponent : public LogicalPathComponent {
-    LValueConversionExpr *Conversion;
-    
-  public:
-    LValueConversionComponent(LValueConversionExpr *E,
-                              LValueTypeData typeData)
-      : LogicalPathComponent(typeData),
-        Conversion(E)
-    {}
-    
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue orig, SGFContext c) const override {
-      // Load the original value.
-      ManagedValue origVal = gen.emitLoad(loc, orig.getValue(),
-                                          gen.getTypeLowering(orig.getType()),
-                                          SGFContext(),
-                                          IsNotTake);
-      // Apply the "from" conversion.
-      auto origTy = Conversion->getSubExpr()->getType()
-        ->getLValueOrInOutObjectType()
-        ->getCanonicalType();
-      return gen.emitApplyConversionFunction(loc,
-                     Conversion->getFromConversionFn(),
-                     Conversion->getType()->getLValueOrInOutObjectType(),
-                     RValue(gen, loc, origTy, origVal));
-    }
-    
-    void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue origAddr) const override {
-      // Apply the "to" conversion.
-      ManagedValue convertedVal = gen.emitApplyConversionFunction(loc,
-              Conversion->getToConversionFn(),
-              Conversion->getSubExpr()->getType()->getLValueOrInOutObjectType(),
-              std::move(value));
-      
-      // Store back to the original value.
-      convertedVal.assignInto(gen, loc, origAddr.getValue());
-    }
-    
-    std::unique_ptr<LogicalPathComponent>
-    clone(SILGenFunction &gen, SILLocation loc) const override {
-      LogicalPathComponent *clone
-        = new LValueConversionComponent(Conversion, getTypeData());
-      return std::unique_ptr<LogicalPathComponent>(clone);
-    }
-  };
-  
   /// Remap an lvalue referencing a generic type to an lvalue of its substituted
   /// type in a concrete context.
   class OrigToSubstComponent : public LogicalPathComponent {
@@ -767,16 +717,6 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   };
 
   lv.add<TupleElementComponent>(index, typeData);
-  return std::move(lv);
-}
-
-LValue SILGenLValue::visitLValueConversionExpr(LValueConversionExpr *e) {
-  LValue lv = visitRec(e->getSubExpr());
-  
-  LValueTypeData typeData = getMemberTypeData(gen,
-                                    e->getType()->getLValueOrInOutObjectType(),
-                                    e);
-  lv.add<LValueConversionComponent>(e, typeData);
   return std::move(lv);
 }
 

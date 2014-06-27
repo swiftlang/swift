@@ -1915,38 +1915,6 @@ public:
   }
 };
   
-/// Convert an lvalue to an lvalue of a different type using a pair of
-/// conversion functions.
-class LValueConversionExpr : public ImplicitConversionExpr {
-  // The conversion function that converts from the original type to the
-  // converted type.
-  Expr *FromConversionFn;
-  // The conversion function that converts back to the original type from the
-  // converted type.
-  Expr *ToConversionFn;
-  
-public:
-  LValueConversionExpr(Expr *SubExpr, Type Ty,
-                       Expr *FromConversionFn, Expr *ToConversionFn)
-    : ImplicitConversionExpr(ExprKind::LValueConversion, SubExpr, Ty),
-      FromConversionFn(FromConversionFn), ToConversionFn(ToConversionFn)
-  {}
-  
-  /// Get the expression that produces the function that converts from the
-  /// original lvalue type to the converted type.
-  Expr *getFromConversionFn() const { return FromConversionFn; }
-  void setFromConversionFn(Expr *e) { FromConversionFn = e; }
-  
-  /// Get the expression that produces the function that converts back to the
-  /// original lvalue type from the converted type.
-  Expr *getToConversionFn() const { return ToConversionFn; }
-  void setToConversionFn(Expr *e) { ToConversionFn = e; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::LValueConversion;
-  }
-};
-  
 /// Convert the address of an lvalue to a raw pointer.
 class LValueToPointerExpr : public ImplicitConversionExpr {
   Type AbstractionPattern;
@@ -3058,41 +3026,6 @@ public:
   }
 };
   
-/// Indicates that the enclosed apply expression is an inout conversion.
-///
-/// Unlike a normal call, calls inside the inout conversion do not get their
-/// own writeback scope, but instead extend the writeback chain for the
-/// surrounding call. This ensures that in an expression like:
-///   foo(&a)
-/// 'a' is not written back to until the end of 'foo', even if passing
-/// '&a' to foo involves an inout conversion.
-class InOutConversionExpr : public Expr {
-  SourceLoc OperLoc;
-  Expr *SubExpr;
-public:
-  InOutConversionExpr(SourceLoc OperLoc, Expr *SubExpr, bool Implicit = false)
-    : Expr(ExprKind::InOutConversion, Implicit, SubExpr->getType()),
-      OperLoc(OperLoc), SubExpr(SubExpr)
-  {}
-  
-  Expr *getSubExpr() const {
-    return SubExpr;
-  }
-  void setSubExpr(Expr *apply) {
-    SubExpr = apply;
-  }
-  
-  /// Location of the '&' operator for the inout expression.
-  SourceLoc getLoc() const { return OperLoc; }
-  SourceRange getSourceRange() const {
-    return {OperLoc, SubExpr->getSourceRange().End};
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::InOutConversion;
-  }
-};
-
 /// \brief Represents an explicit cast, 'a as T' or 'a is T', where "T" is a
 /// type, and "a" is the expression that will be converted to the type.
 class ExplicitCastExpr : public Expr {

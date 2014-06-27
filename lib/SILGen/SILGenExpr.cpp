@@ -141,7 +141,6 @@ namespace {
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }
     
-    RValue visitInOutConversionExpr(InOutConversionExpr *E, SGFContext C);
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
     
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C) {
@@ -210,7 +209,6 @@ namespace {
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
-    RValue visitLValueConversionExpr(LValueConversionExpr *E, SGFContext C);
     RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
     RValue visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
                                           SGFContext C);
@@ -4393,11 +4391,6 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   return RValue(SGF, E, result);
 }
 
-RValue RValueEmitter::visitLValueConversionExpr(LValueConversionExpr *E,
-                                                SGFContext C) {
-  llvm_unreachable("should only appear in lvalue contexts");
-}
-
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
                                                SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr());
@@ -4476,14 +4469,6 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
   SGF.B.createStrongRetain(E, value);
   
   return RValue(SGF, E, ManagedValue::forUnmanaged(value));
-}
-
-RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,
-                                               SGFContext C) {
-  // Disable nested writeback scopes for any calls evaluated in the
-  // subexpression.
-  InOutConversionScope scope(SGF);
-  return visit(E->getSubExpr());
 }
 
 namespace {
