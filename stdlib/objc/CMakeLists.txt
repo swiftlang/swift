@@ -32,7 +32,6 @@ add_subdirectory(Dispatch)
 add_subdirectory(CoreGraphics)
 add_subdirectory(Foundation)
 add_subdirectory(SpriteKit)
-add_subdirectory(QuartzCore)
 
 if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
   add_subdirectory(AppKit)
