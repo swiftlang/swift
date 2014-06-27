@@ -975,65 +975,6 @@ namespace {
       return result;
     }
 
-    Type visitNewArrayExpr(NewArrayExpr *expr) {
-      // Validate the element type.
-      auto &tc = CS.getTypeChecker();
-      if (tc.validateType(expr->getElementTypeLoc(), CS.DC,
-                          TR_AllowUnboundGenerics))
-        return nullptr;
-
-      // Open up the element type.
-      auto elementTy = CS.openType(expr->getElementTypeLoc().getType());
-      auto resultTy = elementTy;
-      for (unsigned i = expr->getBounds().size(); i != 1; --i) {
-        // FIXME: To support multidimensional arrays, we'll need to look at
-        // the expressions in here.
-        auto &bound = expr->getBounds()[i-1];
-        resultTy = tc.getArraySliceType(bound.Brackets.Start, resultTy);
-      }
-
-      // The outer bound must be an ArrayBound.
-      auto &outerBound = expr->getBounds()[0];
-      auto arrayBoundProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::ArrayBound);
-      if (!arrayBoundProto)
-        return nullptr;
-
-      CS.addConstraint(ConstraintKind::ConformsTo, outerBound.Value->getType(),
-                       arrayBoundProto->getDeclaredType(),
-                       CS.getConstraintLocator(outerBound.Value));
-
-      // If we have an explicit constructor, make sure we can call it.
-      // Either we have an explicit constructor closure or else ElementType must
-      // be default constructible.
-      if (expr->hasConstructionFunction()) {
-        // FIXME: Assume the index type is DefaultIntegerLiteralType for now.
-        auto intProto = tc.getProtocol(
-                          expr->getConstructionFunction()->getLoc(),
-                          KnownProtocolKind::IntegerLiteralConvertible);
-        Type intTy = tc.getDefaultType(intProto, CS.DC);
-        assert(intTy && "No default integer type?");
-
-        Expr *constructionFn = expr->getConstructionFunction();
-        Type constructionTy = FunctionType::get(intTy, elementTy);
-
-        CS.addConstraint(ConstraintKind::Conversion, constructionFn->getType(),
-                         constructionTy,
-                         CS.getConstraintLocator(
-                           expr, ConstraintLocator::NewArrayConstructor));
-      } else {
-        // Otherwise, ElementType must be default constructible.
-        Type defaultCtorTy = FunctionType::get(TupleType::getEmpty(tc.Context),
-                                               elementTy);
-        CS.addValueMemberConstraint(elementTy,
-          tc.Context.Id_init,
-          defaultCtorTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::NewArrayElement));
-      }
-      
-      return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
-    }
-
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       /*options=*/0);

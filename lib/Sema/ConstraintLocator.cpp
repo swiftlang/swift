@@ -207,14 +207,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
       break;
-        
-    case NewArrayElement:
-      out << "new array element type";
-      break;
-
-    case NewArrayConstructor:
-      out << "new array constructor";
-      break;
     }
   }
 

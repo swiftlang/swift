@@ -318,19 +318,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::NewArrayConstructor:
-      if (auto newArray = dyn_cast<NewArrayExpr>(anchor)) {
-        // No additional target locator information.
-        // FIXME: Dig out the constructor we're trying to call?
-        targetAnchor = nullptr;
-        targetPath.clear();
-
-        anchor = newArray->getConstructionFunction();
-        path = path.slice(1);
-        continue;
-      }
-      break;
-
     case ConstraintLocator::AssignSource:
       if (auto assign = dyn_cast<AssignExpr>(anchor)) {
         targetAnchor = assign->getDest();

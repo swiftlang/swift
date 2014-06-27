@@ -130,10 +130,6 @@ public:
     AssignSource,
     /// \brief The destination of an assignment
     AssignDest,
-    /// \brief The array element type of a 'new' expression.
-    NewArrayElement,
-    /// \brief The constructor for an array 'new' expression.
-    NewArrayConstructor,
     /// \brief The operand of a checked cast.
     CheckedCastOperand,
   };
@@ -173,8 +169,6 @@ public:
     case IfElse:
     case AssignSource:
     case AssignDest:
-    case NewArrayElement:
-    case NewArrayConstructor:
     case CheckedCastOperand:
       return 0;
 
@@ -236,8 +230,6 @@ public:
     case IfElse:
     case AssignSource:
     case AssignDest:
-    case NewArrayElement:
-    case NewArrayConstructor:
       return 0;
 
     case FunctionArgument:

@@ -944,8 +944,6 @@ ERROR(broken_array_bound_proto,sema_tce,none,
       "protocol 'ArrayBound' is broken", ())
 ERROR(broken_builtin_array_bound,sema_tce,none,
       "builtin 'ArrayBound' type is broken", ())
-ERROR(array_new_removed,sema_tce,none,
-      "array 'new' has been removed; use array construction instead", ())
 
 ERROR(interpolation_missing_proto,sema_tce,none,
       "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",

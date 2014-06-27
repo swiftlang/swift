@@ -1525,26 +1525,6 @@ public:
     OS << ')';
   }
 
-  void visitNewArrayExpr(NewArrayExpr *E) {
-    printCommon(E, "new_array_expr")
-      << " elementType='" << E->getElementTypeLoc().getType() << "'";
-    OS << '\n';
-    if (E->hasInjectionFunction())
-      printRec(E->getInjectionFunction());
-    for (auto &bound : E->getBounds()) {
-      OS << '\n';
-      if (bound.Value)
-        printRec(bound.Value);
-      else
-        OS.indent(Indent + 2) << "(empty bound)";
-    }
-    if (E->hasConstructionFunction()) {
-      OS << '\n';
-      printRec(E->getConstructionFunction());
-    }
-    OS << ')';
-  }
-
   void visitDynamicTypeExpr(DynamicTypeExpr *E) {
     printCommon(E, "metatype_expr");
     OS << '\n';

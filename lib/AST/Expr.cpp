@@ -288,19 +288,6 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
-NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
-                                   TypeLoc elementTy, ArrayRef<Bound> bounds,
-                                   Expr *constructionFn) {
-  void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
-                              bounds.size() * sizeof(Bound),
-                              alignof(NewArrayExpr));
-  NewArrayExpr *E =
-    ::new (buffer) NewArrayExpr(newLoc, elementTy, bounds.size(),
-                                constructionFn);
-  memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
-  return E;
-}
-
 SourceRange TupleExpr::getSourceRange() const {
   if (LParenLoc.isValid() && !hasTrailingClosure()) {
     assert(RParenLoc.isValid() && "Mismatched parens?");

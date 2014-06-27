@@ -197,7 +197,6 @@ namespace {
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
-    RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
@@ -2455,30 +2454,6 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   }
 
   return result;
-}
-
-RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
-  SILValue NumElements = visit(E->getBounds()[0].Value)
-    .getAsSingleValue(SGF, E->getBounds()[0].Value)
-    .getValue();
-
-  // Allocate the array.
-  AllocArrayInst *AllocArray = SGF.B.createAllocArray(E,
-                                            SGF.getLoweredType(E->getElementType()),
-                                            NumElements);
-
-  ManagedValue ObjectPtr
-    = SGF.emitManagedRValueWithCleanup(SILValue(AllocArray, 0));
-  SILValue BasePtr(AllocArray, 1);
-
-  // FIXME: We need to initialize the elements of the array that are now
-  // allocated.
-
-  // Finally, build and return an Array instance using the object
-  // header/base/count.
-  return RValue(SGF, E,
-                SGF.emitArrayInjectionCall(ObjectPtr, BasePtr, NumElements,
-                                           E->getInjectionFunction(), E));
 }
 
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {

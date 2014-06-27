@@ -298,23 +298,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    for (auto &bound : E->getBounds()) {
-      // Ignore empty bounds.
-      if (!bound.Value) continue;
-
-      Expr *newValue = doIt(bound.Value);
-      if (!newValue) return nullptr;
-      bound.Value = newValue;
-    }
-    if (E->hasConstructionFunction()) {
-      Expr *newConstructionFn = doIt(E->getConstructionFunction());
-      if (!newConstructionFn) return nullptr;
-      E->setConstructionFunction(newConstructionFn);
-    }
-    return E;
-  }
-
   Expr *visitDynamicTypeExpr(DynamicTypeExpr *E) {
     Expr *base = E->getBase();
     if ((base = doIt(base)))

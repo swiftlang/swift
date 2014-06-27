@@ -1196,35 +1196,6 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyParsed(NewArrayExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying NewArrayExpr", E);
-
-      if (E->getBounds().empty()) {
-        Out << "NewArrayExpr has an empty bounds list\n";
-        abort();
-      }
-      if (E->getBounds()[0].Value == nullptr) {
-        Out << "First bound of NewArrayExpr is missing\n";
-        abort();
-      }
-      verifyParsedBase(E);
-    }
-
-    void verifyChecked(NewArrayExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying NewArrayExpr", E);
-
-      if (!E->hasElementType()) {
-        Out << "NewArrayExpr is missing its element type";
-        abort();
-      }
-
-      if (!E->hasInjectionFunction()) {
-        Out << "NewArrayExpr is missing an injection function";
-        abort();
-      }
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(InjectIntoOptionalExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying InjectIntoOptionalExpr",
                                       E);

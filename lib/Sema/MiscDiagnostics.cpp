@@ -198,7 +198,6 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::AutoClosure:
           case ExprKind::Module:
           case ExprKind::InOut:
-          case ExprKind::NewArray:
           case ExprKind::RebindSelfInConstructor:
           case ExprKind::OpaqueValue:
           case ExprKind::BindOptional:

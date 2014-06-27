@@ -458,7 +458,6 @@ ParserResult<Expr> Parser::parseExprNew() {
     return makeParserError();
 
   bool hadInvalid = false;
-  SmallVector<NewArrayExpr::Bound, 4> bounds;
   while (Tok.isFollowingLSquare()) {
     Parser::StructureMarkerRAII ParsingIndices(*this, Tok);
     SourceRange brackets;
@@ -466,13 +465,7 @@ ParserResult<Expr> Parser::parseExprNew() {
 
     // If the bound is missing, that's okay unless this is the first bound.
     if (Tok.is(tok::r_square)) {
-      if (bounds.empty()) {
-        diagnose(Tok, diag::array_new_missing_first_bound);
-        hadInvalid = true;
-      }
-
       brackets.End = consumeToken(tok::r_square);
-      bounds.push_back(NewArrayExpr::Bound(nullptr, brackets));
       continue;
     }
 
@@ -491,17 +484,6 @@ ParserResult<Expr> Parser::parseExprNew() {
     }
 
     brackets.End = consumeToken(tok::r_square);
-
-    // We don't support multi-dimensional arrays with specified inner bounds.
-    // Jagged arrays (e.g., new Int[n][][]) are permitted.
-    if (!bounds.empty()) {
-      diagnose(boundValue.get()->getLoc(), diag::new_array_multidimensional)
-        .highlight(boundValue.get()->getSourceRange());
-      bounds.push_back(NewArrayExpr::Bound(nullptr, brackets));
-      continue;
-    }
-
-    bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
   }
 
   if (hadInvalid)
@@ -521,16 +503,8 @@ ParserResult<Expr> Parser::parseExprNew() {
     assert(constructExpr);
   }
 
-  if (bounds.empty()) {
-    diagnose(newLoc, diag::expected_bracket_array_new);
-    // No need to indicate the error to the caller because it was not a parse
-    // error.
-    return makeParserResult(new (Context) ErrorExpr({newLoc, PreviousLoc}));
-  }
-
-  return makeParserResult(
-      NewArrayExpr::create(Context, newLoc, elementTy.get(), bounds,
-                           constructExpr));
+  diagnose(newLoc, diag::array_new_removed);
+  return makeParserError();
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
