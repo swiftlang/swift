@@ -47,20 +47,21 @@ public:
   /// Modules are checked.  The results in the ResultVector will
   /// be consulted first.  Return true if results have been added
   /// to RV.
+  /// FIXME: I don't think this ever does anything useful.
   virtual bool lookupOverrides(Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
+ 
+ /// This is the second time DebuggerClient is consulted:
+  /// after all names in external Modules are checked, the client
+  /// gets a chance to add names to the list of candidates that
+  /// have been found in the external module lookup.  
 
-  /// This is the second time DebuggerClient is consulted:
-  /// after all names in external Modules are checked, if nothing
-  /// suitable was found.  The idea is that lookupFallbacks can
-  /// perform more cost-intensive checks.  Return true if results
-  /// have been added to RV.
-  virtual bool lookupFallbacks(Identifier Name, DeclContext *DC,
+  virtual bool lookupAdditions (Identifier Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
-  virtual SILDebuggerClient *getAsSILDebuggerClient() = 0;
+   virtual SILDebuggerClient *getAsSILDebuggerClient() = 0;
 private:
   virtual void anchor();
 };

@@ -582,7 +582,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   for (auto VD : CurModuleResults)
     Results.push_back(Result::getModuleMember(VD));
 
-  // If we've found something, we're done.
+  // Now add any names the DebugClient knows about to the lookup.
+  if (Name.isSimpleName() && DebugClient)
+      DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc, IsTypeLookup,
+                                   Results);
+
+  // If we've found something, we're done. 
   if (!Results.empty())
     return;
 
@@ -600,9 +605,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     return true;
   });
 
-  if (Name.isSimpleName() && DebugClient && !Results.size())
-    DebugClient->lookupFallbacks(Name.getBaseName(), DC, Loc, IsTypeLookup,
-                                 Results);
 }
 
 Optional<UnqualifiedLookup>
