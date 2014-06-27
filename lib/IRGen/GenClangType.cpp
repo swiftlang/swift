@@ -301,7 +301,7 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
     auto blockTy = clangCtx.getBlockPointerType(fnTy);
     return clangCtx.getCanonicalType(blockTy);
   }
-no_clang_type:  
+no_clang_type:
   // Fall back to void(^)() for block types we can't convert otherwise. As long
   // as it's a pointer type it doesn't matter exactly which for either ABI type
   // generation or standard Obj-C type encoding, but protocol extended method
