@@ -633,12 +633,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     
     // Parse the matching ')'.
     SourceLoc RParenLoc;
-    bool Invalid = false;
-    if (parseMatchingToken(tok::r_paren, RParenLoc, 
-                           diag::attr_objc_expected_rparen, LParenLoc)) {
-      RParenLoc = Tok.getLoc();
-      Invalid = true;
-    }
+    bool Invalid = parseMatchingToken(tok::r_paren, RParenLoc,
+                                      diag::attr_objc_expected_rparen,
+                                      LParenLoc);
 
     if (Names.empty()) {
       // When there are no names, recover as if there were no parentheses.
@@ -765,9 +762,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       }
 
       SourceLoc rp;
-      if (parseMatchingToken(tok::r_paren, rp,
-                             diag::attr_unowned_expected_rparen, lp))
-        return false;
+      parseMatchingToken(tok::r_paren, rp, diag::attr_unowned_expected_rparen,
+                         lp);
 
       if (invalid)
         return false;
@@ -1000,10 +996,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // Parse the ')'.  We can't use parseMatchingToken if we're in
       // just-checking mode.
       if (!justChecking) {
-        if (parseMatchingToken(tok::r_paren, endLoc,
-                               diag::cc_attribute_expected_rparen,
-                               beginLoc))
-          return true;
+        parseMatchingToken(tok::r_paren, endLoc,
+                           diag::cc_attribute_expected_rparen,
+                           beginLoc);
       } else if (!consumeIf(tok::r_paren)) {
         return true;
       }
@@ -2373,10 +2368,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
         consumeGetSetBody(TheDecl, LBLoc);
 
       SourceLoc RBLoc = Tok.getLoc();
-      if (!isImplicitGet &&
-          parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                             LBLoc))
-        RBLoc = PreviousLoc;
+      if (!isImplicitGet)
+        parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                           LBLoc);
 
       if (!isDelayedParsingEnabled()) {
         BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
@@ -2406,11 +2400,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
   if (Invalid)
     skipUntil(tok::r_brace);
 
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc)) {
-    Invalid = true;
-    RBLoc = LastValidLoc;
-  }
+  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                     LBLoc);
   return Invalid;
 }
 

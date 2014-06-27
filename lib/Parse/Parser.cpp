@@ -520,6 +520,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   }
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
+
+    TokLoc = Tok.getLoc();
     return true;
   }
 
@@ -588,7 +590,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
-    RightLoc = PreviousLoc.isValid()? PreviousLoc : Tok.getLoc();
   }
 
   return Status;

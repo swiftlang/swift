@@ -332,11 +332,13 @@ struct ErrorTypeInVarDeclArrayType2 {
 
 struct ErrorTypeInVarDeclArrayType3 {
   var v1 : Int[ // expected-note {{to match this opening '['}}
+      // expected-error @-1{{expected expression for size of array type}}
   var v2 : Int // expected-error {{expected ']' in array type}} expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
 }
 
 struct ErrorTypeInVarDeclArrayType4 {
   var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  // expected-error @-1{{fixed-length arrays are not yet supported}}
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
@@ -347,7 +349,8 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0] // expected-error {{'()' does not have a member named 'Element'}}
+        // expected-error@-1{{fixed-length arrays are not yet supported}}
+    return [0]
   }
 }
 
@@ -402,6 +405,7 @@ struct ErrorInFunctionSignatureResultArrayType10 {
 
 struct ErrorInFunctionSignatureResultArrayType11 {
   func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
+              // expected-error @-1{{expected expression for size of array type}}
   }
 }
 

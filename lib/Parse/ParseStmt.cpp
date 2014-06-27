@@ -513,10 +513,8 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   SourceLoc RBLoc;
 
   ParserStatus Status = parseBraceItems(Entries);
-  if (parseMatchingToken(tok::r_brace, RBLoc,
-                         diag::expected_rbrace_in_brace_stmt, LBLoc)) {
-    RBLoc = PreviousLoc;
-  }
+  parseMatchingToken(tok::r_brace, RBLoc,
+                     diag::expected_rbrace_in_brace_stmt, LBLoc);
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
@@ -1419,12 +1417,6 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
-    // Make sure the source range still properly contains all the cases we've
-    // parsed so far. <rdar://problem/15971438>
-    if (cases.empty())
-      rBraceLoc = PreviousLoc;
-    else
-      rBraceLoc = cases.back()->getEndLoc();
   }
 
   return makeParserResult(

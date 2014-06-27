@@ -1722,12 +1722,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
   parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
                      leftBrace);
 
-  // We always need a right brace location, even if we couldn't parse the
-  // actual right brace.
-  // FIXME: Is this a local hack, should parseMatchingToken handle this?
-  if (rightBrace.isInvalid())
-    rightBrace = PreviousLoc;
-
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
   if (!params) {

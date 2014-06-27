@@ -638,11 +638,10 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   // future, we will need to remove this check to accept any compositional
   // expressions
   ParserResult<Expr> sizeEx = parseExprBasic(diag::expected_expr_array_type);
-  
-  if (parseMatchingToken(tok::r_square, rsquareLoc,
-                         diag::expected_rbracket_array_type, lsquareLoc))
-    return nullptr;
-  
+
+  parseMatchingToken(tok::r_square, rsquareLoc,
+                     diag::expected_rbracket_array_type, lsquareLoc);
+
   if (!sizeEx.isNull() && isa<IntegerLiteralExpr>(sizeEx.get())) {
     if (sizeEx.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
@@ -713,8 +712,6 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
     return makeParserError();
 
   // Form the dictionary type.
-  if (rsquareLoc.isInvalid())
-    rsquareLoc = Tok.getLoc();
   SourceRange brackets(lsquareLoc, rsquareLoc);
   if (colonLoc.isValid())
     return makeParserResult(ParserStatus(firstTy) | ParserStatus(secondTy),
