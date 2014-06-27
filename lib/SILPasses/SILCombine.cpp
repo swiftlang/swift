@@ -1338,10 +1338,13 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   if (!OutputTy.isLayoutCompatibleWith(InputTy, Mod))
     return nullptr;
 
-  // If our input is trivial and our output type is not, do not do anything.
+  // If our types have mismatching trivial properties, bail.
+  // TODO: Can we handle this case?
   bool InputIsTrivial = InputTy.isTrivial(Mod);
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
-  bool IsTrivialCast = InputIsTrivial || OutputIsTrivial;
+  if (InputIsTrivial != OutputIsTrivial)
+    return nullptr;
+  bool IsTrivialCast = InputIsTrivial;
 
   // For each user U of the unchecked_addr_cast...
   for (auto U : UADCI->getUses())

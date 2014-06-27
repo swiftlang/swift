@@ -210,10 +210,9 @@ static bool isLayoutCompatibleWithRawPointer(SILType Ty, SILModule &Mod) {
   return false;
 }
 
-/// Returns true if scalar type \p LHS is layout compatible with scalar \p
-/// RHS. These are all commutative queries.
-static bool areLayoutCompatibleNonAggregates(SILType LHS, SILType RHS,
-                                             SILModule &Mod) {
+/// Returns true if scalar type \p LHS is layout compatible with scalar \p RHS.
+static bool isLayoutCompatibleAsNonAggregates(SILType LHS, SILType RHS,
+                                              SILModule &Mod) {
   // First check canonicalize Builtin.RawPointer on the LHS.
   if (RHS.is<BuiltinRawPointerType>())
     std::swap(LHS, RHS);
@@ -239,26 +238,18 @@ static bool areLayoutCompatibleNonAggregates(SILType LHS, SILType RHS,
   if (RHS.is<BuiltinNativeObjectType>() || RHS.is<BuiltinUnknownObjectType>())
     return true;
 
-  // If both are classes, we treat them as being layout compatible.
+  // As one last final check, if both are classes and have a derived class
+  // relationship, they are layout compatible.
   if (LHS.getClassOrBoundGenericClass() && RHS.getClassOrBoundGenericClass())
-    return true;
-
-  // Canonicalize AnyObject on the left side.
-  if (RHS.isAnyObject())
-    std::swap(LHS, RHS);
-
-  // If LHS is an AnyObject and RHS is a class, we are going to say that they
-  // are layout compatible.
-  if (LHS.isAnyObject() && RHS.getClassOrBoundGenericClass())
-    return true;
+    return LHS.isSuperclassOf(RHS) || RHS.isSuperclassOf(LHS);
 
   // Otherwise conservatively assume that the two types are not layout
   // compatible.
   return false;
 }
 
-static SILType getFirstPayloadTypeOfEnum(EnumDecl *E, SILType TyIter,
-                                         SILModule &Mod) {
+static SILType getFirstPayloadOfEnum(EnumDecl *E, SILType TyIter,
+                                     SILModule &Mod) {
   for (EnumElementDecl *Elt : E->getAllElements())
     if (Elt->hasArgumentType())
       return TyIter.getEnumElementType(Elt, Mod);
@@ -297,17 +288,16 @@ static bool isLayoutCompatibleWithAggregate(SILType LHS, SILType RHS,
   SILType TyIter = RHS;
 
   while (true) {
-    // If TyIter is equal to Ty1 or is layout compatible with Ty1 as a non
-    // aggregate, return true.
-    if (TyIter == LHS || areLayoutCompatibleNonAggregates(TyIter, LHS, Mod) ||
-        areLayoutCompatibleNonAggregates(LHS, TyIter, Mod))
+    // If this type is the type we are searching for (Ty1), we have succeeded,
+    // return.
+    if (TyIter == LHS)
       return true;
 
     // Then if we have an enum...
     if (EnumDecl *E = TyIter.getEnumOrBoundGenericEnum()) {
       // Attempt to compute the first payloaded case of the enum. If we find it,
       // continue.
-      if ((TyIter = getFirstPayloadTypeOfEnum(E, TyIter, Mod)))
+      if ((TyIter = getFirstPayloadOfEnum(E, TyIter, Mod)))
         continue;
 
       // Otherwise this enum has no payloads implying that it can not be layout
@@ -328,8 +318,8 @@ static bool isLayoutCompatibleWithAggregate(SILType LHS, SILType RHS,
 
     // If we reached this point, then this type has no subrecords we are
     // interested in. Check if LHS/RHS are layout compatible as scalars.
-    return areLayoutCompatibleNonAggregates(TyIter, LHS, Mod) ||
-      areLayoutCompatibleNonAggregates(LHS, TyIter, Mod);
+    return isLayoutCompatibleAsNonAggregates(TyIter, LHS, Mod) ||
+      isLayoutCompatibleAsNonAggregates(LHS, TyIter, Mod);
   }
 }
 
@@ -341,37 +331,34 @@ bool SILType::isLayoutCompatibleWith(SILType RHS, SILModule &Mod) const {
   // Create a reference to ourselves so we can canonicalize.
   SILType LHS = *this;
 
+  // If we are equal to Ty, we must be layout compatible with it.
+  if (LHS == RHS)
+    return true;
+
   // If either LHS or RHS has archetypes, bail since we don't know what the
   // archetypes are. This could probably be improved.
   if (LHS.hasArchetype() || RHS.hasArchetype())
     return false;
 
-  // If LHS is equal to RHS, or they are layout compatible as non aggregates,
-  // return true.
-  if (LHS == RHS || areLayoutCompatibleNonAggregates(LHS, RHS, Mod) ||
-      areLayoutCompatibleNonAggregates(RHS, LHS, Mod))
-    return true;
+  // First check if RHS is an enum...
+  if (RHS.getEnumOrBoundGenericEnum()) {
+    // If LHS is an enum as well...
+    if (LHS.getEnumOrBoundGenericEnum()) {
+      // If both are optional types with layout compatible types, they are
+      // layout compatible.
+      SILType LHSOptType = LHS.getOptionalObjectType(Mod);
+      SILType RHSOptType = RHS.getOptionalObjectType(Mod);
+      if (LHSOptType && RHSOptType &&
+          LHSOptType.isLayoutCompatibleWith(RHSOptType, Mod))
+        return true;
+    }
 
-  // If LHS is an enum type...
-  if (EnumDecl *E = LHS.getEnumOrBoundGenericEnum()) {
-    // LHS can only be layout compatible with RHS if RHS is the layout
-    // compatible with the first payload type of LHS. Thus grab the first
-    // payload type from LHS and redo the query with it instead. We are trusting
-    // the stdlib not to attempt to perform this operation on invalid types.
-    LHS = getFirstPayloadTypeOfEnum(E, LHS, Mod);
-
-    if (LHS.isLayoutCompatibleWith(RHS, Mod))
-      return true;
-  }
-
-  // If RHS is an enum...
-  if (EnumDecl *E = RHS.getEnumOrBoundGenericEnum()) {
     // Otherwise if we have a generic enum, try to prove that the LHS/RHS are
     // layout compatible by using the fact the enum is an aggregate to see if
-    // LHS is the payload of RHS.
-    RHS = getFirstPayloadTypeOfEnum(E, RHS, Mod);
-
-    if (RHS.isLayoutCompatibleWith(LHS, Mod))
+    // LHS is the payload of RHS.  We do not handle the case where LHS is an
+    // enum since enums are not commutatively layout compatible with their first
+    // payload.
+    if (isLayoutCompatibleWithAggregate(LHS, RHS, Mod))
       return true;
   }
 
@@ -386,8 +373,10 @@ bool SILType::isLayoutCompatibleWith(SILType RHS, SILModule &Mod) const {
     if (isLayoutCompatibleWithAggregate(RHS, LHS, Mod))
       return true;
 
-  // Otherwise be conservative and assume that they are not layout compatible.
-  return false;
+  // Otherwise attempt to prove that the LHS, RHS are layout compatible as
+  // non-aggregate types.
+  return isLayoutCompatibleAsNonAggregates(LHS, RHS, Mod) ||
+    isLayoutCompatibleAsNonAggregates(RHS, LHS, Mod);
 }
 
 SILType SILType::getOptionalObjectType(SILModule &M) const {

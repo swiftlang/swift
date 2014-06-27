@@ -388,9 +388,6 @@ public:
   /// return the null type.
   SILType getOptionalObjectType(SILModule &SILMod) const;
 
-  /// Returns true if this is the AnyObject SILType;
-  bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
-
   //
   // Accessors for types used in SIL instructions:
   //
