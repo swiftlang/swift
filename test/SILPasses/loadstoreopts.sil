@@ -300,10 +300,10 @@ bb0(%0 : $Optional<A>):
 // CHECK-NEXT: alloc_stack
 // CHECK: unchecked_addr_cast
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $B
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.RawPointer
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
 // CHECK: unchecked_addr_cast
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
 sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
 bb0(%0 : $Optional<B>):
@@ -388,10 +388,10 @@ bb0(%0 : $*Optional<A>):
 // CHECK: bb0(
 // CHECK: unchecked_addr_cast
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.RawPointer
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.NativeObject
 // CHECK: unchecked_addr_cast
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.NativeObject>
 sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
 bb0(%0 : $*Optional<B>):
