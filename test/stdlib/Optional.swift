@@ -104,3 +104,70 @@ testRelation(!=)
 
 testRelation(<)
 // CHECK-NEXT: false, true, false, false, true, false.
+
+struct X {}
+class C {}
+
+class E : Equatable {}
+func == (E, E) -> Bool { return true }
+
+func nilComparison() {
+  let x0: X? = nil
+  let x1: X? = X()
+
+  /*
+  // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
+  println(x1 == nil) // DISABLED-CHECK-NEXT: false
+  println(x1 != nil) // DISABLED-CHECK-NEXT: true
+  println(x0 == nil) // DISABLED-CHECK-NEXT: true
+  println(x0 != nil) // DISABLED-CHECK-NEXT: false
+
+  println(nil == x1) // DISABLED-CHECK-NEXT: false
+  println(nil != x1) // DISABLED-CHECK-NEXT: true
+  println(nil == x0) // DISABLED-CHECK-NEXT: true
+  println(nil != x0) // DISABLED-CHECK-NEXT: false
+  */
+  
+  let v0: Int? = nil
+  let v1: Int? = 1
+  
+  println(v1 == nil) // CHECK-NEXT: false
+  println(v1 != nil) // CHECK-NEXT: true
+  println(v0 == nil) // CHECK-NEXT: true
+  println(v0 != nil) // CHECK-NEXT: false
+
+  println(nil == v1) // CHECK-NEXT: false
+  println(nil != v1) // CHECK-NEXT: true
+  println(nil == v0) // CHECK-NEXT: true
+  println(nil != v0) // CHECK-NEXT: false
+
+  let c0: C? = nil
+  let c1: C? = C()
+  
+  /*
+  // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
+  println(c1 == nil) // DISABLED-CHECK-NEXT: false
+  println(c1 != nil) // DISABLED-CHECK-NEXT: true
+  println(c0 == nil) // DISABLED-CHECK-NEXT: true
+  println(c0 != nil) // DISABLED-CHECK-NEXT: false
+
+  println(nil == c1) // DISABLED-CHECK-NEXT: false
+  println(nil != c1) // DISABLED-CHECK-NEXT: true
+  println(nil == c0) // DISABLED-CHECK-NEXT: true
+  println(nil != c0) // DISABLED-CHECK-NEXT: false
+  */
+  
+  let e0: E? = nil
+  let e1: E? = E()
+  
+  println(e1 == nil) // CHECK-NEXT: false
+  println(e1 != nil) // CHECK-NEXT: true
+  println(e0 == nil) // CHECK-NEXT: true
+  println(e0 != nil) // CHECK-NEXT: false
+
+  println(nil == e1) // CHECK-NEXT: false
+  println(nil != e1) // CHECK-NEXT: true
+  println(nil == e0) // CHECK-NEXT: true
+  println(nil != e0) // CHECK-NEXT: false
+}
+nilComparison()
