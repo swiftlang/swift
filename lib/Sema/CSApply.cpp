@@ -2220,36 +2220,6 @@ namespace {
       }
           
       case WritebackConversion: {
-        auto resultTy = simplifyType(expr->getType());
-        
-        // Find the conversion methods we chose.
-        auto conversionChoice = getOverloadChoice(cs.getConstraintLocator(expr,
-                                   ConstraintLocator::WritebackConversion));
-        auto getChoice = getOverloadChoice(cs.getConstraintLocator(expr,
-                                   ConstraintLocator::WritebackConversionGet));
-        auto setChoice = getOverloadChoice(cs.getConstraintLocator(expr,
-                                   ConstraintLocator::WritebackConversionSet));
-        
-        // Build the LValueConversion through the get/set pair.
-        auto &C = cs.getASTContext();
-        // FIXME: Bogus location info.
-        auto resultMeta = TypeExpr::createImplicitHack(StartLoc, resultTy, C);
-        Expr *getMemberRef =buildMemberRef(resultMeta, getChoice.openedFullType,
-                                           StartLoc, getChoice.choice.getDecl(),
-                                           StartLoc, getChoice.openedType,
-                                           ConstraintLocatorBuilder(locator),
-                                           /*implicit*/ true,
-                                           /*directPropertyAccess*/ false);
-        auto writebackTy = getMemberRef->getType()
-          ->castTo<AnyFunctionType>()->getResult();
-        
-        Expr *setMemberRef =buildMemberRef(resultMeta, setChoice.openedFullType,
-                                           StartLoc, setChoice.choice.getDecl(),
-                                           StartLoc, setChoice.openedType,
-                                           ConstraintLocatorBuilder(locator),
-                                           /*implicit*/ true,
-                                           /*directPropertyAccess*/ false);
-
         llvm_unreachable("it's dead, jim");
       }
       }
