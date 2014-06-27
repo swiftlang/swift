@@ -252,11 +252,6 @@
   }
 % end
 
-  // TODO: Remove this when staging is complete.
-  func withUnsafePointer<R>(f: UnsafePointer<T> -> R) -> R {
-    return f(UnsafePointer(self))
-  }
-
   //
   // Protocol conformance
   //

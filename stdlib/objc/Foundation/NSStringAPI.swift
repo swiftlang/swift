@@ -209,9 +209,8 @@ extension String {
     usedEncoding: UnsafePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
-    return usedEncoding.withUnsafePointer {
-      NSString.stringWithContentsOfFile(path, usedEncoding: $0, error: error)
-    }
+    return NSString.stringWithContentsOfFile(path, usedEncoding: usedEncoding,
+                                             error: error)
   }
 
   // + (instancetype)
@@ -241,9 +240,8 @@ extension String {
     usedEncoding enc: UnsafePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) -> String? {
-    return enc.withUnsafePointer {
-      NSString.stringWithContentsOfURL(url, usedEncoding: $0, error: error)
-    }
+    return NSString.stringWithContentsOfURL(url, usedEncoding: enc,
+                                            error: error)
   }
 
   // + (instancetype)
@@ -784,9 +782,9 @@ extension String {
     count: Int, 
     freeWhenDone flag: Bool
   ) {
-    self = utf16CodeUnitsNoCopy.withUnsafePointer {
-      NSString(charactersNoCopy: $0, length: count, freeWhenDone: flag)
-    }
+    self = NSString(charactersNoCopy: UnsafePointer(utf16CodeUnitsNoCopy),
+                    length: count,
+                    freeWhenDone: flag)
   }
 
   //===--- Initializers that can fail dropped for factory functions -------===//
