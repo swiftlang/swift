@@ -2148,81 +2148,12 @@ namespace {
     Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
 
     Expr *visitInOutExpr(InOutExpr *expr) {
-      auto &C = cs.getASTContext();
-      
-      // Determine the disjunction choice.
-      auto locator = cs.getConstraintLocator(expr,
-                                           ConstraintLocator::InOutConversion);
-      // The order of the disjunction choices.
-      enum InOutConversion : unsigned {
-        InOut,
-        AddressConversion,
-        WritebackConversion,
-        Last_Conversion = WritebackConversion,
-      };
-      unsigned choice = solution.getDisjunctionChoice(locator);
-      assert(choice <= InOutConversion::Last_Conversion
-             && "inout conversion kinds are not synced with disjunction "
-                "constraint system");
-
-      auto StartLoc = expr->getSubExpr()->getStartLoc();
-
-      auto buildInOutConversionExpr = [&](const SelectedOverload &choice,
-                                          Type resultTy,
-                                          Expr *lvExpr) -> Expr * {
-        auto inout = new (C) InOutExpr(lvExpr->getLoc(), lvExpr,
-               InOutType::get(lvExpr->getType()->getLValueOrInOutObjectType()),
-               /*implicit*/ true);
-        
-        // Build up a call to the method.
-        auto &C = cs.getASTContext();
-        // FIXME: Bogus location info.
-        auto resultMeta = TypeExpr::createImplicitHack(StartLoc, resultTy, C);
-        auto memberRef = buildMemberRef(resultMeta, choice.openedFullType,
-                                    StartLoc, choice.choice.getDecl(),
-                                    StartLoc, choice.openedType,
-                                    ConstraintLocatorBuilder(locator),
-                                    /*implicit*/ true,
-                                    /*directPropertyAccess*/ false);
-        auto methodTy = memberRef->getType()->castTo<AnyFunctionType>();
-        
-        ApplyExpr *call
-          = new (C) CallExpr(memberRef, inout, /*implicit*/ true);
-        call->setType(methodTy->getResult());
-        Expr *conversion = finishApply(call, choice.openedType,
-                                       ConstraintLocatorBuilder(locator));
-        conversion = coerceToType(conversion, resultTy,
-                                  ConstraintLocatorBuilder(locator));
-        
-        // Wrap the call in an InOutConversion node to mark its special
-        // writeback semantics.
-        llvm_unreachable("it's dead, jim");
-      };
-      
       auto lvTy = expr->getSubExpr()->getType()->castTo<LValueType>();
-      switch (InOutConversion(choice)) {
-      case InOut: {
-        // The type is simply inout.
-        // Compute the type of the inout expression.
-        expr->setType(InOutType::get(lvTy->getObjectType()));
-        return expr;
-      }
-          
-      case AddressConversion: {
-        auto resultTy = simplifyType(expr->getType());
-        
-        // Find the conversion method we chose.
-        auto choice = getOverloadChoice(locator);
-        
-        // Use it to convert the lvalue.
-        return buildInOutConversionExpr(choice, resultTy,
-                                        expr->getSubExpr());
-      }
-          
-      case WritebackConversion: {
-        llvm_unreachable("it's dead, jim");
-      }
-      }
+
+      // The type is simply inout.
+      // Compute the type of the inout expression.
+      expr->setType(InOutType::get(lvTy->getObjectType()));
+      return expr;
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {

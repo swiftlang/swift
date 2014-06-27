@@ -43,8 +43,8 @@ func useTwoIdentical(xi: Int, yi: Float) {
   twoIdentical(x, y) // expected-error{{'Float' is not convertible to 'Int'}}
 }
 
-func mySwap<T>(inout x: T,   // expected-note{{in initialization of parameter 'x'}}
-               inout y: T) {
+func mySwap<T>(inout x: T,
+               inout y: T) {   // expected-note{{in initialization of parameter 'y'}}
   var tmp = x
   x = y
   y = tmp
@@ -57,7 +57,7 @@ func useSwap(xi: Int, yi: Float) {
   
   mySwap(x, x) // expected-error 2{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   
-  mySwap(&x, &y) // expected-error{{'Int' is not identical to 'Float'}}
+  mySwap(&x, &y) // expected-error{{'Float' is not identical to 'Int'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {

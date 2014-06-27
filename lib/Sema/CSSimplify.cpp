@@ -1741,7 +1741,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
             auto inoutBaseType = inoutType1->getInOutObjectType();
             
-            auto isWrappedArray = false;
+            auto isWrappedArray = isArrayType(inoutBaseType);
             
             if (auto baseTyVar1 = dyn_cast<TypeVariableType>(inoutBaseType.
                                                                 getPointer())) {

@@ -16,7 +16,8 @@ func use_assignments(var i: Int, var j: Int) {
  ++i
  i += j
  ++(&i)  // expected-error {{reference to 'Float' not used to initialize a inout parameter}}
- &i += j // expected-error {{reference to 'UInt8' not used to initialize a inout parameter}}
+ // FIXME: <rdar://problem/17489894> inout not rejected as operand to assignment operator
+ &i += j // e/xpected-error {{reference to 'UInt8' not used to initialize a inout parameter}}
 }
 
 

@@ -7,7 +7,7 @@ func modify(inout x: Int) {}
 
 if let x = foo() {
   use(x)
-  modify(&x) // expected-error{{not a subtype of '@lvalue}}
+  modify(&x) // expected-error{{not convertible to '@lvalue}}
 }
 
 use(x) // expected-error{{unresolved identifier 'x'}}
