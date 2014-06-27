@@ -277,7 +277,11 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   Builder.createReleaseValue(I->getLoc(), UEDI);
 }
 
-static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I,
+/// Sink retain_value, release_value before switch_enum to be retain_value,
+/// release_value on the payload of the switch_enum in the destination BBs. We
+/// only do this if the destination BBs have only the switch enum as its
+/// predecessor.
+static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
                                   AliasAnalysis *AA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
@@ -319,20 +323,46 @@ static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I,
   return true;
 }
 
-/// Sink retain_value, release_value before switch_enum to be retain_value,
-/// release_value on the payload of the switch_enum in the destination BBs. We
-/// only do this if the destination BBs have only the switch enum as its
-/// predecessor.
-static bool sinkSwitchEnumRefCountArgsToSuccessors(SILBasicBlock *BB,
-                                                   AliasAnalysis *AA) {
-  // First attempt to cast our terminator to a switch enum...
-  SwitchEnumInst *S = dyn_cast<SwitchEnumInst>(BB->getTerminator());
+static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
+                                  AliasAnalysis *AA) {
+  if (auto *S = dyn_cast<SwitchEnumInst>(T))
+    return tryToSinkRefCountAcrossSwitch(S, I, AA);
 
-  // If we don't have a switch enum, bail...
-  if (!S)
+  // We currently handle checked_cast_br and cond_br.
+  if (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))
     return false;
 
-  // Then make sure that each one of our successors only has one predecessor,
+  if (!isa<StrongRetainInst>(I))
+    return false;
+
+  SILValue Ptr = I->getOperand(0);
+  SILBasicBlock::iterator II = I;
+  ++II;
+  for (; &*II != T; ++II) {
+    if (canDecrementRefCount(&*II, Ptr, AA))
+      return false;
+  }
+
+  SILBuilder Builder(T);
+
+  // Ok, we have a ref count instruction, sink it!
+  for (auto &Succ : T->getParent()->getSuccs()) {
+    SILBasicBlock *SuccBB = Succ.getBB();
+    Builder.setInsertionPoint(&*SuccBB->begin());
+    Builder.createStrongRetain(I->getLoc(), Ptr);
+  }
+
+  I->eraseFromParent();
+  NumSunk++;
+  return true;
+}
+
+/// Sink retains to successors if possible. We only do this if the successors
+/// have only one predecessor.
+static bool sinkRetainToSuccessors(SILBasicBlock *BB, AliasAnalysis *AA) {
+  SILInstruction *S = BB->getTerminator();
+
+  // Make sure that each one of our successors only has one predecessor,
   // us. If that condition is not true, bail...
   for (auto &Succ : BB->getSuccs()) {
     SILBasicBlock *SuccBB = Succ.getBB();
@@ -377,11 +407,7 @@ class SILCodeMotion : public SILFunctionTransform {
     for (auto &BB : F) {
       Changed |= sinkCodeFromPredecessors(&BB);
       Changed |= sinkArgumentsFromPredecessors(&BB);
-
-      // Push retain_value, release_value on enums before switch_enum into
-      // retain_value, release_value on the payload of the enum in the
-      // successors of the switch_enum.
-      Changed |= sinkSwitchEnumRefCountArgsToSuccessors(&BB, AA);
+      Changed |= sinkRetainToSuccessors(&BB, AA);
     }
 
     if (Changed)

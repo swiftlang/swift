@@ -59,14 +59,13 @@ ArchetypeToArchetypeCast(t1: c, t2: b)
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C_CS_1D___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@thin (@out D, @in C, @in D) -> () {
 // CHECK:   [[TMP:%.*]] = alloc_stack $Optional<D>
 // CHECK:   [[V:%.*]] = load %1 : $*C
-// CHECK:   strong_retain [[V]] : $C
 // CHECK:   checked_cast_br [[V]] : $C to $D,
 // CHECK: bb1([[T0:%.*]] : $D):
+// CHECK:   strong_retain [[V]] : $C
 // CHECK:   [[T1:%.*]] = enum $Optional<D>, #Optional.Some!enumelt.1, [[T0]] : $D
 // CHECK:   store [[T1]] to [[TMP]]#1 : $*Optional<D>
 // CHECK:   br bb3
 // CHECK: bb2:
-// CHECK:   strong_release [[V]] : $C
 // CHECK:   [[T0:%.*]] = enum $Optional<D>, #Optional.None
 // CHECK:   store [[T0]] to [[TMP]]#1 : $*Optional<D>
 // CHECK:   br bb3
@@ -186,8 +185,9 @@ ArchetypeToConcreteCastE(t: c)
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastDU__FT1tQ__CS_1D : $@thin (@in C) -> @owned D {
 // CHECK: bb0
 // CHECK:  [[T0:%.*]] = load %0 : $*C
-// CHECK:  strong_retain [[T0]] : $C
-// CHECK:  checked_cast_br [[T0]] : $C to $D
+// CHECK:  checked_cast_br [[T0]] : $C to $D, bb1, bb2
+// CHECK: bb1(
+// CHECK: strong_retain [[T0]] : $C
 // CHECK: bb0
 ArchetypeToConcreteCastD(t: c)
 

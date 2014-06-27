@@ -260,3 +260,54 @@ bb3:
   dealloc_stack %2#0 : $*@local_storage FakeOptional
   return %5 : $FakeOptional
 }
+
+// Sink retain down the successors so we can pair up retain with release on the
+// fast path.
+class Test {
+  func testing() -> UInt64
+}
+let test: Test
+var x: UInt64
+
+// CHECK-LABEL: @sink_refcount_to_succs
+sil @sink_refcount_to_succs : $@thin () -> () {
+bb0:
+  %0 = global_addr #test : $*Test
+  %1 = alloc_ref $Test
+  store %1 to %0 : $*Test
+  %7 = global_addr #x : $*UInt64
+  %8 = integer_literal $Builtin.Int64, 0
+  %9 = struct $UInt64 (%8 : $Builtin.Int64)
+  store %9 to %7 : $*UInt64
+  br bb1
+bb1:
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+  %17 = load %0 : $*Test
+  strong_retain %17 : $Test
+  %19 = class_method %17 : $Test, #Test.testing!1 : Test -> () -> UInt64 , $@cc(method) @thin (@owned Test) -> UInt64
+  %20 = load %7 : $*UInt64
+  checked_cast_br [exact] %17 : $Test to $Test, bb3, bb4
+bb2:
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+  %36 = tuple ()
+  return %36 : $()
+bb3(%38 : $Test):
+// CHECK: bb3(
+// CHECK: strong_retain
+// CHECK: strong_release
+  strong_release %17 : $Test
+  br bb2
+bb4:
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK: apply
+  %65 = apply %19(%17) : $@cc(method) @thin (@owned Test) -> UInt64
+  br bb2
+}
+
+sil @virtual_callee : $@cc(method) @thin (@owned Test) -> UInt64
+sil_vtable Test {
+  #Test.testing!1: virtual_callee
+}
