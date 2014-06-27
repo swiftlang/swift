@@ -8,6 +8,25 @@ import Builtin
 
 sil @user : $@thin (Builtin.NativeObject) -> ()
 
+struct S {
+  var x : Builtin.NativeObject
+}
+sil @S_user : $@thin (S) -> ()
+
+class Cls {
+  var random : Builtin.Int32
+
+  init()
+}
+
+class C {
+  var w : Optional<Builtin.NativeObject>
+}
+
+class RetainUser { }
+
+sil @rawpointer_use: $@thin (Builtin.RawPointer) -> Bool
+
 /////////////////
 // Basic Tests //
 /////////////////
@@ -22,10 +41,6 @@ bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
   %1 = tuple ()
   return %1 : $()
-}
-
-struct S {
-  var x : Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil @simple_copyvalue_destroyvalue_pair : $@thin (S) -> S
@@ -116,8 +131,6 @@ bb0(%0 : $Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()
 }
-
-sil @S_user : $@thin (S) -> ()
 
 // CHECK-LABEL: sil @dont_delete_copyvalue_over_decrement_use : $@thin (S) -> ()
 // CHECK: bb0
@@ -336,12 +349,6 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
-class Cls {
-  var random : Builtin.Int32
-
-  init()
-}
-
 // CHECK-LABEL: sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> ()
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
@@ -434,8 +441,6 @@ bb0:
   %11 = tuple ()
   return %11 : $()
 }
-
-class RetainUser { }
 
 // CHECK-LABEL: sil @retain_can_be_used_by_other_pointer : $@thin (RetainUser, Builtin.NativeObject) -> Builtin.NativeObject {
 // CHECK: strong_retain
@@ -1191,4 +1196,40 @@ bb1:
 bb2:
   %1 = tuple()
   return %1 : $()
+}
+
+// Make sure that if top down we do not complete the sequence, but bottom up we
+// do not move anything. This prevents us from just moving retains and
+// eliminating releases (or vis-a-versa).
+// CHECK-LABEL: sil @test_complete_incomplete_sequence_mismatch : $@cc(method) @thin (@owned C) -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: strong_release
+sil @test_complete_incomplete_sequence_mismatch : $@cc(method) @thin (@owned C) -> () {
+bb0(%0 : $C):
+  br bb1(undef : $Builtin.Word)                   // id: %1
+
+bb1(%2 : $Builtin.Word):                          // Preds: bb0 bb5
+  cond_br undef, bb3, bb2                         // id: %3
+
+bb2:                                              // Preds: bb1
+  strong_retain %0 : $C                         // id: %4
+  %5 = ref_element_addr %0 : $C, #C.w         // user: %6
+  %8 = function_ref @rawpointer_use : $@thin (Builtin.RawPointer) -> Bool // user: %15
+  %9 = load %5 : $*Optional<Builtin.NativeObject> // user: %11
+  %10 = unchecked_trivial_bit_cast %9 : $Optional<Builtin.NativeObject> to $Builtin.RawPointer
+  %15 = apply %8(%10) : $@thin (Builtin.RawPointer) -> Bool
+  br bb5                                          // id: %16
+
+bb3:                                              // Preds: bb1
+  strong_release %0 : $C                        // id: %17
+  %18 = tuple ()                                  // user: %19
+  return %18 : $()                                // id: %19
+
+bb4:
+  br bb5                                          // id: %20
+
+bb5:                                              // Preds: bb2 bb4
+  strong_release %0 : $C                        // id: %21
+  br bb1(undef : $Builtin.Word)                   // id: %22
 }

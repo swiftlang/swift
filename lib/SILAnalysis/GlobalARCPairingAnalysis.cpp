@@ -309,14 +309,23 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 
   }
 
+  bool HaveIncInsertPts = !MatchSet.IncrementInsertPts.empty();
+  bool HaveDecInsertPts = !MatchSet.DecrementInsertPts.empty();
+
   // If we have insertion points and partial merges, return false to avoid
   // control dependency issues.
-  if ((!MatchSet.IncrementInsertPts.empty() ||
-       !MatchSet.DecrementInsertPts.empty()) &&
-      Partial)
+  if ((HaveIncInsertPts || HaveDecInsertPts) && Partial)
     return false;
 
-  if (MatchSet.IncrementInsertPts.empty() && !MatchSet.Increments.empty())
+  // If we have insertion points for increments, but not for decrements (or
+  // vis-a-versa), return false. This prevents us from inserting retains and
+  // removing releases or vis-a-versa.
+  if (HaveIncInsertPts != HaveDecInsertPts)
+    return false;
+
+  // If we do not have any insertion points but we do have increments, we must
+  // be eliminating pairs.
+  if (!HaveIncInsertPts && !MatchSet.Increments.empty())
     MatchedPair = true;
 
   // Success!
