@@ -279,28 +279,33 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
   CanType result = type.getResult();
   CanType input = type.getInput();
   auto resultType = Converter.convert(IGM, result);
-  if (!resultType.isNull())
+  {
+    if (resultType.isNull())
+      goto no_clang_type;
+    
     if (auto tuple = dyn_cast<TupleType>(input)) {
-      bool failed = false;
       for (auto argType: tuple.getElementTypes()) {
         auto clangType = Converter.convert(IGM, argType);
-        if (clangType.isNull()) {
-          failed = true;
-          break;
-        }
+        if (clangType.isNull())
+          goto no_clang_type;
         paramTypes.push_back(clangType);
       }
-      if (!failed) {
-        clang::FunctionProtoType::ExtProtoInfo DefaultEPI;
-        auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, DefaultEPI);
-        auto blockTy = clangCtx.getBlockPointerType(fnTy);
-        return clangCtx.getCanonicalType(blockTy);
-      }
+    } else {
+      auto clangType = Converter.convert(IGM, input);
+      if (clangType.isNull())
+        goto no_clang_type;
+      paramTypes.push_back(clangType);
     }
-  
-  // We'll select (void)(^)() for function types. As long as it's a
-  // pointer type it doesn't matter exactly which for either ABI type
-  // generation or Obj-C type encoding.
+    clang::FunctionProtoType::ExtProtoInfo DefaultEPI;
+    auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, DefaultEPI);
+    auto blockTy = clangCtx.getBlockPointerType(fnTy);
+    return clangCtx.getCanonicalType(blockTy);
+  }
+no_clang_type:  
+  // Fall back to void(^)() for block types we can't convert otherwise. As long
+  // as it's a pointer type it doesn't matter exactly which for either ABI type
+  // generation or standard Obj-C type encoding, but protocol extended method
+  // encodings will break.
   auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
   auto blockTy = clangCtx.getBlockPointerType(fnTy);
   return clangCtx.getCanonicalType(blockTy);

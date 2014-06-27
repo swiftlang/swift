@@ -50,5 +50,3 @@ func _convertConstArrayToPointerArgument<
   let (owner: AnyObject?, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
 }
-
-
