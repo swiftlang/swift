@@ -332,7 +332,7 @@ static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
   if (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))
     return false;
 
-  if (!isa<StrongRetainInst>(I))
+  if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
     return false;
 
   SILValue Ptr = I->getOperand(0);
@@ -349,7 +349,11 @@ static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
   for (auto &Succ : T->getParent()->getSuccs()) {
     SILBasicBlock *SuccBB = Succ.getBB();
     Builder.setInsertionPoint(&*SuccBB->begin());
-    Builder.createStrongRetain(I->getLoc(), Ptr);
+    if (isa<StrongRetainInst>(I))
+      Builder.createStrongRetain(I->getLoc(), Ptr);
+    else
+      // I should be RetainValueInst.
+      Builder.createRetainValue(I->getLoc(), Ptr);
   }
 
   I->eraseFromParent();
