@@ -17,7 +17,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 
   // Make sure the SynthesizeSugarOnTypes option is functioning
   const char *FunctionNameWithSugar = "_TF4main3fooFT3argGSqGSaSi___T_";
-  const char *DemangledNameWithSugar = "main.foo (arg : (Swift.Int[])?) -> ()";
+  const char *DemangledNameWithSugar = "main.foo (arg : [Swift.Int]?) -> ()";
 
   Result = fnd_get_demangled_name(FunctionNameWithSugar, OutputBuffer,
                                   sizeof(OutputBuffer));
