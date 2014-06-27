@@ -713,6 +713,8 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
     return makeParserError();
 
   // Form the dictionary type.
+  if (rsquareLoc.isInvalid())
+    rsquareLoc = Tok.getLoc();
   SourceRange brackets(lsquareLoc, rsquareLoc);
   if (colonLoc.isValid())
     return makeParserResult(ParserStatus(firstTy) | ParserStatus(secondTy),

@@ -23,3 +23,8 @@ func constructDictionary(n: Int) {
   var dict = [Int : String](minimumCapacity: n)
   dict[5] = "hello"
 }
+
+// Parse errors
+var y1: [String : Int = ["hello" : 1] // expected-error{{expected ']' in dictionary type}}
+  // expected-note @-1{{to match this opening '['}}
+var y2: [String : ] // expected-error{{expected dictionary value type}}
