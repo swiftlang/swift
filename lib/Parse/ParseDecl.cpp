@@ -1967,7 +1967,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   if (Attributes.shouldSaveInAST())
     TAD->getMutableAttrs() = Attributes;
   addToScope(TAD);
-  return makeParserResult(Status, TAD);
+  return DCC.fixupParserResult(Status, TAD);
 }
 
 /// This function creates an accessor function (with no body) for a computed
