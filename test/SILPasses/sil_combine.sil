@@ -1465,3 +1465,18 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   %6 = tuple(%3 : $Builtin.NativeObject, %5 : $Builtin.RawPointer)
   return %6 : $(Builtin.NativeObject, Builtin.RawPointer)
 }
+
+// CHECK-LABEL: sil @bitcast_combines : $@thin (Builtin.NativeObject, Builtin.RawPointer) -> (B, Optional<Builtin.Word>) {
+// CHECK: unchecked_ref_bit_cast
+// CHECK-NOT: unchecked_ref_bit_cast
+// CHECK: unchecked_trivial_bit_cast
+// CHECK-NOT: unchecked_trivial_bit_cast
+sil @bitcast_combines : $@thin (Builtin.NativeObject, Builtin.RawPointer) -> (B, Optional<Builtin.Word>) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
+  %2 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
+  %3 = unchecked_ref_bit_cast %2 : $Optional<Builtin.NativeObject> to $B
+  %4 = unchecked_trivial_bit_cast %1 : $Builtin.RawPointer to $Builtin.Word
+  %5 = unchecked_trivial_bit_cast %4 : $Builtin.Word to $Optional<Builtin.Word>
+  %6 = tuple(%3 : $B, %5 : $Optional<Builtin.Word>)
+  return %6 : $(B, Optional<Builtin.Word>)
+}

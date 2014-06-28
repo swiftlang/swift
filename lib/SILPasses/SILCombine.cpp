@@ -279,6 +279,10 @@ public:
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
   SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
+  SILInstruction *
+  visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
+  SILInstruction *
+  visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
@@ -1508,6 +1512,49 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::
+visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
+  // (unchecked_ref_bit_cast Y->Z (unchecked_ref_bit_cast X->Y x))
+  //   ->
+  // (unchecked_ref_bit_cast X->Z x)
+  if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand())) {
+    return new (URBCI->getModule()) UncheckedRefBitCastInst(URBCI->getLoc(),
+                                                            Op->getOperand(),
+                                                            URBCI->getType());
+  }
+
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::
+visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
+  // (unchecked_trivial_bit_cast Y->Z
+  //                                 (unchecked_trivial_bit_cast X->Y x))
+  //   ->
+  // (unchecked_trivial_bit_cast X->Z x)
+  SILValue Op = UTBCI->getOperand();
+  if (auto *OtherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(Op)) {
+    SILModule &Mod = UTBCI->getModule();
+    return new (Mod) UncheckedTrivialBitCastInst(UTBCI->getLoc(),
+                                                 OtherUTBCI->getOperand(),
+                                                 UTBCI->getType());
+  }
+
+  // (unchecked_trivial_bit_cast Y->Z
+  //                                 (unchecked_ref_bit_cast X->Y x))
+  //   ->
+  // (unchecked_trivial_bit_cast X->Z x)
+  if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op)) {
+    SILModule &Mod = UTBCI->getModule();
+    return new (Mod) UncheckedTrivialBitCastInst(UTBCI->getLoc(),
+                                                 URBCI->getOperand(),
+                                                 UTBCI->getType());
+  }
+
+  return nullptr;
+}
 
 
 //===----------------------------------------------------------------------===//
