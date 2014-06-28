@@ -436,6 +436,9 @@ void CompilerInstance::performParseOnly() {
   assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");
 
+  if (Kind == SourceFileKind::Main)
+    SourceMgr.setHashbangBufferID(BufferIDs[0]);
+
   auto *Input = new (*Context) SourceFile(*MainModule,
                                           Kind,
                                           BufferIDs[0],
