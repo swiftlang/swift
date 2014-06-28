@@ -407,15 +407,14 @@ NSStringAPIs.test("fastestEncoding") {
 
 NSStringAPIs.test("fileSystemRepresentation()") {
   if true {
-    let expectedStr = lazy("abc\0".utf8).map { $0.asSigned() }.array
+    let expectedStr = map("abc\0".utf8) { $0.asSigned() }
     expectEqual(expectedStr, "abc".fileSystemRepresentation())
   }
 
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr =
-        lazy("\u305f\u3099くてん\0".utf8).map { $0.asSigned() }.array
+    let expectedStr = map("\u305f\u3099くてん\0".utf8) { $0.asSigned() }
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
 }
@@ -518,7 +517,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   }
   if true {
     let bufferLength = 17
-    var expectedStr = lazy("abc あかさた\0".utf8).map { $0.asSigned() }.array
+    var expectedStr = map("abc あかさた\0".utf8) { $0.asSigned() }
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
@@ -549,9 +548,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   }
   if true {
     let bufferLength = 100
-    var expectedStr = lazy(
-      "abc \u305f\u3099くてん\0".utf8
-    ).map { $0.asSigned() }.array
+    var expectedStr = map("abc \u305f\u3099くてん\0".utf8) { $0.asSigned() }
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
@@ -717,7 +714,7 @@ NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRange
         NSLinguisticTagWord ],
       tags)
   expectEqual([ "Глокая", " ", "куздра" ],
-      tokenRanges.map() { s[$0] } )
+      tokenRanges.map { s[$0] } )
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {

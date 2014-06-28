@@ -59,6 +59,14 @@ extension LazySequence {
   }
 } 
 
+/// Return an `Array` containing the results of mapping `transform`
+/// over `source`.
+@public func map<S:Sequence, T>(
+  source: S, transform: (S.GeneratorType.Element)->T
+) -> [T] {
+  return lazy(source).map(transform).array
+}
+
 //===--- Collections ------------------------------------------------------===//
 
 /// A `Collection` whose elements consist of those in a `Base`
@@ -98,16 +106,10 @@ extension LazyCollection {
   }
 } 
 
-/*
-@public func map<S:Sequence, T>(
-  source: S, transform: (S.GeneratorType.Element)->T
-) -> MapSequenceView<S, T> {
-  return MapSequenceView(_base: source, _transform: transform)
-}
-
+/// Return an `Array` containing the results of mapping `transform`
+/// over `source`.
 @public func map<C:Collection, T>(
   source: C, transform: (C.GeneratorType.Element)->T
-) -> MapCollectionView<C, T> {
-  return MapCollectionView(_base: source, _transform: transform)
+) -> [T] {
+  return lazy(source).map(transform).array
 }
-*/

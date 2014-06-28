@@ -14,12 +14,12 @@
   // Use lazy initialization of static properties to safely initialize the
   // public 'arguments' property on first use.
   static var _arguments: [String] = {
-    lazy(0..<Int(C_ARGC)).map { i in 
+    map(0..<Int(C_ARGC)) { i in 
       if let s = String.fromCStringRepairingIllFormedUTF8(C_ARGV[i]).0 {
           return s
       }
       return ""
-    }.array
+    }
   }()
 
   @public var arguments : [String] {
