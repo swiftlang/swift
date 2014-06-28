@@ -2,6 +2,7 @@
 
 sil_stage canonical
 
+import Swift
 import Builtin
 
 // Utilities
