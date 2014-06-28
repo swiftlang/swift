@@ -1957,6 +1957,17 @@ public:
   }
 };
   
+/// Convert the a string to a pointer referencing its encoded representation.
+class StringToPointerExpr : public ImplicitConversionExpr {
+public:
+  StringToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::StringToPointer, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::StringToPointer;
+  }
+};
+  
 /// Convert a pointer to a different kind of pointer.
 class PointerToPointerExpr : public ImplicitConversionExpr {
 public:

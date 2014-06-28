@@ -1465,6 +1465,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitStringToPointerExpr(StringToPointerExpr *E) {
+    printCommon(E, "string_to_pointer") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitPointerToPointerExpr(PointerToPointerExpr *E) {
     printCommon(E, "pointer_to_pointer") << '\n';
     printRec(E->getSubExpr());

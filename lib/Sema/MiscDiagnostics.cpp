@@ -234,6 +234,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::DefaultValue:
           case ExprKind::UnresolvedPattern:
           case ExprKind::InOutToPointer:
+          case ExprKind::StringToPointer:
           case ExprKind::ArrayToPointer:
           case ExprKind::PointerToPointer:
             Diagnose = Diagnostic::UnqualifiedMetatypeValue;

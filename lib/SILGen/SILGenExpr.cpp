@@ -233,6 +233,7 @@ namespace {
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
+    RValue visitStringToPointerExpr(StringToPointerExpr *E, SGFContext C);
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
   };
 }
@@ -5392,6 +5393,10 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
   SGF.emitManagedRValueWithCleanup(owner);
   auto pointer = SGF.B.createTupleExtract(E, result.getValue(), 1);
   return RValue(SGF, E, ManagedValue::forUnmanaged(pointer));
+}
+RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
+                                               SGFContext C) {
+  llvm_unreachable("not implemented");
 }
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {

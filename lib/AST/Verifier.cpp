@@ -903,6 +903,34 @@ struct ASTNodeBase {};
       }
     }
     
+    void verifyChecked(StringToPointerExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying StringToPointer", E);
+      
+      if (E->getSubExpr()->getType()->getNominalOrBoundGenericNominal()
+            != Ctx.getStringDecl()) {
+        Out << "StringToPointer does not convert from string:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      
+      PointerTypeKind PTK;
+      auto toElement = E->getType()->getAnyPointerElementType(PTK);
+      if (!toElement) {
+        Out << "StringToPointer does not convert to pointer:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (PTK != PTK_ConstUnsafePointer) {
+        Out << "StringToPointer converts to non-const pointer:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
     void verifyChecked(CollectionUpcastConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
