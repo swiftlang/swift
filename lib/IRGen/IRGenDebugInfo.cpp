@@ -401,7 +401,8 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
   //  })
   //
   // The actual closure has a closure expression as scope.
-  if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc))
+  if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc)
+      && Loc->getKind() != SILLocation::ImplicitReturnKind)
     return;
 
   if (L.LocForLinetable.Line == 0 && DS == LastScope) {

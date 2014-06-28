@@ -107,6 +107,7 @@ public:
   std::vector<SwitchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
+  SILDebugScope *MainScope = nullptr;
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
@@ -294,8 +295,10 @@ public:
   void enterDebugScope(SILDebugScope *DS) {
     if (DebugScopeStack.size())
       DS->setParent(DebugScopeStack.back());
-    else
+    else {
       DS->setParent(F.getDebugScope());
+      MainScope = DS;
+    }
     DebugScopeStack.push_back(DS);
     setDebugScopeForInsertedInstrs(DS->Parent);
   }

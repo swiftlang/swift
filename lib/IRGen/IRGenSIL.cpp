@@ -1285,6 +1285,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Generate the body.
   bool InCleanupBlock = false;
   bool KeepCurrentLocation = false;
+  SILDebugScope * PrevScope = CurSILFn->getDebugScope();
 
   for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
     auto &I = *InsnIter;
@@ -1327,13 +1328,18 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         assert(DS->SILFn == CurSILFn);
       }
 
-      if (!DS) DS = CurSILFn->getDebugScope();
+      // Reuse the last scope for orphaned instructions.
+      if (!DS)
+        DS = PrevScope;
+
       if (!DS)
         // Until DebugScopes are properly serialized, bare functions
         // are allowed to not have a scope.
         assert(CurSILFn->isBare() && "function without a debug scope");
-      else if (!KeepCurrentLocation)
+      else if (!KeepCurrentLocation) {
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+        PrevScope = DS;
+      }
 
       // Function argument handling.
       if (InEntryBlock && !ArgsEmitted) {

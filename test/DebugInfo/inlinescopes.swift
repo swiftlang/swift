@@ -8,9 +8,8 @@
 // CHECK-DAG: ![[INLINED_TOPLEVEL:.*]] = metadata !{i32 0, i32 0, metadata ![[MAIN:.*]], null}
 
 func square(x : Int) -> Int {
-// CHECK-DAG: ![[MULSCOPE]] = metadata !{i32 [[@LINE+3]], i32 {{.*}}, metadata ![[MULBLOCK:.*]], metadata ![[INLINED:.*]]}
+// CHECK-DAG: ![[MULSCOPE]] = metadata !{i32 [[@LINE+2]], i32 {{.*}}, metadata ![[MUL:.*]], metadata ![[INLINED:.*]]}
 // CHECK-DAG: ![[MUL:.*]] = {{.*}}[ DW_TAG_subprogram ] [line 0] [def] [_TFSsoi1mFTSiSi_Si]
-// CHECK-DAG: ![[MULBLOCK]] = {{.*}} metadata ![[MUL]]} ; [ DW_TAG_lexical_block ]
   let res = x * x
   return res
 }

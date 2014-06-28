@@ -3028,7 +3028,7 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
     returnValue = emitEmptyTuple(CleanupLocation::getCleanupLocation(TopLevel));
 
   B.createReturn(returnLoc, returnValue)
-    ->setDebugScope(F.getDebugScope());
+    ->setDebugScope(MainScope);
 }
 
 void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
