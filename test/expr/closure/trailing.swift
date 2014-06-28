@@ -49,6 +49,17 @@ var c = C().map
   $0 + 1
 }
 
+var c2 = C().map // expected-note{{parsing trailing closure for this call}}
+
+{ // expected-warning{{trailing closure is separated from call site}}
+  $0 + 1
+}
+
+var c3 = C().map // expected-note{{parsing trailing closure for this call}}
+// blah blah blah
+{ // expected-warning{{trailing closure is separated from call site}}
+  $0 + 1
+}
 
 // Calls with multiple trailing closures should be rejected until we have time
 // to design it right.

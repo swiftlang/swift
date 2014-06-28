@@ -1127,6 +1127,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a trailing closure, if allowed.
     if (!isExprBasic && Tok.is(tok::l_brace) &&
         !isStartOfGetSetAccessor(*this)) {
+      SourceLoc braceLoc = Tok.getLoc();
       // Parse the closure.
       ParserResult<Expr> closure = parseExprClosure();
       if (closure.hasCodeCompletion())
@@ -1135,6 +1136,17 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       if (closure.isParseError())
         return closure;
 
+      // Track the original end location of the expression we're trailing so
+      // we can warn about excess newlines.
+      auto origEndLoc = Result.get()->getEndLoc();
+      auto origLineCol = SourceMgr.getLineAndColumn(origEndLoc);
+      auto braceLineCol = SourceMgr.getLineAndColumn(braceLoc);
+      if (((int)braceLineCol.first - (int)origLineCol.first) > 1) {
+        diagnose(braceLoc, diag::trailing_closure_excess_newlines);
+        diagnose(Result.get()->getLoc(), diag::trailing_closure_call_here);
+      }
+      
+      
       // Introduce the trailing closure into the call, or form a call, as
       // necessary.
       if (auto call = dyn_cast<CallExpr>(Result.get())) {
