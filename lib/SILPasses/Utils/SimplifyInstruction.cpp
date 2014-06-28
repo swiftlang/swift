@@ -43,6 +43,9 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
+    SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
+    SILValue
+    visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
 
     SILValue simplifyOverflowBuiltin(ApplyInst *AI,
                                      BuiltinFunctionRefInst *FR);
@@ -268,6 +271,29 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
 
   return SILValue();
 }
+
+SILValue
+InstSimplifier::
+visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
+  // (unchecked_ref_bit_cast Y->X (unchecked_ref_bit_cast X->Y x)) -> x
+  if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand()))
+    if (Op->getOperand().getType() == URBCI->getType())
+      return Op->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
+  // (unchecked_trivial_bit_cast Y->X (unchecked_trivial_bit_cast X->Y x)) -> x
+  if (auto *Op = dyn_cast<UncheckedTrivialBitCastInst>(UTBCI->getOperand()))
+    if (Op->getOperand().getType() == UTBCI->getType())
+      return Op->getOperand();
+
+  return SILValue();
+}
+
 
 static SILValue simplifyBuiltin(ApplyInst *AI,
                                 BuiltinFunctionRefInst *FR) {
