@@ -521,7 +521,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = Tok.getLoc();
+    TokLoc = PreviousLoc;
     return true;
   }
 
