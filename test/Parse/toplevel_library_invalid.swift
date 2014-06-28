@@ -3,8 +3,8 @@
 println("a"); // expected-error {{expressions are not allowed at the top level}}
 println("a"); // expected-error {{expressions are not allowed at the top level}}
 // Make sure we don't crash on closures at the top level
-({ }) // expected-error {{expressions are not allowed at the top level}}
-({ 5 }()) // expected-error {{expressions are not allowed at the top level}}
+{ } // expected-error {{expressions are not allowed at the top level}} expected-error {{braced block of statements}}
+{ 5 }() // expected-error {{expressions are not allowed at the top level}}
 
 // FIXME: Too many errors for this.
 for i // expected-error 2 {{expected ';' in 'for' statement}} 
