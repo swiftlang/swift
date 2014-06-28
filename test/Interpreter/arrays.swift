@@ -56,7 +56,7 @@ println()
 // CHECK: dead
 // CHECK: dead
 // CHECK: dead
-{ [Canary(), Canary(), Canary()] }()
+_ = { [Canary(), Canary(), Canary()] }()
 
 // Create an array of (String, Bool) pairs. <rdar://problem/16916422>
 do {

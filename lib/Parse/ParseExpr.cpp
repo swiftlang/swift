@@ -491,7 +491,7 @@ ParserResult<Expr> Parser::parseExprNew() {
   
   // Check for an initialization closure.
   Expr *constructExpr = nullptr;
-  if (Tok.isFollowingLBrace()) {
+  if (Tok.is(tok::l_brace)) {
     ParserResult<Expr> construction = parseExprClosure();
     if (construction.hasCodeCompletion())
       return construction;
@@ -912,7 +912,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       consumeToken(tok::period_prefix);
       IsPeriod = peekToken().isFollowingLParen() ||
                  peekToken().isFollowingLSquare() ||
-                 peekToken().isFollowingLBrace();
+                 peekToken().is(tok::l_brace);
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       // Non-identifier cases.
@@ -1125,7 +1125,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     }
 
     // Check for a trailing closure, if allowed.
-    if (!isExprBasic && Tok.isFollowingLBrace() &&
+    if (!isExprBasic && Tok.is(tok::l_brace) &&
         !isStartOfGetSetAccessor(*this)) {
       // Parse the closure.
       ParserResult<Expr> closure = parseExprClosure();
@@ -1154,7 +1154,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       
       // We only allow a single trailing closure on a call.  This could be
       // generalized in the future, but needs further design.
-      if (Tok.isFollowingLBrace()) break;
+      if (Tok.is(tok::l_brace)) break;
       continue;
     }
 
