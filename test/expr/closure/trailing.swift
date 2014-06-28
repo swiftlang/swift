@@ -44,8 +44,10 @@ var a = C().map {$0 + 1}.filter {$0 % 3 == 0}
 var b = C().map {$0 + 1}
   .filter {$0 % 3 == 0}
 
-
-
+var c = C().map
+{
+  $0 + 1
+}
 
 
 // Calls with multiple trailing closures should be rejected until we have time
