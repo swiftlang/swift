@@ -9,7 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-/// A wrapper for a BidirectionalIndex that reverses its
+
+/// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal
 @public struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
   var _base: I
@@ -60,6 +61,7 @@
   var _base: T
 }
 
+/*
 /// Return a lazy Collection containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
 @public func reverse<
@@ -67,4 +69,22 @@
 >(source: C) -> ReverseView<C> {
   return ReverseView(source)
 }
+*/
 
+% traversals = ('Bidirectional', 'RandomAccess')
+% for View, Self in [ 
+%   ('ReverseView', 'Lazy%sCollection' % t) for t in traversals
+% ]:
+
+extension ${Self} {
+  /// Return a `${View}` over this `${Self}`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  func reverse() -> LazyBidirectionalCollection<${View}<S>> {
+    return LazyBidirectionalCollection<ReverseView<S>>(
+      ReverseView<S>(self._base)
+    )
+  }
+}
+
+% end

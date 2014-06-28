@@ -134,7 +134,7 @@ extension String {
   }
   
   @public func hasSuffix(suffix: String) -> Bool {
-    return Swift.startsWith(reverse(self), reverse(suffix))
+    return Swift.startsWith(lazy(self).reverse(), lazy(suffix).reverse())
   }
 
   func _isAlpha() -> Bool { return _isAll({ $0.isAlpha() }) }

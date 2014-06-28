@@ -10,44 +10,49 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Augments `C` with lazy versions of various collection algorithms.
-struct LazyCollection<C: Collection> : Collection {
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%  whereClause = 'where S.IndexType : %sIndex' % traversal
+%  Self = 'Lazy%sCollection' % traversal
+
+/// Augments `S` with lazy versions of various collection algorithms.
+struct ${Self}<S: Collection ${whereClause}> : Collection {
   @public
-  init(_ base: C) {
+  init(_ base: S) {
     self._base = base
   }
 
   @public
-  func generate() -> C.GeneratorType {
+  func generate() -> S.GeneratorType {
     return self._base.generate()
   }
 
   @public
-  var startIndex: C.IndexType {
+  var startIndex: S.IndexType {
     return _base.startIndex
   }
   
   @public
-  var endIndex: C.IndexType {
+  var endIndex: S.IndexType {
     return _base.endIndex
   }
 
   @public
-  subscript(i: C.IndexType) -> C.GeneratorType.Element {
+  subscript(i: S.IndexType) -> S.GeneratorType.Element {
     return _base[i]
   }
   
   /// an Array, created on-demand, containing the elements of this
   /// lazy Collection.
-  @public var array: [C.GeneratorType.Element] {
+  @public var array: [S.GeneratorType.Element] {
     return Array(_base)
   }
 
-  var _base: C
+  var _base: S
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-func lazy<C: Collection>(s: C) -> LazyCollection<C> {
-  return LazyCollection(s)
+func lazy<S: Collection ${whereClause}>(s: S) -> ${Self}<S> {
+  return ${Self}(s)
 }
 
+%end

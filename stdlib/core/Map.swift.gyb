@@ -46,19 +46,6 @@
   var _transform: (Base.GeneratorType.Element)->T
 }
 
-extension LazySequence {
-  /// Return a `MapSequenceView` over this `Sequence`.  The elements of
-  /// the result are computed lazily, each time they are read, by
-  /// calling `transform` function on a base element.
-  func map<U>(
-    transform: (S.GeneratorType.Element)->U
-  ) -> LazySequence<MapSequenceView<S, U>> {
-    return LazySequence<MapSequenceView<S, U>>(
-      MapSequenceView(_base: self._base, transform)
-    )
-  }
-} 
-
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 @public func map<S:Sequence, T>(
@@ -94,18 +81,6 @@ extension LazySequence {
   var _transform: (Base.GeneratorType.Element)->T
 }
 
-extension LazyCollection {
-  /// Return a `MapCollectionView` over this `Collection`.  The
-  /// elements of the result are computed lazily, each time they are
-  /// read, by calling `transform` function on a base element.
-  func map<U>(
-    transform: (C.GeneratorType.Element)->U
-  ) -> LazyCollection<MapCollectionView<C, U>> {
-    return LazyCollection<MapCollectionView<C, U>>(
-      MapCollectionView(_base: self._base, transform))
-  }
-} 
-
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 @public func map<C:Collection, T>(
@@ -113,3 +88,25 @@ extension LazyCollection {
 ) -> [T] {
   return lazy(source).map(transform).array
 }
+
+//===--- Support for lazy(s) ----------------------------------------------===//
+
+% traversals = ('Forward', 'Bidirectional', 'RandomAccess')
+% for View, Self in [('MapSequenceView', 'LazySequence')] + [ 
+%   ('MapCollectionView', 'Lazy%sCollection' % t) for t in traversals
+% ]:
+
+extension ${Self} {
+  /// Return a `${View}` over this `${Self}`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  func map<U>(
+    transform: (S.GeneratorType.Element)->U
+  ) -> ${Self}<${View}<S, U>> {
+    return ${Self}<${View}<S, U>>(
+      ${View}(_base: self._base, transform)
+    )
+  }
+}
+
+% end

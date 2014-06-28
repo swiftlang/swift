@@ -3,7 +3,7 @@
 func test()
 {
     print("[")
-   for i in reverse(0..<10) {
+  for i in lazy(0..<10).reverse() {
         print(i)
         print(" ")
     }
@@ -13,7 +13,7 @@ func test()
 func testr()
 {
     print("[")
-   for i in reverse(reverse(0..<10)) {
+    for i in lazy(0..<10).reverse().reverse() {
         print(i)
         print(" ")
     }

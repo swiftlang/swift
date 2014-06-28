@@ -262,7 +262,7 @@ extension ${Self} : ArrayType {
 
   /// A ${Self} containing the elements of `self` in reverse order
   @public func reverse() -> ${Self} {
-    return ${Self}(Swift.reverse(self))
+    return ${Self}(lazy(self).reverse())
   }
 
   /// Return a ${Self} containing the elements `x` of `self` for which

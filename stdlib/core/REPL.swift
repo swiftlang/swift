@@ -26,7 +26,7 @@ var _replExitHandlers = [_REPLExitHandler]()
 }
 
 @internal func _replExit() {
-  for handler in reverse(_replExitHandlers) {
+  for handler in lazy(_replExitHandlers).reverse() {
     handler.f()
   }
 }

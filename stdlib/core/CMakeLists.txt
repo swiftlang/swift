@@ -48,11 +48,11 @@ set(SWIFTLIB_ESSENTIAL
   Index.swift
   IntegerArithmetic.swift.gyb
   Join.swift
-  LazyCollection.swift
+  LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
   LogicValue.swift
-  Map.swift
+  Map.swift.gyb
   Mirrors.swift.gyb
   Misc.swift
   NSSwiftArray.swift
@@ -65,7 +65,7 @@ set(SWIFTLIB_ESSENTIAL
   Range.swift
   Reflection.swift
   Repeat.swift
-  Reverse.swift
+  Reverse.swift.gyb
   Shims.swift
   StaticString.swift
   String.swift
