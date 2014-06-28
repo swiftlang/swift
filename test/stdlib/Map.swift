@@ -16,11 +16,11 @@ println("testing...")
 
 // Test mapping a collection
 // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
-let a = Array(map(2..<8) { $0 * 3 })
+let a = lazy(2..<8).map { $0 * 3 }.array
 println(a)
 
 // Test mapping a sequence
-let s = map(a.generate()) { $0 / 3 }
+let s = lazy(a.generate()).map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
 print("<")
 var prefix = ""
@@ -68,7 +68,7 @@ struct IntRange: Sequence {
 
 // Make sure we can iterate a mapped view of IntRange without
 // consuming it.
-let m1 = map(IntRange(start: 1, end: 5)) { $0 * 2 }
+let m1 = lazy(IntRange(start: 1, end: 5)).map { $0 * 2 }
 // CHECK-NEXT: [2, 4, 6, 8]
 println(Array(m1))
 

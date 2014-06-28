@@ -82,16 +82,10 @@ extension NSView : Reflectable {
 
 @public extension NSGradient {
   convenience init(colorsAndLocations objects: (NSColor, CGFloat)...) {
-    let colors = [NSColor](map(0..<objects.count) { 
-        i in return objects[i].0 
-      })
-    let locations = [CGFloat](map(0..<objects.count) { 
-        i in return objects[i].1 
-      })
     self.init(
-      colors: colors, atLocations: locations._elementStorageIfContiguous,
+      colors: objects.map { $0.0 },
+      atLocations: objects.map { $0.1 },
       colorSpace: NSColorSpace.genericRGBColorSpace())
-    _fixLifetime(locations)
   }
 }
 

@@ -1744,12 +1744,12 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   // API itself.
   //
 
-  @public var keys: MapCollectionView<Dictionary, KeyType> {
-    return map(self) { $0.0 }
+  @public var keys: LazyCollection<MapCollectionView<Dictionary, KeyType>> {
+    return lazy(self).map { $0.0 }
   }
 
-  @public var values: MapCollectionView<Dictionary, ValueType> {
-    return map(self) { $0.1 }
+  @public var values: LazyCollection<MapCollectionView<Dictionary, ValueType>> {
+    return lazy(self).map { $0.1 }
   }
 }
 

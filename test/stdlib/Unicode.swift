@@ -2502,8 +2502,7 @@ StringCookedViews.test("UTF16") {
 
 StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
-    let expectedScalars: [UnicodeScalar] =
-        Array(map(test.scalars) { UnicodeScalar($0) })
+    let expectedScalars = lazy(test.scalars).map { UnicodeScalar($0) }.array
     let subject: String = NonContiguousNSString(test.scalars)
     checkSliceableWithBidirectionalIndex(expectedScalars,
         subject.unicodeScalars, test.loc.withCurrentLoc())
@@ -2511,9 +2510,9 @@ StringCookedViews.test("UnicodeScalars") {
 
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> () in
-    let expectedScalars: [UnicodeScalar] =
-        Array(map(test.scalarsHead + test.scalarsRepairedTail) {
-            UnicodeScalar($0) })
+    let expectedScalars = lazy(
+      test.scalarsHead + test.scalarsRepairedTail
+    ).map { UnicodeScalar($0) }.array
     checkSliceableWithBidirectionalIndex(expectedScalars,
         subject.unicodeScalars, test.loc.withCurrentLoc())
   }
@@ -2529,8 +2528,7 @@ StringTests.test("StreamableConformance") {
     (test: UTF16Test, subject: String) -> () in
     let expected = test.scalarsHead + test.scalarsRepairedTail
     let printedSubject = toString(subject)
-    let actual: [UInt32] =
-        Array(map(printedSubject.unicodeScalars) { $0.value })
+    let actual = lazy(printedSubject.unicodeScalars).map { $0.value }.array
     expectEqual(expected, actual)
   }
 }

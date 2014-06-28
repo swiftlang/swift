@@ -407,15 +407,15 @@ NSStringAPIs.test("fastestEncoding") {
 
 NSStringAPIs.test("fileSystemRepresentation()") {
   if true {
-    let expectedStr: [CChar] = Array(map("abc\0".utf8) { $0.asSigned() })
+    let expectedStr = lazy("abc\0".utf8).map { $0.asSigned() }.array
     expectEqual(expectedStr, "abc".fileSystemRepresentation())
   }
 
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr: [CChar] =
-        Array(map("\u305f\u3099くてん\0".utf8) { $0.asSigned() })
+    let expectedStr =
+        lazy("\u305f\u3099くてん\0".utf8).map { $0.asSigned() }.array
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
 }
@@ -518,7 +518,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   }
   if true {
     let bufferLength = 17
-    var expectedStr: [CChar] = Array(map("abc あかさた\0".utf8) { $0.asSigned() })
+    var expectedStr = lazy("abc あかさた\0".utf8).map { $0.asSigned() }.array
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
@@ -549,8 +549,9 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   }
   if true {
     let bufferLength = 100
-    var expectedStr: [CChar] =
-        Array(map("abc \u305f\u3099くてん\0".utf8) { $0.asSigned() })
+    var expectedStr = lazy(
+      "abc \u305f\u3099くてん\0".utf8
+    ).map { $0.asSigned() }.array
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }

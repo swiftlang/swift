@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// The `Generator` used by `MapSequenceView` and `MapCollectionView`.
+/// Produces each element by passing the output of the `Base`
+/// `Generator` through a transform function returning `T`
 @public struct MapSequenceGenerator<Base: Generator, T>: Generator, Sequence {
   @public mutating func next() -> T? {
     let x = _base.next()
@@ -27,6 +30,12 @@
   var _transform: (Base.Element)->T
 }
 
+//===--- Sequences --------------------------------------------------------===//
+
+/// A `Sequence` whose elements consist of those in a `Base`
+/// `Sequence` passed through a transform function returning `T`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
 @public struct MapSequenceView<Base: Sequence, T> : Sequence {
   @public func generate() -> MapSequenceGenerator<Base.GeneratorType,T> {
     return MapSequenceGenerator(
@@ -37,6 +46,25 @@
   var _transform: (Base.GeneratorType.Element)->T
 }
 
+extension LazySequence {
+  /// Return a `MapSequenceView` over this `Sequence`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  func map<U>(
+    transform: (S.GeneratorType.Element)->U
+  ) -> LazySequence<MapSequenceView<S, U>> {
+    return LazySequence<MapSequenceView<S, U>>(
+      MapSequenceView(_base: self._base, transform)
+    )
+  }
+} 
+
+//===--- Collections ------------------------------------------------------===//
+
+/// A `Collection` whose elements consist of those in a `Base`
+/// `Collection` passed through a transform function returning `T`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
 @public struct MapCollectionView<Base: Collection, T> : Collection {
   @public var startIndex: Base.IndexType {
     return _base.startIndex
@@ -58,6 +86,19 @@
   var _transform: (Base.GeneratorType.Element)->T
 }
 
+extension LazyCollection {
+  /// Return a `MapCollectionView` over this `Collection`.  The
+  /// elements of the result are computed lazily, each time they are
+  /// read, by calling `transform` function on a base element.
+  func map<U>(
+    transform: (C.GeneratorType.Element)->U
+  ) -> LazyCollection<MapCollectionView<C, U>> {
+    return LazyCollection<MapCollectionView<C, U>>(
+      MapCollectionView(_base: self._base, transform))
+  }
+} 
+
+/*
 @public func map<S:Sequence, T>(
   source: S, transform: (S.GeneratorType.Element)->T
 ) -> MapSequenceView<S, T> {
@@ -69,3 +110,4 @@
 ) -> MapCollectionView<C, T> {
   return MapCollectionView(_base: source, _transform: transform)
 }
+*/

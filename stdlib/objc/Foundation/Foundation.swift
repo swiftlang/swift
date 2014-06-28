@@ -646,14 +646,10 @@ extension NSDictionary : DictionaryLiteralConvertible {
   @public class func convertFromDictionaryLiteral(
     elements: (NSCopying, AnyObject)...
   ) -> Self {
-    let keys = [NSCopying?](map(0..<elements.count) { i in 
-      return elements[i].0 
-    })
-    let objects = [AnyObject?](map(0..<elements.count) { i in 
-      return elements[i].1 
-    })
-
-    return self(objects: objects, forKeys: keys, count: elements.count)
+    return self(
+      objects: elements.map { (AnyObject?)($0.1) },
+      forKeys: elements.map { (NSCopying?)($0.0) },
+      count: elements.count)
   }
 }
 

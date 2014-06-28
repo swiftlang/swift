@@ -257,7 +257,7 @@ extension ${Self} : ArrayType {
   /// Return a ${Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
   @public func map<U>(transform: (T)->U) -> ${Self}<U> {
-    return ${Self}<U>(Swift.map(self, transform))
+    return ${Self}<U>(lazy(self).map(transform))
   }
 
   /// A ${Self} containing the elements of `self` in reverse order
