@@ -270,8 +270,6 @@ operator infix >>= { associativity right precedence 90 }
 operator infix  &= { associativity right precedence 90 }
 operator infix  ^= { associativity right precedence 90 }
 operator infix  |= { associativity right precedence 90 }
-operator infix &&= { associativity right precedence 90 }
-operator infix ||= { associativity right precedence 90 }
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure
