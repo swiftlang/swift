@@ -35,8 +35,10 @@ add_subdirectory(SpriteKit)
 
 if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
   add_subdirectory(AppKit)
+  add_subdirectory(QuartzCore)
 else()
   add_subdirectory(UIKit)
+  add_subdirectory(CoreImage)
 endif()
 
 # FIXME: Temporarily allow one to disable building this overlay module.
