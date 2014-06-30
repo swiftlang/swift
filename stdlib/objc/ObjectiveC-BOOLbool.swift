@@ -37,6 +37,10 @@ import ObjectiveC
   @conversion @public func __conversion() -> Bool {
     return self.getLogicValue()
   }
+
+	func getMirror() -> Mirror {
+		return reflect(getLogicValue())
+	}
 }
 
 extension Bool {
