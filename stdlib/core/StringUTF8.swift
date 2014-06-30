@@ -20,7 +20,7 @@
 extension _StringCore {
   // An integral type that holds a chunk of UTF8, starting in its low
   // byte
-  typealias UTF8Chunk = UInt64
+  @public typealias UTF8Chunk = UInt64
   
   /// Encode text starting at i as UTF8.  Returns a pair whose first
   /// element is the index of the text following whatever got encoded,
@@ -138,7 +138,7 @@ extension String {
     return UTF8View(self.core)
   }
 
-  var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
+  @public var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 

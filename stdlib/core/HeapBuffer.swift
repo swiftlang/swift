@@ -45,11 +45,11 @@ func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
 @objc @public class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
-  typealias Buffer = HeapBuffer<Value, Element>
+  @public typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
   }
-  func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  @public func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
@@ -83,7 +83,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 }
 
 @public struct HeapBuffer<Value, Element> : LogicValue, Equatable {
-  typealias Storage = HeapBufferStorage<Value, Element>
+  @public typealias Storage = HeapBufferStorage<Value, Element>
   let storage: Storage?
   
   static func _valueOffset() -> Int {
@@ -147,7 +147,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
   
   /// Create a `HeapBuffer` with `self.value = initializer` and
   /// `self._capacity() >= capacity`.
-  init(
+  @public init(
     _ storageClass: HeapBufferStorageBase.Type,
     _ initializer: Value, _ capacity: Int
   ) {
@@ -193,7 +193,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     return HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
   }
 
-  mutating func isUniquelyReferenced() -> Bool {
+  @public mutating func isUniquelyReferenced() -> Bool {
     if !storage {
       return false
     }

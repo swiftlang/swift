@@ -125,7 +125,7 @@ def otherIntName(name, signed):
 %   ConstructIntType = 'Int' if Self != 'Int' else ''
 
 @public struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
-  var value: Builtin.${BuiltinName}
+  @public var value: Builtin.${BuiltinName}
 
   @transparent @public
   init() {
@@ -133,7 +133,7 @@ def otherIntName(name, signed):
     value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
   }
 
-  @transparent
+  @transparent @public
   init(_ v: Builtin.${BuiltinName}) {
     value = v
   }
@@ -174,7 +174,7 @@ def otherIntName(name, signed):
   static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
     return value
   }
-  @transparent
+  @transparent @public
   func _getBuiltinArrayBoundValue() -> Builtin.Word {
 %  if bits < wordBits:
     return Builtin.${ext}OrBitCast_${BuiltinName}_Word(self.value)

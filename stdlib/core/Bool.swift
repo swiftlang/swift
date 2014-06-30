@@ -20,7 +20,7 @@
   @transparent @public 
   init() { value = Builtin.trunc_Word_Int1(0.value) }
 
-  @transparent
+  @transparent @public
   init(_ v : Builtin.Int1) { value = v }
 
   @public static var false : Bool {
@@ -51,7 +51,7 @@
 }
 
 extension Bool : LogicValue {
-  @transparent func _getBuiltinLogicValue() -> Builtin.Int1 {
+  @transparent @public func _getBuiltinLogicValue() -> Builtin.Int1 {
     return value
   }
 

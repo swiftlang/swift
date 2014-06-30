@@ -328,10 +328,10 @@ func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer
     @asmname("swift_MagicMirrorData_valueType")get
   }
 
-  var objcValue: Any {
+  @public var objcValue: Any {
     @asmname("swift_MagicMirrorData_objcValue")get
   }
-  var objcValueType: Any.Type {
+  @public var objcValueType: Any.Type {
     @asmname("swift_MagicMirrorData_objcValueType")get
   }
   
@@ -343,7 +343,7 @@ func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer
     return result
   }
   
-  func _loadValue<T>() -> T {
+  @public func _loadValue<T>() -> T {
     return Builtin.load(ptr) as T
   }
 }

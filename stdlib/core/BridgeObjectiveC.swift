@@ -320,7 +320,7 @@ var _nilRawPointer: Builtin.RawPointer {
   }
 
   /// Initialize to a null pointer.
-  @transparent
+  @transparent @public
   init() {
     self.value = _nilRawPointer
   }
@@ -330,7 +330,7 @@ var _nilRawPointer: Builtin.RawPointer {
   /// This is inherently unsafe; UnsafePointer assumes the referenced memory
   /// has +1 strong ownership semantics, whereas AutoreleasingUnsafePointer
   /// implies +0 semantics.
-  @transparent
+  @transparent @public
   init<U>(_ ptr: UnsafePointer<U>) {
     self.value = ptr.value
   }

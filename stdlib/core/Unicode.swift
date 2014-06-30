@@ -55,14 +55,14 @@ enum UTFDecodeResult {
 
 @public struct UTF8 : UnicodeCodec {
 
-  typealias CodeUnit = UInt8
+  @public typealias CodeUnit = UInt8
 
-  init() {}
+  @public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
   /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
   /// sequence, returns 4.
-  static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
+  @public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
     if _fastPath(cu0 & 0x80 == 0) {
       // 0x00 -- 0x7f: 1-byte sequences.
       return 0
@@ -298,7 +298,7 @@ enum UTFDecodeResult {
     return 1
   }
 
-  mutating func decode<
+  @public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout next: G) -> UTFDecodeResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
@@ -409,7 +409,7 @@ enum UTFDecodeResult {
     return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
-  static func encode<
+  @public static func encode<
     S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var c = UInt32(input)
@@ -445,9 +445,9 @@ enum UTFDecodeResult {
 }
 
 @public struct UTF16 : UnicodeCodec {
-  typealias CodeUnit = UInt16
+  @public typealias CodeUnit = UInt16
 
-  init() {}
+  @public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
   var _decodeLookahead: UInt32 = 0
@@ -459,7 +459,7 @@ enum UTFDecodeResult {
   /// `x` is set when `_decodeLookahead` contains a code unit.
   var _lookaheadFlags: UInt8 = 0
 
-  mutating func decode<
+  @public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UTFDecodeResult {
     if _lookaheadFlags & 0b01 != 0 {
@@ -553,7 +553,7 @@ enum UTFDecodeResult {
     }
   }
 
-  static func encode<
+  @public static func encode<
       S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var scalarValue: UInt32 = UInt32(input)
@@ -572,11 +572,11 @@ enum UTFDecodeResult {
 }
 
 @public struct UTF32 : UnicodeCodec {
-  typealias CodeUnit = UInt32
+  @public typealias CodeUnit = UInt32
 
-  init() {}
+  @public init() {}
 
-  mutating func decode<
+  @public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UTFDecodeResult {
     return UTF32._decode(&input)
@@ -595,7 +595,7 @@ enum UTFDecodeResult {
     return .EmptyInput
   }
 
-  static func encode<
+  @public static func encode<
     S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     output.put(UInt32(input))
@@ -755,21 +755,21 @@ extension UTF8.CodeUnit : StringElement {
 }
 
 extension UTF16 {
-  static func width(x: UnicodeScalar) -> Int {
+  @public static func width(x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  @public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) >> 10) + 0xD800
   }
 
-  static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  @public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
   }
 
-  static func copy<T: StringElement, U: StringElement>(
+  @public static func copy<T: StringElement, U: StringElement>(
     source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
   ) {
     if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
@@ -793,7 +793,7 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
-  static func measure<
+  @public static func measure<
       Encoding : UnicodeCodec, Input : Generator
       where Encoding.CodeUnit == Input.Element
   >(

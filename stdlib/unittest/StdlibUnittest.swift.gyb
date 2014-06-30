@@ -21,12 +21,14 @@ import Darwin
   let line: UWord
   let comment: String?
 
+  @public
   init(_ file: String, _ line: UWord, comment: String? = nil) {
     self.file = file
     self.line = line
     self.comment = comment
   }
 
+  @public
   func withCurrentLoc(
       file: String = __FILE__, line: UWord = __LINE__
   ) -> SourceLocStack {
@@ -37,6 +39,7 @@ import Darwin
 @public struct SourceLocStack {
   let locs: [SourceLoc] = []
 
+  @public
   init() {}
 
   init(_ loc: SourceLoc) {
@@ -57,6 +60,7 @@ import Darwin
     return SourceLocStack(_locs: locs)
   }
 
+  @public
   func withCurrentLoc(
       file: String = __FILE__, line: UWord = __LINE__
   ) -> SourceLocStack {
@@ -227,11 +231,11 @@ func _expectNotEqual${Generic}(
     self._isPass = isPass
   }
 
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     return _isPass
   }
 
-  func withDescription(description: String) -> AssertionResult {
+  @public func withDescription(description: String) -> AssertionResult {
     var result = self
     result.description += description
     return result

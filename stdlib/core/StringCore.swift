@@ -27,9 +27,9 @@
 @public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
-  var _baseAddress: COpaquePointer
+  @public var _baseAddress: COpaquePointer
   var _countAndFlags: UWord
-  var _owner: AnyObject?
+  @public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
@@ -127,7 +127,7 @@
   
   //===--------------------------------------------------------------------===//
   // Initialization
-  init(
+  @public init(
     baseAddress: COpaquePointer,
     count: Int,
     elementShift: Int,
@@ -171,7 +171,7 @@
   // Properties
   
   /// The number of elements stored
-  var count: Int {
+  @public var count: Int {
     get {
       return Int(_countAndFlags & _countMask)
     }
@@ -188,11 +188,11 @@
   }
   
   /// the number of bytes per element
-  var elementWidth: Int {
+  @public var elementWidth: Int {
     return elementShift + 1
   }
 
-  var hasContiguousStorage: Bool {
+  @public var hasContiguousStorage: Bool {
     return _fastPath(_baseAddress != .null())
   }
 
@@ -201,12 +201,12 @@
     return Word((_countAndFlags << 1).value) < 0
   }
 
-  var startASCII: UnsafePointer<UTF8.CodeUnit> {
+  @public var startASCII: UnsafePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
     return UnsafePointer(_baseAddress)
   }
 
-  var startUTF16: UnsafePointer<UTF16.CodeUnit> {
+  @public var startUTF16: UnsafePointer<UTF16.CodeUnit> {
     _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF16")
@@ -214,7 +214,7 @@
   }
 
   /// the native _StringBuffer, if any, or .None.
-  var nativeBuffer: _StringBuffer? {
+  @public var nativeBuffer: _StringBuffer? {
     if !hasCocoaBuffer {
       return _owner.map {
         reinterpretCast($0) as _StringBuffer
@@ -224,7 +224,7 @@
   }
 
   /// the Cocoa String buffer, if any, or .None.
-  var cocoaBuffer: _CocoaString? {
+  @public var cocoaBuffer: _CocoaString? {
     if hasCocoaBuffer {
       return _owner.map {
         reinterpretCast($0) as _CocoaString
@@ -237,7 +237,7 @@
   // slicing
   
   /// Return the given sub-_StringCore
-  subscript(subRange: Range<Int>) -> _StringCore {
+  @public subscript(subRange: Range<Int>) -> _StringCore {
     
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex <= count)
@@ -264,7 +264,7 @@
   }
 
   /// Get the Nth UTF16 Code Unit stored
-  subscript(position: Int) -> UTF16.CodeUnit {
+  @public subscript(position: Int) -> UTF16.CodeUnit {
     _sanityCheck(position >= 0)
     _sanityCheck(position <= count)
 

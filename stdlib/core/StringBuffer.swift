@@ -46,7 +46,7 @@ struct _StringBufferIVars {
 
   // Make this a buffer of UTF16 code units so that it's properly
   // aligned for them if that's what we store.
-  typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
+  @public typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
   @conversion 
   func __conversion() -> _Storage {
@@ -57,7 +57,7 @@ struct _StringBufferIVars {
     _storage = storage
   }
 
-  init(capacity: Int, initialSize: Int, elementWidth: Int) {
+  @public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     let elementShift = elementWidth - 1
 
@@ -121,7 +121,7 @@ struct _StringBufferIVars {
   }
 
   /// a pointer to the start of this buffer's data area
-  var start: UnsafePointer<RawByte> {
+  @public var start: UnsafePointer<RawByte> {
     return UnsafePointer(_storage.elementStorage)
   }
 
@@ -145,7 +145,7 @@ struct _StringBufferIVars {
   }
 
   /// The number of elements that can be stored in this buffer
-  var capacity: Int {
+  @public var capacity: Int {
     return _storage.value.byteCapacity >> elementShift
   }
 

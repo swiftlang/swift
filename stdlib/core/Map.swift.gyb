@@ -100,6 +100,7 @@ extension ${Self} {
   /// Return a `${View}` over this `${Self}`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
+  @public
   func map<U>(
     transform: (S.GeneratorType.Element)->U
   ) -> ${Self}<${View}<S, U>> {

@@ -23,9 +23,9 @@
   : _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible {
-  var start: Builtin.RawPointer
-  var byteSize: Builtin.Word
-  var isASCII: Builtin.Int1
+  @public var start: Builtin.RawPointer
+  @public var byteSize: Builtin.Word
+  @public var isASCII: Builtin.Int1
 
   @public init() {
     self = ""

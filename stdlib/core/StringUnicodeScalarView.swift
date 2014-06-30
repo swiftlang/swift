@@ -39,7 +39,7 @@ extension String {
     }
 
     @public struct IndexType : BidirectionalIndex {
-      init(_ _position: Int, _ _core: _StringCore) {
+      @public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core
       }

@@ -162,7 +162,7 @@ func _cocoaStringToContiguousImpl(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   let cfSelf: CFString = reinterpretCast(source)
-  _sanityCheck(CFStringGetCharactersPtr(cfSelf)._isNull,
+  _sanityCheck(!CFStringGetCharactersPtr(cfSelf),
     "Known contiguously-stored strings should already be converted to Swift")
 
   var startIndex = range.startIndex

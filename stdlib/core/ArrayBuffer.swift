@@ -95,7 +95,7 @@ class IndirectArrayBuffer {
     return Builtin.castFromNativeObject(storage!)
   }
   
-  typealias Element = T
+  @public typealias Element = T
 
   /// create an empty buffer
   init() {
@@ -108,7 +108,7 @@ class IndirectArrayBuffer {
       ))
   }
 
-  init(_ cocoa: _CocoaArray) {
+  @public init(_ cocoa: _CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(
@@ -155,7 +155,7 @@ extension ArrayBuffer {
   /// Convert to an NSArray.
   /// Precondition: isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func _asCocoaArray() -> _CocoaArray {
+  @public func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")

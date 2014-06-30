@@ -78,16 +78,16 @@
   // Because of <rdar://problem/14396120> we've had to factor _Collection out
   // of Collection to make it useful.
 
-  init(_ seq: C) {
+  @public init(_ seq: C) {
     self._elements = seq
     self._position = seq.startIndex
   }
   
-  func generate() -> IndexingGenerator {
+  @public func generate() -> IndexingGenerator {
     return self
   }
   
-  mutating func next() -> C._Element? {
+  @public mutating func next() -> C._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }

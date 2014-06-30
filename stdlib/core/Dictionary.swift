@@ -317,7 +317,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     }
   }
 
-  @transparent
+  @transparent @public
   var count: Int {
     get {
       return body.count
@@ -438,11 +438,11 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
 
   typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
-  var startIndex: Index {
+  @public var startIndex: Index {
     return Index(nativeStorage: self, offset: -1).successor()
   }
 
-  var endIndex: Index {
+  @public var endIndex: Index {
     return Index(nativeStorage: self, offset: capacity)
   }
 
@@ -451,13 +451,13 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     return found ? i : .None
   }
 
-  func assertingGet(i: Index) -> (KeyType, ValueType) {
+  @public func assertingGet(i: Index) -> (KeyType, ValueType) {
     let e = self[i.offset]
     _precondition(e, "attempting to access Dictionary elements using an invalid Index")
     return e!
   }
 
-  func assertingGet(key: KeyType) -> ValueType {
+  @public func assertingGet(key: KeyType) -> ValueType {
     let e = self[_find(key, _bucket(key)).pos.offset]
     _precondition(e, "key not found in Dictionary")
     return e!.value
@@ -691,7 +691,7 @@ class _NativeDictionaryStorageOwnerBase
     super.init()
   }
 
-  var nativeStorage: NativeStorage
+  @public var nativeStorage: NativeStorage
 
   //
   // Dictionary -> NSDictionary bridging.
@@ -759,7 +759,7 @@ class _NativeDictionaryStorageOwnerBase
 }
 
 struct _CocoaDictionaryStorage : _DictionaryStorage {
-  var cocoaDictionary: _SwiftNSDictionary
+  @public var cocoaDictionary: _SwiftNSDictionary
 
   typealias Index = _CocoaDictionaryIndex
 
@@ -1609,7 +1609,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   @public typealias Element = (KeyType, ValueType)
   @public typealias Index = DictionaryIndex<KeyType, ValueType>
 
-  var _variantStorage: _VariantStorage
+  @public var _variantStorage: _VariantStorage
 
   /// Create a dictionary with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
@@ -1626,7 +1626,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   }
 
   /// Private initializer used for bridging.
-  init(_cocoaDictionary: _SwiftNSDictionary) {
+  @public init(_cocoaDictionary: _SwiftNSDictionary) {
     _variantStorage =
         .Cocoa(_CocoaDictionaryStorage(cocoaDictionary: _cocoaDictionary))
   }

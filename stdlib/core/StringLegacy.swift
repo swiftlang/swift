@@ -30,11 +30,11 @@ extension String {
         input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  var _lines : [String] {
+  @public var _lines : [String] {
     return _split("\n")
   }
   
-  func _split(separator: UnicodeScalar) -> [String] {
+  @public func _split(separator: UnicodeScalar) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
     return scalarSlices.map { $0 as String }
   }
@@ -119,7 +119,7 @@ extension String {
         input: resultArray)
   }
 
-  init(_ _c: UnicodeScalar) {
+  @public init(_ _c: UnicodeScalar) {
     self = String(count: 1, repeatedValue: _c)
   }
 
@@ -243,15 +243,15 @@ extension String {
   typealias _Float = Float
   typealias _Bool = Bool
   
-  init(_ v : _Double) {
+  @public init(_ v : _Double) {
     self = _doubleToString(v)
   }
 
-  init(_ v : _Float) {
+  @public init(_ v : _Float) {
     self = String(Double(v))
   }
 
-  init(_ b : _Bool) {
+  @public init(_ b : _Bool) {
     if b {
       self = "true"
     } else {
@@ -331,7 +331,7 @@ extension String {
   /// Split the given string at the given delimiter character, returning 
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
-  func _splitFirst(delim: UnicodeScalar)
+  @public func _splitFirst(delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
     var rng = unicodeScalars
@@ -347,7 +347,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
-  func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
+  @public func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars

@@ -30,7 +30,7 @@
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible,
     LogicValue {
-  var _bytesPtr: UnsafePointer<UInt8>
+  @public var _bytesPtr: UnsafePointer<UInt8>
 
   @public init(_ bytesPtr: UnsafePointer<UInt8>) {
     self._bytesPtr = bytesPtr
@@ -66,7 +66,7 @@
   }
 
   @transparent
-  var _isNull : Bool {
+  @public var _isNull : Bool {
     return _bytesPtr._isNull
   }
 

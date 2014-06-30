@@ -24,61 +24,61 @@
   var value : Builtin.RawPointer
 
   /// Construct a null pointer.
-  init() {
+  @public init() {
     self.value = Builtin.inttoptr_Word(0.value)
   }
 
   /// Construct ${a_Self} from a builtin raw pointer.
-  init(_ value : Builtin.RawPointer) {
+  @public init(_ value : Builtin.RawPointer) {
     self.value = value
   }
 
   /// Convert from an opaque C pointer to a typed pointer
   ///
   /// This is a fundamentally unsafe conversion.
-  init(_ other : COpaquePointer) {
+  @public init(_ other : COpaquePointer) {
     value = other.value
   }
 
   /// Construct ${a_Self} from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  init(_ value : Int) {
+  @public init(_ value : Int) {
     self.value = Builtin.inttoptr_Word(value.value)
   }
 
   /// Convert from an UnsafePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  init<U>(_ from : UnsafePointer<U>) {
+  @public init<U>(_ from : UnsafePointer<U>) {
     value = from.value
   }
 
   /// Convert from a ConstUnsafePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  init<U>(_ from : ConstUnsafePointer<U>) {
+  @public init<U>(_ from : ConstUnsafePointer<U>) {
     value = from.value
   }
 
   // Make nil work with ${Self}.
-  @transparent
+  @transparent @public
   static func convertFromNilLiteral() -> ${Self}<T> {
     return .null()
   }
 
-  static func null() -> ${Self} {
+  @public static func null() -> ${Self} {
     return ${Self}()
   }
 
 %  if mutable:
-  static func alloc(num: Int) -> ${Self} {
+  @public static func alloc(num: Int) -> ${Self} {
     // Don't bother with overflow checking.
     var size = Int(Builtin.strideof(T.self)) * num
     return ${Self}(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
 
-  func dealloc(num: Int) {
+  @public func dealloc(num: Int) {
     // Overflow checking is actually not required here.
     var size = Int(Builtin.strideof(T.self)) * num
     Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
@@ -87,7 +87,7 @@
 
   /// Access the underlying raw memory, getting and
   /// setting values.
-  var memory : T {
+  @public var memory : T {
     @transparent get {
       return Builtin.load(value)
     }
@@ -101,7 +101,7 @@
 %  if mutable:
   /// Initialize the value the pointer points to, to construct
   /// an object where there was no object previously stored.
-  func initialize(newvalue: T) {
+  @public func initialize(newvalue: T) {
     Builtin.initialize(newvalue, value)
   }
 
@@ -110,7 +110,7 @@
   ///
   /// Postcondition: The value has been destroyed and the memory must
   /// be initialized before being used again.
-  func move() -> T {
+  @public func move() -> T {
     return Builtin.take(value)
   }
 
@@ -120,7 +120,7 @@
   /// later memory that may overlap with the source range.
   ///
   /// Requires: either `source` precedes `self` or follows `self + count`.
-  func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
+  @public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
     _debugPrecondition(
@@ -135,7 +135,7 @@
 
   /// Assign from count values beginning at source into initialized
   /// memory, transforming the source values into raw memory.
-  func moveAssignFrom(source: ${Self}, count: Int) {
+  @public func moveAssignFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "moveAssignFrom with negative count")
     _debugPrecondition(
@@ -148,7 +148,7 @@
 
   /// Move count values beginning at source into raw memory,
   /// transforming the source values into raw memory.
-  func moveInitializeFrom(source: ${Self}, count: Int) {
+  @public func moveInitializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeFrom with negative count")
     _debugPrecondition(
@@ -160,7 +160,7 @@
   }
 
   /// Copy count values beginning at source into raw memory.
-  func initializeFrom(source: ${Self}, count: Int) {
+  @public func initializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
@@ -172,7 +172,7 @@
   }
 
   /// Copy the elements of `C` into raw memory.
-  func initializeFrom<
+  @public func initializeFrom<
     C: Collection where C._Element == T
   >(
     source: C
@@ -188,28 +188,28 @@
   }
 
   /// Destroy the object the pointer points to.
-  func destroy() {
+  @public func destroy() {
     Builtin.destroy(T.self, value)
   }
 
   /// Destroy the `count` objects the pointer points to.
-  func destroy(count: Int) {
+  @public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(T.self, value, count.value)
   }
 %  end
 
-  @transparent
+  @transparent @public
   var _isNull : Bool {
     return self == ${Self}.null()
   }
 
-  @transparent
+  @transparent @public
   func getLogicValue() -> Bool {
     return !_isNull
   }
 
-  subscript (i : Int) -> T {
+  @public subscript (i : Int) -> T {
     @transparent
     get {
       return (self + i).memory
@@ -225,6 +225,7 @@
 % if mutable:
   /// If self was converted from nil, writes the result of invoking body into 
   /// the pointee
+  @public
   func _setIfNonNil(body: () -> T) {
     if self {
       memory = body()
@@ -234,7 +235,7 @@
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a T which is written into buffer before this method returns
-  @transparent
+  @transparent @public
   func _withBridgeObject<U: AnyObject, R>(
     inout buffer: U?, body: (AutoreleasingUnsafePointer<U?>)->R
   ) -> R {
@@ -244,7 +245,7 @@
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of buffer
-  @transparent
+  @transparent @public
   func _withBridgeValue<U, R>(
     inout buffer: U, body: (UnsafePointer<U>)->R
   ) -> R {
@@ -255,13 +256,13 @@
   //
   // Protocol conformance
   //
-  var hashValue: Int {
+  @public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
-  func successor() -> ${Self} {
+  @public func successor() -> ${Self} {
     return self + 1
   }
-  func predecessor() -> ${Self} {
+  @public func predecessor() -> ${Self} {
     return self - 1
   }
 }

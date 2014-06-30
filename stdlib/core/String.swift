@@ -15,15 +15,15 @@
     core = _StringCore()
   }
 
-  init(_ _core: _StringCore) {
+  @public init(_ _core: _StringCore) {
     self.core = _core
   }
 
-  var core: _StringCore
+  @public var core: _StringCore
 }
 
 extension String {
-  static func _fromWellFormedCodeUnitSequence<
+  @public static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -32,7 +32,7 @@ extension String {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
-  static func _fromCodeUnitSequence<
+  @public static func _fromCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -48,7 +48,7 @@ extension String {
     }
   }
 
-  static func _fromCodeUnitSequenceWithRepair<
+  @public static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -300,7 +300,7 @@ extension String {
 extension String : Collection {
   // An adapter over UnicodeScalarView that advances by whole Character
   @public struct Index : BidirectionalIndex {
-    init(_ _base: UnicodeScalarView.IndexType) {
+    @public init(_ _base: UnicodeScalarView.IndexType) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
@@ -331,7 +331,7 @@ extension String : Collection {
     let _lengthUTF16: Int
 
     /// The integer offset of this index in UTF-16 code units.
-    var _utf16Index: Int {
+    @public var _utf16Index: Int {
       return _base._position
     }
 

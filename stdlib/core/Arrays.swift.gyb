@@ -100,7 +100,7 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 extension ${Self} {
-  func _asCocoaArray() -> _CocoaArray {
+  @public func _asCocoaArray() -> _CocoaArray {
     return _buffer._asCocoaArray()
   }
 }
@@ -151,7 +151,7 @@ extension ${Self} : ArrayType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var _elementStorageIfContiguous: UnsafePointer<Element> {
+  @public var _elementStorageIfContiguous: UnsafePointer<Element> {
     return _buffer.elementStorage
   }
 
@@ -354,7 +354,7 @@ extension ${Self} {
 
 extension Array {
   /// This function "seeds" the ArrayLiteralConvertible protocol
-  static func convertFromHeapArray(
+  @public static func convertFromHeapArray(
     base: Builtin.RawPointer,
     owner: Builtin.NativeObject,
     count: Builtin.Word
