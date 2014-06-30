@@ -65,8 +65,8 @@ class Token {
 
   /// \brief The length of the comment that precedes the token.
   ///
-  /// Hopefully 64 Kib is enough.
-  unsigned CommentLength : 16;
+  /// Hopefully 128 Mib is enough.
+  unsigned CommentLength : 27;
   
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
