@@ -1186,8 +1186,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have any type-adjusting attributes, apply them here.
   if (binding->getPattern()->hasType()) {
     if (auto var = binding->getSingleVar()) {
-      if (var->getAttrs().hasAttribute<IBOutletAttr>())
-        tc.checkIBOutlet(var);
       if (var->getAttrs().hasOwnership())
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
     }
@@ -2367,21 +2365,18 @@ public:
       // Type check each VarDecl in that his PatternBinding handles.
       visitBoundVars(PBD->getPattern());
 
-
-      // If we have a type but no initializer on an @IBOutlet, check
-      // whether the type is default-initializable. If so, do it.
+      // If we have a type but no initializer, check whether the type is
+      // default-initializable. If so, do it.
       if (PBD->getPattern()->hasType() && !PBD->hasInit() &&
           PBD->hasStorage() && !PBD->getPattern()->getType()->is<ErrorType>()) {
 
         // If we have a type-adjusting attribute, apply it now.
         if (auto var = PBD->getSingleVar()) {
-          if (var->getAttrs().hasAttribute<IBOutletAttr>())
-            TC.checkIBOutlet(var);
-
+#if 0
           // FIXME: Ugly hack to get the pattern type to reflect the
           // updated variable type. Not cool.
           PBD->getPattern()->setType(var->getType());
-
+#endif
           if (var->getAttrs().hasOwnership())
             TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
         }

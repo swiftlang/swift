@@ -236,7 +236,7 @@ class MyObject : NSObject {}
   unowned var unownedOther: Properties = .shared
   unowned(unsafe) var unmanagedOther: Properties = .shared
 
-  @IBOutlet var outlet: AnyObject
+  @IBOutlet weak var outlet: AnyObject!
 
   var string = "abc"
   var array: [AnyObject] = []

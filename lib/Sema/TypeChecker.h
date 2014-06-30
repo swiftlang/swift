@@ -497,7 +497,6 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
-  void checkIBOutlet(VarDecl *D);
   void checkOwnershipAttr(VarDecl *D, Ownership ownershipKind);
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);

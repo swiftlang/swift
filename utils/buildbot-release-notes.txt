@@ -30,6 +30,11 @@ Latest
   The type [K : V] is syntactic sugar for Dictionary<K, V>; nothing
   else has changed.
 
+* The @IBOutlet attribute no longer implicitly (and invisibly) changes the type
+  of the declaration it is attached to.  It no longer implicitly makes variables
+  be an implicitly unwrapped optional and no longer defaults them to weak.
+
+
 2014-06-23
 ---------
 

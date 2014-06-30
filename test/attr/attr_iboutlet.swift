@@ -137,10 +137,9 @@ class NonObjC {}
   init() { }
 }
 
-// Turn non-optional @IBOutlets into (possibly unchecked) optional ones.
 @objc class Infer {
-  @IBOutlet var outlet1: Infer
-  @IBOutlet weak var outlet2: Infer
+  @IBOutlet var outlet1: Infer!
+  @IBOutlet weak var outlet2: Infer!
 
   func testOptionalNess() {
    let o1 = outlet1!

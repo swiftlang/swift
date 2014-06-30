@@ -770,10 +770,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       var->overwriteType(ErrorType::get(Context));
     else
       var->overwriteType(type);
-    if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
-      checkIBOutlet(var);
-      type = getTypeOfRValue(var, true);
-    }
     if (var->getAttrs().hasOwnership()) {
       checkOwnershipAttr(var, var->getAttrs().getOwnership());
       type = getTypeOfRValue(var, true);

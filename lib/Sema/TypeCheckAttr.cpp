@@ -353,6 +353,10 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(IBDesignable)
+    UNINTERESTING_ATTR(IBInspectable)
+    UNINTERESTING_ATTR(IBOutlet) // checked early.
+    UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ObjC)
@@ -364,18 +368,12 @@ public:
 
 #undef UNINTERESTING_ATTR
 
-  void visitIBActionAttr(IBActionAttr *attr);
-  void visitIBDesignableAttr(IBDesignableAttr *attr) {}
-  void visitIBInspectableAttr(IBInspectableAttr *attr) {}
-
-  void visitIBOutletAttr(IBOutletAttr *attr);
-  
-  void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {};
-
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the
     // one it overrides.
   }
+
+  void visitIBActionAttr(IBActionAttr *attr);
 
   void visitAssignmentAttr(AssignmentAttr *attr);
 
@@ -489,10 +487,6 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
 
   if (!Valid)
     attr->setInvalid();
-}
-
-void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
-  TC.checkIBOutlet(cast<VarDecl>(D));
 }
 
 void AttributeChecker::visitAssignmentAttr(AssignmentAttr *attr) {
@@ -789,110 +783,4 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   // Change the type to the appropriate reference storage type.
   if (ownershipKind != Ownership::Strong)
     var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
-}
-
-static void addImplicitOptionalToTypeLoc(TypeLoc &TyLoc, ASTContext &Ctx) {
-  TypeRepr *Repr = TyLoc.getTypeRepr();
-  assert(Repr && "No parsed form?");
-
-  Repr = new (Ctx) ImplicitlyUnwrappedOptionalTypeRepr(Repr, Repr->getEndLoc());
-  TyLoc = TypeLoc(Repr);
-}
-
-/// When processing an @IBOutlet causes a variable to be promoted to implicit
-/// optional type, we need to adjust the typeloc for the accessor if the outlet
-/// is computed.
-static void adjustAccessorTypeLocForImplicitOptional(FuncDecl *Accessor) {
-  // If there is no accessor, don't do anything.
-  if (Accessor == nullptr) return;
-  auto &Ctx = Accessor->getASTContext();
-
-  if (Accessor->isGetter()) {
-    addImplicitOptionalToTypeLoc(Accessor->getBodyResultTypeLoc(), Ctx);
-    return;
-  }
-
-  // Otherwise, this is a didset/willset/setter, they have the type of the
-  // outlet specified in the pattern for the argument.
-  bool HasSelf = Accessor->getDeclContext()->isTypeContext();
-  Pattern *ArgPattern = Accessor->getBodyParamPatterns()[HasSelf];
-
-  // Strip off the TuplePattern to get to the first argpattern.
-  if (auto *TP = dyn_cast<TuplePattern>(ArgPattern))
-    ArgPattern = TP->getFields()[0].getPattern();
-
-  addImplicitOptionalToTypeLoc(cast<TypedPattern>(ArgPattern)->getTypeLoc(),
-                               Ctx);
-}
-
-void TypeChecker::checkIBOutlet(VarDecl *VD) {
-  assert(VD->getAttrs().hasAttribute<IBOutletAttr>() &&
-         "Only call when @IBOutlet is set");
-  checkDeclAttributesEarly(VD);
-
-  // Check to see if prechecking removed the attribute because it was invalid.
-  if (!VD->getMutableAttrs().getAttribute<IBOutletAttr>())
-    return;
-  
-  // If this is an explicitly marked "strong" outlet, then there are no
-  // adjustments necessary.
-  if (VD->getAttrs().isStrong())
-    return;
-  
-  bool NeedsUpdate = false;
-
-  // Validate the type of the @IBOutlet.
-  auto type = VD->getType();
-  Ownership ownership = Ownership::Strong;
-  if (auto refStorageType = type->getAs<ReferenceStorageType>()) {
-    ownership = refStorageType->getOwnership();
-    type = refStorageType->getReferentType();
-
-    // If the outlet was explicitly marked unowned, then bail out.  This is a
-    // horrible hack because unowned pointers cannot yet be optionals.
-    if (ownership == Ownership::Unowned)
-      return;
-  } else {
-    // If it isn't marked weak or unowned, then it needs to be updated.
-    ownership = VD->getAttrs().getOwnership();
-    NeedsUpdate = true;
-  }
-
-  // If the underlying type isn't an optional, then we need to update it.
-  OptionalTypeKind optionalKind;
-  if (auto optObjectType = type->getAnyOptionalObjectType(optionalKind))
-    type = optObjectType;
-  else
-    NeedsUpdate = true;
-
-  // If the type wasn't optional before or has no ownership, default it to
-  // implicitly unwrapped optional and weak.
-  if (NeedsUpdate) {
-    if (ownership == Ownership::Unowned)
-      /* FIXME: Cannot wrap unowned pointers with optionals yet*/;
-    else if (optionalKind == OptionalTypeKind::OTK_None ||
-             optionalKind == OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional){
-      type = ImplicitlyUnwrappedOptionalType::get(type);
-
-      // Adjust the accessors to take/return the implicit optional as well.
-      if (optionalKind == OptionalTypeKind::OTK_None &&
-          VD->hasAccessorFunctions()) {
-        adjustAccessorTypeLocForImplicitOptional(VD->getGetter());
-        adjustAccessorTypeLocForImplicitOptional(VD->getSetter());
-        if (VD->getStorageKind() == VarDecl::Observing) {
-          adjustAccessorTypeLocForImplicitOptional(VD->getWillSetFunc());
-          adjustAccessorTypeLocForImplicitOptional(VD->getDidSetFunc());
-        }
-      }
-    } else
-      type = OptionalType::get(type);
-    
-    // Build the right ownership type around it.
-    if (ownership == Ownership::Strong) {
-      ownership = Ownership::Weak;
-      VD->getMutableAttrs().setAttr(AK_weak, VD->getLoc());
-    }
-    type = ReferenceStorageType::get(type, ownership, Context);
-    VD->overwriteType(type);
-  }
 }

@@ -712,11 +712,6 @@ namespace {
         if (!forFunctionParam && var->getAttrs().isWeak()) {
           ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
-        } else if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
-          // For @IBOutlet variables, use an optional type T!.
-          ty = CS.getTypeChecker().
-                   getImplicitlyUnwrappedOptionalType(var->getLoc(), ty);
-          if (!ty) return Type();
         }
 
         // We want to set the variable's type here when type-checking

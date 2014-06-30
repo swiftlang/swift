@@ -1493,7 +1493,7 @@ class HasIBOutlet {
 
   init() {}
 
-  @IBOutlet var goodOutlet: Class_ObjC1
+  @IBOutlet weak var goodOutlet: Class_ObjC1!
   // CHECK-LABEL: {{^}}  @objc @IBOutlet var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
