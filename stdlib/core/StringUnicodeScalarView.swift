@@ -31,6 +31,9 @@ extension String {
         base = core
       }
       mutating func next() -> UTF16.CodeUnit? {
+        if idx == base.endIndex {
+          return .None
+        }
         return self.base[idx++]
       }
     }

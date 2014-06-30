@@ -2254,9 +2254,9 @@ import Foundation
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
-  convenience init(_ scalars: [UInt8]) {
+  convenience init(_ utf8: [UInt8]) {
     var encoded: [UInt16] = []
-    var g = scalars.generate()
+    var g = utf8.generate()
     let hadError = transcode(UTF8.self, UTF16.self, g,
         SinkOf {
           encoded += $0
@@ -2315,21 +2315,8 @@ func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
   for (name, batch) in UTF16Tests {
     println("Batch: \(name)")
     for test in batch {
-      test.encoded.withUnsafePointerToElements {
-        (ptr) -> () in
-        let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-            ptr, test.encoded.count, kCFAllocatorNull)
-        if !test.encoded.isEmpty {
-          // Exclude the empty testcase from this check because it will fail --
-          // CoreFoundation will return NULL for character data of an empty
-          // string.
-          expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
-        }
-        let subject: String = cfstring
-
-        checkClosure(test, subject)
-        return ()
-      }
+      let subject: String = NonContiguousNSString(test.encoded)
+      checkClosure(test, subject)
     }
   }
 }
