@@ -174,7 +174,7 @@
   class func convertFromNilLiteral() -> Self
 }
 
-@internal protocol _BuiltinIntegerLiteralConvertible {
+@public protocol _BuiltinIntegerLiteralConvertible {
   class func _convertFromBuiltinIntegerLiteral(
                 value: MaxBuiltinIntegerType) -> Self
 }
@@ -184,7 +184,7 @@
   class func convertFromIntegerLiteral(value: IntegerLiteralType) -> Self
 }
 
-@internal protocol _BuiltinFloatLiteralConvertible {
+@public protocol _BuiltinFloatLiteralConvertible {
   class func _convertFromBuiltinFloatLiteral(
                 value: MaxBuiltinFloatType) -> Self
 }

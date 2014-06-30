@@ -171,6 +171,9 @@ namespace swift {
 
     DiagnosticArgument(diag::RequirementKind kind)
       : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
+      
+    DiagnosticArgument(Accessibility kind)
+      : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 

@@ -171,6 +171,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     }
   }
 
+  @public
   func getLogicValue() -> Bool {
     return storage.getLogicValue()
   }
@@ -203,7 +204,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 }
 
 // HeapBuffers are equal when they reference the same buffer
-@internal func == <Value, Element> (
+@public func == <Value, Element> (
   lhs: HeapBuffer<Value, Element>,
   rhs: HeapBuffer<Value, Element>) -> Bool {
   return (lhs as Builtin.NativeObject) == (rhs as Builtin.NativeObject)

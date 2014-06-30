@@ -39,6 +39,7 @@
     self.isASCII = isASCII
   }
 
+  @public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -53,6 +54,7 @@
     return value
   }
 
+  @public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) -> StaticString {

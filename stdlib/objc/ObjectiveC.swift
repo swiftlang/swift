@@ -93,6 +93,7 @@ extension String {
 }
 
 extension Selector : Reflectable {
+  @public
   func getMirror() -> Mirror {
     return reflect(String(_sel: self))
   }

@@ -1087,6 +1087,31 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                     requirement->getFullName());
       }
 
+      // If the match isn't accessible enough, complain.
+      // FIXME: Handle "private(set)" requirements.
+      Accessibility requiredAccess =
+        std::min(Proto->getAccessibility(),
+                 Adoptee->getAnyNominal()->getAccessibility());
+      if (best.Witness->getAccessibility() < requiredAccess) {
+        StringRef fixItString =
+          (requiredAccess == Accessibility::Public) ? "@public " : "@internal ";
+        bool protoForcesAccess = (requiredAccess == Proto->getAccessibility());
+        auto diagKind = protoForcesAccess ? diag::witness_not_accessible_proto
+                                          : diag::witness_not_accessible_type;
+        auto diag = TC.diagnose(best.Witness, diagKind,
+                                getRequirementKind(requirement),
+                                best.Witness->getFullName(),
+                                requiredAccess,
+                                Proto->getName());
+        const DeclAttributes &attrs = best.Witness->getAttrs();
+        // FIXME: Handle "private(set)" syntax.
+        if (auto *attr = attrs.getAttribute<AccessibilityAttr>()) {
+          diag.fixItReplace(attr->getRangeWithAt(), fixItString.drop_back());
+        } else {
+          diag.fixItInsert(best.Witness->getStartLoc(), fixItString);
+        }
+      }
+
       // Record the match.
       recordWitness(requirement, best);
       return ResolveWitnessResult::Success;

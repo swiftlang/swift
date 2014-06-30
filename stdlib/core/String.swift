@@ -62,6 +62,7 @@ extension String {
 }
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+  @public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -84,6 +85,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
+  @public
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
   ) -> String {
@@ -99,6 +101,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 }
 
 extension String : _BuiltinStringLiteralConvertible {
+  @public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,

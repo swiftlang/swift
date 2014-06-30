@@ -238,6 +238,8 @@ func _expectNotEqual${Generic}(
   }
 
   let _isPass: Bool
+  
+  @public
   var description: String = ""
 }
 

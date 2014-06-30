@@ -56,12 +56,15 @@ extension Int : _BridgedToObjectiveC {
 }
 
 extension Array : _ConditionallyBridgedToObjectiveC {
+  @public
   static func getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
+  @public
   func bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
+  @public
   static func bridgeFromObjectiveC(x: NSArray) -> Array {
     fatal("implement")
   }
@@ -74,12 +77,15 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 }
 
 extension Dictionary : _ConditionallyBridgedToObjectiveC {
+  @public
   static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
+  @public
   func bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
+  @public
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     fatal("implement")
   }

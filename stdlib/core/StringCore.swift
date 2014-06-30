@@ -464,14 +464,17 @@
 }
 
 extension _StringCore : Collection {
+  @public
   var startIndex: Int {
     return 0
   }
-  
+
+  @public
   var endIndex: Int {
     return count
   }
-  
+
+  @public
   func generate() -> IndexingGenerator<_StringCore> {
     return IndexingGenerator(self)
   }

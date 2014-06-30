@@ -40,6 +40,7 @@
     self._bytesPtr = UnsafePointer<UInt8>(bytesPtr)
   }
 
+  @public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -55,6 +56,7 @@
     return convertFromStringLiteral(value)
   }
 
+  @public
   static func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
                                                byteSize: Builtin.Word,
                                                isASCII: Builtin.Int1) -> CString {

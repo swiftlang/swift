@@ -85,6 +85,7 @@
 
   typealias _Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
 
+  @public
   init(_ buffer: _Buffer) {
     self._buffer = buffer
   }
@@ -144,6 +145,7 @@ extension ${Self} : ArrayType {
   }
   
   /// An object that guarantees the lifetime of this array's elements
+  @public
   var _owner: AnyObject? {
     return _buffer.owner
   }

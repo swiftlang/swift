@@ -49,9 +49,10 @@ enum class Associativity {
 
 
 /// Access control levels.
-enum class Accessibility {
+// These are used in diagnostics, so please do not reorder existing values.
+enum class Accessibility : uint8_t {
   /// Private access is limited to the current file.
-  Private,
+  Private = 0,
   /// Internal access is limited to the current module.
   Internal,
   /// Public access is not limited.

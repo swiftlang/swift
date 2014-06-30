@@ -33,7 +33,8 @@
   @public func advancedBy(distance: Int) -> Bit {
     return toRaw().advancedBy(distance) > 0 ? one : zero
   }
-  
+
+  @public
   func getMirror() -> Mirror {
     return _BitMirror(self)
   }

@@ -322,6 +322,7 @@ extension ArrayBuffer {
   }
 
   /// Get/set the value of the ith element
+  @public
   subscript(i: Int) -> T {
     get {
       _typeCheck(i..<i)
@@ -368,14 +369,17 @@ extension ArrayBuffer {
   }
   
   //===--- Collection conformance -----------------------------------------===//
+  @public
   var startIndex: Int {
     return 0
   }
-  
+
+  @public
   var endIndex: Int {
     return count
   }
 
+  @public
   func generate() -> IndexingGenerator<ArrayBuffer> {
     return IndexingGenerator(self)
   }

@@ -419,6 +419,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     self[i.offset] = Element(key: key, value: value)
   }
 
+  @public
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED

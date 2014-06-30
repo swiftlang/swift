@@ -161,7 +161,7 @@ def otherIntName(name, signed):
   }
 %  end
 
-  @transparent
+  @transparent @public
   static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
@@ -306,6 +306,7 @@ extension ${Self} : RandomAccessIndex {
     return ${'self' if Self == U+'Int%s'%maxBits else U+'IntMax(self)'}
   }
 % if not signed:
+  @transparent @public
   func toIntMax() -> IntMax {
     return IntMax(toUIntMax())
   }
