@@ -406,6 +406,13 @@ println(reflect(String.self).summary)
 // CHECK-NEXT:  - element: Howdy Swift!
 dump(CollectionOfOne("Howdy Swift!"))
 
+// CHECK-NEXT: EmptyCollection
+var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
+println(reflect(emptyCollectionOfInt).summary)
+
+// CHECK-NEXT .one
+println(reflect(Bit.one).summary)
+
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
 println("ObjC:")
