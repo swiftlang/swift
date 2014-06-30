@@ -201,9 +201,9 @@ struct Less<T: Comparable> {
   }
 }
 
-/// The functions below are a copy of the functions above except that
-/// they don't accept a predicate and they are hardcoded to use the less-than
-/// comparator.
+// The functions below are a copy of the functions above except that
+// they don't accept a predicate and they are hardcoded to use the less-than
+// comparator.
 @public func sort<T : Comparable>(inout array: [T]) {
   return array.withUnsafeMutableStorage {
     a in sort(&a)
