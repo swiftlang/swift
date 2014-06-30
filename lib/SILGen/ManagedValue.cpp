@@ -77,7 +77,7 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
 /// Disable the cleanup for this value.
 void ManagedValue::forwardCleanup(SILGenFunction &gen) const {
   assert(hasCleanup() && "value doesn't have cleanup!");
-  gen.Cleanups.setCleanupState(getCleanup(), CleanupState::Dead);
+  gen.Cleanups.forwardCleanup(getCleanup());
 }
 
 /// Forward this value, deactivating the cleanup and returning the

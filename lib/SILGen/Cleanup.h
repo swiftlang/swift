@@ -34,11 +34,17 @@ enum class CleanupState {
   /// The cleanup is inactive but may be activated later.
   Dormant,
   
+  /// The cleanup is inactive and will not be activated later.
+  Dead,
+
+  // Only active states after this point
+
   /// The cleanup is currently active.
   Active,
   
-  /// The cleanup is inactive and will not be activated later.
-  Dead
+  /// The cleanup is currently active.  When it's forwarded, it should
+  /// be placed in a dormant state, not a dead state.
+  PersistentlyActive
 };
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
@@ -57,7 +63,7 @@ public:
   
   CleanupState getState() const { return state; }
   void setState(CleanupState newState) { state = newState; }
-  bool isActive() const { return state == CleanupState::Active; }
+  bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
   virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
@@ -162,6 +168,11 @@ public:
     return pushCleanupInState<T, A...>(CleanupState::Active,
                                        ::std::forward<A>(args)...);
   }
+
+  /// Transition the given active cleanup to the corresponding
+  /// inactive state: Active becomes Dead and PersistentlyActive
+  /// becomes Dormant.
+  void forwardCleanup(CleanupHandle depth);
 
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.

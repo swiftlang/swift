@@ -577,7 +577,7 @@ namespace {
 
       // Deactivate all the element cleanups and activate the tuple cleanup.
       for (auto cleanup : cleanups)
-        SGF.Cleanups.setCleanupState(cleanup, CleanupState::Dead);
+        SGF.Cleanups.forwardCleanup(cleanup);
       tupleInit.finishInitialization(SGF);
     }
 

@@ -203,7 +203,7 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
   // we did a semantic load to produce it in the first place.
 
   if (valueCleanup.isValid())
-    gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
+    gen.Cleanups.forwardCleanup(valueCleanup);
   return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
 }
 
