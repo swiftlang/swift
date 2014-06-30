@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public struct GeneratorOfOne<T> : Generator, Sequence {
+@public struct GeneratorOfOne<T> : Generator, Sequence, Reflectable {
   @public init(_ elements: T?) {
     self.elements = elements
   }
@@ -25,10 +25,45 @@
     return result
   }
   
+  @public func getMirror() -> Mirror {
+    return _GeneratorOfOneMirror(self)
+  }
+  
   var elements: T?
 }
 
-@public struct CollectionOfOne<T> : Collection {
+struct _GeneratorOfOneMirror<T>: Mirror {
+  let _value: GeneratorOfOne<T>
+  
+  init(_ val: GeneratorOfOne<T>) {
+    self._value = val
+  }
+  
+  var value: Any { return _value }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return .None }
+
+  var count: Int { return 1 }
+
+  subscript(i: Int) -> (String, Mirror) {
+    switch i {
+    case 0:	return ("elements",reflect(_value.elements))
+    default: _preconditionFailure("cannot extract this child index")
+    }
+  }
+
+  var summary: String { 
+  	return "GeneratorOfOne(\( reflect(_value.elements).summary ))"
+  }
+
+  var quickLookObject: QuickLookObject? { return .None }
+
+  var disposition: MirrorDisposition { return .Struct }
+}
+
+@public struct CollectionOfOne<T> : Collection, Reflectable {
   @public typealias IndexType = Bit
 
   @public init(_ element: T) { 
@@ -53,6 +88,41 @@
   }
   
   let element: T
+  
+  @public func getMirror() -> Mirror {
+    return _CollectionOfOneMirror(self)
+  }
+}
+
+struct _CollectionOfOneMirror<T>: Mirror {
+  let _value: CollectionOfOne<T>
+  
+  init(_ val: CollectionOfOne<T>) {
+    self._value = val
+  }
+  
+  var value: Any { return _value }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return .None }
+
+  var count: Int { return 1 }
+
+  subscript(i: Int) -> (String, Mirror) {
+    switch i {
+    case 0:	return ("element",reflect(_value.element))
+    default: _preconditionFailure("cannot extract this child index")
+    }
+  }
+
+  var summary: String { 
+    return "CollectionOfOne(\( reflect(_value.element).summary ))"
+  }
+
+  var quickLookObject: QuickLookObject? { return .None }
+
+  var disposition: MirrorDisposition { return .Struct }
 }
 
 // Specialization of countElements for CollectionOfOne<T>
