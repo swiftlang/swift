@@ -49,7 +49,7 @@
         _buffer[index] = newValue
       }
       else {
-        makeUnique(&_buffer, e: newValue, index: index)
+        _subscriptSetSlowPath(&_buffer, e: newValue, index: index)
       }
     }
   }
@@ -73,7 +73,7 @@
   //===--- private --------------------------------------------------------===//
 
   @noinline
-  func makeUnique(inout buffer: _Buffer, e: Element, index : Int) {
+  func _subscriptSetSlowPath(inout buffer: _Buffer, e: Element, index : Int) {
     var newBuffer = ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     let target = buffer._uninitializedCopy(
