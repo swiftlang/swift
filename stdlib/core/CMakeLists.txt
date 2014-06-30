@@ -39,7 +39,7 @@ set(SWIFTLIB_ESSENTIAL
   Dictionary.swift
   EmptyCollection.swift
   Existential.swift
-  Filter.swift
+  Filter.swift.gyb
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift

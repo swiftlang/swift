@@ -121,13 +121,21 @@
   var _include: (Base.GeneratorType.Element)->Bool
 }
 
-/// Return a lazy Sequence containing the elements `x` of `source` for
-/// which `includeElement(x)` is `true`
-@public func filter<S:Sequence>(
-  source: S, includeElement: (S.GeneratorType.Element)->Bool
-) -> FilterSequenceView<S> {
-  return FilterSequenceView(_base: source, _include: includeElement)
+% traversals = ('Forward', 'Bidirectional', 'RandomAccess')
+% for Self in ['LazySequence'] + [ 'Lazy%sCollection' % t for t in traversals ]:
+extension ${Self} {
+  /// Return a lazy Sequence containing the elements `x` of `source` for
+  /// which `includeElement(x)` is `true`
+  @public
+  func filter(
+    includeElement: (S.GeneratorType.Element)->Bool
+  ) -> LazySequence<FilterSequenceView<S>> {
+    return LazySequence<FilterSequenceView<S>>(
+      FilterSequenceView(_base: self._base, _include: includeElement))
+  }
 }
+
+% end
 
 /*
 // No overload for collections; see the comment on

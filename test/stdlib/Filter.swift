@@ -52,14 +52,14 @@ if true {
 
 // Test filtering Sequences
 if true {
-  let f0 = filter((0..<30).generate()) { $0 % 7 == 0 }
+  let f0 = lazy((0..<30).generate()).filter { $0 % 7 == 0 }
   
   // CHECK-NEXT: <0, 7, 14, 21, 28>
   printlnByGenerating(f0)
 
   // Also try when the first element of the underlying sequence
   // doesn't pass the filter
-  let f1 = filter((1..<30).generate()) { $0 % 7 == 0 }
+  let f1 = lazy((1..<30).generate()).filter { $0 % 7 == 0 }
   
   // CHECK-NEXT: <7, 14, 21, 28>
   printlnByGenerating(f1)

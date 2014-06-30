@@ -268,7 +268,7 @@ extension ${Self} : ArrayType {
   /// Return a ${Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   @public func filter(includeElement: (T)->Bool) -> ${Self} {
-    return ${Self}(Swift.filter(self, includeElement))
+    return ${Self}(lazy(self).filter(includeElement))
   }
 }
 
