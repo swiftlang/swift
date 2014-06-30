@@ -648,6 +648,9 @@ ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
       "cannot use initial value when one of the variables is '_'", ())
 NOTE(decl_init_here,sema_tcd,none,
      "initial value is here", ())
+WARNING(let_default_init,sema_tcd,none,
+        "immutable value is default initialized and can never be changed", ())
+
 
 // Inheritance
 ERROR(duplicate_inheritance,sema_tcd,none,

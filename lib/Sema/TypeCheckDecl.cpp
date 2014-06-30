@@ -2396,6 +2396,16 @@ public:
         if (!hasNSManaged) {
           auto type = PBD->getPattern()->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+            // If any of the default initialized values are immutable, then
+            // emit an error.  We don't do this for members of types, since the
+            // init members have write access to the let values.
+            if (!PBD->getDeclContext()->isTypeContext()) {
+              PBD->getPattern()->forEachVariable([&] (VarDecl *VD) {
+                if (VD->isLet())
+                  TC.diagnose(VD->getLoc(), diag::let_default_init);
+              });
+            }
+
             // If we got a default initializer, install it and re-type-check it
             // to make sure it is properly coerced to the pattern type.
             PBD->setInit(defaultInit, /*checked=*/false);
