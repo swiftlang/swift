@@ -2372,11 +2372,6 @@ public:
 
         // If we have a type-adjusting attribute, apply it now.
         if (auto var = PBD->getSingleVar()) {
-#if 0
-          // FIXME: Ugly hack to get the pattern type to reflect the
-          // updated variable type. Not cool.
-          PBD->getPattern()->setType(var->getType());
-#endif
           if (var->getAttrs().hasOwnership())
             TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
         }
