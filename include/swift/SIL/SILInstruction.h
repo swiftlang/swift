@@ -22,6 +22,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "swift/AST/Builtins.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
@@ -45,35 +46,6 @@ class StringLiteralExpr;
 class Substitution;
 class ValueDecl;
 class VarDecl;
-
-enum IsTake_t { IsNotTake, IsTake };
-enum IsInitialization_t { IsNotInitialization, IsInitialization };
-
-/// The behavior of a dynamic cast operation on the source value.
-enum class CastConsumptionKind : unsigned char {
-  /// The source value is always taken, regardless of whether the cast
-  /// succeeds.  That is, if the cast fails, the source value is
-  /// destroyed.
-  TakeAlways,
-
-  /// The source value is taken only on a successful cast; otherwise,
-  /// it is left in place.
-  TakeOnSuccess,
-
-  /// The source value is always left in place, and the destination
-  /// value is copied into on success.
-  CopyOnSuccess,
-};
-
-/// Should the source value be destroyed if the cast fails?
-inline bool shouldDestroyOnFailure(CastConsumptionKind kind) {
-  return (kind == CastConsumptionKind::TakeAlways);
-}
-
-/// Should the source value be taken if the cast succeeds?
-inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
-  return IsTake_t(kind != CastConsumptionKind::CopyOnSuccess);
-}
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
