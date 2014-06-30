@@ -272,9 +272,6 @@ private:
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
   Type NSStringType;
-  Type StringType;
-  Type Int8Type;
-  Type UInt8Type;
 
   /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
@@ -316,9 +313,6 @@ public:
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
   Type getNSStringType(DeclContext *dc);
-  Type getStringType(DeclContext *dc);
-  Type getInt8Type(DeclContext *dc);
-  Type getUInt8Type(DeclContext *dc);
   
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,

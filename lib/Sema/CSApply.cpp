@@ -3975,11 +3975,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) ArrayToPointerExpr(expr, toType);
     }
     
-    case ConversionRestrictionKind::StringToPointer: {
-      tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return new (tc.Context) StringToPointerExpr(expr, toType);
-    }
-    
     case ConversionRestrictionKind::PointerToPointer: {
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) PointerToPointerExpr(expr, toType);

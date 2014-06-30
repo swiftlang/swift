@@ -90,28 +90,6 @@ Type TypeChecker::getNSStringType(DeclContext *dc) {
   return NSStringType;
 }
 
-static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
-                          StringRef name) {
-  if (cached.isNull()) {
-    Module *stdlib = TC.Context.getStdlibModule();
-    LookupTypeResult lookup = TC.lookupMemberType(ModuleType::get(stdlib),
-                                            TC.Context.getIdentifier(name), dc);
-    if (lookup)
-      cached = lookup.back().second;
-  }
-  return cached;
-}
-
-Type TypeChecker::getStringType(DeclContext *dc) {
-  return ::getStdlibType(*this, StringType, dc, "String");
-}
-Type TypeChecker::getInt8Type(DeclContext *dc) {
-  return ::getStdlibType(*this, Int8Type, dc, "Int8");
-}
-Type TypeChecker::getUInt8Type(DeclContext *dc) {
-  return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
-}
-
 Type 
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,

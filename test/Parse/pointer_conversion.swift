@@ -3,13 +3,10 @@
 class C {}
 class D {}
 
-func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
-func takesMutableVoidPointer(x: UnsafePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
-func takesMutableInt8Pointer(x: UnsafePointer<Int8>) {}  // expected-note{{}}expected-note{{}}
+func takesMutablePointer(x: UnsafePointer<Int>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
+func takesMutableVoidPointer(x: UnsafePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 func takesMutableArrayPointer(x: UnsafePointer<[Int]>) {} // expected-note{{}}
-func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}expected-note{{}}
-func takesConstInt8Pointer(x: ConstUnsafePointer<Int8>) {}
-func takesConstUInt8Pointer(x: ConstUnsafePointer<UInt8>) {}
+func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}
 func takesConstVoidPointer(x: ConstUnsafePointer<Void>) {}
 func takesAutoreleasingPointer(x: AutoreleasingUnsafePointer<C>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 
@@ -135,19 +132,6 @@ func constVoidPointerArguments(p: UnsafePointer<Int>,
   x = cfp // expected-error{{}}
   x = ap // expected-error{{}}
   x = afp // expected-error{{}}
-}
-
-func stringArguments(var s: String) {
-  takesConstVoidPointer(s)
-  takesConstInt8Pointer(s)
-  takesConstUInt8Pointer(s)
-  takesConstPointer(s) // expected-error{{}}
-
-  takesMutableVoidPointer(s) // expected-error{{}}
-  takesMutableInt8Pointer(s) // expected-error{{}}
-  takesMutableInt8Pointer(&s) // expected-error{{}}
-  takesMutablePointer(s) // expected-error{{}}
-  takesMutablePointer(&s) // expected-error{{}}
 }
 
 func autoreleasingPointerArguments(p: UnsafePointer<Int>,
