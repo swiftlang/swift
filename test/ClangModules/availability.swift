@@ -41,3 +41,7 @@ func test_unavailable_app_extension() {
   // No expected error here.  See corresponding App extension test.
   println(SomeCrazyAppExtensionForbiddenAPI()) // no-error
 }
+
+func test_swift_unavailable() {
+  NSSwiftUnavailableFunction() // expected-error {{Not available in Swift}}
+}

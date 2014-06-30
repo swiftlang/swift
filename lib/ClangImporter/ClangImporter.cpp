@@ -188,6 +188,7 @@ ClangImporter::create(ASTContext &ctx,
     "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
     "-target-abi", irGenOpts.TargetABI,
     "-I", searchPathOpts.RuntimeResourcePath,
+    "-D__swift__",
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
