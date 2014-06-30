@@ -1135,6 +1135,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_typealias:
   case tok::kw_var:
   case tok::pound_if:
+  case tok::pound_line:
   case tok::kw_protocol:
   case tok::identifier:
     return true;
@@ -1462,6 +1463,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       break;
     }
+    case tok::pound_line:
+      DeclResult = parseLineDirective();
+      Status = DeclResult;
+      break;
 
     case tok::kw_func:
       // If the 'mutating' or 'nonmutating' modifier was applied to the func,
@@ -1857,6 +1862,59 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   return DCC.fixupParserResult(Status, ED);
+}
+
+ParserStatus Parser::parseLineDirective() {
+  SourceLoc Loc = consumeToken(tok::pound_line);
+  bool InPoundLineEnvironment = SourceMgr.inVirtualFile();
+  if (InPoundLineEnvironment)
+    SourceMgr.closeVirtualFile(Tok.getText().begin());
+
+  // #line\n returns to the main buffer.
+  if (Tok.isAtStartOfLine()) {
+    if (!InPoundLineEnvironment) {
+      diagnose(Tok, diag::unexpected_line_directive);
+      return makeParserError();
+    }
+    return makeParserSuccess();
+  }
+
+  // #line 42 "file.swift"\n
+  if (Tok.isNot(tok::integer_literal)) {
+    diagnose(Tok, diag::expected_line_directive_number);
+    return makeParserError();
+  }
+  unsigned StartLine = 0;
+  if (Tok.getText().getAsInteger(0, StartLine)) {
+    diagnose(Tok, diag::expected_line_directive_number);
+    return makeParserError();
+  }
+  if (StartLine == 0) {
+    diagnose(Tok, diag::line_directive_line_zero);
+    return makeParserError();
+  }
+  consumeToken();
+
+  if (Tok.isNot(tok::string_literal)) {
+    diagnose(Tok, diag::expected_line_directive_name);
+    return makeParserError();
+  }
+
+  const char* Begin = Tok.getText().end() + 1;
+  StringRef Filename =
+    getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
+  int LineOffset = StartLine -
+    SourceMgr.getLineNumber(SourceLoc(llvm::SMLoc::getFromPointer(Begin)));
+
+  consumeToken(tok::string_literal);
+  if (!Tok.isAtStartOfLine()) {
+    diagnose(Tok.getLoc(), diag::extra_tokens_line_directive);
+    return makeParserError();
+  }
+
+  // Create a new virtual file for the region started by the #line marker.
+  SourceMgr.beginVirtualFile(Begin, Filename, LineOffset);
+  return makeParserSuccess();
 }
 
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {

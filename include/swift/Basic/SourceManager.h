@@ -17,6 +17,7 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
+#include <map>
 
 namespace swift {
 
@@ -32,6 +33,18 @@ class SourceManager {
 
   /// Associates buffer identifiers to buffer IDs.
   llvm::StringMap<unsigned> BufIdentIDMap;
+
+  // #line directive handling.
+  struct VirtualFile {
+    const char *Begin, *End;
+    std::string Name;
+    int LineOffset;
+  };
+  std::map<const char *, VirtualFile> VirtualFiles;
+  mutable std::pair<const char *, const VirtualFile*> CachedVFile
+    = { 0, nullptr };
+  /// Used during parsing.
+  Optional<VirtualFile> CurrentVFile;
 
 public:
   llvm::SourceMgr &getLLVMSourceMgr() {
@@ -89,12 +102,7 @@ public:
   ///
   /// Because a valid source location always corresponds to a source buffer,
   /// this routine always returns a valid buffer ID.
-  unsigned findBufferContainingLoc(SourceLoc Loc) const {
-    assert(Loc.isValid());
-    int BufferID = LLVMSourceMgr.FindBufferContainingLoc(Loc.Value);
-    assert(BufferID != -1);
-    return unsigned(BufferID);
-  }
+  unsigned findBufferContainingLoc(SourceLoc Loc) const;
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   ///
@@ -103,6 +111,23 @@ public:
 
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     return addNewSourceBuffer(Buffer.release());
+  }
+
+  bool inVirtualFile() { return CurrentVFile.hasValue(); }
+
+  /// Start a new #line-defined virtual file region.
+  void beginVirtualFile(const char *Begin, StringRef Name, int LineOffset) {
+    assert(!CurrentVFile.hasValue() && "previous VFile still open");
+    CurrentVFile = VirtualFile{ Begin, nullptr, Name.str(), LineOffset };
+  }
+
+  /// Close a #line-defined virtual file region.
+  void closeVirtualFile(const char *End) {
+    assert(CurrentVFile.hasValue() && "no open VFile");
+    VirtualFiles[End] = { CurrentVFile->Begin, End,
+                          CurrentVFile->Name,
+                          CurrentVFile->LineOffset };
+    CurrentVFile.reset();
   }
 
   /// Creates a copy of a \c MemoryBuffer and adds it to the \c SourceManager,
@@ -152,10 +177,35 @@ public:
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
 
-  std::pair<unsigned, unsigned> getLineAndColumn(SourceLoc Loc,
+  const VirtualFile *getVirtualFile(llvm::SMLoc Loc) const;
+
+  int getLineOffset(llvm::SMLoc Loc) const {
+    if (auto VFile = getVirtualFile(Loc))
+      return VFile->LineOffset;
+    else
+      return 0;
+  }
+
+  const char *getBufferIdentifierForLoc(SourceLoc Loc) const {
+    if (auto VFile = getVirtualFile(Loc.Value))
+      return VFile->Name.c_str();
+    else
+      return getIdentifierForBuffer(findBufferContainingLoc(Loc));
+  }
+
+  std::pair<unsigned, unsigned>
+  getLineAndColumn(SourceLoc Loc, int BufferID = -1) const {
+    return getLineAndColumn(Loc.Value, BufferID);
+  }
+
+  std::pair<unsigned, unsigned> getLineAndColumn(llvm::SMLoc Loc,
                                                  int BufferID = -1) const {
     assert(Loc.isValid());
-    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    int LineOffset = getLineOffset(Loc);
+    int l, c;
+    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
+    assert(LineOffset+l > 0 && "bogus line offset");
+    return { LineOffset + l, c };
   }
 
   unsigned getLineNumber(SourceLoc Loc, int BufferID = -1) const {
@@ -164,6 +214,11 @@ public:
   }
 
   StringRef extractText(CharSourceRange Range) const;
+
+  llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
+                                const Twine &Msg,
+                                ArrayRef<llvm::SMRange> Ranges,
+                                ArrayRef<llvm::SMFixIt> FixIts) const;
 };
 
 } // namespace swift

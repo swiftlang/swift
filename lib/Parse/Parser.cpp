@@ -252,7 +252,6 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                PersistentParserState *PersistentState)
   : SourceMgr(SF.getASTContext().SourceMgr),
-    BufferID(BufferID),
     Diags(SF.getASTContext().Diags),
     SF(SF),
     L(new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,

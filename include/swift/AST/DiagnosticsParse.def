@@ -63,6 +63,18 @@ ERROR(expected_build_configuration_expression,parsing,none,
 ERROR(extra_tokens_config_directive,parsing,none,
       "extra tokens at the end of the build configuration directive", ())
 
+ERROR(unexpected_line_directive,parsing,none,
+      "parameterless closing #line directive "
+      "without prior opening #line directive", ())
+ERROR(expected_line_directive_number,parsing,none,
+      "expected starting line number for #line directive", ())
+ERROR(expected_line_directive_name,parsing,none,
+      "expected filename string literal for #line directive", ())
+ERROR(extra_tokens_line_directive,parsing,none,
+      "extra tokens at the end of #line directive", ())
+ERROR(line_directive_line_zero,parsing,none,
+      "the line number needs to be greater than zero", ())
+
 WARNING(val_deprecated,lexing,none,
         "'val' is being removed, please switch to 'let'", ())
 

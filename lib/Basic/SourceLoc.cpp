@@ -39,6 +39,36 @@ unsigned SourceManager::addMemBufferCopy(StringRef InputData,
   return addNewSourceBuffer(Buffer);
 }
 
+const SourceManager::VirtualFile *
+SourceManager::getVirtualFile(llvm::SMLoc Loc) const {
+  const char *p = Loc.getPointer();
+  // If there is an open VFile, see if p is within the limits of the
+  // buffer that contains the VFile.
+  if (CurrentVFile.hasValue() && p >= CurrentVFile->Begin) {
+    auto Range = getRangeForBuffer(findBufferContainingLoc(SourceLoc(Loc)));
+    auto bufBegin = Range.getStart().Value.getPointer();
+    auto bufEnd = Range.getEnd().Value.getPointer();
+    if (bufBegin <= CurrentVFile->Begin &&
+        bufEnd >= CurrentVFile->Begin &&
+        bufEnd >= p)
+      return &*CurrentVFile;
+  }
+
+  if (CachedVFile.first == p)
+    return CachedVFile.second;
+
+  // Returns the first element that is >p.
+  auto VFileIt = VirtualFiles.upper_bound(p);
+  if (VFileIt != VirtualFiles.end() &&
+      p >= VFileIt->second.Begin &&
+      p <= VFileIt->second.End) {
+    CachedVFile = { p, &VFileIt->second };
+    return CachedVFile.second;
+  }
+  return nullptr;
+}
+
+
 Optional<unsigned> SourceManager::getIDForBufferIdentifier(
     StringRef BufIdentifier) {
   auto It = BufIdentIDMap.find(BufIdentifier);
@@ -93,6 +123,21 @@ StringRef SourceManager::extractText(CharSourceRange Range) const {
                        Range.getByteLength());
 }
 
+unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
+  assert(Loc.isValid());
+  // Search the buffers back-to front, so later alias buffers are
+  // visited first.
+  for (unsigned i = LLVMSourceMgr.getNumBuffers()-1, e = 0; i >= e; --i) {
+    auto Buf = LLVMSourceMgr.getMemoryBuffer(i);
+    if (Loc.Value.getPointer() >= Buf->getBufferStart() &&
+        // Use <= here so that a pointer to the null at the end of the buffer
+        // is included as part of the buffer.
+        Loc.Value.getPointer() <= Buf->getBufferEnd())
+      return i;
+  }
+  llvm_unreachable("no buffer containing location found");
+}
+
 void SourceLoc::printLineAndColumn(raw_ostream &OS,
                                    const SourceManager &SM) const {
   if (isInvalid()) {
@@ -100,7 +145,7 @@ void SourceLoc::printLineAndColumn(raw_ostream &OS,
     return;
   }
 
-  auto LineAndCol = SM.getLineAndColumn(*this);
+  auto LineAndCol = SM.getLineAndColumn(this->Value);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
 }
 

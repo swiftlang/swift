@@ -1469,10 +1469,17 @@ Restart:
       CurPtr += 6;
       return formToken(tok::pound_elseif, TokStart);
     }
+
     if (getSubstring(TokStart + 1, 5).equals("endif") &&
         isWhitespace(CurPtr[5])) {
       CurPtr += 5;
       return formToken(tok::pound_endif, TokStart);
+    }
+
+    if (getSubstring(TokStart + 1, 4).equals("line") &&
+        isWhitespace(CurPtr[4])) {
+      CurPtr += 4;
+      return formToken(tok::pound_line, TokStart);
     }
 
     // Allow a hashbang #! line at the beginning of the file.

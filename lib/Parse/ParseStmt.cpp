@@ -44,6 +44,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::pound_if:
+  case tok::pound_line:
     return true;
       
   case tok::identifier:
@@ -248,7 +249,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (isStartOfDecl() && Tok.isNot(tok::pound_if)) {
+    if (isStartOfDecl()
+        && Tok.isNot(tok::pound_if)
+        && Tok.isNot(tok::pound_line)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -310,6 +313,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           }
         }
       }
+
+    } else if (Tok.is(tok::pound_line)) {
+      ParserStatus Status = parseLineDirective();
+      BraceItemsStatus |= Status;
+      NeedParseErrorRecovery = Status.isError();
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
@@ -474,6 +482,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::pound_if:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtIfConfig();
+  case tok::pound_line:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseLineDirective();
   case tok::kw_while:  return parseStmtWhile(LabelInfo);
   case tok::kw_do:     return parseStmtDoWhile(LabelInfo);
   case tok::kw_for:    return parseStmtFor(LabelInfo);

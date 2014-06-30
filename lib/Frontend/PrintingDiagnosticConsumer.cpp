@@ -19,6 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -98,6 +99,69 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   ColoredStream coloredErrs{llvm::errs()};
   raw_ostream &out = ForceColors ? coloredErrs : llvm::errs();
   const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
-  rawSM.PrintMessage(out, getRawLoc(Loc), SMKind, Text, Ranges, FixIts);
+  auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
+  rawSM.PrintMessage(out, Msg);
+}
+
+llvm::SMDiagnostic
+SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
+                          const Twine &Msg,
+                          ArrayRef<llvm::SMRange> Ranges,
+                          ArrayRef<llvm::SMFixIt> FixIts) const {
+
+  // First thing to do: find the current buffer containing the specified
+  // location to pull out the source line.
+  SmallVector<std::pair<unsigned, unsigned>, 4> ColRanges;
+  std::pair<unsigned, unsigned> LineAndCol;
+  const char *BufferID = "<unknown>";
+  std::string LineStr;
+
+  if (Loc.isValid()) {
+    BufferID = getBufferIdentifierForLoc(Loc);
+    auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
+
+    // Scan backward to find the start of the line.
+    const char *LineStart = Loc.Value.getPointer();
+    const char *BufStart = CurMB->getBufferStart();
+    while (LineStart != BufStart && LineStart[-1] != '\n' &&
+           LineStart[-1] != '\r')
+      --LineStart;
+
+    // Get the end of the line.
+    const char *LineEnd = Loc.Value.getPointer();
+    const char *BufEnd = CurMB->getBufferEnd();
+    while (LineEnd != BufEnd && LineEnd[0] != '\n' && LineEnd[0] != '\r')
+      ++LineEnd;
+    LineStr = std::string(LineStart, LineEnd);
+
+    // Convert any ranges to column ranges that only intersect the line of the
+    // location.
+    for (unsigned i = 0, e = Ranges.size(); i != e; ++i) {
+      llvm::SMRange R = Ranges[i];
+      if (!R.isValid()) continue;
+
+      // If the line doesn't contain any part of the range, then ignore it.
+      if (R.Start.getPointer() > LineEnd || R.End.getPointer() < LineStart)
+        continue;
+
+      // Ignore pieces of the range that go onto other lines.
+      if (R.Start.getPointer() < LineStart)
+        R.Start = llvm::SMLoc::getFromPointer(LineStart);
+      if (R.End.getPointer() > LineEnd)
+        R.End = llvm::SMLoc::getFromPointer(LineEnd);
+
+      // Translate from SMLoc ranges to column ranges.
+      // FIXME: Handle multibyte characters.
+      ColRanges.push_back(std::make_pair(R.Start.getPointer()-LineStart,
+                                         R.End.getPointer()-LineStart));
+    }
+
+    LineAndCol = getLineAndColumn(Loc);
+  }
+
+  return llvm::SMDiagnostic(LLVMSourceMgr, Loc.Value, BufferID,
+                            LineAndCol.first,
+                            LineAndCol.second-1, Kind, Msg.str(),
+                            LineStr, ColRanges, FixIts);
 }
 

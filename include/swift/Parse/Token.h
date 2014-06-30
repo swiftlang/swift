@@ -41,6 +41,7 @@ enum class tok {
   pound_else,
   pound_elseif,
   pound_endif,
+  pound_line,
   comment,
   
 #define KEYWORD(X) kw_ ## X,

@@ -72,7 +72,6 @@ class Parser {
 
 public:
   SourceManager &SourceMgr;
-  const unsigned BufferID;
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
@@ -630,6 +629,8 @@ public:
                                             DeclAttributes &Attributes);
   
   ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
+  /// Parse a #line directive.
+  ParserStatus parseLineDirective();
 
   void setLocalDiscriminator(ValueDecl *D);
 

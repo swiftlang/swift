@@ -238,9 +238,8 @@ Location getDeserializedLoc(Decl* D)  {
 
 Location getLoc(SourceManager &SM, SourceLoc Loc) {
   Location L = {};
-  unsigned BufferID = SM.findBufferContainingLoc(Loc);
-  L.Filename = SM.getIdentifierForBuffer(BufferID);
-  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc, BufferID);
+  L.Filename = SM.getBufferIdentifierForLoc(Loc);
+  std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc);
   return L;
 }
 
@@ -380,9 +379,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
     return;
 
   FullLocation L = getLocation(SM, Loc);
-  if (DS && L.LocForLinetable.Filename &&
-      L.LocForLinetable.Filename !=
-          getLocation(SM, DS->Loc).LocForLinetable.Filename) {
+  auto File = getOrCreateFile(L.LocForLinetable.Filename);
+  if (Scope.isScope() &&
+      File.getFilename() != llvm::DIScope(Scope).getFilename()) {
     // We changed files in the middle of a scope. This happens, for
     // example, when constructors are inlined. Create a new scope to
     // reflect this.
