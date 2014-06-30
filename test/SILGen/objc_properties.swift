@@ -3,23 +3,6 @@
 
 import Foundation
 
-class ClassWithOutlets {
-  // CHECK: sil {{.*}}ClassWithOutlets{{.*}}String1{{.*}} : $@cc(objc_method) @thin (ClassWithOutlets) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>
-
-  // CHECK-LABEL: sil @_TFC15objc_properties16ClassWithOutletscfMS0_FT_S0_ : $@cc(method) @thin (@owned ClassWithOutlets) -> @owned ClassWithOutlets
-  // CHECK: string_literal utf16 "Hello"
-  // CHECK-NOT: return
-  // CHECK: string_literal utf16 "World"
-  // CHECK-NOT: return
-  // CHECK: ref_element_addr [[SELF:%[0-9]+]] : $ClassWithOutlets, #ClassWithOutlets.String3
-  @IBOutlet var String1 = "Hello"
-  @IBOutlet weak var String2: String! = "World"
-  @IBOutlet var String3: String
-
-
-  @IBOutlet weak var String4: String = "World"
-}
-
 
 class A {
   @objc var prop: Int
