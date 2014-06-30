@@ -458,8 +458,8 @@ public:
                           bool hasFalseCode = true, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {});
 
-  SILBasicBlock *createBasicBlock() {
-    return new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr) {
+    return new (F.getModule()) SILBasicBlock(&F, afterBB);
   }
   
   
