@@ -309,7 +309,7 @@ func test_isa_2(p: P) {
   // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1                 {{.*}} line:[[@LINE-11]]:8
   // CHECK: load                                                     {{.*}} line:[[@LINE-12]]:8
   //
-  // CHECK: checked_cast_br                                          {{.*}} line:[[@LINE-14]]:9
+  // CHECK: checked_cast_addr_br                                     {{.*}} line:[[@LINE-14]]:9
   // CHECK: load                                                     {{.*}} line:[[@LINE-15]]:9
     
 }
@@ -334,7 +334,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   // CHECK: bb0
   // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-10]]:3
   // CHECK: [[FALSE_BB]]:
-  // CHECK-NEXT: br {{.*}}                                           {{.*}} line:[[@LINE-8]]:19:cleanup
+  // CHECK: br {{.*}}                                        {{.*}} line:[[@LINE-9]]:3
 
 }
 

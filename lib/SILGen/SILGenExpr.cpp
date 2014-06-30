@@ -1595,6 +1595,7 @@ namespace {
       SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
       // Emit the branch.
+      SILValue scalarOperandValue;
       SILValue resultBuffer;
       if (Strategy == CastStrategy::Address) {
         assert(operand.getType().isAddress());
@@ -1605,9 +1606,13 @@ namespace {
                                           resultBuffer, TargetType,
                                           trueBB, falseBB);
       } else {
-        assert(!operand.getType().isAddress());
-        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false,
-                                      operand.forward(SGF),
+        // Tolerate being passed an address here.  It comes up during switch
+        //emission.
+        scalarOperandValue = operand.forward(SGF);
+        if (scalarOperandValue.getType().isAddress()) {
+          scalarOperandValue = SGF.B.createLoad(Loc, scalarOperandValue);
+        }
+        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
                                       origTargetTL.getLoweredType(),
                                       trueBB, falseBB);
       }
@@ -1628,6 +1633,7 @@ namespace {
         }
 
         handleTrue(result);
+        assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
 
       // Emit the failure block.
@@ -1637,10 +1643,11 @@ namespace {
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
             shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitReleaseValueOperation(Loc, operand.getValue());
+          SGF.B.emitReleaseValueOperation(Loc, scalarOperandValue);
         }
 
         handleFalse();
+        assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
     }
 
@@ -1742,38 +1749,33 @@ static RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
   return emitter.emitUnconditionalCast(operandValue, C);
 }
 
-SILValue
-SILGenFunction::emitCheckedCastAbstractionChange(SILLocation loc,
-                                       SILValue original,
-                                       const TypeLowering &origTL,
-                                       ArrayRef<const TypeLowering *> castTLs) {
-  // If we're casting a thin metatype, make it thick.
-  if (auto metatype = original.getType().getAs<MetatypeType>()) {
-    if (metatype->getRepresentation() == MetatypeRepresentation::Thin) {
-      auto thickTy = CanMetatypeType::get(metatype.getInstanceType(),
-                                          MetatypeRepresentation::Thick);
-      return B.createMetatype(loc, SILType::getPrimitiveObjectType(thickTy));
-    }
-    return original;
+/// Treating this as a successful operation, turn a CMV into a +1 MV.
+ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
+                                             ConsumableManagedValue value) {
+  // If the consumption rules say that this is already +1 given a
+  // successful operation, just use the value.
+  if (value.isOwned())
+    return value.getFinalManagedValue();
+
+  SILType valueTy = value.getType();
+  auto &valueTL = getTypeLowering(valueTy);
+
+  // If the type is trivial, it's always +1.
+  if (valueTL.isTrivial())
+    return ManagedValue::forUnmanaged(value.getValue());
+
+  // If it's an object, retain and enter a release cleanup.
+  if (valueTy.isObject()) {
+    valueTL.emitRetainValue(B, loc, value.getValue());
+    return emitManagedRValueWithCleanup(value.getValue(), valueTL);
   }
-  
-  // If the original type is already address-only, we don't need to abstract
-  // further.
-  if (origTL.isAddressOnly()) {
-    return SILValue();
-  }
-  
-  // If any of the cast-to types are address-only, spill to a temporary.
-  if (std::find_if(castTLs.begin(), castTLs.end(),
-                   [](const TypeLowering *tl){ return tl->isAddressOnly(); })
-        != castTLs.end()) {
-    SILValue temp = emitTemporaryAllocation(loc, origTL.getLoweredType());
-    B.createStore(loc, original, temp);
-    return temp;
-  }
-  
-  // Otherwise, no abstraction change is needed.
-  return SILValue();
+
+  // Otherwise, produce a temporary and copy into that.
+  auto temporary = emitTemporary(loc, valueTL);
+  valueTL.emitCopyInto(B, loc, value.getValue(), temporary->getAddress(),
+                       IsNotTake, IsInitialization);
+  temporary->finishInitialization(*this);
+  return temporary->getManagedAddress();
 }
 
 void SILGenFunction::emitCheckedCastBranch(SILLocation loc, Expr *source,
@@ -1785,6 +1787,18 @@ void SILGenFunction::emitCheckedCastBranch(SILLocation loc, Expr *source,
   ManagedValue operand = emitter.emitOperand(source);
   emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
                           handleTrue, handleFalse);
+}
+
+void SILGenFunction::emitCheckedCastBranch(SILLocation loc,
+                                           ConsumableManagedValue src,
+                                           CanType sourceType,
+                                           CanType targetType,
+                                           SGFContext ctx,
+                                std::function<void(ManagedValue)> handleTrue,
+                                           std::function<void()> handleFalse) {
+  CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
+  emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
+                          ctx, handleTrue, handleFalse);
 }
 
 std::pair<SILBasicBlock*, SILBasicBlock*>

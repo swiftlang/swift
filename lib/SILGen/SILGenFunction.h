@@ -743,6 +743,10 @@ public:
   
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
+  /// Turn a consumable managed value into a +1 managed value.
+  ManagedValue getManagedValue(SILLocation loc,
+                               ConsumableManagedValue value);
+
   /// Convert a value with the abstraction patterns of the original type
   /// to a value with the abstraction patterns of the substituted type.
   ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
@@ -828,22 +832,6 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
-  /// \brief Emits the abstraction change needed, if any, to perform casts from
-  /// the type represented by \c origTL to each of the types represented by
-  /// \c castTLs.
-  ///
-  /// \param loc      The AST location associated with the operation.
-  /// \param original The value to cast.
-  /// \param origTL   The original type.
-  /// \param castTLs  The types to which to cast.
-  ///
-  /// \returns The value shifted to the highest abstraction level necessary
-  /// for the casts, or a null SILValue if no abstraction changes are needed.
-  SILValue emitCheckedCastAbstractionChange(SILLocation loc,
-                                       SILValue original,
-                                       const TypeLowering &origTL,
-                                       ArrayRef<const TypeLowering *> castTLs);
-  
   /// \brief Emit a conditional checked cast branch. Does not re-abstract the
   /// argument to the success branch. Terminates the current BB.
   ///
@@ -866,6 +854,12 @@ public:
                         const TypeLowering &origTL,
                         const TypeLowering &castTL,
                         CheckedCastKind kind);
+
+  void emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
+                             CanType sourceType, CanType targetType,
+                             SGFContext C,
+                             std::function<void(ManagedValue)> handleTrue,
+                             std::function<void()> handleFalse);
 
   void emitCheckedCastBranch(SILLocation loc, Expr *src,
                              Type targetType, SGFContext C,

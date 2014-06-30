@@ -19,9 +19,8 @@ func classifyPoint2(p: (Double, Double)) {
           println("on the X axis")
         case (var x, var y) where
           // CHECK:   call double {{.*}}return_same{{.*}}, !dbg ![[LOC1:.*]]
-          // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC2:.*]]
-          // CHECK-NOT: br
-          // CHECK: br label {{.*}}, !dbg ![[LOC2]]
+          // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC1]]
+          // CHECK: convertFromBuiltinUTF16StringLiteral{{.*}}, !dbg ![[LOC2:.*]]
           // CHECK: ![[LOC1]] = metadata !{i32 [[@LINE+1]], i32
                             return_same(x) == return_same(y):
           // CHECK: ![[LOC2]] = metadata !{i32 [[@LINE+1]], i32
@@ -32,7 +31,7 @@ func classifyPoint2(p: (Double, Double)) {
           println("near the origin")
         case (var x, var y):
           println("sqrt(\(x*x + y*y)) units from the origin")
-          // CHECK: metadata !{i32 [[@LINE+1]], i32
+          // CHECK-FIXME: metadata !{i32 [[@LINE+1]], i32
         }
   // CHECK: metadata !{i32 [[@LINE+1]], i32
     }
