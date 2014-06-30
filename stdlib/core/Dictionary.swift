@@ -414,7 +414,8 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
   /// This function does *not* update `count`.
   mutating func unsafeAddNew(#key: KeyType, value: ValueType) {
     var (i, found) = _find(key, _bucket(key))
-    _sanityCheck(!found, "unsafeAddNew was called, but the key is already present")
+    _sanityCheck(
+      !found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: key, value: value)
   }
 
@@ -453,7 +454,8 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
 
   @public func assertingGet(i: Index) -> (KeyType, ValueType) {
     let e = self[i.offset]
-    _precondition(e, "attempting to access Dictionary elements using an invalid Index")
+    _precondition(
+      e, "attempting to access Dictionary elements using an invalid Index")
     return e!
   }
 
@@ -624,8 +626,11 @@ class _NativeDictionaryStorageOwnerBase
   //
 
   @objc
-  init(objects: ConstUnsafePointer<AnyObject?>, forKeys: ConstUnsafePointer<Void>,
-       count: Int) {
+  init(
+    objects: ConstUnsafePointer<AnyObject?>,
+    forKeys: ConstUnsafePointer<Void>,
+    count: Int
+  ) {
     _fatalError("don't call this designated initializer")
   }
 
@@ -933,7 +938,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  mutating func migrateDataToNativeStorage(cocoaStorage: _CocoaDictionaryStorage) {
+  mutating func migrateDataToNativeStorage(
+    cocoaStorage: _CocoaDictionaryStorage
+  ) {
     var minCapacity = NativeStorage.getMinCapacity(
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
     var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
@@ -1046,7 +1053,10 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     return oldValue
   }
 
-  mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
+  mutating func updateValue(
+    value: ValueType, forKey key: KeyType
+  ) -> ValueType? {
+    
     if _fastPath(guaranteedNative) {
       return nativeUpdateValue(value, forKey: key)
     }
@@ -1349,7 +1359,8 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
   }
 
   func successor() -> Index {
-    _precondition(nextKeyIndex < allKeys.count, "can not advance endIndex forward")
+    _precondition(
+      nextKeyIndex < allKeys.count, "can not advance endIndex forward")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex + 1)
   }
 }
@@ -1363,7 +1374,8 @@ func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
   return lhs.nextKeyIndex == rhs.nextKeyIndex
 }
 
-@public enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
+@public
+enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -1601,8 +1613,10 @@ class _CocoaDictionaryGenerator : Generator {
 }
 
 @public
-struct Dictionary<KeyType : Hashable, ValueType> : Collection,
-                                                   DictionaryLiteralConvertible {
+struct Dictionary<
+  KeyType : Hashable, ValueType
+> : Collection, DictionaryLiteralConvertible {
+  
   typealias _Self = Dictionary<KeyType, ValueType>
   typealias _VariantStorage = _VariantDictionaryStorage<KeyType, ValueType>
   typealias _NativeStorage = _NativeDictionaryStorage<KeyType, ValueType>
@@ -1684,7 +1698,10 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
   /// was added.
-  @public mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
+  @public
+  mutating func updateValue(
+    value: ValueType, forKey key: KeyType
+  ) -> ValueType? {
     return _variantStorage.updateValue(value, forKey: key)
   }
 
@@ -1893,15 +1910,21 @@ struct _DictionaryMirrorPosition<Key : Hashable,Value> {
   }
 }
 
-func ==<K : Hashable,V> (lhs : _DictionaryMirrorPosition<K,V>, rhs : Int) -> Bool {
+func ==<K : Hashable,V> (
+  lhs : _DictionaryMirrorPosition<K,V>, rhs : Int
+) -> Bool {
   return lhs._intPos == rhs
 }
 
-func > <K : Hashable,V> (lhs : _DictionaryMirrorPosition<K,V>, rhs : Int) -> Bool {
+func > <K : Hashable,V> (
+  lhs : _DictionaryMirrorPosition<K,V>, rhs : Int
+) -> Bool {
   return lhs._intPos > rhs
 }
 
-func < <K : Hashable,V> (lhs : _DictionaryMirrorPosition<K,V>, rhs : Int) -> Bool {
+func < <K : Hashable,V> (
+  lhs : _DictionaryMirrorPosition<K,V>, rhs : Int
+) -> Bool {
   return lhs._intPos < rhs
 }
 
@@ -2015,8 +2038,10 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   // NSDictionary subclass.
 
   // The designated initializer of `NSDictionary`.
-  init(objects: ConstUnsafePointer<AnyObject?>, forKeys: ConstUnsafePointer<Void>,
-       count: Int)
+  init(
+    objects: ConstUnsafePointer<AnyObject?>,
+    forKeys: ConstUnsafePointer<Void>, count: Int)
+  
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?
   func keyEnumerator() -> _SwiftNSEnumerator?
