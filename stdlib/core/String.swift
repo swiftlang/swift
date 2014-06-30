@@ -342,7 +342,7 @@ extension String : Collection {
 extension String : Sliceable {
   @public subscript(subRange: Range<Index>) -> String {
     return String(
-      unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._base)
+      unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
   }
 }
 

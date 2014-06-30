@@ -19,63 +19,63 @@
 
 extension String {
   @public struct UnicodeScalarView : Sliceable, Sequence {
-    init(_ _base: _StringCore) {
-      self._base = _base
+    init(_ _core: _StringCore) {
+      self._core = _core
     }
 
     struct _ScratchGenerator : Generator {
-      var base: _StringCore
+      var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {
-        idx = pos
-        base = core
+        self.idx = pos
+        self.core = core
       }
       mutating func next() -> UTF16.CodeUnit? {
-        if idx == base.endIndex {
+        if idx == core.endIndex {
           return .None
         }
-        return self.base[idx++]
+        return self.core[idx++]
       }
     }
 
     @public struct IndexType : BidirectionalIndex {
-      init(_ _position: Int, _ _base: _StringCore) {
+      init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
-        self._base = _base
+        self._core = _core
       }
 
       @public func successor() -> IndexType {
-        var scratch = _ScratchGenerator(_base, _position)
+        var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()
         let (result, length) = decoder._decodeOne(&scratch)
-        return IndexType(_position + length, _base)
+        return IndexType(_position + length, _core)
       }
 
       @public func predecessor() -> IndexType {
         var i = _position
-        let codeUnit = _base[--i]
+        let codeUnit = _core[--i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
-          if i != 0 && (_base[i - 1] >> 10) == 0b1101_10 {
+          if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
             --i
           }
         }
-        return IndexType(i, _base)
+        return IndexType(i, _core)
       }
-      
+
       var _position: Int
-      var _base: _StringCore
+      var _core: _StringCore
     }
 
     @public var startIndex: IndexType {
-      return IndexType(_base.startIndex, _base)
+      return IndexType(_core.startIndex, _core)
     }
-    
+
     @public var endIndex: IndexType {
-      return IndexType(_base.endIndex, _base)
+      return IndexType(_core.endIndex, _core)
     }
-    
+
     @public subscript(i: IndexType) -> UnicodeScalar {
-      var scratch = _ScratchGenerator(_base, i._position)
+      var scratch = _ScratchGenerator(_core, i._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
       case .Result(let us):
@@ -89,7 +89,7 @@ extension String {
 
     @public subscript(r: Range<IndexType>) -> UnicodeScalarView {
       return UnicodeScalarView(
-        _base[r.startIndex._position..<r.endIndex._position])
+        _core[r.startIndex._position..<r.endIndex._position])
     }
 
     @public struct GeneratorType : Generator {
@@ -110,31 +110,31 @@ extension String {
       var _decoder: UTF16 = UTF16()
       var _base: _StringCore.GeneratorType
     }
-    
+
     @public func generate() -> GeneratorType {
-      return GeneratorType(_base.generate())
+      return GeneratorType(_core.generate())
     }
 
     @conversion @public
     func __conversion() -> String {
-      return String(_base)
+      return String(_core)
     }
 
     @public func compare(other : UnicodeScalarView) -> Int {
       // Try to compare the string without decoding
       // the UTF16 string.
-      var aIdx = self._base.startIndex
-      var bIdx = other._base.startIndex
-      var aEnd = self._base.endIndex
-      var bEnd = other._base.endIndex
+      var aIdx = self._core.startIndex
+      var bIdx = other._core.startIndex
+      var aEnd = self._core.endIndex
+      var bEnd = other._core.endIndex
 
       // If this is not a contiguous UTF-16 then use the slow path.
       // TODO: when we fix rdar://16740011 we'll need to optimize the ascii
       // path.
-      if ((self._base.elementShift != 1) |
-         (other._base.elementShift != 1) |
-         (!self._base.hasContiguousStorage) |
-         (!other._base.hasContiguousStorage)) {
+      if ((self._core.elementShift != 1) |
+         (other._core.elementShift != 1) |
+         (!self._core.hasContiguousStorage) |
+         (!other._core.hasContiguousStorage)) {
         // This is a cold path and inlining _compareUnicode may
         // prevent the inlining of the compare function.
         return _compareUnicode(other)
@@ -143,8 +143,8 @@ extension String {
       while true {
         if aIdx < aEnd {
           if bIdx < bEnd {
-            let e1 = self._base._nthContiguous(aIdx)
-            let e2 = other._base._nthContiguous(bIdx)
+            let e1 = self._core._nthContiguous(aIdx)
+            let e2 = other._core._nthContiguous(bIdx)
 
             // The range 0xD800 .. 0xDFFF is reserved for lead and trail
             // surrogates. In this code we are only comparing against the
@@ -202,7 +202,7 @@ extension String {
       }
     }
 
-    var _base: _StringCore
+    var _core: _StringCore
   }
 }
 

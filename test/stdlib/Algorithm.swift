@@ -8,8 +8,8 @@ extension CodePoints {
   }
 }
 
-func print(x: CodePoints) { print(String(x._base)) }
-func println(x: CodePoints) { println(String(x._base)) }
+func print(x: CodePoints) { print(String(x._core)) }
+func println(x: CodePoints) { println(String(x._core)) }
 
 func println(x: [CodePoints]) {
   print("[ ")
