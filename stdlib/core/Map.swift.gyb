@@ -1,3 +1,4 @@
+%# -*- mode: swift -*-
 //===--- Map.swift - Lazily map the elements of a Sequence ---------------===//
 //
 // This source file is part of the Swift.org open source project

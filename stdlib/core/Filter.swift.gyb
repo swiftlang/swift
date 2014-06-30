@@ -1,3 +1,4 @@
+%# -*- mode: swift -*-
 //===--- Filter.swift - Lazily filter the elements of a Sequence ----------===//
 //
 // This source file is part of the Swift.org open source project
