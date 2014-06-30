@@ -1,8 +1,4 @@
-%# -*- mode: swift -*-
-
-%# Ignore the following admonition; it applies to the resulting .swift file only
-//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly!
-//===----------------------------------------------------------------------===//
+//===--- FixedPoint.swift.gyb ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

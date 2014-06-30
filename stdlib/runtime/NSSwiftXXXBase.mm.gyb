@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- NSSwiftXXXBase.mm.gyb - Cocoa bases for Swift container buffers --===//
+//===--- NSSwiftXXXBase.mm.gyb - Cocoa container buffer bases -*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -93,3 +92,6 @@ extern "C" bool swift_stdlib_NSDictionary_isEqual(NSDictionary *lhs,
   return [lhs isEqual:rhs];
 }
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

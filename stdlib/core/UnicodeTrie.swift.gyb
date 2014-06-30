@@ -1,8 +1,4 @@
-%# -*- mode: swift -*-
-
-%# Ignore the following admonition; it applies to the resulting .swift file only
-//// Automatically Generated From UnicodeTrie.gyb.swift.  Do Not Edit Directly!
-//===----------------------------------------------------------------------===//
+//===--- UnicodeTrie.swift.gyb --------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -246,3 +242,6 @@ struct _GraphemeClusterBreakPropertyRawValue {
   }
 }
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

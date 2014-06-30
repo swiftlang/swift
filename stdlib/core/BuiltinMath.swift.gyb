@@ -1,8 +1,4 @@
-%# -*- mode: swift -*-
-
-%# Ignore the following admonition; it applies to the resulting .swift file only
-//// Automatically Generated From BuiltinMath.swift.gyb.  Do Not Edit Directly
-//===----------------------------------------------------------------------===//
+//===--- BuiltinMath.swift.gyb --------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -73,3 +69,6 @@ func _${ufunc}(x: ${T}) -> ${T} {
 
 % end
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

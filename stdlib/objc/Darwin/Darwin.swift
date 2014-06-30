@@ -155,3 +155,7 @@ func _swift_Darwin_openat(fd: CInt, path: CString,
   return -1
 }
 
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

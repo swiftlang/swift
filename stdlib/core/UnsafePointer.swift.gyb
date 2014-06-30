@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===----------------------------------------------------------------------===//
+//===--- UnsafePointer.swift.gyb ------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -325,3 +324,7 @@ extension ${Self} : Printable {
 @public struct RawByte {
   let _inaccessible: UInt8
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

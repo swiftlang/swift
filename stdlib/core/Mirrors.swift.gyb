@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- Mirrors.swift.gyb - Mirror implementations for common types ------===//
+//===--- Mirrors.swift.gyb - Common Mirror implementations -----*- swift -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -31,3 +30,7 @@ extension ${Type[0]} : Reflectable {
   }
 }
 
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

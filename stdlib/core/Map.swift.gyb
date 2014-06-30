@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- Map.swift - Lazily map the elements of a Sequence ---------------===//
+//===--- Map.swift - Lazily map the elements of a Sequence ----*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -112,3 +111,7 @@ extension ${Self} {
 }
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

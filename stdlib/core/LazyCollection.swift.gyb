@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- LazyCollection.swift ---------------------------------------------===//
+//===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -59,3 +58,7 @@ func lazy<S: Collection ${whereClause}>(s: S) -> ${Self}<S> {
 }
 
 %end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

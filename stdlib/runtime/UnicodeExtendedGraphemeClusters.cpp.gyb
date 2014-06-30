@@ -1,9 +1,4 @@
-%# -*- mode: swift -*-
-
-%# Ignore the following admonition; it applies to the resulting .cpp file only
-//// Automatically Generated From UnicodeExtendedGraphemeClusters.cpp.gyb.
-//// Do Not Edit Directly!
-//===----------------------------------------------------------------------===//
+//===- UnicodeExtendedGraphemeClusters.cpp.gyb ------------------*- c++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -131,3 +126,6 @@ const uint16_t _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl[] 
 const uint16_t *_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix =
     _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl;
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

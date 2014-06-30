@@ -1,8 +1,4 @@
-%# -*- mode: swift -*-
-
-%# Ignore the following admonition; it applies to the resulting .swift file only
-//// Automatically Generated From tgmath.swift.gyb.  Do Not Edit Directly
-//===----------------------------------------------------------------------===//
+//===--- tgmath.swift.gyb -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -306,3 +302,6 @@ func yn(n: Int, x: Double) -> Double {
 
 % end
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

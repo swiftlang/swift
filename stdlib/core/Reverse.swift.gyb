@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- Reverse.swift - Lazy sequence reversal ---------------------------===//
+//===--- Reverse.swift.gyb - Lazy sequence reversal -----------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -90,3 +89,7 @@ extension ${Self} {
 }
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

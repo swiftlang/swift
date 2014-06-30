@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- Filter.swift - Lazily filter the elements of a Sequence ----------===//
+//===--- Filter.swift.gyb -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -158,3 +157,7 @@ extension ${Self} {
   return FilterCollectionView(_base: source, _include: includeElement)
 }
 */
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

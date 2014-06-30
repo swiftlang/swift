@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===--- IntegerArithmetic.swift.gyb --------------------------------------===//
+//===--- IntegerArithmetic.swift.gyb -------------------------*- swift -*--===//
 //
 // This source file is part of the Swift.org open source project
 //

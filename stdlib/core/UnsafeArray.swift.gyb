@@ -1,5 +1,4 @@
-%# -*- mode: swift -*-
-//===----------------------------------------------------------------------===//
+//===--- UnsafeArray.swift.gyb --------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -69,3 +68,7 @@
   var _position, _end: UnsafePointer<T>
 }
 %end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
