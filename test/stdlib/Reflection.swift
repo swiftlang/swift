@@ -402,6 +402,10 @@ println(reflect(justSomeFunction).summary)
 // CHECK-NEXT: (Metatype)
 println(reflect(String.self).summary)
 
+// CHECK-NEXT: CollectionOfOne(Howdy Swift!)
+// CHECK-NEXT:  - element: Howdy Swift!
+dump(CollectionOfOne("Howdy Swift!"))
+
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
 println("ObjC:")
