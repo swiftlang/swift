@@ -50,3 +50,16 @@ func _convertConstArrayToPointerArgument<
   let (owner: AnyObject?, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
 }
+
+/// Derive a UTF8 pointer argument from a value string parameter.
+@transparent
+func _convertConstStringToUTF8PointerArgument<
+  ToPointer: _Pointer
+>(str: String) -> (AnyObject?, ToPointer) {
+  // Convert the UTF8 representation to a null-terminated array.
+  var utf8 = Array(str.utf8)
+  utf8.append(0)
+  // Extract the owner and pointer from the array.
+  let (owner: AnyObject?, raw) = utf8._cPointerArgs()
+  return (owner, ToPointer(raw))
+}
