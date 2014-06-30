@@ -104,6 +104,8 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void setCleanupState(Cleanup &cleanup, CleanupState state);
   
   void endScope(CleanupsDepth depth, CleanupLocation l);
+
+  friend class CleanupStateRestorationScope;
   
 public:
   CleanupManager(SILGenFunction &Gen)
@@ -168,6 +170,31 @@ public:
   /// True if there are any active cleanups in the scope between the two
   /// cleanup handles.
   bool hasAnyActiveCleanups(CleanupsDepth from, CleanupsDepth to);
+};
+
+/// An RAII object that allows the state of a cleanup to be
+/// temporarily modified.
+class CleanupStateRestorationScope {
+  CleanupManager &Cleanups;
+  SmallVector<std::pair<CleanupHandle, CleanupState>, 4> SavedStates;
+
+  CleanupStateRestorationScope(const CleanupStateRestorationScope &) = delete;
+  CleanupStateRestorationScope &
+    operator=(const CleanupStateRestorationScope &) = delete;
+public:
+  CleanupStateRestorationScope(CleanupManager &cleanups) : Cleanups(cleanups) {}
+
+  /// Set the state of the given cleanup and remember what we set it to.
+  void pushCleanupState(CleanupHandle handle, CleanupState newState);
+
+  /// Just remember whatever the current state of the given cleanup is.
+  void pushCurrentCleanupState(CleanupHandle handle);
+
+  void pop();
+
+  ~CleanupStateRestorationScope() {
+    pop();
+  }
 };
 
 } // end namespace Lowering

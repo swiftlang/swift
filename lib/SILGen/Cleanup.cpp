@@ -152,3 +152,47 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   // cleanup emissions between various branches, doesn't require any
   // code to be emitted at transition points.
 }
+
+void CleanupStateRestorationScope::pushCleanupState(CleanupHandle handle,
+                                                    CleanupState newState) {
+  // Don't put the cleanup in a state we can't restore it from.
+  assert(newState != CleanupState::Dead && "cannot restore cleanup from death");
+
+  auto iter = Cleanups.Stack.find(handle);
+  assert(iter != Cleanups.Stack.end() && "can't change end of cleanups stack");
+  Cleanup &cleanup = *iter;
+  assert(cleanup.getState() != CleanupState::Dead &&
+         "changing state of dead cleanup");
+
+  CleanupState oldState = cleanup.getState();
+  cleanup.setState(newState);
+
+  SavedStates.push_back({handle, oldState});
+}
+
+void
+CleanupStateRestorationScope::pushCurrentCleanupState(CleanupHandle handle) {
+  auto iter = Cleanups.Stack.find(handle);
+  assert(iter != Cleanups.Stack.end() && "can't change end of cleanups stack");
+  Cleanup &cleanup = *iter;
+  assert(cleanup.getState() != CleanupState::Dead &&
+         "changing state of dead cleanup");
+
+  CleanupState oldState = cleanup.getState();
+  SavedStates.push_back({handle, oldState});
+}
+
+void CleanupStateRestorationScope::pop() {
+  // Restore cleanup states in the opposite order in which we saved them.
+  for (auto i = SavedStates.rbegin(), e = SavedStates.rend(); i != e; ++i) {
+    CleanupHandle handle = i->first;
+    CleanupState stateToRestore = i->second;
+
+    auto iter = Cleanups.Stack.find(handle);
+    assert(iter != Cleanups.Stack.end() && "can't change end of cleanups stack");
+    Cleanup &cleanup = *iter;
+    assert(cleanup.getState() != CleanupState::Dead &&
+           "changing state of dead cleanup");
+    cleanup.setState(stateToRestore);
+  }
+}
