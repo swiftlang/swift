@@ -190,12 +190,14 @@ namespace {
     ImportResult VisitPointerType(const clang::PointerType *type) {      
       auto pointeeQualType = type->getPointeeType();
 
-      // "const char *" maps to Swift's CString.
-      // FIXME: Map to a bridged type in parameter context?
-      clang::ASTContext &clangContext = Impl.getClangASTContext();
-      if (clangContext.hasSameType(pointeeQualType,
-                                   clangContext.CharTy.withConst())) {
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
+      if (!Impl.SwiftContext.LangOpts.EnableStringPointerConversion) {
+        // "const char *" maps to Swift's CString.
+        // FIXME: Map to a bridged type in parameter context?
+        clang::ASTContext &clangContext = Impl.getClangASTContext();
+        if (clangContext.hasSameType(pointeeQualType,
+                                     clangContext.CharTy.withConst())) {
+          return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
+        }
       }
       
       // Special case for NSZone*, which has its own Swift wrapper.
