@@ -1294,6 +1294,20 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   return ConstraintSystem::SolutionKind::Solved;
 }
 
+static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
+                                              DeclContext *DC,
+                                              Type baseType) {
+  // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
+  if (baseType->isEqual(TC.getInt8Type(DC)))
+    return true;
+  if (baseType->isEqual(TC.getUInt8Type(DC)))
+    return true;
+  if (baseType->isEqual(TC.Context.TheEmptyTupleType))
+    return true;
+  
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1766,35 +1780,48 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
             // We can potentially convert from an UnsafePointer of a different
             // type, if we're a void pointer.
-            if (bgt1 && bgt1->getDecl() == getASTContext().getUnsafePointerDecl()) {
+            if (bgt1 && bgt1->getDecl()
+                  == getASTContext().getUnsafePointerDecl()) {
               // Favor an UnsafePointer-to-UnsafePointer conversion.
               if (bgt1->getDecl() != bgt2->getDecl())
                 increaseScore(ScoreKind::SK_ScalarPointerConversion);
               conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::PointerToPointer);
+                                   ConversionRestrictionKind::PointerToPointer);
             }
             
-            // ConstUnsafePointer can also be converted from an array value, or
-            // a ConstUnsafePointer or AutoreleasingUnsafePointer.
-            if (bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()) {
+            // ConstUnsafePointer can also be converted from an array or string
+            // value, or a ConstUnsafePointer or AutoreleasingUnsafePointer.
+            if (bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()){
               if (isArrayType(type1)) {
                 conversionsOrFixes.push_back(
-                                       ConversionRestrictionKind::ArrayToPointer);
+                                     ConversionRestrictionKind::ArrayToPointer);
               }
+              
+              // The pointer can be converted from a string, if the element type
+              // is compatible.
+              if (type1->isEqual(TC.getStringType(DC))) {
+                TypeVariableType *tv = nullptr;
+                auto baseTy = getFixedTypeRecursive(bgt2->getGenericArgs()[0],
+                                                    tv, false, false);
+                
+                if (tv || isStringCompatiblePointerBaseType(TC, DC, baseTy))
+                  conversionsOrFixes.push_back(
+                                    ConversionRestrictionKind::StringToPointer);
+              }
+              
               if (bgt1 && bgt1->getDecl()
-                                 == getASTContext().getConstUnsafePointerDecl()) {
+                               == getASTContext().getConstUnsafePointerDecl()) {
                 conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::PointerToPointer);
+                                   ConversionRestrictionKind::PointerToPointer);
               }
               if (bgt1
                   && bgt1->getDecl()
-                         == getASTContext().getAutoreleasingUnsafePointerDecl()) {
+                       == getASTContext().getAutoreleasingUnsafePointerDecl()) {
                 conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::PointerToPointer);
+                                   ConversionRestrictionKind::PointerToPointer);
               }
             }
           }
-          // TODO: Strings
         } else if (bgt2->getDecl()
                        == getASTContext().getAutoreleasingUnsafePointerDecl()) {
           // AutoUnsafePointer can be converted from an inout reference to a
@@ -3169,7 +3196,8 @@ static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
   auto bgt = type->castTo<BoundGenericType>();
   assert((bgt->getDecl() == cs.getASTContext().getUnsafePointerDecl()
           || bgt->getDecl() == cs.getASTContext().getConstUnsafePointerDecl()
-          || bgt->getDecl() == cs.getASTContext().getAutoreleasingUnsafePointerDecl())
+          || bgt->getDecl()
+                      == cs.getASTContext().getAutoreleasingUnsafePointerDecl())
          && "conversion is not to a pointer type");
   return bgt->getGenericArgs()[0];
 }
@@ -3323,6 +3351,57 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchTypes(baseType1, baseType2,
                       TypeMatchKind::BindToPointerType,
                       subFlags, locator);
+  }
+      
+  // String ===> ConstUnsafePointer<[U]Int8>
+  case ConversionRestrictionKind::StringToPointer: {
+    addContextualScore();
+
+    auto baseType2 = getBaseTypeForPointer(*this, type2->getDesugaredType());
+    
+    // The pointer element type must be void or a byte-sized type.
+    // TODO: Handle different encodings based on pointer element type, such as
+    // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
+    // Int8 pointers using UTF8 encoding.
+    TypeVariableType *btv2 = nullptr;
+    baseType2 = getFixedTypeRecursive(baseType2, btv2, false, false);
+    baseType2->dump();
+    // If we haven't resolved the element type, generate constraints.
+    if (btv2) {
+      if (flags & TMF_GenerateConstraints) {
+        auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
+                                       btv2, TC.getInt8Type(DC),
+                                       DeclName(),
+                                       getConstraintLocator(locator));
+        auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
+                                        btv2, TC.getUInt8Type(DC),
+                                        DeclName(),
+                                        getConstraintLocator(locator));
+        auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
+                                        btv2, TC.Context.TheEmptyTupleType,
+                                        DeclName(),
+                                        getConstraintLocator(locator));
+        
+        Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
+        auto disjunction = Constraint::createDisjunction(*this,
+                                                 disjunctionChoices,
+                                                 getConstraintLocator(locator));
+        
+        addConstraint(disjunction);
+        llvm::errs() << "a\n";
+        return SolutionKind::Solved;
+      }
+
+      llvm::errs() << "b\n";
+      return SolutionKind::Unsolved;
+    }
+    
+    if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
+      llvm::errs() << "c\n";
+      return SolutionKind::Unsolved;
+    }
+    llvm::errs() << "d\n";
+    return SolutionKind::Solved;
   }
       
   // T <p U ===> inout T <a UnsafePointer<U>
