@@ -2392,8 +2392,8 @@ public:
           auto type = PBD->getPattern()->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
             // If any of the default initialized values are immutable, then
-            // emit an error.  We don't do this for members of types, since the
-            // init members have write access to the let values.
+            // emit a diagnostic.  We don't do this for members of types, since
+            // the init members have write access to the let values.
             if (!PBD->getDeclContext()->isTypeContext()) {
               PBD->getPattern()->forEachVariable([&] (VarDecl *VD) {
                 if (VD->isLet())
