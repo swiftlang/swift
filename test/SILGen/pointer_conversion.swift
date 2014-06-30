@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %swift -emit-silgen -enable-string-pointer-conversion -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
 
 import Foundation
 
@@ -58,6 +58,19 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
   // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
   // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
+  // CHECK: release_value [[OWNER]]
+}
+
+// CHECK-LABEL: sil @_TF18pointer_conversion15stringToPointerFSST_ 
+func stringToPointer(s: String) {
+  takesConstVoidPointer(s)
+  // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGVSs18ConstUnsafePointerT__T_
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFSs40_convertConstStringToUTF8PointerArgumentUSs8_Pointer__FSSTGSqPSs9AnyObject__Q__
+  // CHECK: apply [transparent] [[CONVERT_STRING]]<ConstUnsafePointer<Void>>([[TUPLE_BUF:%.*]]#1,
+  // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
+  // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
+  // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
+  // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[POINTER]])
   // CHECK: release_value [[OWNER]]
 }
 

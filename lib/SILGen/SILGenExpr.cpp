@@ -5369,7 +5369,24 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
 }
 RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
                                                SGFContext C) {
-  llvm_unreachable("not implemented");
+  auto &Ctx = SGF.getASTContext();
+  FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument(nullptr);
+  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  // Get the original value.
+  ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  
+  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
+  Substitution sub =
+    SGF.getPointerSubstitution(E->getType(),
+                               converterArchetypes[0]);
+  auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, sub, orig, C);
+  
+  // Lifetime-extend the owner, and pass on the pointer.
+  auto owner = SGF.B.createTupleExtract(E, result.forward(SGF), 0);
+  SGF.emitManagedRValueWithCleanup(owner);
+  auto pointer = SGF.B.createTupleExtract(E, result.getValue(), 1);
+  return RValue(SGF, E, ManagedValue::forUnmanaged(pointer));
 }
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {

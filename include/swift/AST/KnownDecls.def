@@ -44,5 +44,7 @@ FUNC_DECL(ConvertMutableArrayToPointerArgument,
           "_convertMutableArrayToPointerArgument")
 FUNC_DECL(ConvertConstArrayToPointerArgument,
           "_convertConstArrayToPointerArgument")
+FUNC_DECL(ConvertConstStringToUTF8PointerArgument,
+          "_convertConstStringToUTF8PointerArgument")
 
 #undef FUNC_DECL

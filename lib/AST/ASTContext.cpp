@@ -875,6 +875,7 @@ bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
     && getConvertPointerToPointerArgument(resolver)
     && getConvertMutableArrayToPointerArgument(resolver)
     && getConvertConstArrayToPointerArgument(resolver)
+    && getConvertConstStringToUTF8PointerArgument(resolver)
     && getConvertInOutToPointerArgument(resolver);
 }
 
