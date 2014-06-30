@@ -579,17 +579,21 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {
   assert(S->getTarget() && "Sema didn't fill in break target?");
-  CurrentSILLoc = S;
+  emitBreakOutOf(S, S->getTarget());
+}
+
+void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
+  CurrentSILLoc = loc;
   
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
   for (auto elt : BreakContinueDestStack) {
-    if (S->getTarget() == std::get<0>(elt)) {
-      Cleanups.emitBranchAndCleanups(std::get<1>(elt), S);
+    if (target == std::get<0>(elt)) {
+      Cleanups.emitBranchAndCleanups(std::get<1>(elt), loc);
       return;
     }
   }
-  assert(0 && "Break has available target block.");
+  llvm_unreachable("Break has available target block.");
 }
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {

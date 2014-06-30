@@ -568,6 +568,8 @@ public:
   void visitSwitchStmt(SwitchStmt *S);
 
   void visitCaseStmt(CaseStmt *S);
+
+  void emitBreakOutOf(SILLocation loc, Stmt *S);
   
   //===--------------------------------------------------------------------===//
   // Patterns
