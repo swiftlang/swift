@@ -57,6 +57,7 @@
   }
   
   @public init(start: UnsafePointer<T>, length: Int) {
+    _precondition(length >= 0, "Unsafe${Mutable}Array with negative length")
     _position = start
     _end = start + length
   }
