@@ -164,22 +164,9 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                                     [=](ValueDecl *VD) {
       if (typeResolver)
         typeResolver->resolveDeclSignature(VD);
-
       if (!VD->hasAccessibility())
         return false;
-      if (!moduleScopeContext)
-        return VD->getAccessibility() != Accessibility::Public;
-
-      switch (VD->getAccessibility()) {
-      case Accessibility::Private: {
-        const DeclContext *DC = VD->getDeclContext();
-        return moduleScopeContext != DC->getModuleScopeContext();
-      }
-      case Accessibility::Internal:
-        return moduleScopeContext->getParentModule() != VD->getModuleContext();
-      case Accessibility::Public:
-        return false;
-      }
+      return !VD->isAccessibleFrom(moduleScopeContext);
     });
     localDecls.erase(newEndIter, localDecls.end());
   }

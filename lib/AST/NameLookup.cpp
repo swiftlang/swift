@@ -946,6 +946,22 @@ void ClassDecl::recordObjCMember(ValueDecl *vd) {
   (*ObjCMemberLookup)[afd->getObjCSelector()].push_back(afd);
 }
 
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
+  assert(hasAccessibility());
+  if (!DC)
+    return getAccessibility() == Accessibility::Public;
+
+  DC = DC->getModuleScopeContext();
+  switch (getAccessibility()) {
+  case Accessibility::Private:
+    return DC == getDeclContext()->getModuleScopeContext();
+  case Accessibility::Internal:
+    return DC->getParentModule() == getModuleContext();
+  case Accessibility::Public:
+    return true;
+  }
+}
+
 bool DeclContext::lookupQualified(Type type,
                                   DeclName name,
                                   unsigned options,
@@ -969,6 +985,9 @@ bool DeclContext::lookupQualified(Type type,
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
+    assert(!(options & NL_IgnoreAccessibility) &&
+           "accessibility always enforced for module-level lookup");
+
     Module *module = moduleTy->getModule();
     auto topLevelScope = getModuleScopeContext();
     if (module == topLevelScope->getParentModule()) {
@@ -998,6 +1017,10 @@ bool DeclContext::lookupQualified(Type type,
                 decls.end());
     return !decls.empty();
   }
+
+  auto &ctx = getASTContext();
+  if (!ctx.LangOpts.EnableAccessControl)
+    options |= NL_IgnoreAccessibility;
 
   // The set of nominal type declarations we should (and have) visited.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1081,12 +1104,16 @@ bool DeclContext::lookupQualified(Type type,
         return false;
     }
 
+    // Check access.
+    if (!(options & NL_IgnoreAccessibility))
+      if (auto VD = dyn_cast<ValueDecl>(decl))
+        return VD->isAccessibleFrom(this);
+
     return true;
   };
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  auto &ctx = getASTContext();
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> knownConformances;
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1101,7 +1128,7 @@ bool DeclContext::lookupQualified(Type type,
     for (auto decl : current->lookupDirect(name)) {
       // Resolve the declaration signature when we find the
       // declaration.
-      if (typeResolver && !decl->hasType() && !decl->isBeingTypeChecked()) {
+      if (typeResolver && !decl->isBeingTypeChecked()) {
         typeResolver->resolveDeclSignature(decl);
 
         if (!decl->hasType())

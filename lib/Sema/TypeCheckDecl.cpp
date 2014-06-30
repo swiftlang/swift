@@ -4947,8 +4947,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  Accessibility accessLevel = std::min(decl->getAccessibility(),
-                                       Accessibility::Internal);
+  Accessibility accessLevel = decl->getAccessibility();
+  if (!decl->hasClangNode())
+    accessLevel = std::min(accessLevel, Accessibility::Internal);
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;

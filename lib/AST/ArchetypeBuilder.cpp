@@ -139,7 +139,8 @@ ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
     for (auto proto : ParentArchetype->getConformsTo()) {
       SmallVector<ValueDecl *, 2> decls;
       if (mod.lookupQualified(proto->getDeclaredType(), Name,
-                             NL_VisitSupertypes, nullptr, decls)) {
+                              NL_VisitSupertypes | NL_IgnoreAccessibility,
+                              nullptr, decls)) {
         for (auto decl : decls) {
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
             assocTypeOrProto = assocType;
@@ -187,7 +188,8 @@ ArchetypeBuilder::PotentialArchetype::getAssociatedType(Module &mod,
   for (auto proto : getRepresentative()->getConformsTo()) {
     SmallVector<ValueDecl *, 2> decls;
     if (mod.lookupQualified(proto->getDeclaredType(), name,
-                           NL_VisitSupertypes, nullptr, decls)) {
+                            NL_VisitSupertypes | NL_IgnoreAccessibility,
+                            nullptr, decls)) {
       for (auto decl : decls) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
           return assocType;
@@ -1018,7 +1020,8 @@ Type swift::resolvePotentialArchetypeToType(
     for (auto proto : parentPA->getConformsTo()) {
       SmallVector<ValueDecl *, 2> decls;
       if (mod.lookupQualified(proto->getDeclaredType(), name,
-                              NL_VisitSupertypes, nullptr, decls)) {
+                              NL_VisitSupertypes | NL_IgnoreAccessibility,
+                              nullptr, decls)) {
         for (auto decl : decls) {
           associatedType = dyn_cast<AssociatedTypeDecl>(decl);
           if (associatedType)
