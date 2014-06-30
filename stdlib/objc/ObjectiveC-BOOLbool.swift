@@ -38,9 +38,9 @@ import ObjectiveC
     return self.getLogicValue()
   }
 
-	func getMirror() -> Mirror {
-		return reflect(getLogicValue())
-	}
+  func getMirror() -> Mirror {
+    return reflect(getLogicValue())
+  }
 }
 
 extension Bool {

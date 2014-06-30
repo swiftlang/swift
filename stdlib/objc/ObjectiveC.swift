@@ -93,9 +93,9 @@ extension String {
 }
 
 extension Selector : Reflectable {
-	func getMirror() -> Mirror {
-		return reflect(String(_sel: self))
-	}
+  func getMirror() -> Mirror {
+    return reflect(String(_sel: self))
+  }
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
