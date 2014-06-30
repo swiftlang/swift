@@ -458,6 +458,7 @@ int main(int argc, char **argv) {
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
+  Invocation.getLangOptions().EnableAccessControl = false;
 
   // Load the input file.
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
