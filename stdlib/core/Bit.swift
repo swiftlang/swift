@@ -13,7 +13,7 @@
 //  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
-@public enum Bit : Int, RandomAccessIndex {
+@public enum Bit : Int, RandomAccessIndex, Reflectable {
   case zero = 0, one = 1
 
   @public func successor() -> Bit {
@@ -33,6 +33,41 @@
   @public func advancedBy(distance: Int) -> Bit {
     return toRaw().advancedBy(distance) > 0 ? one : zero
   }
+  
+  func getMirror() -> Mirror {
+    return _BitMirror(self)
+  }
+}
+
+struct _BitMirror: Mirror {
+  let _value: Bit
+  
+  init(_ v: Bit) {
+    self._value = v
+  }
+  
+  var value: Any { return _value }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return .None }
+
+  var count: Int { return 0 }
+
+  subscript(i: Int) -> (String, Mirror) { 
+    _fatalError("Mirror access out of bounds")
+  }
+
+  var summary: String { 
+    switch _value {
+      case .zero: return ".zero"
+      case .one:  return ".one"
+    }
+  }
+
+  var quickLookObject: QuickLookObject? { return .None }
+
+  var disposition: MirrorDisposition { return .Enum }
 }
 
 @public func == (lhs: Bit, rhs: Bit) -> Bool {
