@@ -163,6 +163,8 @@ enum class ConversionRestrictionKind {
   InoutToPointer,
   /// Array-to-pointer conversion.
   ArrayToPointer,
+  /// String-to-pointer conversion.
+  StringToPointer,
   /// Pointer-to-pointer conversion.
   PointerToPointer,
   /// Lvalue-to-rvalue conversion.

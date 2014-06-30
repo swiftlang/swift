@@ -536,6 +536,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
 
+  Opts.EnableStringPointerConversion |= Args.hasArg(OPT_enable_string_pointer_conversion);
+
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
 
   if (auto A = Args.getLastArg(OPT_enable_access_control,
