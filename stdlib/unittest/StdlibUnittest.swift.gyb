@@ -363,6 +363,7 @@ func _expectNotEqual${Generic}(
 // Helpers that verify invariants of various stdlib types.
 //
 
+@public
 func checkGenerator<
     Element : Equatable, G : Generator
     where G.Element == Element>(
@@ -383,6 +384,7 @@ func checkGenerator<
   }
 }
 
+@public
 func checkSequence<
     Element : Equatable, S : Sequence
     where S.GeneratorType.Element == Element>(
@@ -391,6 +393,7 @@ func checkSequence<
   expectGE(expected.count, underestimateCount(sequence))
 }
 
+@public
 func checkCollection<
     Element : Equatable, C : Collection
     where C.GeneratorType.Element == Element>(
@@ -422,6 +425,7 @@ func checkCollection<
   }
 }
 
+@public
 func checkSliceableWithBidirectionalIndex<
     Element : Equatable, S : Sliceable
     where S.GeneratorType.Element == Element,

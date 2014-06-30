@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Augments `S` with lazy versions of various sequence algorithms.
+@public
 struct LazySequence<S: Sequence> : Sequence {
   @public
   init(_ base: S) {
@@ -32,6 +33,7 @@ struct LazySequence<S: Sequence> : Sequence {
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
+@public
 func lazy<S: Sequence>(s: S) -> LazySequence<S> {
   return LazySequence(s)
 }

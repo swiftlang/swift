@@ -15,6 +15,7 @@
 %  Self = 'Lazy%sCollection' % traversal
 
 /// Augments `S` with lazy versions of various collection algorithms.
+@public
 struct ${Self}<S: Collection ${whereClause}> : Collection {
   @public
   init(_ base: S) {
@@ -51,6 +52,7 @@ struct ${Self}<S: Collection ${whereClause}> : Collection {
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
+@public
 func lazy<S: Collection ${whereClause}>(s: S) -> ${Self}<S> {
   return ${Self}(s)
 }
