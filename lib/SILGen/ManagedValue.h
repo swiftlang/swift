@@ -22,9 +22,12 @@
 
 #include "Cleanup.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
+enum class CastConsumptionKind : unsigned char;
+
 namespace Lowering {
 
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
@@ -167,6 +170,78 @@ public:
   }
 };
 
+/// A ManagedValue which may not be intended to be consumed.
+///
+/// The invariant is that the cleanup on a ManagedValue that's not
+/// meant to be consumed should be free to clear.
+///
+/// Code which gets a ManagedValue from a ConsumableManagedValue
+/// must be careful before handing the MV off to an API.  Many
+/// SILGen APIs expect that an MV is +1, but ConsumableManagedValue
+/// often traffics in borrowed values.  A value is only +1 if
+/// the associated consumption is TakeAlways, but conditional
+/// operation should turn TakeOnSuccess consumptions into TakeAlways
+/// consumptions on their success path.
+class ConsumableManagedValue {
+  ManagedValue Value;
+  CastConsumptionKind FinalConsumption;
+
+public:
+  /// Create an invalid CMV.
+  ConsumableManagedValue() = default;
+
+  /// Create a CMV with a specific value and consumption rule.
+  /*implicit*/ ConsumableManagedValue(ManagedValue value,
+                                      CastConsumptionKind finalConsumption)
+    : Value(value), FinalConsumption(finalConsumption) {}
+
+  /// Create a CMV for a value of trivial type.
+  static ConsumableManagedValue forUnmanaged(SILValue value) {
+    return { ManagedValue::forUnmanaged(value),
+             CastConsumptionKind::TakeAlways };
+  }
+
+  /// Create a CMV for an owned value.
+  static ConsumableManagedValue forOwned(ManagedValue value) {
+    return { value, CastConsumptionKind::TakeAlways };
+  }
+
+  /// Has this been filled in with meaningful data?
+  bool isValid() const { return (bool) Value; }
+
+  bool isOwned() const {
+    assert(isValid());
+    return FinalConsumption == CastConsumptionKind::TakeAlways;
+  }
+
+  /// Return true if there's a cleanup associated with this value.
+  bool hasCleanup() const { return Value.hasCleanup(); }
+  CleanupHandle getCleanup() const { return Value.getCleanup(); }
+
+  SILType getType() const { return Value.getType(); }
+  SILValue getValue() const { return Value.getValue(); }
+
+  /// Return a managed value appropriate for the final use of this CMV.
+  ManagedValue getFinalManagedValue() const { return Value; }
+
+  /// Get the value as an unmanaged ManagedValue.
+  ///
+  /// You probably should not be using this; it's here to make it easy
+  /// to find code that is probably wrong.
+  ManagedValue asUnmanagedValue() const {
+    return ManagedValue::forUnmanaged(Value.getValue());
+  }
+
+  /// Return the consumption rules appropriate for the final use of
+  /// this CMV.
+  CastConsumptionKind getFinalConsumption() const { return FinalConsumption; }
+
+  /// Return a managed value that's appropriate for borrowing this
+  /// value and promising not to consume it.
+  ConsumableManagedValue asBorrowedOperand() const {
+    return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
+  }
+};
   
 } // end namespace Lowering
 } // end namespace swift

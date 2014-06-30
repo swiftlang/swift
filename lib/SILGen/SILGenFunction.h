@@ -22,7 +22,16 @@
 
 namespace swift {
 namespace Lowering {
+
+class ConsumableManagedValue;
+class Initialization;
+class LogicalPathComponent;
+class LValue;
+class ManagedValue;
 struct Materialize;
+class RValue;
+class RValueSource;
+class TemporaryInitialization;
 
 /// SGFContext - Internal context information for the SILGenFunction visitor.
 ///

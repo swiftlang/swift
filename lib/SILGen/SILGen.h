@@ -28,16 +28,8 @@ namespace swift {
   class SILBasicBlock;
 
 namespace Lowering {
-  class LogicalPathComponent;
-  class LValue;
-  class RValue;
-  class RValueSource;
-  class ManagedValue;
   class TypeConverter;
   class SILGenFunction;
-  class Initialization;
-  class RValueSource;
-  class TemporaryInitialization;
 
 /// An enum to indicate whether a protocol method requirement is satisfied by
 /// a free function, as for an operator requirement.
