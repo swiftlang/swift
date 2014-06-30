@@ -1,9 +1,11 @@
 @objc @public class ForwardClass : NSObject {
+  @public init() {}
 }
 
 @objc @public protocol ForwardProto : NSObjectProtocol {
 }
 @objc @public class ForwardProtoAdopter : NSObject, ForwardProto {
+  @public init() {}
 }
 
 @objc @public class PartialBaseClass {
@@ -12,9 +14,10 @@
 }
 
 @public class ProtoConformer : ForwardClassUser {
-   @public func consumeForwardClass(arg: ForwardClass) {}
+  @public func consumeForwardClass(arg: ForwardClass) {}
 
-   @public var forward = ForwardClass()
+  @public var forward = ForwardClass()
+  @public init() {}
 }
 
 @public func testProtocolWrapper(conformer: ForwardClassUser) {

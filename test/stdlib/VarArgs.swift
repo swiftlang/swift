@@ -6,22 +6,6 @@
 
 import Swift
 
-func hexAddr(x: AnyObject) -> String {
-  return hexAddr(Builtin.bridgeToRawPointer(Builtin.castToNativeObject(x)))
-}
-
-func hexAddr(x: Builtin.RawPointer) -> String {
-  return "@0x" + String(UInt64(UWord(Builtin.ptrtoint_Word(x))), radix: 16)
-}
-
-func hexAddr<T>(p: UnsafePointer<T>) -> String {
-  return hexAddr(p.value)
-}
-
-func hexAddr(p: COpaquePointer) -> String {
-  return hexAddr(p.value)
-}
-
 @asmname("vprintf")
 func c_vprintf(format: CString, args: CVaListPointer)
 
@@ -43,7 +27,7 @@ func test_varArgs0() {
 test_varArgs0()
 
 func test_varArgs1() {
-  var args = VaListBuilder()
+  var args = CVarArg[]()
 
   var format = "dig it: "
   for i in 0..<12 {

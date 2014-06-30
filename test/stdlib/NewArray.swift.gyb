@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 // RUN-DISABLED: %target-run-simple-swift | FileCheck %s
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
-// RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NewArray.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
 // RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift
 
 var xCount = 0

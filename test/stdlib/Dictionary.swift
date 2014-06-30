@@ -1,10 +1,9 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: rm -rf %t &&mkdir -p %t
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 // 
 // RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -g
+// RUN: %target-build-swift %s -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -g -Xfrontend -disable-access-control
 
 // RUN: %target-run %t/Dictionary > %t.txt
 // RUN: FileCheck %s < %t.txt

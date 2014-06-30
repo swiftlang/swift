@@ -9,4 +9,5 @@
   @public func doSomething() -> Y {
     return Y()
   }
+  @public init() {}
 }

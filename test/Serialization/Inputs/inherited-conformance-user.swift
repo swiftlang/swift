@@ -20,4 +20,6 @@ import Base
   @public func generate() -> IndexingGenerator<OneToAThousand> {
     return IndexingGenerator(self)
   }
+
+  @public init() {}
 }

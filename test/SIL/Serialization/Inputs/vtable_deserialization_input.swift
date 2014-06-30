@@ -14,4 +14,5 @@ func unknown() -> ()
   @public func doSomething() {
     doAnotherThing()
   }
+  @public init() {}
 }

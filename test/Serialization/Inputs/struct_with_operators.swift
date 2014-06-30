@@ -1,5 +1,6 @@
 @public struct SpecialInt {
   @public var value = 0
+  @public init() {}
 }
 
 operator prefix +++ {}

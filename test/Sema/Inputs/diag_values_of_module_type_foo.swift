@@ -1,8 +1,9 @@
 @public class SomeClass {
-  @public class NestedClass {}
+  @public class NestedClass { @public init() {} }
 
   @public static func staticFunc1() -> Int {}
   @public static var staticVar1: Int
+  @public init() {}
 }
 @public struct SomeStruct {
   @public init() {}

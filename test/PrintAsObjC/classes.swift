@@ -159,7 +159,7 @@ typealias AliasForNSRect = NSRect
 
   func someEnum() -> NSRuncingMode { return .Mince }
 
-  func zone() -> NSZone { return NSZone(pointer: COpaquePointer()) }
+  func zone() -> NSZone { return nil }
 
   func cf(x: CFTree, str: CFString, str2: CFMutableString) -> CFTypeRef? { return nil }
 

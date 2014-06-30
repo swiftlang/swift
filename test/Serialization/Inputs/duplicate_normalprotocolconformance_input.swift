@@ -7,7 +7,7 @@
   class func b()
 }
 
-@public struct S {}
+@public struct S { @public init() {} }
 
 extension S : A {
   @public static func a() { }

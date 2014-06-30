@@ -3,5 +3,6 @@
 
 @public struct Container<V> {
   @public func doSomething() {}
+  @public init() {}
 }
 

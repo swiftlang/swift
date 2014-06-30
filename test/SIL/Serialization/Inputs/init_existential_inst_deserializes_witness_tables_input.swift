@@ -10,6 +10,7 @@ func unknown() -> ()
   @public func doSomething() {
     unknown()
   }
+  @public init() {}
 }
 
 @public func whatShouldIDo(p : P) {

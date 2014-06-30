@@ -33,6 +33,7 @@
   @public func f() -> Z {
     return id(self)
   }
+  @public init() {}
 }
 
 @public func makeZDoSomething(z : Z) -> Z {

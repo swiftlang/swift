@@ -9,6 +9,8 @@
   @public func successor() -> Counter {
     return Counter(value: value + 1)
   }
+
+  @public init(value: Int) { self.value = value }
 }
 
 @public func == <T>(lhs: Counter<T>, rhs: Counter<T>) -> Bool {

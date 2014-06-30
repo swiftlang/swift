@@ -28,6 +28,7 @@ operator infix %%% {
        * Ccc.
        */
     @public func fooInstanceFunc() {}
+@public init() {}
 }
 @public struct BarGenericSwiftStruct1<T> {
   @public init(t: T) {}

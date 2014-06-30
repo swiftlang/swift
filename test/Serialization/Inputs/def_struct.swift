@@ -2,6 +2,10 @@
 
 @public struct TwoInts {
   @public var x, y : Int
+  @public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
 }
 
 @public struct ComputedProperty {
@@ -49,6 +53,7 @@
     var zero = 0
     value = zero
   }
+  @public init(value: Int) { self.value = value }
 }
 
 @public protocol Computable {
@@ -66,6 +71,7 @@
 
 @public struct ComputableWrapper<T : Computable> : HasAssociatedType {
   @public typealias ComputableType = T
+  @public init() {}
 }
 
 @public protocol AnotherAssociatedType {
@@ -74,6 +80,7 @@
 
 @public struct ResettableWrapper<T : Resettable> : AnotherAssociatedType {
   @public typealias ResettableType = T
+  @public init() {}
 }
 
 @public func cacheViaWrappers<
@@ -87,6 +94,7 @@
   @public subscript(x : Int) -> Bool {
     return true
   }
+  @public init() {}
 }
 
 @public struct ComplexSubscript {
@@ -98,6 +106,7 @@
       return 0
     }
   }
+  @public init() {}
 }
 
 

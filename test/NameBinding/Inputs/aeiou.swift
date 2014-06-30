@@ -1,5 +1,5 @@
-@public struct A {}
-@public struct E {}
-@public struct I {}
-@public struct O {}
-@public struct U {}
+@public struct A { @public init() {} }
+@public struct E { @public init() {} }
+@public struct I { @public init() {} }
+@public struct O { @public init() {} }
+@public struct U { @public init() {} }

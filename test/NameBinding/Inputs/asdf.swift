@@ -1,4 +1,4 @@
-@public struct A {}
-@public struct D {}
-@public struct S {}
-@public struct F {}
+@public struct A { @public init() {} }
+@public struct D { @public init() {} }
+@public struct S { @public init() {} }
+@public struct F { @public init() {} }

@@ -47,7 +47,7 @@ func testCStrings() -> Bool {
 
 
 func testObjCString() -> Int {
-  return OBJC_STRING._encodedLength(UTF8.self)
+  return countElements(OBJC_STRING)
 }
 
 // CHECK-LABEL: define linkonce_odr hidden { i8*, i64, i64 } @_TFSCg11OBJC_STRINGSS

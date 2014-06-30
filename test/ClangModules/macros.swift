@@ -62,7 +62,7 @@ func testCStrings() -> Bool {
 
 func testObjCString() -> Int {
   let str: String = OBJC_STRING
-  return str._encodedLength(UTF8.self)
+  return countElements(str)
 }
 
 func testInvalidIntegerLiterals() {

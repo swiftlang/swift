@@ -23,6 +23,8 @@
   @public var readOnly : Int {
     return 42
   }
+
+  @public init() {}
 }
 
 
@@ -84,12 +86,14 @@
 
 @public class OptionalImplementer : ObjCProtoWithOptional {
   @public func unrelated() {}
+  @public init() {}
 }
 
 
 // Inheritance
 @public class StillEmpty : Empty, Resettable {
-  func reset() {}
+  @public func reset() {}
+  @public init() {}
 }
 
 @public class BoolPair<T> : Pair<Bool, Bool>, PairLike {
@@ -137,6 +141,7 @@
   @public subscript(x : Int) -> Bool {
     return true
   }
+  @public init() {}
 }
 
 @public class ComplexSubscript {
@@ -148,6 +153,7 @@
       return 0
     }
   }
+  @public init() {}
 }
 
 

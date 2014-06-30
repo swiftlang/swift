@@ -5,6 +5,11 @@
   @public func magnitude() -> Double {
     return real * real + imag * imag
   }
+  @public init() {}
+  @public init(real: Double, imag: Double) {
+    self.real = real
+    self.imag = imag
+  }
 }
 
 @public func * (lhs: Complex, rhs: Complex) -> Complex {

@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
+// RUN: %target-run %t.out | FileCheck %s
 
 typealias CodePoints = String.UnicodeScalarView
 
