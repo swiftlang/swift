@@ -567,3 +567,23 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   return diagUnreachableCode(TC, S);
 }
 
+//===--------------------------------------------------------------------===//
+// Utility functions
+//===--------------------------------------------------------------------===//
+
+void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
+                               Accessibility desiredAccess) {
+  StringRef fixItString;
+  switch (desiredAccess) {
+  case Accessibility::Private:  fixItString = "@private ";  break;
+  case Accessibility::Internal: fixItString = "@internal "; break;
+  case Accessibility::Public:   fixItString = "@public ";   break;
+  }
+
+  // FIXME: Handle "private(set)" attributes, which have the same
+  // representation.
+  if (auto *attr = VD->getAttrs().getAttribute<AccessibilityAttr>())
+    diag.fixItReplace(attr->getRangeWithAt(), fixItString.drop_back());
+  else
+    diag.fixItInsert(VD->getStartLoc(), fixItString);
+}

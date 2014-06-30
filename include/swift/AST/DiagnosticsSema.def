@@ -1238,6 +1238,8 @@ ERROR(required_incomplete_implementation,sema_tcd,none,
       "class %0 does not implement its superclass's required members", (Type))
 NOTE(required_initializer_not_overridden,attribute_parsing,none,
       "'required' initializer with type %0 not overridden", (Type))
+ERROR(required_initializer_not_accessible,sema_tcd,none,
+      "'required' initializer must be as accessible as its enclosing type", ())
 
 // Functions
 ERROR(attribute_requires_function_type,attribute_parsing,none,

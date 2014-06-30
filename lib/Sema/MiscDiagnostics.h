@@ -13,17 +13,25 @@
 #ifndef SWIFT_SEMA_MISC_DIAGNOSTICS_H
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
+#include "swift/AST/Attr.h"
+
 namespace swift {
   class DeclContext;
   class Expr;
+  class InFlightDiagnostic;
   class Stmt;
   class TypeChecker;
+  class ValueDecl;
 
 /// \brief Emit diagnostics for a given expression.
 void performExprDiagnostics(TypeChecker &TC, const Expr *E,
                             const DeclContext *DC);
-  /// \brief Emit diagnostics for a given statement.
+/// \brief Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
+
+/// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
+void fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
+                        Accessibility desiredAccess);
 
 } // namespace swift
 

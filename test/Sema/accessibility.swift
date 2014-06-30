@@ -35,3 +35,20 @@
   func internalReq() {}
   func privateReq() {}
 }
+
+
+@public class Base {
+  @public @required init() {}
+}
+
+@public class PublicSub: Base {
+  init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-3=@public }}
+}
+
+@internal class InternalSub: Base {
+  @private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-11=@internal}}
+}
+
+@internal class InternalSubGood: Base {
+  init() {} // no-warning
+}

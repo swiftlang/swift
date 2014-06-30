@@ -17,6 +17,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "MiscDiagnostics.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -4559,6 +4560,16 @@ public:
       if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
         CD->getMutableAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
+    }
+
+    if (CD->isRequired() && ContextTy) {
+      if (auto nominal = ContextTy->getAnyNominal()) {
+        if (CD->getAccessibility() < nominal->getAccessibility()) {
+          auto diag = TC.diagnose(CD,
+                                  diag::required_initializer_not_accessible);
+          fixItAccessibility(diag, CD, nominal->getAccessibility());
+        }
+      }
     }
 
     TC.checkDeclAttributes(CD);
