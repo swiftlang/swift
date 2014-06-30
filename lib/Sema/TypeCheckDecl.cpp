@@ -3438,9 +3438,10 @@ public:
     if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
       return false;
 
-    // Functions can have an asmname attribute.
+    // Functions can have asmname and semantics attributes.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->getAttrs().hasAttribute<AsmnameAttr>())
+      if (func->getAttrs().hasAttribute<AsmnameAttr>() ||
+          func->getAttrs().hasAttribute<SemanticsAttr>())
         return false;
     }
 
@@ -4054,6 +4055,7 @@ public:
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)

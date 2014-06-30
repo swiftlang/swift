@@ -1012,6 +1012,12 @@ namespace decls_block {
     BCBlob      // asmname
   >;
 
+  using SemanticsDeclAttrLayout = BCRecordLayout<
+  Semantics_DECL_ATTR,
+  BCFixed<1>, // implicit flag
+  BCBlob      // semantics value
+  >;
+
   using AvailabilityDeclAttrLayout = BCRecordLayout<
     Availability_DECL_ATTR,
     BCFixed<1>, // implicit flag

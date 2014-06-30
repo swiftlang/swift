@@ -512,6 +512,25 @@ public:
   }
 };
 
+/// Defines the @semantics attribute.
+class SemanticsAttr : public DeclAttribute {
+public:
+  SemanticsAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,
+                bool Implicit)
+  : DeclAttribute(DAK_Semantics, AtLoc, Range, Implicit),
+  Value(Value) {}
+
+  SemanticsAttr(StringRef Value, bool Implicit)
+  : SemanticsAttr(Value, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+
+  /// The semantics tag value.
+  const StringRef Value;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Semantics;
+  }
+};
+
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:

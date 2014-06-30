@@ -460,6 +460,46 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+  case DAK_Semantics: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+
+    StringRef Value =
+    getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+
+    consumeToken(tok::string_literal);
+
+    if (!Value.empty())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      return false;
+    }
+
+    // Diagnose using @semantics in a local scope.  These don't
+    // actually work.
+    if (CurDeclContext->isLocalContext()) {
+      // Emit an error, but do not discard the attribute.  This enables
+      // better recovery in the parser.
+      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) SemanticsAttr(Value, AtLoc, AttrRange,
+                                                 /*Implicit=*/false));
+    break;
+  }
+
   case DAK_Availability: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);
@@ -672,6 +712,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 /// \verbatim
 ///   attribute:
 ///     'asmname' '(' identifier ')'
+///     'semantics' '(' identifier ')'
 ///     'infix' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'

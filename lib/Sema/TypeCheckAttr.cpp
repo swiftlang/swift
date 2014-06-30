@@ -44,6 +44,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Asmname)
+  IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
@@ -352,6 +353,7 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(Override)

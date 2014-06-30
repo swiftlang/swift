@@ -150,6 +150,9 @@ SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
 
 SIMPLE_DECL_ATTR(noinline, Noinline, OnFunc, 19)
 
+DECL_ATTR(semantics, Semantics,
+OnFunc | OnConstructor | OnDestructor | OnSubscript, 20)
+
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
                   OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor,

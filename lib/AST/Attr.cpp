@@ -132,6 +132,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
       Printer << "(set)";
     break;
 
+  case DAK_Semantics:
+    Printer << "@semantics(\"" << cast<SemanticsAttr>(this)->Value << "\")";
+    break;
+
   case DAK_Asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;
@@ -198,6 +202,8 @@ StringRef DeclAttribute::getAttrName() const {
 #include "swift/AST/Attr.def"
   case DAK_Asmname:
     return "asmname";
+  case DAK_Semantics:
+      return "semantics";
   case DAK_Availability:
     return "availability";
   case DAK_ObjC:

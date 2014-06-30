@@ -1445,6 +1445,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Semantics_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::SemanticsDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) SemanticsAttr(blobData, isImplicit);
+        break;
+      }
+
       case decls_block::Availability_DECL_ATTR: {
         bool isImplicit;
         bool isUnavailable;

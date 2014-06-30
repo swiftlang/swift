@@ -1273,6 +1273,15 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                       theAttr->Name);
     return;
   }
+  case DAK_Semantics: {
+    auto *theAttr = cast<SemanticsAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];
+    SemanticsDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      theAttr->isImplicit(),
+                                      theAttr->Value);
+    return;
+  }
+
   case DAK_Availability: {
     auto *theAttr = cast<AvailabilityAttr>(DA);
     llvm::SmallString<32> blob;
