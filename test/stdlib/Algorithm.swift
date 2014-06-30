@@ -199,3 +199,25 @@ func testMinMax() {
 }
 
 testMinMax()
+
+func testFilter() {
+  var count = 0
+  
+  // Make sure filter is eager and only calls its predicate once per
+  // element.
+  let one = filter(0..<10) {
+    (x: Int)->Bool in ++count; return x == 1
+  }
+  // CHECK-NEXT: <10>
+  for x in one {
+    println("<\(count)>")
+  }
+  // CHECK-NEXT: <10>
+  for x in one {
+    println("<\(count)>")
+  }
+}
+testFilter()
+
+// CHECK-NEXT: all done.
+println("all done.")

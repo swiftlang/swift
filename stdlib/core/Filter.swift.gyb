@@ -121,6 +121,14 @@
   var _include: (Base.GeneratorType.Element)->Bool
 }
 
+/// Return an `Array` containing the elements of `source`,
+/// in order, that satisfy the predicate `includeElement`.
+@public func filter<S:Sequence>(
+  source: S, includeElement: (S.GeneratorType.Element)->Bool
+) -> [S.GeneratorType.Element] {
+  return lazy(source).filter(includeElement).array
+}
+
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')
 % for Self in ['LazySequence'] + [ 'Lazy%sCollection' % t for t in traversals ]:
 extension ${Self} {
