@@ -3,12 +3,13 @@
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
 // RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
 //
-// RUN: %target-run %t/a.out OutOfBounds1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out OutOfBounds2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out OutOfBounds3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out OutOfBounds4 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out OutOfBounds1 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out OutOfBounds2 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out OutOfBounds3 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out OutOfBounds4 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out UnsafeArrayLength 2>&1 | FileCheck %s
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
@@ -67,6 +68,19 @@ if arg == "Downcast2" {
   let s1 = sa[1]
 }
 
+if arg == "UnsafeArrayLength" {
+  let a = [42, 77, 88]
+  
+  if a.withUnsafePointerToElements({
+      UnsafeArray(start: $0, length: 1)[0]
+  }) == 42 {
+    println("OK")
+  }
+  
+  a.withUnsafePointerToElements {
+    UnsafeArray(start: $0, length: -1)
+  }
+}
 println("BUSTED: should have crashed already")
 exit(1)
 
