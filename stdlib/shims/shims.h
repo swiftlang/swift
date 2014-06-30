@@ -31,4 +31,35 @@ typedef struct {
     unsigned long extra[5];
 } _SwiftNSFastEnumerationState;
 
+extern const uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
+
+struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy {
+  unsigned BMPFirstLevelIndexBits;
+  unsigned BMPDataOffsetBits;
+  unsigned SuppFirstLevelIndexBits;
+  unsigned SuppSecondLevelIndexBits;
+  unsigned SuppDataOffsetBits;
+
+  unsigned BMPLookupBytesPerEntry;
+  unsigned BMPDataBytesPerEntry;
+  unsigned SuppLookup1BytesPerEntry;
+  unsigned SuppLookup2BytesPerEntry;
+  unsigned SuppDataBytesPerEntry;
+
+  unsigned TrieSize;
+
+  unsigned BMPLookupBytesOffset;
+  unsigned BMPDataBytesOffset;
+  unsigned SuppLookup1BytesOffset;
+  unsigned SuppLookup2BytesOffset;
+  unsigned SuppDataBytesOffset;
+};
+
+extern const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
+_swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
+
+extern const uint16_t *
+_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
+
 #endif
+

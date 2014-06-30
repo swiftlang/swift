@@ -78,6 +78,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   Unicode.swift
   UnicodeScalar.swift
+  UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeArray.swift.gyb
   UnsafePointer.swift.gyb

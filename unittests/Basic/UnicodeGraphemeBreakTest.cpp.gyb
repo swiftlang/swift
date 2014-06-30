@@ -17,55 +17,10 @@
 
 %{
 
-import re
+from GYBUnicodeDataUtils import *
 
-def convertLine(line):
-    # Strip comments.
-    line = re.sub('#.*', '', line).strip()
-
-    if line == "":
-        return None
-
-    test = ""
-    currBytes = 0
-    boundaries = []
-
-    # Match a list of code points.
-    for token in line.split(" "):
-        if token == "÷":
-            boundaries += [ currBytes ]
-        elif token == "×":
-            pass
-        else:
-            codePoint = int(token, 16)
-            # Tests from Unicode spec have isolated surrogates in them.  Our
-            # segmentation algorithm works on UTF-8 sequences, so encoding a
-            # surrogate would produce an invalid code unit sequence.  Instead
-            # of trying to emulate the maximal subpart algorithm for inserting
-            # U+FFFD in Python, we just replace every isolated surrogate with
-            # U+200B, which also has Grapheme_Cluster_Break equal to 'Control'
-            # and test separately that we handle ill-formed UTF-8 sequences.
-            if codePoint >= 0xd800 and codePoint <= 0xdfff:
-                codePoint = 0x200b
-            codePoint = ('\U%(cp)08x' % { 'cp': codePoint }).decode('unicode_escape')
-            asUTF8Bytes = codePoint.encode('utf8')
-            asUTF8Escaped = ''.join(['\\x%(byte)02x' % { 'byte': ord(byte) } for byte in asUTF8Bytes])
-            test += asUTF8Escaped
-            currBytes += len(asUTF8Bytes)
-
-    return (test, boundaries)
-
-# Self-test.
-assert(convertLine('÷ 0903 × 0308 ÷ AC01 ÷ # abc') == ('\\xe0\\xa4\\x83\\xcc\\x88\\xea\\xb0\\x81', [ 0, 5, 8 ]))
-assert(convertLine('÷ D800 ÷ # abc') == ('\\xe2\\x80\\x8b', [ 0, 3 ]))
-
-graphemeBreakTests = []
-
-with open(unicodeGraphemeBreakTestFile, 'rb') as f:
-    for line in f:
-        test = convertLine(line)
-        if test:
-            graphemeBreakTests += [ test ]
+grapheme_cluster_break_tests = \
+    get_grapheme_cluster_break_tests_as_UTF8(unicodeGraphemeBreakTestFile)
 
 }%
 
@@ -90,9 +45,9 @@ static std::vector<unsigned> FindGraphemeClusterBoundaries(StringRef Str) {
 }
 
 TEST(ExtractExtendedGraphemeCluster, TestsFromUnicodeSpec) {
-% for subjectString,expectedBoundaries in graphemeBreakTests:
-  EXPECT_EQ((std::vector<unsigned>{ ${', '.join([ str(x) for x in expectedBoundaries ])} }),
-      FindGraphemeClusterBoundaries("${subjectString}"));
+% for subject_string,expected_boundaries in grapheme_cluster_break_tests:
+  EXPECT_EQ((std::vector<unsigned>{ ${', '.join([ str(x) for x in expected_boundaries ])} }),
+      FindGraphemeClusterBoundaries("${subject_string}"));
 % end
 }
 

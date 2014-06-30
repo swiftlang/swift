@@ -62,6 +62,16 @@ extension String {
         return IndexType(i, _core)
       }
 
+      /// The end index that for this view.
+      @internal var _viewStartIndex: IndexType {
+        return IndexType(_core.startIndex, _core)
+      }
+
+      /// The end index that for this view.
+      @internal var _viewEndIndex: IndexType {
+        return IndexType(_core.endIndex, _core)
+      }
+
       var _position: Int
       var _core: _StringCore
     }

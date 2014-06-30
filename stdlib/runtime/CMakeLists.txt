@@ -22,7 +22,9 @@ add_swift_library(swift_runtime INSTALL
   Once.cpp
   Reflection.mm
   Heap.cpp
-  Errors.cpp)
+  Errors.cpp
+  UnicodeExtendedGraphemeClusters.cpp.gyb
+  )
 
 add_swift_optimization_flags(swift_runtime)
 

@@ -384,9 +384,7 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
 NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   let s = "え\u304b\u3099お\u263a\ufe0f😀😊"
   let startIndex = advance(s.startIndex, 1)
-  // FIXME: this might need to be adjusted to 5 when we implement
-  // grapheme clusters properly.
-  let endIndex = advance(s.startIndex, 7)
+  let endIndex = advance(s.startIndex, 5)
   var substrings: [String] = []
   s.enumerateSubstringsInRange(startIndex..<endIndex,
       options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
@@ -846,7 +844,6 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
       let s = "абвклмнабв"
       let r = s.rangeOfCharacterFromSet(charset,
           range: advance(s.startIndex, 3)..<s.endIndex)!
-      dump(r.startIndex._utf16Index)
       expectEqual(advance(s.startIndex, 7), r.startIndex)
       expectEqual(advance(s.startIndex, 8), r.endIndex)
     }
@@ -882,7 +879,7 @@ NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
       advance(s.startIndex, 1))])
   expectEqual("\u305f\u3099", s[s.rangeOfComposedCharacterSequenceAtIndex(
       advance(s.startIndex, 5))])
-  expectEqual("\u305f\u3099", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual(" ", s[s.rangeOfComposedCharacterSequenceAtIndex(
       advance(s.startIndex, 6))])
 }
 
@@ -891,7 +888,7 @@ NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
 
   expectEqual("\U0001F601a", s[s.rangeOfComposedCharacterSequencesForRange(
       s.startIndex..<advance(s.startIndex, 2))])
-  expectEqual("し\u3099す\u3099", s[s.rangeOfComposedCharacterSequencesForRange(
+  expectEqual("せ\u3099そ\u3099", s[s.rangeOfComposedCharacterSequencesForRange(
       advance(s.startIndex, 8)..<advance(s.startIndex, 10))])
 }
 

@@ -68,9 +68,10 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
     isASCII: Builtin.Int1) -> String {
 
     return String._fromWellFormedCodeUnitSequence(
-      UTF8.self,
-      input: UnsafeArray(start: UnsafePointer<UTF8.CodeUnit>(start), 
-                         length: Int(byteSize)))
+        UTF8.self,
+        input: UnsafeArray(
+            start: UnsafePointer<UTF8.CodeUnit>(start),
+            length: Int(byteSize)))
   }
 }
 
@@ -86,7 +87,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
   ) -> String {
-    
+
     return String(
       _StringCore(
         baseAddress: COpaquePointer(start),
@@ -114,9 +115,10 @@ extension String : _BuiltinStringLiteralConvertible {
     }
     else {
       return String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeArray(start: UnsafePointer<UTF8.CodeUnit>(start), length: 
-                           Int(byteSize)))
+          UTF8.self,
+          input: UnsafeArray(
+              start: UnsafePointer<UTF8.CodeUnit>(start),
+              length: Int(byteSize)))
     }
   }
 }
@@ -159,7 +161,7 @@ extension String {
     Encoding: UnicodeCodec,
     Output: Sink
     where Encoding.CodeUnit == Output.Element
-  >(encoding: Encoding.Type, output: Output) 
+  >(encoding: Encoding.Type, output: Output)
   {
     return core.encode(encoding, output: output)
   }
@@ -177,7 +179,7 @@ extension String: Equatable {
   //
   // NOTE: if this algorithm is changed, consider updating equality comparison
   // of Character.
-  return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)  
+  return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)
 }
 
 @public func <(lhs: String, rhs: String) -> Bool {
@@ -197,7 +199,7 @@ extension String {
   mutating func _append(x: UnicodeScalar) {
     core.append(x)
   }
-  
+
   var _utf16Count: Int {
     return core.count
   }
@@ -276,7 +278,7 @@ extension String : StringInterpolationConvertible {
 
 // Comparison operators
 // FIXME: Compare Characters, not code units
-extension String : Comparable {  
+extension String : Comparable {
 }
 
 extension String {
@@ -300,34 +302,130 @@ extension String : Collection {
   @public struct Index : BidirectionalIndex {
     init(_ _base: UnicodeScalarView.IndexType) {
       self._base = _base
+      self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
+    }
+
+    init(_ _base: UnicodeScalarView.IndexType, _ _lengthUTF16: Int) {
+      self._base = _base
+      self._lengthUTF16 = _lengthUTF16
     }
 
     @public func successor() -> Index {
-       // For now, each Character will just be a single UnicodeScalar
-      return Index(_base.successor())
+      _precondition(_base != _base._viewEndIndex,
+          "can not advance endIndex forward")
+      return Index(_endBase)
     }
+
     @public func predecessor() -> Index {
-       // For now, each Character will just be a single UnicodeScalar
-      return Index(_base.predecessor())
+      _precondition(_base != _base._viewStartIndex,
+          "can not advance startIndex backwards")
+      let predecessorLengthUTF16 =
+          Index._measureExtendedGraphemeClusterBackward(_base)
+      return Index(UnicodeScalarView.IndexType(
+          _utf16Index - predecessorLengthUTF16, _base._core))
     }
+
     let _base: UnicodeScalarView.IndexType
 
-    /// The integer offset of this index in UTF16 text.  
+    /// The length of this extended grapheme cluster in UTF-16 code units.
+    let _lengthUTF16: Int
+
+    /// The integer offset of this index in UTF-16 code units.
     var _utf16Index: Int {
       return _base._position
+    }
+
+    /// The one past end index for this extended grapheme cluster in Unicode
+    /// scalars.
+    var _endBase: UnicodeScalarView.IndexType {
+      return UnicodeScalarView.IndexType(
+          _utf16Index + _lengthUTF16, _base._core)
+    }
+
+    /// Returns the length of the first extended grapheme cluster in UTF-16
+    /// code units.
+    @private static func _measureExtendedGraphemeClusterForward(
+        var start: UnicodeScalarView.IndexType
+    ) -> Int {
+      let end = start._viewEndIndex
+      if start == end {
+        return 0
+      }
+
+      let startIndexUTF16 = start._position
+      let unicodeScalars = UnicodeScalarView(start._core)
+      let graphemeClusterBreakProperty =
+          _UnicodeGraphemeClusterBreakPropertyTrie()
+      let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+
+      var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
+          unicodeScalars[start].value)
+      ++start
+
+      for ; start != end; ++start {
+        if segmenter.isBoundaryAfter(gcb0) {
+          break
+        }
+        let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
+            unicodeScalars[start].value)
+        if segmenter.isBoundary(gcb0, gcb1) {
+          break
+        }
+        gcb0 = gcb1
+      }
+
+      return start._position - startIndexUTF16
+    }
+
+    /// Returns the length of the previous extended grapheme cluster in UTF-16
+    /// code units.
+    @private static func _measureExtendedGraphemeClusterBackward(
+        end: UnicodeScalarView.IndexType
+    ) -> Int {
+      var start = end._viewStartIndex
+      if start == end {
+        return 0
+      }
+
+      let endIndexUTF16 = end._position
+      let unicodeScalars = UnicodeScalarView(start._core)
+      let graphemeClusterBreakProperty =
+          _UnicodeGraphemeClusterBreakPropertyTrie()
+      let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+
+      var graphemeClusterStart = end
+
+      --graphemeClusterStart
+      var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
+          unicodeScalars[graphemeClusterStart].value)
+
+      var graphemeClusterStartUTF16 = graphemeClusterStart._position
+
+      while graphemeClusterStart != start {
+        --graphemeClusterStart
+        let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
+            unicodeScalars[graphemeClusterStart].value)
+        if segmenter.isBoundary(gcb1, gcb0) {
+          break
+        }
+        gcb0 = gcb1
+        graphemeClusterStartUTF16 = graphemeClusterStart._position
+      }
+
+      return endIndexUTF16 - graphemeClusterStartUTF16
     }
   }
 
   @public var startIndex: Index {
     return Index(unicodeScalars.startIndex)
   }
-  
+
   @public var endIndex: Index {
     return Index(unicodeScalars.endIndex)
   }
-  
+
   @public subscript(i: Index) -> Character {
-    return Character(unicodeScalars[i._base])
+    return Character(unicodeScalars[i._base..<i._endBase])
   }
 
   @public func generate() -> IndexingGenerator<String> {

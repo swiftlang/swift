@@ -558,6 +558,7 @@ function(handle_gyb_sources sourcesvar)
   set(de_gybbed_sources)
   set(gyb_sources)
   set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
+  set(gyb_extra_sources "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py")
   foreach (src ${${sourcesvar}})
     string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
     if(src STREQUAL src_sans_gyb)
@@ -568,7 +569,7 @@ function(handle_gyb_sources sourcesvar)
       add_custom_command(
         OUTPUT "${output_file}"
         COMMAND "${gyb_tool}"  ${SWIFT_GYB_FLAGS} -o "${output_file}" "${src}"
-        DEPENDS "${gyb_tool}" "${src}"
+        DEPENDS "${gyb_tool}" "${src}" "${gyb_extra_sources}"
         COMMENT "Generating ${src_sans_gyb} from ${src}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         )

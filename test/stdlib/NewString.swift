@@ -100,7 +100,7 @@ func nonASCII() {
   // Slicing the String does not allocate
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
   let i2 = advance(newNSUTF16.startIndex, 2)
-  let i8 = advance(newNSUTF16.startIndex, 8)
+  let i8 = advance(newNSUTF16.startIndex, 6)
   println("  \(repr(newNSUTF16[i2..<i8]))")
 
   // Representing a slice as an NSString requires a new object

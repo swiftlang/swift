@@ -1,0 +1,248 @@
+%# -*- mode: swift -*-
+
+%# Ignore the following admonition; it applies to the resulting .swift file only
+//// Automatically Generated From UnicodeTrie.gyb.swift.  Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+BMPFirstLevelIndexBits = 8
+BMPDataOffsetBits = 8
+SuppFirstLevelIndexBits = 5
+SuppSecondLevelIndexBits = 8
+SuppDataOffsetBits = 8
+
+BMPLookupBytesPerEntry = 1
+BMPDataBytesPerEntry = 1
+SuppLookup1BytesPerEntry = 1
+SuppLookup2BytesPerEntry = 1
+SuppDataBytesPerEntry = 1
+
+TrieSize = 15904
+
+BMPLookupBytesOffset = 0
+BMPDataBytesOffset = 256
+SuppLookup1BytesOffset = 12032
+SuppLookup2BytesOffset = 12064
+SuppDataBytesOffset = 12832
+
+}%
+
+import SwiftShims
+
+@internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
+  case Other = 0
+  case CR = 1
+  case LF = 2
+  case Control = 3
+  case Extend = 4
+  case Regional_Indicator = 5
+  case Prepend = 6
+  case SpacingMark = 7
+  case L = 8
+  case V = 9
+  case T = 10
+  case LV = 11
+  case LVT = 12
+
+  var description: String {
+    switch self {
+    case Other:
+      return "Other"
+    case CR:
+      return "CR"
+    case LF:
+      return "LF"
+    case Control:
+      return "Control"
+    case Extend:
+      return "Extend"
+    case Regional_Indicator:
+      return "Regional_Indicator"
+    case Prepend:
+      return "Prepend"
+    case SpacingMark:
+      return "SpacingMark"
+    case L:
+      return "L"
+    case V:
+      return "V"
+    case T:
+      return "T"
+    case LV:
+      return "LV"
+    case LVT:
+      return "LVT"
+    }
+  }
+}
+
+struct _GraphemeClusterBreakPropertyRawValue {
+  init(_ rawValue: UInt${BMPDataBytesPerEntry * 8}) {
+    self.rawValue = rawValue
+  }
+
+  var rawValue: UInt${BMPDataBytesPerEntry * 8}
+
+  // Use with care: this operation is expensive (even with optimization
+  // turned on the compiler generates code for a switch).
+  var cookedValue: _GraphemeClusterBreakPropertyValue {
+    return _GraphemeClusterBreakPropertyValue.fromRaw(Int(rawValue))!
+  }
+}
+
+@internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
+  static func _checkParameters() {
+    let metadata = _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata
+
+    _precondition(metadata.BMPFirstLevelIndexBits == ${BMPFirstLevelIndexBits})
+    _precondition(metadata.BMPDataOffsetBits == ${BMPDataOffsetBits})
+    _precondition(metadata.SuppFirstLevelIndexBits == ${SuppFirstLevelIndexBits})
+    _precondition(metadata.SuppSecondLevelIndexBits == ${SuppSecondLevelIndexBits})
+    _precondition(metadata.SuppDataOffsetBits == ${SuppDataOffsetBits})
+
+    _precondition(metadata.BMPLookupBytesPerEntry == ${BMPLookupBytesPerEntry})
+    _precondition(metadata.BMPDataBytesPerEntry == ${BMPDataBytesPerEntry})
+    _precondition(metadata.SuppLookup1BytesPerEntry == ${SuppLookup1BytesPerEntry})
+    _precondition(metadata.SuppLookup2BytesPerEntry == ${SuppLookup2BytesPerEntry})
+    _precondition(metadata.SuppDataBytesPerEntry == ${SuppDataBytesPerEntry})
+
+    _precondition(metadata.TrieSize == ${TrieSize})
+
+    _precondition(metadata.BMPLookupBytesOffset == ${BMPLookupBytesOffset})
+    _precondition(metadata.BMPDataBytesOffset == ${BMPDataBytesOffset})
+    _precondition(metadata.SuppLookup1BytesOffset == ${SuppLookup1BytesOffset})
+    _precondition(metadata.SuppLookup2BytesOffset == ${SuppLookup2BytesOffset})
+    _precondition(metadata.SuppDataBytesOffset == ${SuppDataBytesOffset})
+  }
+
+  let _trieData: ConstUnsafePointer<UInt8>
+
+% if BMPLookupBytesPerEntry == 1:
+  @transparent var _BMPLookup: ConstUnsafePointer<UInt8> {
+    return _trieData + ${BMPLookupBytesOffset}
+  }
+% end
+
+% if BMPDataBytesPerEntry == 1:
+  @transparent var _BMPData: ConstUnsafePointer<UInt8> {
+    return _trieData + ${BMPDataBytesOffset}
+  }
+% end
+
+% if SuppLookup1BytesPerEntry == 1:
+  @transparent var _SuppLookup1: ConstUnsafePointer<UInt8> {
+    return _trieData + ${SuppLookup1BytesOffset}
+  }
+% end
+
+% if SuppLookup2BytesPerEntry == 1:
+  @transparent var _SuppLookup2: ConstUnsafePointer<UInt8> {
+    return _trieData + ${SuppLookup2BytesOffset}
+  }
+% end
+
+% if SuppDataBytesPerEntry == 1:
+  @transparent var _SuppData: ConstUnsafePointer<UInt8> {
+    return _trieData + ${SuppDataBytesOffset}
+  }
+% end
+
+  init() {
+#if INTERNAL_CHECKS_ENABLED
+    _UnicodeGraphemeClusterBreakPropertyTrie._checkParameters()
+#endif
+    _trieData = _swift_stdlib_GraphemeClusterBreakPropertyTrie
+  }
+
+  @transparent
+  func _getBMPFirstLevelIndex(cp: UInt32) -> Int {
+    return Int(cp >> ${BMPFirstLevelIndexBits})
+  }
+
+  @transparent
+  func _getBMPDataOffset(cp: UInt32) -> Int {
+    return Int(cp & ((1 << ${BMPDataOffsetBits}) - 1))
+  }
+
+  @transparent
+  func _getSuppFirstLevelIndex(cp: UInt32) -> Int {
+    return Int(cp >> (${SuppSecondLevelIndexBits} + ${SuppDataOffsetBits}))
+  }
+
+  @transparent
+  func _getSuppSecondLevelIndex(cp: UInt32) -> Int {
+    return Int((cp >> ${SuppDataOffsetBits}) &
+        ((1 << ${SuppSecondLevelIndexBits}) - 1))
+  }
+
+  @transparent
+  func _getSuppDataOffset(cp: UInt32) -> Int {
+    return Int(cp & ((1 << ${SuppDataOffsetBits}) - 1))
+  }
+
+  func getPropertyRawValue(
+      codePoint: UInt32
+  ) -> _GraphemeClusterBreakPropertyRawValue {
+    // Note: for optimization, the code below uses '&+' instead of '+' to avoid
+    // a few branches.  There is no possibility of overflow here.
+    //
+    // The optimizer could figure this out, but right now it keeps extra checks
+    // if '+' is used.
+
+    if _fastPath(codePoint <= 0xffff) {
+      let dataBlockIndex = Int(_BMPLookup[_getBMPFirstLevelIndex(codePoint)])
+      return _GraphemeClusterBreakPropertyRawValue(
+          _BMPData[
+              (dataBlockIndex << ${BMPDataOffsetBits}) &+
+              _getBMPDataOffset(codePoint)])
+    } else {
+      _precondition(codePoint <= 0x10ffff)
+      let secondLookupIndex = Int(_SuppLookup1[_getSuppFirstLevelIndex(codePoint)])
+      let dataBlockIndex = Int(_SuppLookup2[
+          (secondLookupIndex << ${SuppSecondLevelIndexBits}) &+
+          _getSuppSecondLevelIndex(codePoint)])
+      return _GraphemeClusterBreakPropertyRawValue(
+          _SuppData[
+              (dataBlockIndex << ${SuppDataOffsetBits}) &+
+              _getSuppDataOffset(codePoint)])
+    }
+  }
+
+  func getPropertyValue(codePoint: UInt32) -> _GraphemeClusterBreakPropertyValue {
+    return getPropertyRawValue(codePoint).cookedValue
+  }
+}
+
+@internal struct _UnicodeExtendedGraphemeClusterSegmenter {
+  let _noBoundaryRulesMatrix: ConstUnsafePointer<UInt16>
+
+  init() {
+    _noBoundaryRulesMatrix =
+        _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix
+  }
+
+  func isBoundaryAfter(gcb: _GraphemeClusterBreakPropertyRawValue) -> Bool {
+    let ruleRow = _noBoundaryRulesMatrix[Int(gcb.rawValue)]
+    return ruleRow == 0
+  }
+
+  func isBoundary(
+      gcb1: _GraphemeClusterBreakPropertyRawValue,
+      _ gcb2: _GraphemeClusterBreakPropertyRawValue
+  ) -> Bool {
+    let ruleRow = _noBoundaryRulesMatrix[Int(gcb1.rawValue)]
+    return (ruleRow & (1 << UInt16(gcb2.rawValue))) == 0
+  }
+}
+
