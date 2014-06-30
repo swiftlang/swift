@@ -1,11 +1,11 @@
-struct Empty {}
+@public struct Empty {}
 
-struct TwoInts {
-  var x, y : Int
+@public struct TwoInts {
+  @public var x, y : Int
 }
 
-struct ComputedProperty {
-  var value : Int {
+@public struct ComputedProperty {
+  @public var value : Int {
     get {
       var result = 0
       return result
@@ -14,83 +14,83 @@ struct ComputedProperty {
 }
 
 // Generics
-struct Pair<A, B> {
-  var first : A
-  var second : B
+@public struct Pair<A, B> {
+  @public var first : A
+  @public var second : B
 
-  init(a : A, b : B) {
+  @public init(a : A, b : B) {
     first = a
     second = b
   }
 }
 
-typealias VoidPairTuple = ((), ())
+@public typealias VoidPairTuple = ((), ())
 
-struct GenericCtor<U> {
-  init<T>(_ t : T) {}
+@public struct GenericCtor<U> {
+  @public init<T>(_ t : T) {}
 
-  func doSomething<T>(t: T) {}
+  @public func doSomething<T>(t: T) {}
 
-  @conversion func __conversion() -> VoidPairTuple {
+  @conversion @public func __conversion() -> VoidPairTuple {
     return ((), ())
   }
 }
 
 // Protocols
-protocol Resettable {
+@public protocol Resettable {
   mutating
   func reset()
 }
 
-struct ResettableIntWrapper : Resettable {
-  var value : Int
-  mutating
+@public struct ResettableIntWrapper : Resettable {
+  @public var value : Int
+  @public mutating
   func reset() {
     var zero = 0
     value = zero
   }
 }
 
-protocol Computable {
+@public protocol Computable {
   mutating
   func compute()
 }
 
-typealias Cacheable = protocol<Resettable, Computable>
+@public typealias Cacheable = protocol<Resettable, Computable>
 
-protocol SpecialResettable : Resettable, Computable {}
+@public protocol SpecialResettable : Resettable, Computable {}
 
-protocol HasAssociatedType {
+@public protocol HasAssociatedType {
   typealias ComputableType : Computable
 }
 
-struct ComputableWrapper<T : Computable> : HasAssociatedType {
-  typealias ComputableType = T
+@public struct ComputableWrapper<T : Computable> : HasAssociatedType {
+  @public typealias ComputableType = T
 }
 
-protocol AnotherAssociatedType {
+@public protocol AnotherAssociatedType {
   typealias ResettableType : Resettable
 }
 
-struct ResettableWrapper<T : Resettable> : AnotherAssociatedType {
-  typealias ResettableType = T
+@public struct ResettableWrapper<T : Resettable> : AnotherAssociatedType {
+  @public typealias ResettableType = T
 }
 
-func cacheViaWrappers<
+@public func cacheViaWrappers<
   T : HasAssociatedType, U : AnotherAssociatedType
     where T.ComputableType == U.ResettableType
 >(computable : T, resettable : U) {}
 
 
 // Subscripts
-struct ReadonlySimpleSubscript {
-  subscript(x : Int) -> Bool {
+@public struct ReadonlySimpleSubscript {
+  @public subscript(x : Int) -> Bool {
     return true
   }
 }
 
-struct ComplexSubscript {
-  subscript(x : Int, y : Bool) -> Int {
+@public struct ComplexSubscript {
+  @public subscript(x : Int, y : Bool) -> Int {
     set(newValue) {
       // do nothing!
     }
@@ -102,21 +102,21 @@ struct ComplexSubscript {
 
 
 // Extensions
-extension Empty {
-  func doAbsolutelyNothing() {}
+@public extension Empty {
+  @public func doAbsolutelyNothing() {}
 }
 
-struct UnComputable {}
+@public struct UnComputable {}
 extension UnComputable : Computable {
-  init(x : Int) {}
-  func compute() {}
-  static func canCompute() -> Bool {
+  @public init(x : Int) {}
+  @public func compute() {}
+  @public static func canCompute() -> Bool {
     return true
   }
 }
 
-extension Pair {
-  func swap() -> (B, A) {
+@public extension Pair {
+  @public func swap() -> (B, A) {
     return (second, first)
   }
 }

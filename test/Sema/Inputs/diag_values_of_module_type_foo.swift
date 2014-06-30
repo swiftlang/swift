@@ -1,23 +1,23 @@
-class SomeClass {
-  class NestedClass {}
+@public class SomeClass {
+  @public class NestedClass {}
 
-  static func staticFunc1() -> Int {}
-  static var staticVar1: Int
+  @public static func staticFunc1() -> Int {}
+  @public static var staticVar1: Int
 }
-struct SomeStruct {
-  init() {}
-  init(a: Int) {}
+@public struct SomeStruct {
+  @public init() {}
+  @public init(a: Int) {}
 }
-enum SomeEnum {
+@public enum SomeEnum {
   case Foo
 }
-protocol SomeProtocol {
+@public protocol SomeProtocol {
   typealias Foo
 }
-protocol SomeExistential {
+@public protocol SomeExistential {
 }
-class SomeProtocolImpl : SomeProtocol {}
-typealias SomeTypealias = Swift.Int
-var someGlobal: Int
-func someFunc() {}
+@public class SomeProtocolImpl : SomeProtocol {}
+@public typealias SomeTypealias = Swift.Int
+@public var someGlobal: Int
+@public func someFunc() {}
 

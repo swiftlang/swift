@@ -5,6 +5,6 @@ operator infix ~~ {
   precedence 200
 }
 
-func ~~(x: Int, y: Int) -> Bool {
+@public func ~~(x: Int, y: Int) -> Bool {
   return x < y
 }

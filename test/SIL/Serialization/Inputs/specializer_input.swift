@@ -1,7 +1,7 @@
 
-typealias Int = Builtin.Int32
+@public typealias Int = Builtin.Int32
 
-struct Container<V> {
-  func doSomething() {}
+@public struct Container<V> {
+  @public func doSomething() {}
 }
 

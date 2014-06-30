@@ -1,17 +1,17 @@
 
-protocol P {
+@public protocol P {
   func doSomething()
 }
 
-@asmname("unknown")
+@asmname("unknown") @public
 func unknown() -> ()
 
-struct X : P {
-  func doSomething() {
+@public struct X : P {
+  @public func doSomething() {
     unknown()
   }
 }
 
-func whatShouldIDo(p : P) {
+@public func whatShouldIDo(p : P) {
   p.doSomething()
 }

@@ -1,21 +1,21 @@
 // This is an overlay Swift module.
 @exported import ObjectiveC
 
-struct ObjCBool : Printable {
-  var value : UInt8
+@public struct ObjCBool : Printable {
+  @private var value : UInt8
 
   /// \brief Allow use in a Boolean context.
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     return value != 0
   }
 
   /// \brief Implicit conversion from C Boolean type to Swift Boolean
   /// type.
-  @conversion func __conversion() -> Bool {
+  @conversion @public func __conversion() -> Bool {
     return self.getLogicValue()
   }
 
-  var description: String {
+  @public var description: String {
     // Dispatch to Bool.
     return self.getLogicValue().description
   }
@@ -24,25 +24,25 @@ struct ObjCBool : Printable {
 extension Bool {
   /// \brief Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
-  @conversion func __conversion() -> ObjCBool {
+  @conversion @public func __conversion() -> ObjCBool {
     return ObjCBool(self ? 1 : 0)
   }
 }
 
-struct Selector : StringLiteralConvertible {
-  var ptr : COpaquePointer
+@public struct Selector : StringLiteralConvertible {
+  @private var ptr : COpaquePointer
 
-  static func convertFromStringLiteral(str: CString) -> Selector {
+  @public static func convertFromStringLiteral(str: CString) -> Selector {
     return sel_registerName(str)
   }
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+@internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return x
 }
-func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+@internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
 }
 

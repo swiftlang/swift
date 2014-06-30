@@ -95,7 +95,7 @@ func nsEncode<CodeUnit>(
 
 // Convert the given numeric value to a hexidecimal string
 func hex<T : Integer>(x: T) -> String {
-  return "0x" + _int64ToString(x.toIntMax(), radix: 16)
+  return "0x" + String(x.toIntMax(), radix: 16)
 }
 
 // Convert the given sequence of numeric values to a string

@@ -1,62 +1,62 @@
-protocol Fooable {
+@public protocol Fooable {
   func foo<T>(x: T)
 }
 
-class FooClass : Fooable {
-  init() { }
-  func foo<U>(x: U) {}
+@public class FooClass : Fooable {
+  @public init() { }
+  @public func foo<U>(x: U) {}
 }
 
-struct FooStruct : Fooable {
-  func foo<V>(x: V) {}
+@public struct FooStruct : Fooable {
+  @public func foo<V>(x: V) {}
 }
 
 
-protocol Barrable {
+@public protocol Barrable {
   func bar<T>(x: Self, y: T)
 }
 
-class BarClass : Barrable {
-  init() { }
-  func bar<U>(x: BarClass, y: U) { }
+@public class BarClass : Barrable {
+  @public init() { }
+  @public func bar<U>(x: BarClass, y: U) { }
 }
 
-struct BarStruct : Barrable {
-  var x = 0
-  func bar<V>(x: BarStruct, y: V) { }
+@public struct BarStruct : Barrable {
+  @public var x = 0
+  @public func bar<V>(x: BarStruct, y: V) { }
 }
 
 
-protocol HasAssociatedType {
+@public protocol HasAssociatedType {
   typealias Foo : Fooable
 }
 
-protocol Bassable {
+@public protocol Bassable {
   func bas<T : HasAssociatedType>(x: T, y: T.Foo)
 }
 
-class BasClass : Bassable {
-  init() { }
-  func bas<U : HasAssociatedType>(x: U, y: U.Foo) {}
+@public class BasClass : Bassable {
+  @public init() { }
+  @public func bas<U : HasAssociatedType>(x: U, y: U.Foo) {}
 }
 
-struct BasStruct : Bassable {
-  func bas<V : HasAssociatedType>(x: V, y: V.Foo) {}
+@public struct BasStruct : Bassable {
+  @public func bas<V : HasAssociatedType>(x: V, y: V.Foo) {}
 }
 
 
 operator prefix ~~~ {}
 
-protocol _CyclicAssociatedType {
+@public protocol _CyclicAssociatedType {
   typealias Assoc = CyclicImpl
 }
 
-protocol CyclicAssociatedType : _CyclicAssociatedType {
+@public protocol CyclicAssociatedType : _CyclicAssociatedType {
   @prefix func ~~~(_: Self.Type)
 }
 
-@prefix func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
+@prefix @public func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
 
-struct CyclicImpl : CyclicAssociatedType {
-  typealias Assoc = CyclicImpl
+@public struct CyclicImpl : CyclicAssociatedType {
+  @public typealias Assoc = CyclicImpl
 }

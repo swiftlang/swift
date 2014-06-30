@@ -1,7 +1,7 @@
 import Foundation
 @exported import UIKit
 
-@asmname("UIApplicationMain")
+@asmname("UIApplicationMain") @public
 func UIApplicationMain(argc: CInt,
                        argv: UnsafePointer<CString>,
                        principalClassName: NSString?,

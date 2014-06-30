@@ -3,10 +3,10 @@
 
 import gizmo
 
-class Bas {
-  func runce() -> NSObject { return NSObject() }
+@public class Bas {
+  @public func runce() -> NSObject { return NSObject() }
 }
 
-class Zang {
-  func funge() {}
+@public class Zang {
+  @public func funge() {}
 }

@@ -1,17 +1,17 @@
 // Adopt ForwardIndex via BidirectionalIndex.
-struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>> : BidirectionalIndex {
-  var value = 0
+@public struct Counter<T: protocol<RandomAccessIndex, IntegerLiteralConvertible>> : BidirectionalIndex {
+  @public var value = 0
   
-  func predecessor() -> Counter {
+  @public func predecessor() -> Counter {
     return Counter(value: value - 1)
   }
 
-  func successor() -> Counter {
+  @public func successor() -> Counter {
     return Counter(value: value + 1)
   }
 }
 
-func == <T>(lhs: Counter<T>, rhs: Counter<T>) -> Bool {
+@public func == <T>(lhs: Counter<T>, rhs: Counter<T>) -> Bool {
   return lhs.value == rhs.value
 }
 

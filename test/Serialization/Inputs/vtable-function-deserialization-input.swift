@@ -1,26 +1,26 @@
 
-struct Y {}
+@public struct Y {}
 
-struct X<U> {
-  var a : U
+@public struct X<U> {
+  @public var a : U
 
-  init(_a : U) {
+  @public init(_a : U) {
     a = _a
   }
 
-  func doneSomething() {}
+  @public func doneSomething() {}
 }
 
-class A {
-  var y : Y
-  var x : X<Y>
+@public class A {
+  @public var y : Y
+  @public var x : X<Y>
 
-  init() {
+  @public init() {
     y = Y()
     x = X<Y>(_a: y)
   }
 
-  func doSomething() {
+  @public func doSomething() {
     x.doneSomething()
   }
 }

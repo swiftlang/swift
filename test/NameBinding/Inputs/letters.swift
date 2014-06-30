@@ -4,12 +4,12 @@
 @exported import struct asdf.D
 import struct asdf.S
 
-struct C {
-  var b : B
+@public struct C {
+  @public var b : B
 }
 
-struct F {}
+@public struct F {}
 
-var myS : S = S()
-func consumeS(s: S) {}
+@public var myS : S = S()
+@public func consumeS(s: S) {}
 

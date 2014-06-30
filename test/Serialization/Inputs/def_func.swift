@@ -1,48 +1,48 @@
-func getZero() -> Int {
+@public func getZero() -> Int {
   return 0
 }
 
-func getInput(#x: Int) -> Int {
+@public func getInput(#x: Int) -> Int {
   return x
 }
 
-func getSecond(Int, #y: Int) -> Int {
+@public func getSecond(Int, #y: Int) -> Int {
   return y
 }
 
-func useNested((x: Int, y: Int), #n: Int) {}
+@public func useNested((x: Int, y: Int), #n: Int) {}
 
-func variadic(#x: Double, y: Int...) {}
+@public func variadic(#x: Double, y: Int...) {}
 
-func slice(#x: [Int]) {}
-func optional(#x: Int?) {}
+@public func slice(#x: [Int]) {}
+@public func optional(#x: Int?) {}
 
-func overloaded(#x: Int) {}
-func overloaded(#x: Bool) {}
+@public func overloaded(#x: Int) {}
+@public func overloaded(#x: Bool) {}
 
 // Generic functions.
-func makePair<A, B>(#a: A, #b: B) -> (A, B) {
+@public func makePair<A, B>(#a: A, #b: B) -> (A, B) {
   return (a, b)
 }
 
-func different<T : Equatable>(#a: T, #b: T) -> Bool {
+@public func different<T : Equatable>(#a: T, #b: T) -> Bool {
   return a != b
 }
 
-func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
+@public func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
   return a != b
 }
 
-func selectorFunc1(#a: Int, b x: Int) {}
+@public func selectorFunc1(#a: Int, b x: Int) {}
 
-protocol Wrapped {
+@public protocol Wrapped {
   typealias ValueType : Equatable
   
   //var value : ValueType
   func getValue() -> ValueType
 }
 
-func differentWrapped<
+@public func differentWrapped<
   T : Wrapped, U : Wrapped
   where
   T.ValueType == U.ValueType
@@ -50,14 +50,14 @@ func differentWrapped<
   return a.getValue() != b.getValue()
 }
 
-@noreturn @asmname("exit") func exit ()->()
+@noreturn @asmname("exit") @public func exit ()->()
 
-@noreturn func testNoReturnAttr() -> () { exit() }
-@noreturn func testNoReturnAttrPoly<T>(#x: T) -> () { exit() }
+@noreturn @public func testNoReturnAttr() -> () { exit() }
+@noreturn @public func testNoReturnAttrPoly<T>(#x: T) -> () { exit() }
 
 
-@asmname("primitive") func primitive()
+@asmname("primitive") @public func primitive()
 
-protocol EqualOperator {
+@public protocol EqualOperator {
   func ==(x: Self, y: Self) -> Bool
 }

@@ -32,25 +32,25 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 extension String : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
-  func bridgeToObjectiveC() -> NSString {
+  @public func bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  static func bridgeFromObjectiveC(x: NSString) -> String {
+  @public static func bridgeFromObjectiveC(x: NSString) -> String {
     fatal("implement")
   }
 }
 
 extension Int : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
-  func bridgeToObjectiveC() -> NSNumber {
+  @public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  @public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     fatal("implement")
   }
 }
@@ -92,7 +92,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 }
 
 extension NSObject : Hashable {
-  var hashValue: Int { return 0 }
+  @public var hashValue: Int { return 0 }
 }
 
-func == (x: NSObject, y: NSObject) -> Bool { return true }
+@public func == (x: NSObject, y: NSObject) -> Bool { return true }

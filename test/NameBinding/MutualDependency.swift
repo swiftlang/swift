@@ -8,9 +8,9 @@
 
 import MutualDependencyHelper
 
-class MyClass {
+@public class MyClass {
   // FIXME: This is an error in -i mode.
-  var delegate : MyDelegate // expected-error {{use of undeclared type}}
+  @public var delegate : MyDelegate // expected-error {{use of undeclared type}}
 
-  init() {}
+  @public init() {}
 }

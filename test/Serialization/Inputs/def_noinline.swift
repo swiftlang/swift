@@ -1,3 +1,3 @@
-@noinline func testNoinline(#x: Bool) -> Bool {
+@noinline @public func testNoinline(#x: Bool) -> Bool {
   return x
 }

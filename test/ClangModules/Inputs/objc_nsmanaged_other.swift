@@ -1,10 +1,10 @@
 import CoreData
 
 // <rdar://problem/16879162>
-class OtherManagedObject : NSManagedObject {
-  @NSManaged var managed: String
+@public class OtherManagedObject : NSManagedObject {
+  @NSManaged @public var managed: String
 }
 
-func getMyManagedObject() -> MyManagedObject {
+@public func getMyManagedObject() -> MyManagedObject {
   return MyManagedObject()
 }

@@ -1,7 +1,7 @@
 
-@asmname("evil") func _evil()
+@asmname("evil") @public func _evil()
 
-func id<U>(u : U) -> U {
+@public func id<U>(u : U) -> U {
   _evil()
   _evil()
   _evil()
@@ -25,16 +25,16 @@ func id<U>(u : U) -> U {
   return u
 }
 
-protocol Z {
+@public protocol Z {
   func f() -> Z
 }
 
-struct X : Z {
-  func f() -> Z {
+@public struct X : Z {
+  @public func f() -> Z {
     return id(self)
   }
 }
 
-func makeZDoSomething(z : Z) -> Z {
+@public func makeZDoSomething(z : Z) -> Z {
   return z.f()
 }

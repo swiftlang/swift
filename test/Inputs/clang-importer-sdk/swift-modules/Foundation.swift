@@ -2,21 +2,21 @@
 @exported import CoreGraphics
 @exported import Foundation
 
-@asmname("swift_StringToNSString")
+@asmname("swift_StringToNSString") @internal
 func _convertStringToNSString(string: String) -> NSString
 
-@asmname("swift_NSStringToString")
+@asmname("swift_NSStringToString") @internal
 func _convertNSStringToString(nsstring: NSString) -> String
 
-struct NSZone {
-  var pointer : COpaquePointer
+@public struct NSZone {
+  @public var pointer : COpaquePointer
 }
 
-func == (lhs: NSObject, rhs: NSObject) -> Bool {
+@public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-let NSUTF8StringEncoding: UInt = 8
+@public let NSUTF8StringEncoding: UInt = 8
 
 // NSArray bridging entry points
 func _convertNSArrayToArray<T>(nsarr: NSArray) -> [T] {
@@ -28,62 +28,62 @@ func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 // NSDictionary bridging entry points
-func _convertDictionaryToNSDictionary<KeyType, ValueType>(
+@internal func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     d: Dictionary<KeyType, ValueType>
 ) -> NSDictionary {
   return NSDictionary()
 }
 
-func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
+@internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
        d: NSDictionary
      ) -> Dictionary<K, V> {
   return Dictionary<K, V>()
 }
 
 extension String : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
-  func bridgeToObjectiveC() -> NSString {
+  @public func bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  static func bridgeFromObjectiveC(x: NSString) -> String {
+  @public static func bridgeFromObjectiveC(x: NSString) -> String {
     _fatalError("implement")
   }
 }
 
 extension Int : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
-  func bridgeToObjectiveC() -> NSNumber {
+  @public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  @public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     _fatalError("implement")
   }
 }
 
 extension Array : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
-  func bridgeToObjectiveC() -> NSArray {
+  @public func bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  static func bridgeFromObjectiveC(x: NSArray) -> Array {
+  @public static func bridgeFromObjectiveC(x: NSArray) -> Array {
     return []
   }
 }
 
 extension Dictionary : _BridgedToObjectiveC {
-  static func getObjectiveCType() -> Any.Type {
+  @public static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
-  func bridgeToObjectiveC() -> NSDictionary {
+  @public func bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+  @public static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     return [:]
   }
 }

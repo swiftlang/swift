@@ -16,8 +16,8 @@ operator infix *-* {
   precedence 10
 }
 
-@prefix func ~~~(x: Bool) -> () {}
-@postfix @assignment func ^^(inout x: Bool) -> () { x = true }
-@infix func *-*(x: Bool, y: Bool) -> () {}
-@infix @assignment func  *-(inout x: Bool, y: Bool) -> Bool { x = y; return x }
+@prefix @public func ~~~(x: Bool) -> () {}
+@postfix @assignment @public func ^^(inout x: Bool) -> () { x = true }
+@infix @public func *-*(x: Bool, y: Bool) -> () {}
+@infix @assignment @public func  *-(inout x: Bool, y: Bool) -> Bool { x = y; return x }
 

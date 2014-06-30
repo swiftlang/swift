@@ -3,21 +3,21 @@ operator infix %%% {
   precedence 200
 }
 
-func %%% (lhs: Int, rhs: Int) -> Int {
+@public func %%% (lhs: Int, rhs: Int) -> Int {
   return lhs + rhs
 }
 
-func visibleImport() {}
-func hiddenImport() {}
+@public func visibleImport() {}
+@public func hiddenImport() {}
 
-func overlayedFoo() {}
+@public func overlayedFoo() {}
 
 /// FooSwiftStruct Aaa.
 /**
  * Bbb.
  * Ccc.
  */
-struct FooSwiftStruct {
+@public struct FooSwiftStruct {
   // Indentation is incorrect on purpose, don't fix this.
 
     /// fooInstanceFunc Aaa.
@@ -27,17 +27,17 @@ struct FooSwiftStruct {
       /**
        * Ccc.
        */
-    func fooInstanceFunc() {}
+    @public func fooInstanceFunc() {}
 }
-struct BarGenericSwiftStruct1<T> {
-  init(t: T) {}
-  func bar1InstanceFunc() {}
+@public struct BarGenericSwiftStruct1<T> {
+  @public init(t: T) {}
+  @public func bar1InstanceFunc() {}
 }
-protocol BarProtocol {
+@public protocol BarProtocol {
   func instanceFunc()
 }
-struct BarGenericSwiftStruct2<T: BarProtocol, U> {
-  init(t: T, u: U) {}
-  func bar2InstanceFunc() {}
+@public struct BarGenericSwiftStruct2<T: BarProtocol, U> {
+  @public init(t: T, u: U) {}
+  @public func bar2InstanceFunc() {}
 }
 

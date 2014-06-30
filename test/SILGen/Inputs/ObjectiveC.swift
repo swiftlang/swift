@@ -2,18 +2,18 @@
 
 @exported import ObjectiveC
 
-struct ObjCBool : LogicValue {
+@public struct ObjCBool : LogicValue {
   var value : UInt8
 
   /// \brief Allow use in a Boolean context.
-  func getLogicValue() -> Bool {
+  @public func getLogicValue() -> Bool {
     if value == 0 { return false }
     return true
   }
 
   /// \brief Implicit conversion from C Boolean type to Swift Boolean
   /// type.
-  @conversion func __conversion() -> Bool {
+  @conversion @public func __conversion() -> Bool {
     return self
   }
 }

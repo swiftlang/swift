@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 //
-// RUN: echo "typealias TestFloat = Float" > %t/float_type.swift
+// RUN: echo "@public typealias TestFloat = Float" > %t/float_type.swift
 // RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/float.out
 // RUN: %target-run %t/float.out | FileCheck %s
 
-// RUN: echo "typealias TestFloat = Double" > %t/float_type.swift
+// RUN: echo "@public typealias TestFloat = Double" > %t/float_type.swift
 // RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/double.out
 // RUN: %target-run %t/double.out | FileCheck %s
 

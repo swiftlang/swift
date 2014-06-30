@@ -1,16 +1,16 @@
-@objc class BaseClass {}
+@objc @public class BaseClass {}
 
-func getBaseClass() -> BaseClass {
+@public func getBaseClass() -> BaseClass {
   return BaseClass()
 }
 
-func useBaseClass(_: BaseClass) {}
+@public func useBaseClass(_: BaseClass) {}
 
-@objc @class_protocol
+@objc @class_protocol @public
 protocol BaseProto {}
 
-func useBaseProto(_: BaseProto) {}
+@public func useBaseProto(_: BaseProto) {}
 
 extension BaseClass {
-  func extensionMethod() {}
+  @public func extensionMethod() {}
 }

@@ -1,8 +1,8 @@
-func something(value: Bool) -> Bool { return value }
+@public func something(value: Bool) -> Bool { return value }
 
-func ambiguousWithVar(_: Bool) {}
+@public func ambiguousWithVar(_: Bool) {}
 
-func scopedFunction(value: Bool) -> Bool { return value }
+@public func scopedFunction(value: Bool) -> Bool { return value }
 
-struct TypeNameWins {}
-struct localVar {}
+@public struct TypeNameWins {}
+@public struct localVar {}

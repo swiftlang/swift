@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 
-enum unionSearchFlags {
+@public enum unionSearchFlags {
   case None
   case Backwards
   case Anchored

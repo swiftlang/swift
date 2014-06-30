@@ -1,18 +1,18 @@
 
-protocol A {
+@public protocol A {
   class func a()
 }
 
-protocol B : A {
+@public protocol B : A {
   class func b()
 }
 
-struct S {}
+@public struct S {}
 
 extension S : A {
-  static func a() { }
+  @public static func a() { }
 }
 
 extension S : B {
-  static func b() { }
+  @public static func b() { }
 }

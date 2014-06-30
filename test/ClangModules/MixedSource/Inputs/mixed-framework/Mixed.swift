@@ -1,12 +1,12 @@
 // Do not add an import of the Clang "Mixed" module here!
 
-@objc class SwiftClass {
-  init(x: Int) {}
-  func pureSwiftMethod(x: Int?) -> Bool {
+@public @objc class SwiftClass {
+  @public init(x: Int) {}
+  @public func pureSwiftMethod(x: Int?) -> Bool {
     return x ? true : false
   }
 }
 
-class PureSwiftClass {
-  class func verify() -> Bool { return true }
+@public class PureSwiftClass {
+  @public class func verify() -> Bool { return true }
 }

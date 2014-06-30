@@ -1,25 +1,25 @@
-@class_protocol @objc protocol ObjCProto {
+@class_protocol @objc @public protocol ObjCProto {
   func doSomething()
 }
 
-@objc class ObjCClass {
-  class func classMethod() {}
-  func implicitlyObjC() {}
+@objc @public class ObjCClass {
+  @public class func classMethod() {}
+  @public func implicitlyObjC() {}
 
-  @IBOutlet var outlet : ObjCClass = ObjCClass()
-  @IBAction func performAction(_: AnyObject?) {}
+  @IBOutlet @public var outlet : ObjCClass = ObjCClass()
+  @IBAction @public func performAction(_: AnyObject?) {}
 }
 
-class NonObjCClass : ObjCProto {
-  func doSomething() {}
+@public class NonObjCClass : ObjCProto {
+  @public func doSomething() {}
 
-  @objc func objcMethod() {}
-  @objc var objcProp : ObjCClass = ObjCClass()
+  @objc @public func objcMethod() {}
+  @objc @public var objcProp : ObjCClass = ObjCClass()
 
-  @objc subscript (i : Int) -> Int {
+  @objc @public subscript (i : Int) -> Int {
     return 5
   }
 
-  @IBOutlet var outlet : ObjCClass! = ObjCClass()
-  @IBAction func performAction(_: AnyObject?) {}
+  @IBOutlet @public var outlet : ObjCClass! = ObjCClass()
+  @IBAction @public func performAction(_: AnyObject?) {}
 }

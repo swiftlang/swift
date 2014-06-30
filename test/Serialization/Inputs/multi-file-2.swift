@@ -1,10 +1,10 @@
 // Do not put any classes in this file. It's part of the test that no classes
 // get serialized here.
 
-enum TheEnum {
+@public enum TheEnum {
   case A, B, C(MyClass)
 }
 
-enum EquatableEnum {
+@public enum EquatableEnum {
   case A
 }

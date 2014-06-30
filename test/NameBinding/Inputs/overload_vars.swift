@@ -1,8 +1,8 @@
-var something : Int = 1
+@public var something : Int = 1
 
-var ambiguousWithVar : Int = 2
-var scopedVar : Int = 3
-var localVar : Int = 4
-var scopedFunction : Int = 5
+@public var ambiguousWithVar : Int = 2
+@public var scopedVar : Int = 3
+@public var localVar : Int = 4
+@public var scopedFunction : Int = 5
 
-var typeNameWins : Int = 6
+@public var typeNameWins : Int = 6

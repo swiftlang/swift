@@ -1,17 +1,17 @@
 
-protocol P {
+@public protocol P {
   func doSomething()
 }
 
-@asmname("unknown")
+@asmname("unknown") @public
 func unknown() -> ()
 
-class Y : P {
-  func doAnotherThing() {
+@public class Y : P {
+  @public func doAnotherThing() {
     unknown()
   }
 
-  func doSomething() {
+  @public func doSomething() {
     doAnotherThing()
   }
 }

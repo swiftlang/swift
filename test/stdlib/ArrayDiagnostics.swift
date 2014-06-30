@@ -4,6 +4,6 @@ class NotEquatable {}
 
 func test_ArrayOfNotEquatableIsNotEquatable() {
   var a = [ NotEquatable(), NotEquatable() ]
-  if a == a {} // expected-error {{'[NotEquatable]' is not convertible to '_ArrayCastKind'}}
+  if a == a {} // expected-error {{'[NotEquatable]' is not convertible to 'MirrorDisposition'}}
 }
 

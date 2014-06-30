@@ -1,7 +1,7 @@
 
 @asmname("unknown")
-func unknown() -> ()
+@public func unknown() -> ()
 
-func doSomething() {
+@public func doSomething() {
   unknown()
 }

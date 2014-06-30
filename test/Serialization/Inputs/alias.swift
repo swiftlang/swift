@@ -1,28 +1,28 @@
-typealias MyInt64 = Int64
-typealias AnotherInt64 = (MyInt64)
+@public typealias MyInt64 = Int64
+@public typealias AnotherInt64 = (MyInt64)
 
-typealias TwoInts = (MyInt64, Int64)
-typealias ThreeNamedInts = (a : MyInt64, b : MyInt64, c : MyInt64)
-typealias None = ()
+@public typealias TwoInts = (MyInt64, Int64)
+@public typealias ThreeNamedInts = (a : MyInt64, b : MyInt64, c : MyInt64)
+@public typealias None = ()
 
-typealias NullFunction = () -> ()
-typealias IntFunction = (MyInt64) -> MyInt64
-typealias TwoIntFunction = (TwoInts) -> MyInt64
+@public typealias NullFunction = () -> ()
+@public typealias IntFunction = (MyInt64) -> MyInt64
+@public typealias TwoIntFunction = (TwoInts) -> MyInt64
 
-struct AliasWrapper {
-  typealias Boolean = Bool
+@public struct AliasWrapper {
+  @public typealias Boolean = Bool
 }
 
-extension Int {
-  typealias EspeciallyMagicalInt = Int64
+@public extension Int {
+  @public typealias EspeciallyMagicalInt = Int64
 }
 
-typealias IntSlice = [Int]
+@public typealias IntSlice = [Int]
 
 
-struct Base {
-  func foo() -> BaseAlias {
+@public struct Base {
+  @public func foo() -> BaseAlias {
     return self
   }
 }
-typealias BaseAlias = Base
+@public typealias BaseAlias = Base

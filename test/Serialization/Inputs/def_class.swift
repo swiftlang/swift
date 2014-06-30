@@ -1,16 +1,16 @@
-class Empty {}
+@public class Empty {}
 
-class TwoInts {
-  var x, y : Int
+@public class TwoInts {
+  @public var x, y : Int
   
-  @required init(a : Int, b : Int) {
+  @required @public init(a : Int, b : Int) {
     x = a
     y = b
   }
 }
 
-class ComputedProperty {
-  var value : Int {
+@public class ComputedProperty {
+  @public var value : Int {
     get {
       var result = 0
       return result
@@ -20,127 +20,127 @@ class ComputedProperty {
     }
   }
 
-  var readOnly : Int {
+  @public var readOnly : Int {
     return 42
   }
 }
 
 
 // Generics
-class Pair<A, B> {
-  var first : A
-  var second : B
+@public class Pair<A, B> {
+  @public var first : A
+  @public var second : B
 
-  init(a : A, b : B) {
+  @public init(a : A, b : B) {
     first = a
     second = b
   }
 }
 
-class GenericCtor<U> {
-  init<T>(_ t : T) {}
+@public class GenericCtor<U> {
+  @public init<T>(_ t : T) {}
   
-  func doSomething<T>(t : T) {}
+  @public func doSomething<T>(t : T) {}
 }
 
 
 // Protocols
-protocol Resettable {
+@public protocol Resettable {
   func reset()
 }
 
-class ResettableIntWrapper : Resettable {
-  var value : Int
-  init() { value = 0 }
-  func reset() {
+@public class ResettableIntWrapper : Resettable {
+  @public var value : Int
+  @public init() { value = 0 }
+  @public func reset() {
     var zero = 0
     value = zero
   }
 }
 
-protocol Computable {
+@public protocol Computable {
   func compute()
 }
 
-typealias Cacheable = protocol<Resettable, Computable>
+@public typealias Cacheable = protocol<Resettable, Computable>
 
-protocol SpecialResettable : Resettable, Computable {}
+@public protocol SpecialResettable : Resettable, Computable {}
 
-protocol PairLike {
+@public protocol PairLike {
   typealias FirstType
   typealias SecondType
   func getFirst() -> FirstType
   func getSecond() -> SecondType
 }
 
-@class_protocol protocol ClassProto {}
+@class_protocol @public protocol ClassProto {}
 
-@class_protocol @objc protocol ObjCProtoWithOptional {
+@class_protocol @objc @public protocol ObjCProtoWithOptional {
   @optional func optionalMethod()
   @optional var optionalVar: Int { get }
   @optional subscript (i: Int) -> Int { get }
 }
 
 
-class OptionalImplementer : ObjCProtoWithOptional {
-  func unrelated() {}
+@public class OptionalImplementer : ObjCProtoWithOptional {
+  @public func unrelated() {}
 }
 
 
 // Inheritance
-class StillEmpty : Empty, Resettable {
+@public class StillEmpty : Empty, Resettable {
   func reset() {}
 }
 
-class BoolPair<T> : Pair<Bool, Bool>, PairLike {
-  init() { super.init(a: false, b: false) }
-  func bothTrue() -> Bool {
+@public class BoolPair<T> : Pair<Bool, Bool>, PairLike {
+  @public init() { super.init(a: false, b: false) }
+  @public func bothTrue() -> Bool {
     return first && second
   }
 
-  func getFirst() -> Bool { return first }
-  func getSecond() -> Bool { return second }
+  @public func getFirst() -> Bool { return first }
+  @public func getSecond() -> Bool { return second }
 }
 
-class SpecialPair<A> : Pair<Int, Int>, Computable {
-  func compute() {}
+@public class SpecialPair<A> : Pair<Int, Int>, Computable {
+  @public func compute() {}
 }
 
-class OtherPair<A, B> : PairLike {
-  var first : A
-  var second : B
+@public class OtherPair<A, B> : PairLike {
+  @public var first : A
+  @public var second : B
 
-  init(a : A, b : B) {
+  @public init(a : A, b : B) {
     first = a
     second = b
   }
 
-  typealias FirstType = Bool
-  typealias SecondType = Bool
+  @public typealias FirstType = Bool
+  @public typealias SecondType = Bool
 
-  func getFirst() -> Bool { return true }
-  func getSecond() -> Bool { return true }
+  @public func getFirst() -> Bool { return true }
+  @public func getSecond() -> Bool { return true }
 }
 
-class OtherBoolPair<T> : OtherPair<Bool, Bool> {
+@public class OtherBoolPair<T> : OtherPair<Bool, Bool> {
 }
 
-class RequiresPairLike<P : PairLike> { }
+@public class RequiresPairLike<P : PairLike> { }
 
-func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> { 
+@public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> { 
   return RequiresPairLike<OtherBoolPair<Bool>>()
 }
 
 
 // Subscripts
-class ReadonlySimpleSubscript {
-  subscript(x : Int) -> Bool {
+@public class ReadonlySimpleSubscript {
+  @public subscript(x : Int) -> Bool {
     return true
   }
 }
 
-class ComplexSubscript {
-  subscript(x : Int, y : Bool) -> Int {
+@public class ComplexSubscript {
+  @public subscript(x : Int, y : Bool) -> Int {
     set(newValue) {
       // do nothing!
     }
@@ -152,19 +152,19 @@ class ComplexSubscript {
 
 
 // Destructor
-class Resource {
-  init() { }
+@public class Resource {
+  @public init() { }
   deinit {}
 }
 
 
 // Ownership
-class ResourceSharer {
+@public class ResourceSharer {
   // FIXME: Cannot perform in-class initialization here
-  unowned var alwaysPresent : Resource
-  weak var maybePresent : Resource?
+  @public unowned var alwaysPresent : Resource
+  @public weak var maybePresent : Resource?
 
-  init (res: Resource) {
+  @public init (res: Resource) {
     self.alwaysPresent = res
     self.maybePresent = nil
   }

@@ -6,7 +6,7 @@ import Swift
 // ==== Tests =====
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + _uint64ToString(UInt64(reinterpretCast(x) as Word), radix: 16)
+  return "@0x" + String(UInt64(reinterpretCast(x) as Word), radix: 16)
 }
 
 func hexAddr(x: AnyObject?) -> String {
@@ -235,7 +235,7 @@ func printHexSequence<
   var prefix = ""
   for x in s {
     print(prefix);
-    print(_int64ToString(x.toIntMax(), radix: 16))
+    print(String(x.toIntMax(), radix: 16))
     prefix = " "
   }
   println("]")

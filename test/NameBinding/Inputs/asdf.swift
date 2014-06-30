@@ -1,4 +1,4 @@
-struct A {}
-struct D {}
-struct S {}
-struct F {}
+@public struct A {}
+@public struct D {}
+@public struct S {}
+@public struct F {}

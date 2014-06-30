@@ -1,5 +1,5 @@
 import MutualDependency
 
-protocol MyDelegate {
+@public protocol MyDelegate {
   func doSomething(sender: MyClass)
 }

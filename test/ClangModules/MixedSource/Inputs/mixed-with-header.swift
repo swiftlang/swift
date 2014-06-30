@@ -1,37 +1,37 @@
-@objc class ForwardClass : NSObject {
+@objc @public class ForwardClass : NSObject {
 }
 
-@objc protocol ForwardProto : NSObjectProtocol {
+@objc @public protocol ForwardProto : NSObjectProtocol {
 }
-@objc class ForwardProtoAdopter : NSObject, ForwardProto {
-}
-
-@objc class PartialBaseClass {
-}
-@objc class PartialSubClass : NSObject {
+@objc @public class ForwardProtoAdopter : NSObject, ForwardProto {
 }
 
-class ProtoConformer : ForwardClassUser {
-   func consumeForwardClass(arg: ForwardClass) {}
-
-   var forward = ForwardClass()
+@objc @public class PartialBaseClass {
+}
+@objc @public class PartialSubClass : NSObject {
 }
 
-func testProtocolWrapper(conformer: ForwardClassUser) {
+@public class ProtoConformer : ForwardClassUser {
+   @public func consumeForwardClass(arg: ForwardClass) {}
+
+   @public var forward = ForwardClass()
+}
+
+@public func testProtocolWrapper(conformer: ForwardClassUser) {
    conformer.consumeForwardClass(conformer.forward)
 }
 
-func testStruct(p: Point) -> Point {
+@public func testStruct(p: Point) -> Point {
    var result = p
    result.y += 5
    return result
 }
 
-class Derived : Base {
-   override func safeOverride(arg: NSObject) -> ForwardClass {
+@public class Derived : Base {
+   @public override func safeOverride(arg: NSObject) -> ForwardClass {
       return ForwardClass()
    }
 }
 
-func rdar16923405(a: AALevel) {}
+@public func rdar16923405(a: AALevel) {}
 

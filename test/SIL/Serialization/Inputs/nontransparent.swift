@@ -1,21 +1,21 @@
 
-struct B {
-  func amIConfused() {}
+@public struct B {
+  @public func amIConfused() {}
 }
 
-struct A {
-  var b : B
+@public struct A {
+  @public var b : B
 
-  init() {
+  @public init() {
     b = B()
   }
 
-  func isBConfused() {
+  @public func isBConfused() {
     b.amIConfused()
   }
 }
 
-func doSomething() -> A {
+@public func doSomething() -> A {
   var a = A()
   return a
 }

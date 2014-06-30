@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: echo "struct X {}; var x = X()" | %swift -module-name import_builtin -parse-stdlib -emit-module -o %t -
-// RUN: echo "func foo() -> Int { return false }" > %t/import_text.swift
-// RUN: echo "func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
+// RUN: echo "@public struct X {}; @public var x = X()" | %swift -module-name import_builtin -parse-stdlib -emit-module -o %t -
+// RUN: echo "@public func foo() -> Int { return false }" > %t/import_text.swift
+// RUN: echo "@public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
 // RUN: %swift %s -I=%t -sdk "" -enable-source-import -verify -show-diagnostics-after-fatal
 // RUN: not %swift %s -I=%t -sdk "" -enable-source-import 2>&1 | FileCheck %s
 
