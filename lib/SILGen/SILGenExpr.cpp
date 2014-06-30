@@ -1801,47 +1801,6 @@ void SILGenFunction::emitCheckedCastBranch(SILLocation loc,
                           ctx, handleTrue, handleFalse);
 }
 
-std::pair<SILBasicBlock*, SILBasicBlock*>
-SILGenFunction::emitCheckedCastBranch(SILLocation loc,
-                                      SILValue original,
-                                      SILValue originalAbstracted,
-                                      const TypeLowering &origLowering,
-                                      const TypeLowering &castLowering,
-                                      CheckedCastKind kind) {
-  // Spill to a temporary if casting from loadable to address-only or from
-  // metatype to metatype.
-  if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
-    assert(originalAbstracted && "no abstracted value for cast");
-    original = originalAbstracted;
-  }
-  if (original.getType().is<MetatypeType>())
-    original = originalAbstracted;
-  
-  // Get the cast destination type at the least common denominator abstraction
-  // level, thickening metatypes and falling back to address-only casting if
-  // needed.
-  SILType destTy = castLowering.getLoweredType();
-  if (auto metaTy = destTy.getAs<MetatypeType>())
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
-      destTy = SILType::getPrimitiveObjectType(
-                           CanMetatypeType::get(metaTy.getInstanceType(),
-                                                MetatypeRepresentation::Thick));
-  
-  if (origLowering.isAddressOnly())
-    destTy = destTy.getAddressType();
-
-  // Set up BBs for the cast.
-  auto success = createBasicBlock();
-  new (SGM.M) SILArgument(destTy, success);
-  auto failure = createBasicBlock();
-
-  // Emit the cast.
-  B.createCheckedCastBranch(loc, /*exact*/ false, original, destTy,
-                            success, failure);
-  
-  return {success, failure};
-}
-
 RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
                                                  SGFContext C) {
   return emitUnconditionalCheckedCast(SGF, E, E->getSubExpr(), E->getType(),

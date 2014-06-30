@@ -832,35 +832,38 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
-  /// \brief Emit a conditional checked cast branch. Does not re-abstract the
-  /// argument to the success branch. Terminates the current BB.
+  /// \brief Emit a conditional checked cast branch. Does not
+  /// re-abstract the argument to the success branch. Terminates the
+  /// current BB.
   ///
   /// \param loc          The AST location associated with the operation.
-  /// \param original     The value to cast.
-  /// \param originalAbstracted
-  ///                     The result of \c emitCheckedCastAbstractionChange
-  ///                     applied to the original value.
-  /// \param origTL       The original AST-level type.
-  /// \param castTL       The destination type.
-  /// \param kind         The semantics of the cast.
-  ///
-  /// \returns a pair of SILBasicBlocks, representing the success and failure
-  /// branches of the cast. The argument to the success block is not adjusted
-  /// to its natural abstraction level.
-  std::pair<SILBasicBlock*, SILBasicBlock*>
-  emitCheckedCastBranch(SILLocation loc,
-                        SILValue original,
-                        SILValue originalAbstracted,
-                        const TypeLowering &origTL,
-                        const TypeLowering &castTL,
-                        CheckedCastKind kind);
-
+  /// \param src          The abstract value to cast.
+  /// \param sourceType   The formal source type.
+  /// \param targetType   The formal target type.
+  /// \param C            Information about the result of the cast.
+  /// \param handleTrue   A callback to invoke with the result of the cast
+  ///                     in the success path.  The current BB should be
+  ///                     terminated.
+  /// \param handleFalse  A callback to invoke in the failure path.  The
+  ///                     current BB should be terminated.
   void emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
                              CanType sourceType, CanType targetType,
                              SGFContext C,
                              std::function<void(ManagedValue)> handleTrue,
                              std::function<void()> handleFalse);
 
+  /// \brief Emit a conditional checked cast branch, starting from an
+  /// expression.  Terminates the current BB.
+  ///
+  /// \param loc          The AST location associated with the operation.
+  /// \param src          An expression which will generate the value to cast.
+  /// \param targetType   The formal target type.
+  /// \param C            Information about the result of the cast.
+  /// \param handleTrue   A callback to invoke with the result of the cast
+  ///                     in the success path.  The current BB should be
+  ///                     terminated.
+  /// \param handleFalse  A callback to invoke in the failure path.  The
+  ///                     current BB should be terminated.
   void emitCheckedCastBranch(SILLocation loc, Expr *src,
                              Type targetType, SGFContext C,
                              std::function<void(ManagedValue)> handleTrue,
