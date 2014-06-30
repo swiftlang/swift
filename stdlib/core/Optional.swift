@@ -51,11 +51,14 @@
   }
 }
 
-extension Optional : Printable {
-  @public var description: String {
+extension Optional : DebugPrintable {
+  @public var debugDescription: String {
     switch self {
     case .Some(var value):
-      return toString(value)
+      var result = "Optional("
+      debugPrint(value, &result)
+      result += ")"
+      return result
     case .None:
       return "nil"
     }

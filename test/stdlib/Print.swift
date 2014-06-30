@@ -155,10 +155,18 @@ func test_StdlibTypesPrinted() {
   printedIs(nullCString, "")
   debugPrintedIs(nullCString, "<null C string>")
 
-  var implicitlyUnwrappedString: String! = nil
-  printedIs(implicitlyUnwrappedString, "nil")
-  implicitlyUnwrappedString = "meow"
-  printedIs(implicitlyUnwrappedString, "meow")
+  if true {
+    var implicitlyUnwrappedString: String! = nil
+    printedIs(implicitlyUnwrappedString, "nil")
+    implicitlyUnwrappedString = "meow"
+    printedIs(implicitlyUnwrappedString, "meow")
+  }
+  if true {
+    var optionalString: String? = nil
+    printedIs(optionalString, "nil")
+    optionalString = "meow"
+    printedIs(optionalString, "Optional(\"meow\")")
+  }
 
   println("test_StdlibTypesPrinted done")
 }
