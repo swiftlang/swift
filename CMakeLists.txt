@@ -951,6 +951,12 @@ macro(add_swift_library name)
         # Configure variables for this subdirectory.
         set(VARIANT_NAME "${name}-${SDK}-${ARCH}")
 
+        # Map dependencies over to the appropriate variants.
+        set(depends)
+        foreach(DEP ${SWIFTLIB_DEPENDS})
+          list(APPEND depends "${DEP}-${SDK}-${ARCH}")
+        endforeach()
+
         # Add this library variant.
         add_swift_library_single(
           ${VARIANT_NAME}
@@ -958,7 +964,7 @@ macro(add_swift_library name)
           ${SWIFTLIB_SOURCES}
           SDK ${SDK}
           ARCHITECTURE ${ARCH}
-          DEPENDS ${SWIFTLIB_DEPENDS}
+          DEPENDS ${depends}
           FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
           COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
