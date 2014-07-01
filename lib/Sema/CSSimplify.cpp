@@ -2713,11 +2713,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
 
-  // If the instance type is a bridged to an Objective-C type, compute
+  // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedClass;
   Type bridgedType;
-  if (!instanceTy->isBridgeableObjectType()) {
+  if (instanceTy->getAnyNominal() == TC.Context.getStringDecl()) {
     if (Type classType = TC.getBridgedToObjC(DC, instanceTy).first) {
       bridgedClass = classType;
       bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
