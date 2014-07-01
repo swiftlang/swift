@@ -107,7 +107,7 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
 endif()
 
 set(SHARED_LIBRARY ON)
-add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE
+add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   ${SWIFTLIB_SOURCES}
   DEPENDS swift_runtime
   # The copy_shim_headers target dependency is required to let the

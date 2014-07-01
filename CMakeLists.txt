@@ -300,11 +300,15 @@ endif()
 #   compile_swift_files(OUTPUT objfile  # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
 #     FLAGS -module-name foo            # Flags to add to the compilation
+#     [SDK sdk]                         # SDK to build for
+#     [ARCHITECTURE architecture]       # Architecture to build for
 #     [DEPENDS cmake_target...]         # CMake targets on which the object file depends
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
 function(compile_swift_files)
-  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS;DEPENDS" "IS_MAIN;IS_STDLIB_CORE"
+  parse_arguments(SWIFTFILE
+    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE"
+    "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
@@ -335,9 +339,6 @@ function(compile_swift_files)
   if (SWIFT_SPLIT_OBJC_SELECTORS)
     list(APPEND swift_flags "-split-objc-selectors")
   endif()
-
-  # FIXME: Temporary, until this flag goes away
-  list(APPEND swift_flags "-Xfrontend" "-strict-keyword-arguments")
 
   # FIXME: We shouldn't /have/ to build things in a single process.
   # <rdar://problem/15972329>
@@ -375,14 +376,39 @@ function(compile_swift_files)
     list(APPEND swift_flags "-g")
   endif()
   
-  # If we have a modules SDK, use it for building.
-  if (MODULES_SDK)
-    list(APPEND swift_flags "-sdk" "${MODULES_SDK}")
-  endif()
+  if (SWIFTFILE_SDK)
+    # If we have an SDK, we're building for a target.
+    list(APPEND swift_flags "-sdk" "${SWIFT_SDK_${SWIFTFILE_SDK}_PATH}")
 
-  # If we have a host triple, use it.
-  if (SWIFT_HOST_TRIPLE)
-    list(APPEND swift_flags "-target" "${SWIFT_HOST_TRIPLE}")
+    # Determine the triple from the SDK and architecture.
+    list(APPEND swift_flags "-target" 
+      "${SWIFTFILE_ARCHITECTURE}-apple-${SWIFT_SDK_${SWIFTFILE_SDK}_TRIPLE_NAME}${SWIFT_SDK_${SWIFTFILE_SDK}_DEPLOYMENT_VERSION}")
+
+    # Determine the subdirectory where the binary should go.
+    set(SWIFTFILE_LIBRARY_SUBDIR ${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR})
+    if (NOT ${SWIFTFILE_ARCHITECTURE} MATCHES "64")
+      set(SWIFTFILE_LIBRARY_SUBDIR "${SWIFTFILE_LIBRARY_SUBDIR}/32")
+    endif()
+  else()
+    # We're building for the host.
+
+    # If we have a modules SDK, use it for building.
+    if (MODULES_SDK)
+      list(APPEND swift_flags "-sdk" "${MODULES_SDK}")
+    endif()
+
+    # If we have a host triple, use it.
+    if (SWIFT_HOST_TRIPLE)
+      list(APPEND swift_flags "-target" "${SWIFT_HOST_TRIPLE}")
+    endif()
+
+    # Determine the subdirectory where the binary should go.
+    set(arch_subdir "")
+    if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
+      set(arch_subdir "/32")
+    endif()
+
+    set(SWIFTFILE_LIBRARY_SUBDIR "${SWIFTLIB_SUBDIR}${arch_subdir}")
   endif()
 
   # If we have a custom module cache path, use it.
@@ -403,8 +429,15 @@ function(compile_swift_files)
 
   set(objfile ${SWIFTFILE_OUTPUT})
   if (NOT IS_ABSOLUTE ${objfile})
+    # If we have an SDK, put the object file into a subdirectory that
+    # identifies where the library would go.
+    set(objsubdir)
+    if (SWIFTFILE_SDK)
+      set(objsubdir "/${SWIFTFILE_LIBRARY_SUBDIR}")
+    endif()
+
     set(objfile
-      "${CMAKE_CURRENT_BINARY_DIR}/${objfile}")
+      "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${objfile}")
   endif()
 
   if(SWIFTFILE_IS_MAIN)
@@ -413,12 +446,7 @@ function(compile_swift_files)
   else()
     get_filename_component(module_name ${objfile} NAME_WE)
 
-    set(arch_subdir "")
-    if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
-      set(arch_subdir "/32")
-    endif()
-
-    set(module_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
+    set(module_dir "${SWIFTLIB_DIR}/${SWIFTFILE_LIBRARY_SUBDIR}")
 
     set(module_file ${module_dir}/${module_name}.swiftmodule)
     set(module_doc_file ${module_dir}/${module_name}.swiftdoc)
@@ -428,7 +456,7 @@ function(compile_swift_files)
       COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir})
 
     install(FILES ${module_file} ${module_doc_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}${arch_subdir})
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
   endif()
 
   set(stdlib_dep)
@@ -467,6 +495,17 @@ function(compile_swift_files)
     PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile};${module_file}")
 endfunction()
 
+# Compute the library subdirectory to use for the given sdk and
+# architecture, placing the result in 'resultvar'.
+function(compute_library_subdir resultvar sdk architecture)
+  set(result ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
+  if (NOT ${architecture} MATCHES "64")
+    set(result "${result}/32")
+  endif()
+
+  set(${resultvar} "${result}" PARENT_SCOPE)
+endfunction(compute_library_subdir)
+
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
 # ${sourcesvar} in place with the resulting list and ${externalvar} with the
@@ -474,8 +513,11 @@ endfunction()
 #
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar target)
-function(handle_swift_sources sourcesvar externalvar target)
-  parse_arguments(SWIFTSOURCES  "DEPENDS" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
+function(handle_swift_sources sourcesvar externalvar target name)
+  parse_arguments(SWIFTSOURCES  
+    "DEPENDS;SDK;ARCHITECTURE" 
+    "IS_MAIN;IS_STDLIB_CORE" 
+    ${ARGN})
 
   set(result)
   set(swift_sources)
@@ -494,7 +536,7 @@ function(handle_swift_sources sourcesvar externalvar target)
   if (SWIFTSOURCES_IS_MAIN)
     set(IS_MAIN_arg IS_MAIN)
   else()
-    set(swift_flags -module-link-name "${target}")
+    set(swift_flags -module-link-name "${name}")
   endif()
   set(IS_STDLIB_CORE_arg)
   if(SWIFTSOURCES_IS_STDLIB_CORE)
@@ -502,7 +544,6 @@ function(handle_swift_sources sourcesvar externalvar target)
   endif()
 
   if(swift_sources)
-
     # Special-case hack to create swift.o for the swift_stdlib_* targets
     if(target STREQUAL swift_stdlib_core)
       set(swift_obj_base "Swift")
@@ -513,11 +554,24 @@ function(handle_swift_sources sourcesvar externalvar target)
       get_filename_component(swift_obj_base ${swift_obj_base} NAME_WE)
     endif()
 
-    set(swift_obj "${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
+    # FIXME Doesn't account for the SDK here
+
+    set(objsubdir)
+    if (SWIFTSOURCES_SDK)
+      compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
+        ${SWIFTSOURCES_SDK} ${SWIFTSOURCES_ARCHITECTURE})
+      set(objsubdir "/${SWIFTSOURCES_LIBRARY_SUBDIR}")
+    endif()
+
+    set(swift_obj 
+        "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
+
     compile_swift_files(OUTPUT ${swift_obj}
       SOURCES ${swift_sources}
       DEPENDS ${SWIFTSOURCES_DEPENDS}
       FLAGS ${swift_flags}
+      SDK ${SWIFTSOURCES_SDK}
+      ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
     list(APPEND result ${swift_obj})
   endif()
@@ -582,8 +636,11 @@ endfunction()
 #
 # Usage:
 #   add_swift_library_single(
+#     target                         # Name of the target
+#                                    #   (e.g., swiftParse-IOS-armv7)
 #     name                           # Name of the library (e.g., swiftParse)
-#     library_subdir                 # Library subdirectory
+#     [SDK sdk]                      # SDK to build for
+#     [ARCHITECTURE architecture]    # Architecture to build for
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
@@ -591,11 +648,20 @@ endfunction()
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
 #     source1 [source2 source3 ...]) # Sources to add into this library
-macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
-  parse_arguments(SWIFTLIB_SINGLE "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+macro(add_swift_library_single target name)
+  parse_arguments(SWIFTLIB_SINGLE
+    "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
 
   set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_DEFAULT_ARGS})
+
+  # Determine the subdirectory where this library will be installed.
+  if (SWIFTLIB_SINGLE_SDK)
+    set(SWIFTLIB_SINGLE_SUBDIR ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR})
+  else()
+    set(SWIFTLIB_SINGLE_SUBDIR ${SWIFTLIB_SUBDIR})
+  endif()
 
   handle_gyb_sources(SWIFTLIB_SINGLE_SOURCES)
   
@@ -626,11 +692,14 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
   
-  handle_swift_sources(SWIFTLIB_SINGLE_SOURCES SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
+  handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
+    SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${target} ${name}
     DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS}
+    SDK ${SWIFTLIB_SINGLE_SDK}
+    ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
     ${IS_STDLIB_CORE_arg})
 
-  add_library( ${name} ${libkind}
+  add_library( ${target} ${libkind}
     ${SWIFTLIB_SINGLE_SOURCES}
     ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
 
@@ -638,27 +707,27 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
     ${SWIFTLIB_SINGLE_SOURCES}
     PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_SINGLE_FILE_DEPENDS}")
   
-  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+  set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
-    set(name_static "${name}_static")
-    add_library( ${name_static} STATIC
+    set(target_static "${target}_static")
+    add_library( ${target_static} STATIC
       ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
-    set_target_properties(${name_static} PROPERTIES OUTPUT_NAME ${name})
-    add_dependencies(${name_static} ${name})
-    set_output_directory(${name_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+    set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
+    add_dependencies(${target_static} ${name})
+    set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
   endif()
   
   if (MODULE)
-    set_target_properties(${name} PROPERTIES
+    set_target_properties(${target} PROPERTIES
       PREFIX ""
       SUFFIX ${LLVM_PLUGIN_EXT}
       )
   endif()
 
   if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
+    add_dependencies( ${target} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
 
   # Add Swift source files to the project.
@@ -668,31 +737,31 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
   set_source_files_properties(${SWIFTLIB_SINGLE_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}" ${SWIFTLIB_SINGLE_DEPENDS} )
-  llvm_config( ${name} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
+  target_link_libraries( ${target} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}" ${SWIFTLIB_SINGLE_DEPENDS} )
+  llvm_config( ${target} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
   if (NOT NO_LLVM_COMMON_LIBS)
-    target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+    target_link_libraries( ${target} ${LLVM_COMMON_LIBS} )
   endif()
 
   if(MSVC)
-    get_target_property(cflag ${name} COMPILE_FLAGS)
+    get_target_property(cflag ${target} COMPILE_FLAGS)
     if(NOT cflag)
       set(cflag "")
     endif(NOT cflag)
     set(cflag "${cflag} /Za")
-    set_target_properties(${name} PROPERTIES COMPILE_FLAGS ${cflag})
+    set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${cflag})
   endif(MSVC)
 
   if(SWIFTLIB_SINGLE_INSTALL)
     # Install runtime libraries to lib/swift instead of lib. This works around
     # the fact that -isysroot prevents linking to libraries in the system
     # /usr/lib if Swift is installed in /usr.
-    set_target_properties(${name} PROPERTIES
+    set_target_properties(${target} PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
 
-    if (name_static)
-      set_target_properties(${name_static} PROPERTIES
+    if (target_static)
+      set_target_properties(${target_static} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
     endif()
@@ -707,7 +776,7 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
       # outside of Xcode.
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
-      set_target_properties(${name} PROPERTIES
+      set_target_properties(${target} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
 
@@ -715,18 +784,18 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
       if (name_static)  
         string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
           ${SWIFTSTATICLIB_DIR})
-        set_target_properties(${name_static} PROPERTIES
+        set_target_properties(${target_static} PROPERTIES
           LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
           ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
       endif()
     endforeach()
 
-    install(TARGETS ${name}
+    install(TARGETS ${target}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR})
 
-    if (name_static)
-      install(TARGETS ${name_static}
+    if (target_static)
+      install(TARGETS ${target_static}
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR})
     endif()
@@ -742,7 +811,7 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
   endif(SWIFTLIB_SINGLE_INSTALL)
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set_target_properties(${name}
+    set_target_properties(${target}
       PROPERTIES
       INSTALL_NAME_DIR "@rpath"
       BUILD_WITH_INSTALL_RPATH YES)
@@ -760,14 +829,14 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
     endif()
 
     set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
-    target_link_libraries(${name}
+    target_link_libraries(${target}
       "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
     configure_file("${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in" "${PLIST_INFO_PLIST_OUT}" @ONLY)
 
     # If Application Extensions are enabled, pass the linker flag marking
     # the dylib as safe.
     if (CXX_SUPPORTS_FAPPLICATION_EXTENSION AND (NOT DISABLE_APPLICATION_EXTENSION))
-      target_link_libraries(${name} "-Wl,-application_extension")
+      target_link_libraries(${target} "-Wl,-application_extension")
     endif()
 
     set(PLIST_INFO_UTI)
@@ -776,7 +845,7 @@ macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
-  set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
+  set_target_properties(${target} PROPERTIES FOLDER "Swift libraries")
 endmacro(add_swift_library_single)
 
 # Translate a yes/no variable to the presence of a given string in a
@@ -805,9 +874,10 @@ endmacro(translate_flag)
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
+#     [TARGET_LIBRARY]               # Build library for the target SDKs
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
 
@@ -821,7 +891,7 @@ macro(add_swift_library name)
   # Pass through to build the default configuration.
   add_swift_library_single(
     ${name}
-    ${SWIFTLIB_SUBDIR}
+    ${name}
     ${SWIFTLIB_SOURCES}
     DEPENDS ${SWIFTLIB_DEPENDS}
     COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
@@ -829,6 +899,33 @@ macro(add_swift_library name)
     ${SWIFTLIB_INSTALL_FLAG}
     ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
     ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+
+  # If we're supposed to build this library for the target...
+  if(SWIFTLIB_TARGET_LIBRARY) 
+    # Loop through the various SDKs building the other variants of
+    # this library.
+    foreach(SDK ${SWIFT_SDKS})
+      # For each architecture supported by this SDK
+      foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+        # Configure variables for this subdirectory.
+        set(VARIANT_NAME "${name}-${SDK}-${ARCH}")
+
+        # Add this library variant.
+        add_swift_library_single(
+          ${VARIANT_NAME}
+          ${name}
+          ${SWIFTLIB_SOURCES}
+          SDK ${SDK}
+          ARCHITECTURE ${ARCH}
+          DEPENDS ${SWIFTLIB_DEPENDS}
+          COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+          FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+          ${SWIFTLIB_INSTALL_FLAG}
+          ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
+          ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+      endforeach(ARCH)
+    endforeach(SDK)    
+  endif()
 endmacro(add_swift_library)
 
 # Add a new Swift executable.
@@ -957,6 +1054,7 @@ set(SWIFT_SDKS)
 #   configure_sdk(
 #     prefix             # Prefix to use for SDK variables (e.g., OSX)
 #     name               # Display name for this SDK
+#     deployment_version # Deployment version
 #     xcrun_name         # SDK name to use with xcrun
 #     version_min_name   # The name used in the -mOS-version-min flag
 #     triple_name        # The name used in Swift's -triple
@@ -966,14 +1064,15 @@ set(SWIFT_SDKS)
 # This macro attempts to configure a given SDK. When successful, it
 # defines a number of variables:
 #
-#   SWIFT_SDK_${PREFIX}_PATH              Path to the SDK
-#   SWIFT_SDK_${PREFIX}_VERSION           SDK version number (e.g., 10.9, 7.0)
-#   SWIFT_SDK_${PREFIX}_LIB_SUBDIR        Library subdir for this SDK
-#   SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME  Version min name for this SDK
-#   SWIFT_SDK_${PREFIX}_TRIPLE_NAME       Triple name for this SDK
-#   SWIFT_SDK_${PREFIX}_ARCHITECTURES     Architectures (as a list)
-macro(configure_sdk PREFIX NAME XCRUN_NAME VERSION_MIN_NAME TRIPLE_NAME 
-                    ARCHITECTURES)
+#   SWIFT_SDK_${PREFIX}_PATH                Path to the SDK
+#   SWIFT_SDK_${PREFIX}_VERSION             SDK version number (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${PREFIX}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${PREFIX}_LIB_SUBDIR          Library subdir for this SDK
+#   SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME    Version min name for this SDK
+#   SWIFT_SDK_${PREFIX}_TRIPLE_NAME         Triple name for this SDK
+#   SWIFT_SDK_${PREFIX}_ARCHITECTURES       Architectures (as a list)
+macro(configure_sdk PREFIX NAME DEPLOYMENT_VERSION XCRUN_NAME
+                    VERSION_MIN_NAME TRIPLE_NAME ARCHITECTURES)
   # Find the SDK
   set(SWIFT_SDK_${PREFIX}_PATH "" CACHE PATH "Path to the ${NAME} SDK")
 
@@ -992,15 +1091,18 @@ macro(configure_sdk PREFIX NAME XCRUN_NAME VERSION_MIN_NAME TRIPLE_NAME
            SWIFT_SDK_${PREFIX}_VERSION ${SCRATCH})
          
     # Set other variables.
+    set(SWIFT_SDK_${PREFIX}_NAME ${NAME})
+    set(SWIFT_SDK_${PREFIX}_DEPLOYMENT_VERSION ${DEPLOYMENT_VERSION})
     set(SWIFT_SDK_${PREFIX}_LIB_SUBDIR ${XCRUN_NAME})
     set(SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME ${VERSION_MIN_NAME})
     set(SWIFT_SDK_${PREFIX}_TRIPLE_NAME ${TRIPLE_NAME})
     set(SWIFT_SDK_${PREFIX}_ARCHITECTURES ${ARCHITECTURES})
 
     # Report this SDK to the user.
-    message(STATUS "${NAME} SDK:")
+    message(STATUS "${SWIFT_SDK_${PREFIX}_NAME} SDK:")
     message(STATUS "  Path: ${SWIFT_SDK_${PREFIX}_PATH}")
     message(STATUS "  Version: ${SWIFT_SDK_${PREFIX}_VERSION}")
+    message(STATUS "  Deployment version: ${SWIFT_SDK_${PREFIX}_DEPLOYMENT_VERSION}")
     message(STATUS "  Library subdir: ${SWIFT_SDK_${PREFIX}_LIB_SUBDIR}")
     message(STATUS "  Version min name: ${SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME}")
     message(STATUS "  Triple name: ${SWIFT_SDK_${PREFIX}_TRIPLE_NAME}")
@@ -1087,14 +1189,14 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   #   - iOS
   option(SWIFT_BUILD_IOS "Build for iOS" NO)
   if (SWIFT_BUILD_IOS)
-    configure_sdk(IOS "iOS" iphoneos ios ios "armv7;arm64")
+    configure_sdk(IOS "iOS" "7.0" iphoneos ios ios "armv7;arm64")
   endif()
 
   #   - iOS simulator
   option(SWIFT_BUILD_IOS_SIMULATOR "Build for iOS Simulator" NO)
   if (SWIFT_BUILD_IOS_SIMULATOR)
-    configure_sdk(IOS_SIMULATOR "iOS Simulator" iphonesimulator ios-simulator 
-                  ios "i386;x86_64")
+    configure_sdk(IOS_SIMULATOR "iOS Simulator" "7.0" iphonesimulator 
+                  ios-simulator ios "i386;x86_64")
   endif()
 
   message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
