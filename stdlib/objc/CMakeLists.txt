@@ -5,7 +5,7 @@ list(APPEND SWIFT_EXTRA_FLAGS
 # Build the swiftObjC dylib.
 set(SHARED_LIBRARY ON)
 
-add_swift_library(swiftObjectiveC INSTALL
+add_swift_library(swiftObjectiveC INSTALL TARGET_LIBRARY
   ObjectiveC.swift
   DEPENDS swift_stdlib_core swiftDarwin)
 
