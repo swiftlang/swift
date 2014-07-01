@@ -59,12 +59,14 @@ class GraphemeClusterBreakPropertyTable(UnicodeProperty):
       'LVT': 12,
     }
 
-    symbolic_values = [
-      'Other', 'CR', 'LF', 'Control', 'Extend', 'Regional_Indicator',
-      'Prepend', 'SpacingMark', 'L', 'V', 'T', 'LV', 'LVT',
-    ]
-
     def __init__(self, grapheme_break_property_file_name):
+        # Build 'self.symbolic_values' -- an array that maps numeric property
+        # values to symbolic values.
+        self.symbolic_values = \
+            [ None ] * (max(self.numeric_value_table.values()) + 1)
+        for k,v in self.numeric_value_table.iteritems():
+            self.symbolic_values[v] = k
+
         # Load the data file.
         with open(grapheme_break_property_file_name, 'rb') as f:
             for line in f:
