@@ -87,21 +87,23 @@
     } else if self == "\t" {
       return "\\t"
     } else if UInt32(self) < 128 {
-      return "\\x"  
+      return "\\u{"
         + lowNibbleAsHex(UInt32(self) >> 4)
-        + lowNibbleAsHex(UInt32(self))
+        + lowNibbleAsHex(UInt32(self)) + "}"
     } else if !asASCII {
       return String(self)
     } else if UInt32(self) <= 0xFFFF {
-      return "\\u"  
-        + lowNibbleAsHex(UInt32(self) >> 12)
-        + lowNibbleAsHex(UInt32(self) >> 8)
-        + lowNibbleAsHex(UInt32(self) >> 4)
-        + lowNibbleAsHex(UInt32(self))
+      var result = "\\u{"
+      result += lowNibbleAsHex(UInt32(self) >> 12)
+      result += lowNibbleAsHex(UInt32(self) >> 8)
+      result += lowNibbleAsHex(UInt32(self) >> 4)
+      result += lowNibbleAsHex(UInt32(self))
+      result += "}"
+      return result
     } else {
       // FIXME: Type checker performance prohibits this from being a 
       // single chained "+".
-      var result = "\\U"  
+      var result = "\\u{"
       result += lowNibbleAsHex(UInt32(self) >> 28)
       result += lowNibbleAsHex(UInt32(self) >> 24)
       result += lowNibbleAsHex(UInt32(self) >> 20)
@@ -110,6 +112,7 @@
       result += lowNibbleAsHex(UInt32(self) >> 8)
       result += lowNibbleAsHex(UInt32(self) >> 4)
       result += lowNibbleAsHex(UInt32(self))
+      result += "}"
       return result
     }
   }
@@ -157,7 +160,7 @@
     // until we can optimize the constraint solver better.
     if self == " "  || self == "\t" { return true }
     if self == "\n" || self == "\r" { return true }
-    return self == "\x0B" || self == "\x0C"
+    return self == "\u{0B}" || self == "\u{0C}"
   }
 }
 

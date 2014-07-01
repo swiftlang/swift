@@ -631,7 +631,7 @@ enum UTFDecodeResult {
       if stopOnError {
         return (hadError: true)
       }
-      OutputEncoding.encode("\ufffd", output: &output)
+      OutputEncoding.encode("\u{fffd}", output: &output)
       hadError = true
     }
   }

@@ -24,19 +24,19 @@ struct SillyCharacter :
 // CHECK: call [[stringLayout]] @_TFSS37_convertFromBuiltinUTF16StringLiteral{{.*}}(i8* bitcast ([22 x i16]* @0 to i8*), i64 21)
 
 func TestStringLiteral() -> String {
-  return "this is just a\n\x0a test"
+  return "this is just a\n\u{0a} test"
 }
 
 // CHECK: define [[stringLayout]] @_TF11expressions18TestStringLiteral2FT_SS() {
 // CHECK: call [[stringLayout]] @_TFSS37_convertFromBuiltinUTF16StringLiteral{{.*}}(i8* bitcast ([19 x i16]* @1 to i8*), i64 18)
 func TestStringLiteral2() -> String {
-  return "non-ASCII string \u00B5"
+  return "non-ASCII string \u{00B5}"
 }
 
 // CHECK: @_TF11expressions15TestCharLiteral
 func TestCharLiteral(inout a: SillyCharacter) {
   a = '0'  // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 48)
   a = 'a'  // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 97)
-  a = '\u2603' // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 9731)
+  a = '\u{2603}' // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 9731)
   a = '☃' // CHECK: _TFV11expressions14SillyCharacter35_convertFromBuiltinCharacterLiteral{{.*}}(i32 9731)
 }

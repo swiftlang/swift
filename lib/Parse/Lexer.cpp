@@ -863,16 +863,44 @@ void Lexer::lexNumber() {
   return formToken(tok::floating_literal, TokStart);
 }
 
+///   unicode_character_escape ::= [\]u{hex+}
+///   hex                      ::= [0-9a-fA-F]
+unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
+  assert(CurPtr[0] == '{' && "Invalid unicode escape");
+  ++CurPtr;
+
+  const char *DigitStart = CurPtr;
+
+  unsigned NumDigits = 0;
+  for (; isxdigit(CurPtr[0]); ++NumDigits)
+    ++CurPtr;
+
+  if (CurPtr[0] != '}') {
+    if (Diags)
+      Diags->diagnose(CurPtr, diag::lex_invalid_u_escape_rbrace);
+    return ~1U;
+  }
+  ++CurPtr;
+
+  if (NumDigits < 1 || NumDigits > 8) {
+    if (Diags)
+      Diags->diagnose(CurPtr, diag::lex_invalid_u_escape);
+    return ~1U;
+  }
+
+  unsigned CharValue = 0;
+  StringRef(DigitStart, NumDigits).getAsInteger(16, CharValue);
+  return CharValue;
+}
+
+
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence, this returns ~0U.  If this is a
 /// malformed character sequence, it emits a diagnostic (when EmitDiagnostics is
 /// true) and returns ~1U.
 /// 
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
-///   character_escape  ::= [\]x hex hex  
-///   character_escape  ::= [\]u hex hex hex hex  
-///   character_escape  ::= [\]U hex hex hex hex hex hex hex hex
-///   hex               ::= [0-9a-fA-F]
+///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
                              bool EmitDiagnostics) {
   const char *CharStart = CurPtr;
@@ -951,35 +979,43 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2]);
     if (ValidChars != 2) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_x_escape);
+        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
       CurPtr += 1 + ValidChars;
       return ~1U;
     }
 
+    if (EmitDiagnostics && Diags)
+      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
+                      StringRef(CurPtr+1, ValidChars));
+
     StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
     CurPtr += 1 + ValidChars;
 
-    // Reject \x80 and above, since it is going to encode into a multibyte
-    // unicode encoding, which is something that C folks may not expect.
-    if (CharValue >= 0x80) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_hex_escape);
-      return ~1U;
-    }
-
     break;
   }
-  case 'u': {  //  \u HEX HEX HEX HEX 
+  case 'u': {  //  \u HEX HEX HEX HEX
+    if (CurPtr[1] == '{') {
+      ++CurPtr;
+      CharValue = lexUnicodeEscape(CurPtr, EmitDiagnostics ? this : nullptr);
+      if (CharValue == ~1U) return ~1U;
+      break;
+    }
+
     unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2])
                         + !!isxdigit(CurPtr[3]) + !!isxdigit(CurPtr[4]);
     StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
 
     if (ValidChars != 4) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_u_escape);
+        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
       CurPtr += 1 + ValidChars;
       return ~1U;
     }
+
+    if (EmitDiagnostics && Diags)
+      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
+                      StringRef(CurPtr+1, ValidChars));
+
     CurPtr += 1 + ValidChars;
     break;
   }
@@ -992,10 +1028,14 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 
     if (ValidChars != 8) {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_U_escape);
+        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
       CurPtr += 1 + ValidChars;
       return ~1U;
     }
+
+    if (EmitDiagnostics && Diags)
+      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
+                      StringRef(CurPtr+1, ValidChars));
 
     CurPtr += 1 + ValidChars;
     break;
@@ -1253,30 +1293,13 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       llvm_unreachable("string contained interpolated segments");
         
       // Unicode escapes of various lengths.
-    case 'x':  //  \x HEX HEX
-      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]))
-        continue;  // Ignore invalid escapes.
-      
-      StringRef(BytesPtr, 2).getAsInteger(16, CharValue);
-      BytesPtr += 2;
-      break;
-    case 'u':  //  \u HEX HEX HEX HEX 
-      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]) ||
-          !isxdigit(BytesPtr[2]) || !isxdigit(BytesPtr[3]))
-        continue;  // Ignore invalid escapes.
-      
-      StringRef(BytesPtr, 4).getAsInteger(16, CharValue);
-      BytesPtr += 4;
-      break;
-    case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
-      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]) ||
-          !isxdigit(BytesPtr[2]) || !isxdigit(BytesPtr[3]) ||
-          !isxdigit(BytesPtr[4]) || !isxdigit(BytesPtr[5]) ||
-          !isxdigit(BytesPtr[6]) || !isxdigit(BytesPtr[7]))
-        continue;  // Ignore invalid escapes.
-      
-      StringRef(BytesPtr, 8).getAsInteger(16, CharValue);
-      BytesPtr += 8;
+    case 'u':  //  \u HEX HEX HEX HEX
+      if (BytesPtr[0] != '{')
+        continue;       // Ignore invalid escapes.
+
+      CharValue = lexUnicodeEscape(BytesPtr, /*no diagnostics*/nullptr);
+      // Ignore invalid escapes.
+      if (CharValue == ~1U) continue;
       break;
     }
     

@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 
-var c: Character = "\uB977"
+var c: Character = "\u{B977}"
 String(c)
 
-var s: String = "\uB977"
+var s: String = "\u{B977}"
 

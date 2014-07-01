@@ -49,17 +49,15 @@ var ch_Joker = '🃏'
 var ch_n = '\n'
 var ch_r = '\r'
 var ch_t = '\t'
-var ch_x = '\x7f'   // DEL
+var ch_x = '\u{7f}'   // DEL
 var ch_q = ''     // expected-error {{unprintable ASCII character found in source file}}
-var ch_u = '\u014d' // 'ō'
-var ch_U = '\U0001D41F' // '𝐁' a.k.a. "Math alphanumeric B"
+var ch_u = '\u{014d}' // 'ō'
+var ch_U = '\u{0001D41F}' // '𝐁' a.k.a. "Math alphanumeric B"
 
-var ch_x_too_big = '\x80' // expected-error {{invalid hex escape, use \u00XX for values over \x7F}}
-var ch_U_too_big = '\U12345678' // expected-error {{invalid unicode scalar}}
+var ch_x_too_big = '\u{80}'
+var ch_U_too_big = '\u{12345678}' // expected-error {{invalid unicode scalar}}
 
-var ch_x_too_short = '\x1' // expected-error {{\x escape sequence expects 2 hex digits to follow it}}
-var ch_u_too_short = '\u1' // expected-error {{\u escape sequence expects 4 hex digits to follow it}}
-var ch_U_too_short = '\U1' // expected-error {{\U escape sequence expects 8 hex digits to follow it}}
+var ch_x_too_short = '\u{1}'
 
 // Recovery for invalid character literals.
 func isSpace(c: MyCharacter) -> Bool {

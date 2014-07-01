@@ -27,7 +27,7 @@ var (_, y) = (x,2)  // CHECK: (_, y) : (Int, Int) = (1, 2)
 
 var aString = String() // CHECK: aString : String = ""
 
-"\n\r\t\"' abcd\x45\x01"  // CHECK: "\n\r\t\"\' abcdE\x01"
+"\n\r\t\"' abcd\u{45}\u{01}"  // CHECK: "\n\r\t\"\' abcdE\u{01}"
 
 
 String(-1) // CHECK: String = "-1"

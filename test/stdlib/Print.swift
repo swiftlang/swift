@@ -127,8 +127,8 @@ func test_StdlibTypesPrinted() {
   var s: String = "abc"
   printedIs(s, "abc")
   debugPrintedIs(s, "\"abc\"")
-  s = "\\ \' \" \0 \n \r \t \x05"
-  debugPrintedIs(s, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\x05\"")
+  s = "\\ \' \" \0 \n \r \t \u{05}"
+  debugPrintedIs(s, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\u{05}\"")
 
   var ch: Character = "a"
   printedIs(ch, "a")
@@ -143,13 +143,13 @@ func test_StdlibTypesPrinted() {
   us = "あ"
   printedIs(us, "あ")
   assertEquals("\"あ\"", us.description)
-  debugPrintedIs(us, "\"\\u3042\"")
+  debugPrintedIs(us, "\"\\u{3042}\"")
 
   var cstr: CString = "abc"
   printedIs(cstr, "abc")
   debugPrintedIs(cstr, "\"abc\"")
-  cstr = "\\ \' \" \n \r \t \x05"
-  debugPrintedIs(cstr, "\"\\\\ \\\' \\\" \\n \\r \\t \\x05\"")
+  cstr = "\\ \' \" \n \r \t \u{05}"
+  debugPrintedIs(cstr, "\"\\\\ \\\' \\\" \\n \\r \\t \\u{05}\"")
 
   var nullCString = CString(UnsafePointer<CChar>.null())
   printedIs(nullCString, "")

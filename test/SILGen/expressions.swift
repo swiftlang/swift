@@ -480,7 +480,7 @@ func magic_identifier_expansion(a: Int = __COLUMN__) {
 
 func print_string() {
   // CHECK-LABEL: print_string
-  var str = "\x08\x09\thello\r\n\0world\x1e\x7f"
+  var str = "\u{08}\u{09}\thello\r\n\0world\u{1e}\u{7f}"
   // CHECK: string_literal utf16 "\x08\t\thello\r\n\0world\x1E\x7F"
 }
 

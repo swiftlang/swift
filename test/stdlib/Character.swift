@@ -104,9 +104,9 @@ func testStringRoundTripping() {
    // and the corresponding tuple element)
    for sExpectSmall in [ 
      ("0123456", 1),
-     ("012345\u00A9", 1),
+     ("012345\u{00A9}", 1),
      ("01234567", 0),
-     ("0123456\u00A9", 0)
+     ("0123456\u{00A9}", 0)
    ] {
      if (expectedRepresentationFails(sExpectSmall.0, sExpectSmall.1 != 0)
      || roundTripThroughCharacterFails(sExpectSmall.0)

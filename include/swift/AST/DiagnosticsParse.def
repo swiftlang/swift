@@ -113,16 +113,17 @@ ERROR(lex_unexpected_quote_string_interpolation,lexing,none,
       "unexpected '\"' character in string interpolation", ())
 ERROR(lex_invalid_escape,lexing,none,
        "invalid escape sequence in literal", ())
-ERROR(lex_invalid_x_escape,lexing,none,
-       "\\x escape sequence expects 2 hex digits to follow it", ())
 ERROR(lex_invalid_u_escape,lexing,none,
-       "\\u escape sequence expects 4 hex digits to follow it", ())
-ERROR(lex_invalid_U_escape,lexing,none,
-       "\\U escape sequence expects 8 hex digits to follow it", ())
+      "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
+ERROR(lex_invalid_u_escape_rbrace,lexing,none,
+      "expected '}' in \\u{...} escape sequence", ())
+
+ERROR(lex_unicode_escape_changed,lexing,none,
+      "unicode escapes changed, please use the \\u{%0} syntax instead",
+      (StringRef))
+
 ERROR(lex_invalid_unicode_scalar,lexing,none,
        "invalid unicode scalar", ())
-ERROR(lex_invalid_hex_escape,lexing,none,
-       "invalid hex escape, use \\u00XX for values over \\x7F", ())
 
 
 ERROR(lex_invalid_character,lexing,none,

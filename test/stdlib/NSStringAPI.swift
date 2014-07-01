@@ -330,13 +330,13 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
 
 NSStringAPIs.test("decomposedStringWithCanonicalMapping") {
   expectEqual("abc", "abc".decomposedStringWithCanonicalMapping)
-  expectEqual("\u305f\u3099くてん", "だくてん".decomposedStringWithCanonicalMapping)
-  expectEqual("\uff80\uff9eｸﾃﾝ", "ﾀﾞｸﾃﾝ".decomposedStringWithCanonicalMapping)
+  expectEqual("\u{305f}\u{3099}くてん", "だくてん".decomposedStringWithCanonicalMapping)
+  expectEqual("\u{ff80}\u{ff9e}ｸﾃﾝ", "ﾀﾞｸﾃﾝ".decomposedStringWithCanonicalMapping)
 }
 
 NSStringAPIs.test("decomposedStringWithCompatibilityMapping") {
   expectEqual("abc", "abc".decomposedStringWithCompatibilityMapping)
-  expectEqual("\u30bf\u3099クテン", "ﾀﾞｸﾃﾝ".decomposedStringWithCompatibilityMapping)
+  expectEqual("\u{30bf}\u{3099}クテン", "ﾀﾞｸﾃﾝ".decomposedStringWithCompatibilityMapping)
 }
 
 NSStringAPIs.test("enumerateLines(_:)") {
@@ -382,7 +382,7 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
 }
 
 NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
-  let s = "え\u304b\u3099お\u263a\ufe0f😀😊"
+  let s = "え\u{304b}\u{3099}お\u{263a}\u{fe0f}😀😊"
   let startIndex = advance(s.startIndex, 1)
   let endIndex = advance(s.startIndex, 5)
   var substrings: [String] = []
@@ -395,7 +395,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
     expectEqual(substring, s[substringRange])
     expectEqual(substring, s[enclosingRange])
   }
-  expectEqual([ "\u304b\u3099", "お", "☺️", "😀" ], substrings)
+  expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
 }
 
 NSStringAPIs.test("fastestEncoding") {
@@ -412,7 +412,7 @@ NSStringAPIs.test("fileSystemRepresentation()") {
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr = map("\u305f\u3099くてん\0".utf8) { $0.asSigned() }
+    let expectedStr = map("\u{305f}\u{3099}くてん\0".utf8) { $0.asSigned() }
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
 }
@@ -546,7 +546,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   }
   if true {
     let bufferLength = 100
-    var expectedStr = map("abc \u305f\u3099くてん\0".utf8) { $0.asSigned() }
+    var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) { $0.asSigned() }
     while (expectedStr.count != bufferLength) {
       expectedStr += (0xff).asSigned()
     }
@@ -573,7 +573,7 @@ NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
 }
 
 NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
-  let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
+  let s = "Глокая куздра\nштеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n Абв."
   let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     var outStartIndex = s.startIndex
@@ -581,9 +581,9 @@ NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
     var outContentsEndIndex = s.startIndex
     s.getParagraphStart(&outStartIndex, end: &outEndIndex,
         contentsEnd: &outContentsEndIndex, forRange: r)
-    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n",
+    expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n",
         s[outStartIndex..<outEndIndex])
-    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.",
+    expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.",
         s[outStartIndex..<outContentsEndIndex])
   }
 }
@@ -630,14 +630,14 @@ NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
 }
 
 NSStringAPIs.test("init(utf16CodeUnits:count:)") {
-  let expected = "abc абв \U0001F60A"
+  let expected = "abc абв \u{0001F60A}"
   let chars: [unichar] = Array(expected.utf16)
 
   expectEqual(expected, String(utf16CodeUnits: chars, count: chars.count))
 }
 
 NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
-  let expected = "abc абв \U0001F60A"
+  let expected = "abc абв \u{0001F60A}"
   let chars: [unichar] = Array(expected.utf16)
 
   expectEqual(expected, String(utf16CodeUnitsNoCopy: chars,
@@ -681,7 +681,7 @@ NSStringAPIs.test("lastPathComponent") {
 
 NSStringAPIs.test("utf16count") {
   expectEqual(1, "a".utf16count)
-  expectEqual(2, "\U0001F60A".utf16count)
+  expectEqual(2, "\u{0001F60A}".utf16count)
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
@@ -763,18 +763,18 @@ NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   if true {
-    let s = "\U0001F60A"
+    let s = "\u{1F60A}"
     expectLE(countElements(s.utf8),
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
 }
 
 NSStringAPIs.test("paragraphRangeForRange(_:)") {
-  let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
+  let s = "Глокая куздра\nштеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n Абв."
   let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     let result = s.paragraphRangeForRange(r)
-    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n", s[result])
+    expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n", s[result])
   }
 }
 
@@ -791,10 +791,10 @@ NSStringAPIs.test("pathExtension") {
 NSStringAPIs.test("precomposedStringWithCanonicalMapping") {
   expectEqual("abc", "abc".precomposedStringWithCanonicalMapping)
   expectEqual("だくてん",
-      "\u305f\u3099くてん".precomposedStringWithCanonicalMapping)
+      "\u{305f}\u{3099}くてん".precomposedStringWithCanonicalMapping)
   expectEqual("ﾀﾞｸﾃﾝ",
-      "\uff80\uff9eｸﾃﾝ".precomposedStringWithCanonicalMapping)
-  expectEqual("\ufb03", "\ufb03".precomposedStringWithCanonicalMapping)
+      "\u{ff80}\u{ff9e}ｸﾃﾝ".precomposedStringWithCanonicalMapping)
+  expectEqual("\u{fb03}", "\u{fb03}".precomposedStringWithCanonicalMapping)
 }
 
 NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
@@ -804,10 +804,10 @@ NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
   <rdar://problem/17041347> NFKD normalization as implemented by
   'precomposedStringWithCompatibilityMapping:' is not idempotent
 
-  expectEqual("\u30c0クテン",
-      "\uff80\uff9eｸﾃﾝ".precomposedStringWithCompatibilityMapping)
+  expectEqual("\u{30c0}クテン",
+      "\u{ff80}\u{ff9e}ｸﾃﾝ".precomposedStringWithCompatibilityMapping)
   */
-  expectEqual("ffi", "\ufb03".precomposedStringWithCompatibilityMapping)
+  expectEqual("ffi", "\u{fb03}".precomposedStringWithCompatibilityMapping)
 }
 
 NSStringAPIs.test("propertyList()") {
@@ -850,45 +850,45 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
   }
 
   if true {
-    let charset = NSCharacterSet(charactersInString: "\u305f\u3099")
-    expectEmpty("\u3060".rangeOfCharacterFromSet(charset))
+    let charset = NSCharacterSet(charactersInString: "\u{305f}\u{3099}")
+    expectEmpty("\u{3060}".rangeOfCharacterFromSet(charset))
   }
   if true {
-    let charset = NSCharacterSet(charactersInString: "\u3060")
-    expectEmpty("\u305f\u3099".rangeOfCharacterFromSet(charset))
+    let charset = NSCharacterSet(charactersInString: "\u{3060}")
+    expectEmpty("\u{305f}\u{3099}".rangeOfCharacterFromSet(charset))
   }
 
   if true {
-    let charset = NSCharacterSet(charactersInString: "\U0001F600")
+    let charset = NSCharacterSet(charactersInString: "\u{1F600}")
     if true {
-      let s = "abc\U0001F600"
-      expectEqual("\U0001F600",
+      let s = "abc\u{1F600}"
+      expectEqual("\u{1F600}",
           s[s.rangeOfCharacterFromSet(charset)!])
     }
     if true {
-      expectEmpty("abc\U0001F601".rangeOfCharacterFromSet(charset))
+      expectEmpty("abc\u{1F601}".rangeOfCharacterFromSet(charset))
     }
   }
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
-  let s = "\U0001F601abc \u305f\u3099 def"
-  expectEqual("\U0001F601", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  let s = "\u{1F601}abc \u{305f}\u{3099} def"
+  expectEqual("\u{1F601}", s[s.rangeOfComposedCharacterSequenceAtIndex(
       s.startIndex)])
   expectEqual("a", s[s.rangeOfComposedCharacterSequenceAtIndex(
       advance(s.startIndex, 1))])
-  expectEqual("\u305f\u3099", s[s.rangeOfComposedCharacterSequenceAtIndex(
+  expectEqual("\u{305f}\u{3099}", s[s.rangeOfComposedCharacterSequenceAtIndex(
       advance(s.startIndex, 5))])
   expectEqual(" ", s[s.rangeOfComposedCharacterSequenceAtIndex(
       advance(s.startIndex, 6))])
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
-  let s = "\U0001F601abc さ\u3099し\u3099す\u3099せ\u3099そ\u3099"
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual("\U0001F601a", s[s.rangeOfComposedCharacterSequencesForRange(
+  expectEqual("\u{1F601}a", s[s.rangeOfComposedCharacterSequencesForRange(
       s.startIndex..<advance(s.startIndex, 2))])
-  expectEqual("せ\u3099そ\u3099", s[s.rangeOfComposedCharacterSequencesForRange(
+  expectEqual("せ\u{3099}そ\u{3099}", s[s.rangeOfComposedCharacterSequencesForRange(
       advance(s.startIndex, 8)..<advance(s.startIndex, 10))])
 }
 
@@ -1157,7 +1157,7 @@ CStringTests.test("debugDescription") {
   }
   if true {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEqual("<ill-formed UTF-8>\"\u0041\ufffd\ufffd\ufffd\u0041\"",
+    expectEqual("<ill-formed UTF-8>\"\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}\"",
         s.debugDescription)
     dealloc()
   }
@@ -1180,7 +1180,7 @@ CStringTests.test("hashValue") {
   }
   if true {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEqual("\u0041\ufffd\ufffd\ufffd\u0041".hashValue,
+    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}".hashValue,
         s.hashValue)
     dealloc()
   }
@@ -1286,7 +1286,7 @@ CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
   if true {
     let (s, dealloc) = getIllFormedUTF8String1()
     let (result, hadError) = String.fromCStringRepairingIllFormedUTF8(s)
-    expectOptionalEqual("\u0041\ufffd\ufffd\ufffd\u0041", result)
+    expectOptionalEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}", result)
     expectTrue(hadError)
     dealloc()
   }

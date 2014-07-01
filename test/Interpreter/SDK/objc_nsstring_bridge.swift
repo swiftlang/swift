@@ -45,7 +45,7 @@ var s3:String = s2.stringByAppendingPathComponent(s1).reallyAString()
 printDescription(s3) // CHECK: kappa-chow/wa-da-ta
 
 // Unicode conversion
-var s4 : String = NSString(string: "\uf8ff\ufffd")
+var s4 : String = NSString(string: "\u{f8ff}\u{fffd}")
 printDescription(s4) // CHECK: �
 
 // NSCFConstantString conversion

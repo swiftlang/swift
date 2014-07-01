@@ -79,7 +79,7 @@ println("NSError out:")
 autoreleasepool {
   var err: NSError? = NSError()
   hangCanary(err!)
-  if let s = NSString.stringWithContentsOfFile("/hopefully/does/not/exist\x1B",
+  if let s = NSString.stringWithContentsOfFile("/hopefully/does/not/exist\u{1B}",
                                                encoding: NSUTF8StringEncoding,
                                                error: &err) {
     _preconditionFailure("file should not actually exist")

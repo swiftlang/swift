@@ -21,7 +21,7 @@ func testTypeInference() {
   isCharacter(&ch2)
   var ch4: Character = "例"
   isCharacter(&ch3)
-  var ch5: Character = "\u304b\u3099"
+  var ch5: Character = "\u{304b}\u{3099}"
   isCharacter(&ch4)
 
   var s1 = ""
@@ -34,7 +34,7 @@ func testTypeInference() {
   isString(&s4)
   var s5 = "例"
   isString(&s5)
-  var s6 = "\u304b\u3099"
+  var s6 = "\u{304b}\u{3099}"
   isString(&s6)
 }
 testTypeInference()
@@ -47,7 +47,7 @@ func testOverloads() {
   overloaded("")
   overloaded("a")
   overloaded("あ")
-  overloaded("\u304b\u3099")
+  overloaded("\u{304b}\u{3099}")
   overloaded("abc")
 
   // Ensure that one can force a particular overload.

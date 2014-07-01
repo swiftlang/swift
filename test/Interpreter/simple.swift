@@ -11,6 +11,6 @@ if (true) {
   print(UnicodeScalar(67))
   print(UnicodeScalar(0o104))
   print(UnicodeScalar(10))
-  print("Hello \u2603\n")  // Hi Snowman!
+  print("Hello \u{2603}\n")  // Hi Snowman!
   print("Hello ☃\n")
 }

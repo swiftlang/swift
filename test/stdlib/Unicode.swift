@@ -245,7 +245,7 @@ func additionalUtf16Tests() {
   // CHECK-NEXT: 1
   println(UTF16.width("x"))
   // CHECK-NEXT: 2
-  println(UTF16.width("\U00101010"))
+  println(UTF16.width("\u{101010}"))
 
   // CHECK-NEXT: 2
   println(UTF16.width("𝄞"))
