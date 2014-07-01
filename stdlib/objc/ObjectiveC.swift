@@ -16,8 +16,64 @@ import ObjectiveC
 //===----------------------------------------------------------------------===//
 // Objective-C Primitive Types
 //===----------------------------------------------------------------------===//
-// FIXME: Objective-C types belong in a layer below the Objective-C support
-// libraries, not here.
+
+/// The Objective-C BOOL type.
+///
+/// On iOS, the Objective-C BOOL type is a typedef of C/C++ bool. Clang 
+/// importer imports it as ObjCBool.
+///
+/// The compiler has special knowledge of this type.
+///
+/// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
+@public struct ObjCBool {
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+  // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
+  var value: Int8
+
+  @public init(_ value: Int8) {
+    self.value = value
+  }
+#else
+  // Everywhere else it is C/C++'s "Bool"
+  var value : Bool
+
+  @public init(_ value: Bool) {
+    self.value = value
+  }
+#endif
+
+  /// Allow use in a Boolean context.
+  @public func getLogicValue() -> Bool {
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+    return value != 0
+#else
+    return value == true
+#endif
+  }
+
+  /// Implicit conversion from C Boolean type to Swift Boolean type.
+  @conversion @public func __conversion() -> Bool {
+    return self.getLogicValue()
+  }
+}
+
+extension ObjCBool : Reflectable {
+	@public func getMirror() -> Mirror {
+		return reflect(getLogicValue())
+	}
+}
+
+extension Bool {
+  /// Implicit conversion from Swift Boolean type to
+  /// Objective-C Boolean type.
+  @conversion @public func __conversion() -> ObjCBool {
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+    return ObjCBool(self ? 1 : 0)
+#else
+    return ObjCBool(self ? Bool.true : Bool.false)
+#endif
+  }
+}
 
 extension ObjCBool : Printable {
   @public var description: String {
