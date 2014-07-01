@@ -57,20 +57,20 @@
 
 
 @public typealias PublicTA1 = PublicStruct
-@public typealias PublicTA2 = InternalStruct // expected-error {{type alias 'PublicTA2' cannot be declared public because its underlying type uses an internal type}}
-@public typealias PublicTA3 = PrivateStruct // expected-error {{type alias 'PublicTA3' cannot be declared public because its underlying type uses a private type}}
+@public typealias PublicTA2 = InternalStruct // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+@public typealias PublicTA3 = PrivateStruct // expected-error {{type alias cannot be declared public because its underlying type uses a private type}}
 
 @internal typealias InternalTA1 = PublicStruct
 @internal typealias InternalTA2 = InternalStruct
-@internal typealias InternalTA3 = PrivateStruct // expected-error {{type alias 'InternalTA3' cannot be declared internal because its underlying type uses a private type}}
+@internal typealias InternalTA3 = PrivateStruct // expected-error {{type alias cannot be declared internal because its underlying type uses a private type}}
 
-typealias FunctionType1 = PrivateStruct -> PublicStruct // expected-error {{type alias 'FunctionType1' must be declared private because its underlying type uses a private type}}
-typealias FunctionType2 = PublicStruct -> PrivateStruct // expected-error {{type alias 'FunctionType2' must be declared private because its underlying type uses a private type}}
-typealias FunctionType3 = PrivateStruct -> PrivateStruct // expected-error {{type alias 'FunctionType3' must be declared private because its underlying type uses a private type}}
+typealias FunctionType1 = PrivateStruct -> PublicStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias FunctionType2 = PublicStruct -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias FunctionType3 = PrivateStruct -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
 
-typealias ArrayType = [PrivateStruct] // expected-error {{type alias 'ArrayType' must be declared private because its underlying type uses a private type}}
-typealias DictType = [String : PrivateStruct] // expected-error {{type alias 'DictType' must be declared private because its underlying type uses a private type}}
-typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias 'GenericArgs' must be declared private because its underlying type uses a private type}}
+typealias ArrayType = [PrivateStruct] // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias DictType = [String : PrivateStruct] // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias must be declared private because its underlying type uses a private type}}
 
 
 @public protocol HasAssocType {

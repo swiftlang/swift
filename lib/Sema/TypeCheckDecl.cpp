@@ -2780,11 +2780,8 @@ public:
                              [&](Accessibility typeAccess,
                                  const TypeRepr *complainRepr) {
         bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
-        auto kind =
-          isExplicit ? diag::type_alias_underlying_type_access
-                     : diag::type_alias_underlying_type_access_implicit;
-        auto diag = TC.diagnose(TAD, kind,
-                                TAD->getName(), TAD->getAccessibility(),
+        auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
+                                isExplicit, TAD->getAccessibility(),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
