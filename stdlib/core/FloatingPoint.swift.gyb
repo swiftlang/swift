@@ -15,11 +15,10 @@
 # Utility code for later in this template
 #
 
-if CMAKE_SYSTEM_PROCESSOR in ('i386', 'x86_64'):
-  allFloatBits = [32, 64, 80]
-else:
-  # Compile only 32-bit and 64-bit floating point on non-x86 architectures
-  allFloatBits = [32, 64]
+# Bit counts for all floating point types. 
+# 80-bit floating point types are only permitted on x86 architectures. This
+# restriction is handled via #if's in the generated code.
+allFloatBits = [32, 64, 80]
 
 # Bit counts for all int types
 allIntBits = [8, 16, 32, 64, 'Int']
@@ -121,6 +120,10 @@ def getInfinityExponent(bits):
 
 % for bits in allFloatBits:
 %   Self = floatName(bits)
+
+% if bits == 80:
+#if arch(i386) || arch(x86_64)
+% end
 
 @public struct ${Self} {
   @public var value: Builtin.FPIEEE${bits}
@@ -388,6 +391,11 @@ extension ${Self} {
 % for srcBits in allFloatBits:
 %   That = floatName(srcBits)
 %   if Self != That:
+
+%     if srcBits == 80:
+#if arch(i386) || arch(x86_64)
+%     end
+
   @public init(_ v: ${That}) {
 %     if srcBits > bits:
     value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
@@ -395,6 +403,11 @@ extension ${Self} {
     value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
 %     end
   }
+
+%     if srcBits == 80:
+#endif
+%     end
+
 %   end
 % end
 }
@@ -469,6 +482,10 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 % end
 
+% if bits == 80:
+#endif
+% end
+
 % end # for bits in allFloatBits
 
 // Construction of integers from floating point numbers.
@@ -480,6 +497,11 @@ func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 extension ${Self} {
 %   for srcBits in allFloatBits:
 %     That = floatName(srcBits)
+
+%     if srcBits == 80:
+#if arch(i386) || arch(x86_64)
+%     end
+
   @public init(_ v: ${That}) {
     _precondition(v >= ${That}(${Self}.min),
         "floating point value can not be converted to ${Self} because it is greater than ${Self}.min")
@@ -487,6 +509,11 @@ extension ${Self} {
         "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
     value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
   }
+
+%      if srcBits == 80:
+#endif
+%       end
+
 %   end
 }
 
