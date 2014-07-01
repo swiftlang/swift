@@ -117,11 +117,8 @@ add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   # and the generated directory as dependencies
   FILE_DEPENDS
     copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
+  LINK_FLAGS "-all_load -Xlinker -reexport-lobjc"
   )
 add_dependencies(swift_stdlib_core swift)
 
 add_swift_optimization_flags(swift_stdlib_core)
-
-# Link against Foundation, for ObjC bridging.
-set_target_properties(swift_stdlib_core PROPERTIES
-                                        LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")

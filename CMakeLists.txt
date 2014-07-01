@@ -645,6 +645,7 @@ endfunction()
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
@@ -652,7 +653,7 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
 
@@ -720,6 +721,9 @@ macro(add_swift_library_single target name)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
     add_dependencies(${target_static} ${name})
     set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+    set_target_properties(${target_static} 
+      PROPERTIES LINK_FLAGS ${SWIFTLIB_SINGLE_LINK_FLAGS})
 
     if (SWIFT_SDKS)
       # FIXME: Deal with library variants here
@@ -837,14 +841,14 @@ macro(add_swift_library_single target name)
       # SDK, deployment target, architecture.
       COMPILE_FLAGS
       "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
-      LINK_FLAGS "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
+      LINK_FLAGS "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH} ${SWIFTLIB_SINGLE_LINK_FLAGS}"
     )
   else()
     if (SWIFT_SDKS)
       # Deployment flags.
       set_target_properties(${target} PROPERTIES
         COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
-        LINK_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
+        LINK_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ${SWIFTLIB_SINGLE_LINK_FLAGS}")
     endif()
   endif()
 
@@ -910,9 +914,10 @@ endmacro(translate_flag)
 #     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
-#     [TARGET_SDKS sdk1...]           # The set of SDKs in which this library
+#     [TARGET_SDKS sdk1...]          # The set of SDKs in which this library
 #                                    # is included. If empty, the library is
 #                                    # included in all SDKs.
+#     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
@@ -920,7 +925,7 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;LINK_FLAGS" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
@@ -956,6 +961,7 @@ macro(add_swift_library name)
         DEPENDS ${SWIFTLIB_DEPENDS}
         FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
         COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+        LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_INSTALL_FLAG}
         ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1000,6 +1006,7 @@ macro(add_swift_library name)
             FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
             COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
             FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+            LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
             ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
@@ -1016,6 +1023,7 @@ macro(add_swift_library name)
       FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
       COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+      LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
       ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
