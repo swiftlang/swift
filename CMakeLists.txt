@@ -1113,6 +1113,7 @@ set(SWIFT_SDKS)
 #     version_min_name   # The name used in the -mOS-version-min flag
 #     triple_name        # The name used in Swift's -triple
 #     architectures      # A list of architectures this SDK supports
+#     internal           # Whether the prefer the internal SDK, if present
 #   )
 #     
 # This macro attempts to configure a given SDK. When successful, it
@@ -1126,20 +1127,29 @@ set(SWIFT_SDKS)
 #   SWIFT_SDK_${PREFIX}_TRIPLE_NAME         Triple name for this SDK
 #   SWIFT_SDK_${PREFIX}_ARCHITECTURES       Architectures (as a list)
 macro(configure_sdk PREFIX NAME DEPLOYMENT_VERSION XCRUN_NAME
-                    VERSION_MIN_NAME TRIPLE_NAME ARCHITECTURES)
+                    VERSION_MIN_NAME TRIPLE_NAME ARCHITECTURES INTERNAL)
   # Find the SDK
   set(SWIFT_SDK_${PREFIX}_PATH "" CACHE PATH "Path to the ${NAME} SDK")
 
   if (NOT SWIFT_SDK_${PREFIX}_PATH)
-    execute_process(COMMAND xcrun --sdk ${XCRUN_NAME} --show-sdk-path
-      OUTPUT_VARIABLE SWIFT_SDK_${PREFIX}_PATH
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (${INTERNAL})
+      execute_process(
+        COMMAND xcrun -sdk "${XCRUN_NAME}.internal" --show-sdk-path
+        OUTPUT_VARIABLE SWIFT_SDK_${PREFIX}_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
+
+    if (NOT SWIFT_SDK_${PREFIX}_PATH)
+      execute_process(
+        COMMAND xcrun -sdk ${XCRUN_NAME} --show-sdk-path
+        OUTPUT_VARIABLE SWIFT_SDK_${PREFIX}_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
   endif()
 
   if(EXISTS "${SWIFT_SDK_${PREFIX}_PATH}/System/Library/Frameworks/module.map")
-
     # Determine the SDK version we found.
-    string(REGEX MATCH "/[A-Za-z]+[0-9]+\\.[0-9]+(\\.internal)?\\.sdk"
+    string(REGEX MATCH "/[A-Za-z]+[0-9]+\\.[0-9]+(\\.Internal)?\\.sdk"
            SCRATCH ${SWIFT_SDK_${PREFIX}_PATH})
     string(REGEX MATCH "[0-9]+\\.[0-9]+"
            SWIFT_SDK_${PREFIX}_VERSION ${SCRATCH})
@@ -1232,14 +1242,14 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   #   - iOS
   option(SWIFT_BUILD_IOS "Build for iOS" NO)
   if (SWIFT_BUILD_IOS)
-    configure_sdk(IOS "iOS" "7.0" iphoneos ios ios "armv7;arm64")
+    configure_sdk(IOS "iOS" "7.0" iphoneos ios ios "armv7;arm64" YES)
   endif()
 
   #   - iOS simulator
   option(SWIFT_BUILD_IOS_SIMULATOR "Build for iOS Simulator" NO)
   if (SWIFT_BUILD_IOS_SIMULATOR)
     configure_sdk(IOS_SIMULATOR "iOS Simulator" "7.0" iphonesimulator 
-                  ios-simulator ios "i386;x86_64")
+                  ios-simulator ios "i386;x86_64" NO)
   endif()
 
   message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
