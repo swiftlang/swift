@@ -932,21 +932,36 @@ macro(add_swift_library name)
   translate_flag(${SWIFTLIB_NO_LLVM_COMMON_LIBS} "NO_LLVM_COMMON_LIBS" 
                  SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG)
 
-  # Pass through to build the default configuration.
-  add_swift_library_single(
-    ${name}
-    ${name}
-    ${SWIFTLIB_SOURCES}
-    DEPENDS ${SWIFTLIB_DEPENDS}
-    FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
-    COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
-    FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
-    ${SWIFTLIB_INSTALL_FLAG}
-    ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
-    ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
-
   # If we're supposed to build this library for the target...
   if(SWIFTLIB_TARGET_LIBRARY) 
+    # Check whether we should build the default variant.
+    # FIXME: This is a hack. OSX should just be another SDK.
+    if (SWIFTLIB_TARGET_SDKS)
+      set(SHOULD_CREATE_VARIANT NO)
+      foreach(TARGET_SDK ${SWIFTLIB_TARGET_SDKS})
+        if (TARGET_SDK STREQUAL SWIFT_DEFAULT_TARGET_SDK)
+          set(SHOULD_CREATE_VARIANT YES)
+        endif()
+      endforeach()
+    else()
+      set(SHOULD_CREATE_VARIANT YES)
+    endif()
+    
+    if (SHOULD_CREATE_VARIANT)
+      # Pass through to build the default configuration.
+      add_swift_library_single(
+        ${name}
+        ${name}
+        ${SWIFTLIB_SOURCES}
+        DEPENDS ${SWIFTLIB_DEPENDS}
+        FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
+        COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+        FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+        ${SWIFTLIB_INSTALL_FLAG}
+        ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
+        ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+    endif ()
+
     # Loop through the various SDKs building the other variants of
     # this library.
     foreach(SDK ${SWIFT_SDKS})
@@ -955,13 +970,19 @@ macro(add_swift_library name)
         # Configure variables for this subdirectory.
         set(VARIANT_NAME "${name}-${SDK}-${ARCH}")
 
+        # Determine whether we should build this variant.
         if (SWIFTLIB_TARGET_SDKS)
-          list(FIND ${SWIFTLIB_TARGET_SDKS} ${SDK} SHOULD_CREATE_VARIANT)
+          set(SHOULD_CREATE_VARIANT NO)
+          foreach(TARGET_SDK ${SWIFTLIB_TARGET_SDKS})
+            if (TARGET_SDK STREQUAL SDK)
+              set(SHOULD_CREATE_VARIANT YES)
+            endif()
+          endforeach()
         else()
-          set(SHOULD_CREATE_VARIANT 0)
+          set(SHOULD_CREATE_VARIANT YES)
         endif()
 
-        if (SHOULD_CREATE_VARIANT GREATER -1)
+        if (SHOULD_CREATE_VARIANT)
           # Map dependencies over to the appropriate variants.
           set(depends)
           foreach(DEP ${SWIFTLIB_DEPENDS})
@@ -985,6 +1006,19 @@ macro(add_swift_library name)
         endif()
       endforeach(ARCH)
     endforeach(SDK)    
+  else()
+    # Pass through to build the default configuration.
+    add_swift_library_single(
+      ${name}
+      ${name}
+      ${SWIFTLIB_SOURCES}
+      DEPENDS ${SWIFTLIB_DEPENDS}
+      FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
+      COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+      FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+      ${SWIFTLIB_INSTALL_FLAG}
+      ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
+      ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
   endif()
 endmacro(add_swift_library)
 
@@ -1228,12 +1262,15 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if (SWIFT_DEPLOYMENT_OS MATCHES "^iphoneos")
     set(version_min_os "ios")
     set(triple_os "ios")
+    set(SWIFT_DEFAULT_TARGET_SDK "IOS")
   elseif (SWIFT_DEPLOYMENT_OS MATCHES "^iphonesimulator")
     set(version_min_os "ios-simulator")
     set(triple_os "ios")
+    set(SWIFT_DEFAULT_TARGET_SDK "IOS_SIMULATOR")
   elseif (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
     set(version_min_os "macosx")
     set(triple_os "macosx")
+    set(SWIFT_DEFAULT_TARGET_SDK "OSX")
   else()
     message(FATAL_ERROR "Can't understand SWIFT_DEPLOYMENT_OS '${SWIFT_DEPLOYMENT_OS}';")
   endif()
