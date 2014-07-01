@@ -24,6 +24,9 @@ var graphemeBreakPropertyTable = [
 var UnicodeTrie = TestCase("UnicodeTrie")
 
 UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
+  // Verify that the trie reports correct values of the property for every code
+  // point.
+
   var trie = _UnicodeGraphemeClusterBreakPropertyTrie()
 
   var expected = [_GraphemeClusterBreakPropertyValue](count: 0x110000,
@@ -88,6 +91,8 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
+/// Verify that extended grapheme cluster boundaries in `subject` occur at
+/// positions specified in `expectedBoundaries`.
 func checkGraphemeClusterSegmentation(
     expectedBoundaries: [Int], subject: String, stackTrace: SourceLocStack
 ) {
@@ -124,11 +129,16 @@ func checkGraphemeClusterSegmentation(
       stackTrace.withCurrentLoc())
 }
 
-UnicodeTrie.test("GraphemeClusterSegmentation") {
+UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
+  // Test segmentation algorithm using test data from the Unicode
+  // specification.
+
 % for code_points,expected_boundaries in grapheme_cluster_break_tests:
   if true {
-    let scalars: [UInt32] = [ ${", ".join([ str(cp) for cp in code_points ])} ]
-    let expectedBoundaries: [Int] = [ ${", ".join([ str(x) for x in expected_boundaries ])} ]
+    let scalars: [UInt32] =
+        [ ${", ".join([ str(cp) for cp in code_points ])} ]
+    let expectedBoundaries: [Int] =
+        [ ${", ".join([ str(x) for x in expected_boundaries ])} ]
     checkGraphemeClusterSegmentation(expectedBoundaries, scalars: scalars,
         SourceLocStack().withCurrentLoc())
   }
@@ -137,6 +147,8 @@ UnicodeTrie.test("GraphemeClusterSegmentation") {
 }
 
 UnicodeTrie.test("GraphemeClusterSegmentation/Extra") {
+  // Extra tests for input Strings that contain ill-formed code unit sequences.
+
   // U+D800 (high-surrogate)
   checkGraphemeClusterSegmentation(
       [ 0, 1 ],
