@@ -944,6 +944,77 @@ macro(manpage PODFILE DESC MANFILE SECTION)
   endif()
 endmacro(manpage)
 
+# Variable that tracks the set of configured SDKs.
+#
+# Each element in this list is an SDK for which the various
+# SWIFT_SDK_${NAME}_* variables are defined. Swift libraries will be
+# built for each variant.
+set(SWIFT_SDKS)
+
+# Configure an SDK
+#
+# Usage:
+#   configure_sdk(
+#     prefix             # Prefix to use for SDK variables (e.g., OSX)
+#     name               # Display name for this SDK
+#     xcrun_name         # SDK name to use with xcrun
+#     version_min_name   # The name used in the -mOS-version-min flag
+#     triple_name        # The name used in Swift's -triple
+#     architectures      # A list of architectures this SDK supports
+#   )
+#     
+# This macro attempts to configure a given SDK. When successful, it
+# defines a number of variables:
+#
+#   SWIFT_SDK_${PREFIX}_PATH              Path to the SDK
+#   SWIFT_SDK_${PREFIX}_VERSION           SDK version number (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${PREFIX}_LIB_SUBDIR        Library subdir for this SDK
+#   SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME  Version min name for this SDK
+#   SWIFT_SDK_${PREFIX}_TRIPLE_NAME       Triple name for this SDK
+#   SWIFT_SDK_${PREFIX}_ARCHITECTURES     Architectures (as a list)
+macro(configure_sdk PREFIX NAME XCRUN_NAME VERSION_MIN_NAME TRIPLE_NAME 
+                    ARCHITECTURES)
+  # Find the SDK
+  set(SWIFT_SDK_${PREFIX}_PATH "" CACHE PATH "Path to the ${NAME} SDK")
+
+  if (NOT SWIFT_SDK_${PREFIX}_PATH)
+    execute_process(COMMAND xcrun --sdk ${XCRUN_NAME} --show-sdk-path
+      OUTPUT_VARIABLE SWIFT_SDK_${PREFIX}_PATH
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+
+  if(EXISTS "${SWIFT_SDK_${PREFIX}_PATH}/System/Library/Frameworks/module.map")
+
+    # Determine the SDK version we found.
+    string(REGEX MATCH "/[A-Za-z]+[0-9]+\\.[0-9]+(\\.internal)?\\.sdk"
+           SCRATCH ${SWIFT_SDK_${PREFIX}_PATH})
+    string(REGEX MATCH "[0-9]+\\.[0-9]+"
+           SWIFT_SDK_${PREFIX}_VERSION ${SCRATCH})
+         
+    # Set other variables.
+    set(SWIFT_SDK_${PREFIX}_LIB_SUBDIR ${XCRUN_NAME})
+    set(SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME ${VERSION_MIN_NAME})
+    set(SWIFT_SDK_${PREFIX}_TRIPLE_NAME ${TRIPLE_NAME})
+    set(SWIFT_SDK_${PREFIX}_ARCHITECTURES ${ARCHITECTURES})
+
+    # Report this SDK to the user.
+    message(STATUS "${NAME} SDK:")
+    message(STATUS "  Path: ${SWIFT_SDK_${PREFIX}_PATH}")
+    message(STATUS "  Version: ${SWIFT_SDK_${PREFIX}_VERSION}")
+    message(STATUS "  Library subdir: ${SWIFT_SDK_${PREFIX}_LIB_SUBDIR}")
+    message(STATUS "  Version min name: ${SWIFT_SDK_${PREFIX}_VERSION_MIN_NAME}")
+    message(STATUS "  Triple name: ${SWIFT_SDK_${PREFIX}_TRIPLE_NAME}")
+    message(STATUS "  Architectures: ${SWIFT_SDK_${PREFIX}_ARCHITECTURES}")
+
+    # Add this to the list of known SDKs.
+    list(APPEND SWIFT_SDKS ${PREFIX})
+  else()
+    message(FATAL_ERROR "${NAME} SDK not found at SWIFT_SDK_${PREFIX}_PATH.")
+  endif()
+endmacro(configure_sdk)
+
+# Configure the various SDKs.
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # Choose an SDK if none was set.
   set(MODULES_SDK "" CACHE PATH
@@ -1009,6 +1080,24 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   # Add OS name to stdlib install directory
   set(SWIFTLIB_SUBDIR "${SWIFT_DEPLOYMENT_OS}")
+
+  # Configure the requested SDKs.
+  # FIXME: Once iOS builds are working this way, add OS X as "just
+  # another SDK".
+  #   - iOS
+  option(SWIFT_BUILD_IOS "Build for iOS" NO)
+  if (SWIFT_BUILD_IOS)
+    configure_sdk(IOS "iOS" iphoneos ios ios "armv7;arm64")
+  endif()
+
+  #   - iOS simulator
+  option(SWIFT_BUILD_IOS_SIMULATOR "Build for iOS Simulator" NO)
+  if (SWIFT_BUILD_IOS_SIMULATOR)
+    configure_sdk(IOS_SIMULATOR "iOS Simulator" iphonesimulator ios-simulator 
+                  ios "i386;x86_64")
+  endif()
+
+  message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
 endif()
 
 # We'll need this once we have generated headers
