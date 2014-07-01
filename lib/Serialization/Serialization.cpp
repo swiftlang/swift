@@ -1007,6 +1007,23 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   }
 }
 
+static serialization::CtorInitializerKind
+getStableCtorInitializerKind(swift::CtorInitializerKind K){
+  switch (K) {
+  case swift::CtorInitializerKind::ConvenienceFactory:
+    llvm_unreachable("Convenience factory initializers cannot be uttered");
+
+  case swift::CtorInitializerKind::Factory:
+    llvm_unreachable("Factory initializers cannot be uttered");
+
+#define CASE(NAME) \
+  case swift::CtorInitializerKind::NAME: return serialization::NAME;
+      CASE(Designated)
+      CASE(Convenience)
+#undef CASE
+  }
+}
+
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   using namespace decls_block;
 
@@ -1076,6 +1093,15 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     writeCrossReference(DC->getParent(), pathLen + 1 + fn->isOperator());
 
     Type ty = fn->getInterfaceType()->getCanonicalType();
+
+    if (auto ctor = dyn_cast<ConstructorDecl>(DC)) {
+      abbrCode = DeclTypeAbbrCodes[XRefInitializerPathPieceLayout::Code];
+      XRefInitializerPathPieceLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addTypeRef(ty),
+        getStableCtorInitializerKind(ctor->getInitKind()));
+      break;
+    }
+
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
@@ -1318,23 +1344,6 @@ bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   return (topLevel->getParentModule() != M ||
           (SF && topLevel != SF && !isForced(D, DeclIDs)));
-}
-
-static serialization::CtorInitializerKind
-getStableCtorInitializerKind(swift::CtorInitializerKind K){
-  switch (K) {
-  case swift::CtorInitializerKind::ConvenienceFactory:
-    llvm_unreachable("Convenience factory initializers cannot be uttered");
-
-  case swift::CtorInitializerKind::Factory:
-    llvm_unreachable("Factory initializers cannot be uttered");
-
-#define CASE(NAME) \
-  case swift::CtorInitializerKind::NAME: return serialization::NAME;
-      CASE(Designated)
-      CASE(Convenience)
-#undef CASE
-  }
 }
 
 void Serializer::writeDecl(const Decl *D) {
@@ -2549,6 +2558,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
     registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
     registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
+    registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
     registerDeclTypeAbbr<NoConformanceLayout>();
     registerDeclTypeAbbr<NormalProtocolConformanceLayout>();

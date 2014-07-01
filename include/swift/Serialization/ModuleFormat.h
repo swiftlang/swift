@@ -988,6 +988,12 @@ namespace decls_block {
     IdentifierIDField // name
   >;
 
+  using XRefInitializerPathPieceLayout = BCRecordLayout<
+    XREF_INITIALIZER_PATH_PIECE,
+    TypeIDField,             // type
+    CtorInitializerKindField // initializer kind
+  >;
+
   using XRefExtensionPathPieceLayout = BCRecordLayout<
     XREF_EXTENSION_PATH_PIECE,
     ModuleIDField     // module ID

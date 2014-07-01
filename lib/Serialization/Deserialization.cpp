@@ -972,12 +972,25 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   return members;
 }
 
+static Optional<swift::CtorInitializerKind>
+getActualCtorInitializerKind(uint8_t raw) {
+  switch (serialization::CtorInitializerKind(raw)) {
+  case serialization::Designated:
+    return swift::CtorInitializerKind::Designated;
+
+  case serialization::Convenience:
+    return swift::CtorInitializerKind::Convenience;
+  }
+  return Nothing;
+}
+
 /// Remove values from \p values that don't match the expected type or module.
 ///
 /// Both \p expectedTy and \p expectedModule can be omitted, in which case any
 /// type or module is accepted. Values imported from Clang can also appear in
 /// any module.
 static void filterValues(Type expectedTy, Module *expectedModule, bool isType,
+                         Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
   if (expectedTy)
@@ -994,6 +1007,14 @@ static void filterValues(Type expectedTy, Module *expectedModule, bool isType,
     if (expectedModule && !value->hasClangNode() &&
         value->getModuleContext() != expectedModule)
       return true;
+
+    // If we're expecting an initializer with a specific kind, and this is not
+    // an initializer with that kind, remove it.
+    if (ctorInit) {
+      if (!isa<ConstructorDecl>(value) ||
+          cast<ConstructorDecl>(value)->getInitKind() != *ctorInit)
+        return true;
+    }
     return false;
   });
   values.erase(newEnd, values.end());
@@ -1037,7 +1058,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     M->lookupQualified(ModuleType::get(M), name, NL_QualifiedDefault,
                        /*typeResolver=*/nullptr, values);
-    filterValues(getType(TID), nullptr, isType, values);
+    filterValues(getType(TID), nullptr, isType, Nothing, values);
     break;
   }
 
@@ -1067,6 +1088,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
   }
 
   case XREF_GENERIC_PARAM_PATH_PIECE:
+  case XREF_INITIALIZER_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
 
   default:
@@ -1097,16 +1119,40 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
                                                   &blobData);
     switch (recordID) {
     case XREF_TYPE_PATH_PIECE:
-    case XREF_VALUE_PATH_PIECE: {
-      IdentifierID IID;
+    case XREF_VALUE_PATH_PIECE:
+    case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
-      bool isType = (recordID == XREF_TYPE_PATH_PIECE);
-      if (isType)
+      Identifier memberName;
+      Optional<swift::CtorInitializerKind> ctorInit;
+      bool isType = false;
+      switch (recordID) {
+      case XREF_TYPE_PATH_PIECE: {
+        IdentifierID IID;
         XRefTypePathPieceLayout::readRecord(scratch, IID);
-      else
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+        memberName = getIdentifier(IID);
+        isType = true;
+        break;
+      }
 
-      Identifier memberName = getIdentifier(IID);
+      case XREF_VALUE_PATH_PIECE: {
+        IdentifierID IID;
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+        memberName = getIdentifier(IID);
+        break;
+      }
+
+      case XREF_INITIALIZER_PATH_PIECE: {
+        uint8_t kind;
+        XRefInitializerPathPieceLayout::readRecord(scratch, TID, kind);
+        memberName = getContext().Id_init;
+        ctorInit = getActualCtorInitializerKind(kind);
+        break;
+      }
+        
+      default:
+        llvm_unreachable("Unhandled path piece");
+      }
+
       pathTrace.addValue(memberName);
 
       if (values.size() != 1) {
@@ -1124,7 +1170,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
-      filterValues(getType(TID), M, isType, values);
+      filterValues(getType(TID), M, isType, ctorInit, values);
       break;
     }
 
@@ -1363,18 +1409,6 @@ static bool isDeclAttrRecord(unsigned ID) {
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   default: return false;
   }
-}
-
-static Optional<swift::CtorInitializerKind>
-getActualCtorInitializerKind(uint8_t raw) {
-  switch (serialization::CtorInitializerKind(raw)) {
-  case serialization::Designated:
-    return swift::CtorInitializerKind::Designated;
-
-  case serialization::Convenience:
-    return swift::CtorInitializerKind::Convenience;
-  }
-  return Nothing;
 }
 
 static Optional<swift::Accessibility>
