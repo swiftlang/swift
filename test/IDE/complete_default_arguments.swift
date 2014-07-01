@@ -29,5 +29,5 @@ func testDefaultArgInit2(_: Int = #^DEFAULT_ARG_INIT_2^#) { }
 func testDefaultArgInit3(Int = #^DEFAULT_ARG_INIT_3^#) { }
 func testDefaultArgInit4(x: Int = #^DEFAULT_ARG_INIT_4^#) { }
 // DEFAULT_ARG_INIT: Begin completions
-// DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]
+// DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{$}}
 // DEFAULT_ARG_INIT: End completions
