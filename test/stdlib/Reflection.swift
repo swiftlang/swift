@@ -410,7 +410,7 @@ dump(CollectionOfOne("Howdy Swift!"))
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
 println(reflect(emptyCollectionOfInt).summary)
 
-// CHECK-NEXT .one
+// CHECK-NEXT: .one
 println(reflect(Bit.one).summary)
 
 // Check ObjC mirror implementation.
@@ -418,6 +418,20 @@ println(reflect(Bit.one).summary)
 println("ObjC:")
 // CHECK-NEXT:  <NSObject: {{0x[0-9a-f]+}}>
 dump(NSObject())
+
+// CHECK-NEXT: UnsafePointer(nil)
+var nilUnsafePointerString: UnsafePointer<String> = UnsafePointer()
+println(reflect(nilUnsafePointerString).summary)
+
+// CHECK-NEXT: UnsafePointer(0x123456)
+var randomUnsafePointerString: UnsafePointer<String> = UnsafePointer(0x123456)
+println(reflect(randomUnsafePointerString).summary)
+
+// CHECK-NEXT: Hello panda
+var sanePointerString: UnsafePointer<String> = UnsafePointer.alloc(1)
+sanePointerString.initialize("Hello panda")
+println(reflect(sanePointerString.memory).summary)
+sanePointerString.dealloc(1)
 
 let o = NSObject(), p = NSObject()
 // CHECK-NEXT: true

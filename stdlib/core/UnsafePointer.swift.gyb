@@ -18,7 +18,8 @@
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
 @public struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
-                            LogicValue, NilLiteralConvertible, _Pointer {
+                            LogicValue, NilLiteralConvertible, _Pointer,
+                            Reflectable {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -264,6 +265,48 @@
   @public func predecessor() -> ${Self} {
     return self - 1
   }
+  
+  @public func getMirror() -> Mirror {
+    return _${Self}Mirror(self)
+  }
+}
+
+@public struct _${Self}Mirror<T>: Mirror {
+  let _value: ${Self}<T>
+  
+  init(_ v: ${Self}<T>) {
+    _value = v
+  }
+  
+  var value: Any { return _value }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return .None }
+
+  var count: Int { return 1 }
+  
+  func _getPointerValue() -> UInt64 {
+    return UInt64(Int(Builtin.ptrtoint_Word(_value.value)))
+  }
+
+  subscript(i: Int) -> (String, Mirror) {
+    switch i {
+    case 0: return ("pointerValue",reflect(_getPointerValue()))
+    default: _preconditionFailure("cannot extract this child index")
+    }
+  }
+
+  var summary: String {
+    let selfType = "${Self}"
+    let ptrValue = _getPointerValue()
+    if ptrValue == 0 { return "\(selfType)(nil)" }
+    return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
+  }
+
+  var quickLookObject: QuickLookObject? { return .None }
+
+  var disposition: MirrorDisposition { return .Struct }
 }
 
 @transparent @public
