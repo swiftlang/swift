@@ -225,8 +225,8 @@ Strings are **Unicode-Aware**
 
 
    Any deviation from what Unicode
-   specifies requires careful justification.  So far, we have found two
-   possible points of deviation for Swift ``String``:
+   specifies requires careful justification.  So far, we have found one
+   possible point of deviation for Swift ``String``:
 
    1. The `Unicode Text Segmentation Specification`_ says, “`do not
       break between CR and LF`__.”  However, breaking extended
@@ -235,18 +235,6 @@ Strings are **Unicode-Aware**
       point is still open for discussion.
 
       __ http://www.unicode.org/reports/tr29/#GB2
-
-   2. The `Unicode Text Segmentation Specification`_ says,
-      “`do not break between regional indicator symbols`__.”  However, it also
-      says “(Sequences of more than two RI characters should be separated
-      by other characters, such as U+200B ZWSP).”  Although the
-      parenthesized note probably has less official weight than the other
-      admonition, breaking pairs of RI characters seems like the right
-      thing for us to do given that Cocoa already forms strings with
-      several adjacent pairs of RI characters, and the Unicode spec *can*
-      be read as outlawing such strings anyway.
-
-      __ http://www.unicode.org/reports/tr29/#GB8
 
 .. _Unicode Text Segmentation Specification: http://www.unicode.org/reports/tr29
 
