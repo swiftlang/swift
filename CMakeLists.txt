@@ -302,7 +302,8 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
-#     [DEPENDS cmake_target...]         # CMake targets on which the object file depends
+#     [DEPENDS cmake_target...]         # CMake targets on which the object 
+#                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
 function(compile_swift_files)
@@ -909,6 +910,9 @@ endmacro(translate_flag)
 #     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
+#     [TARGET_SDKS sdk1...]           # The set of SDKs in which this library
+#                                    # is included. If empty, the library is
+#                                    # included in all SDKs.
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
@@ -916,7 +920,7 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
@@ -951,26 +955,34 @@ macro(add_swift_library name)
         # Configure variables for this subdirectory.
         set(VARIANT_NAME "${name}-${SDK}-${ARCH}")
 
-        # Map dependencies over to the appropriate variants.
-        set(depends)
-        foreach(DEP ${SWIFTLIB_DEPENDS})
-          list(APPEND depends "${DEP}-${SDK}-${ARCH}")
-        endforeach()
+        if (SWIFTLIB_TARGET_SDKS)
+          list(FIND ${SWIFTLIB_TARGET_SDKS} ${SDK} SHOULD_CREATE_VARIANT)
+        else()
+          set(SHOULD_CREATE_VARIANT 0)
+        endif()
 
-        # Add this library variant.
-        add_swift_library_single(
-          ${VARIANT_NAME}
-          ${name}
-          ${SWIFTLIB_SOURCES}
-          SDK ${SDK}
-          ARCHITECTURE ${ARCH}
-          DEPENDS ${depends}
-          FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
-          COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
-          FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
-          ${SWIFTLIB_INSTALL_FLAG}
-          ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
-          ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+        if (SHOULD_CREATE_VARIANT GREATER -1)
+          # Map dependencies over to the appropriate variants.
+          set(depends)
+          foreach(DEP ${SWIFTLIB_DEPENDS})
+            list(APPEND depends "${DEP}-${SDK}-${ARCH}")
+          endforeach()
+
+          # Add this library variant.
+          add_swift_library_single(
+            ${VARIANT_NAME}
+            ${name}
+            ${SWIFTLIB_SOURCES}
+            SDK ${SDK}
+            ARCHITECTURE ${ARCH}
+            DEPENDS ${depends}
+            FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
+            COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+            FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+            ${SWIFTLIB_INSTALL_FLAG}
+            ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
+            ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+        endif()
       endforeach(ARCH)
     endforeach(SDK)    
   endif()
