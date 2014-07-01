@@ -9,7 +9,7 @@ else ()
   SET_SOURCE_FILES_PROPERTIES(FastEntryPoints.s PROPERTIES LANGUAGE C)
 endif()
 
-add_swift_library(swift_runtime INSTALL
+add_swift_library(swift_runtime 
   Casting.cpp
   FastEntryPoints.s
   HeapObject.cpp
@@ -24,7 +24,8 @@ add_swift_library(swift_runtime INSTALL
   Heap.cpp
   Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
-  )
+  TARGET_LIBRARY INSTALL
+  FRAMEWORK_DEPENDS Foundation)
 
 add_swift_optimization_flags(swift_runtime)
 
@@ -41,9 +42,6 @@ set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
-
-target_link_libraries(swift_runtime
-  "-framework Foundation")
 
 list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
 find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)

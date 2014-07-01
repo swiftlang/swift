@@ -642,6 +642,7 @@ endfunction()
 #     [SDK sdk]                      # SDK to build for
 #     [ARCHITECTURE architecture]    # Architecture to build for
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
+#     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
@@ -650,7 +651,7 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;SDK;ARCHITECTURE" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
 
@@ -738,6 +739,12 @@ macro(add_swift_library_single target name)
     HEADER_FILE_ONLY true)
 
   target_link_libraries( ${target} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}" ${SWIFTLIB_SINGLE_DEPENDS} )
+  
+  # Link against system frameworks.
+  foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
+    target_link_libraries(${target} "-framework ${FRAMEWORK}")
+  endforeach()
+
   llvm_config( ${target} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
   if (NOT NO_LLVM_COMMON_LIBS)
     target_link_libraries( ${target} ${LLVM_COMMON_LIBS} )
@@ -869,6 +876,7 @@ endmacro(translate_flag)
 # Usage:
 #   add_swift_library(name           # Name of the library (e.g., swiftParse)
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
+#     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
@@ -877,7 +885,9 @@ endmacro(translate_flag)
 #     [TARGET_LIBRARY]               # Build library for the target SDKs
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
+  parse_arguments(SWIFTLIB 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" 
+    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
 
@@ -894,6 +904,7 @@ macro(add_swift_library name)
     ${name}
     ${SWIFTLIB_SOURCES}
     DEPENDS ${SWIFTLIB_DEPENDS}
+    FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
     COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
     FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
     ${SWIFTLIB_INSTALL_FLAG}
@@ -918,6 +929,7 @@ macro(add_swift_library name)
           SDK ${SDK}
           ARCHITECTURE ${ARCH}
           DEPENDS ${SWIFTLIB_DEPENDS}
+          FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
           COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
           ${SWIFTLIB_INSTALL_FLAG}
