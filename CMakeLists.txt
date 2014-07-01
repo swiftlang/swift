@@ -730,15 +730,13 @@ macro(add_swift_library_single target name)
     add_dependencies(${target_static} ${name})
     set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-    set_target_properties(${target_static} 
-      PROPERTIES LINK_FLAGS ${SWIFTLIB_SINGLE_LINK_FLAGS})
-
     if (SWIFT_SDKS)
       # FIXME: Deal with library variants here
       set_target_properties(${target_static} PROPERTIES
-        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
-        LINK_FLAGS "${link_flags}")
+        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
     endif()
+
+    set_target_properties(${target_static} PROPERTIES LINK_FLAGS "${link_flags}")
   endif()
   
   if (MODULE)
