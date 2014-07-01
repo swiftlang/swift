@@ -1,0 +1,26 @@
+// RUN: %sil-opt %s -early-inline -sil-inline-threshold=50 -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [semantics "no_inline_plz"] @_TF16inline_semantics3fooFT_Si : $@thin () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Word, 3           // user: %1
+  %1 = struct $Int (%0 : $Builtin.Word)           // user: %2
+  return %1 : $Int                                // id: %2
+}
+
+//CHECK-LABLE: _TF16inline_semantics3barFT_Si
+//CHECK: function_ref
+//CHECK: apply
+//CHECK-NEXT: ret
+sil @_TF16inline_semantics3barFT_Si : $@thin () -> Int {
+bb0:
+  %0 = function_ref @_TF16inline_semantics3fooFT_Si : $@thin () -> Int // user: %1
+  %1 = apply %0() : $@thin () -> Int              // user: %2
+  return %1 : $Int                                // id: %2
+}
+
+
+

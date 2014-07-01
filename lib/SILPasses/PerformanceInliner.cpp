@@ -28,13 +28,20 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 namespace {
   class SILPerformanceInliner {
+    /// The inline threashold.
     const unsigned InlineCostThreshold;
-    SILModule::LinkingMode Mode;
+    /// The linking mode.
+    SILModule::LinkingMode LinkMode;
+    /// If set to true then the inliner is allowed to inline function calls
+    /// that are marked with the @semantics attribute.
+    bool InlineFunctionsWithSemantics;
 
   public:
     SILPerformanceInliner(unsigned threshold,
-                          SILModule::LinkingMode M)
-      : InlineCostThreshold(threshold), Mode(M) {}
+                          SILModule::LinkingMode M,
+                          bool InlineFuncWithSemantics)
+      : InlineCostThreshold(threshold), LinkMode(M),
+    InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
 
     bool inlineCallsIntoFunction(SILFunction *F);
   };
@@ -47,7 +54,8 @@ namespace {
 /// \brief Returns a SILFunction if this ApplyInst calls a recognizable function
 /// that is legal to inline.
 static SILFunction *getInlinableFunction(ApplyInst *AI,
-                                         SILModule::LinkingMode Mode) {
+                                         SILModule::LinkingMode Mode,
+                                         bool InlineFunctionsWithSemantics) {
   // Avoid substituion lists, we don't support them.
   if (AI->hasSubstitutions())
     return nullptr;
@@ -57,6 +65,15 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
     return nullptr;
 
   SILFunction *F = FRI->getReferencedFunction();
+
+  // Don't inline functions that are marked with the @semantics attribute
+  // if the inliner is asked not to inline them.
+  if (!InlineFunctionsWithSemantics && F->hasDefinedSemantics()) {
+    DEBUG(llvm::dbgs() << " Function " << F->getName()
+          << " has special semantics: " << F->getSemanticsString() << "\n");
+    return nullptr;
+  }
+
   // If F is an external declaration, we can't inline...
   if (F->empty() || F->isExternalDeclaration()) {
     DEBUG(llvm::dbgs() << "        FAIL! Can't inline " << F->getName()
@@ -119,7 +136,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount; 
   for (auto AI : CallSites) {
-    SILFunction *Callee = getInlinableFunction(AI, Mode);
+    assert(AI && "Invalid AI");
+    SILFunction *Callee = getInlinableFunction(AI, LinkMode,
+                                               InlineFunctionsWithSemantics);
     if (Callee)
       CalleeCount[Callee]++;
   }
@@ -128,7 +147,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     DEBUG(llvm::dbgs() << "    Found call site:" <<  *AI);
 
     // Get the callee.
-    SILFunction *Callee = getInlinableFunction(AI, Mode);
+    SILFunction *Callee = getInlinableFunction(AI, LinkMode,
+                                               InlineFunctionsWithSemantics);
     if (!Callee) {
       DEBUG(llvm::dbgs() << "        FAIL! Couldn't find inlineable callee.\n");
       continue;
@@ -213,8 +233,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
 namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
+  /// If InlineSem is true then the inliner is free to inline functions with
+  /// defined semantics.
+  bool InlineSem;
 public:
-  SILPerformanceInlinerPass() {}
+  SILPerformanceInlinerPass(bool InlineFuncWithSemantics):
+      InlineSem(InlineFuncWithSemantics) {}
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -231,7 +255,7 @@ public:
     std::reverse(Worklist.begin(), Worklist.end());
 
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
-                                  SILModule::LinkingMode::LinkAll);
+                                  SILModule::LinkingMode::LinkAll, InlineSem);
 
     bool Changed = false;
     while (!Worklist.empty()) {
@@ -257,5 +281,11 @@ public:
 
 
 SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass();
+  return new SILPerformanceInlinerPass(true /* Inline all functions. */);
+}
+
+/// Create an inliner pass that does not inline functions that are marked with
+/// the @semantics attribute.
+SILTransform *swift::createEarlyInliner() {
+  return new SILPerformanceInlinerPass(false);
 }

@@ -57,6 +57,7 @@ enum class PassKind {
   SILInlineCaches,
   SimplifyCFG,
   PerformanceInlining,
+  EarlyInlining,
   CodeMotion,
   LowerAggregateInstrs,
   SROA,
@@ -131,10 +132,12 @@ Passes(llvm::cl::desc("Passes:"),
                                    "Propagate constants and emit diagnostics"),
                         clEnumValN(PassKind::PerformanceCCP,
                                    "performance-constant-propagation",
-                                   "Propagate constants and do not emit diagnostics"),
+                                   "Propagate constants and do not emit"
+                                   " diagnostics"),
                         clEnumValN(PassKind::CSE,
                                    "cse",
-                                   "Perform constant subexpression elimination."),
+                                   "Perform constant subexpression "
+                                   "elimination."),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
@@ -181,6 +184,10 @@ Passes(llvm::cl::desc("Passes:"),
                                    "inline",
                                    "Inline functions which are determined to be"
                                    " less than a pre-set cost."),
+                        clEnumValN(PassKind::EarlyInlining,
+                                   "early-inline",
+                                   "Inline functions that are not marked as "
+                                   "having special semantics."),
                         clEnumValN(PassKind::CodeMotion,
                                    "codemotion",
                                    "Perform code motion optimizations"),
@@ -367,6 +374,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::PerformanceInlining:
       PM.add(createPerfInliner());
+      break;
+    case PassKind::EarlyInlining:
+      PM.add(createEarlyInliner());
       break;
     case PassKind::CodeMotion:
       PM.add(createCodeMotion());

@@ -168,6 +168,20 @@ public:
   void setDeclContext(Decl *D);
   void setDeclContext(Expr *E);
 
+  /// @returns True if the function is marked with the @semantics attribute
+  /// and has special semantics that the optimizer can use to optimize the
+  /// function.
+  bool hasDefinedSemantics() const {
+    return SemanticsAttr.length() > 0;
+  }
+
+  /// @returns the semantics tag that describes this function.
+  StringRef getSemanticsString() const {
+    assert(hasDefinedSemantics() &&
+           "Accessing a function with no semantics tag");
+    return SemanticsAttr;
+  }
+
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
