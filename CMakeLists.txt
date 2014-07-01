@@ -719,6 +719,13 @@ macro(add_swift_library_single target name)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
     add_dependencies(${target_static} ${name})
     set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+    if (SWIFT_SDKS)
+      # FIXME: Deal with library variants here
+      set_target_properties(${target_static} PROPERTIES
+        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
+        LINK_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
+    endif()
   endif()
   
   if (MODULE)
@@ -817,6 +824,28 @@ macro(add_swift_library_single target name)
       endif()
     endforeach(external_source)
   endif(SWIFTLIB_SINGLE_INSTALL)
+
+  # Add variant-specific flags.
+  if (SWIFTLIB_SINGLE_SDK)
+    set(SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS
+        "-m${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
+    set_target_properties(${target}
+      PROPERTIES
+      # Library name (without the variant information)
+      OUTPUT_NAME ${name}
+      # SDK, deployment target, architecture.
+      COMPILE_FLAGS
+      "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
+      LINK_FLAGS "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
+    )
+  else()
+    if (SWIFT_SDKS)
+      # Deployment flags.
+      set_target_properties(${target} PROPERTIES
+        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
+        LINK_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
+    endif()
+  endif()
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${target}
@@ -989,6 +1018,12 @@ macro(add_swift_executable name)
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+
+  if (SWIFT_SDKS)
+    set_target_properties(${name} PROPERTIES
+      COMPILE_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} "
+      LINK_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ")
+  endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
   # ASan does not play well with exported_symbol option. This should be fixed soon.
@@ -1178,20 +1213,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # Add host triple to swift compiler flags.
   set(SWIFT_HOST_TRIPLE "${CMAKE_SYSTEM_PROCESSOR}-apple-${triple_os}${SWIFT_DEPLOYMENT_TARGET}" CACHE STRING "triple")
 
-  # Add deployment target to C/C++ compiler and linker flags.
-  # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
-  if (XCODE)
-    if (${SWIFT_DEPLOYMENT_OS} MATCHES "^macosx") 
-      set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
-    else()
-      set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
-    endif()
-  else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
-  endif()
+  # Determine deployment flags for the C/C++ compiler and linker.
+  set(SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS
+    "-m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
 
   # Add OS name to stdlib install directory
   set(SWIFTLIB_SUBDIR "${SWIFT_DEPLOYMENT_OS}")
@@ -1213,6 +1237,24 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   endif()
 
   message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
+
+  if (NOT SWIFT_SDKS)
+    # Add deployment target to C/C++ compiler and linker flags.
+    # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
+    if (XCODE)
+      if (${SWIFT_DEPLOYMENT_OS} MATCHES "^macosx") 
+        set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
+      else()
+        set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SWIFT_DEPLOYMENT_TARGET})
+      endif()
+    else()
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m${version_min_os}-version-min=${SWIFT_DEPLOYMENT_TARGET}")
+    endif()
+  endif()
+
 endif()
 
 # We'll need this once we have generated headers
