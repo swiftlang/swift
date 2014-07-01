@@ -545,7 +545,7 @@ function(handle_swift_sources sourcesvar externalvar target name)
 
   if(swift_sources)
     # Special-case hack to create swift.o for the swift_stdlib_* targets
-    if(target STREQUAL swift_stdlib_core)
+    if(name STREQUAL swift_stdlib_core)
       set(swift_obj_base "Swift")
     else()
       # Otherwise, get the name from the first swift input file.  Also
