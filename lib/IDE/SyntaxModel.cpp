@@ -185,6 +185,8 @@ private:
                          const ASTNodeType& ASTNode);
   bool popStructureNode();
   bool isCurrentCallArgExpr(const Expr *E);
+
+  bool processComment(CharSourceRange Range);
 };
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -750,7 +752,15 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
   assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
   LastLoc = Node.Range.getStart();
 
-  Walker.walkToNodePre(Node);
+  bool ShouldWalkSubTree = Walker.walkToNodePre(Node);
+
+  if (ShouldWalkSubTree) {
+    if (Node.isComment()) {
+      if (!processComment(Node.Range))
+        return false;
+    }
+  }
+
   if (!Walker.walkToNodePost(Node))
     return false;
   return true;
@@ -773,6 +783,13 @@ bool ModelASTWalker::popStructureNode() {
   SyntaxStructureNode Node = SubStructureStack.back().StructureNode;
   SubStructureStack.pop_back();
 
+  // VarDecls are popped before we see their TypeRepr, so if we pass the token
+  // nodes now they will not change from identifier to a type-identifier.
+  if (Node.Kind != SyntaxStructureKind::InstanceVariable &&
+      Node.Kind != SyntaxStructureKind::Parameter) {
+    if (!passTokenNodesUntil(Node.Range.getEnd(), IncludeNodeAtLocation))
+      return false;
+  }
   if (!Walker.walkToSubStructurePost(Node))
     return false;
 
@@ -785,4 +802,31 @@ bool ModelASTWalker::isCurrentCallArgExpr(const Expr *E) {
   auto Current = SubStructureStack.back();
   return (Current.StructureNode.Kind == SyntaxStructureKind::CallExpression &&
           cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E);
+}
+
+bool ModelASTWalker::processComment(CharSourceRange Range) {
+  StringRef Text = SM.extractText(Range, BufferID);
+  SourceLoc Loc = Range.getStart();
+  // Search for 'FIXME:' or 'TODO:'.
+  while (1) {
+    auto Pos = Text.find_first_of("FTM");
+    if (Pos == StringRef::npos)
+      return true;
+
+    Text = Text.substr(Pos);
+    Loc = Loc.getAdvancedLoc(Pos);
+    if (Text.startswith("FIXME:") || Text.startswith("TODO:") ||
+        Text.startswith("MARK:"))
+      break;
+    Text = Text.substr(1);
+    Loc = Loc.getAdvancedLoc(1);
+  }
+
+  auto NewLinePos = Text.find_first_of("\r\n");
+  if (NewLinePos != StringRef::npos) {
+    Text = Text.substr(0, NewLinePos);
+  }
+  SyntaxNode Node{ SyntaxNodeKind::CommentMarker,
+                   CharSourceRange(Loc, Text.size()) };
+  return passNode(Node);
 }

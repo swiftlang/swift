@@ -213,7 +213,8 @@ public:
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
   }
 
-  StringRef extractText(CharSourceRange Range) const;
+  StringRef extractText(CharSourceRange Range,
+                        Optional<unsigned> BufferID = {}) const;
 
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,

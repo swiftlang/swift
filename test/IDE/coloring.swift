@@ -240,3 +240,41 @@ operator infix ~~ {}
 operator prefix *~~ {}
 // CHECK: <kw>operator</kw> <kw>postfix</kw> ~~* {
 operator postfix ~~* {}
+
+// FIXME: blah.
+//    FIXME:   blah blah
+// Something something, FIXME: blah
+
+// CHECK: <comment-line>// <comment-marker>FIXME: blah.</comment-marker></comment-line>
+// CHECK: <comment-line>//    <comment-marker>FIXME:   blah blah</comment-marker></comment-line>
+// CHECK: <comment-line>// Something something, <comment-marker>FIXME: blah</comment-marker></comment-line>
+
+/* FIXME: blah*/
+
+// CHECK: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
+
+/*
+ * FIXME: blah
+ * Blah, blah.
+ */
+
+// CHECK: <comment-block>/*
+// CHECK:  * <comment-marker>FIXME: blah</comment-marker>
+// CHECK:  * Blah, blah.
+// CHECK:  */</comment-block>
+
+// TODO: blah.
+/// TTODO: blah.
+// MARK: blah.
+
+// CHECK: <comment-line>// <comment-marker>TODO: blah.</comment-marker></comment-line>
+// CHECK: <comment-line>/// T<comment-marker>TODO: blah.</comment-marker></comment-line>
+// CHECK: <comment-line>// <comment-marker>MARK: blah.</comment-marker></comment-line>
+
+// CHECK: <kw>func</kw> test5() -> <type>Int</type> {
+func test5() -> Int {
+  // CHECK: <comment-line>// <comment-marker>TODO: something, something.</comment-marker></comment-line>
+  // TODO: something, something.
+  // CHECK: <kw>return</kw> <int>0</int>
+  return 0
+}

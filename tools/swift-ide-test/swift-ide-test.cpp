@@ -433,34 +433,54 @@ public:
   }
 
   bool walkToNodePre(SyntaxNode Node) override {
-    const char *LocPtr =
-        BufStart + SM.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
+    if (shouldIgnore(Node))
+      return false;
+
+    const char *LocPtr = getPtr(Node.Range.getStart());
+    printSourceUntil(LocPtr);
+    wrap(Node.Kind, /*Begin=*/true);
+    return true;
+  }
+
+  bool walkToNodePost(SyntaxNode Node) override {
+    if (shouldIgnore(Node))
+      return true;
+
+    const char *LocPtr = getPtr(Node.Range.getStart());
+    unsigned Length = Node.Range.getByteLength();
+    if (Node.Kind == SyntaxNodeKind::CommentLine) {
+      if (LocPtr[Length-1] == '\n')
+        --Length; // Wrapping should be in the same line.
+    }
+    printSourceUntil(LocPtr + Length);
+    wrap(Node.Kind, /*Begin=*/false);
+    return true;
+  }
+
+  void wrap(SyntaxNodeKind Kind, bool Begin) {
+    if (TerminalOutput) {
+      wrapForTerminal(Kind, Begin);
+    } else {
+      wrapForTest(Kind, Begin);
+    }
+  }
+
+  bool shouldIgnore(SyntaxNode Node) const {
+    const char *LocPtr = getPtr(Node.Range.getStart());
     if (Node.Kind == SyntaxNodeKind::CommentLine && !TerminalOutput) {
       // Ignore CHECK lines.
       if (StringRef(LocPtr, BufEnd - LocPtr).startswith("// CHECK"))
         return true;
     }
+    return false;
+  }
 
-    unsigned Length = Node.Range.getByteLength();
-    assert(LocPtr >= CurrBufPtr && LocPtr+Length <= BufEnd);
-    if (Node.Kind == SyntaxNodeKind::CommentLine) {
-      if (LocPtr[Length-1] == '\n')
-        --Length; // Wrapping should be in the same line.
-    }
-    printSourceUntil(LocPtr);
-    StringRef NodeText = StringRef(LocPtr, Length);
-    if (TerminalOutput) {
-      if (!wrapForTerminal(Node.Kind, NodeText))
-        OS << NodeText;
-    } else {
-      if (!wrapForTest(Node.Kind, StringRef(LocPtr, Length)))
-        OS << NodeText;
-    }
-    CurrBufPtr = LocPtr + Length;
-    return true;
+  const char *getPtr(SourceLoc Loc) const {
+    return BufStart + SM.getLocOffsetInBuffer(Loc, BufferID);
   }
 
   void printSourceUntil(const char *Ptr) {
+    assert(Ptr >= CurrBufPtr && Ptr <= BufEnd);
     StringRef Text = StringRef(CurrBufPtr, Ptr-CurrBufPtr);
     // Skip all "// CHECK" lines.
     while (true) {
@@ -472,14 +492,15 @@ public:
       Text = Idx == StringRef::npos ? StringRef() : Text.substr(Idx+1);
     }
     OS << Text;
+    CurrBufPtr = Ptr;
   }
 
-  bool wrapForTest(SyntaxNodeKind Kind, StringRef Text) {
+  void wrapForTest(SyntaxNodeKind Kind, bool Begin) {
     const char *Id = 0;
     switch (Kind) {
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
-    case SyntaxNodeKind::Identifier: return false;
+    case SyntaxNodeKind::Identifier: return;
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -487,6 +508,7 @@ public:
     case SyntaxNodeKind::Character: Id = "char"; break;
     case SyntaxNodeKind::CommentLine: Id = "comment-line"; break;
     case SyntaxNodeKind::CommentBlock: Id = "comment-block"; break;
+    case SyntaxNodeKind::CommentMarker: Id = "comment-marker"; break;
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
@@ -494,18 +516,15 @@ public:
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
     }
 
-    OS << '<' << Id << '>';
-    OS << Text;
-    OS << "</" << Id << '>';
-    return true;
+    OS << (Begin ? "<" : "</") << Id << '>';
   }
 
-  bool wrapForTerminal(SyntaxNodeKind Kind, StringRef Text) {
+  void wrapForTerminal(SyntaxNodeKind Kind, bool Begin) {
     llvm::raw_ostream::Colors Col;
     switch (Kind) {
     case SyntaxNodeKind::Keyword: Col = llvm::raw_ostream::MAGENTA; break;
     // Skip identifier.
-    case SyntaxNodeKind::Identifier: return false;
+    case SyntaxNodeKind::Identifier: return;
     case SyntaxNodeKind::DollarIdent: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::Integer: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::Floating: Col = llvm::raw_ostream::BLUE; break;
@@ -513,6 +532,7 @@ public:
     case SyntaxNodeKind::Character: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::CommentLine: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentBlock: Col = llvm::raw_ostream::GREEN; break;
+    case SyntaxNodeKind::CommentMarker: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;
@@ -520,13 +540,14 @@ public:
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
     }
 
-    if (const char *CStr =
-        llvm::sys::Process::OutputColor(Col, false, false)) {
-      OS << CStr;
+    if (Begin) {
+      if (const char *CStr =
+          llvm::sys::Process::OutputColor(Col, false, false)) {
+        OS << CStr;
+      }
+    } else {
+      OS << llvm::sys::Process::ResetColor();
     }
-    OS << Text;
-    OS << llvm::sys::Process::ResetColor();
-    return true;
   }
 
   void finished() {
