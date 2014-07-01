@@ -1,10 +1,8 @@
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftCoreImage INSTALL
+add_swift_library(swiftCoreImage INSTALL TARGET_LIBRARY
   CoreImage.swift
-  DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC)
+  TARGET_SDKS IOS IOS_SIMULATOR
+  DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC
+  FRAMEWORK_DEPENDS CoreImage)
 
 add_swift_optimization_flags(swiftCoreImage)
-
-# Link against frameworks
-target_link_libraries(swiftCoreImage
-  "-framework CoreImage")

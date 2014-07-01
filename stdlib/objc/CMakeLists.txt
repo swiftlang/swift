@@ -18,6 +18,8 @@ add_subdirectory(SpriteKit)
 
 if (SWIFT_SDKS)
   add_subdirectory(AppKit)
+  add_subdirectory(CoreImage)
+  add_subdirectory(QuartzCore)
   add_subdirectory(UIKit)
 else()
   if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")

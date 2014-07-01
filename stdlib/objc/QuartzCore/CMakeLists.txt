@@ -1,10 +1,8 @@
 set(SHARED_LIBRARY ON)
-add_swift_library(swiftQuartzCore INSTALL
+add_swift_library(swiftQuartzCore INSTALL TARGET_LIBRARY
   QuartzCore.swift
-  DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC)
+  TARGET_SDKS OSX
+  DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC
+  FRAMEWORK_DEPENDS QuartzCore)
 
 add_swift_optimization_flags(swiftQuartzCore)
-
-# Link against frameworks
-target_link_libraries(swiftQuartzCore
-  "-framework QuartzCore")
