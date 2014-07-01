@@ -217,12 +217,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                      << " FnID " << FnID << "\n");
   DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
+  IdentifierID SemanticsID =
+    F.getSemanticsAttr().empty() ? (IdentifierID)0 :
+    S.addIdentifierRef(Ctx.getIdentifier(F.getSemanticsAttr()));
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
                                 (unsigned)F.isGlobalInit(),
                                 (unsigned)F.isNoinline(),
-                                FnID);
+                                FnID, SemanticsID);
 
   if (DeclOnly || F.isAvailableExternally() || F.isExternalDeclaration())
     return;

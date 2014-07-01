@@ -94,6 +94,7 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
                         Orig->getLocation(), Orig->isBare(),
                         Orig->isTransparent(), Orig->isNoinline(), 0,
                         Orig->getDebugScope(), Orig->getDeclContext());
+  NewF->setSemanticsAttr(Orig->getSemanticsAttr());
 
   NumSpecialized++;
   return NewF;

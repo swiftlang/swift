@@ -667,7 +667,8 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
-                                 bool &isNoinline, Parser &P) {
+                                 bool &isNoinline, std::string &Semantics,
+                                 Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
@@ -678,6 +679,21 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
       isGlobalInit = true;
     else if (P.Tok.getText() == "noinline")
       isNoinline = true;
+    else if (P.Tok.getText() == "semantics") {
+      P.consumeToken(tok::identifier);
+      if (P.Tok.getKind() != tok::string_literal) {
+        P.diagnose(P.Tok, diag::expected_in_attribute_list);
+        return true;
+      }
+  
+      // Drop the double quotes.
+      StringRef rawString = P.Tok.getText().drop_front().drop_back();
+      Semantics = rawString;
+      P.consumeToken(tok::string_literal);
+
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    }
     else {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
       return true;
@@ -2937,8 +2953,10 @@ bool Parser::parseDeclSIL() {
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
   bool isGlobalInit = false, isNoinline = false;
+  std::string Semantics;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, *this) ||
+      parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, Semantics,
+                           *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -2962,6 +2980,8 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setNoinline(isNoinline);
+    if (!Semantics.empty())
+      FunctionState.F->setSemanticsAttr(Semantics);
 
     // Now that we have a SILFunction parse the body, if present.
 

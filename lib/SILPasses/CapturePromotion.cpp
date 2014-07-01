@@ -320,11 +320,13 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   // This inserts the new cloned function before the original function.
-  return SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
-                             Orig->getContextGenericParams(),
-                             Orig->getLocation(), Orig->isBare(),
-                             IsNotTransparent, Orig->isNoinline(), Orig,
-                             Orig->getDebugScope());
+  auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
+                                Orig->getContextGenericParams(),
+                                Orig->getLocation(), Orig->isBare(),
+                                IsNotTransparent, Orig->isNoinline(), Orig,
+                                Orig->getDebugScope());
+  Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  return Fn;
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as

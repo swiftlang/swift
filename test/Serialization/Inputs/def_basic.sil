@@ -818,6 +818,13 @@ bb0:
 }
 sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 
+// CHECK-LABEL: [semantics "foo"] @test_semantics : $@thin () -> ()
+sil [semantics "foo"] @test_semantics : $@thin () -> () {
+bb0:
+  %2 = tuple ()
+  %3 = return %2 : $()
+}
+
 sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> @callee_owned () -> @callee_owned () -> Int
 
 sil @takes_int64_float32 : $@thin (Int, Float32) -> ()
@@ -1190,6 +1197,7 @@ bb0:
   %107 = function_ref @test_assign : $@thin (Int, @inout Int) -> ()
   %109 = function_ref @test_transparent : $@thin () -> ()
   %130 = function_ref @noinline_callee : $@thin () -> Int
+  %131 = function_ref @test_semantics : $@thin () -> ()
   %111 = function_ref @test_partial_apply : $@thin Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@thin () -> ()

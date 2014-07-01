@@ -1308,6 +1308,9 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isNoinline())
     OS << "[noinline] ";
 
+  if (!getSemanticsAttr().empty())
+    OS << "[semantics \"" << getSemanticsAttr() << "\"] ";
+
   printName(OS);
   OS << " : $";
   

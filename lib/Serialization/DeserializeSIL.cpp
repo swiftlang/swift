@@ -366,8 +366,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isGlobal, isNoinline;
+  IdentifierID SemanticsID;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isGlobal,
-                                isNoinline, funcTyID);
+                                isNoinline, funcTyID, SemanticsID);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -416,6 +417,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setGlobalInit(isGlobal == 1);
     fn->setNoinline(isNoinline == 1);
+    if (SemanticsID)
+      fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }

@@ -1111,6 +1111,13 @@ entry(%0 : $Class1):
   return %3 : $(Class2, Int)
 }
 
+// CHECK-LABEL: sil [semantics "foo"] @test_semantics : $@thin () -> () {
+sil [semantics "foo"] @test_semantics : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $() 
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis

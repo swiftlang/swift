@@ -216,7 +216,8 @@ namespace sil_block {
     BCFixed<1>,        // transparent
     BCFixed<1>,        // global_init
     BCFixed<1>,        // noinline
-    TypeIDField
+    TypeIDField,
+    IdentifierIDField  // Semantics Attribute
                        // followed by generic param list, if any
   >;
 

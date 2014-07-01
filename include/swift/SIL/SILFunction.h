@@ -91,6 +91,9 @@ private:
   /// This is the number of uses of this SILFunction.
   unsigned RefCount = 0;
 
+  /// The function's semantics attribute.
+  std::string SemanticsAttr;
+
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
               GenericParamList *contextGenericParams,
@@ -213,6 +216,9 @@ public:
   /// called within the addressor.
   bool isGlobalInit() const { return GlobalInitFlag; }
   void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
+
+  StringRef getSemanticsAttr() const { return SemanticsAttr; }
+  void setSemanticsAttr(StringRef attr) { SemanticsAttr = attr; }
 
   /// Retrieve the generic parameter list containing the contextual archetypes
   /// of the function.

@@ -271,6 +271,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                 constant.isNoinline());
 
   F->setGlobalInit(constant.isGlobal());
+  if (constant.hasDecl())
+    if (auto SemanticsA =
+        constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
+      F->setSemanticsAttr(SemanticsA->Value);
   
   ValueDecl *VD = nullptr;
   if (constant.hasDecl())
