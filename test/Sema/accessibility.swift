@@ -80,3 +80,16 @@ typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias '
   @public func test(input: Bool) {}
 }
 @public let _: AssocTypeImpl.Inferred?
+
+
+@public let x: PrivateStruct = PrivateStruct() // expected-error {{constant cannot be declared public because its type uses a private type}}
+@public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{variable cannot be declared public because its type uses a private type}}
+@public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{variable cannot be declared public because its type uses a private type}}
+
+var internalVar: PrivateStruct? // expected-error {{variable must be declared private because its type uses a private type}}
+
+@public struct Properties {
+  @public let x: PrivateStruct = PrivateStruct() // expected-error {{property cannot be declared public because its type uses a private type}}
+  @public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{property cannot be declared public because its type uses a private type}}
+  @public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{property cannot be declared public because its type uses a private type}}
+}

@@ -2219,6 +2219,11 @@ public:
 static void checkTypeAccessibility(
     TypeChecker &TC, TypeLoc TL, Accessibility access,
     std::function<void(Accessibility, const TypeRepr *)> diagnose) {
+  // Don't spend time checking private access; this is always valid.
+  // This includes local declarations.
+  if (access == Accessibility::Private)
+    return;
+
   Accessibility typeAccess =
     TypeAccessibilityChecker::getAccessibility(TL.getType(),
                                                TC.TypeAccessibilityCache);
@@ -2446,6 +2451,7 @@ public:
         VD->getSetter()->getMutableAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
+
     TC.checkDeclAttributes(VD);
   }
 
@@ -2518,9 +2524,10 @@ public:
       }
     }
 
-        bool isInSILMode = false;
+    bool isInSILMode = false;
     if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
+    bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     // If this is a declaration without an initializer, reject code if
     // uninitialized vars are not allowed.
@@ -2537,7 +2544,7 @@ public:
         // type).
         // The debugger will also need to emulate let variables which have been
         // initialized in a previous expression, so they don't need initializers.
-        if (var->isLet() && !var->isDebuggerVar() && !varDC->isTypeContext()) {
+        if (var->isLet() && !var->isDebuggerVar() && !isTypeContext) {
           TC.diagnose(var->getLoc(), diag::let_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
@@ -2546,8 +2553,7 @@ public:
         }
         
         // Non-member observing properties need an initializer.
-        if (var->getStorageKind() == VarDecl::Observing &&
-            !var->getDeclContext()->isTypeContext()) {
+        if (var->getStorageKind() == VarDecl::Observing && !isTypeContext) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
@@ -2577,6 +2583,38 @@ public:
         }
       });
     }
+
+    if (!IsFirstPass) {
+      PBD->getPattern()->forEachNode([&](Pattern *P) {
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+
+        // FIXME: We need an accessibility value to check against, so we pull
+        // one out of some random VarDecl in the pattern. They're all going to
+        // be the same, but still, ick.
+        const VarDecl *anyVar = nullptr;
+        TP->forEachVariable([&](VarDecl *V) { anyVar = V; });
+        if (!anyVar)
+          return;
+
+        checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar->getAccessibility(),
+                               [&](Accessibility typeAccess,
+                                   const TypeRepr *complainRepr) {
+          bool isExplicit =
+            anyVar->getAttrs().hasAttribute<AccessibilityAttr>();
+          auto diag = TC.diagnose(P->getLoc(), diag::pattern_type_access,
+                                  anyVar->isLet(),
+                                  isTypeContext,
+                                  isExplicit,
+                                  anyVar->getAccessibility(),
+                                  typeAccess);
+          if (complainRepr)
+            diag.highlight(complainRepr->getSourceRange());
+        });
+      });
+    }
+
 
     TC.checkDeclAttributes(PBD);
   }

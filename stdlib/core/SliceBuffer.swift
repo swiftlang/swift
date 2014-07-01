@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for Slice<T>
-@internal struct SliceBuffer<T> : ArrayBufferType {
+@public
+struct SliceBuffer<T> : ArrayBufferType {
   typealias Element = T
   typealias NativeStorage = ContiguousArrayStorage<T>
   typealias NativeBuffer = ContiguousArrayBuffer<T>
@@ -219,6 +220,7 @@
     return Swift.isUniquelyReferenced(&owner)
   }
 
+  @public
   subscript(i: Int) -> T {
     get {
       _sanityCheck(i >= 0, "negative slice index is out of range")
@@ -243,14 +245,17 @@
   }
 
   //===--- Collection conformance -----------------------------------------===//
+  @public
   var startIndex: Int {
     return 0
   }
-  
+
+  @public
   var endIndex: Int {
     return count
   }
 
+  @public
   func generate() -> IndexingGenerator<SliceBuffer> {
     return IndexingGenerator(self)
   }

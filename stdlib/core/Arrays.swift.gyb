@@ -83,6 +83,7 @@
     buffer = _Buffer(newBuffer)
   }
 
+  @public
   typealias _Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
 
   @public

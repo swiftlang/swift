@@ -438,7 +438,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
   // _DictionaryStorage conformance
   //
 
-  typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
+  @public typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
   @public var startIndex: Index {
     return Index(nativeStorage: self, offset: -1).successor()
@@ -587,7 +587,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
 /// Specifically, we can not have @objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_NativeDictionaryStorageOwner`.
-@objc
+@objc @public
 class _NativeDictionaryStorageOwnerBase
     : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverrides {
 
@@ -626,7 +626,7 @@ class _NativeDictionaryStorageOwnerBase
   // `nativeStorage`.
   //
 
-  @objc
+  @objc @public
   init(
     objects: ConstUnsafePointer<AnyObject?>,
     forKeys: ConstUnsafePointer<Void>,
@@ -635,12 +635,12 @@ class _NativeDictionaryStorageOwnerBase
     _fatalError("don't call this designated initializer")
   }
 
-  @objc
+  @objc @public
   var count: Int {
     return bridgingCount.0
   }
 
-  @objc
+  @objc @public
   func objectForKey(aKey: AnyObject?) -> AnyObject? {
     if let nonNullKey: AnyObject = aKey {
       return bridgingObjectForKey(nonNullKey, dummy: ())
@@ -648,19 +648,19 @@ class _NativeDictionaryStorageOwnerBase
     return nil
   }
 
-  @objc
+  @objc @public
   func keyEnumerator() -> _SwiftNSEnumerator? {
     return bridgingKeyEnumerator(())
   }
 
-  @objc
+  @objc @public
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
   }
 
-  @objc
+  @objc @public
   func countByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int
@@ -682,7 +682,8 @@ class _NativeDictionaryStorageOwnerBase
 /// is also a proper `NSDictionary` subclass, which is returned to Objective-C
 /// during bridging.  `DictionaryIndex` points directly to
 /// `_NativeDictionaryStorage`.
-@final class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
+@final @public
+class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<KeyType, ValueType>
@@ -764,6 +765,7 @@ class _NativeDictionaryStorageOwnerBase
   }
 }
 
+@public
 struct _CocoaDictionaryStorage : _DictionaryStorage {
   @public var cocoaDictionary: _SwiftNSDictionary
 
@@ -834,14 +836,17 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   }
 }
 
+@public
 enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     _DictionaryStorage {
 
   typealias _NativeStorageElement = _DictionaryElement<KeyType, ValueType>
   typealias NativeStorage =
       _NativeDictionaryStorage<KeyType, ValueType>
+  @public
   typealias NativeStorageOwner =
       _NativeDictionaryStorageOwner<KeyType, ValueType>
+  @public
   typealias CocoaStorage = _CocoaDictionaryStorage
   typealias NativeIndex = _NativeDictionaryIndex<KeyType, ValueType>
 
@@ -1276,6 +1281,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 }
 
+@public
 struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
     BidirectionalIndex {
 
@@ -1290,6 +1296,7 @@ struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
     self.offset = offset
   }
 
+  @public
   func predecessor() -> NativeIndex {
     var j = offset
     while --j > 0 {
@@ -1300,6 +1307,7 @@ struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
     return self
   }
 
+  @public
   func successor() -> NativeIndex {
     var i = offset + 1
     // FIXME: Can't write the simple code pending
@@ -1316,6 +1324,7 @@ struct _NativeDictionaryIndex<KeyType : Hashable, ValueType> :
   }
 }
 
+@public
 func == <KeyType : Hashable, ValueType> (
   lhs: _NativeDictionaryIndex<KeyType, ValueType>,
   rhs: _NativeDictionaryIndex<KeyType, ValueType>
@@ -1619,6 +1628,7 @@ struct Dictionary<
 > : Collection, DictionaryLiteralConvertible {
   
   typealias _Self = Dictionary<KeyType, ValueType>
+  @public
   typealias _VariantStorage = _VariantDictionaryStorage<KeyType, ValueType>
   typealias _NativeStorage = _NativeDictionaryStorage<KeyType, ValueType>
   @public typealias Element = (KeyType, ValueType)
@@ -1986,7 +1996,7 @@ extension Dictionary : Reflectable {
 
 import SwiftShims
 
-@objc
+@objc @public
 protocol _SwiftNSFastEnumeration {
   func countByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
@@ -2002,7 +2012,7 @@ protocol _SwiftNSEnumerator {
 
 typealias _SwiftNSZone = COpaquePointer
 
-@objc
+@objc @public
 protocol _SwiftNSCopying {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
@@ -2031,7 +2041,7 @@ protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
   func indexOfObject(anObject: AnyObject) -> Int
 }
 
-@objc
+@objc @public
 protocol _SwiftNSDictionaryRequiredOverrides :
     _SwiftNSCopying, _SwiftNSFastEnumeration {
 
@@ -2057,7 +2067,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   ) -> Int
 }
 
-@objc @unsafe_no_objc_tagged_pointer 
+@objc @unsafe_no_objc_tagged_pointer @public
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
   var allKeys: _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool

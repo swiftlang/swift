@@ -151,12 +151,13 @@ skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
 
   unsigned I = 0;
   for (unsigned N = Text.size(); I != N; ++I) {
-    if (Depth == 0 && Text[I] == '{') {
+    if (Text[I] == '{') {
       ++Depth;
       continue;
     }
-    if (Depth > 0 && Text[I] == '}') {
-      --Depth;
+    if (Depth > 0) {
+      if (Text[I] == '}')
+        --Depth;
       continue;
     }
     
