@@ -9,8 +9,16 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// A custom trie implementation to quickly retrive Unicode property values.
+//
+//===----------------------------------------------------------------------===//
 
 %{
+
+# Note: keep these constants synchronized with the data that it is actually
+# generated.  There is a runtime check for this, but it is only performed in
+# builds with INTERNAL_CHECKS_ENABLED.
 
 BMPFirstLevelIndexBits = 8
 BMPDataOffsetBits = 8
@@ -83,6 +91,9 @@ import SwiftShims
   }
 }
 
+// It is expensive to convert a raw enum value to an enum, so we use this type
+// safe wrapper around the raw property value to avoid paying the conversion
+// cost in hot code paths.
 struct _GraphemeClusterBreakPropertyRawValue {
   init(_ rawValue: UInt${BMPDataBytesPerEntry * 8}) {
     self.rawValue = rawValue
@@ -101,25 +112,25 @@ struct _GraphemeClusterBreakPropertyRawValue {
   static func _checkParameters() {
     let metadata = _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata
 
-    _precondition(metadata.BMPFirstLevelIndexBits == ${BMPFirstLevelIndexBits})
-    _precondition(metadata.BMPDataOffsetBits == ${BMPDataOffsetBits})
-    _precondition(metadata.SuppFirstLevelIndexBits == ${SuppFirstLevelIndexBits})
-    _precondition(metadata.SuppSecondLevelIndexBits == ${SuppSecondLevelIndexBits})
-    _precondition(metadata.SuppDataOffsetBits == ${SuppDataOffsetBits})
+    _sanityCheck(metadata.BMPFirstLevelIndexBits == ${BMPFirstLevelIndexBits})
+    _sanityCheck(metadata.BMPDataOffsetBits == ${BMPDataOffsetBits})
+    _sanityCheck(metadata.SuppFirstLevelIndexBits == ${SuppFirstLevelIndexBits})
+    _sanityCheck(metadata.SuppSecondLevelIndexBits == ${SuppSecondLevelIndexBits})
+    _sanityCheck(metadata.SuppDataOffsetBits == ${SuppDataOffsetBits})
 
-    _precondition(metadata.BMPLookupBytesPerEntry == ${BMPLookupBytesPerEntry})
-    _precondition(metadata.BMPDataBytesPerEntry == ${BMPDataBytesPerEntry})
-    _precondition(metadata.SuppLookup1BytesPerEntry == ${SuppLookup1BytesPerEntry})
-    _precondition(metadata.SuppLookup2BytesPerEntry == ${SuppLookup2BytesPerEntry})
-    _precondition(metadata.SuppDataBytesPerEntry == ${SuppDataBytesPerEntry})
+    _sanityCheck(metadata.BMPLookupBytesPerEntry == ${BMPLookupBytesPerEntry})
+    _sanityCheck(metadata.BMPDataBytesPerEntry == ${BMPDataBytesPerEntry})
+    _sanityCheck(metadata.SuppLookup1BytesPerEntry == ${SuppLookup1BytesPerEntry})
+    _sanityCheck(metadata.SuppLookup2BytesPerEntry == ${SuppLookup2BytesPerEntry})
+    _sanityCheck(metadata.SuppDataBytesPerEntry == ${SuppDataBytesPerEntry})
 
-    _precondition(metadata.TrieSize == ${TrieSize})
+    _sanityCheck(metadata.TrieSize == ${TrieSize})
 
-    _precondition(metadata.BMPLookupBytesOffset == ${BMPLookupBytesOffset})
-    _precondition(metadata.BMPDataBytesOffset == ${BMPDataBytesOffset})
-    _precondition(metadata.SuppLookup1BytesOffset == ${SuppLookup1BytesOffset})
-    _precondition(metadata.SuppLookup2BytesOffset == ${SuppLookup2BytesOffset})
-    _precondition(metadata.SuppDataBytesOffset == ${SuppDataBytesOffset})
+    _sanityCheck(metadata.BMPLookupBytesOffset == ${BMPLookupBytesOffset})
+    _sanityCheck(metadata.BMPDataBytesOffset == ${BMPDataBytesOffset})
+    _sanityCheck(metadata.SuppLookup1BytesOffset == ${SuppLookup1BytesOffset})
+    _sanityCheck(metadata.SuppLookup2BytesOffset == ${SuppLookup2BytesOffset})
+    _sanityCheck(metadata.SuppDataBytesOffset == ${SuppDataBytesOffset})
   }
 
   let _trieData: ConstUnsafePointer<UInt8>
@@ -155,9 +166,7 @@ struct _GraphemeClusterBreakPropertyRawValue {
 % end
 
   init() {
-#if INTERNAL_CHECKS_ENABLED
     _UnicodeGraphemeClusterBreakPropertyTrie._checkParameters()
-#endif
     _trieData = _swift_stdlib_GraphemeClusterBreakPropertyTrie
   }
 
@@ -215,7 +224,9 @@ struct _GraphemeClusterBreakPropertyRawValue {
     }
   }
 
-  func getPropertyValue(codePoint: UInt32) -> _GraphemeClusterBreakPropertyValue {
+  func getPropertyValue(
+      codePoint: UInt32
+  ) -> _GraphemeClusterBreakPropertyValue {
     return getPropertyRawValue(codePoint).cookedValue
   }
 }
@@ -228,11 +239,15 @@ struct _GraphemeClusterBreakPropertyRawValue {
         _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix
   }
 
+  /// Returns `true` if there is always a grapheme cluster break after a code
+  /// point with a given `Grapheme_Cluster_Break` property value.
   func isBoundaryAfter(gcb: _GraphemeClusterBreakPropertyRawValue) -> Bool {
     let ruleRow = _noBoundaryRulesMatrix[Int(gcb.rawValue)]
     return ruleRow == 0
   }
 
+  /// Returns `true` if there is a grapheme cluster break between code points
+  /// with given `Grapheme_Cluster_Break` property values.
   func isBoundary(
       gcb1: _GraphemeClusterBreakPropertyRawValue,
       _ gcb2: _GraphemeClusterBreakPropertyRawValue
