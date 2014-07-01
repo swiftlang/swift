@@ -310,7 +310,9 @@ class UnicodeTrieGenerator(object):
                     j += 1
             i += 1
 
-        # Same as above, but for self.supp_data/supp_lookup2.
+        # For supp tables, perform bottom-up deduplication: first, deduplicate
+        # data blocks.  The algorithm is the same as above, but operates on
+        # self.supp_data/supp_lookup2.
         i = 0
         while i < len(self.supp_data):
             j = i + 1
@@ -327,6 +329,7 @@ class UnicodeTrieGenerator(object):
                     j += 1
             i += 1
 
+        # Next, deduplicate second-level lookup tables.
         # Same as above, but for supp_lookup1/supp_lookup2.
         i = 0
         while i < len(self.supp_lookup2):
@@ -343,20 +346,20 @@ class UnicodeTrieGenerator(object):
                     j += 1
             i += 1
 
-    def _word_to_LE_bytes(self, word, width):
+    def _int_to_LE_bytes(self, data, width):
         if width == 1:
-            assert(word & ~0xff == 0)
-            return [ word ]
+            assert(data & ~0xff == 0)
+            return [ data ]
         if width == 2:
-            assert(word & 0xffff == 0)
-            return [ word & 0xff, word & 0xff00 ]
+            assert(data & 0xffff == 0)
+            return [ data & 0xff, data & 0xff00 ]
         assert(False)
 
-    def _word_list_to_LE_bytes(self, words, width):
+    def _int_list_to_LE_bytes(self, ints, width):
         return [
             byte
-            for word in words
-            for byte in self._word_to_LE_bytes(word, width) ]
+            for elt in ints
+            for byte in self._int_to_LE_bytes(elt, width) ]
 
     def serialize(self, unicode_property):
         self.BMP_lookup_bytes_per_entry = 1 if len(self.BMP_data) < 256 else 2
@@ -379,16 +382,16 @@ class UnicodeTrieGenerator(object):
             for block in self.supp_data
             for elt in block ]
 
-        BMP_lookup_bytes = self._word_list_to_LE_bytes(
+        BMP_lookup_bytes = self._int_list_to_LE_bytes(
             BMP_lookup_words, self.BMP_lookup_bytes_per_entry)
-        BMP_data_bytes = self._word_list_to_LE_bytes(
+        BMP_data_bytes = self._int_list_to_LE_bytes(
             BMP_data_words, self.BMP_data_bytes_per_entry)
 
-        supp_lookup1_bytes = self._word_list_to_LE_bytes(
+        supp_lookup1_bytes = self._int_list_to_LE_bytes(
             supp_lookup1_words, self.supp_lookup1_bytes_per_entry)
-        supp_lookup2_bytes = self._word_list_to_LE_bytes(
+        supp_lookup2_bytes = self._int_list_to_LE_bytes(
             supp_lookup2_words, self.supp_lookup2_bytes_per_entry)
-        supp_data_bytes = self._word_list_to_LE_bytes(
+        supp_data_bytes = self._int_list_to_LE_bytes(
             supp_data_words, self.supp_data_bytes_per_entry)
 
         self.trie_bytes = []
@@ -413,8 +416,14 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
         grapheme_cluster_break_property_table.symbolic_values
 
     # Rules to determine extended grapheme cluster boundaries, as defined in
-    # 'Grapheme Break Chart', ucd/auxiliary/GraphemeBreakTest.html, Unicode
-    # 6.3.0.
+    # 'Grapheme Break Chart',
+    # http://www.unicode.org/Public/6.3.0/ucd/auxiliary/GraphemeBreakTest.html,
+    # Unicode 6.3.0.
+    #
+    # The Unicode 7.0.0 draft does not change these rules.
+    #
+    # As in the referenced document, the rules are specified in order of
+    # decreasing priority.
     rules = [
       ( [ 'CR' ], 'no_boundary', [ 'LF' ] ),
       ( [ 'Control', 'CR', 'LF' ], 'boundary', any_value ),
@@ -435,6 +444,7 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_t
         rules_matrix[first] = \
             dict.fromkeys(any_value, None)
 
+    # Iterate over rules in the order of increasing priority.
     for firstList,action,secondList in reversed(rules):
         for first in firstList:
             for second in secondList:
