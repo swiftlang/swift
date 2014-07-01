@@ -33,7 +33,7 @@ class Packet {
   var id: Int
   var kind: Kind
   var a1: UInt32 = 0
-  var a2: UInt8[] = new UInt8[BufSize]
+  var a2: [UInt8] = [UInt8](count:BufSize, repeatedValue:UInt8(0))
 
   // This stands in for the original pkt() function.
   init(link: Packet?, id: Int, kind: Kind) {
@@ -85,8 +85,8 @@ class Task {
     case Bits(UInt8)
     var bits: UInt8 {
       switch self {
-        case .Bits(var i):
-          return i
+      case .Bits(var i):
+        return i
       }
     }
   }
@@ -98,11 +98,11 @@ class Task {
     var taskid: Int {
       get {
         switch self {
-          case TaskID(var i):
-            return i
-          default:
-            assert("Task value is not a task ID")
-            return 0
+        case TaskID(var i):
+          return i
+        default:
+          assert("Task value is not a task ID")
+          return 0
         }
       }
       set(newid) {
@@ -112,13 +112,13 @@ class Task {
     var packet: Packet? {
       get {
         switch self {
-          case Worklist(var wkq):
-            return wkq
-          case None:
-            return .None
-          default:
-            assert("Task value is not a worklist")
-            return .None
+        case Worklist(var wkq):
+          return wkq
+        case None:
+          return .None
+        default:
+          assert("Task value is not a worklist")
+          return .None
         }
       }
       set(newpacket) {
@@ -135,11 +135,11 @@ class Task {
     var count: Int {
       get {
         switch self {
-          case Count(var i):
-            return i
-          default:
-            assert("Task value is not a count")
-            return 0
+        case Count(var i):
+          return i
+        default:
+          assert("Task value is not a count")
+          return 0
         }
       }
       set(newcount) {
@@ -149,13 +149,13 @@ class Task {
     var packet: Packet? {
       get {
         switch self {
-          case Worklist(var wkq):
-            return wkq
-          case None:
-            return .None
-          default:
-            assert("Task value is not a worklist")
-            return .None
+        case Worklist(var wkq):
+          return wkq
+        case None:
+          return .None
+        default:
+          assert("Task value is not a worklist")
+          return .None
         }
       }
       set(newpacket) {
@@ -186,7 +186,7 @@ class Task {
 }
 
 struct Richards {
-  var tasktab: Task?[] = new Task?[11]
+  var tasktab: [Task?] = [Task?](count:11, repeatedValue:nil)
   var tasklist: Task? = .None
 
   // We could have each type of Task know how to create itself given
@@ -240,32 +240,32 @@ struct Richards {
       var newtcb: Task? = .None
 
       switch tcb!.state {
-        case .Bits(TSWaitPkt):
-          pkt = tcb!.wkq
-          tcb!.wkq = pkt!.link
-          tcb!.state = Task.State.Bits(!tcb!.wkq ? TSRun : TSRunPkt)
-          fallthrough
-        case .Bits(TSRun),
-             .Bits(TSRunPkt):
-          taskid = tcb!.id
-          v1 = tcb!.v1
-          v2 = tcb!.v2
-          if tracing {
-            trace(UnicodeScalar(UInt32(taskid!)+'0'.value))
-          }
-          newtcb = tcb!.fn(pkt)
-          tcb!.v1 = v1
-          tcb!.v2 = v2
-          tcb = newtcb
-          // break
-        case .Bits(TSWait),
-             .Bits(TSHold),
-             .Bits(TSHoldPkt),
-             .Bits(TSHoldWait),
-             .Bits(TSHoldWaitPkt):
-          tcb = tcb!.link;
-        default:
-          return
+      case .Bits(TSWaitPkt):
+        pkt = tcb!.wkq
+        tcb!.wkq = pkt!.link
+        tcb!.state = Task.State.Bits(!tcb!.wkq ? TSRun : TSRunPkt)
+        fallthrough
+      case .Bits(TSRun),
+        .Bits(TSRunPkt):
+        taskid = tcb!.id
+        v1 = tcb!.v1
+        v2 = tcb!.v2
+        if tracing {
+          trace(UnicodeScalar(UInt32(taskid!)+"0".value))
+        }
+        newtcb = tcb!.fn(pkt)
+        tcb!.v1 = v1
+        tcb!.v2 = v2
+        tcb = newtcb
+        // break
+      case .Bits(TSWait),
+        .Bits(TSHold),
+        .Bits(TSHoldPkt),
+        .Bits(TSHoldWait),
+        .Bits(TSHoldWaitPkt):
+        tcb = tcb!.link;
+      default:
+        return
       }
     }
   }
@@ -326,7 +326,7 @@ struct Richards {
       }
     }
     else {
-      append(pkt, t.wkq)
+      append(pkt, ptr: t.wkq)
     }
     return tcb
   }
@@ -350,7 +350,7 @@ struct Richards {
     }
   }
 
-  let alphabet: UInt8[] = "0ABCDEFGHIJKLMNOPQRSTUVWXYZ".asUTF8()
+  let alphabet: [UInt8] = Array("0ABCDEFGHIJKLMNOPQRSTUVWXYZ".utf8)
 
   mutating func workfn(pkt: Packet?) -> Task? {
     debug("WORK")
@@ -361,14 +361,14 @@ struct Richards {
     pkt!.id = v1.taskid
     pkt!.a1 = 0
     switch v2 {
-      case .None:
-        v2 = Task.Val2.Count(0)
-      case .Count:
-        break
-      default:
-        assert("Task value is not a count")
+    case .None:
+      v2 = Task.Val2.Count(0)
+    case .Count:
+      break
+    default:
+      assert("Task value is not a count")
     }
-    for i in 0..BufSize {
+    for i in 0..<BufSize {
       ++v2.count
       if v2.count > 26 {
         v2.count = 1
@@ -383,10 +383,10 @@ struct Richards {
     if pkt {
       debug({pkt!.dump()})
       switch pkt!.kind {
-        case .Work:
-          v1.packet = append(pkt!, v1.packet)
-        default:
-          v2.packet = append(pkt!, v2.packet)
+      case .Work:
+        v1.packet = append(pkt!, ptr:v1.packet)
+      default:
+        v2.packet = append(pkt!, ptr:v2.packet)
       }
     }
     if v1.packet {
@@ -448,35 +448,35 @@ struct Richards {
 
     println("Bench mark starting")
     var wkq: Packet? = .None
-    createTask(TIIdle, 0, wkq, Task.State.Bits(TSRun), idlefn,
-      Task.Val1.TaskID(1), Task.Val2.Count(Count))
+    createTask(TIIdle, pri:0, wkq:wkq, state:Task.State.Bits(TSRun), fn:idlefn,
+      v1:Task.Val1.TaskID(1), v2:Task.Val2.Count(Count))
 
-    wkq = Packet(.None, 0, Packet.Kind.Work)
-    wkq = Packet(wkq, 0, Packet.Kind.Work)
+    wkq = Packet(link:.None, id:0, kind:Packet.Kind.Work)
+    wkq = Packet(link:wkq, id:0, kind:Packet.Kind.Work)
 
-    createTask(TIWork, 1000, wkq, Task.State.Bits(TSWaitPkt), workfn,
-      Task.Val1.TaskID(TIHandlerA), Task.Val2.None)
+    createTask(TIWork, pri:1000, wkq:wkq, state:Task.State.Bits(TSWaitPkt),
+      fn:workfn, v1:Task.Val1.TaskID(TIHandlerA), v2:Task.Val2.None)
 
-    wkq = Packet(.None, TIDevA, Packet.Kind.Dev)
-    wkq = Packet(wkq, TIDevA, Packet.Kind.Dev)
-    wkq = Packet(wkq, TIDevA, Packet.Kind.Dev)
+    wkq = Packet(link:.None, id:TIDevA, kind:Packet.Kind.Dev)
+    wkq = Packet(link:wkq, id:TIDevA, kind:Packet.Kind.Dev)
+    wkq = Packet(link:wkq, id:TIDevA, kind:Packet.Kind.Dev)
 
-    createTask(TIHandlerA, 2000, wkq, Task.State.Bits(TSWaitPkt), handlerfn,
-      Task.Val1.None, Task.Val2.None)
+    createTask(TIHandlerA, pri:2000, wkq:wkq, state:Task.State.Bits(TSWaitPkt),
+      fn:handlerfn, v1:Task.Val1.None, v2:Task.Val2.None)
 
-    wkq = Packet(.None, TIDevB, Packet.Kind.Dev)
-    wkq = Packet(wkq, TIDevB, Packet.Kind.Dev)
-    wkq = Packet(wkq, TIDevB, Packet.Kind.Dev)
+    wkq = Packet(link:.None, id:TIDevB, kind:Packet.Kind.Dev)
+    wkq = Packet(link:wkq, id:TIDevB, kind:Packet.Kind.Dev)
+    wkq = Packet(link:wkq, id:TIDevB, kind:Packet.Kind.Dev)
 
-    createTask(TIHandlerB, 3000, wkq, Task.State.Bits(TSWaitPkt), handlerfn,
-      Task.Val1.None, Task.Val2.None)
+    createTask(TIHandlerB, pri:3000, wkq:wkq, state:Task.State.Bits(TSWaitPkt),
+      fn:handlerfn, v1:Task.Val1.None, v2:Task.Val2.None)
 
     wkq = .None
 
-    createTask(TIDevA, 4000, wkq, Task.State.Bits(TSWait), devfn,
-      Task.Val1.None, Task.Val2.None)
-    createTask(TIDevB, 5000, wkq, Task.State.Bits(TSWait), devfn,
-      Task.Val1.None, Task.Val2.None)
+    createTask(TIDevA, pri:4000, wkq:wkq, state:Task.State.Bits(TSWait),
+      fn:devfn, v1:Task.Val1.None, v2:Task.Val2.None)
+    createTask(TIDevB, pri:5000, wkq:wkq, state:Task.State.Bits(TSWait),
+      fn:devfn, v1:Task.Val1.None, v2:Task.Val2.None)
 
     tcb = tasklist
 
