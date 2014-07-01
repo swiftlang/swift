@@ -1355,13 +1355,13 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
   }
 
   func predecessor() -> Index {
-    _precondition(nextKeyIndex >= 1, "can not advance startIndex backwards")
+    _precondition(nextKeyIndex >= 1, "can not decrement startIndex")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex - 1)
   }
 
   func successor() -> Index {
     _precondition(
-      nextKeyIndex < allKeys.count, "can not advance endIndex forward")
+        nextKeyIndex < allKeys.count, "can not increment endIndex")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex + 1)
   }
 }

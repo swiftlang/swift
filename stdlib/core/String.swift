@@ -314,14 +314,13 @@ extension String : Collection {
     }
 
     @public func successor() -> Index {
-      _precondition(_base != _base._viewEndIndex,
-          "can not advance endIndex forward")
+      _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
       return Index(_endBase)
     }
 
     @public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
-          "can not advance startIndex backwards")
+          "can not decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
       return Index(UnicodeScalarView.IndexType(
