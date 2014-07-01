@@ -659,7 +659,8 @@ macro(add_swift_library_single target name)
 
   # Determine the subdirectory where this library will be installed.
   if (SWIFTLIB_SINGLE_SDK)
-    set(SWIFTLIB_SINGLE_SUBDIR ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR})
+    compute_library_subdir(SWIFTLIB_SINGLE_SUBDIR ${SWIFTLIB_SINGLE_SDK}
+                           ${SWIFTLIB_SINGLE_ARCHITECTURE})
   else()
     set(SWIFTLIB_SINGLE_SUBDIR ${SWIFTLIB_SUBDIR})
   endif()
