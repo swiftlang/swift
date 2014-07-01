@@ -100,8 +100,8 @@ extension Bit : IntegerArithmetic {
     return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func modulusWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
-    return _withOverflow(Int.modulusWithOverflow(lhs.toRaw(), rhs.toRaw()))
+  @public static func remainderWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+    return _withOverflow(Int.remainderWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
   @public func toIntMax() -> IntMax {

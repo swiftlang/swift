@@ -16,7 +16,7 @@
 
 % integerBinaryOps = [
 %    (x[:-1], x[-1]) for x in 
-%     'add+ subtract- multiply* divide/ modulus%'.split()]
+%     'add+ subtract- multiply* divide/ remainder%'.split()]
 
 @public protocol _IntegerArithmetic {
 % for name,_ in integerBinaryOps:

@@ -280,7 +280,7 @@ extension ${Self} : RandomAccessIndex {
   }
 % end
   
-% for Method,op in [('divide', 'div'), ('modulus', 'rem')]:
+% for Method,op in [('divide', 'div'), ('remainder', 'rem')]:
   /// Operations that return an overflow bit in addition to a partial result,
   /// helpful for checking for overflow when you want to handle it.
   @transparent @public
