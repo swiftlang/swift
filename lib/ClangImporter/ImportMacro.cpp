@@ -164,10 +164,16 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
     return nullptr;
 
   Type importTy;
-  if (isObjC)
+  if (isObjC) {
     importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
-  else
+  } else if (Impl.SwiftContext.LangOpts.EnableStringPointerConversion) {
+    if (auto ccharTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CChar"))
+      importTy = Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                      "ConstUnsafePointer",
+                                                      ccharTy);
+  } else {
     importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
+  }
   if (!importTy)
     return nullptr;
 
