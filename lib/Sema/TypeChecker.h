@@ -253,6 +253,13 @@ public:
   /// The list of nominal type declarations that have been validated
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
+
+  /// Caches whether a particular type is accessible from a particular file
+  /// unit.
+  ///
+  /// This can't use CanTypes because typealiases may have more limited types
+  /// than their underlying types.
+  llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
   
   // We delay validation of C and Objective-C type-bridging functions in the
   // standard library until we encounter a declaration that requires one. This

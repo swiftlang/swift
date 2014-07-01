@@ -24,6 +24,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APFloat.h"
@@ -2120,6 +2121,117 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
 
 namespace {
 
+class TypeAccessibilityChecker : private TypeWalker {
+  using TypeAccessibilityCacheMap =
+    decltype(TypeChecker::TypeAccessibilityCache);
+  TypeAccessibilityCacheMap &Cache;
+  SmallVector<Accessibility, 8> AccessStack;
+
+  explicit TypeAccessibilityChecker(TypeAccessibilityCacheMap &cache)
+      : Cache(cache) {
+    // Always have something on the stack.
+    AccessStack.push_back(Accessibility::Private);
+  }
+
+  Action walkToTypePre(Type ty) override {
+    // Assume failure until we post-visit this node.
+    // This will be correct as long as we don't ever have self-referential
+    // Types.
+    auto cached = Cache.find(ty);
+    if (cached != Cache.end()) {
+      AccessStack.back() = std::min(AccessStack.back(), cached->second);
+      return Action::SkipChildren;
+    }
+
+    Accessibility current;
+    if (auto nominal = ty->getAnyNominal())
+      current = nominal->getAccessibility();
+    else if (auto alias = ty->getAs<NameAliasType>())
+      current = alias->getDecl()->getAccessibility();
+    else
+      current = Accessibility::Public;
+    AccessStack.push_back(current);
+
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    Accessibility last = AccessStack.pop_back_val();
+    Cache[ty] = last;
+    AccessStack.back() = std::min(AccessStack.back(), last);
+    return Action::Continue;
+  }
+
+public:
+  static Accessibility getAccessibility(Type ty,
+                                        TypeAccessibilityCacheMap &cache) {
+    ty.walk(TypeAccessibilityChecker(cache));
+    return cache[ty];
+  }
+};
+
+class TypeAccessibilityDiagnoser : private ASTWalker {
+  const ComponentIdentTypeRepr *minAccessibilityType = nullptr;
+
+  const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
+    if (const ValueDecl *VD = TR->getBoundDecl())
+      return VD;
+    if (Type ty = TR->getBoundType())
+      return ty->getAnyNominal();
+    assert(TR->isBoundModule());
+    return nullptr;
+  }
+
+  bool walkToTypeReprPre(TypeRepr *TR) override {
+    auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
+    if (!CITR)
+      return true;
+
+    const ValueDecl *VD = getValueDecl(CITR);
+    if (!VD)
+      return true;
+
+    if (minAccessibilityType) {
+      const ValueDecl *minDecl = getValueDecl(minAccessibilityType);
+      if (minDecl->getAccessibility() <= VD->getAccessibility())
+        return true;
+    }
+
+    minAccessibilityType = CITR;
+    return true;
+  }
+
+public:
+  static const TypeRepr *findMinAccessibleType(TypeRepr *TR) {
+    TypeAccessibilityDiagnoser diagnoser;
+    TR->walk(diagnoser);
+    return diagnoser.minAccessibilityType;
+  }
+};
+} // end anonymous namespace
+
+/// Checks if the accessibility of the type described by \p TL is at least
+/// \p access. If it isn't, calls \p diagnose with a TypeRepr representing the
+/// offending part of \p TL.
+///
+/// The TypeRepr passed to \p diagnose may be null, in which case a particular
+/// part of the type that caused the problem could not be found.
+static void checkTypeAccessibility(
+    TypeChecker &TC, TypeLoc TL, Accessibility access,
+    std::function<void(Accessibility, const TypeRepr *)> diagnose) {
+  Accessibility typeAccess =
+    TypeAccessibilityChecker::getAccessibility(TL.getType(),
+                                               TC.TypeAccessibilityCache);
+  if (typeAccess >= access)
+    return;
+
+  const TypeRepr *complainRepr = nullptr;
+  if (TypeRepr *TR = TL.getTypeRepr())
+    complainRepr = TypeAccessibilityDiagnoser::findMinAccessibleType(TR);
+  diagnose(typeAccess, complainRepr);
+}
+
+namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   TypeChecker &TC;
@@ -2604,6 +2716,24 @@ public:
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         TC.checkInheritanceClause(TAD);
     }
+
+    if (IsSecondPass && !TAD->isInvalid()) {
+      checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
+                             TAD->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *complainRepr) {
+        bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
+        auto kind =
+          isExplicit ? diag::type_alias_underlying_type_access
+                     : diag::type_alias_underlying_type_access_implicit;
+        auto diag = TC.diagnose(TAD, kind,
+                                TAD->getName(), TAD->getAccessibility(),
+                                typeAccess);
+        if (complainRepr)
+          diag.highlight(complainRepr->getSourceRange());
+      });
+    }
+
     TC.checkDeclAttributes(TAD);
     
     TAD->setIsBeingTypeChecked(false);

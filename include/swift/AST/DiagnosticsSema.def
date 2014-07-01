@@ -448,6 +448,14 @@ ERROR(static_requires_initializer,decl_parsing,none,
 // Type aliases
 ERROR(circular_type_alias,sema_tct,none,
       "type alias %0 circularly references itself", (Identifier))
+ERROR(type_alias_underlying_type_access,sema_tcd,none,
+      "type alias %0 cannot be declared %select{PRIVATE|internal|public}1 "
+      "because its underlying type uses %select{a private|an internal|PUBLIC}2 "
+      "type", (Identifier, Accessibility, Accessibility))
+ERROR(type_alias_underlying_type_access_implicit,sema_tcd,none,
+      "type alias %0 must be declared %select{private|internal|PUBLIC}2 "
+      "because its underlying type uses %select{a private|an internal|PUBLIC}2 "
+      "type", (Identifier, Accessibility, Accessibility))
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,

@@ -46,7 +46,7 @@ struct _StringBufferIVars {
 
   // Make this a buffer of UTF16 code units so that it's properly
   // aligned for them if that's what we store.
-  @public typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
+  typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
   @conversion 
   func __conversion() -> _Storage {
