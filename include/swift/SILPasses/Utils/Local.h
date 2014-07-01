@@ -75,11 +75,8 @@ namespace swift {
   // known function reference.
   void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);
 
-  /// \returns True if the type T has unbound generic types.
-  bool hasUnboundGenericTypes(CanType T);
-
-  /// \brief Return true if the substitution map contains unbound
-  /// generic types.
+  /// \brief Return true if the substitution map contains a
+  /// substitution that is an unbound generic type.
   bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
 } // end namespace swift
 

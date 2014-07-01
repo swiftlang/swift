@@ -820,7 +820,7 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   // archetypes.
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
   for (Substitution S : Subs)
-    if (hasUnboundGenericTypes(S.Replacement->getCanonicalType()))
+    if (S.Replacement->getCanonicalType()->hasArchetype())
       return nullptr;
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
@@ -900,8 +900,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
       CFI->getOperand().getType().castTo<SILFunctionType>();
 
   // ... and make sure they have no unsubstituted generics. If they do, bail.
-  if (hasUnboundGenericTypes(SubstCalleeTy) ||
-      hasUnboundGenericTypes(ConvertCalleeTy))
+  if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
   // Ok, we can now perform our transformation. Grab AI's operands and the

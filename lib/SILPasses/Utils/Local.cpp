@@ -220,14 +220,10 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
 
-bool swift::hasUnboundGenericTypes(CanType T) {
-  return T->hasArchetype();
-}
-
 bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are dependent.
   for (auto &entry : SubsMap)
-    if (hasUnboundGenericTypes(entry.second->getCanonicalType()))
+    if (entry.second->getCanonicalType()->hasArchetype())
       return true;
 
   return false;

@@ -627,7 +627,7 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
 
 static bool substitutionListHasUnboundGenerics(ArrayRef<Substitution> Subs) {
   for (auto &Sub : Subs)
-    if (hasUnboundGenericTypes(Sub.Replacement->getCanonicalType()))
+    if (Sub.Replacement->getCanonicalType()->hasArchetype())
       return true;
   return false;
 }
