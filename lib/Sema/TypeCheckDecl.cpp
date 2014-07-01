@@ -2605,7 +2605,33 @@ public:
     }
 
     if (!IsFirstPass) {
+      llvm::DenseSet<const VarDecl *> seenVars;
       PBD->getPattern()->forEachNode([&](Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          // Only check individual variables if we didn't check an enclosing
+          // TypedPattern.
+          const VarDecl *theVar = NP->getDecl();
+          if (seenVars.count(theVar) || theVar->isInvalid())
+            return;
+
+          checkTypeAccessibility(TC, TypeLoc::withoutLoc(theVar->getType()),
+                                 theVar->getAccessibility(),
+                                 [&](Accessibility typeAccess,
+                                     const TypeRepr *complainRepr) {
+            bool isExplicit =
+              theVar->getAttrs().hasAttribute<AccessibilityAttr>();
+            auto diag = TC.diagnose(P->getLoc(),
+                                    diag::pattern_type_access_inferred,
+                                    theVar->isLet(),
+                                    isTypeContext,
+                                    isExplicit,
+                                    theVar->getAccessibility(),
+                                    typeAccess,
+                                    theVar->getType());
+          });
+          return;
+        }
+
         auto *TP = dyn_cast<TypedPattern>(P);
         if (!TP)
           return;
@@ -2614,7 +2640,10 @@ public:
         // one out of some random VarDecl in the pattern. They're all going to
         // be the same, but still, ick.
         const VarDecl *anyVar = nullptr;
-        TP->forEachVariable([&](VarDecl *V) { anyVar = V; });
+        TP->forEachVariable([&](VarDecl *V) {
+          seenVars.insert(V);
+          anyVar = V;
+        });
         if (!anyVar)
           return;
 

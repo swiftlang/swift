@@ -450,6 +450,12 @@ ERROR(pattern_type_access,sema_tcd,none,
       "|cannot be declared %select{PRIVATE|internal|public}3}2 because its "
       "type uses %select{a private|an internal|PUBLIC}4 type",
       (bool, bool, bool, Accessibility, Accessibility))
+ERROR(pattern_type_access_inferred,sema_tcd,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{private|internal|PUBLIC}4"
+      "|cannot be declared %select{PRIVATE|internal|public}3}2 because its "
+      "type %5 uses %select{a private|an internal|PUBLIC}4 type",
+      (bool, bool, bool, Accessibility, Accessibility, Type))
 
 // Type aliases
 ERROR(circular_type_alias,sema_tct,none,

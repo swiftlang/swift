@@ -90,8 +90,13 @@ typealias GenericArgs = Optional<PrivateStruct> // expected-error {{type alias m
 
 var internalVar: PrivateStruct? // expected-error {{variable must be declared private because its type uses a private type}}
 
+let internalConstant = PrivateStruct() // expected-error {{constant must be declared private because its type 'PrivateStruct' uses a private type}}
+@public let publicConstant = [InternalStruct]() // expected-error {{constant cannot be declared public because its type '[(InternalStruct)]' uses an internal type}}
+
 @public struct Properties {
   @public let x: PrivateStruct = PrivateStruct() // expected-error {{property cannot be declared public because its type uses a private type}}
   @public var a: PrivateStruct?, b: PrivateStruct? // expected-error 2 {{property cannot be declared public because its type uses a private type}}
   @public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{property cannot be declared public because its type uses a private type}}
+
+  let y = PrivateStruct() // expected-error {{property must be declared private because its type 'PrivateStruct' uses a private type}}
 }
