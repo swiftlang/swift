@@ -365,6 +365,9 @@ extension String : Collection {
       ++start
 
       for ; start != end; ++start {
+        // FIXME(performance): consider removing this "fast path".  A branch
+        // that is hard to predict could be worse for performance than a few
+        // loads from cache to fetch the property 'gcb1'.
         if segmenter.isBoundaryAfter(gcb0) {
           break
         }
