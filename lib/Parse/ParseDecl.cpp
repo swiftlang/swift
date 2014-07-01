@@ -471,8 +471,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return false;
     }
 
-    StringRef Value =
-    getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+    StringRef Value = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                                        AttrName);
 
     consumeToken(tok::string_literal);
 

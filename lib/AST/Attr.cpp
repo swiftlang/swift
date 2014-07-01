@@ -203,7 +203,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Asmname:
     return "asmname";
   case DAK_Semantics:
-      return "semantics";
+    return "semantics";
   case DAK_Availability:
     return "availability";
   case DAK_ObjC:
