@@ -278,3 +278,11 @@ func test5() -> Int {
   // CHECK: <kw>return</kw> <int>0</int>
   return 0
 }
+
+// http://whatever.com?ee=2&yy=1 and radar://123456
+/* http://whatever.com FIXME: see in http://whatever.com/fixme
+  http://whatever.com */
+
+// CHECK: <comment-line>// <comment-url>http://whatever.com?ee=2&yy=1</comment-url> and <comment-url>radar://123456</comment-url></comment-line>
+// CHECK: <comment-block>/* <comment-url>http://whatever.com</comment-url> <comment-marker>FIXME: see in <comment-url>http://whatever.com/fixme</comment-url></comment-marker>
+// CHECK:  <comment-url>http://whatever.com</comment-url> */</comment-block>

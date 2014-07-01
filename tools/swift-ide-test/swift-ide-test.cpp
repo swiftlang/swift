@@ -509,6 +509,7 @@ public:
     case SyntaxNodeKind::CommentLine: Id = "comment-line"; break;
     case SyntaxNodeKind::CommentBlock: Id = "comment-block"; break;
     case SyntaxNodeKind::CommentMarker: Id = "comment-marker"; break;
+    case SyntaxNodeKind::CommentURL: Id = "comment-url"; break;
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
@@ -533,6 +534,7 @@ public:
     case SyntaxNodeKind::CommentLine: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentBlock: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentMarker: Col = llvm::raw_ostream::MAGENTA; break;
+    case SyntaxNodeKind::CommentURL: Col = llvm::raw_ostream::RED; break;
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;

@@ -25,10 +25,12 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Regex.h"
 #include <vector>
 
 using namespace swift;
 using namespace ide;
+using llvm::Regex;
 
 void SyntaxModelWalker::anchor() {}
 
@@ -136,12 +138,27 @@ struct StructureElement {
     :StructureNode(StructureNode), ASTNode(ASTNode) { }
 };
 
+static const char *RegexStrURL = "(acap|afp|afs|cid|data|fax|feed|file|ftp|go|"
+  "gopher|http|https|imap|ldap|mailserver|mid|modem|news|nntp|opaquelocktoken|"
+  "pop|prospero|rdar|rtsp|service|sip|soap\\.beep|soap\\.beeps|tel|telnet|tip|"
+  "tn3270|urn|vemmi|wais|xcdoc|z39\\.50r|z39\\.50s)://"
+  "([a-zA-Z0-9\\-_.]+/)?[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
+
+static const char *RegexStrMailURL =
+  "(mailto|im):[a-zA-Z0-9\\-_]+@[a-zA-Z0-9\\-_\\.!%]+";
+
+static const char *RegexStrRadarURL =
+  "radar:[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
+
 class ModelASTWalker : public ASTWalker {
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
+  Regex URLRxs[3] = { { RegexStrURL, Regex::Newline },
+                      { RegexStrMailURL, Regex::Newline },
+                      { RegexStrRadarURL, Regex::Newline } };
 
 public:
   SyntaxModelWalker &Walker;
@@ -187,6 +204,7 @@ private:
   bool isCurrentCallArgExpr(const Expr *E);
 
   bool processComment(CharSourceRange Range);
+  bool searchForURL(CharSourceRange Range);
 };
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -758,6 +776,9 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
     if (Node.isComment()) {
       if (!processComment(Node.Range))
         return false;
+    } else if (Node.Kind == SyntaxNodeKind::CommentMarker) {
+      if (!searchForURL(Node.Range))
+        return false;
     }
   }
 
@@ -811,7 +832,7 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   while (1) {
     auto Pos = Text.find_first_of("FTM");
     if (Pos == StringRef::npos)
-      return true;
+      return searchForURL(Range);
 
     Text = Text.substr(Pos);
     Loc = Loc.getAdvancedLoc(Pos);
@@ -826,7 +847,47 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (NewLinePos != StringRef::npos) {
     Text = Text.substr(0, NewLinePos);
   }
-  SyntaxNode Node{ SyntaxNodeKind::CommentMarker,
-                   CharSourceRange(Loc, Text.size()) };
-  return passNode(Node);
+
+  CharSourceRange BeforeMarker{ SM, Range.getStart(), Loc };
+  CharSourceRange Marker(Loc, Text.size());
+  CharSourceRange AfterMarker{ SM, Marker.getEnd(), Range.getEnd() };
+
+  if (!searchForURL(BeforeMarker))
+    return false;
+
+  SyntaxNode Node{ SyntaxNodeKind::CommentMarker, Marker };
+  if (!passNode(Node))
+    return false;
+
+  return searchForURL(AfterMarker);  
+}
+
+bool ModelASTWalker::searchForURL(CharSourceRange Range) {
+  StringRef OrigText = SM.extractText(Range, BufferID);
+  SourceLoc OrigLoc = Range.getStart();
+
+  // URLs are uncommon, do a fast check before the regex one.
+  if (OrigText.find("://") == StringRef::npos)
+    return true;
+
+  StringRef Text = OrigText;
+  while (1) {
+    SmallVector<StringRef, 4> Matches;
+    for (auto &Rx : URLRxs) {
+      bool HadMatch = Rx.match(Text, &Matches);
+      if (HadMatch)
+        break;
+    }
+    if (Matches.empty())
+      break;
+    StringRef Match = Matches[0];
+    SourceLoc Loc = OrigLoc.getAdvancedLoc(Match.data() - OrigText.data());
+    CharSourceRange Range(Loc, Match.size());
+    SyntaxNode Node{ SyntaxNodeKind::CommentURL, Range };
+    if (!passNode(Node))
+      return false;
+    Text = Text.substr(Match.data() - Text.data() + Match.size());
+  }
+
+  return true;
 }

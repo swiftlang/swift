@@ -37,6 +37,7 @@ enum class SyntaxNodeKind : uint8_t {
   CommentBlock,
   /// A marker like 'FIXME:' or 'TODO:' inside a comment.
   CommentMarker,
+  CommentURL,
   TypeId,
   /// #if/#else/#endif occurence.
   BuildConfigKeyword,
@@ -58,6 +59,11 @@ struct SyntaxNode {
   bool isComment() const {
     return Kind == SyntaxNodeKind::CommentLine ||
            Kind == SyntaxNodeKind::CommentBlock;
+  }
+
+  bool isInnerCommentNode() const {
+    return Kind == SyntaxNodeKind::CommentMarker ||
+           Kind == SyntaxNodeKind::CommentURL;
   }
 };
 
