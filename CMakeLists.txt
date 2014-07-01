@@ -578,10 +578,12 @@ function(handle_gyb_sources sourcesvar)
   set(${sourcesvar} "${de_gybbed_sources}" PARENT_SCOPE)
 endfunction()
 
-# Add a new Swift library.
+# Add a single variant of a new Swift library.
 #
 # Usage:
-#   add_swift_library(name           # Name of the library (e.g., swiftParse)
+#   add_swift_library_single(
+#     name                           # Name of the library (e.g., swiftParse)
+#     library_subdir                 # Library subdirectory
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
@@ -589,25 +591,26 @@ endfunction()
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
 #     source1 [source2 source3 ...]) # Sources to add into this library
-macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+macro(add_swift_library_single name SWIFTLIB_SINGLE_SUBDIR)
+  parse_arguments(SWIFTLIB_SINGLE "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
-  set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
-  handle_gyb_sources(SWIFTLIB_SOURCES)
+  set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_DEFAULT_ARGS})
+
+  handle_gyb_sources(SWIFTLIB_SINGLE_SOURCES)
   
   if(MSVC_IDE OR XCODE)
     string( REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list( GET split_path -1 dir)
-    file( GLOB_RECURSE SWIFTLIB_HEADERS
+    file( GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def)
 
-    file( GLOB_RECURSE SWIFTLIB_TDS
+    file( GLOB_RECURSE SWIFTLIB_SINGLE_TDS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
-    source_group("TableGen descriptions" FILES ${SWIFTLIB_TDS})
+    source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
 
-    set(SWIFTLIB_SOURCES ${SWIFTLIB_SOURCES} ${SWIFTLIB_HEADERS} ${SWIFTLIB_TDS})
+    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
   endif(MSVC_IDE OR XCODE)
 
   if (MODULE)
@@ -619,29 +622,29 @@ macro(add_swift_library name)
   endif()
 
   set(IS_STDLIB_CORE_arg)
-  if(SWIFTLIB_IS_STDLIB_CORE)
+  if(SWIFTLIB_SINGLE_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
   
-  handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
-    DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+  handle_swift_sources(SWIFTLIB_SINGLE_SOURCES SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
+    DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS}
     ${IS_STDLIB_CORE_arg})
 
   add_library( ${name} ${libkind}
-    ${SWIFTLIB_SOURCES}
-    ${SWIFTLIB_EXTERNAL_SOURCES})
+    ${SWIFTLIB_SINGLE_SOURCES}
+    ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
 
   set_source_files_properties(
-    ${SWIFTLIB_SOURCES}
-    PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_FILE_DEPENDS}")
+    ${SWIFTLIB_SINGLE_SOURCES}
+    PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_SINGLE_FILE_DEPENDS}")
   
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_INSTALL)
+  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
     set(name_static "${name}_static")
     add_library( ${name_static} STATIC
-      ${SWIFTLIB_SOURCES}
-      ${SWIFTLIB_EXTERNAL_SOURCES})
+      ${SWIFTLIB_SINGLE_SOURCES}
+      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
     set_target_properties(${name_static} PROPERTIES OUTPUT_NAME ${name})
     add_dependencies(${name_static} ${name})
     set_output_directory(${name_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
@@ -659,14 +662,14 @@ macro(add_swift_library name)
   endif( LLVM_COMMON_DEPENDS )
 
   # Add Swift source files to the project.
-  source_group("Swift Sources" FILES ${SWIFTLIB_EXTERNAL_SOURCES})
+  source_group("Swift Sources" FILES ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
   # ...and for now, mark them as HEADER_FILE_ONLY, so that Xcode doesn't try
   # to build them itself.
-  set_source_files_properties(${SWIFTLIB_EXTERNAL_SOURCES} PROPERTIES
+  set_source_files_properties(${SWIFTLIB_SINGLE_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTLIB_DEPENDS} )
-  llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
+  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}" ${SWIFTLIB_SINGLE_DEPENDS} )
+  llvm_config( ${name} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
   if (NOT NO_LLVM_COMMON_LIBS)
     target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
   endif()
@@ -680,18 +683,18 @@ macro(add_swift_library name)
     set_target_properties(${name} PROPERTIES COMPILE_FLAGS ${cflag})
   endif(MSVC)
 
-  if(SWIFTLIB_INSTALL)
+  if(SWIFTLIB_SINGLE_INSTALL)
     # Install runtime libraries to lib/swift instead of lib. This works around
     # the fact that -isysroot prevents linking to libraries in the system
     # /usr/lib if Swift is installed in /usr.
     set_target_properties(${name} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR} )
+      LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
 
     if (name_static)
       set_target_properties(${name_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SUBDIR} )
+        LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
     endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
@@ -705,38 +708,38 @@ macro(add_swift_library name)
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
       set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
 
       # Do the same for static libraries.
       if (name_static)  
         string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
           ${SWIFTSTATICLIB_DIR})
         set_target_properties(${name_static} PROPERTIES
-          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
-          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
       endif()
     endforeach()
 
     install(TARGETS ${name}
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR})
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR})
 
     if (name_static)
       install(TARGETS ${name_static}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SUBDIR}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SUBDIR})
+        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR}
+        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR})
     endif()
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
-    foreach(external_source ${SWIFTLIB_EXTERNAL_SOURCES})
+    foreach(external_source ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
       get_filename_component(extension ${external_source} EXT)
       if(extension STREQUAL ".swift")
         set(filename ${external_source})
       endif()
     endforeach(external_source)
-  endif(SWIFTLIB_INSTALL)
+  endif(SWIFTLIB_SINGLE_INSTALL)
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${name}
@@ -774,6 +777,58 @@ macro(add_swift_library name)
   endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
+endmacro(add_swift_library_single)
+
+# Translate a yes/no variable to the presence of a given string in a
+# variable.
+#
+# Usage:
+#   translate_flag(is_set flag_name var_name)
+#
+# If is_set is true, sets ${var_name} to ${flag_name}. Otherwise,
+# unsets ${var_name}.
+macro(translate_flag IS_SET FLAG_NAME VAR_NAME)
+  if (${IS_SET})
+    set(${VAR_NAME} ${FLAG_NAME})
+  else()
+    unset(${VAR_NAME})
+  endif()
+endmacro(translate_flag)
+
+# Add a new Swift library.
+#
+# Usage:
+#   add_swift_library(name           # Name of the library (e.g., swiftParse)
+#     [DEPENDS dep1 ...]             # Libraries this library depends on
+#     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
+#     [INSTALL]                      # Install library to lib/swift
+#     [IS_STDLIB_CORE]               # Compile as the standard library core
+#     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
+#     source1 [source2 source3 ...]) # Sources to add into this library
+macro(add_swift_library name)
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+    ${ARGN})
+  set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
+
+  # Translate flags.
+  translate_flag(${SWIFTLIB_INSTALL} "INSTALL" SWIFTLIB_INSTALL_FLAG)
+  translate_flag(${SWIFTLIB_IS_STDLIB_CORE} "IS_STDLIB_CORE" 
+                 SWIFTLIB_IS_STDLIB_CORE_FLAG)
+  translate_flag(${SWIFTLIB_NO_LLVM_COMMON_LIBS} "NO_LLVM_COMMON_LIBS" 
+                 SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG)
+
+  # Pass through to build the default configuration.
+  add_swift_library_single(
+    ${name}
+    ${SWIFTLIB_SUBDIR}
+    ${SWIFTLIB_SOURCES}
+    DEPENDS ${SWIFTLIB_DEPENDS}
+    COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+    FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+    ${SWIFTLIB_INSTALL_FLAG}
+    ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
+    ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
 endmacro(add_swift_library)
 
 # Add a new Swift executable.
