@@ -826,7 +826,6 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // variables are immutable, and if so, we print as 'let'.  This allows us to
   // handle the 'let x = 4' case properly at least.
   const VarDecl *anyVar = nullptr;
-  Optional<Accessibility> access;
   decl->getPattern()->forEachVariable([&](VarDecl *V) {
     anyVar = V;
   });
