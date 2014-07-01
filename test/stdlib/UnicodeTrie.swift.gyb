@@ -14,15 +14,15 @@ grapheme_cluster_break_property_table = \
 import StdlibUnittest
 import Darwin
 import Foundation
-/*
+
 var graphemeBreakPropertyTable = [
 % for start_code_point,end_code_point,value in grapheme_cluster_break_property_table.property_value_ranges:
   (${start_code_point}, ${end_code_point}, _GraphemeClusterBreakPropertyValue.${value}),
 % end
 ]
-*/
+
 var UnicodeTrie = TestCase("UnicodeTrie")
-/*
+
 UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
   var trie = _UnicodeGraphemeClusterBreakPropertyTrie()
 
@@ -43,7 +43,7 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
     }
   }
 }
-*/
+
 %{
 
 grapheme_cluster_break_tests = \
