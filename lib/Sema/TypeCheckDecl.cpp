@@ -2173,15 +2173,6 @@ public:
 class TypeAccessibilityDiagnoser : private ASTWalker {
   const ComponentIdentTypeRepr *minAccessibilityType = nullptr;
 
-  const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
-    if (const ValueDecl *VD = TR->getBoundDecl())
-      return VD;
-    if (Type ty = TR->getBoundType())
-      return ty->getAnyNominal();
-    assert(TR->isBoundModule());
-    return nullptr;
-  }
-
   bool walkToTypeReprPre(TypeRepr *TR) override {
     auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
     if (!CITR)
@@ -2202,6 +2193,15 @@ class TypeAccessibilityDiagnoser : private ASTWalker {
   }
 
 public:
+  static const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
+    if (const ValueDecl *VD = TR->getBoundDecl())
+      return VD;
+    if (Type ty = TR->getBoundType())
+      return ty->getAnyNominal();
+    assert(TR->isBoundModule());
+    return nullptr;
+  }
+
   static const TypeRepr *findMinAccessibleType(TypeRepr *TR) {
     TypeAccessibilityDiagnoser diagnoser;
     TR->walk(diagnoser);
@@ -2234,6 +2234,26 @@ static void checkTypeAccessibility(
   if (TypeRepr *TR = TL.getTypeRepr())
     complainRepr = TypeAccessibilityDiagnoser::findMinAccessibleType(TR);
   diagnose(typeAccess, complainRepr);
+}
+
+/// Highlights the given TypeRepr, and adds a note pointing to the type's
+/// declaration if possible.
+///
+/// Just flushes \p diag as is if \p complainRepr is null.
+static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
+                                   const TypeRepr *complainRepr) {
+  if (!complainRepr) {
+    diag.flush();
+    return;
+  }
+
+  diag.highlight(complainRepr->getSourceRange());
+  diag.flush();
+
+  if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = TypeAccessibilityDiagnoser::getValueDecl(CITR);
+    TC.diagnose(VD, diag::type_declared_here);
+  }
 }
 
 namespace {
@@ -2609,8 +2629,7 @@ public:
                                   isExplicit,
                                   anyVar->getAccessibility(),
                                   typeAccess);
-          if (complainRepr)
-            diag.highlight(complainRepr->getSourceRange());
+          highlightOffendingType(TC, diag, complainRepr);
         });
       });
     }
@@ -2767,8 +2786,7 @@ public:
         auto diag = TC.diagnose(TAD, kind,
                                 TAD->getName(), TAD->getAccessibility(),
                                 typeAccess);
-        if (complainRepr)
-          diag.highlight(complainRepr->getSourceRange());
+        highlightOffendingType(TC, diag, complainRepr);
       });
     }
 

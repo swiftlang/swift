@@ -408,7 +408,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         {
           // Figure out which declaration to print. It's the top-most
           // declaration (not a module).
-          Decl *ppDecl = ActiveDiagnosticDecl;
+          const Decl *ppDecl = ActiveDiagnosticDecl;
           auto dc = ActiveDiagnosticDecl->getDeclContext();
 
           // FIXME: Horrible, horrible hackaround. We're not getting a

@@ -392,7 +392,7 @@ namespace swift {
 
     /// \brief The declaration of the currently active diagnostic, if there is
     /// one.
-    Decl *ActiveDiagnosticDecl = nullptr;
+    const Decl *ActiveDiagnosticDecl = nullptr;
 
     /// \brief The source location of the currently active diagnostic, if there
     /// is one.
@@ -515,7 +515,7 @@ namespace swift {
     ///
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
-    InFlightDiagnostic diagnose(Decl *decl, DiagID id,
+    InFlightDiagnostic diagnose(const Decl *decl, DiagID id,
                                 ArrayRef<DiagnosticArgument> args) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnosticLoc = SourceLoc();
@@ -534,7 +534,7 @@ namespace swift {
     ///
     /// \returns An in-flight diagnostic, to which additional information can
     /// be attached.
-    InFlightDiagnostic diagnose(Decl *decl, const Diagnostic &diag) {
+    InFlightDiagnostic diagnose(const Decl *decl, const Diagnostic &diag) {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnosticLoc = SourceLoc();
       ActiveDiagnosticDecl = decl;
@@ -553,7 +553,7 @@ namespace swift {
     /// the types expected by the diagnostic \p ID.
     template<typename ...ArgTypes>
     InFlightDiagnostic
-    diagnose(Decl *decl, Diag<ArgTypes...> id,
+    diagnose(const Decl *decl, Diag<ArgTypes...> id,
              typename detail::PassArgument<ArgTypes>::type... args) {
       ActiveDiagnosticLoc = SourceLoc();
       ActiveDiagnosticDecl = decl;

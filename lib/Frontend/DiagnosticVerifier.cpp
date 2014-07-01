@@ -172,25 +172,38 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     unsigned MatchCount = 1;
     int LineOffset = 0;
-    if (TextStartIdx > 0) {
-      if (MatchStart[0] == '@') {
-        if (MatchStart[1] != '+' && MatchStart[1] != '-') {
-          Errors.push_back({ MatchStart.data(),
-            "expected '+'/'-' for line offset" });
-          continue;
-        }
-        StringRef Offs;
-        if (MatchStart[1] == '+')
-          Offs = MatchStart.substr(2, TextStartIdx-2);
-        else
-          Offs = MatchStart.substr(1, TextStartIdx-1);
-        if (Offs.rtrim().getAsInteger(10, LineOffset)) {
-          Errors.push_back({ MatchStart.data(),
-            "expected line offset before '{{'" });
-          continue;
-        }
+    if (TextStartIdx > 0 && MatchStart[0] == '@') {
+      if (MatchStart[1] != '+' && MatchStart[1] != '-') {
+        Errors.push_back({ MatchStart.data(),
+          "expected '+'/'-' for line offset" });
+        continue;
+      }
+      StringRef Offs;
+      if (MatchStart[1] == '+')
+        Offs = MatchStart.slice(2, TextStartIdx).rtrim();
+      else
+        Offs = MatchStart.slice(1, TextStartIdx).rtrim();
 
-      } else if (MatchStart.substr(0, TextStartIdx).rtrim()
+      size_t SpaceIndex = Offs.find(' ');
+      if (SpaceIndex != StringRef::npos && SpaceIndex < TextStartIdx) {
+        size_t Delta = Offs.size() - SpaceIndex;
+        MatchStart = MatchStart.substr(TextStartIdx - Delta);
+        TextStartIdx = Delta;
+        Offs = Offs.slice(0, SpaceIndex);
+      } else {
+        MatchStart = MatchStart.substr(TextStartIdx);
+        TextStartIdx = 0;
+      }
+
+      if (Offs.getAsInteger(10, LineOffset)) {
+        Errors.push_back({ MatchStart.data(),
+          "expected line offset before '{{'" });
+        continue;
+      }
+    }
+
+    if (TextStartIdx > 0) {
+      if (MatchStart.substr(0, TextStartIdx).rtrim()
           .getAsInteger(10, MatchCount)) {
         Errors.push_back(std::make_pair(MatchStart.data(),
                                         "expected match count before '{{'"));
