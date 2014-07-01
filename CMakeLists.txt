@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 2.8)
 
 include(CMakeParseArguments)
 
+# lipo is used to create universal binaries.
+find_program(LIPO "lipo")
+
 # Support building Swift as a standalone project, using LLVM as an
 # external library.
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
@@ -555,8 +558,6 @@ function(handle_swift_sources sourcesvar externalvar target name)
       get_filename_component(swift_obj_base ${swift_obj_base} NAME_WE)
     endif()
 
-    # FIXME Doesn't account for the SDK here
-
     set(objsubdir)
     if (SWIFTSOURCES_SDK)
       compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
@@ -661,8 +662,7 @@ macro(add_swift_library_single target name)
 
   # Determine the subdirectory where this library will be installed.
   if (SWIFTLIB_SINGLE_SDK)
-    compute_library_subdir(SWIFTLIB_SINGLE_SUBDIR ${SWIFTLIB_SINGLE_SDK}
-                           ${SWIFTLIB_SINGLE_ARCHITECTURE})
+    set(SWIFTLIB_SINGLE_SUBDIR "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
   else()
     set(SWIFTLIB_SINGLE_SUBDIR ${SWIFTLIB_SUBDIR})
   endif()
@@ -713,6 +713,8 @@ macro(add_swift_library_single target name)
   
   set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+  set(link_flags "${SWIFTLIB_SINGLE_LINK_FLAGS}")
+
   if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
     set(target_static "${target}_static")
     add_library( ${target_static} STATIC
@@ -729,7 +731,7 @@ macro(add_swift_library_single target name)
       # FIXME: Deal with library variants here
       set_target_properties(${target_static} PROPERTIES
         COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
-        LINK_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
+        LINK_FLAGS "${link_flags}")
     endif()
   endif()
   
@@ -771,6 +773,7 @@ macro(add_swift_library_single target name)
     set(cflag "${cflag} /Za")
     set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${cflag})
   endif(MSVC)
+
 
   if(SWIFTLIB_SINGLE_INSTALL)
     # Install runtime libraries to lib/swift instead of lib. This works around
@@ -834,6 +837,7 @@ macro(add_swift_library_single target name)
   if (SWIFTLIB_SINGLE_SDK)
     set(SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS
         "-m${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
+    set(link_flags "${link_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
     set_target_properties(${target}
       PROPERTIES
       # Library name (without the variant information)
@@ -841,16 +845,19 @@ macro(add_swift_library_single target name)
       # SDK, deployment target, architecture.
       COMPILE_FLAGS
       "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
-      LINK_FLAGS "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH} ${SWIFTLIB_SINGLE_LINK_FLAGS}"
     )
   else()
     if (SWIFT_SDKS)
       # Deployment flags.
+      set(link_flags "${link_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ${SWIFTLIB_SINGLE_LINK_FLAGS}")
+      
       set_target_properties(${target} PROPERTIES
-        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}
-        LINK_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ${SWIFTLIB_SINGLE_LINK_FLAGS}")
+        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
     endif()
   endif()
+
+  # Set link flags.
+  set_target_properties(${target} PROPERTIES LINK_FLAGS "${link_flags}")
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${target}
@@ -938,7 +945,7 @@ macro(add_swift_library name)
                  SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG)
 
   # If we're supposed to build this library for the target...
-  if(SWIFTLIB_TARGET_LIBRARY) 
+  if(SWIFTLIB_TARGET_LIBRARY AND SWIFT_SDKS)
     # Check whether we should build the default variant.
     # FIXME: This is a hack. OSX should just be another SDK.
     if (SWIFTLIB_TARGET_SDKS)
@@ -971,10 +978,13 @@ macro(add_swift_library name)
     # Loop through the various SDKs building the other variants of
     # this library.
     foreach(SDK ${SWIFT_SDKS})
+      set(THIN_INPUT_TARGETS)
+
       # For each architecture supported by this SDK
       foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
         # Configure variables for this subdirectory.
-        set(VARIANT_NAME "${name}-${SDK}-${ARCH}")
+        set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+        set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
 
         # Determine whether we should build this variant.
         if (SWIFTLIB_TARGET_SDKS)
@@ -992,7 +1002,7 @@ macro(add_swift_library name)
           # Map dependencies over to the appropriate variants.
           set(depends)
           foreach(DEP ${SWIFTLIB_DEPENDS})
-            list(APPEND depends "${DEP}-${SDK}-${ARCH}")
+            list(APPEND depends "${DEP}${VARIANT_SUFFIX}")
           endforeach()
 
           # Add this library variant.
@@ -1010,9 +1020,46 @@ macro(add_swift_library name)
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
             ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
+
+          # Add dependencies on the (not-yet-created) custom lipo
+          # target.
+          foreach(DEP ${SWIFTLIB_DEPENDS})
+            add_dependencies(${VARIANT_NAME} 
+              "${DEP}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+          endforeach()
+
+          # Note this thin library.
+          list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
         endif()
       endforeach(ARCH)
-    endforeach(SDK)    
+
+      # Find the library targets created for this SDK.
+      if (THIN_INPUT_TARGETS)
+        set(THIN_INPUT_LIBRARIES)
+        foreach(TARGET ${THIN_INPUT_TARGETS})
+          get_property(TARGET_FILE TARGET ${TARGET} PROPERTY LOCATION)
+          list(APPEND THIN_INPUT_LIBRARIES "${TARGET_FILE}")
+        endforeach()
+        
+        # Determine the name of the universal library.
+        if (SHARED_LIBRARY)
+          set(UNIVERSAL_LIBRARY_NAME 
+            "${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        else()
+          set(UNIVERSAL_LIBRARY_NAME 
+            "${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        endif()
+          
+        # Use lipo to create the final binary.      
+        add_custom_target("${name}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}" ALL
+          COMMAND ${LIPO} 
+          "-create"
+          "-output" 
+          ${UNIVERSAL_LIBRARY_NAME}
+          ${THIN_INPUT_LIBRARIES}
+          DEPENDS ${THIN_INPUT_TARGETS})
+      endif()
+    endforeach(SDK)      
   else()
     # Pass through to build the default configuration.
     add_swift_library_single(
