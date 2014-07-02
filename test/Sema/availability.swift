@@ -48,6 +48,7 @@ func testSuvscript(cwu: ClassWithUnavailable) {
 }
 
 /* FIXME 'nil == a' fails to type-check with a bogus error message
+ * <rdar://problem/17540796>
 func testString() {
   let a : String = "Hey"
   if a == nil {
