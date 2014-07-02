@@ -2271,11 +2271,101 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
     llvm_unreachable("cannot appear in a type context");
 
   case DeclKind::Param:
     llvm_unreachable("does not have accessibility");
+
+  case DeclKind::IfConfig:
+    // Does not have accessibility.
+  case DeclKind::EnumCase:
+    // Handled at the EnumElement level.
+  case DeclKind::Var:
+    // Handled at the PatternBindingDecl level.
+  case DeclKind::Destructor:
+    // Always correct.
+    return;
+
+  case DeclKind::PatternBinding: {
+    auto PBD = cast<PatternBindingDecl>(D);
+    bool isTypeContext = PBD->getDeclContext()->isTypeContext();
+
+    llvm::DenseSet<const VarDecl *> seenVars;
+    PBD->getPattern()->forEachNode([&](const Pattern *P) {
+      if (auto *NP = dyn_cast<NamedPattern>(P)) {
+        // Only check individual variables if we didn't check an enclosing
+        // TypedPattern.
+        const VarDecl *theVar = NP->getDecl();
+        if (seenVars.count(theVar) || theVar->isInvalid())
+          return;
+
+        checkTypeAccessibility(TC, TypeLoc::withoutLoc(theVar->getType()),
+                               theVar->getAccessibility(),
+                               [&](Accessibility typeAccess,
+                                   const TypeRepr *complainRepr) {
+          bool isExplicit =
+            theVar->getAttrs().hasAttribute<AccessibilityAttr>();
+          auto diag = TC.diagnose(P->getLoc(),
+                                  diag::pattern_type_access_inferred,
+                                  theVar->isLet(),
+                                  isTypeContext,
+                                  isExplicit,
+                                  theVar->getAccessibility(),
+                                  typeAccess,
+                                  theVar->getType());
+        });
+        return;
+      }
+
+      auto *TP = dyn_cast<TypedPattern>(P);
+      if (!TP)
+        return;
+
+      // FIXME: We need an accessibility value to check against, so we pull
+      // one out of some random VarDecl in the pattern. They're all going to
+      // be the same, but still, ick.
+      const VarDecl *anyVar = nullptr;
+      TP->forEachVariable([&](VarDecl *V) {
+        seenVars.insert(V);
+        anyVar = V;
+      });
+      if (!anyVar)
+        return;
+
+      checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *complainRepr) {
+        bool isExplicit =
+          anyVar->getAttrs().hasAttribute<AccessibilityAttr>() ||
+          isa<ProtocolDecl>(anyVar->getDeclContext());
+        auto diag = TC.diagnose(P->getLoc(), diag::pattern_type_access,
+                                anyVar->isLet(),
+                                isTypeContext,
+                                isExplicit,
+                                anyVar->getAccessibility(),
+                                typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    });
+    return;
+  }
+
+  case DeclKind::TypeAlias: {
+    auto TAD = cast<TypeAliasDecl>(D);
+
+    checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
+                           TAD->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *complainRepr) {
+      bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
+      auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
+                              isExplicit, TAD->getAccessibility(),
+                              typeAccess);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+
+    return;
+  }
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
@@ -2322,23 +2412,60 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
-  case DeclKind::PatternBinding:
-  case DeclKind::TypeAlias:
+  case DeclKind::Subscript: {
+    auto SD = cast<SubscriptDecl>(D);
+
+    Optional<Accessibility> minAccess;
+    const TypeRepr *complainRepr = nullptr;
+    bool problemIsElement = false;
+    SD->getIndices()->forEachNode([&](const Pattern *P) {
+      auto *TP = dyn_cast<TypedPattern>(P);
+      if (!TP)
+        return;
+
+      checkTypeAccessibility(TC, TP->getTypeLoc(), SD->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+        }
+      });
+    });
+
+    checkTypeAccessibility(TC, SD->getElementTypeLoc(),
+                           SD->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *thisComplainRepr) {
+      if (!minAccess || *minAccess > typeAccess) {
+        minAccess = typeAccess;
+        complainRepr = thisComplainRepr;
+        problemIsElement = true;
+      }
+    });
+
+    if (minAccess) {
+      bool isExplicit = SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
+                        isa<ProtocolDecl>(SD->getDeclContext());
+      auto diag = TC.diagnose(SD, diag::subscript_type_access,
+                              isExplicit,
+                              SD->getAccessibility(),
+                              *minAccess,
+                              problemIsElement);
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+    return;
+  }
+
   case DeclKind::GenericTypeParam:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
-  case DeclKind::Var:
   case DeclKind::Func:
-  case DeclKind::Subscript:
   case DeclKind::Constructor:
   case DeclKind::EnumElement:
     // unimplemented
-    return;
-
-  case DeclKind::EnumCase:
-  case DeclKind::Destructor:
     return;
   }
 }
@@ -2691,109 +2818,15 @@ public:
       });
     }
 
-    if (!IsFirstPass) {
-      llvm::DenseSet<const VarDecl *> seenVars;
-      PBD->getPattern()->forEachNode([&](Pattern *P) {
-        if (auto *NP = dyn_cast<NamedPattern>(P)) {
-          // Only check individual variables if we didn't check an enclosing
-          // TypedPattern.
-          const VarDecl *theVar = NP->getDecl();
-          if (seenVars.count(theVar) || theVar->isInvalid())
-            return;
-
-          checkTypeAccessibility(TC, TypeLoc::withoutLoc(theVar->getType()),
-                                 theVar->getAccessibility(),
-                                 [&](Accessibility typeAccess,
-                                     const TypeRepr *complainRepr) {
-            bool isExplicit =
-              theVar->getAttrs().hasAttribute<AccessibilityAttr>();
-            auto diag = TC.diagnose(P->getLoc(),
-                                    diag::pattern_type_access_inferred,
-                                    theVar->isLet(),
-                                    isTypeContext,
-                                    isExplicit,
-                                    theVar->getAccessibility(),
-                                    typeAccess,
-                                    theVar->getType());
-          });
-          return;
-        }
-
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-
-        // FIXME: We need an accessibility value to check against, so we pull
-        // one out of some random VarDecl in the pattern. They're all going to
-        // be the same, but still, ick.
-        const VarDecl *anyVar = nullptr;
-        TP->forEachVariable([&](VarDecl *V) {
-          seenVars.insert(V);
-          anyVar = V;
-        });
-        if (!anyVar)
-          return;
-
-        checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar->getAccessibility(),
-                               [&](Accessibility typeAccess,
-                                   const TypeRepr *complainRepr) {
-          bool isExplicit =
-            anyVar->getAttrs().hasAttribute<AccessibilityAttr>();
-          auto diag = TC.diagnose(P->getLoc(), diag::pattern_type_access,
-                                  anyVar->isLet(),
-                                  isTypeContext,
-                                  isExplicit,
-                                  anyVar->getAccessibility(),
-                                  typeAccess);
-          highlightOffendingType(TC, diag, complainRepr);
-        });
-      });
-    }
-
+    if (!IsFirstPass)
+      checkAccessibility(TC, PBD);
 
     TC.checkDeclAttributes(PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (IsSecondPass && !SD->isInvalid()) {
-      Optional<Accessibility> minAccess;
-      const TypeRepr *complainRepr = nullptr;
-      bool problemIsElement = false;
-      SD->getIndices()->forEachNode([&](Pattern *P) {
-        auto *TP = dyn_cast<TypedPattern>(P);
-        if (!TP)
-          return;
-
-        checkTypeAccessibility(TC, TP->getTypeLoc(), SD->getAccessibility(),
-                               [&](Accessibility typeAccess,
-                                   const TypeRepr *thisComplainRepr) {
-          if (!minAccess || *minAccess > typeAccess) {
-            minAccess = typeAccess;
-            complainRepr = thisComplainRepr;
-          }
-        });
-      });
-
-      checkTypeAccessibility(TC, SD->getElementTypeLoc(),
-                             SD->getAccessibility(),
-                             [&](Accessibility typeAccess,
-                                 const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
-          complainRepr = thisComplainRepr;
-          problemIsElement = true;
-        }
-      });
-
-      if (minAccess) {
-        bool isExplicit = SD->getAttrs().hasAttribute<AccessibilityAttr>();
-        auto diag = TC.diagnose(SD, diag::subscript_type_access,
-                                isExplicit,
-                                SD->getAccessibility(),
-                                *minAccess,
-                                problemIsElement);
-        highlightOffendingType(TC, diag, complainRepr);
-      }
+    if (IsSecondPass) {
+      checkAccessibility(TC, SD);
       return;
     }
 
@@ -2937,18 +2970,8 @@ public:
         TC.checkInheritanceClause(TAD);
     }
 
-    if (IsSecondPass && !TAD->isInvalid()) {
-      checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
-                             TAD->getAccessibility(),
-                             [&](Accessibility typeAccess,
-                                 const TypeRepr *complainRepr) {
-        bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
-        auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
-                                isExplicit, TAD->getAccessibility(),
-                                typeAccess);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
-    }
+    if (IsSecondPass)
+      checkAccessibility(TC, TAD);
 
     TC.checkDeclAttributes(TAD);
     

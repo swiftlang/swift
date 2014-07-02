@@ -20,14 +20,14 @@
   @private func privateReq() {}
 }
 
-// expected-note@+1 2 {{type declared here}}
+// expected-note@+1 3 {{type declared here}}
 @internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-11=@internal}}
   @private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-11=@internal}}
   @private func privateReq() {}
 }
 
-// expected-note@+1 25 {{type declared here}}
+// expected-note@+1 26 {{type declared here}}
 @private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {}
   @private func internalReq() {}
@@ -132,4 +132,9 @@ class InternalClass {}
   typealias PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
   typealias PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
   typealias PublicPublicDefaultConformer: PublicProto = PublicStruct
+}
+
+@public protocol RequirementTypes {
+  var x: PrivateStruct { get } // expected-error {{property cannot be declared public because its type uses a private type}}
+  subscript(x: Int) -> InternalStruct { get set } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
 }

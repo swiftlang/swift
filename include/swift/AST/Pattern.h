@@ -141,6 +141,11 @@ public:
   /// this pattern.  This is a pre-order traversal.
   void forEachNode(const std::function<void(Pattern*)> &f);
 
+  void forEachNode(const std::function<void(const Pattern*)> &f) const {
+    const std::function<void(Pattern*)> &f2 = f;
+    const_cast<Pattern *>(this)->forEachNode(f2);
+  }
+
   /// Return the number of "top-level" variables in the given pattern,
   /// which looks into one level of tuple pattern to determine the #
   /// of variables. If the pattern is not a tuple, the result is one.

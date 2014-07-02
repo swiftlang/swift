@@ -2062,6 +2062,7 @@ public:
   bool hasUnderlyingType() const { return !UnderlyingTy.getType().isNull(); }
 
   TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
+  const TypeLoc &getUnderlyingTypeLoc() const { return UnderlyingTy; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
