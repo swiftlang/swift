@@ -4480,6 +4480,22 @@ void ClangImporter::Implementation::importAttributes(
       IsUnavailable = true;
       continue;
     }
+
+    //
+    // __attribute__((annotate(swift1_unavailable)))
+    //
+    // Mapping: @availability(*, unavailable)
+    //
+    if (auto unavailable_annot = dyn_cast<clang::AnnotateAttr>(*AI))
+      if (unavailable_annot->getAnnotation() == "swift1_unavailable") {
+        auto attr =
+          AvailabilityAttr::createImplicitUnavailableAttr(C,
+                                                      "Not available in Swift");
+        MappedDecl->getMutableAttrs().add(attr);
+        IsUnavailable = true;
+        continue;
+      }
+
     //
     // __attribute__((deprecated))
     //
