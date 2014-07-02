@@ -2831,12 +2831,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                NSStringFromClass->getType(),
                                SILType::getPrimitiveObjectType(IUOptNSStringTy),
                                {}, iuoptMetaTy);
-    SILValue name = B.createUncheckedEnumData(mainClass, iuoptName,
-                       getASTContext().getImplicitlyUnwrappedOptionalSomeDecl(),
-                                   SILType::getPrimitiveObjectType(NSStringTy));
-    SILValue optName = B.createEnum(mainClass, name,
-                                    getASTContext().getOptionalSomeDecl(),
-                                SILType::getPrimitiveObjectType(OptNSStringTy));
     
     // Call UIApplicationMain.
     SILParameterInfo argTypes[] = {
@@ -2844,17 +2838,13 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                        ParameterConvention::Direct_Unowned),
       SILParameterInfo(argv.getType().getSwiftRValueType(),
                        ParameterConvention::Direct_Unowned),
-      // FIXME: Should be unowned, but we overlay UIApplicationMain with
-      // an asmname'd definition that we apply Swift conventions to.
-      SILParameterInfo(OptNSStringTy, ParameterConvention::Direct_Owned),
-      SILParameterInfo(OptNSStringTy, ParameterConvention::Direct_Owned),
+      SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
+      SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
     };
     auto UIApplicationMainType = SILFunctionType::get(nullptr,
                   AnyFunctionType::ExtInfo()
                     .withRepresentation(AnyFunctionType::Representation::Thin)
-      // FIXME: Should be ::C, but we overlay UIApplicationMain with
-      // an asmname'd definition that we apply Swift conventions to.
-                    .withCallingConv(AbstractCC::Freestanding),
+                    .withCallingConv(AbstractCC::C),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
                   SILResultInfo(argc.getType().getSwiftRValueType(),
@@ -2869,10 +2859,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     
     auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
     auto nil = B.createEnum(mainClass, SILValue(),
-                            getASTContext().getOptionalNoneDecl(),
-                            SILType::getPrimitiveObjectType(OptNSStringTy));
+                      getASTContext().getImplicitlyUnwrappedOptionalNoneDecl(),
+                      SILType::getPrimitiveObjectType(IUOptNSStringTy));
 
-    SILValue args[] = { argc, argv, nil, optName };
+    SILValue args[] = { argc, argv, nil, iuoptName };
     
     B.createApply(mainClass, UIApplicationMain,
                   UIApplicationMain->getType(),

@@ -13,16 +13,6 @@
 import Foundation
 @exported import UIKit
 
-// Overlay UIApplicationMain, which is declared with a non-const char *argv[]
-// argument that gets mapped to UnsafePointer<UnsafePointer<CChar>> by the
-// importer, with one that takes UnsafePointer<CString> instead, matching the
-// type of C_ARGV.
-@asmname("UIApplicationMain") @public
-func UIApplicationMain(argc: CInt,
-                       argv: UnsafePointer<CString>,
-                       principalClassName: NSString?,
-                       delegateClassName: NSString?) -> CInt
-
 // These are un-imported macros in UIKit.
 
 @public extension UIDeviceOrientation {
