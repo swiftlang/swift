@@ -1721,15 +1721,8 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
         static_cast<HeapObject*>(sourceValueAsObjectiveCType),
         nativeType, nativeType);
 
-  using box = OpaqueExistentialBox<1>;
-  box::Container outValue;
-  outValue.Header.Type = nativeType;
-  nativeType->vw_initializeBufferWithTake(
-    outValue.getBuffer(),
-    reinterpret_cast<OpaqueValue *>(&value.Buffer));
-
   return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
-           reinterpret_cast<OpaqueValue *>(&outValue), 
+           reinterpret_cast<OpaqueValue *>(&value), 
            nativeType);
 }
 
