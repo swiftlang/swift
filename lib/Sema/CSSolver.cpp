@@ -679,6 +679,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::TypeMember:
       // If our type variable shows up in the base type, there's
       // nothing to do.

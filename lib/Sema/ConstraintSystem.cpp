@@ -1169,6 +1169,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TypeDecl: {
     bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
     bool isDynamicResult

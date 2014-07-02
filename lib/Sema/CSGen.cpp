@@ -389,8 +389,8 @@ namespace {
       // for fresh type variables T0 and T1, which pulls out a static
       // member, i.e., an enum case or a static variable.
       auto baseMetaTy = MetatypeType::get(baseTy);
-      CS.addValueMemberConstraint(baseMetaTy, expr->getName(), memberTy,
-                                  memberLocator);
+      CS.addUnresolvedValueMemberConstraint(baseMetaTy, expr->getName(),
+                                            memberTy, memberLocator);
 
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
@@ -416,8 +416,15 @@ namespace {
       // Otherwise, the member needs to be convertible to the base type.
       CS.addConstraint(ConstraintKind::Conversion, memberTy, baseTy,
         CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-
-      return memberTy;
+      
+      // The member type also needs to be convertible to the context type, which
+      // preserves lvalue-ness.
+      auto resultTy = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
+      CS.addConstraint(ConstraintKind::Conversion, memberTy, resultTy,
+                       memberLocator);
+      CS.addConstraint(ConstraintKind::Equal, resultTy, baseTy,
+                       memberLocator);
+      return resultTy;
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {

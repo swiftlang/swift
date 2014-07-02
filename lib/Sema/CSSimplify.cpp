@@ -2545,9 +2545,22 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     isMetatype = true;
   }
 
+  bool isUnresolvedMember;
+  switch (constraint.getKind()) {
+  case ConstraintKind::UnresolvedValueMember:
+    isUnresolvedMember = true;
+    break;
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
+    isUnresolvedMember = false;
+    break;
+  default:
+    llvm_unreachable("not a member constraint");
+  }
+  
   if (instanceTy->is<TypeVariableType>())
     return SolutionKind::Unsolved;
-  
+
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   DeclName name = constraint.getMember();
@@ -2726,7 +2739,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Local function that adds the given declaration if it is a
   // reasonable choice.
-  auto addChoice = [&](ValueDecl *result, bool isBridged) {
+  auto addChoice = [&](ValueDecl *result, bool isBridged,
+                       bool isUnwrappedOptional) {
     // If the result is invalid, skip it.
     // FIXME: Note this as invalid, in case we don't find a solution,
     // so we don't let errors cascade further.
@@ -2810,12 +2824,22 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return;
     }
 
-    choices.push_back(OverloadChoice(baseTy, result, /*isSpecialized=*/false));
+    // If we got the choice by unwrapping an optional type, unwrap the base
+    // type.
+    Type ovlBaseTy = baseTy;
+    if (isUnwrappedOptional) {
+      ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
+        ->getInstanceType()
+        ->getAnyOptionalObjectType());
+    }
+    
+    choices.push_back(OverloadChoice(ovlBaseTy, result,
+                                     /*isSpecialized=*/false));
   };
 
   // Add all results from this lookup.
   for (auto result : lookup) {
-    addChoice(result, /*isBridged=*/false);
+    addChoice(result, /*isBridged=*/false, /*isUnwrappedOptional=*/false);
   }
 
   // If the instance type is a bridged to an Objective-C type, perform
@@ -2839,7 +2863,20 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         continue;
       }
 
-      addChoice(result, /*isBridged=*/true);
+      addChoice(result, /*isBridged=*/true, /*isUnwrappedOptional=*/false);
+    }
+  }
+  
+  // If we're looking into a metatype for an unresolved member lookup, look
+  // through optional types.
+  //
+  // FIXME: The short-circuit here is lame.
+  if (choices.empty() && isMetatype && isUnresolvedMember) {
+    if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
+      LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
+                                                  name);
+      for (auto result : optionalLookup)
+        addChoice(result, /*bridged*/ false, /*isUnwrappedOptional=*/true);
     }
   }
 
@@ -3166,6 +3203,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Checked cast constraints don't involve type matches");
 
   case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
     llvm_unreachable("Member constraints don't involve type matches");
 
@@ -3787,6 +3825,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getLocator());
 
   case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
     return simplifyMemberConstraint(constraint);
 

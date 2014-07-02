@@ -98,6 +98,10 @@ enum class ConstraintKind : char {
   /// \brief The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
+  /// \brief The first type (which is implicit) has a member with the given
+  /// name, and the type of that member, when referenced as a value, is the
+  /// second type.
+  UnresolvedValueMember,
   /// \brief The first type has a type member with the given name, and the
   /// type of that member, when referenced as a type, is the second type.
   TypeMember,
@@ -471,6 +475,7 @@ public:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
@@ -512,6 +517,7 @@ public:
   /// \brief Retrieve the name of the member for a member constraint.
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::TypeMember);
     return Types.Member;
   }
@@ -519,6 +525,7 @@ public:
   /// \brief Determine whether this constraint kind has a second type.
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
+        || kind == ConstraintKind::UnresolvedValueMember
         || kind == ConstraintKind::TypeMember;
   }
 

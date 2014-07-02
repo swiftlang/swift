@@ -54,6 +54,9 @@ enum class OverloadChoiceKind : int {
   /// was found by bridging the base value type to its Objective-C
   /// class type.
   DeclViaBridge,
+  /// \brief The overload choice selects a particular declaration that
+  /// was found by unwrapping an optional context type.
+  DeclViaUnwrappedOptional,
 };
 
 /// \brief Describes a particular choice within an overload set.
@@ -65,14 +68,22 @@ class OverloadChoice {
     IsSpecializedBit = 0x01,
     /// Indicates whether this declaration was bridged, turning a
     /// "Decl" kind into "DeclViaBridge" kind.
-    IsBridgedBit = 0x02
+    IsBridgedBit = 0x02,
+    /// Indicates whether this declaration was resolved by unwrapping an
+    /// optional context type, turning a "Decl" kind into
+    /// "DeclViaUnwrappedOptional".
+    IsUnwrappedOptionalBit = 0x04,
+    
+    // IsBridged and IsUnwrappedOptional are mutually exclusive, so there is
+    // room for another mutually exclusive OverloadChoiceKind to be packed into
+    // those two bits.
   };
 
   /// \brief The base type to be used when referencing the declaration
   /// along with two bits: the low bit indicates whether this overload
   /// was immediately specialized and the second lowest bit indicates
   /// whether the declaration was bridged.
-  llvm::PointerIntPair<Type, 2, unsigned> BaseAndBits;
+  llvm::PointerIntPair<Type, 3, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
   /// overload choice kind shifted by 1 with the low bit set.
@@ -103,6 +114,7 @@ public:
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::TypeDecl &&
            kind != OverloadChoiceKind::DeclViaBridge &&
+           kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
            "wrong constructor for decl");
   }
 
@@ -133,6 +145,17 @@ public:
     return result;
   }
 
+  /// Retrieve an overload choice for a declaration that was found
+  /// by unwrapping an optional context type.
+  static OverloadChoice getDeclViaUnwrappedOptional(Type base,
+                                                    ValueDecl *value) {
+    OverloadChoice result;
+    result.BaseAndBits.setPointer(base);
+    result.BaseAndBits.setInt(IsUnwrappedOptionalBit);
+    result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    return result;
+  }
+
   /// \brief Retrieve the base type used to refer to the declaration.
   Type getBaseType() const { return BaseAndBits.getPointer(); }
 
@@ -150,6 +173,8 @@ public:
     case 0x00: 
       if (BaseAndBits.getInt() & IsBridgedBit)
         return OverloadChoiceKind::DeclViaBridge;
+      if (BaseAndBits.getInt() & IsUnwrappedOptionalBit)
+        return OverloadChoiceKind::DeclViaUnwrappedOptional;
 
       return OverloadChoiceKind::Decl;
       
@@ -170,15 +195,16 @@ public:
   /// Determine whether this choice is for a declaration.
   bool isDecl() const {
     switch (getKind()) {
-      case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::TypeDecl:
-      case OverloadChoiceKind::DeclViaBridge:
-        return true;
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaDynamic:
+    case OverloadChoiceKind::TypeDecl:
+    case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      return true;
 
-      case OverloadChoiceKind::BaseType:
-      case OverloadChoiceKind::TupleIndex:
-        return false;
+    case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::TupleIndex:
+      return false;
     }
   }
 

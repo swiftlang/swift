@@ -864,6 +864,7 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::TypeDecl:
       case OverloadChoiceKind::DeclViaBridge:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
         // FIXME: show deduced types, etc, etc.
         tc.diagnose(choice.getDecl(), diag::found_candidate);
         break;
@@ -1018,7 +1019,8 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // Failed binding constraints point to a missing member.
     if (!valueMemberConstraint &&
-        (constraint->getKind() == ConstraintKind::ValueMember)) {
+        (constraint->getKind() == ConstraintKind::ValueMember
+         || constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
       valueMemberConstraint = constraint;
     }
     

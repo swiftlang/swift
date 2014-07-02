@@ -70,6 +70,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::TypeMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
     assert(Member && "Member constraint has no member");
     break;
 
@@ -218,6 +219,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "decl-via-bridge ";
       printDecl();
       break;
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      Out << "decl-via-unwrapped-optional ";
+      printDecl();
+      break;
     case OverloadChoiceKind::BaseType:
       Out << "base type";
       break;
@@ -232,6 +237,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   case ConstraintKind::ValueMember:
     Out << "[." << Types.Member << ": value] == ";
+    break;
+  case ConstraintKind::UnresolvedValueMember:
+    Out << "[(implicit) ." << Types.Member << ": value] == ";
     break;
   case ConstraintKind::TypeMember:
     Out << "[." << Types.Member << ": type] == ";
@@ -423,6 +431,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::TypeMember:
+  case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
     constraint->getSecondType()->getTypeVariables(typeVars);

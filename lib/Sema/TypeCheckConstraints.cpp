@@ -1657,6 +1657,7 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
@@ -1762,25 +1763,26 @@ void ConstraintSystem::dump(raw_ostream &out) {
       auto &choice = resolved->Choice;
       out << "  selected overload set choice ";
       switch (choice.getKind()) {
-        case OverloadChoiceKind::Decl:
-        case OverloadChoiceKind::DeclViaDynamic:
-        case OverloadChoiceKind::TypeDecl:
-        case OverloadChoiceKind::DeclViaBridge:
-          if (choice.getBaseType())
-            out << choice.getBaseType()->getString() << ".";
-          out << choice.getDecl()->getName().str() << ": "
-            << resolved->BoundType->getString() << " == "
-            << resolved->ImpliedType->getString() << "\n";
-          break;
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
+      case OverloadChoiceKind::TypeDecl:
+      case OverloadChoiceKind::DeclViaBridge:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+        if (choice.getBaseType())
+          out << choice.getBaseType()->getString() << ".";
+        out << choice.getDecl()->getName().str() << ": "
+          << resolved->BoundType->getString() << " == "
+          << resolved->ImpliedType->getString() << "\n";
+        break;
 
-        case OverloadChoiceKind::BaseType:
-          out << "base type " << choice.getBaseType()->getString() << "\n";
-          break;
+      case OverloadChoiceKind::BaseType:
+        out << "base type " << choice.getBaseType()->getString() << "\n";
+        break;
 
-        case OverloadChoiceKind::TupleIndex:
-          out << "tuple " << choice.getBaseType()->getString() << " index "
-              << choice.getTupleIndex() << "\n";
-          break;
+      case OverloadChoiceKind::TupleIndex:
+        out << "tuple " << choice.getBaseType()->getString() << " index "
+            << choice.getTupleIndex() << "\n";
+        break;
       }
     }
     out << "\n";

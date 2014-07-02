@@ -151,6 +151,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
@@ -391,8 +392,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   } checkKind;
   if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
     // Nothing to do: these have the curried 'self' already.
-    checkKind = CheckInput;
-
+    if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
+      checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
+    } else {
+      checkKind = CheckInput;
+    }
+    
     // Only check the result type for conversion functions.
     if (auto func = dyn_cast<FuncDecl>(decl1)) {
       if (func->getAttrs().isConversion())
@@ -580,16 +585,18 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       identical = false;
       
       // A declaration found directly beats any declaration found via dynamic
-      // lookup or one found via bridging.
+      // lookup, bridging, or optional unwrapping.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
-           choice2.getKind() == OverloadChoiceKind::DeclViaBridge)) {
+           choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
+           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         ++score1;
         continue;
       }
 
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaBridge) &&
+           choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
+           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
         ++score2;
         continue;
@@ -613,6 +620,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2))
         ++score1;

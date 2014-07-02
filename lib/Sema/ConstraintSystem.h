@@ -1570,6 +1570,19 @@ public:
                                      baseTy, memberTy, name, locator));
   }
 
+  /// \brief Add a value member constraint for an UnresolvedMemberRef
+  /// to the constraint system.
+  void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
+                                          Type memberTy,
+                                          ConstraintLocator *locator) {
+    assert(baseTy);
+    assert(memberTy);
+    assert(name);
+    addConstraint(Constraint::create(*this,
+                                     ConstraintKind::UnresolvedValueMember,
+                                     baseTy, memberTy, name, locator));
+  }
+
   /// \brief Add an archetype constraint.
   void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator) {
     assert(baseTy);

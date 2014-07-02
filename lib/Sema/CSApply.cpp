@@ -1920,7 +1920,8 @@ namespace {
         SWIFT_FALLTHROUGH;
       }
 
-      case OverloadChoiceKind::Decl: {
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional: {
         auto member = buildMemberRef(base,
                                      selected.openedFullType,
                                      dotLoc,
