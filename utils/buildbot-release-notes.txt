@@ -34,6 +34,9 @@ Latest
   of the declaration it is attached to.  It no longer implicitly makes variables
   be an implicitly unwrapped optional and no longer defaults them to weak.
 
+* The \x, \u and \U escape sequences in string literals have been consolidated 
+  into a single and less error prone \u{123456} syntax.
+
 
 2014-06-23
 ---------
