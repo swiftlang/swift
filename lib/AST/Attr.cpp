@@ -331,10 +331,12 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 AvailabilityAttr *
 AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
                                                 StringRef Message) {
-  return new (C) AvailabilityAttr(SourceLoc(), SourceRange(),
-                                  PlatformKind::none, Message,
-                                  /* isUnavailable */ true,
-                                  /* isImplicit */ true);
+  clang::VersionTuple NoVersion;
+  return new (C) AvailabilityAttr(
+    SourceLoc(), SourceRange(), PlatformKind::none, Message,
+    NoVersion, NoVersion, NoVersion,
+    /* isUnavailable */ true,
+    /* isImplicit */ true);
 }
 
 StringRef

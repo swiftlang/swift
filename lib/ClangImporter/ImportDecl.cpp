@@ -4523,8 +4523,9 @@ void ClangImporter::Implementation::importAttributes(
     if (auto avail = dyn_cast<clang::AvailabilityAttr>(*AI)) {
       // Does this availability attribute map to the platform we are
       // currently targeting?
+      StringRef Platform = avail->getPlatform()->getName();
       if (!PlatformAvailabilityFilter ||
-          !PlatformAvailabilityFilter(avail->getPlatform()->getName()))
+          !PlatformAvailabilityFilter(Platform))
         continue;
 
       // Is this declaration marked unconditionally unavailable?
@@ -4548,9 +4549,23 @@ void ClangImporter::Implementation::importAttributes(
           IsUnavailable = true;
           continue;
         }
-
-        // FIXME: Mark remaining declarations as deprecated.
       }
+
+      auto platformK = AvailabilityAttr::platformFromString(Platform);
+      if (!platformK)
+        continue;
+
+      const auto &introduced = avail->getIntroduced();
+      const auto &obsoleted = avail->getObsoleted();
+
+      auto AvAttr = new (C) AvailabilityAttr(
+        SourceLoc(), SourceRange(), platformK.getValue(),
+        avail->getMessage(),
+        introduced, deprecated, obsoleted,
+        false, /* FIXME: Adjust for minimum deployment target. */
+        true);
+
+      MappedDecl->getMutableAttrs().add(AvAttr);
     }
   }
 

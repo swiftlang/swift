@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 112;
+const uint16_t VERSION_MINOR = 113;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1029,14 +1029,33 @@ namespace decls_block {
   BCFixed<2>  // inline value
   >;
 
+  // Encodes a VersionTuple:
+  //
+  //  Major
+  //  Minor
+  //  Subminor
+  //  HasMinor
+  //  HasSubminor
+#define BC_AVAIL_TUPLE\
+    BCVBR<5>,\
+    BCVBR<5>,\
+    BCVBR<4>,\
+    BCFixed<1>,\
+    BCFixed<1>
+
   using AvailabilityDeclAttrLayout = BCRecordLayout<
     Availability_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
+    BC_AVAIL_TUPLE, // Introduced
+    BC_AVAIL_TUPLE, // Deprecated
+    BC_AVAIL_TUPLE, // Obsoleted
     BCVBR<5>,   // platform
     BCVBR<5>,   // number of bytes in message string
     BCBlob      // platform, followed by message
   >;
+
+#undef BC_AVAIL_TUPLE
 
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,

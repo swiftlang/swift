@@ -1496,17 +1496,49 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       }
 
       case decls_block::Availability_DECL_ATTR: {
+#define LIST_VER_TUPLE_PIECES(X)\
+  X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
+#define DEF_VER_TUPLE_PIECES(X) unsigned LIST_VER_TUPLE_PIECES(X)
+#define DECODE_VER_TUPLE(X)\
+  if (X##_HasMinor) {\
+    if (X##_HasSubminor)\
+      X = clang::VersionTuple(X##_Major, X##_Minor, X##_Subminor);\
+    else\
+      X = clang::VersionTuple(X##_Major, X##_Minor);\
+    }\
+  else X = clang::VersionTuple(X##_Major);
+
         bool isImplicit;
         bool isUnavailable;
+        DEF_VER_TUPLE_PIECES(Introduced);
+        DEF_VER_TUPLE_PIECES(Deprecated);
+        DEF_VER_TUPLE_PIECES(Obsoleted);
         unsigned platform;
         unsigned messageSize;
+        // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
-            scratch, isImplicit, isUnavailable, platform, messageSize);
+            scratch, isImplicit, isUnavailable,
+            LIST_VER_TUPLE_PIECES(Introduced),
+            LIST_VER_TUPLE_PIECES(Deprecated),
+            LIST_VER_TUPLE_PIECES(Obsoleted),
+            platform, messageSize);
+
         StringRef message = blobData;
-        Attr = new (ctx) AvailabilityAttr(SourceLoc(), SourceRange(),
-                                       (AvailabilityAttr::PlatformKind)platform,
-                                       message, isUnavailable, isImplicit);
+        clang::VersionTuple Introduced, Deprecated, Obsoleted;
+        DECODE_VER_TUPLE(Introduced)
+        DECODE_VER_TUPLE(Deprecated)
+        DECODE_VER_TUPLE(Obsoleted)
+
+        Attr = new (ctx) AvailabilityAttr(
+          SourceLoc(), SourceRange(),
+          (AvailabilityAttr::PlatformKind)platform, message,
+          Introduced, Deprecated, Obsoleted,
+          isUnavailable, isImplicit);
         break;
+
+#undef DEF_VER_TUPLE_PIECES
+#undef LIST_VER_TUPLE_PIECES
+#undef DECODE_VER_TUPLE
       }
 
       case decls_block::ObjC_DECL_ATTR: {

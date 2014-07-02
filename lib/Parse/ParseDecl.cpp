@@ -620,7 +620,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         Attributes.add(new (Context)
                        AvailabilityAttr(AtLoc, AttrRange,
                                         PlatformKind.getValue(),
-                                        Message, true,
+                                        Message,
+                                        clang::VersionTuple(),
+                                        clang::VersionTuple(),
+                                        clang::VersionTuple(),
+                                        true,
                                         /*Implicit=*/false));
       }
       else {

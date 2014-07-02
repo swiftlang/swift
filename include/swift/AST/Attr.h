@@ -24,6 +24,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "clang/Basic/VersionTuple.h"
 
 namespace swift {
 class ASTPrinter;
@@ -545,15 +546,27 @@ public:
 #include "swift/AST/Attr.def"
   };
 
+#define INIT_VER_TUPLE(X)\
+  X(X.empty() ? Optional<clang::VersionTuple>() : X)
+
   AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
                    StringRef Message,
+                   const clang::VersionTuple &Introduced,
+                   const clang::VersionTuple &Deprecated,
+                   const clang::VersionTuple &Obsoleted,
                    bool IsUnavailable,
                    bool Implicit)
     : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
       Platform(Platform),
       Message(Message),
-      IsUnvailable(IsUnavailable) {}
+      IsUnvailable(IsUnavailable),
+      INIT_VER_TUPLE(Introduced),
+      INIT_VER_TUPLE(Deprecated),
+      INIT_VER_TUPLE(Obsoleted)
+  {}
+
+#undef INIT_VER_TUPLE
 
   /// The platform of the availability.
   const PlatformKind Platform;
@@ -563,6 +576,15 @@ public:
 
   /// Indicates if the declaration is unconditionally unavailable.
   const bool IsUnvailable;
+
+  /// Indicates when the symbol was introduced.
+  const Optional<clang::VersionTuple> Introduced;
+
+  /// Indicates when the symbol was deprecated.
+  const Optional<clang::VersionTuple> Deprecated;
+
+  /// Indicates when the symbol was obsoleted.
+  const Optional<clang::VersionTuple> Obsoleted;
 
   /// Returns true if the availability applies to a specific
   /// platform.
