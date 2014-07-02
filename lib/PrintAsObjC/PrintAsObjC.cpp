@@ -135,8 +135,8 @@ private:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-    os << "SWIFT_EXTENSION\n@interface " << baseClass->getName()
-       << " (" << ED->getModuleContext()->Name << "_Swift)";
+    os << "@interface " << baseClass->getName()
+       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->Name << "))";
     printProtocols(ED->getProtocols());
     os << "\n";
     printMembers(ED->getMembers());
@@ -907,6 +907,10 @@ public:
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "#endif\n"
+           "#if !defined(SWIFT_PASTE)\n"
+           "# define SWIFT_PASTE_HELPER(x, y) x##y\n"
+           "# define SWIFT_PASTE(x, y) SWIFT_PASTE_HELPER(x, y)\n"
+           "#endif"
            "\n"
            "#if !defined(SWIFT_METATYPE)\n"
            "# define SWIFT_METATYPE(X) Class\n"
@@ -924,9 +928,6 @@ public:
            "#endif\n"
            "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
            "# define SWIFT_PROTOCOL_EXTRA\n"
-           "#endif\n"
-           "#if !defined(SWIFT_EXTENSION_EXTRA)\n"
-           "# define SWIFT_EXTENSION_EXTRA\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS)\n"
            "# if defined(__has_attribute) && "
@@ -946,7 +947,7 @@ public:
            "#endif\n"
            "\n"
            "#if !defined(SWIFT_EXTENSION)\n"
-           "# define SWIFT_EXTENSION SWIFT_EXTENSION_EXTRA\n"
+           "# define SWIFT_EXTENSION(M) SWIFT_PASTE(M##_Swift_, __LINE__)\n"
            "#endif\n"
            "\n"
            "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"

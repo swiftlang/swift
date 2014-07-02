@@ -23,3 +23,6 @@ let p: BaseProto = UserClass()
 useBaseProtoObjC(p)
 
 getBaseClass().extensionMethod()
+
+// Make sure we're actually parsing stuff.
+useBaseClass() // expected-error{{missing argument for parameter #1}}

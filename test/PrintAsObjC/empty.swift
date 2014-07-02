@@ -16,6 +16,7 @@
 // CHECK: # define SWIFT_METATYPE(X)
 // CHECK: # define SWIFT_CLASS
 // CHECK: # define SWIFT_PROTOCOL
+// CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
 // CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)

@@ -55,11 +55,11 @@ class MyObject : NSObject, NSCoding {
 @class_protocol protocol NotObjC {}
 
 
-// CHECK-LABEL: @interface NSString (protocols_Swift){{$}}
+// CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
 extension NSString : NotObjC {}
 
 // CHECK-LABEL: @protocol ZZZ{{$}}
-// CHECK-LABEL: @interface NSString (protocols_Swift) <A, ZZZ>
+// CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(protocols)) <A, ZZZ>
 extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @protocol Optional

@@ -3818,8 +3818,20 @@ namespace {
 
     Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
-      if (hasNativeSwiftDecl(decl))
-        return nullptr;
+      clang::SourceLocation categoryNameLoc = decl->getCategoryNameLoc();
+      if (categoryNameLoc.isMacroID()) {
+        // Climb up to the top-most macro invocation.
+        clang::Preprocessor &PP = Impl.getClangPreprocessor();
+        clang::SourceManager &SM = PP.getSourceManager();
+        clang::SourceLocation macroCaller =
+          SM.getImmediateMacroCallerLoc(categoryNameLoc);
+        while (macroCaller.isMacroID()) {
+          categoryNameLoc = macroCaller;
+          macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
+        }
+        if (PP.getImmediateMacroName(categoryNameLoc) == "SWIFT_EXTENSION")
+          return nullptr;
+      }
 
       // Find the Swift class being extended.
       auto objcClass

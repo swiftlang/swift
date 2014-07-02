@@ -13,31 +13,46 @@ import AppKit
 
 // CHECK-NOT: AppKit
 
-// CHECK: @interface A1{{$}}
+// CHECK-LABEL: @interface A1{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class A1 {}
 
-// CHECK: SWIFT_EXTENSION{{$}}
-// CHECK: @interface A1 (extensions_Swift)
+// CHECK-LABEL: @interface A1 (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: @end
 extension A1 {}
 
-// CHECK: @interface A2{{$}}
+// CHECK-LABEL: @interface A2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: SWIFT_EXTENSION{{$}}
-// CHECK: @interface A2 (extensions_Swift)
+// CHECK-LABEL: @interface A2 (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: @end
 extension A2 {}
 @objc class A2 {}
+
+// CHECK-LABEL: @interface A3{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class A3 {}
+
+// CHECK-LABEL: @interface A3 (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @interface A3 (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger more;
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-DAG: @end
+// CHECK: @end
+extension A3 {
+  var some: Int { return 1 }
+}
+extension A3 {
+  var more: Int { return 10 }
+}
 
 // NEGATIVE-NOT: NotObjC
 class NotObjC {}
 extension NotObjC {}
 
-// CHECK: SWIFT_EXTENSION{{$}}
-// CHECK: @interface NSObject (extensions_Swift)
+// CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
@@ -45,8 +60,7 @@ extension NSObject {}
 
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
-// CHECK: SWIFT_EXTENSION{{$}}
-// CHECK: @interface NSString (extensions_Swift)
+// CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
 // CHECK-NEXT: + (NSString *)fromColor:(NSColor *)color;
