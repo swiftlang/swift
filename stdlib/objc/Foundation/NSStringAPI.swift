@@ -1366,16 +1366,16 @@ extension String {
 
   /// Returns a new string containing the characters of the
   /// `String` from the one at a given index to the end.
-  @public func substringFromIndex(index: Int) -> String {
-    return _ns.substringFromIndex(index)
+  @public func substringFromIndex(index: Index) -> String {
+    return _ns.substringFromIndex(index._utf16Index)
   }
 
   // - (NSString *)substringToIndex:(NSUInteger)anIndex
 
   /// Returns a new string containing the characters of the
   /// `String` up to, but not including, the one at a given index.
-  @public func substringToIndex(index: Int) -> String {
-    return _ns.substringToIndex(index)
+  @public func substringToIndex(index: Index) -> String {
+    return _ns.substringToIndex(index._utf16Index)
   }
 
   // - (NSString *)substringWithRange:(NSRange)aRange

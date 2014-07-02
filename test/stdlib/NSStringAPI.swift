@@ -981,11 +981,21 @@ NSStringAPIs.test("stringsByAppendingPaths(_:)") {
 }
 
 NSStringAPIs.test("substringFromIndex(_:)") {
-  // FIXME
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+
+  expectEqual(s, s.substringFromIndex(s.startIndex))
+  expectEqual("せ\u{3099}そ\u{3099}",
+      s.substringFromIndex(advance(s.startIndex, 8)))
+  expectEqual("", s.substringFromIndex(advance(s.startIndex, 10)))
 }
 
 NSStringAPIs.test("substringToIndex(_:)") {
-  // FIXME
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+
+  expectEqual("", s.substringToIndex(s.startIndex))
+  expectEqual("\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}",
+      s.substringToIndex(advance(s.startIndex, 8)))
+  expectEqual(s, s.substringToIndex(advance(s.startIndex, 10)))
 }
 
 NSStringAPIs.test("substringWithRange(_:)") {
