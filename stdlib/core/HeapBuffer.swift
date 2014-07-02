@@ -151,7 +151,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     _ storageClass: HeapBufferStorageBase.Type,
     _ initializer: Value, _ capacity: Int
   ) {
-    _sanityCheck(capacity >= 0)
+    _sanityCheck(capacity >= 0, "creating a HeapBuffer with negative capacity")
 
     let totalSize = HeapBuffer._elementOffset() +
         capacity * Int(Builtin.strideof(Element.self))
