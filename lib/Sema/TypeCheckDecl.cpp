@@ -2668,7 +2668,49 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (IsSecondPass || SD->hasType())
+    if (IsSecondPass && !SD->isInvalid()) {
+      Optional<Accessibility> minAccess;
+      const TypeRepr *complainRepr = nullptr;
+      bool problemIsElement = false;
+      SD->getIndices()->forEachNode([&](Pattern *P) {
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+
+        checkTypeAccessibility(TC, TP->getTypeLoc(), SD->getAccessibility(),
+                               [&](Accessibility typeAccess,
+                                   const TypeRepr *thisComplainRepr) {
+          if (!minAccess || *minAccess > typeAccess) {
+            minAccess = typeAccess;
+            complainRepr = thisComplainRepr;
+          }
+        });
+      });
+
+      checkTypeAccessibility(TC, SD->getElementTypeLoc(),
+                             SD->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+          problemIsElement = true;
+        }
+      });
+
+      if (minAccess) {
+        bool isExplicit = SD->getAttrs().hasAttribute<AccessibilityAttr>();
+        auto diag = TC.diagnose(SD, diag::subscript_type_access,
+                                isExplicit,
+                                SD->getAccessibility(),
+                                *minAccess,
+                                problemIsElement);
+        highlightOffendingType(TC, diag, complainRepr);
+      }
+      return;
+    }
+
+    if (SD->hasType())
       return;
 
     assert(SD->getDeclContext()->isTypeContext() &&

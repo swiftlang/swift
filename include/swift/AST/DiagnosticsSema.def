@@ -466,6 +466,15 @@ ERROR(type_alias_underlying_type_access,sema_tcd,none,
       "underlying type uses %select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility))
 
+// Subscripts
+ERROR(subscript_type_access,sema_tcd,none,
+      "subscript %select{must be declared %select{private|internal|PUBLIC}2"
+      "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
+      "%select{index|element type}3 uses "
+      "%select{a private|an internal|PUBLIC}2 type",
+      (bool, Accessibility, Accessibility, bool))
+
+
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))

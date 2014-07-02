@@ -18,14 +18,14 @@
   @private func privateReq() {}
 }
 
-// expected-note@+1 {{type declared here}}
+// expected-note@+1 2 {{type declared here}}
 @internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-11=@internal}}
   @private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-11=@internal}}
   @private func privateReq() {}
 }
 
-// expected-note@+1 17 {{type declared here}}
+// expected-note@+1 23 {{type declared here}}
 @private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {}
   @private func internalReq() {}
@@ -99,4 +99,15 @@ let internalConstant = PrivateStruct() // expected-error {{constant must be decl
   @public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{property cannot be declared public because its type uses a private type}}
 
   let y = PrivateStruct() // expected-error {{property must be declared private because its type 'PrivateStruct' uses a private type}}
+}
+
+struct Subscripts {
+  subscript (a: PrivateStruct) -> Int { return 0 } // expected-error {{subscript must be declared private because its index uses a private type}}
+  subscript (a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript must be declared private because its element type uses a private type}}
+
+  @public subscript (a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  @public subscript (a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  @public subscript (a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  @public subscript (a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
+  @public subscript (a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
 }
