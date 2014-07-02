@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -553,9 +554,16 @@ int main(int argc, char **argv) {
 
   // If we're in -verify mode, we've buffered up all of the generated
   // diagnostics.  Check now to ensure that they meet our expectations.
-  if (VerifyMode)
+  if (VerifyMode) {
     HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs());
-
+    DiagnosticEngine &diags = CI.getDiags();
+    if (diags.hasFatalErrorOccurred() &&
+        !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
+      diags.resetHadAnyError();
+      diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
+      HadError = true;
+    }
+  }
 
   return HadError;
 }

@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -D FOO -D BAR -target arm-apple-ios7.0 -D FOO
+// RUN: %swift -parse %s -verify -D FOO -D BAR -target arm-apple-ios7.0 -D FOO -parse-stdlib
 
 #if arch(arm) && os(iOS)
 class C {}

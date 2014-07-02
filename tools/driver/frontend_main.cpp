@@ -390,6 +390,13 @@ int frontend_main(ArrayRef<const char *>Args,
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
     HadError = verifyDiagnostics(Instance.getSourceMgr(),
                                  Instance.getInputBufferIDs());
+    DiagnosticEngine &diags = Instance.getDiags();
+    if (diags.hasFatalErrorOccurred() &&
+        !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
+      diags.resetHadAnyError();
+      diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
+      HadError = true;
+    }
   }
   
   return HadError;
