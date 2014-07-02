@@ -68,7 +68,7 @@ protected:
     // If Ty does not have unbound generic types, we did not specialize it so
     // just return C. This relies on the fact that we do not partially
     // specialize.
-    if (!Ty.getSwiftRValueType()->getCanonicalType()->hasArchetype())
+    if (!Ty.hasArchetype())
       return C;
 
     // Otherwise we need to create a specialized conformance for C. Remap the
