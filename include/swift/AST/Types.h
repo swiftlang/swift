@@ -1069,7 +1069,12 @@ public:
     }
   }
 
-  inline Type getVarargBaseTy() const;
+  static inline Type getVarargBaseTy(Type VarArgT);
+
+  Type getVarargBaseTy() const {
+    assert(isVararg());
+    return getVarargBaseTy(getType());
+  }
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
@@ -3668,8 +3673,8 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
   }
 }
 
-inline Type TupleTypeElt::getVarargBaseTy() const {
-  TypeBase *T = getType().getPointer();
+inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
+  TypeBase *T = VarArgT.getPointer();
   if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
     return AT->getBaseType();
   // It's the stdlib Array<T>.

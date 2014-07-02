@@ -45,6 +45,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
     case CodeCompletionString::Chunk::ChunkKind::RightAngle:
     case CodeCompletionString::Chunk::ChunkKind::Dot:
+    case CodeCompletionString::Chunk::ChunkKind::Ellipsis:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:

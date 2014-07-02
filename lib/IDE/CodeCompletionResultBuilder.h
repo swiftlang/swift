@@ -131,6 +131,11 @@ public:
     addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Dot, ".");
   }
 
+  void addEllipsis() {
+    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Ellipsis,
+                           "...");
+  }
+
   void addComma() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::Comma, ", ");
@@ -146,7 +151,8 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
-  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty) {
+  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
+                        bool IsVarArg) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
@@ -193,11 +199,13 @@ public:
 
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      Ty->getString());
+    if (IsVarArg)
+      addEllipsis();
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty) {
-    addCallParameter(Name, Identifier(), Ty);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg);
   }
 
   void addGenericParameter(StringRef Name) {

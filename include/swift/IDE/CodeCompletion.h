@@ -81,6 +81,7 @@ public:
       LeftAngle,
       RightAngle,
       Dot,
+      Ellipsis,
       Comma,
       ExclamationMark,
       QuestionMark,
@@ -149,6 +150,7 @@ public:
              Kind == ChunkKind::LeftAngle ||
              Kind == ChunkKind::RightAngle ||
              Kind == ChunkKind::Dot ||
+             Kind == ChunkKind::Ellipsis ||
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::ExclamationMark ||
              Kind == ChunkKind::QuestionMark ||

@@ -137,6 +137,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::LeftAngle:
     case Chunk::ChunkKind::RightAngle:
     case Chunk::ChunkKind::Dot:
+    case Chunk::ChunkKind::Ellipsis:
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
@@ -636,6 +637,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
     case CodeCompletionString::Chunk::ChunkKind::RightAngle:
     case CodeCompletionString::Chunk::ChunkKind::Dot:
+    case CodeCompletionString::Chunk::ChunkKind::Ellipsis:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
@@ -1192,22 +1194,29 @@ public:
                             const Pattern *P) {
     if (auto *TP = dyn_cast<TuplePattern>(P)) {
       bool NeedComma = false;
-      for (auto TupleElt : TP->getFields()) {
+      for (unsigned i = 0, end = TP->getNumFields(); i < end; ++i) {
+        TuplePatternElt TupleElt = TP->getFields()[i];
         if (NeedComma)
           Builder.addComma();
         NeedComma = true;
 
+        // The last elt must be the vararg if there is one.
+        bool IsVarArg = i == end-1 && TP->hasVararg();
+        Type EltT = TupleElt.getPattern()->getType();
+        if (IsVarArg)
+          EltT = TupleTypeElt::getVarargBaseTy(EltT);
+
         Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
-                                 TupleElt.getPattern()->getType());
+                                 EltT, IsVarArg);
       }
       return;
     }
 
-    Builder.addCallParameter(P->getBoundName(), P->getType());
+    Builder.addCallParameter(P->getBoundName(), P->getType(),/*IsVarArg*/false);
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
-                              Identifier Label, bool IsTopLevel) {
+                              Identifier Label, bool IsTopLevel, bool IsVarArg) {
     if (auto *TT = T->getAs<TupleType>()) {
       if (!Label.empty()) {
         Builder.addTextChunk(Label.str());
@@ -1221,8 +1230,10 @@ public:
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
           Builder.addComma();
-        addPatternFromTypeImpl(Builder, TupleElt.getType(),
-                               TupleElt.getName(), false);
+        Type EltT = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
+                                        : TupleElt.getType();
+        addPatternFromTypeImpl(Builder, EltT, TupleElt.getName(), false,
+                               TupleElt.isVararg());
         NeedComma = true;
       }
       Builder.addRightParen();
@@ -1233,7 +1244,8 @@ public:
         Builder.addLeftParen();
       else if (IsTopLevel)
         Builder.addAnnotatedLeftParen();
-      Builder.addCallParameter(Identifier(), PT->getUnderlyingType());
+      Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
+                               /*IsVarArg*/false);
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -1244,13 +1256,13 @@ public:
     else if (IsTopLevel)
       Builder.addAnnotatedLeftParen();
 
-    Builder.addCallParameter(Label, T);
+    Builder.addCallParameter(Label, T, IsVarArg);
     if (IsTopLevel)
       Builder.addRightParen();
   }
 
   void addPatternFromType(CodeCompletionResultBuilder &Builder, Type T) {
-    addPatternFromTypeImpl(Builder, T, Identifier(), true);
+    addPatternFromTypeImpl(Builder, T, Identifier(), true, /*isVarArg*/false);
   }
 
   void addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
@@ -1288,7 +1300,8 @@ public:
           // typically don't want to specify these parameters.
           continue;
         }
-        auto ParamType = TupleElt.getType();
+        auto ParamType = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
+                                             : TupleElt.getType();
         auto Name = TupleElt.getName();
 
         if (NeedComma)
@@ -1296,9 +1309,10 @@ public:
         if (BodyTuple) {
           // If we have a local name for the parameter, pass in that as well.
           auto ParamPat = BodyTuple->getFields()[i].getPattern();
-          Builder.addCallParameter(Name, ParamPat->getBoundName(), ParamType);
+          Builder.addCallParameter(Name, ParamPat->getBoundName(), ParamType,
+                                   TupleElt.isVararg());
         } else
-          Builder.addCallParameter(Name, ParamType);
+          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
         NeedComma = true;
       }
     } else {
@@ -1310,9 +1324,10 @@ public:
       }
       if (BodyTuple) {
         auto ParamPat = BodyTuple->getFields().front().getPattern();
-        Builder.addCallParameter(Identifier(), ParamPat->getBoundName(), T);
+        Builder.addCallParameter(Identifier(), ParamPat->getBoundName(), T,
+                                 /*IsVarArg*/false);
       } else
-        Builder.addCallParameter(Identifier(), T);
+        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
     }
   }
 
@@ -1404,7 +1419,7 @@ public:
         FirstInputType = PT->getUnderlyingType();
 
       Builder.addLeftParen();
-      Builder.addCallParameter(Ctx.Id_self, FirstInputType);
+      Builder.addCallParameter(Ctx.Id_self, FirstInputType, /*IsVarArg*/false);
       Builder.addRightParen();
     } else {
       Builder.addLeftParen();
