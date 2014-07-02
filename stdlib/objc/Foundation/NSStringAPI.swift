@@ -894,7 +894,7 @@ extension String {
   // @property NSUInteger length;
 
   /// Returns the number of Unicode characters in the `String`.
-  @public var utf16count: Int {
+  @public var utf16Count: Int {
     return _ns.length
   }
 

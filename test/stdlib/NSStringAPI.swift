@@ -679,9 +679,9 @@ NSStringAPIs.test("lastPathComponent") {
   expectEqual("абв", "/foo/абв".lastPathComponent)
 }
 
-NSStringAPIs.test("utf16count") {
-  expectEqual(1, "a".utf16count)
-  expectEqual(2, "\u{0001F60A}".utf16count)
+NSStringAPIs.test("utf16Count") {
+  expectEqual(1, "a".utf16Count)
+  expectEqual(2, "\u{0001F60A}".utf16Count)
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
