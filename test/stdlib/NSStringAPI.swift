@@ -154,7 +154,7 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
     up[i] = b
     i++
   }
-  expectOptionalEqual(s, String.stringWithUTF8String(CString(up)))
+  expectOptionalEqual(s, String.stringWithUTF8String(ConstUnsafePointer(up)))
   up.dealloc(100)
 }
 
@@ -1027,29 +1027,29 @@ NSStringAPIs.run()
 
 var CStringTests = TestCase("CStringTests")
 
-func getNullCString() -> CString {
-  return CString(UnsafePointer<CChar>.null())
+func getNullCString() -> UnsafePointer<CChar> {
+  return .null()
 }
 
-func getASCIICString() -> (CString, dealloc: ()->()) {
-  var up = UnsafePointer<UInt8>.alloc(100)
+func getASCIICString() -> (UnsafePointer<CChar>, dealloc: ()->()) {
+  var up = UnsafePointer<CChar>.alloc(100)
   up[0] = 0x61
   up[1] = 0x62
   up[2] = 0
-  return (CString(up), { up.dealloc(100) })
+  return (up, { up.dealloc(100) })
 }
 
-func getNonASCIICString() -> (CString, dealloc: ()->()) {
+func getNonASCIICString() -> (UnsafePointer<CChar>, dealloc: ()->()) {
   var up = UnsafePointer<UInt8>.alloc(100)
   up[0] = 0xd0
   up[1] = 0xb0
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (CString(up), { up.dealloc(100) })
+  return (UnsafePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String1() -> (CString, dealloc: ()->()) {
+func getIllFormedUTF8String1() -> (UnsafePointer<CChar>, dealloc: ()->()) {
   var up = UnsafePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
@@ -1057,10 +1057,10 @@ func getIllFormedUTF8String1() -> (CString, dealloc: ()->()) {
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (CString(up), { up.dealloc(100) })
+  return (UnsafePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String2() -> (CString, dealloc: ()->()) {
+func getIllFormedUTF8String2() -> (UnsafePointer<CChar>, dealloc: ()->()) {
   var up = UnsafePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
@@ -1068,186 +1068,11 @@ func getIllFormedUTF8String2() -> (CString, dealloc: ()->()) {
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (CString(up), { up.dealloc(100) })
+  return (UnsafePointer(up), { up.dealloc(100) })
 }
 
 func asCCharArray(a: [UInt8]) -> [CChar] {
   return a.map { $0.asSigned() }
-}
-
-CStringTests.test("init(_:)") {
-  if true {
-    getNullCString()
-  }
-  if true {
-    var (s, dealloc) = getASCIICString()
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getNonASCIICString()
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getIllFormedUTF8String1()
-    dealloc()
-  }
-}
-
-CStringTests.test("initFromSignedUnsigned") {
-  CString(UnsafePointer<UInt8>())
-  CString(UnsafePointer<Int8>())
-}
-
-CStringTests.test("convertFromLiterals") {
-  var fromEmpty: CString = ""
-  var fromGraphemeCluster1: CString = "z"
-  var fromGraphemeCluster2: CString = "あ"
-  var fromStringLiteral1: CString = "abc"
-  var fromStringLiteral2: CString = "абв"
-}
-
-CStringTests.test("getLogicValue()") {
-  if true {
-    var s = getNullCString()
-    expectFalse(s.getLogicValue())
-  }
-  if true {
-    var (s, dealloc) = getASCIICString()
-    expectTrue(s.getLogicValue())
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getNonASCIICString()
-    expectTrue(s.getLogicValue())
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getIllFormedUTF8String1()
-    expectTrue(s.getLogicValue())
-    dealloc()
-  }
-}
-
-CStringTests.test("persist()") {
-  if true {
-    var s = getNullCString()
-    expectEmpty(s.persist())
-  }
-  if true {
-    var (s, dealloc) = getASCIICString()
-    expectEqual(asCCharArray([ 0x61, 0x62, 0 ]), s.persist()!)
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getNonASCIICString()
-    expectEqual(asCCharArray([ 0xd0, 0xb0, 0xd0, 0xb1, 0 ]), s.persist()!)
-    dealloc()
-  }
-  if true {
-    var (s, dealloc) = getIllFormedUTF8String1()
-    expectEqual(asCCharArray([ 0x41, 0xed, 0xa0, 0x80, 0x41, 0 ]), s.persist()!)
-    dealloc()
-  }
-}
-
-CStringTests.test("debugDescription") {
-  if true {
-    let s = getNullCString()
-    expectEqual("<null C string>", s.debugDescription)
-  }
-  if true {
-    let (s, dealloc) = getASCIICString()
-    expectEqual("\"ab\"", s.debugDescription)
-    dealloc()
-  }
-  if true {
-    let (s, dealloc) = getNonASCIICString()
-    expectEqual("\"аб\"", s.debugDescription)
-    dealloc()
-  }
-  if true {
-    let (s, dealloc) = getIllFormedUTF8String1()
-    expectEqual("<ill-formed UTF-8>\"\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}\"",
-        s.debugDescription)
-    dealloc()
-  }
-}
-
-CStringTests.test("hashValue") {
-  if true {
-    let s = getNullCString()
-    expectEqual(0, s.hashValue)
-  }
-  if true {
-    let (s, dealloc) = getASCIICString()
-    expectEqual("ab".hashValue, s.hashValue)
-    dealloc()
-  }
-  if true {
-    let (s, dealloc) = getNonASCIICString()
-    expectEqual("аб".hashValue, s.hashValue)
-    dealloc()
-  }
-  if true {
-    let (s, dealloc) = getIllFormedUTF8String1()
-    expectEqual("\u{41}\u{fffd}\u{fffd}\u{fffd}\u{41}".hashValue,
-        s.hashValue)
-    dealloc()
-  }
-}
-
-CStringTests.test("OperatorEquals") {
-  if true {
-    let (s1, dealloc1) = getASCIICString()
-    let (s2, dealloc2) = getNonASCIICString()
-    expectTrue(s1 == s1)
-    expectFalse(s1 == s2)
-    dealloc1()
-    dealloc2()
-  }
-  if true {
-    let (s1, dealloc1) = getIllFormedUTF8String1()
-    let (s2, dealloc2) = getIllFormedUTF8String1()
-    expectTrue(s1 == s2)
-    dealloc1()
-    dealloc2()
-  }
-  if true {
-    let (s1, dealloc1) = getIllFormedUTF8String1()
-    let (s2, dealloc2) = getIllFormedUTF8String2()
-    // This would return true if were decoding UTF-8 and replacing ill-formed
-    // sequences with U+FFFD.
-    expectFalse(s1 == s2)
-    dealloc1()
-    dealloc2()
-  }
-}
-
-CStringTests.test("OperatorLess") {
-  if true {
-    let (s1, dealloc1) = getASCIICString()
-    let (s2, dealloc2) = getNonASCIICString()
-    expectFalse(s1 < s1)
-    expectTrue(s1 < s2)
-    dealloc1()
-    dealloc2()
-  }
-  if true {
-    let (s1, dealloc1) = getIllFormedUTF8String1()
-    let (s2, dealloc2) = getIllFormedUTF8String1()
-    expectFalse(s1 < s2)
-    dealloc1()
-    dealloc2()
-  }
-  if true {
-    let (s1, dealloc1) = getIllFormedUTF8String1()
-    let (s2, dealloc2) = getIllFormedUTF8String2()
-    // This would return false if were decoding UTF-8 and replacing ill-formed
-    // sequences with U+FFFD.
-    expectTrue(s1 < s2)
-    dealloc1()
-    dealloc2()
-  }
 }
 
 CStringTests.test("String.fromCString") {

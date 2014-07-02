@@ -83,7 +83,7 @@ namespace swift {
     bool EnableAccessControl = false;
     
     /// Enable string-to-pointer argument conversions.
-    bool EnableStringPointerConversion = false;
+    bool EnableStringPointerConversion = true;
 
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:

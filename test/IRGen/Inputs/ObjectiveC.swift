@@ -32,7 +32,7 @@ extension Bool {
 @public struct Selector : StringLiteralConvertible {
   @private var ptr : COpaquePointer
 
-  @public static func convertFromStringLiteral(str: CString) -> Selector {
+  @public static func convertFromStringLiteral(str: String) -> Selector {
     return sel_registerName(str)
   }
 }

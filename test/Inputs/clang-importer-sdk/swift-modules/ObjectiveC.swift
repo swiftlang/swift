@@ -63,12 +63,12 @@ extension Bool {
   @private var ptr : COpaquePointer
 
   @public static func convertFromExtendedGraphemeClusterLiteral(
-    value: CString) -> Selector {
+    value: String) -> Selector {
 
     return convertFromStringLiteral(value)
   }
 
-  @public static func convertFromStringLiteral(value: CString) -> Selector {
+  @public static func convertFromStringLiteral(value: String) -> Selector {
     return sel_registerName(value)
   }
 }

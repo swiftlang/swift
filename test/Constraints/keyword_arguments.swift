@@ -286,9 +286,6 @@ func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
 func string_literals1(#x: String) { }
 string_literals1(x: "hello")
 
-func string_literals2(#x: CString) { }
-string_literals2(x: "hello")
-
 func int_literals1(#x: Int) { }
 int_literals1(x: 1)
 

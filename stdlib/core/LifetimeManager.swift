@@ -97,10 +97,10 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   @public func withCString<Result>(
-    f: (CString)->Result
+    f: (ConstUnsafePointer<Int8>)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafePointerToElements {
-      f(CString($0))
+      f(ConstUnsafePointer($0))
     }
   }
 
@@ -110,6 +110,8 @@ extension String {
   @public func withCString<Result>(
     f: (UnsafePointer<CChar>)->Result
   ) -> Result {
+    // FIXME: This interface isn't const-correct; only the UnsafePointer variant
+    // above should be available.
     return self.nulTerminatedUTF8.withUnsafePointerToElements {
       f(UnsafePointer($0))
     }

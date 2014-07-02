@@ -3,6 +3,6 @@ import Foundation
 
 @asmname("UIApplicationMain") @public
 func UIApplicationMain(argc: CInt,
-                       argv: UnsafePointer<CString>,
+                       argv: UnsafePointer<UnsafePointer<CChar>>,
                        principalClassName: NSString?,
                        delegateClassName: NSString?) -> CInt

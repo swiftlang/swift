@@ -16,22 +16,17 @@ fputs("Hello world", stdout)
 println("\(UINT32_MAX)")
 
 // CHECK: the magic word is /* magic */
-let sourceFile = 
-  sourcePath.withCString { (cstr: CString) -> CInt in
-    return open(cstr, O_RDONLY)
-  }
+let sourceFile = open(sourcePath, O_RDONLY)
 assert(sourceFile >= 0)
 var bytes = UnsafePointer<CChar>.alloc(11)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)
-println("the magic word is \(String.fromCString(CString(bytes))!) //")
+println("the magic word is \(String.fromCString(bytes)!) //")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
 let errFile = 
-  sourcePath.withCString { (cstr: CString) -> CInt in
-    return open(cstr, O_RDONLY | O_CREAT | O_EXCL)
-  }
+  open(sourcePath, O_RDONLY | O_CREAT | O_EXCL)
 if errFile != -1 { 
   println("O_CREAT|O_EXCL failed to return an error") 
 } else { 
@@ -40,16 +35,12 @@ if errFile != -1 {
 
 // CHECK: created mode *33216*
 let tempFile = 
-  tempPath.withCString { (cstr: CString) -> CInt in
-    return open(cstr, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
-  }
+  open(tempPath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
 let written = write(tempFile, bytes, 11)
 assert(written == 11)
 close(tempFile)
 var statbuf = stat()
-let err = tempPath.withCString { (cstr: CString) in
-  stat(cstr, &statbuf)
-}
+let err = stat(tempPath, &statbuf)
 if err != 0 { 
   println("stat returned \(err), errno \(errno)") 
 } else { 

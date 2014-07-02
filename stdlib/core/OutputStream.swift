@@ -387,16 +387,3 @@ extension UnicodeScalar : Streamable {
     target.write(String(Character(self)))
   }
 }
-
-extension CString : Streamable {
-  /// Writes the `CString` to the output stream.  If the `CString` does not
-  /// contain well-formed UTF-8, replaces ill-formed code unit sequences
-  /// with U+FFFD.
-  @public func writeTo<Target : OutputStream>(inout target: Target) {
-    if _isNull {
-      return
-    }
-    target.write(String.fromCStringRepairingIllFormedUTF8(self).0!)
-  }
-}
-

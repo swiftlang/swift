@@ -1,20 +1,18 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -i -parse-stdlib -module-cache-path %t/clang-module-cache -sdk %sdk %s | FileCheck %s
 // REQUIRES: swift_interpreter
+// REQUIRES: sdk
 
 // FIXME: iOS fails: target-run-stdlib-swift gets 'unknown identifier VarArgs'
 
 import Swift
 
 @asmname("vprintf")
-func c_vprintf(format: CString, args: CVaListPointer)
+func c_vprintf(format: ConstUnsafePointer<Int8>, args: CVaListPointer)
 
 func printf(format: String, arguments: CVarArg...) {
-  format.withCString {
-    format in
-    withVaList(arguments) {
-      c_vprintf(format, $0)
-    }
+  withVaList(arguments) {
+    c_vprintf(format, $0)
   }
 }
 
@@ -37,11 +35,8 @@ func test_varArgs1() {
   }
   
   // CHECK: dig it: 0  0 -1  1 -2  2 -3  3 -4  4 -5  5 -6  6 -7  7 -8  8 -9  9 -10 10 -11 11
-  (format + "\n").withCString {
-    formatString in
-    withVaList(args) {
-      c_vprintf(formatString, $0)
-    }
+  withVaList(args) {
+    c_vprintf(format + "\n", $0)
   }
 }
 test_varArgs1()

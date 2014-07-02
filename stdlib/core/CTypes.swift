@@ -184,8 +184,7 @@ extension COpaquePointer {
 
 /// Access to the raw argv value from C. Accessing the argument vector
 /// through this pointer is unsafe.
-@public var C_ARGV : UnsafePointer<CString> = UnsafePointer<CString>()
-
+@public var C_ARGV : UnsafePointer<UnsafePointer<Int8>> = UnsafePointer()
 
 func _memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
              #size: UInt) {

@@ -55,9 +55,8 @@ func testTrueFalse() {
 }
 
 func testCStrings() -> Bool {
-  var str: CString = UTF8_STRING
+  var str: String = UTF8_STRING
   str = VERSION_STRING
-  return VERSION_STRING != nil && UTF8_STRING != nil
 }
 
 func testObjCString() -> Int {

@@ -123,3 +123,7 @@ autoreleasepool {
 }
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
+
+let s = "Hello World"
+puts(s)
+// CHECK-NEXT: Hello World

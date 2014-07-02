@@ -13,23 +13,6 @@ func test_CBool() {
 // CHECK: C_Bool: hash = 1
 test_CBool()
 
-func test_CString() {
-  let x: CString = "hello"
-  let y: CString = "hello"
-  let z: CString = "world"  
-  let x_s: String = "hello"
-  let hash = testHash(x)
-  println("CString hash equals String hash? \(hash == x_s.hashValue)")
-  println("CString equality test: \(x == y)")
-  println("CString comparison test: \(x < z)")
-  println("CString comparison test 2: \(z < x)")
-}
-// CHECK-NEXT: CString hash equals String hash? true
-// CHECK-NEXT: CString equality test: true
-// CHECK-NEXT: CString comparison test: true
-// CHECK-NEXT: CString comparison test 2: false
-test_CString()
-
 func test_ObjCBool() {
   let x: ObjCBool = true
   let hash = testHash(x as Bool)

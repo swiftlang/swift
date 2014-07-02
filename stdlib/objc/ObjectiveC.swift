@@ -98,7 +98,7 @@ extension ObjCBool : Printable {
 
   /// Construct a selector from a string literal.
   @public static func convertFromExtendedGraphemeClusterLiteral(
-    value: CString) -> Selector {
+    value: String) -> Selector {
 
     return convertFromStringLiteral(value)
   }
@@ -107,7 +107,7 @@ extension ObjCBool : Printable {
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
-  @public static func convertFromStringLiteral(value: CString) -> Selector {
+  @public static func convertFromStringLiteral(value: String) -> Selector {
     return sel_registerName(value)
   }
 

@@ -145,16 +145,6 @@ func test_StdlibTypesPrinted() {
   assertEquals("\"あ\"", us.description)
   debugPrintedIs(us, "\"\\u{3042}\"")
 
-  var cstr: CString = "abc"
-  printedIs(cstr, "abc")
-  debugPrintedIs(cstr, "\"abc\"")
-  cstr = "\\ \' \" \n \r \t \u{05}"
-  debugPrintedIs(cstr, "\"\\\\ \\\' \\\" \\n \\r \\t \\u{05}\"")
-
-  var nullCString = CString(UnsafePointer<CChar>.null())
-  printedIs(nullCString, "")
-  debugPrintedIs(nullCString, "<null C string>")
-
   if true {
     var implicitlyUnwrappedString: String! = nil
     printedIs(implicitlyUnwrappedString, "nil")

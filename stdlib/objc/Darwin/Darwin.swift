@@ -82,24 +82,29 @@ extension stat {
 //===----------------------------------------------------------------------===//
 
 @asmname("_swift_Darwin_open") 
-func _swift_Darwin_open(path: CString, oflag: CInt, mode: mode_t) -> CInt
-@asmname("_swift_Darwin_openat") 
-func _swift_Darwin_openat(fd: CInt, path: CString, 
+func _swift_Darwin_open(path: ConstUnsafePointer<CChar>,
+  oflag: CInt, mode: mode_t) -> CInt
+@asmname("_swift_Darwin_openat")
+func _swift_Darwin_openat(fd: CInt,
+  path: ConstUnsafePointer<CChar>,
   oflag: CInt, mode: mode_t) -> CInt
 
-@public func open(path: CString, oflag: CInt) -> CInt {
+@public func open(path: ConstUnsafePointer<CChar>, oflag: CInt) -> CInt {
   return _swift_Darwin_open(path, oflag, 0)
 }
 
-@public func open(path: CString, oflag: CInt, mode: mode_t) -> CInt {
+@public func open(path: ConstUnsafePointer<CChar>, oflag: CInt,
+  mode: mode_t) -> CInt {
   return _swift_Darwin_open(path, oflag, mode)
 }
 
-@public func openat(fd: CInt, path: CString, oflag: CInt) -> CInt {
+@public func openat(fd: CInt, path: ConstUnsafePointer<CChar>,
+  oflag: CInt) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, 0)
 }
 
-@public func openat(fd: CInt, path: CString, oflag: CInt, mode: mode_t) -> CInt {
+@public func openat(fd: CInt, path: ConstUnsafePointer<CChar>,
+  oflag: CInt, mode: mode_t) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, mode)
 }
 

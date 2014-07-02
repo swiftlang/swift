@@ -270,13 +270,10 @@ func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
 
 % end
 
-% # This is AllFloatTypes not OverlayFloatTypes because of the String parameter.
-% for T, CT, f in AllFloatTypes():
+% for T, CT, f in OverlayFloatTypes():
 @transparent @public
 func nan(tag: String) -> ${T} {
-  return tag.withCString { (cstr: CString)->${T} in
-    return ${T}(nan${f}(cstr))
-  }
+  return ${T}(nan${f}(tag))
 }
 
 % end

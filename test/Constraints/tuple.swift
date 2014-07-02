@@ -79,7 +79,7 @@ func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
   return result
 }
 
-func open(name: CString, oflag: Int) -> Int { }
+func open(name: String, oflag: Int) -> Int { }
 
 var foo:(bar:Int) = 0
 

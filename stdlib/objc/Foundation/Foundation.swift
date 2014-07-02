@@ -384,7 +384,7 @@ extension String {
 
     // start will hold the base pointer of contiguous storage, if it
     // is found.
-    var start = UnsafePointer<RawByte>(nulTerminatedASCII._bytesPtr)
+    var start = UnsafePointer<RawByte>(nulTerminatedASCII)
     let isUTF16 = nulTerminatedASCII._isNull
     if (isUTF16) {
       start = UnsafePointer(CFStringGetCharactersPtr(cfImmutableValue))

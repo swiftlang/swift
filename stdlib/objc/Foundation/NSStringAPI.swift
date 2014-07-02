@@ -251,7 +251,7 @@ extension String {
   /// Returns a string containing the bytes in a given C array,
   /// interpreted according to a given encoding.
   @public static func stringWithCString(
-    cString: CString,
+    cString: ConstUnsafePointer<CChar>,
     encoding enc: NSStringEncoding
   ) -> String? {
     return NSString.stringWithCString(cString, encoding: enc)
@@ -265,8 +265,10 @@ extension String {
   // + (instancetype)stringWithUTF8String:(const char *)bytes
 
   /// Returns a string created by copying the data from a given
-  /// C array of UTF-8-encoded bytes.
-  @public static func stringWithUTF8String(bytes: CString) -> String? {
+  /// C array of UTF8-encoded bytes.
+  @public static func stringWithUTF8String(
+    bytes: ConstUnsafePointer<CChar>
+  ) -> String? {
     return NSString.stringWithUTF8String(bytes)
   }
 
@@ -442,7 +444,7 @@ extension String {
   @public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
       (s: NSString) -> [CChar]? in
-      s.cStringUsingEncoding(encoding).persist()
+      _persistCString(s.cStringUsingEncoding(encoding))
     }
   }
 
@@ -586,7 +588,7 @@ extension String {
 
   /// Returns a file system-specific representation of the `String`.
   @public func fileSystemRepresentation() -> [CChar] {
-    return _ns.fileSystemRepresentation.persist()!
+    return _persistCString(_ns.fileSystemRepresentation)!
   }
 
   //===--- Omitted for consistency with API review results 5/20/2014 ------===//
