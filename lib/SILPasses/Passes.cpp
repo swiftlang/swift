@@ -79,6 +79,42 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   return Ctx.hadError();
 }
 
+void ConstructSSAPassManager(SILPassManager &PM, SILModule &Module,
+                             bool useEarlyInliner) {
+
+  registerAnalysisPasses(PM, &Module);
+  PM.add(createSimplifyCFG());
+  PM.add(createAllocBoxToStack());
+  PM.add(createLowerAggregate());
+  PM.add(createSILCombine());
+  PM.add(createSROA());
+  PM.add(createMem2Reg());
+
+  // Perform classsic SSA optimizations.
+  PM.add(createPerformanceConstantPropagation());
+  PM.add(createDCE());
+  PM.add(createCSE());
+  PM.add(createSILCombine());
+  PM.add(createSimplifyCFG());
+
+  // Perform retain/release code motion and run the first ARC optimizer.
+  PM.add(createLoadStoreOpts());
+  PM.add(createCodeMotion());
+  PM.add(createEnumSimplification());
+  PM.add(createGlobalARCOpts());
+
+  // Devirtualize.
+  PM.add(createDevirtualization());
+  PM.add(createGenericSpecializer());
+  PM.add(createSILLinker());
+
+  // Use either the early inliner that does not inline functions with defined
+  // semantics or the late performance inliner that inlines everything.
+  PM.add( useEarlyInliner ? createEarlyInliner() :createPerfInliner());
+  PM.add(createGlobalARCOpts());
+}
+
+
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
   if (Options.DebugSerialization) {
@@ -96,37 +132,9 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   GenericsPM.add(createGenericSpecializer());
   GenericsPM.run();
 
-  // Construct SSA and optimize it.
+  // Construct SSA pass manager.
   SILPassManager SSAPM(&Module, Options);
-  registerAnalysisPasses(SSAPM, &Module);
-  SSAPM.add(createSimplifyCFG());
-  SSAPM.add(createAllocBoxToStack());
-  SSAPM.add(createLowerAggregate());
-  SSAPM.add(createSILCombine());
-  SSAPM.add(createSROA());
-  SSAPM.add(createMem2Reg());
-
-  // Perform classsic SSA optimizations.
-  SSAPM.add(createPerformanceConstantPropagation());
-  SSAPM.add(createDCE());
-  SSAPM.add(createCSE());
-  SSAPM.add(createSILCombine());
-  SSAPM.add(createSimplifyCFG());
-
-  // Perform retain/release code motion and run the first ARC optimizer.
-  SSAPM.add(createLoadStoreOpts());
-  SSAPM.add(createCodeMotion());
-  SSAPM.add(createEnumSimplification());
-  SSAPM.add(createGlobalARCOpts());
-
-  // Devirtualize.
-  SSAPM.add(createDevirtualization());
-  SSAPM.add(createGenericSpecializer());
-  SSAPM.add(createSILLinker());
-
-  // Inline.
-  SSAPM.add(createPerfInliner());
-  SSAPM.add(createGlobalARCOpts());
+  ConstructSSAPassManager(SSAPM, Module, false);
 
   // Run three iteration of the SSA pass mananger.
   SSAPM.runOneIteration();
