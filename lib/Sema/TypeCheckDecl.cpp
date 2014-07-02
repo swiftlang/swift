@@ -2221,7 +2221,7 @@ static void checkTypeAccessibility(
     std::function<void(Accessibility, const TypeRepr *)> diagnose) {
   // Don't spend time checking private access; this is always valid.
   // This includes local declarations.
-  if (access == Accessibility::Private)
+  if (access == Accessibility::Private || TL.isNull())
     return;
 
   Accessibility typeAccess =
@@ -2253,6 +2253,93 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
     const ValueDecl *VD = TypeAccessibilityDiagnoser::getValueDecl(CITR);
     TC.diagnose(VD, diag::type_declared_here);
+  }
+}
+
+/// Checks the given declaration's accessibility to make sure it is valid given
+/// the way it is defined.
+///
+/// \p D must be a ValueDecl or a Decl that can appear in a type context.
+static void checkAccessibility(TypeChecker &TC, const Decl *D) {
+  if (D->isInvalid())
+    return;
+
+  switch (D->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
+    llvm_unreachable("cannot appear in a type context");
+
+  case DeclKind::Param:
+    llvm_unreachable("does not have accessibility");
+
+  case DeclKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeDecl>(D);
+
+    // This must stay in sync with diag::assocated_type_access.
+    enum {
+      AEK_DefaultDefinition = 0,
+      AEK_Requirement
+    } accessibilityErrorKind;
+    Optional<Accessibility> minAccess;
+    const TypeRepr *complainRepr = nullptr;
+
+    std::for_each(assocType->getInherited().begin(),
+                  assocType->getInherited().end(),
+                  [&](TypeLoc requirement) {
+      checkTypeAccessibility(TC, requirement,
+                             assocType->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+          accessibilityErrorKind = AEK_Requirement;
+        }
+      });
+    });
+    checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(),
+                           assocType->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *thisComplainRepr) {
+      if (!minAccess || *minAccess > typeAccess) {
+        minAccess = typeAccess;
+        complainRepr = thisComplainRepr;
+        accessibilityErrorKind = AEK_DefaultDefinition;
+      }
+    });
+
+    if (minAccess) {
+      auto diag = TC.diagnose(assocType, diag::assocated_type_access,
+                              assocType->getAccessibility(),
+                              *minAccess, accessibilityErrorKind);
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+    return;
+  }
+
+  case DeclKind::PatternBinding:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::Var:
+  case DeclKind::Func:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::EnumElement:
+    // unimplemented
+    return;
+
+  case DeclKind::EnumCase:
+  case DeclKind::Destructor:
+    return;
   }
 }
 
@@ -3427,6 +3514,8 @@ public:
     computeAccessibility(TC, PD);
 
     if (IsSecondPass) {
+      for (auto member : PD->getMembers())
+        checkAccessibility(TC, member);
       return;
     }
 

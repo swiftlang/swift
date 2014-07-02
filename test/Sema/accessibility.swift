@@ -4,10 +4,12 @@
   func publicReq()
 }
 
+// expected-note@+1 {{type declared here}}
 @internal protocol InternalProto {
   func internalReq()
 }
 
+// expected-note@+1 5 {{type declared here}}
 @private protocol PrivateProto {
   func privateReq()
 }
@@ -25,7 +27,7 @@
   @private func privateReq() {}
 }
 
-// expected-note@+1 23 {{type declared here}}
+// expected-note@+1 25 {{type declared here}}
 @private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {}
   @private func internalReq() {}
@@ -110,4 +112,24 @@ struct Subscripts {
   @public subscript (a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
   @public subscript (a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared public because its index uses a private type}}
   @public subscript (a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
+}
+
+// expected-note@+1 {{type declared here}}
+class InternalClass {}
+
+@public protocol AssocTypes {
+  typealias Foo
+
+  typealias Internal: InternalClass // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
+  typealias InternalConformer: InternalProto // expected-error {{associated type in a public protocol uses an internal type in its requirement}}
+  typealias PrivateConformer: PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  typealias PI: PrivateProto, InternalProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  typealias IP: InternalProto, PrivateProto // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+
+  typealias PrivateDefault = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
+  typealias PublicDefault = PublicStruct
+  typealias PrivateDefaultConformer: PublicProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its default definition}}
+  typealias PublicDefaultConformer: PrivateProto = PublicStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  typealias PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
+  typealias PublicPublicDefaultConformer: PublicProto = PublicStruct
 }

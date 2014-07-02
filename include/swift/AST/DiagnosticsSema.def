@@ -531,6 +531,12 @@ NOTE(no_witnesses_type,sema_tcd,none,
 NOTE(default_assocated_type_req_fail,sema_tcd,none,
      "default associated type definition %0 does not conform to %1", 
      (Type, Type))
+ERROR(assocated_type_access,sema_tcd,none,
+      "associated type in %select{PRIVATE|an internal|a public}0 protocol "
+      "uses %select{a private|an internal|PUBLIC}1 type in its "
+      "%select{default definition|requirement}2 ",
+      (Accessibility, Accessibility, unsigned))
+
 NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,sema_tcd,none,
