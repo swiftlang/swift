@@ -207,14 +207,12 @@ class UnicodeTrieGenerator(object):
     # Note: if you change any of these parameters, don't forget to update the
     # ASCII art above.
     BMP_first_level_index_bits = 8
-    BMP_data_offset_bits = 16 - BMP_first_level_index_bits
 
     supp_first_level_index_bits = 5
     supp_second_level_index_bits = 8
-    supp_data_offset_bits = 21 - supp_first_level_index_bits - supp_second_level_index_bits
 
     def get_BMP_first_level_index(self, cp):
-        return cp >> self.BMP_first_level_index_bits
+        return cp >> self.BMP_data_offset_bits
 
     def get_BMP_data_offset(self, cp):
         return cp & ((1 << self.BMP_data_offset_bits) - 1)
@@ -229,6 +227,30 @@ class UnicodeTrieGenerator(object):
         return cp & ((1 << self.supp_data_offset_bits) - 1)
 
     def __init__(self):
+        """Create a trie generator with default parameters."""
+        pass
+
+    def create_tables(self):
+        """Compute derived parameter values and create internal data
+        structures.
+
+        Don't change parameter values after calling this method.
+        """
+
+        self.BMP_data_offset_bits = 16 - self.BMP_first_level_index_bits
+
+        self.supp_data_offset_bits = \
+            21 - self.supp_first_level_index_bits - \
+            self.supp_second_level_index_bits
+
+        # The maximum value of the first level index for supp tables.  It is
+        # not equal to ((1 << supp_first_level_index_bits) - 1), because
+        # maximum Unicode code point value is not 2^21-1 (0x1fffff), it is
+        # 0x10ffff.
+        self.supp_first_level_index_max = \
+            0x10ffff >> (self.supp_second_level_index_bits + \
+                self.supp_data_offset_bits)
+
         # A mapping from BMP first-level index to BMP data block index.
         self.BMP_lookup = [ i for i in range(0, 1 << self.BMP_first_level_index_bits) ]
 
@@ -239,19 +261,19 @@ class UnicodeTrieGenerator(object):
 
         # A mapping from supp first-level index to an index of the second-level
         # lookup table.
-        self.supp_lookup1 = [ i for i in range(0, 1 << self.supp_first_level_index_bits) ]
+        self.supp_lookup1 = [ i for i in range(0, self.supp_first_level_index_max + 1) ]
 
         # An array of second-level lookup tables.  Each second-level lookup
         # table is a mapping from a supp second-level index to supp data block
         # index.
         self.supp_lookup2 = [
             [ j for j in range(i << self.supp_second_level_index_bits, (i + 1) << self.supp_second_level_index_bits) ]
-                for i in range(0, (1 << self.supp_first_level_index_bits)) ]
+                for i in range(0, self.supp_first_level_index_max + 1) ]
 
         # An arry of supp data blocks.
         self.supp_data = [
             [ -1 for i in range(0, 1 << self.supp_data_offset_bits) ]
-                for i in range(0, 1 << (self.supp_first_level_index_bits + self.supp_second_level_index_bits)) ]
+                for i in range(0, (self.supp_first_level_index_max + 1) * (1 << self.supp_second_level_index_bits)) ]
 
     def splat(self, value):
         for i in range(0, len(self.BMP_data)):
@@ -292,6 +314,23 @@ class UnicodeTrieGenerator(object):
             assert(expectedValue == actualValue)
 
     def freeze(self):
+        """Compress internal trie representation.
+
+        Don't mutate the trie after calling this method.
+
+        """
+
+        def remap_indexes(indexes, old_idx, new_idx):
+            def map_index(idx):
+                if idx == old_idx:
+                    return new_idx
+                elif idx > old_idx:
+                    return idx - 1
+                else:
+                    return idx
+
+            return map(map_index, indexes)
+
         # If self.BMP_data contains identical data blocks, keep the first one,
         # remove duplicates and change the indexes in self.BMP_lookup to point to
         # the first one.
@@ -301,11 +340,8 @@ class UnicodeTrieGenerator(object):
             while j < len(self.BMP_data):
                 if self.BMP_data[i] == self.BMP_data[j]:
                     self.BMP_data.pop(j)
-                    for k in range(0, len(self.BMP_lookup)):
-                        if self.BMP_lookup[k] == j:
-                            self.BMP_lookup[k] = i
-                        elif self.BMP_lookup[k] > j:
-                            self.BMP_lookup[k] -= 1
+                    self.BMP_lookup = \
+                        remap_indexes(self.BMP_lookup, old_idx=j, new_idx=i)
                 else:
                     j += 1
             i += 1
@@ -320,11 +356,9 @@ class UnicodeTrieGenerator(object):
                 if self.supp_data[i] == self.supp_data[j]:
                     self.supp_data.pop(j)
                     for k in range(0, len(self.supp_lookup2)):
-                        for l in range(0, len(self.supp_lookup2[k])):
-                            if self.supp_lookup2[k][l] == j:
-                                self.supp_lookup2[k][l] = i
-                            elif self.supp_lookup2[k][l] > j:
-                                self.supp_lookup2[k][l] -= 1
+                        self.supp_lookup2[k] = \
+                            remap_indexes(self.supp_lookup2[k], old_idx=j,
+                                new_idx=i)
                 else:
                     j += 1
             i += 1
@@ -337,11 +371,8 @@ class UnicodeTrieGenerator(object):
             while j < len(self.supp_lookup2):
                 if self.supp_lookup2[i] == self.supp_lookup2[j]:
                     self.supp_lookup2.pop(j)
-                    for k in range(0, len(self.supp_lookup1)):
-                        if self.supp_lookup1[k] == j:
-                            self.supp_lookup1[k] = i
-                        elif self.supp_lookup1[k] > j:
-                            self.supp_lookup1[k] -= 1
+                    self.supp_lookup1 = \
+                        remap_indexes(self.supp_lookup1, old_idx=j, new_idx=i)
                 else:
                     j += 1
             i += 1
@@ -351,7 +382,7 @@ class UnicodeTrieGenerator(object):
             assert(data & ~0xff == 0)
             return [ data ]
         if width == 2:
-            assert(data & 0xffff == 0)
+            assert(data & ~0xffff == 0)
             return [ data & 0xff, data & 0xff00 ]
         assert(False)
 
