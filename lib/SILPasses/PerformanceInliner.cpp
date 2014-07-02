@@ -76,7 +76,7 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 
   // If F is an external declaration, we can't inline...
   if (F->empty() || F->isExternalDeclaration()) {
-    DEBUG(llvm::dbgs() << "        FAIL! Can't inline " << F->getName()
+    DEBUG(llvm::dbgs() << "        FAIL! Cannot inline " << F->getName()
           << ".\n");
     return nullptr;
   }
@@ -150,7 +150,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     SILFunction *Callee = getInlinableFunction(AI, LinkMode,
                                                InlineFunctionsWithSemantics);
     if (!Callee) {
-      DEBUG(llvm::dbgs() << "        FAIL! Couldn't find inlineable callee.\n");
+      DEBUG(llvm::dbgs() << "        FAIL! Cannot find inlineable callee.\n");
       continue;
     }
     if (Callee->isNoinline())
