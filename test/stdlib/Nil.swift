@@ -8,6 +8,12 @@ if opaqueNil == nil {
   // CHECK: ok opaqueNil == nil
 }
 
+if opaqueNil != nil {
+} else {
+  println("ok opaqueNil != nil is false")
+  // CHECK: ok opaqueNil != nil is false
+}
+
 let unsafeNil: UnsafePointer<Int> = nil
 if unsafeNil == (nil as UnsafePointer<Int>) {
   println("ok unsafeNil == (nil as UnsafePointer<Int>)")
