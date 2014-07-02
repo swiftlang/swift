@@ -10,8 +10,9 @@ Abstract
 
 This document describes the high-level abstraction of built-in Swift
 data structures in SIL that is used by the optimizer. You need to read
-this document to understand the early stages of the Swift optimizer or
-if you are working on some of the containers in the standard library.
+this document if you wish to understand the early stages of the Swift
+optimizer or if you are working on one of the containers in the 
+standard library.
 
 
 Why do we need high-level optimizations?
@@ -21,7 +22,7 @@ Swift containers are implemented in the Swift standard library in Swift code.
 Traditional compiler optimizations can remove some of the redundancy that is
 found in high-level code, but not all of it. Without knowledge of the Swift
 language the optimizer can't perform high-level optimizations on the built-in
-data types. For example::
+containers. For example::
 
   Dict["a"] = 1
   Dict["a"] = 2
@@ -29,12 +30,23 @@ data types. For example::
 Any Swift developer could identify the redundancy in the code sample above.
 Storing two values into the same key in the dictionary is inefficient.
 However, optimizing compilers are unaware of the special semantics that the
-Swift dictionary has and can't perform this optimization. A traditional
-compiler would start optimizing this code by inlining the subscript call
-and try to analyze the sequence of load/store instructions. This approach is
-not very effective because the compiler has to be very conservative when
-optimizing general code with pointers.
+Swift dictionary has and can't perform this optimization. Traditional
+compilers would start optimizing this code by inlining the subscript 
+function call and try to analyze the sequence of load/store instructions.
+This approach is not very effective because the compiler has to be very
+conservative when optimizing general code with pointers. 
 
+On the other hand, compilers for high-level languages usually have special
+bytecode instructions that allow them to perform high-level optimizations.
+However, unlike high-level languages such as JavaScript or Python, Swift
+ containers are implemented in Swift itself. Moreover, it is beneficial to
+be able to inline code from the container into the user program and optimize
+them together, especially for code that uses Generics. 
+
+In order to perform both high-level optimizations, that are common in
+high-level languages, and low-level optimizations we annotate parts of the
+standard library and describe the semantics of a domain-specific high-level
+Swift bytecode. 
 
 Annotation of code in the standard library
 ------------------------------------------
