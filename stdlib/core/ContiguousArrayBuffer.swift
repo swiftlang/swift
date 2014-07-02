@@ -410,7 +410,7 @@ extension ContiguousArrayBuffer : Collection {
   return result
 }
 
-@public protocol _ArrayType : Collection {
+@internal protocol _ArrayType : Collection {
   var count: Int {get}
 
   typealias _Buffer : ArrayBufferType

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public protocol ArrayType
+@internal protocol ArrayType
   : _ArrayType,
     ExtensibleCollection,
     MutableSliceable,

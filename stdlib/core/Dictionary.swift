@@ -2004,12 +2004,13 @@ protocol _SwiftNSFastEnumeration {
   ) -> Int
 }
 
-@objc
+@objc @public
 protocol _SwiftNSEnumerator {
   init()
   func nextObject() -> AnyObject?
 }
 
+@public
 typealias _SwiftNSZone = COpaquePointer
 
 @objc @public
@@ -2017,7 +2018,7 @@ protocol _SwiftNSCopying {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
-@objc
+@objc @public
 protocol _SwiftNSArrayRequiredOverrides :
     _SwiftNSCopying, _SwiftNSFastEnumeration {
 
@@ -2036,7 +2037,7 @@ protocol _SwiftNSArrayRequiredOverrides :
 }
 
 // FIXME: replace _CocoaArray with this.
-@objc @unsafe_no_objc_tagged_pointer
+@objc @unsafe_no_objc_tagged_pointer @public
 protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
   func indexOfObject(anObject: AnyObject) -> Int
 }
