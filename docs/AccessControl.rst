@@ -1,6 +1,6 @@
-:orphan:
-
-.. title:: Swift Access Control
+==============
+Access Control
+==============
 
 The most important feature developers have been asking for is access control. This document describes how access control will behave in Swift 1.0.
 

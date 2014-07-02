@@ -11,15 +11,16 @@ Contents
 
    DesignDecisions
    LangRefNew
-   ObjectInitialization
+   AccessControl
+   DriverInternals
    Generics
-   Pattern Matching
-   Resilience
    LogicalObjects
    Namespace Level Vars and Top Level Code
+   ObjectInitialization
+   Pattern Matching
+   Resilience
    StoredAndComputedVariables
    SIL
    TypeChecker
-   DriverInternals
 
 
