@@ -7,5 +7,3 @@ add_swift_library(swiftStdlibUnittest INSTALL
   ${SWIFTUNITTEST_SOURCES}
   DEPENDS swift_stdlib_core swiftDarwin)
 
-add_swift_optimization_flags(swiftStdlibUnittest)
-

@@ -646,6 +646,7 @@ endfunction()
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [FRAMEWORK_DEPENDS dep1 ...]   # System frameworks this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
@@ -654,7 +655,7 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
 
@@ -719,6 +720,7 @@ macro(add_swift_library_single target name)
   
   set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+  set(compile_flags "${SWIFTLIB_SINGLE_COMPILE_FLAGS}")
   set(link_flags "${SWIFTLIB_SINGLE_LINK_FLAGS}")
 
   if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
@@ -732,11 +734,14 @@ macro(add_swift_library_single target name)
 
     if (SWIFT_SDKS)
       # FIXME: Deal with library variants here
-      set_target_properties(${target_static} PROPERTIES
-        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
+      set(compile_flags
+        "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
     endif()
 
-    set_target_properties(${target_static} PROPERTIES LINK_FLAGS "${link_flags}")
+    set_target_properties(${target_static} PROPERTIES 
+      COMPILE_FLAGS "${compile_flags}")
+    set_target_properties(${target_static} PROPERTIES 
+      LINK_FLAGS "${link_flags}")
   endif()
   
   if (MODULE)
@@ -768,16 +773,6 @@ macro(add_swift_library_single target name)
   if (NOT NO_LLVM_COMMON_LIBS)
     target_link_libraries( ${target} ${LLVM_COMMON_LIBS} )
   endif()
-
-  if(MSVC)
-    get_target_property(cflag ${target} COMPILE_FLAGS)
-    if(NOT cflag)
-      set(cflag "")
-    endif(NOT cflag)
-    set(cflag "${cflag} /Za")
-    set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${cflag})
-  endif(MSVC)
-
 
   if(SWIFTLIB_SINGLE_INSTALL)
     # Install runtime libraries to lib/swift instead of lib. This works around
@@ -842,23 +837,23 @@ macro(add_swift_library_single target name)
     set(SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS
         "-m${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
     set(link_flags "${link_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
+    # SDK, deployment target, architecture.
+    set(compile_flags
+      "${compile_flags} ${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}")
     set_target_properties(${target}
       PROPERTIES
       # Library name (without the variant information)
-      OUTPUT_NAME ${name}
-      # SDK, deployment target, architecture.
-      COMPILE_FLAGS
-      "${SWIFTLIB_SINGLE_DEPLOYMENT_FLAGS} -arch ${SWIFTLIB_SINGLE_ARCHITECTURE} -isysroot ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_PATH}"
-    )
+      OUTPUT_NAME ${name})
   else()
     if (SWIFT_SDKS)
       # Deployment flags.
+      set(compile_flags "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
       set(link_flags "${link_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ${SWIFTLIB_SINGLE_LINK_FLAGS}")
-      
-      set_target_properties(${target} PROPERTIES
-        COMPILE_FLAGS ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS})
     endif()
   endif()
+
+  # Set compile flags.
+  set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${compile_flags}")
 
   # Set link flags.
   set_target_properties(${target} PROPERTIES LINK_FLAGS "${link_flags}")
@@ -928,6 +923,7 @@ endmacro(translate_flag)
 #     [TARGET_SDKS sdk1...]          # The set of SDKs in which this library
 #                                    # is included. If empty, the library is
 #                                    # included in all SDKs.
+#     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
@@ -936,7 +932,7 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;LINK_FLAGS" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
@@ -947,6 +943,15 @@ macro(add_swift_library name)
                  SWIFTLIB_IS_STDLIB_CORE_FLAG)
   translate_flag(${SWIFTLIB_NO_LLVM_COMMON_LIBS} "NO_LLVM_COMMON_LIBS" 
                  SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG)
+
+  set(SWIFTLIB_DEFAULT_COMPILE_FLAGS)
+  if (SWIFT_OPTIMIZED AND SWIFTLIB_TARGET_LIBRARY)
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
+      set(SWIFTLIB_DEFAULT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+      set(SWIFTLIB_DEFAULT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+    endif()
+  endif()
 
   # If we're supposed to build this library for the target...
   if(SWIFTLIB_TARGET_LIBRARY AND SWIFT_SDKS)
@@ -972,6 +977,8 @@ macro(add_swift_library name)
         DEPENDS ${SWIFTLIB_DEPENDS}
         FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
         COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+        COMPILE_FLAGS
+          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
         LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_INSTALL_FLAG}
@@ -1009,6 +1016,16 @@ macro(add_swift_library name)
             list(APPEND depends "${DEP}${VARIANT_SUFFIX}")
           endforeach()
 
+          # Add -momit-leaf-frame-pointer on x86.
+          set(SWIFTLIB_CURRENT_COMPILE_FLAGS)
+          if (SWIFT_OPTIMIZED)
+            if (ARCH STREQUAL "i386")
+              set(SWIFTLIB_CURRENT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+            elseif (ARCH STREQUAL "x86_64")
+              set(SWIFTLIB_CURRENT_COMPILE_FLAGS "-momit-leaf-frame-pointer")
+            endif()
+          endif()
+        
           # Add this library variant.
           add_swift_library_single(
             ${VARIANT_NAME}
@@ -1020,6 +1037,8 @@ macro(add_swift_library name)
             FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
             COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
             FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+            COMPILE_FLAGS
+              "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_COMPILE_FLAGS}"
             LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1074,6 +1093,8 @@ macro(add_swift_library name)
       FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
       COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+      COMPILE_FLAGS
+        "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
       LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1153,29 +1174,6 @@ macro(add_swift_executable name)
   endif()
 
 endmacro(add_swift_executable)
-
-# Add compiler flags for a target.
-#
-# Usage:
-#   add_swift_compiler_flags(name # Name of the target
-#     flags                     ) # compiler flags string
-function(add_swift_compiler_flags name flags)
-  set_property(TARGET ${name} APPEND_STRING PROPERTY COMPILE_FLAGS " ${flags}")
-endfunction()
-
-# Add compiler flags for a target when SWIFT_OPTIMIZED is enabled.
-#
-# Usage:
-#   add_swift_optimization_flags(name) # Name of the target
-macro(add_swift_optimization_flags name)
-  if(SWIFT_OPTIMIZED)
-    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-     add_swift_compiler_flags(${name} "-momit-leaf-frame-pointer")
-    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-     add_swift_compiler_flags(${name} "-momit-leaf-frame-pointer")
-   endif()
-  endif()
-endmacro(add_swift_optimization_flags)
 
 macro(manpage PODFILE DESC MANFILE SECTION)
   find_program(POD2MAN pod2man)

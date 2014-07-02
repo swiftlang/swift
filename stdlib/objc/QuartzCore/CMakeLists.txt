@@ -4,5 +4,3 @@ add_swift_library(swiftQuartzCore INSTALL TARGET_LIBRARY
   TARGET_SDKS OSX
   DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC
   FRAMEWORK_DEPENDS QuartzCore)
-
-add_swift_optimization_flags(swiftQuartzCore)

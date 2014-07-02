@@ -9,5 +9,3 @@ endif()
 add_swift_library(swiftSpriteKit INSTALL
   SpriteKit.swift
   DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation ${SWIFTSPRITEKIT_UI}  FRAMEWORK_DEPENDS SpriteKit)
-
-add_swift_optimization_flags(swiftSpriteKit)

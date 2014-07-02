@@ -5,5 +5,3 @@ add_swift_library(swiftCoreGraphics
   INSTALL TARGET_LIBRARY
   DEPENDS swift_stdlib_core swiftObjectiveC swiftDispatch
   FRAMEWORK_DEPENDS CoreGraphics)
-
-add_swift_optimization_flags(swiftCoreGraphics)

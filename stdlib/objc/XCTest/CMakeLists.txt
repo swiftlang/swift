@@ -32,8 +32,6 @@ add_swift_library(swiftXCTest INSTALL
   ${SWIFTXCTEST_SOURCES}
   DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation)
 
-add_swift_optimization_flags(swiftXCTest)
-
 target_link_libraries(swiftXCTest
   "-F${XCTEST_FRAMEWORK_LOCATION}"
   "-framework Foundation" "-framework XCTest")

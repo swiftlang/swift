@@ -4,5 +4,3 @@ add_swift_library(swiftCoreImage INSTALL TARGET_LIBRARY
   TARGET_SDKS IOS IOS_SIMULATOR
   DEPENDS swift_stdlib_core swiftFoundation swiftObjectiveC
   FRAMEWORK_DEPENDS CoreImage)
-
-add_swift_optimization_flags(swiftCoreImage)

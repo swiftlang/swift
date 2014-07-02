@@ -9,6 +9,21 @@ else ()
   SET_SOURCE_FILES_PROPERTIES(FastEntryPoints.s PROPERTIES LANGUAGE C)
 endif()
 
+if (SWIFT_OPTIMIZED)
+  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT OFF)
+else()
+  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT ON)
+endif()
+
+set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  ${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT}
+  CACHE BOOL "Overwrite memory for deallocated Swift objects")
+
+set(SWIFT_RUNTIME_COMPILE_FLAGS)
+if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
+  list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
+endif()
+
 add_swift_library(swift_runtime 
   Casting.cpp
   FastEntryPoints.s
@@ -24,24 +39,10 @@ add_swift_library(swift_runtime
   Heap.cpp
   Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
+  COMPILE_FLAGS ${SWIFT_RUNTIME_COMPILE_FLAGS}
   TARGET_LIBRARY INSTALL
   FRAMEWORK_DEPENDS Foundation)
 
-add_swift_optimization_flags(swift_runtime)
-
-if (SWIFT_OPTIMIZED)
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT OFF)
-else()
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT ON)
-endif()
-
-set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
-  ${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT}
-  CACHE BOOL "Overwrite memory for deallocated Swift objects")
-
-if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
-  add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
-endif()
 
 list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
 find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)

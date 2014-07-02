@@ -5,5 +5,3 @@ add_swift_library(swiftDispatch
   Dispatch.mm
   INSTALL TARGET_LIBRARY
   DEPENDS swift_stdlib_core swiftObjectiveC)
-
-add_swift_optimization_flags(swiftDispatch)
