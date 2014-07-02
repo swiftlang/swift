@@ -986,7 +986,10 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 
     if (EmitDiagnostics && Diags)
       Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars));
+                      StringRef(CurPtr+1, ValidChars))
+        .fixItReplace(SourceRange(getSourceLoc(CurPtr),
+                                  getSourceLoc(CurPtr+ValidChars+1)),
+                      "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
 
     StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
     CurPtr += 1 + ValidChars;
@@ -1014,7 +1017,10 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 
     if (EmitDiagnostics && Diags)
       Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars));
+                      StringRef(CurPtr+1, ValidChars))
+      .fixItReplace(SourceRange(getSourceLoc(CurPtr),
+                                getSourceLoc(CurPtr+ValidChars+1)),
+                    "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
 
     CurPtr += 1 + ValidChars;
     break;
@@ -1035,7 +1041,11 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 
     if (EmitDiagnostics && Diags)
       Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars));
+                      StringRef(CurPtr+1, ValidChars))
+        .fixItReplace(SourceRange(getSourceLoc(CurPtr),
+                                  getSourceLoc(CurPtr+ValidChars+1)),
+                      "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
+
 
     CurPtr += 1 + ValidChars;
     break;
