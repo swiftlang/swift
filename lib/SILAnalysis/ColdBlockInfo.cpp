@@ -15,32 +15,91 @@
 
 using namespace swift;
 
-/// @return true if the CFG edge FromBB->ToBB is directly gated by a _slowPath
+/// Peek through an extract of Bool.value.
+static SILValue getCondition(SILValue C) {
+  if (auto *SEI = dyn_cast<StructExtractInst>(C)) {
+    if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
+      return Struct->getFieldValue(SEI->getField());
+    return SEI->getOperand();
+  }
+  return C;
+}
+
+namespace {
+/// Tri-value return code for checking branch hints.
+enum BranchHint : unsigned {
+  None,
+  LikelyTrue,
+  LikelyFalse
+};
+} // namespace
+
+/// \return a BranHint if this call is a builtin branch hint.
+static BranchHint getBranchHint(const ApplyInst *AI) {
+  // Handle the fully inlined Builtin.
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+    if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
+      // peek through an extract of Bool.value.
+      SILValue ExpectedValue = getCondition(AI->getArgument(0));
+      if (auto *Literal = dyn_cast<IntegerLiteralInst>(ExpectedValue)) {
+        return (Literal->getValue() == 0)
+          ? BranchHint::LikelyFalse : BranchHint::LikelyTrue;
+      }
+    }
+  }
+  // Handle the @semantic function used for branch hints. The generic
+  // fast/slowPath calls are frequently only inlined one level down to
+  // _branchHint before inlining the call sites that they guard.
+  else if (auto *FunctionRef = dyn_cast<FunctionRefInst>(AI->getCallee())) {
+    SILFunction *F = FunctionRef->getReferencedFunction();
+    if (F->hasDefinedSemantics()) {
+      if (F->getSemanticsString() == "branchhint") {
+        // A "branchint" model takes a Bool expected value as the second
+        // argument.
+        if (auto *SI = dyn_cast<StructInst>(AI->getArgument(1))) {
+          assert(SI->getElements().size() == 1 && "Need Bool.value");
+          if (auto *Literal =
+              dyn_cast<IntegerLiteralInst>(SI->getElements()[0])) {
+            return (Literal->getValue() == 0)
+              ? BranchHint::LikelyFalse : BranchHint::LikelyTrue;
+          }
+        }
+      }
+      // fastpath/slowpath attrs are untested because the inliner luckily
+      // inlines them before the downstream calls.
+      else if (F->getSemanticsString() == "slowpath")
+        return BranchHint::LikelyFalse;
+      else if (F->getSemanticsString() == "fastpath")
+        return BranchHint::LikelyTrue;
+    }
+  }
+  return BranchHint::None;
+}
+
+/// \return true if the CFG edge FromBB->ToBB is directly gated by a _slowPath
 /// branch hint.
 static bool isSlowPath(const SILBasicBlock *FromBB, const SILBasicBlock *ToBB) {
   auto *CBI = dyn_cast<CondBranchInst>(FromBB->getTerminator());
   if (!CBI)
     return false;
 
-  auto *AI = dyn_cast<ApplyInst>(CBI->getCondition());
+  SILValue C = getCondition(CBI->getCondition());
+
+  auto *AI = dyn_cast<ApplyInst>(C);
   if (!AI)
     return false;
 
-  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  if (!BFRI || BFRI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
+  BranchHint hint = getBranchHint(AI);
+  if (hint == BranchHint::None)
     return false;
 
-  auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0));
-  if (!Literal)
-    return false;
+  const SILBasicBlock *ColdTarget =
+    (hint == BranchHint::LikelyTrue) ? CBI->getFalseBB() : CBI->getTrueBB();
 
-  // This is the slow path if the condition's value is expected to be true and
-  // our target is false or vice-versa.
-  return
-    ToBB == (Literal->getValue() == 0 ? CBI->getFalseBB() : CBI->getTrueBB());
+  return ToBB == ColdTarget;
 }
 
-/// @return true if the given block is dominated by a _slowPath branch hint.
+/// \return true if the given block is dominated by a _slowPath branch hint.
 ///
 /// Cache all blocks visited to avoid introducing quadratic behavior.
 bool ColdBlockInfo::isCold(const SILBasicBlock *BB) {

@@ -122,17 +122,21 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 // Branch hints
 //===----------------------------------------------------------------------===//
 
-@transparent @internal
+// Use @semantics to indicate that the optimizer recognizes the
+// semantics of these function calls. This won't be necessary with
+// mandatory generic inlining.
+
+@transparent @internal @semantics("branchhint")
 func _branchHint<C: LogicValue>(actual: C, expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.getLogicValue().value, expected.value))
 }
 
-@transparent @public
+@transparent @public @semantics("fastpath")
 func _fastPath<C: LogicValue>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), true)
 }
 
-@transparent @public
+@transparent @public @semantics("slowpath")
 func _slowPath<C: LogicValue>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), false)
 }
