@@ -44,7 +44,7 @@ struct _StringBufferIVars {
 // class of generic class with dependent argument type) prevents it.
 @public struct _StringBuffer {
 
-  // Make this a buffer of UTF16 code units so that it's properly
+  // Make this a buffer of UTF-16 code units so that it's properly
   // aligned for them if that's what we store.
   typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
@@ -85,7 +85,7 @@ struct _StringBufferIVars {
     encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool) {
-    // Determine how many UTF16 code units we'll need
+    // Determine how many UTF-16 code units we'll need
     var inputStream = input.generate()
     if let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
         repairIllFormedSequences: repairIllFormedSequences) {
@@ -149,7 +149,7 @@ struct _StringBufferIVars {
     return _storage.value.byteCapacity >> elementShift
   }
 
-  /// 1 if the buffer stores UTF16; 0 otherwise
+  /// 1 if the buffer stores UTF-16; 0 otherwise
   var elementShift: Int {
     return _storage.value.elementShift
   }

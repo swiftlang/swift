@@ -72,15 +72,15 @@ println("  \(repr(empty))")
 //===--------- non-ASCII ---------===
 
 func nonASCII() {
-  // Cocoa stores non-ASCII in a UTF16 buffer
+  // Cocoa stores non-ASCII in a UTF-16 buffer
   // Code units in each character: 2 1 1 1 2 2 2
   // Offset of each character:     0 2 3 4 5 7 9 11
   var nsUTF16 = NSString(UTF8String: "🏂☃❅❆❄︎⛄️❄️")
-  // CHECK-NEXT: has UTF16: true
-  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsUTF16)) != nil)")
+  // CHECK-NEXT: has UTF-16: true
+  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsUTF16)) != nil)")
 
-  // CHECK: --- UTF16 basic round-tripping ---
-  println("--- UTF16 basic round-tripping ---")
+  // CHECK: --- UTF-16 basic round-tripping ---
+  println("--- UTF-16 basic round-tripping ---")
 
   // check that no extraneous objects are created
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
@@ -94,8 +94,8 @@ func nonASCII() {
   var nsRoundTripUTF16: NSString = newNSUTF16
   println("  \(repr(nsRoundTripUTF16))")
 
-  // CHECK: --- UTF16 slicing ---
-  println("--- UTF16 slicing ---")
+  // CHECK: --- UTF-16 slicing ---
+  println("--- UTF-16 slicing ---")
 
   // Slicing the String does not allocate
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
@@ -119,11 +119,11 @@ nonASCII()
 
 func ascii() {
   // Cocoa stores ASCII in a buffer of bytes.  This is an important case
-  // because it doesn't provide a contiguous array of UTF16, so we'll be
+  // because it doesn't provide a contiguous array of UTF-16, so we'll be
   // treating it as an opaque NSString.
   var nsASCII = NSString(UTF8String: "foobar")
-  // CHECK-NEXT: has UTF16: false
-  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafePointer<UniChar>))")
+  // CHECK-NEXT: has UTF-16: false
+  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafePointer<UniChar>))")
 
   // CHECK: --- ASCII basic round-tripping ---
   println("--- ASCII basic round-tripping ---")

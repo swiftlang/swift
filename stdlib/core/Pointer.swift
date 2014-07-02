@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafePointer, ConstUnsafePointer, and AutoreleasingUnsafePointer.
 protocol _Pointer {
@@ -51,12 +63,12 @@ func _convertConstArrayToPointerArgument<
   return (owner, ToPointer(raw))
 }
 
-/// Derive a UTF8 pointer argument from a value string parameter.
+/// Derive a UTF-8 pointer argument from a value string parameter.
 @transparent
 func _convertConstStringToUTF8PointerArgument<
   ToPointer: _Pointer
 >(str: String) -> (AnyObject?, ToPointer) {
-  // Convert the UTF8 representation to a null-terminated array.
+  // Convert the UTF-8 representation to a null-terminated array.
   var utf8 = Array(str.utf8)
   utf8.append(0)
   // Extract the owner and pointer from the array.

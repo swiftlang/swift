@@ -140,7 +140,7 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
 
 // When used as a _CocoaString, an NSString should be either
 // immutable or uniquely-referenced, and not have a buffer of
-// contiguous UTF16.  Ideally these distinctions would be captured in
+// contiguous UTF-16.  Ideally these distinctions would be captured in
 // the type system, so one would have to explicitly convert NSString
 // to a type that conforms.  Unfortunately, we don't have a way to do
 // that without an allocation (to wrap NSString in another class
@@ -280,7 +280,7 @@ class _NSContiguousString : NSString {
 }
 
 // A substring of an arbitrary immutable NSString.  The underlying
-// NSString is assumed to not provide contiguous UTF16 storage.
+// NSString is assumed to not provide contiguous UTF-16 storage.
 class _NSOpaqueString : NSString {
   func length() -> Int {
     return subRange.length

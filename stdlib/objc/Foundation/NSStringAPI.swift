@@ -65,20 +65,20 @@ extension String {
     return self as NSString
   }
 
-  /// Return an `Index` corresponding to the given offset in our UTF16
+  /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(utf16Index: Int) -> Index {
     return Index(String.UnicodeScalarView.IndexType(utf16Index, core))
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
-  /// our UTF16 representation.
+  /// our UTF-16 representation.
   func _range(r: NSRange) -> Range<Index> {
     return _index(r.location)..<_index(r.location + r.length)
   }
 
   /// Return a `Range<Index>?` corresponding to the given `NSRange` of
-  /// our UTF16 representation.
+  /// our UTF-16 representation.
   func _optionalRange(r: NSRange) -> Range<Index>? {
     if r.location == NSNotFound {
       return .None
@@ -265,7 +265,7 @@ extension String {
   // + (instancetype)stringWithUTF8String:(const char *)bytes
 
   /// Returns a string created by copying the data from a given
-  /// C array of UTF8-encoded bytes.
+  /// C array of UTF-8-encoded bytes.
   @public static func stringWithUTF8String(bytes: CString) -> String? {
     return NSString.stringWithUTF8String(bytes)
   }
@@ -314,7 +314,7 @@ extension String {
   // - (unichar)characterAtIndex:(NSUInteger)index
   //
   // We have a different meaning for "Character" in Swift, and we are
-  // trying not to expose error-prone UTF16 integer indexes
+  // trying not to expose error-prone UTF-16 integer indexes
   
   // - (NSString *)
   //     commonPrefixWithString:(NSString *)aString
@@ -776,7 +776,7 @@ extension String {
   //     freeWhenDone:(BOOL)flag
 
   /// Returns an initialized `String` object that contains a given
-  /// number of characters from a given array of UTF16 Code Units
+  /// number of characters from a given array of UTF-16 Code Units
   @public init(
     utf16CodeUnitsNoCopy: ConstUnsafePointer<unichar>,
     count: Int, 

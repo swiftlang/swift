@@ -76,7 +76,7 @@
   }
 
   /// Value by which to multiply a 2nd byte fetched in order to
-  /// assemble a UTF16 code unit from our contiguous storage.  If we
+  /// assemble a UTF-16 code unit from our contiguous storage.  If we
   /// store ASCII, this will be zero.  Otherwise, it will be 0x100
   var _highByteMultiplier: UTF16.CodeUnit {
     return UTF16.CodeUnit(elementShift) << 8
@@ -106,7 +106,7 @@
         size: UInt(count << (srcElementWidth - 1)))
     }
     else if (srcElementWidth < dstElementWidth) {
-      // Widening ASCII to UTF16; we need to copy the bytes manually
+      // Widening ASCII to UTF-16; we need to copy the bytes manually
       var dest = UnsafePointer<UTF16.CodeUnit>(dstStart)
       var src = UnsafePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
@@ -115,7 +115,7 @@
       }
     }
     else {
-      // Narrowing UTF16 to ASCII; we need to copy the bytes manually
+      // Narrowing UTF-16 to ASCII; we need to copy the bytes manually
       var dest = UnsafePointer<UTF8.CodeUnit>(dstStart)
       var src = UnsafePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
@@ -209,7 +209,7 @@
   @public var startUTF16: UnsafePointer<UTF16.CodeUnit> {
     _sanityCheck(
       count == 0 || elementWidth == 2,
-      "String does not contain contiguous UTF16")
+      "String does not contain contiguous UTF-16")
     return UnsafePointer(_baseAddress)
   }
 
@@ -254,7 +254,7 @@
     return _cocoaStringSlice(target: self, subRange: subRange)
   }
 
-  /// Get the Nth UTF16 Code Unit stored
+  /// Get the Nth UTF-16 Code Unit stored
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p = UnsafePointer<UInt8>(_pointerToNth(position).value)
       // Always dereference two bytes, but when elements are 8 bits we
@@ -263,7 +263,7 @@
       + UTF16.CodeUnit((p + 1).memory) * _highByteMultiplier
   }
 
-  /// Get the Nth UTF16 Code Unit stored
+  /// Get the Nth UTF-16 Code Unit stored
   @public subscript(position: Int) -> UTF16.CodeUnit {
     _sanityCheck(position >= 0)
     _sanityCheck(position <= count)
@@ -317,8 +317,8 @@
   /// capacity and a null pointer.  
   ///
   /// Note: If successful, effectively appends garbage to the String
-  /// until it has newSize UTF16 code units; you must immediately copy
-  /// valid UTF16 into that storage.
+  /// until it has newSize UTF-16 code units; you must immediately copy
+  /// valid UTF-16 into that storage.
   ///
   /// Note: if unsuccessful because of insufficient space in an
   /// existing buffer, the suggested new capacity will at least double
@@ -350,7 +350,7 @@
   /// Ensure that this String references a _StringBuffer having
   /// a capacity of at least newSize elements of at least the given width.
   /// Effectively appends garbage to the String until it has newSize
-  /// UTF16 code units.  Returns a pointer to the garbage code units;
+  /// UTF-16 code units.  Returns a pointer to the garbage code units;
   /// you must immediately copy valid data into that storage.
   mutating func _growBuffer(
     newSize: Int, minElementWidth: Int
@@ -394,10 +394,10 @@
 
   mutating func append(c: UnicodeScalar) {
     _invariantCheck()
-     // How many bytes does it take to encode each UTF16 code unit of
+     // How many bytes does it take to encode each UTF-16 code unit of
      // c if ASCII storage is available?
     let minBytesPerCodeUnit = c.value <= 0x7f ? 1 : 2
-    // How many UTF16 code units does it take to encode c?
+    // How many UTF-16 code units does it take to encode c?
     let utf16Width = c.value <= 0xFFFF ? 1 : 2
     
     let destination = _growBuffer(count + utf16Width, 

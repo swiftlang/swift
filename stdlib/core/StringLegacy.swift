@@ -198,7 +198,7 @@ extension String {
     self = String(buffer)
   }
 
-  // FIXME: This function assumes UTF16
+  // FIXME: This function assumes UTF-16
   @public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatPositiveInteger(v, UInt64(radix), 
                                         ten: _uppercase ? "A" : "a")

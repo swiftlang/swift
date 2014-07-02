@@ -287,7 +287,7 @@ extension String : Comparable {
 extension String {
   /// Low-level construction interface used by introspection
   /// implementation in the runtime library.  Constructs a String in
-  /// resultStorage containing the given UTF8.
+  /// resultStorage containing the given UTF-8.
   @asmname("swift_stringFromUTF8InRawMemory")
   static func _fromUTF8InRawMemory(
     resultStorage: UnsafePointer<String>,

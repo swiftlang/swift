@@ -131,8 +131,7 @@ extension String {
     }
 
     @public func compare(other : UnicodeScalarView) -> Int {
-      // Try to compare the string without decoding
-      // the UTF16 string.
+      // Try to compare the string without decoding the UTF-16 string.
       var aIdx = self._core.startIndex
       var bIdx = other._core.startIndex
       var aEnd = self._core.endIndex

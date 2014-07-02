@@ -11,28 +11,28 @@
 //===----------------------------------------------------------------------===//
 //
 //  _StringCore currently has three representations: Native ASCII,
-//  Native UTF16, and Opaque Cocoa.  Expose each of these as UTF8 in a
+//  Native UTF-16, and Opaque Cocoa.  Expose each of these as UTF-8 in a
 //  way that will hopefully be efficient to traverse
 //
 //===----------------------------------------------------------------------===//
 
 
 extension _StringCore {
-  // An integral type that holds a chunk of UTF8, starting in its low
-  // byte
+  /// An integral type that holds a sequence of UTF-8 code units, starting in
+  /// its low byte.
   @public typealias UTF8Chunk = UInt64
   
-  /// Encode text starting at i as UTF8.  Returns a pair whose first
+  /// Encode text starting at `i` as UTF-8.  Returns a pair whose first
   /// element is the index of the text following whatever got encoded,
-  /// and the second element contains the encoded UTF8 starting in its
+  /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
   func _encodeSomeUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(i <= count)
     
     if _fastPath(elementWidth == 1) {
-      // How many UTF16 code units might we use before we've filled up
-      // our UTF8Chunk with UTF8 code units?
+      // How many UTF-16 code units might we use before we've filled up
+      // our UTF8Chunk with UTF-8 code units?
       let utf16Count = min(sizeof(UTF8Chunk.self), count - i)
       
       var result: UTF8Chunk = ~0 // start with all bits set

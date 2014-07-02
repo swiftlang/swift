@@ -1712,7 +1712,7 @@ UTF8Decoder.test("IsolatedSurrogates") {
   //    D73.  Low-surrogate code point: A Unicode code point in the range
   //    U+DC00 to U+DFFF.
 
-  // Note: U+E0100 is <DB40 DD00> in UTF16.
+  // Note: U+E0100 is <DB40 DD00> in UTF-16.
 
   // High-surrogates
 

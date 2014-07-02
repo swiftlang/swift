@@ -430,7 +430,7 @@ var st_u3 = " \u{1234567} " // expected-error {{invalid unicode scalar}}
 var st_u4 = " \q "  // expected-error {{invalid escape sequence in literal}}
 
 var st_u5 = " \u{FFFFFFFF} "  // expected-error {{invalid unicode scalar}}
-var st_u6 = " \u{D7FF} \u{E000} "  // Fencepost UTF16 surrogate pairs.
+var st_u6 = " \u{D7FF} \u{E000} "  // Fencepost UTF-16 surrogate pairs.
 var st_u7 = " \u{D800} "  // expected-error {{invalid unicode scalar}}
 var st_u8 = " \u{DFFF} "  // expected-error {{invalid unicode scalar}}
 var st_u10 = " \u{0010FFFD} "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
