@@ -2727,6 +2727,11 @@ public:
       SD->overwriteType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
+      // Hack to deal with types already getting set during type validation
+      // above.
+      if (SD->hasType())
+        return;
+
       // Relabel the indices according to the subscript name.
       auto indicesType = SD->getIndices()->getType();
       indicesType = indicesType->getRelabeledType(
