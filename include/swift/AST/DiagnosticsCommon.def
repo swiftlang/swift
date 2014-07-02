@@ -87,9 +87,9 @@ ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
 ERROR(unsupported_fixed_length_array,type_parsing,none,
       "fixed-length arrays are not yet supported", ())
 
-WARNING(new_array_syntax,type_parsing,none,
-        "array types are now written with the brackets around the element type",
-        ())
+ERROR(new_array_syntax,type_parsing,none,
+      "array types are now written with the brackets around the element type",
+      ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
