@@ -67,6 +67,29 @@ In this example we annotate a member of the Swift array struct with the tag
 size of the array.
 
 
+The ``@semantics`` attribute allows us to create bytecode instructions (that
+are encoded as apply instructions) and operate on these instructions. The
+semantic annotations don't necessarily need to be on public APIs. For example,
+the Array subscript operator may contain two bytecode instructions. One for 
+checking the bounds and another one for accessing the elements. With this
+abstraction the optimizer can remove the ``checkBounds`` instruction and keep
+the getElement instruction::
+ 
+  @public subscript(index: Int) -> Element {
+     get {
+      checkBounds(index)
+      return getElement(index)
+     }
+
+  @semantics("array.checkbounds") func checkBounds(index: Int) {
+    ...
+  }
+	
+  @semantics("array.getelt") func getElement(index: Int) -> Element {
+    return _buffer[index]
+  }
+
+
 Swift optimizations
 -------------------
 The swift optimizer can access the information that is provided by the
