@@ -215,8 +215,6 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
-    case InlineKind::Always:
-      return "inline(always)";
     }
   case DAK_Accessibility:
     switch (cast<AccessibilityAttr>(this)->getAccess()) {

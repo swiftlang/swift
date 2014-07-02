@@ -60,8 +60,7 @@ enum class Accessibility : uint8_t {
 };
 
 enum class InlineKind : uint8_t {
-  Never = 0,
-  Always
+  Never = 0
 };
 
 class InfixData {
@@ -757,7 +756,7 @@ public:
   }
 };
 
-/// Represents a 'never', or 'always' inline attribute.
+/// Represents an inline attribute.
 class InlineAttr : public DeclAttribute {
   InlineKind Kind;
 public:
