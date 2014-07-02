@@ -2784,7 +2784,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
     
     CanType NSStringTy = SGM.Types.getNSStringType();
-    CanType OptNSStringTy = OptionalType::get(NSStringTy)->getCanonicalType();
     CanType IUOptNSStringTy
       = ImplicitlyUnwrappedOptionalType::get(NSStringTy)->getCanonicalType();
     
