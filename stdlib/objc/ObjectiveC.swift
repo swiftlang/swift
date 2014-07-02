@@ -58,9 +58,9 @@ import ObjectiveC
 }
 
 extension ObjCBool : Reflectable {
-	@public func getMirror() -> Mirror {
-		return reflect(getLogicValue())
-	}
+  @public func getMirror() -> Mirror {
+    return reflect(getLogicValue())
+  }
 }
 
 extension Bool {
