@@ -87,9 +87,6 @@ public:
 
   /// \brief Whether we should run LLVM ARC optimizations after IRGen.
   unsigned DisableLLVMARCOpts : 1;
-  
-  /// \brief Whether we should omit dynamic safety checks from the emitted IR.
-  unsigned DisableAllRuntimeChecks : 1;
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
@@ -104,8 +101,8 @@ public:
                    OptLevel(0), DebugInfo(false), UseJIT(false),
                    EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
-                   DisableAllRuntimeChecks(false), DisableFPElim(true),
-                   HasUnderlyingModule(false), Playground(false) {}
+                   DisableFPElim(true), HasUnderlyingModule(false),
+                   Playground(false) {}
 };
 
 } // end namespace swift

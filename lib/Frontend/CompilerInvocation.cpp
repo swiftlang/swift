@@ -726,8 +726,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else if (A->getOption().matches(OPT_Ofast)) {
       // Set the maximum optimization level and remove all runtime checks.
       IRGenOpts.OptLevel = MaxLevel;
-      // Unchecked casts.
-      IRGenOpts.DisableAllRuntimeChecks = true;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;
@@ -860,7 +858,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.TargetFeatures.push_back(A->getValue());
   }
 
-  Opts.DisableAllRuntimeChecks |= Args.hasArg(OPT_disable_all_runtime_checks);
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
   Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
   Opts.EnableDynamicValueTypeLayout |=

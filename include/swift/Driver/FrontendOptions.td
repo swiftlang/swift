@@ -103,9 +103,6 @@ def disable_access_control : Flag<["-"], "disable-access-control">,
 def enable_access_control : Flag<["-"], "enable-access-control">,
   HelpText<"Respect access control restrictions">;
 
-def disable_all_runtime_checks : Flag<["-"], "disable-all-runtime-checks">,
-  HelpText<"Disable all intrinsic runtime safety checks">;
-
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
 
