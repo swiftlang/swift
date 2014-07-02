@@ -118,7 +118,7 @@ extension ${Self} : ArrayType {
     self = ${Self}(_Buffer(s~>_copyToNativeArrayBuffer()))
   }
 
-  /// Construct an array of count elements, each initialized to value
+  /// Construct an array of `count` elements, each initialized to `value`.
   @public init(count: Int, repeatedValue: T) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
