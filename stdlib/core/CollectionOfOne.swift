@@ -55,7 +55,7 @@ struct _GeneratorOfOneMirror<T>: Mirror {
   }
 
   var summary: String { 
-  	return "GeneratorOfOne(\( reflect(_value.elements).summary ))"
+    return "GeneratorOfOne(\( reflect(_value.elements).summary ))"
   }
 
   var quickLookObject: QuickLookObject? { return .None }

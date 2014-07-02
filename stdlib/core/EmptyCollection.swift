@@ -51,7 +51,7 @@ struct _EmptyGeneratorMirror<T>: Mirror {
   }
 
   var summary: String { 
-  	return "EmptyGenerator"
+    return "EmptyGenerator"
   }
 
   var quickLookObject: QuickLookObject? { return .None }
