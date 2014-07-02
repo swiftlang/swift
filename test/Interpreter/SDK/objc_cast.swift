@@ -1,9 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// FIXME: rdar://17411843
-// XFAIL: CPU=i386
-// XFAIL: CPU=armv7
-
 import Foundation
 
 @objc @class_protocol protocol SwiftObjCProto {}
