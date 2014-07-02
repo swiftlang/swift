@@ -25,6 +25,7 @@ KNOWN_SETTINGS=(
     config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
     prefix                      "/usr"           "installation prefix"
+    show-sdks                   ""               "print installed Xcode and SDK versions"
     skip-ios                    ""               "set to skip everything iOS-related"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
@@ -332,6 +333,18 @@ case "${CMAKE_GENERATOR}" in
         )
         ;;
 esac
+
+# Record SDK and tools versions for posterity
+if [[ "$SHOW_SDKS" ]]; then
+    echo "--- SDK versions ---"
+    xcodebuild -version || :
+    echo
+    xcodebuild -version -sdk macosx.internal || :
+    if [[ ! "$SKIP_IOS" ]]; then
+        xcodebuild -version -sdk iphoneos.internal || :
+        xcodebuild -version -sdk iphonesimulator || :
+    fi
+fi
 
 # Build LLVM and Clang (x86 target only).
 if [ \! "$SKIP_BUILD_LLVM" ]; then
