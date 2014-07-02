@@ -59,6 +59,10 @@ enum class Accessibility : uint8_t {
   Public
 };
 
+enum class InlineKind : uint8_t {
+  Never = 0,
+  Always
+};
 
 class InfixData {
   unsigned Precedence : 8;
@@ -750,6 +754,23 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Accessibility;
+  }
+};
+
+/// Represents a 'never', or 'always' inline attribute.
+class InlineAttr : public DeclAttribute {
+  InlineKind Kind;
+public:
+  InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
+    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false), 
+      Kind(kind) {}
+
+  InlineAttr(InlineKind kind)
+  : InlineAttr(SourceLoc(), SourceRange(), kind) {}
+
+  InlineKind getKind() const { return Kind; }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Inline;
   }
 };
 

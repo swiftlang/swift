@@ -332,8 +332,8 @@ ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
 ERROR(transparent_in_classes_not_supported,sema_tcd,none,
       "'transparent' attribute is not supported on declarations within classes",
       ())
-ERROR(invalid_noinline_decl,sema_tcd,none,
-      "'noinline' attribute cannot be applied to this declaration", ())
+ERROR(invalid_inline_decl,sema_tcd,none,
+      "'inline' attribute cannot be applied to this declaration", ())
 
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))

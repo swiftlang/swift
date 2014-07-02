@@ -122,7 +122,6 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_UIApplicationMain:
   case DAK_Lazy:
   case DAK_LLDBDebuggerFunction:
-  case DAK_Noinline:
     Printer << "@" << getAttrName();
     break;
 
@@ -130,6 +129,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     Printer << "@" << getAttrName();
     if (cast<AccessibilityAttr>(this)->isForSetter())
       Printer << "(set)";
+    break;
+
+  case DAK_Inline:
+    Printer << "@" << getAttrName();
     break;
 
   case DAK_Semantics:
@@ -208,6 +211,13 @@ StringRef DeclAttribute::getAttrName() const {
     return "availability";
   case DAK_ObjC:
     return "objc";
+  case DAK_Inline:
+    switch (cast<InlineAttr>(this)->getKind()) {
+    case InlineKind::Never:
+      return "inline(never)";
+    case InlineKind::Always:
+      return "inline(always)";
+    }
   case DAK_Accessibility:
     switch (cast<AccessibilityAttr>(this)->getAccess()) {
     case Accessibility::Private:

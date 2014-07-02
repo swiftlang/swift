@@ -71,7 +71,7 @@
 
   //===--- private --------------------------------------------------------===//
 
-  @noinline
+  @inline(never)
   func _subscriptSetSlowPath(inout buffer: _Buffer, e: Element, index : Int) {
     var newBuffer = ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
@@ -386,7 +386,7 @@ struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
   var newValues: C
 }
 
-@noinline
+@inline(never)
 func _arrayOutOfPlaceReplace<
   B: ArrayBufferType, C: Collection
     where C.GeneratorType.Element == B.Element, B.IndexType == Int

@@ -230,7 +230,12 @@ bool SILDeclRef::isTransparent() const {
 
 /// \brief True if the function has noinline attribute.
 bool SILDeclRef::isNoinline() const {
-  return hasDecl() ? getDecl()->getAttrs().hasAttribute<NoinlineAttr>() : false;
+  if (!hasDecl())
+    return false;
+  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
+    if (InlineA->getKind() == InlineKind::Never)
+      return true;
+   return false;
 }
 
 bool SILDeclRef::isForeignThunk() const {

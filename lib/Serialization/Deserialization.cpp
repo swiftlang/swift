@@ -1487,6 +1487,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Inline_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::InlineDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) InlineAttr((InlineKind)kind);
+        break;
+      }
+
       case decls_block::Availability_DECL_ATTR: {
         bool isImplicit;
         bool isUnavailable;

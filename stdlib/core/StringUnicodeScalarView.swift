@@ -186,7 +186,7 @@ extension String {
       }
     }
 
-    @noinline
+    @inline(never)
     func _compareUnicode(other : UnicodeScalarView) -> Int {
       var g1 = self.generate()
       var g2 = other.generate()

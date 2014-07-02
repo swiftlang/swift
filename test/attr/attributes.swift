@@ -218,18 +218,18 @@ func func_result_attr() -> @xyz Int {       // expected-error {{unknown attribut
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}}
 
-@noinline func nolineFunc() {}
-@noinline var noinlineVar : Int // expected-error {{'noinline' attribute cannot be applied to this declaration}}
-@noinline class FooClass { // expected-error {{'noinline' attribute cannot be applied to this declaration}}
+@inline(never) func nolineFunc() {}
+@inline(never) var noinlineVar : Int // expected-error {{'inline' attribute cannot be applied to this declaration}}
+@inline(never) class FooClass { // expected-error {{'inline' attribute cannot be applied to this declaration}}
 }
 
 class A {
-  @noinline init(a : Int) {}
+  @inline(never) init(a : Int) {}
   var b : Int {
-    @noinline get {
+    @inline(never) get {
       return 42
     }
-    @noinline set {
+    @inline(never) set {
     }
   }
 }

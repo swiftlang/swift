@@ -201,10 +201,10 @@ enum UTFDecodeResult {
   }
 
   /// Given an ill-formed sequence, find the length of its maximal subpart.
-  @noinline
+  @inline(never)
   static func _findMaximalSubpartOfIllFormedUTF8Sequence(
       var buffer: UInt32, var validBytes: UInt8) -> UInt8 {
-    // This function is '@noinline' because it is used only in the error
+    // This function is '@inline(never)' because it is used only in the error
     // handling path.
 
     // Clear EOF flag, we don't care about it.

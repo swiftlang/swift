@@ -1308,6 +1308,14 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Inline: {
+    auto *theAttr = cast<InlineAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[InlineDeclAttrLayout::Code];
+    InlineDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     (unsigned)theAttr->getKind());
+    return;
+  }
+
   case DAK_Availability: {
     auto *theAttr = cast<AvailabilityAttr>(DA);
     llvm::SmallString<32> blob;
