@@ -39,7 +39,7 @@ conservative when optimizing general code with pointers.
 On the other hand, compilers for high-level languages usually have special
 bytecode instructions that allow them to perform high-level optimizations.
 However, unlike high-level languages such as JavaScript or Python, Swift
- containers are implemented in Swift itself. Moreover, it is beneficial to
+containers are implemented in Swift itself. Moreover, it is beneficial to
 be able to inline code from the container into the user program and optimize
 them together, especially for code that uses Generics. 
 
@@ -112,11 +112,11 @@ Array
 TBD.
 
 String
-~~~~~
+~~~~~~
 TBD.
 
 Dictionary
-~~~~~
+~~~~~~~~~~
 TBD.
 
 
