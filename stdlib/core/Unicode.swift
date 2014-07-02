@@ -14,7 +14,7 @@
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
 
-enum UTFDecodeResult {
+enum UnicodeDecodingResult {
   case Result(UnicodeScalar)
   case EmptyInput
   case Error
@@ -37,7 +37,7 @@ enum UTFDecodeResult {
   /// Start or continue decoding a UTF sequence.
   ///
   /// In order to decode a code unit sequence completely, this function should
-  /// be called repeatedly until it returns `UTFDecodeResult.EmptyInput`.
+  /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
   /// Checking that the generator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
@@ -46,7 +46,7 @@ enum UTFDecodeResult {
   /// in the generator for a given returned `UnicodeScalar` or an error.
   mutating func decode<
     G : Generator where G.Element == CodeUnit
-  >(inout next: G) -> UTFDecodeResult
+  >(inout next: G) -> UnicodeDecodingResult
 
   class func encode<
     S : Sink where S.Element == CodeUnit
@@ -300,7 +300,7 @@ enum UTFDecodeResult {
 
   @public mutating func decode<
     G : Generator where G.Element == CodeUnit
-  >(inout next: G) -> UTFDecodeResult {
+  >(inout next: G) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
     // generator.
     if _lookaheadFlags & 0b1111_0000 == 0 {
@@ -461,7 +461,7 @@ enum UTFDecodeResult {
 
   @public mutating func decode<
     G : Generator where G.Element == CodeUnit
-  >(inout input: G) -> UTFDecodeResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .EmptyInput
     }
@@ -539,7 +539,7 @@ enum UTFDecodeResult {
   /// units than required for this scalar.
   mutating func _decodeOne<
     G : Generator where G.Element == CodeUnit
-  >(inout input: G) -> (UTFDecodeResult, Int) {
+  >(inout input: G) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
     case .Result(let us):
@@ -578,13 +578,13 @@ enum UTFDecodeResult {
 
   @public mutating func decode<
     G : Generator where G.Element == CodeUnit
-  >(inout input: G) -> UTFDecodeResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
     G : Generator where G.Element == CodeUnit
-  >(inout input: G) -> UTFDecodeResult {
+  >(inout input: G) -> UnicodeDecodingResult {
     if let x: UInt32 = input.next() {
       if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
         return .Result(UnicodeScalar(x))
