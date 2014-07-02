@@ -1482,27 +1482,35 @@ namespace {
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
       if (requiresObjCPropertyDescriptor(IGM, var)) {
-        if (llvm::Constant *prop = buildProperty(var))
-          Properties.push_back(prop);
+        // ObjC doesn't support formal class properties.
+        if (!var->isStatic())
+          if (llvm::Constant *prop = buildProperty(var))
+            Properties.push_back(prop);
 
         // Don't emit getter/setter descriptors for @NSManagedAttr properties.
         if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
             // Don't emit descriptors for properties without accessors.
             var->getGetter() == nullptr)
           return;
+        
+        SmallVectorImpl<llvm::Constant *> *methods;
+        if (var->getAttrs().isOptional()) {
+          if (var->isStatic())
+            methods = &OptClassMethods;
+          else
+            methods = &OptInstanceMethods;
+        } else {
+          if (var->isStatic())
+            methods = &ClassMethods;
+          else
+            methods = &InstanceMethods;
+        }
 
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
-        if (var->getAttrs().isOptional())
-          OptInstanceMethods.push_back(getter_setter.first);
-        else
-          InstanceMethods.push_back(getter_setter.first);
+        methods->push_back(getter_setter.first);
 
-        if (getter_setter.second) {
-          if (var->getAttrs().isOptional())
-            OptInstanceMethods.push_back(getter_setter.second);
-          else
-            InstanceMethods.push_back(getter_setter.second);
-        }
+        if (getter_setter.second)
+          methods->push_back(getter_setter.second);
       }
     }
     
