@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 func classifyPoint2(p: (Double, Double)) {
     func return_same (var input : Double) -> Double
     {

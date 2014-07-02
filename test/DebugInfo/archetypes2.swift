@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin14 %s -emit-ir -verify -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -verify -g -o - | FileCheck %s
 class C<A> {
 // CHECK: null, null, metadata ![[A:.*]]} ; [ DW_TAG_structure_type ] [_TtQq_C11archetypes21C]
   // CHECK: null, null, metadata ![[B:.*]]} ; [ DW_TAG_structure_type ] [_TtQq_FC11archetypes21C3foo{{.*}}]

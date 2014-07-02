@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 var puzzleInput = "great minds think alike"
 var puzzleOutput = ""
 for letter in puzzleInput {

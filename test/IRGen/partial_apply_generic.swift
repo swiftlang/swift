@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 // FIXME: This should be a SIL test, but we can't parse generic types yet.
 

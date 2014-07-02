@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -O0 | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -O0 | FileCheck %s
 
 // FIXME: Should be a SIL test, but we can't parse same-type constraints
 // <rdar://problem/16238241>

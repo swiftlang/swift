@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // FIXME: Should be DW_TAG_interface_type
 // CHECK: null, null, metadata ![[PT:.*]]} ; [ DW_TAG_structure_type ] [IGiveOutInts]
 protocol IGiveOutInts {

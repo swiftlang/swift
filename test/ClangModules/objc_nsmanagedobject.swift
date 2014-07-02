@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -I=%S/Inputs/custom-modules -parse -parse-as-library -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s %S/Inputs/objc_nsmanaged_other.swift
+// RUN: %swift %clang-importer-sdk -I=%S/Inputs/custom-modules -parse -parse-as-library -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s %S/Inputs/objc_nsmanaged_other.swift
 
 import CoreData
 

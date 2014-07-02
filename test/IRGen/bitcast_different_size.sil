@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 -emit-ir %s -verify
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-ir %s -verify
 
 sil_stage canonical
 

@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
 @class_protocol protocol ClassBound {
   func classBoundMethod()

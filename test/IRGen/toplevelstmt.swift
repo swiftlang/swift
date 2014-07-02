@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 // CHECK: define internal void @top_level_code()
 // CHECK:  alloca %Si, align 8

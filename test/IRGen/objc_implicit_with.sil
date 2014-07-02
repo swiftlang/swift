@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -implicit-objc-with -enable-source-import %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -implicit-objc-with -enable-source-import %s -emit-ir | FileCheck %s
 
 // CHECK: @"\01L_selector_data(initWithRed:green:blue:)"
 // CHECK: @"\01L_selector_data(colorWithRed:green:blue:)"

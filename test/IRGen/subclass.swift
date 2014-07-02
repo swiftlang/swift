@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type {

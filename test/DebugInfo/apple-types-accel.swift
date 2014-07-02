@@ -1,6 +1,6 @@
 // REQUIRES: OS=macosx
-// RUN: %swift -target x86_64-apple-darwin %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -target x86_64-apple-darwin10 %s -c -g -o %t.o
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -c -g -o %t.o
 // RUN: dwarfdump --verify --apple-types %t.o | FileCheck --check-prefix=CHECK-ACCEL %s
 // RUN: dwarfdump --debug-info %t.o | FileCheck --check-prefix=CHECK-DWARF %s
 

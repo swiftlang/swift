@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s
 
 // Verify that a helper function that is generated on-the-fly does
 // not mess up the linetable of the calling function.

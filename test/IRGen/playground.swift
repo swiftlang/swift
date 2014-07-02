@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %swift -playground -parse-stdlib -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift -playground -parse-stdlib -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 import Swift
 

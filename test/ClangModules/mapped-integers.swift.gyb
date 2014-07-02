@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/mapped-integers.swift
-// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %t/mapped-integers.swift
+// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %t/mapped-integers.swift
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
 // CHECK: ctypes{{.*}}.pcm
 

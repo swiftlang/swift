@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -import-cf-types -module-cache-path %t/clang-module-cache -sdk %S/Inputs -target x86_64-apple-darwin13 %s -emit-silgen -o - | FileCheck %s
+// RUN: %swift -import-cf-types -module-cache-path %t/clang-module-cache -sdk %S/Inputs -target x86_64-apple-macosx10.9 %s -emit-silgen -o - | FileCheck %s
 
 import CoreCooling
 

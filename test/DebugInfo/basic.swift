@@ -2,13 +2,13 @@
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -o - | FileCheck %s --check-prefix NDEBUG
 // NDEBUG-NOT: !dbg
 // NDEBUG-NOT: DW_TAG
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - -disable-sil-linking | FileCheck %s --check-prefix=CHECK-NOSIL
 // --------------------------------------------------------------------
 //
 // CHECK: foo
@@ -47,7 +47,7 @@ func foo(var a: Int, var b: Int) -> Int {
        return c
      }
 }
-// CHECK-DAG: Swift version{{.*}}x86_64-apple-darwin10{{.*}}-emit-ir{{.*}} [ DW_TAG_compile_unit ] [{{.*}}basic.swift]
+// CHECK-DAG: Swift version{{.*}}x86_64-apple-macosx10.9{{.*}}-emit-ir{{.*}} [ DW_TAG_compile_unit ] [{{.*}}basic.swift]
 // top_level_code is not an artificial function (Flags & 64 == 0).
 //            LinkageName       Line   Type                  local     isDefn   0      0  ScopeLine Flags   optimized
 // CHECK-DAG: "top_level_code", i32 1, metadata !{{[0-9]+}}, i1 false, i1 true, i32 0, i32 0, null, i32 0, i1 false, void{{.*}} [ DW_TAG_subprogram ]

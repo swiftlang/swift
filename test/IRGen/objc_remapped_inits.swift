@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift %clang-importer-sdk -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 import UIKit
 

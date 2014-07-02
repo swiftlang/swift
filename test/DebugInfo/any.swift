@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 func main() {
   // CHECK: call void @llvm.dbg.declare(metadata !{%"protocol<>"* {{.*}}}, metadata ![[S:.*]]), !dbg ![[DBG:.*]]
   // CHECK: ![[S]] ={{.*}}[ DW_TAG_auto_variable ] [s] [line [[@LINE+3]]]

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -enable-source-import -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -emit-ir -o - %s | FileCheck %s
+// RUN: %swift %clang-importer-sdk -enable-source-import -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -emit-ir -o - %s | FileCheck %s
 
 import Properties
 

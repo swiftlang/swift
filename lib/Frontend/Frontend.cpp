@@ -47,8 +47,19 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   // Set the "os" target configuration.
   if (triple.isMacOSX()) {
     LangOpts.addTargetConfigOption("os", "OSX");
+    unsigned Major, Minor, Micro;
+    if (triple.getMacOSXVersion(Major, Minor, Micro) &&
+        (Major < 10 || (Major == 10 && Minor < 9)))
+      Diagnostics.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                           "OSX 10.9");
   } else if (triple.isiOS()) {
     LangOpts.addTargetConfigOption("os", "iOS");
+    unsigned Major, Minor, Micro;
+    triple.getiOSVersion(Major, Minor, Micro);
+    if (Major < 7)
+      Diagnostics.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                           "iOS 7");
+
   } else {
     assert(false && "Unsupported target OS");
   }

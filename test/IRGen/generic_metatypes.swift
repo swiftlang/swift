@@ -1,4 +1,4 @@
-// RUN: %swift -emit-ir -parse-stdlib -target x86_64-apple-darwin10 %s | FileCheck %s
+// RUN: %swift -emit-ir -parse-stdlib -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
 // CHECK: define %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {

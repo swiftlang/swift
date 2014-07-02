@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // CHECK: [ DW_TAG_union_type ] [_TtO4enum5Color] [line [[@LINE+1]], size 8, align 8,
 enum Color : UInt {
 // CHECK: [ DW_TAG_member ] [Red] [line 0, size 8, align 8, offset 0] [from _TtSu]

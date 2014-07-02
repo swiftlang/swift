@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK-DAG: ![[SINODE:.*]] = {{.*}} null, null, metadata ![[SI:.*]]} ; [ DW_TAG_structure_type ] [Int]
 // CHECK-DAG: ![[SFNODE:.*]] = {{.*}} null, null, metadata ![[SF:.*]]} ; [ DW_TAG_structure_type ] [Float]

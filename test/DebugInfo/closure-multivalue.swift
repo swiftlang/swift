@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // CHECK: [ DW_TAG_arg_variable ] [a] [line 10] [piece, size 8, offset 0]
 // CHECK: [ DW_TAG_arg_variable ] [a] [line 10] [piece, size 8, offset 8]
 // CHECK: [ DW_TAG_arg_variable ] [a] [line 10] [piece, size 8, offset 16]

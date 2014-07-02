@@ -1,4 +1,4 @@
-// RUN: %swift %clang-importer-sdk -enable-source-import -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift %clang-importer-sdk -enable-source-import -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 
 import Foundation
 

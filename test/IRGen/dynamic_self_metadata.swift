@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
 // FIXME: Not a SIL test because we can't parse dynamic Self in SIL.
 // <rdar://problem/16931299>

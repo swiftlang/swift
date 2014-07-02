@@ -114,6 +114,9 @@ ERROR(repl_must_be_initialized,sema,none,
 ERROR(error_doing_code_completion,frontend,none,
       "compiler is in code completion mode (benign diagnostic)", ())
 
+ERROR(error_os_minimum_deployment,frontend,none,
+  "Swift requires a minimum deployment target of %0", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

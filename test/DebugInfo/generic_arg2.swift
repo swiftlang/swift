@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
 // CHECK: %[[Y:.*]] = call %swift.opaque* %allocateBuffer3([24 x i8]* %{{.*}}, %swift.type* %U) #1
 // store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align

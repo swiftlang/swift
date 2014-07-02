@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: not %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s -debug-constraints 2> %t.out
+// RUN: not %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s -debug-constraints 2> %t.out
 // RUN: FileCheck %s < %t.out
 
 import ObjectiveC

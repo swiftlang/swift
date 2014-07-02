@@ -7,7 +7,7 @@ func f() {
   println("Test")
 }
 
-// RUN: %swift -target x86_64-apple-darwin %s -S -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s
 // CHECK: .file	[[MAIN:.*]] "{{.*}}line-directive.swift"
 // CHECK: .loc	[[MAIN]] 1
 // CHECK: .file	[[ABC:.*]] "{{.*}}abc.swift"
