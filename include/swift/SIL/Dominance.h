@@ -37,6 +37,13 @@ public:
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
   using DominatorTreeBase::properlyDominates;
+
+  bool isValid(SILFunction *F) const {
+    return getNode(&F->front()) != nullptr;
+  }
+  void reset() {
+    llvm::DominatorTreeBase<SILBasicBlock>::reset();
+  }
 };
 
 /// A class for computing basic post-dominance information.

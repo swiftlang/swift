@@ -57,6 +57,8 @@ class SILInstruction;
     }
 
     virtual void invalidate(InvalidationKind K) {
+      // FIXME: Invalidating the call graph should not invalidate the domtrees
+      // of all functions.
       if (K >= InvalidationKind::CFG) {
         // Delete Dominance Info.
         for (auto D : DomInfo)

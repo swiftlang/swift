@@ -43,7 +43,8 @@ namespace swift {
       CallGraph,
       Dominance,
       Alias,
-      LoopInfo
+      LoopInfo,
+      ColdBlocks,
     };
 
     /// Stores the kind of derived class.

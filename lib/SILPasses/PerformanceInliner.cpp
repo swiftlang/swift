@@ -13,7 +13,10 @@
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/CallGraph.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILAnalysis/ColdBlockInfo.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -43,7 +46,7 @@ namespace {
       : InlineCostThreshold(threshold), LinkMode(M),
     InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
 
-    bool inlineCallsIntoFunction(SILFunction *F);
+    bool inlineCallsIntoFunction(SILFunction *F, DominanceInfo *DT);
   };
 }
 
@@ -112,13 +115,20 @@ static bool transitivelyReferencesLessVisibleLinkage(const SILFunction &F,
 
 /// \brief Attempt to inline all calls smaller than our threshold into F until.
 /// returns True if a function was inlined.
-bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
+bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
+                                                    DominanceInfo *DT) {
   bool Changed = false;
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   llvm::SmallVector<ApplyInst*, 8> CallSites;
+
+  // Keep track of the cold blocks.
+  // Avoid recomputing dominance by checking cold call blocks before inlining.
+  if (!DT->isValid(Caller))
+    DT->recalculate(*Caller);
+  ColdBlockInfo ColdBlocks(DT);
 
   // Collect all of the ApplyInsts in this function. We will be changing the
   // control flow and collecting the AIs simplifies the scan.
@@ -127,8 +137,14 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     while (I != E) {
       // Check if this is a call site.
       ApplyInst *AI = dyn_cast<ApplyInst>(I++);
-      if (AI)
+      if (AI) {
+        // If the call site is on a slow path, do not inline.
+        if (ColdBlocks.isCold(AI->getParent())) {
+          DEBUG(llvm::dbgs() << "    Pruning cold call site:" <<  *AI);
+          continue;
+        }
         CallSites.push_back(AI);
+      }
     }
   }
 
@@ -223,6 +239,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // newly inlined ApplyInsts. That's okay because we will visit them in
     // our next invocation of the inliner.
     Inliner.inlineFunction(AI, Callee, Args);
+    DT->reset();
     NumFunctionsInlined++;
     Changed = true;
   }
@@ -242,6 +259,7 @@ public:
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
+    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
       DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
@@ -267,7 +285,7 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= inliner.inlineCallsIntoFunction(F);
+      Changed |= inliner.inlineCallsIntoFunction(F, DA->getDomInfo(F));
     }
 
     // Invalidate the call graph.
