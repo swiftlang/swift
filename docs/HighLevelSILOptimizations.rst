@@ -135,7 +135,7 @@ array.get_element(index: Int) -> Element
    elements are read. The storage descriptor is not read. No state is
    written. This operation is not control dependent, but may be
    guarded by ``check_bounds``. Any ``check_bounds`` may act as a
-   guard, regardless of the index being checked.
+   guard, regardless of the index being checked [#f1]_.
 
 array.set_element(index: Int, e: Element)
    
@@ -203,6 +203,8 @@ guards
   ``OpA,OpB`` must be preserved on any control flow path on which the
   sequence originally appears.
 
+An operation can only interfere-with or guard another if they may operate on the same Array.
+
 ============== =============== ==========================================
 semantic op    relation        semantic ops
 ============== =============== ==========================================
@@ -212,6 +214,12 @@ set_element(i) interferes-with get_element(i)
 mutate_unknown itereferes-with get_element, set_element, check_bounds,
                                get_count, get_capacity
 ============== =============== ==========================================
+
+.. [#f1] Although ``check_bounds`` takes an index argument, it guards
+         all ``set_element`` operations on the same Array regardless
+         of the index. This allows the optimizer to check a group of
+         ``set_element`` operations with indices in the range [i,N]
+         with a single ``check_bounds(N)`` operation.
 
 In addition to preserving these semantics, the optimizer must conservatively handle any unknown access to the array object.
 
