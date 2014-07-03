@@ -346,10 +346,23 @@ extension ${Self} {
   @public mutating func withUnsafeMutableStorage<R>(
     body: (inout UnsafeMutableArray<T>)->R
   ) -> R {
+    // Ensure unique storage
     _arrayReserve(&_buffer, 0)
-    var a = UnsafeMutableArray(start: _buffer.elementStorage, length: count)
+
+    // Ensure that body can't invalidate the storage or its bounds by
+    // moving self into a temporary working array.
+    var work = ${Self}()
+    swap(&work, &self)
+
+    // Create an UnsafeArray over work that we can pass to body
+    var a = UnsafeMutableArray(
+      start: work._buffer.elementStorage, length: work.count)
+    
+    // Invoke the body
     let ret = body(&a)
-    _fixLifetime(_buffer)
+
+    // Put the working array back before returning.
+    swap(&work, &self)
     return ret
   }
 }

@@ -432,6 +432,27 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 // CHECK-NEXT: testing subrange replacement in trailing Sub-Slice
 // CHECK-NEXT: testing subrange replacement in interior Sub-Slice
 
+//===--- inout violations -------------------------------------------------===//
+
+// The user has to obey certain rules when things are passed via
+// inout, but in those cases we only guarantee memory-safety, not
+// coherent semantics.  Let's try to force a memory-safety problem
+// here.  This crashes when withUnsafeMutableStorage is not
+// sufficiently careful.
+func testInoutViolation() {
+  var a: [X] = [
+    X(10), X(8), X(6), X(4), X(2), X(0), X(9), X(7), X(5), X(3), X(1)
+  ]
+
+  // An overload of sort for Arrays uses withUnsafeMutableStorage,
+  // which disables bounds checks.
+  sort(&a) { x, y in
+    a = []         // Invalidate the whole array during sorting
+    return x < y
+  }
+}
+testInoutViolation()
+
 //===--- single-element modifiers -----------------------------------------===//
 
 %for A in ['ContiguousArray', 'Array', 'Slice']:
