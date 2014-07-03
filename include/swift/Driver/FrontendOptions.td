@@ -132,6 +132,10 @@ def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;
 
+def enable_union_import :
+  Flag<["-"], "enable-union-import">,
+  HelpText<"Import C unions">;
+
 def strict_keyword_arguments :
   Flag<["-"], "strict-keyword-arguments">,
   HelpText<"Be strict about keyword argument presence/absence/ordering">;
