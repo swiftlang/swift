@@ -833,9 +833,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // FIXME: PatternBindingDecls don't have attributes themselves, so just assume
   // the variables all have the same attributes. This isn't exactly true
   // after type-checking, but it's close enough for now.
-  printAttributes(anyVar);
-  printAccessibility(anyVar);
-  Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
+  if (anyVar) {
+    printAttributes(anyVar);
+    printAccessibility(anyVar);
+    Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
+  } else {
+    Printer << "let ";
+  }
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
     // FIXME: Implement once we can pretty-print expressions.
