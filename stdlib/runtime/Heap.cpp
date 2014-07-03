@@ -866,6 +866,8 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
 
 void *SwiftZone::slowAlloc_optimized(size_t size, size_t alignMask,
                                      uintptr_t flags) {
+  // llvm::RoundUpToAlignment(size, alignMask + 1) generates terrible code
+  size = (size + alignMask) & ~alignMask;
   AllocIndex idx = sizeToIndex(size);
   if (idx == badAllocIndex) {
     // large allocations
@@ -901,7 +903,8 @@ void *SwiftZone::slowAlloc_systemMalloc(size_t size, size_t alignMask,
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes,
                                       size_t alignMask) {
   assert(bytes != 0);
-  AllocIndex idx = sizeToIndex(bytes);
+  auto size = (bytes + alignMask) & ~alignMask;
+  AllocIndex idx = sizeToIndex(size);
   if (idx == badAllocIndex) {
     swiftZone.writeLock();
     auto it2 = swiftZone.hugeAllocations.find(ptr);

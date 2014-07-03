@@ -47,10 +47,8 @@ static HeapObject *
 _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
                     size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
-  // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
-  auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
   auto object = reinterpret_cast<HeapObject *>(
-                             swift_slowAlloc(size, requiredAlignmentMask, 0));
+                  swift_slowAlloc(requiredSize, requiredAlignmentMask, 0));
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
   object->weakRefCount = WRC_INTERVAL;
