@@ -55,6 +55,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_4 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_4
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_5 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_5
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_6 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_6
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_7 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_7
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_1
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_2
@@ -129,6 +130,8 @@ struct FooStruct {
   func instanceFunc6() -> Int! {}
   mutating
   func instanceFunc7(#a: Int) {}
+  mutating
+  func instanceFunc8(a: (Int, Int)) {}
 
   mutating
   func varargInstanceFunc0(v: Int...) {}
@@ -265,6 +268,7 @@ var fooObject: FooStruct
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc5()[#Int?#]{{$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc6()[#Int!#]{{$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#a: Int#})[#Void#]{{$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#(a): (Int, Int)#})[#Void#]{{$}}
 //
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#(v): Int...#})[#Void#]{{$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{$}}
@@ -305,6 +309,7 @@ var fooObject: FooStruct
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc5()[#Int?#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc6()[#Int!#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#a: Int#})[#Void#]{{$}}
+// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#(a): (Int, Int)#})[#Void#]{{$}}
 //
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#(v): Int...#})[#Void#]{{$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#(a): Float#}, {#v: Int...#})[#Void#]{{$}}
@@ -346,6 +351,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc5({#self: &FooStruct#})[#() -> Int?#]{{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc6({#self: &FooStruct#})[#() -> Int!#]{{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc7({#self: &FooStruct#})[#(a: Int) -> Void#]{{$}}
+// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc8({#self: &FooStruct#})[#((Int, Int)) -> Void#]{{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc0({#self: &FooStruct#})[#(Int...) -> Void#]{{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc1({#self: &FooStruct#})[#(Float, v: Int...) -> Void#]{{$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: varargInstanceFunc2({#self: &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{$}}
@@ -399,6 +405,7 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc5({#self: &FooStruct#})[#() -> Int?#]{{$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc6({#self: &FooStruct#})[#() -> Int!#]{{$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc7({#self: &FooStruct#})[#(a: Int) -> Void#]{{$}}
+// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc8({#self: &FooStruct#})[#((Int, Int)) -> Void#]{{$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc0({#self: &FooStruct#})[#(Int...) -> Void#]{{$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc1({#self: &FooStruct#})[#(Float, v: Int...) -> Void#]{{$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .varargInstanceFunc2({#self: &FooStruct#})[#(Float, b: Double, v: Int...) -> Void#]{{$}}
@@ -741,6 +748,14 @@ func testInsideFunctionCall6() {
 // INSIDE_FUNCTION_CALL_6-NEXT: End completions
 }
 
+func testInsideFunctionCall7() {
+  var a = FooStruct()
+  a.instanceFunc8(#^INSIDE_FUNCTION_CALL_7^#
+// INSIDE_FUNCTION_CALL_7: Begin completions
+// INSIDE_FUNCTION_CALL_7: Pattern/ExprSpecific: ['(']{#(a): (Int, Int)#})[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_7: End completions
+}
+
 func testInsideVarargFunctionCall1() {
   var a = FooStruct()
   a.varargInstanceFunc0(#^INSIDE_VARARG_FUNCTION_CALL_1^#
@@ -1031,6 +1046,7 @@ class TestResolveConstructorParam3<Foo : FooProtocol> {
 
 struct FuncParenPattern {
   init(_: Int) {}
+  init(_: (Int, Int)) {}
 
   mutating
   func instanceFunc(_: Int) {}
@@ -1054,6 +1070,7 @@ func testFuncParenPattern2(fpp: FuncParenPattern) {
   FuncParenPattern#^FUNC_PAREN_PATTERN_2^#
 // FUNC_PAREN_PATTERN_2: Begin completions
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal: ({#Int#})[#FuncParenPattern#]{{$}}
+// FUNC_PAREN_PATTERN_2-NEXT: Decl[Constructor]/CurrNominal: ({#(Int, Int)#})[#FuncParenPattern#]{{$}}
 // FUNC_PAREN_PATTERN_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: &FuncParenPattern#})[#(Int) -> Void#]{{$}}
 // FUNC_PAREN_PATTERN_2-NEXT: End completions
 }

@@ -1281,7 +1281,9 @@ public:
         BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front());
     }
 
-    if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
+    // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
+    // from (a,b) for code-completion.
+    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
       bool NeedComma = false;
       // Iterate over the tuple type fields, corresponding to each parameter.
       for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
@@ -1473,9 +1475,16 @@ public:
       return;
     }
 
+    if (!HaveLParen)
+      Builder.addLeftParen();
+    else
+      Builder.addAnnotatedLeftParen();
+
     Type ConstructorType = MemberType->castTo<AnyFunctionType>()->getResult();
-    addPatternFromType(
-        Builder, ConstructorType->castTo<AnyFunctionType>()->getInput());
+    addParamPatternFromFunction(
+        Builder, ConstructorType->castTo<AnyFunctionType>(), CD);
+
+    Builder.addRightParen();
     addTypeAnnotation(
         Builder, ConstructorType->castTo<AnyFunctionType>()->getResult());
   }
