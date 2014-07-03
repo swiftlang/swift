@@ -139,7 +139,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
   target.write("\n")
 }
 
-/// Writes the textual representation of `object` into the stream `target`.
+/// Writes the textual representation of `object` into the standard output.
 ///
 /// The textual representation is obtained from the `object` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
@@ -153,7 +153,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
 }
 
 /// Writes the textual representation of `object` and a newline character into
-/// the stream `target`.
+/// the standard output.
 ///
 /// The textual representation is obtained from the `object` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
@@ -167,7 +167,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
   stdoutStream.write("\n")
 }
 
-/// Writes a single newline character into stdout.
+/// Writes a single newline character into the standard output.
 @public func println() {
   var stdoutStream = _Stdout()
   stdoutStream.write("\n")
