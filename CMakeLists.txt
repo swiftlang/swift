@@ -308,9 +308,10 @@ endif()
 #                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
+#     [OPT_FLAGS])                      # Optimization flags (overrides SWIFT_OPTIMIZE)
 function(compile_swift_files)
   parse_arguments(SWIFTFILE
-    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE"
+    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
   
@@ -333,10 +334,14 @@ function(compile_swift_files)
 
   # Compute flags to be passed down to swift when compiling a swift
   # file.
-  if(SWIFT_OPTIMIZED)
-    list(APPEND swift_flags "-O2")
+  if(NOT SWIFTFILE_OPT_FLAGS)
+    if(SWIFT_OPTIMIZED)
+      list(APPEND swift_flags "-O2")
+    else()
+      list(APPEND swift_flags "-O0")
+    endif()
   else()
-    list(APPEND swift_flags "-O0")
+    list(APPEND swift_flags "${SWIFTFILE_OPT_FLAGS}")
   endif()
 
   if (SWIFT_SPLIT_OBJC_SELECTORS)
@@ -513,8 +518,8 @@ endfunction(compute_library_subdir)
 #   handle_swift_sources(sourcesvar externalvar target)
 function(handle_swift_sources sourcesvar externalvar target name)
   parse_arguments(SWIFTSOURCES  
-    "DEPENDS;SDK;ARCHITECTURE" 
-    "IS_MAIN;IS_STDLIB_CORE" 
+    "DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS"
+    "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
 
   set(result)
@@ -568,7 +573,7 @@ function(handle_swift_sources sourcesvar externalvar target name)
       FLAGS ${swift_flags}
       SDK ${SWIFTSOURCES_SDK}
       ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
-      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
+      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
     list(APPEND result ${swift_obj})
   endif()
 
@@ -1114,15 +1119,16 @@ endmacro(add_swift_library)
 #                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
+#     [OPT_FLAGS]                      # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     source1 [source2 source3 ...])  # Sources to add into this library
 macro(add_swift_executable name)
   # Parse the arguments we were given.
-  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS" "EXCLUDE_FROM_ALL" 
+  parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS;OPT_FLAGS" "EXCLUDE_FROM_ALL"
     ${ARGN})
   set(SWIFTEXE)
   
   handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name}
-    DEPENDS ${SWIFTEXE_FILE_DEPENDS}
+    DEPENDS ${SWIFTEXE_FILE_DEPENDS} OPT_FLAGS ${SWIFTEXE_OPT_FLAGS}
     IS_MAIN)
 
   # Add the executable
