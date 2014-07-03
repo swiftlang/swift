@@ -66,8 +66,11 @@ public:
   }
 
   TypeLoc clone(ASTContext &ctx) const {
-    if (TyR)
-      return TypeLoc(TyR->clone(ctx));
+    if (TyR) {
+      TypeLoc result(TyR->clone(ctx));
+      result.TAndValidBit = this->TAndValidBit;
+      return result;
+    }
 
     return *this;
   }

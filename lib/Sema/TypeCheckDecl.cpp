@@ -2261,7 +2261,7 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
 static void checkAccessibility(TypeChecker &TC, const Decl *D) {
-  if (D->isInvalid())
+  if (D->isInvalid() || D->isImplicit())
     return;
 
   switch (D->getKind()) {
@@ -2457,13 +2457,76 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
+  case DeclKind::Func:
+    if (cast<FuncDecl>(D)->isAccessor())
+      return;
+    SWIFT_FALLTHROUGH;
+  case DeclKind::Constructor: {
+    auto fn = cast<AbstractFunctionDecl>(D);
+    bool isTypeContext = fn->getDeclContext()->isTypeContext();
+
+    // This must stay in sync with diag::assocated_type_access.
+    enum {
+      FK_Function = 0,
+      FK_Method,
+      FK_Initializer
+    };
+
+    Optional<Accessibility> minAccess;
+    const TypeRepr *complainRepr = nullptr;
+    bool problemIsResult = false;
+    std::for_each(fn->getBodyParamPatterns().begin() + isTypeContext,
+                  fn->getBodyParamPatterns().end(),
+                  [&](const Pattern *paramList) {
+      paramList->forEachNode([&](const Pattern *P) {
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+
+        checkTypeAccessibility(TC, TP->getTypeLoc(), fn->getAccessibility(),
+                               [&](Accessibility typeAccess,
+                                   const TypeRepr *thisComplainRepr) {
+          if (!minAccess || *minAccess > typeAccess) {
+            minAccess = typeAccess;
+            complainRepr = thisComplainRepr;
+          }
+        });
+      });
+    });
+
+    if (auto FD = dyn_cast<FuncDecl>(fn)) {
+      checkTypeAccessibility(TC, FD->getBodyResultTypeLoc(),
+                             fn->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+          problemIsResult = true;
+        }
+      });
+    }
+
+    if (minAccess) {
+      bool isExplicit = fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
+                        isa<ProtocolDecl>(D->getDeclContext());
+      auto diag = TC.diagnose(fn, diag::function_type_access,
+                              isExplicit,
+                              fn->getAccessibility(),
+                              *minAccess,
+                              isa<ConstructorDecl>(fn) ? FK_Initializer :
+                                isTypeContext ? FK_Method : FK_Function,
+                              problemIsResult);
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+    return;
+  }
+
   case DeclKind::GenericTypeParam:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
-  case DeclKind::Func:
-  case DeclKind::Constructor:
   case DeclKind::EnumElement:
     // unimplemented
     return;
@@ -3922,10 +3985,15 @@ public:
       }
     }
 
+    if (IsSecondPass) {
+      checkAccessibility(TC, FD);
+      return;
+    }
+
     TC.checkDeclAttributesEarly(FD);
     computeAccessibility(TC, FD);
 
-    if (IsSecondPass || FD->hasType())
+    if (FD->hasType())
       return;
 
     // Bind operator functions to the corresponding operator declaration.
@@ -4812,9 +4880,12 @@ public:
       }
     }
 
-    if (IsSecondPass || CD->hasType()) {
+    if (IsSecondPass) {
+      checkAccessibility(TC, CD);
       return;
     }
+    if (CD->hasType())
+      return;
 
     TC.checkDeclAttributesEarly(CD);
     computeAccessibility(TC, CD);

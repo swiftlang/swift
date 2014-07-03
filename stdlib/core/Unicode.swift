@@ -14,11 +14,13 @@
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
 
+@public
 enum UnicodeDecodingResult {
   case Result(UnicodeScalar)
   case EmptyInput
   case Error
 
+  @public
   func isEmptyInput() -> Bool {
     switch self {
     case .EmptyInput:

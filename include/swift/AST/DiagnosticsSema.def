@@ -474,6 +474,15 @@ ERROR(subscript_type_access,sema_tcd,none,
       "%select{a private|an internal|PUBLIC}2 type",
       (bool, Accessibility, Accessibility, bool))
 
+// Functions
+ERROR(function_type_access,sema_tcd,none,
+      "%select{function|method|initializer}3 "
+      "%select{must be declared %select{private|internal|PUBLIC}2"
+      "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
+      "%select{parameter|result}4 uses "
+      "%select{a private|an internal|PUBLIC}2 type",
+      (bool, Accessibility, Accessibility, unsigned, bool))
+
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,

@@ -53,16 +53,16 @@
 /// dispatching every generic function with a default implementation.
 /// Only authors of specialized distance implementations need to touch
 /// this tag.
-@internal struct _Distance {}
-@internal func _distanceTo<I>(end: I) -> (_Distance, (I)) {
+@public struct _Distance {}
+@public func _distanceTo<I>(end: I) -> (_Distance, (I)) {
   return (_Distance(), (end))
 }
 
-@internal struct _Advance {}
-@internal func _advance<D>(n: D) -> (_Advance, (D)) {
+@public struct _Advance {}
+@public func _advance<D>(n: D) -> (_Advance, (D)) {
   return (_Advance(), (n: n))
 }
-@internal func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
+@public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
   return (_Advance(), (n, end))
 }
 

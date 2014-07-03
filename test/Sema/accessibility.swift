@@ -20,14 +20,14 @@
   @private func privateReq() {}
 }
 
-// expected-note@+1 3 {{type declared here}}
+// expected-note@+1 4 {{type declared here}}
 @internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-11=@internal}}
   @private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-11=@internal}}
   @private func privateReq() {}
 }
 
-// expected-note@+1 26 {{type declared here}}
+// expected-note@+1 40 {{type declared here}}
 @private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {}
   @private func internalReq() {}
@@ -114,6 +114,28 @@ struct Subscripts {
   @public subscript (a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
 }
 
+struct Methods {
+  func foo(a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared private because its parameter uses a private type}}
+  func bar(a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared private because its result uses a private type}}
+
+  @public func a(a: PrivateStruct, b: Int) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  @public func b(a: Int, b: PrivateStruct) -> Int { return 0 } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  @public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  @public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  @public func e(a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
+}
+func privateParam(a: PrivateStruct) {} // expected-error {{function must be declared private because its parameter uses a private type}}
+
+struct Initializers {
+  init(a: PrivateStruct) {} // expected-error {{initializer must be declared private because its parameter uses a private type}}
+
+  @public init(a: PrivateStruct, b: Int) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  @public init(a: Int, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  @public init(a: InternalStruct, b: PrivateStruct) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+  @public init(a: PrivateStruct, b: InternalStruct) { } // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
+}
+
+
 // expected-note@+1 {{type declared here}}
 class InternalClass {}
 
@@ -137,4 +159,6 @@ class InternalClass {}
 @public protocol RequirementTypes {
   var x: PrivateStruct { get } // expected-error {{property cannot be declared public because its type uses a private type}}
   subscript(x: Int) -> InternalStruct { get set } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
+  func foo() -> PrivateStruct // expected-error {{method cannot be declared public because its result uses a private type}}
+  init(x: PrivateStruct) // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
 }
