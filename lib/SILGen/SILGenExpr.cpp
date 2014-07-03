@@ -1432,7 +1432,10 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 
     IsTake_t isTake = IsTake_t(subExistential.hasCleanup());
 
-    gen.B.createUpcastExistential(E, subExistential.getValue(), existential,
+    gen.B.createUpcastExistential(E,
+                                  isTake ? subExistential.forward(gen)
+                                         : subExistential.getValue(),
+                                  existential,
                                   isTake);
   } else {
     // Otherwise, we need to initialize a new existential container from
