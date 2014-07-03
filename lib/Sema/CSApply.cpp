@@ -1824,6 +1824,14 @@ namespace {
                         cs.getConstraintLocator(
                           expr, ConstraintLocator::UnresolvedMember));
       auto member = selected.choice.getDecl();
+      
+      // If the member came by optional unwrapping, then unwrap the base type.
+      if (selected.choice.getKind()
+                              == OverloadChoiceKind::DeclViaUnwrappedOptional) {
+        baseTy = baseTy->getAnyOptionalObjectType();
+        assert(baseTy
+               && "got unwrapped optional decl from non-optional base?!");
+      }
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.

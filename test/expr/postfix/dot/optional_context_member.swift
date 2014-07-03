@@ -66,3 +66,4 @@ func iuoContext() -> Foo! {
 func nestedOptContext() -> Foo!? {
   return .None
 }
+

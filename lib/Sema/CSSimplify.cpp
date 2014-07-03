@@ -2831,10 +2831,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
         ->getInstanceType()
         ->getAnyOptionalObjectType());
+      choices.push_back(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
+                                                                    result));
+    } else {
+      choices.push_back(OverloadChoice(ovlBaseTy, result,
+                                       /*isSpecialized=*/false));
     }
-    
-    choices.push_back(OverloadChoice(ovlBaseTy, result,
-                                     /*isSpecialized=*/false));
   };
 
   // Add all results from this lookup.
