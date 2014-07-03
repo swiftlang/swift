@@ -117,7 +117,7 @@
     }
   }
 
-  /// \returns true if this is an ASCII character (code point 0 to 127
+  /// Returns true if this is an ASCII character (code point 0 to 127
   /// inclusive).
   @public func isASCII() -> Bool {
     return value <= 127
