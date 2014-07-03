@@ -726,16 +726,17 @@ namespace {
   class PrimitiveTypeInfo :
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, LoadableTypeInfo> {
   public:
-    PrimitiveTypeInfo(llvm::Type *storage, Size size, llvm::BitVector spareBits,
+    PrimitiveTypeInfo(llvm::Type *storage, Size size,
+                      llvm::BitVector &&spareBits,
                       Alignment align)
-      : PODSingleScalarTypeInfo(storage, size, spareBits, align) {}
+      : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
   };
 }
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
-const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
-                                               Size size, Alignment align) {
+const LoadableTypeInfo *
+TypeConverter::createPrimitive(llvm::Type *type, Size size, Alignment align) {
   return new PrimitiveTypeInfo(type, size, IGM.getSpareBitsForType(type),
                                align);
 }
@@ -743,7 +744,7 @@ const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type, given that it's a pointer to an aligned pointer
 /// type.
-const TypeInfo *
+const LoadableTypeInfo *
 TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
                                                 Size size,
                                                 Alignment align,
@@ -1139,6 +1140,41 @@ const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
   // This will always yield a TypeInfo because forward-declarations
   // are unnecessary when converting class types.
   return *entry.get<const TypeInfo*>();
+}
+
+/// Return a TypeInfo the represents opaque storage for a loadable POD value
+/// with the given storage size.
+///
+/// The formal alignment of the opaque storage will be 1.
+///
+/// The TypeInfo will completely ignore any type passed to its
+/// implementation methods; it is safe to pass a null type.
+const LoadableTypeInfo &
+IRGenModule::getOpaqueStorageTypeInfo(Size size) {
+  return Types.getOpaqueStorageTypeInfo(size);
+}
+
+const LoadableTypeInfo &
+TypeConverter::getOpaqueStorageTypeInfo(Size size) {
+  auto index = size.getValue();
+  if (index < OpaqueStorageTypes.size())
+    if (auto type = OpaqueStorageTypes[index])
+      return *type;
+
+  llvm::IntegerType *intType =
+    llvm::IntegerType::get(IGM.LLVMContext, size.getValue() * 8);
+
+  // There are no spare bits in an opaque storage type.
+  auto type = new PrimitiveTypeInfo(intType, size, llvm::BitVector(),
+                                    Alignment(1));
+  type->NextConverted = FirstType;
+  FirstType = type;
+
+  if (index >= OpaqueStorageTypes.size())
+    OpaqueStorageTypes.resize(index + 1);
+  OpaqueStorageTypes[index] = type;
+
+  return *type;
 }
 
 /// \brief Convert a primitive builtin type to its LLVM type, size, and

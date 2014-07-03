@@ -53,6 +53,15 @@ protected:
     assert(isFixedSize());
   }
 
+  FixedTypeInfo(llvm::Type *type, Size size,
+                llvm::BitVector &&spareBits,
+                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
+                SpecialTypeInfoKind stik = STIK_Fixed)
+      : TypeInfo(type, align, pod, bt, stik), StorageSize(size),
+        SpareBits(std::move(spareBits)) {
+    assert(isFixedSize());
+  }
+
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }

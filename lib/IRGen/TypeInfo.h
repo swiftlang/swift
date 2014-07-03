@@ -85,7 +85,8 @@ protected:
            IsBitwiseTakable_t bitwiseTakable,
            SpecialTypeInfoKind stik)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), BitwiseTakable(bitwiseTakable), STIK(stik) {}
+      POD(pod), BitwiseTakable(bitwiseTakable), STIK(stik),
+      SubclassKind(InvalidSubclassKind) {}
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -118,6 +119,19 @@ private:
 
   /// The kind of supplemental API this type has, if any.
   unsigned STIK : 3;
+
+  /// An arbitrary discriminator for the subclass.  This is useful for
+  /// e.g. distinguishing between different TypeInfos that all
+  /// implement the same kind of type.
+  unsigned SubclassKind : 3;
+  enum { InvalidSubclassKind = 0x7 };
+
+protected:
+  void setSubclassKind(unsigned kind) {
+    assert(kind != InvalidSubclassKind);
+    SubclassKind = kind;
+    assert(SubclassKind == kind && "kind was truncated?");
+  }
 
 public:
   /// Sets whether this type is POD.  Should only be called during
@@ -154,6 +168,16 @@ public:
   /// can rely on them.
   SpecialTypeInfoKind getSpecialTypeInfoKind() const {
     return SpecialTypeInfoKind(STIK);
+  }
+
+  /// Returns whatever arbitrary data has been stash in the subclass
+  /// kind field.  This mechanism allows an orthogonal dimension of
+  /// distinguishing between TypeInfos, which is useful when multiple
+  /// TypeInfo subclasses are used to implement the same kind of type.
+  unsigned getSubclassKind() const {
+    assert(SubclassKind != InvalidSubclassKind &&
+           "subclass kind has not been initialized!");
+    return SubclassKind;
   }
 
   /// Whether this type is known to be fixed-size in the local

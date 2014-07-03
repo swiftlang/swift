@@ -51,6 +51,7 @@ namespace irgen {
   class Alignment;
   class ProtocolInfo;
   class Size;
+  class LoadableTypeInfo;
   class TypeInfo;
   class UnownedTypeInfo;
   class WeakTypeInfo;
@@ -83,10 +84,11 @@ private:
   const TypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *ObjCClassPtrTI = nullptr;
+  SmallVector<const LoadableTypeInfo *, 4> OpaqueStorageTypes;
   
-  const TypeInfo *createPrimitive(llvm::Type *T,
-                                  Size size, Alignment align);
-  const TypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
+  const LoadableTypeInfo *createPrimitive(llvm::Type *T,
+                                          Size size, Alignment align);
+  const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
                                                    Size size, Alignment align,
                                                    Alignment pointerAlignment);
 
@@ -125,6 +127,7 @@ public:
   const TypeInfo &getObjCClassPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize);
 
   const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);

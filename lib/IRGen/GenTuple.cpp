@@ -185,11 +185,13 @@ namespace {
       public TupleTypeInfoBase<LoadableTupleTypeInfo, LoadableTypeInfo> {
   public:
     // FIXME: Spare bits between tuple elements.
-    LoadableTupleTypeInfo(unsigned numFields, llvm::Type *ty,
-                          Size size, llvm::BitVector spareBits,
+    LoadableTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          unsigned maxExplosionSize, unsigned minExplosionSize,
+                          llvm::Type *ty,
+                          Size size, llvm::BitVector &&spareBits,
                           Alignment align, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, ty, size, std::move(spareBits), align,
-                          isPOD)
+      : TupleTypeInfoBase(fields, maxExplosionSize, minExplosionSize,
+                          ty, size, std::move(spareBits), align, isPOD)
       {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
@@ -205,10 +207,10 @@ namespace {
   {
   public:
     // FIXME: Spare bits between tuple elements.
-    FixedTupleTypeInfo(unsigned numFields, llvm::Type *ty,
-                       Size size, llvm::BitVector spareBits, Alignment align,
+    FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
+                       Size size, llvm::BitVector &&spareBits, Alignment align,
                        IsPOD_t isPOD, IsBitwiseTakable_t isBT)
-      : TupleTypeInfoBase(numFields, ty, size, std::move(spareBits), align,
+      : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
                           isPOD, isBT)
     {}
 
@@ -252,10 +254,10 @@ namespace {
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
   public:
-    NonFixedTupleTypeInfo(unsigned numFields, llvm::Type *T,
+    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *T,
                           Alignment minAlign, IsPOD_t isPOD,
                           IsBitwiseTakable_t isBT)
-      : TupleTypeInfoBase(numFields, T, minAlign, isPOD, isBT) {}
+      : TupleTypeInfoBase(fields, T, minAlign, isPOD, isBT) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             CanType T) const {
@@ -282,27 +284,30 @@ namespace {
       : SequentialTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
-                                    const StructLayout &layout) {
-      return create<FixedTupleTypeInfo>(fields, layout.getType(),
+                                    StructLayout &&layout) {
+      return FixedTupleTypeInfo::create(fields, layout.getType(),
                                         layout.getSize(),
-                                        layout.getSpareBits(),
+                                        std::move(layout.getSpareBits()),
                                         layout.getAlignment(),
                                         layout.isKnownPOD(),
                                         layout.isKnownBitwiseTakable());
     }
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
-                                          const StructLayout &layout) {
-      return create<LoadableTupleTypeInfo>(fields, layout.getType(),
-                                           layout.getSize(),
-                                           layout.getSpareBits(),
+                                          StructLayout &&layout,
+                                          unsigned maxExplosionSize,
+                                          unsigned minExplosionSize) {
+      return LoadableTupleTypeInfo::create(fields, maxExplosionSize,
+                                           minExplosionSize,
+                                           layout.getType(), layout.getSize(),
+                                           std::move(layout.getSpareBits()),
                                            layout.getAlignment(),
                                            layout.isKnownPOD());
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
-                                          const StructLayout &layout) {
-      return create<NonFixedTupleTypeInfo>(fields, layout.getType(),
+                                          StructLayout &&layout) {
+      return NonFixedTupleTypeInfo::create(fields, layout.getType(),
                                            layout.getAlignment(),
                                            layout.isKnownPOD(),
                                            layout.isKnownBitwiseTakable());

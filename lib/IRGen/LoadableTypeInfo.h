@@ -44,6 +44,16 @@ protected:
     assert(isLoadable());
   }
 
+  LoadableTypeInfo(llvm::Type *type, Size size,
+                   llvm::BitVector &&spareBits,
+                   Alignment align,
+                   IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Loadable)
+      : FixedTypeInfo(type, size, std::move(spareBits), align, pod,
+                      // All currently implemented loadable types are bitwise-takable.
+                      IsBitwiseTakable, stik) {
+    assert(isLoadable());
+  }
+
 public:
   // This is useful for metaprogramming.
   static bool isLoadable() { return true; }

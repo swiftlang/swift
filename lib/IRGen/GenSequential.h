@@ -51,6 +51,11 @@ protected:
   explicit SequentialField(const TypeInfo &elementTI)
     : Layout(ElementLayout::getIncomplete(elementTI)) {}
 
+  explicit SequentialField(const ElementLayout &layout,
+                           unsigned begin, unsigned end)
+    : Layout(layout), MaximalBegin(begin), MaximalEnd(end),
+      MinimalBegin(begin), MinimalEnd(end) {}
+
   const FieldImpl *asImpl() const {
     return static_cast<const FieldImpl*>(this);
   }
@@ -110,16 +115,25 @@ private:
     return reinterpret_cast<FieldImpl*>(static_cast<Impl*>(this)+1);
   }
 
-  template <class, class, class> friend class SequentialTypeBuilder;
-
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   template <class... As> 
-  SequentialTypeInfoImpl(unsigned numFields, As&&...args)
-    : Base(std::forward<As>(args)...), NumFields(numFields) {}
+  SequentialTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
+      : Base(std::forward<As>(args)...), NumFields(fields.size()) {
+    std::uninitialized_copy(fields.begin(), fields.end(),
+                            getFieldsBuffer());
+  }
 
 public:
+  /// Allocate and initialize a type info of this type.
+  template <class... As>
+  static Impl *create(ArrayRef<FieldImpl> fields, As &&...args) {
+    void *buffer =
+      ::operator new(sizeof(Impl) + fields.size() * sizeof(FieldImpl));
+    return new(buffer) Impl(fields, std::forward<As>(args)...);
+  }
+
   ArrayRef<FieldImpl> getFields() const {
     return ArrayRef<FieldImpl>(getFieldsBuffer(), NumFields);
   }
@@ -233,13 +247,15 @@ class SequentialTypeInfo<Impl, Base, FieldImpl, /*IsLoadable*/ true>
   unsigned MaximalExplosionSize : 16;
   unsigned MinimalExplosionSize : 16;
 
-  template <class, class, class> friend class SequentialTypeBuilder;
-
 protected:
   using super::asImpl;
 
   template <class... As> 
-  SequentialTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+  SequentialTypeInfo(ArrayRef<FieldImpl> fields, unsigned maxExplosionSize,
+                     unsigned minExplosionSize, As&&...args)
+    : super(fields, std::forward<As>(args)...),
+      MaximalExplosionSize(maxExplosionSize),
+      MinimalExplosionSize(minExplosionSize) {}
 
 private:
   template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
@@ -352,16 +368,6 @@ protected:
   BuilderImpl *asImpl() { return static_cast<BuilderImpl*>(this); }
 
 public:
-  /// Allocate and initialize a type info of the given type.
-  template <class T, class... As>
-  T *create(ArrayRef<FieldImpl> fields, As &&...args) {
-    void *buffer =
-      ::operator new(sizeof(T) + fields.size() * sizeof(FieldImpl));
-    T *type = new(buffer) T(fields.size(), std::forward<As>(args)...);
-    std::uninitialized_copy(fields.begin(), fields.end(), type->getFieldsBuffer());
-    return type;
-  }
-
   TypeInfo *layout(ArrayRef<ASTField> astFields) {
     SmallVector<FieldImpl, 8> fields;
     SmallVector<const TypeInfo *, 8> fieldTypesForLayout;
@@ -407,14 +413,13 @@ public:
     // Create the type info.
     if (loadable) {
       assert(layout.isFixedLayout());
-      auto seqTI = asImpl()->createLoadable(fields, layout);
-      seqTI->MaximalExplosionSize = maximalExplosionSize;
-      seqTI->MinimalExplosionSize = minimalExplosionSize;
-      return seqTI;
+      return asImpl()->createLoadable(fields, std::move(layout),
+                                      maximalExplosionSize,
+                                      minimalExplosionSize);
     } else if (layout.isFixedLayout()) {
-      return asImpl()->createFixed(fields, layout);
+      return asImpl()->createFixed(fields, std::move(layout));
     } else {
-      return asImpl()->createNonFixed(fields, layout);
+      return asImpl()->createNonFixed(fields, std::move(layout));
     }
   }  
 };

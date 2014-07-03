@@ -1,0 +1,77 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -I=%S/Inputs/abi %s -emit-ir -enable-union-import | FileCheck %s
+
+sil_stage canonical
+import c_layout
+
+// CHECK: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], i32, i32, %Sf, i8, [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
+// CHECK: %VSC6Nested = type <{ %Sf, i24 }>
+
+sil public_external @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
+sil public_external @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
+
+sil @test0 : $() -> () {
+bb0:
+  %0 = function_ref @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
+  %1 = apply %0() : $@thin @cc(cdecl) () -> BitfieldOne
+  %2 = function_ref @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
+  apply %2(%1) : $@thin @cc(cdecl) (BitfieldOne) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: define void @test0()
+// CHECK:   [[RESULT:%.*]] = alloca %VSC11BitfieldOne, align 8
+// CHECK:   [[ARG:%.*]] = alloca %VSC11BitfieldOne, align 8
+//   Make the first call and pull all the values out of the indirect result.
+// CHECK:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias sret [[RESULT]])
+// CHECK:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 0
+// CHECK:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK:   [[A:%.*]] = load i32* [[ADDR_A_V]], align 8
+// CHECK:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 1
+// CHECK:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested* [[ADDR_B]], i32 0, i32 0
+// CHECK:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK:   [[B_X:%.*]] = load float* [[ADDR_B_X_V]], align 4
+// CHECK:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested* [[ADDR_B]], i32 0, i32 1
+// CHECK:   [[B_YZ:%.*]] = load i24* [[ADDR_B_YZ]], align 4
+// CHECK:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 3
+// CHECK:   [[CDE:%.*]] = load i32* [[ADDR_CDE]], align 4
+// CHECK:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 4
+// CHECK:   [[FGH:%.*]] = load i32* [[ADDR_FGH]], align 8
+// CHECK:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 5
+// CHECK:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf* [[ADDR_I]], i32 0, i32 0
+// CHECK:   [[I:%.*]] = load float* [[ADDR_I_V]], align 4
+// CHECK:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 6
+// CHECK:   [[JK:%.*]] = load i8* [[ADDR_JK]], align 8
+// CHECK:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 8
+// CHECK:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK:   [[L:%.*]] = load i64* [[ADDR_L_V]], align 8
+// CHECK:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[RESULT]], i32 0, i32 9
+// CHECK:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK:   [[M:%.*]] = load i32* [[ADDR_M_V]], align 8
+//   Put all of the values into the indirect argument and make the second call.
+// CHECK:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 0
+// CHECK:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK:   store i32 [[A]], i32* [[ADDR_A_V]], align 8
+// CHECK:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 1
+// CHECK:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested* [[ADDR_B]], i32 0, i32 0
+// CHECK:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %Sf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK:   store float [[B_X]], float* [[ADDR_B_X_V]], align 4
+// CHECK:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %VSC6Nested* [[ADDR_B]], i32 0, i32 1
+// CHECK:   store i24 [[B_YZ]], i24* [[ADDR_B_YZ]], align 4
+// CHECK:   [[ADDR_CDE:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 3
+// CHECK:   store i32 [[CDE]], i32* [[ADDR_CDE]], align 4
+// CHECK:   [[ADDR_FGH:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 4
+// CHECK:   store i32 [[FGH]], i32* [[ADDR_FGH]], align 8
+// CHECK:   [[ADDR_I:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 5
+// CHECK:   [[ADDR_I_V:%.*]] = getelementptr inbounds %Sf* [[ADDR_I]], i32 0, i32 0
+// CHECK:   store float [[I]], float* [[ADDR_I_V]], align 4
+// CHECK:   [[ADDR_JK:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 6
+// CHECK:   store i8 [[JK]], i8* [[ADDR_JK]], align 8
+// CHECK:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 8
+// CHECK:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK:   store i64 [[L]], i64* [[ADDR_L_V]], align 8
+// CHECK:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne* [[ARG]], i32 0, i32 9
+// CHECK:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
+// CHECK:   call void @consumeBitfieldOne(%VSC11BitfieldOne* byval align 8 [[ARG]])
+// CHECK:   ret void

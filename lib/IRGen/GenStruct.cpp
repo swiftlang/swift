@@ -24,6 +24,9 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/RecordLayout.h"
 
 #include "GenMeta.h"
 #include "GenSequential.h"
@@ -37,6 +40,18 @@
 
 using namespace swift;
 using namespace irgen;
+
+/// The kinds of TypeInfos implementing struct types.
+enum class StructTypeInfoKind {
+  LoadableStructTypeInfo,
+  FixedStructTypeInfo,
+  ClangRecordTypeInfo,
+  NonFixedStructTypeInfo,
+};
+
+static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
+  return (StructTypeInfoKind) type.getSubclassKind();
+}
 
 namespace {
   class StructFieldInfo : public SequentialField<StructFieldInfo> {
@@ -58,20 +73,50 @@ namespace {
     }
   };
 
+  /// A field-info implementation for fields of Clang types.
+  class ClangFieldInfo : public SequentialField<ClangFieldInfo> {
+  public:
+    ClangFieldInfo(VarDecl *swiftField, const ElementLayout &layout,
+                   unsigned explosionBegin, unsigned explosionEnd)
+      : SequentialField(layout, explosionBegin, explosionEnd),
+        Field(swiftField) {}
+
+    VarDecl * const Field;
+
+    StringRef getFieldName() const {
+      if (Field) return Field->getName().str();
+      return "<unimported>";
+    }
+
+    CanType getType(IRGenModule &IGM, CanType T) const {
+      if (Field)
+        return T->getTypeOfMember(IGM.SILMod->getSwiftModule(),
+                                  Field, nullptr)
+          ->getCanonicalType();
+
+      // The Swift-field-less cases use opaque storage, which is
+      // guaranteed to ignore the type passed to it.
+      return CanType();
+    }
+  };
+
   /// A common base class for structs.
-  template <class Impl, class Base>
+  template <class Impl, class Base, class FieldInfoType = StructFieldInfo>
   class StructTypeInfoBase :
-     public SequentialTypeInfo<Impl, Base, StructFieldInfo> {
-    typedef SequentialTypeInfo<Impl, Base, StructFieldInfo> super;
+     public SequentialTypeInfo<Impl, Base, FieldInfoType> {
+    typedef SequentialTypeInfo<Impl, Base, FieldInfoType> super;
 
   protected:
     template <class... As>
-    StructTypeInfoBase(As &&...args) : super(std::forward<As>(args)...) {}
+    StructTypeInfoBase(StructTypeInfoKind kind, As &&...args)
+      : super(std::forward<As>(args)...) {
+      super::setSubclassKind((unsigned) kind);
+    }
 
     using super::asImpl;
 
   public:
-    const StructFieldInfo &getFieldInfo(VarDecl *field) const {
+    const FieldInfoType &getFieldInfo(VarDecl *field) const {
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
         if (fieldInfo.Field == field)
@@ -104,7 +149,7 @@ namespace {
                                 Address addr,
                                 CanType T,
                                 VarDecl *field) const {
-      const StructFieldInfo &fieldInfo = getFieldInfo(field);
+      auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
         return fieldInfo.getTypeInfo().getUndefAddress();
 
@@ -116,7 +161,7 @@ namespace {
     /// field is not at a fixed offset.
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
-      const StructFieldInfo &fieldInfo = getFieldInfo(field);
+      auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.getKind() == ElementLayout::Kind::Fixed) {
         return llvm::ConstantInt::get(IGM.SizeTy,
                                     fieldInfo.getFixedByteOffset().getValue());
@@ -181,16 +226,50 @@ namespace {
     }
   };
 
+  /// A type implementation for loadable record types imported from Clang.
+  class ClangRecordTypeInfo :
+    public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
+                              ClangFieldInfo> {
+  public:
+    ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                        unsigned maxExplosionSize, unsigned minExplosionSize,
+                        llvm::Type *storageType, Size size,
+                        llvm::BitVector &&spareBits, Alignment align)
+      : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
+                           fields, maxExplosionSize, minExplosionSize,
+                           storageType, size, std::move(spareBits),
+                           align, IsPOD) {
+    }
+
+    bool isIndirectArgument(ResilienceExpansion kind) const override {
+      return false;
+    }
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, CanType T) const override {
+      ClangRecordTypeInfo::initialize(IGF, params, addr);
+    }
+
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
+      return Nothing;
+    }
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return Nothing;
+    }
+  };
 
   /// A type implementation for loadable struct types.
   class LoadableStructTypeInfo
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
   public:
     // FIXME: Spare bits between struct members.
-    LoadableStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
-                           llvm::BitVector spareBits,
+    LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                           unsigned maxExplosionSize, unsigned minExplosionSize,
+                           llvm::Type *storageType, Size size,
+                           llvm::BitVector &&spareBits,
                            Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, size, std::move(spareBits),
+      : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
+                           fields, maxExplosionSize, minExplosionSize,
+                           storageType, size, std::move(spareBits),
                            align, isPOD)
     {}
 
@@ -214,10 +293,11 @@ namespace {
                                                    FixedTypeInfo>> {
   public:
     // FIXME: Spare bits between struct members.
-    FixedStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
-                        llvm::BitVector spareBits,
+    FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
+                        Size size, llvm::BitVector &&spareBits,
                         Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
-      : StructTypeInfoBase(numFields, T, size, std::move(spareBits), align,
+      : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
+                           fields, T, size, std::move(spareBits), align,
                            isPOD, isBT)
     {}
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
@@ -292,10 +372,11 @@ namespace {
                                   WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
   {
   public:
-    NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T,
+    NonFixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
                            Alignment align,
                            IsPOD_t isPOD, IsBitwiseTakable_t isBT)
-      : StructTypeInfoBase(numFields, T, align, isPOD, isBT) {
+      : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
+                           fields, T, align, isPOD, isBT) {
     }
 
     // We have an indirect schema.
@@ -362,27 +443,32 @@ namespace {
     }
 
     LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
-                                           const StructLayout &layout) {
-      return create<LoadableStructTypeInfo>(fields, layout.getType(),
+                                           StructLayout &&layout,
+                                           unsigned maxExplosionSize,
+                                           unsigned minExplosionSize) {
+      return LoadableStructTypeInfo::create(fields,
+                                            maxExplosionSize,
+                                            minExplosionSize,
+                                            layout.getType(),
                                             layout.getSize(),
-                                            layout.getSpareBits(),
+                                            std::move(layout.getSpareBits()),
                                             layout.getAlignment(),
                                             layout.isKnownPOD());
     }
 
     FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
-                                     const StructLayout &layout) {
-      return create<FixedStructTypeInfo>(fields, layout.getType(),
+                                     StructLayout &&layout) {
+      return FixedStructTypeInfo::create(fields, layout.getType(),
                                          layout.getSize(),
-                                         layout.getSpareBits(),
+                                         std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
                                          layout.isKnownPOD(),
                                          layout.isKnownBitwiseTakable());
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
-                                           const StructLayout &layout) {
-      return create<NonFixedStructTypeInfo>(fields, layout.getType(),
+                                           StructLayout &&layout) {
+      return NonFixedStructTypeInfo::create(fields, layout.getType(),
                                             layout.getAlignment(),
                                             layout.isKnownPOD(),
                                             layout.isKnownBitwiseTakable());
@@ -404,19 +490,241 @@ namespace {
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }
   };
+
+/// A class for lowering Clang records.
+class ClangRecordLowering {
+  IRGenModule &IGM;
+  StructDecl *SwiftDecl;
+  SILType SwiftType;
+  const clang::RecordDecl *ClangDecl;
+  const clang::ASTContext &ClangContext;
+  const clang::ASTRecordLayout &ClangLayout;
+  const Size TotalStride;
+  Size TotalSize;
+  const Alignment TotalAlignment;
+  llvm::BitVector SpareBits;
+
+  SmallVector<llvm::Type *, 8> LLVMFields;
+  SmallVector<ClangFieldInfo, 8> FieldInfos;
+  Size NextOffset = Size(0);
+  unsigned NextExplosionIndex = 0;
+public:
+  ClangRecordLowering(IRGenModule &IGM, StructDecl *swiftDecl,
+                      const clang::RecordDecl *clangDecl,
+                      SILType swiftType)
+    : IGM(IGM), SwiftDecl(swiftDecl), SwiftType(swiftType),
+      ClangDecl(clangDecl), ClangContext(clangDecl->getASTContext()),
+      ClangLayout(ClangContext.getASTRecordLayout(clangDecl)),
+      TotalStride(Size(ClangLayout.getSize().getQuantity())),
+      TotalSize(TotalStride),
+      TotalAlignment(Alignment(ClangLayout.getAlignment().getQuantity())) {
+    SpareBits.reserve(TotalSize.getValue() * 8);
+  }
+
+  void collectRecordFields() {
+    if (ClangDecl->isUnion()) {
+      collectUnionFields();
+    } else {
+      collectStructFields();
+    }
+
+    // Lots of layout will get screwed up if our structure claims more
+    // storage than we allocated to it.
+    assert(NextOffset == TotalSize && NextOffset <= TotalStride);
+    assert(TotalSize.roundUpToAlignment(TotalAlignment) == TotalStride);
+  }
+
+  const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
+    llvmType->setBody(LLVMFields, /*packed*/ true);
+    return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
+                                       NextExplosionIndex, llvmType, TotalSize,
+                                       std::move(SpareBits), TotalAlignment);
+  }
+
+private:
+  /// Collect all the fields of a union.
+  void collectUnionFields() {
+    addOpaqueField(Size(0), TotalSize);
+  }
+
+  static bool isImportOfClangField(VarDecl *swiftField,
+                                   const clang::FieldDecl *clangField) {
+    assert(swiftField->hasClangNode());
+    return (swiftField->getClangNode().castAsDecl() == clangField);
+  }
+
+  void collectStructFields() {
+    auto cfi = ClangDecl->field_begin(), cfe = ClangDecl->field_end();
+    auto swiftProperties = SwiftDecl->getStoredProperties();
+    auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
+
+    while (cfi != cfe) {
+      const clang::FieldDecl *clangField = *cfi++;
+
+      // Bitfields are currently never mapped, but that doesn't mean
+      // we don't have to copy them.
+      if (clangField->isBitField()) {
+        // Collect all of the following bitfields.
+        unsigned bitStart =
+          ClangLayout.getFieldOffset(clangField->getFieldIndex());
+        unsigned bitEnd = bitStart + clangField->getBitWidthValue(ClangContext);
+
+        while (cfi != cfe && (*cfi)->isBitField()) {
+          clangField = *cfi++;
+          unsigned nextStart =
+            ClangLayout.getFieldOffset(clangField->getFieldIndex());
+          assert(nextStart >= bitEnd && "laying out bit-fields out of order?");
+
+          // In a heuristic effort to reduce the number of weird-sized
+          // fields, whenever we see a bitfield starting on a 32-bit
+          // boundary, start a new storage unit.
+          if (nextStart % 32 == 0) {
+            addOpaqueBitField(bitStart, bitEnd);
+            bitStart = nextStart;
+          }
+
+          bitEnd = nextStart + clangField->getBitWidthValue(ClangContext);
+        }
+
+        addOpaqueBitField(bitStart, bitEnd);
+        continue;
+      }
+
+      VarDecl *swiftField;
+      if (sfi != sfe) {
+        swiftField = *sfi;
+        if (isImportOfClangField(swiftField, clangField)) {
+          ++sfi;
+        } else {
+          swiftField = nullptr;
+        }
+      } else {
+        swiftField = nullptr;
+      }
+
+      // Try to position this field.  If this fails, it's because we
+      // didn't lay out padding correctly.
+      addStructField(clangField, swiftField);
+    }
+
+    assert(sfi == sfe && "more Swift fields than there were Clang fields?");
+
+    // Treat this as the end of the value size.
+    TotalSize = NextOffset;
+  }
+
+  /// Place the next struct field at its appropriate offset.
+  void addStructField(const clang::FieldDecl *clangField,
+                      VarDecl *swiftField) {
+    Size offset(ClangLayout.getFieldOffset(clangField->getFieldIndex()) / 8);
+
+    // If we have a Swift import of this type, use our lowered information.
+    if (swiftField) {
+      auto &fieldTI = cast<LoadableTypeInfo>(
+        IGM.getTypeInfo(SwiftType.getFieldType(swiftField, *IGM.SILMod)));
+      addField(swiftField, offset, fieldTI);
+      return;
+    }
+
+    // Otherwise, add it as an opaque blob.
+    auto fieldSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    return addOpaqueField(offset, Size(fieldSize.getQuantity()));
+  }
+
+  /// Add opaque storage for bitfields spanning the given range of bits.
+  void addOpaqueBitField(unsigned bitBegin, unsigned bitEnd) {
+    assert(bitBegin <= bitEnd);
+
+    // No need to add storage for zero-width bitfields.
+    if (bitBegin == bitEnd) return;
+
+    // Round up to an even number of bytes.
+    assert(bitBegin % 8 == 0);
+    Size offset = Size(bitBegin / 8);
+    Size byteLength = Size((bitEnd - bitBegin + 7) / 8);
+
+    addOpaqueField(offset, byteLength);
+  }
+
+  /// Add opaque storage at the given offset.
+  void addOpaqueField(Size offset, Size fieldSize) {
+    auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize);
+    addField(nullptr, offset, opaqueTI);
+  }
+
+  /// Add storage for an (optional) Swift field at the given offset.
+  void addField(VarDecl *swiftField, Size offset,
+                const LoadableTypeInfo &fieldType) {
+    assert(offset >= NextOffset && "adding fields out of order");
+
+    // Add a padding field if required.
+    if (offset != NextOffset)
+      addPaddingField(offset);
+
+    addFieldInfo(swiftField, fieldType);
+  }
+
+  /// Add information to track a value field at the current offset.
+  void addFieldInfo(VarDecl *swiftField, const LoadableTypeInfo &fieldType) {
+    unsigned explosionSize =
+      fieldType.getExplosionSize(ResilienceExpansion::Maximal);
+    unsigned explosionBegin = NextExplosionIndex;
+    NextExplosionIndex += explosionSize;
+    unsigned explosionEnd = NextExplosionIndex;
+
+    ElementLayout layout = ElementLayout::getIncomplete(fieldType);
+    layout.completeFixed(fieldType.isPOD(ResilienceScope::Local),
+                         NextOffset, LLVMFields.size());
+
+    FieldInfos.push_back(
+           ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
+    LLVMFields.push_back(fieldType.getStorageType());
+    NextOffset += fieldType.getFixedSize();
+
+    // Default to marking all the new storage as used.
+    auto bitStorageSize = fieldType.getFixedSize().getValue() * 8;
+    unsigned oldSize = SpareBits.size();
+    SpareBits.resize(oldSize + bitStorageSize);
+
+    // Go back and mark any spare bits in the value.
+    auto &spareBits = fieldType.getSpareBits();
+    assert(spareBits.size() == bitStorageSize || spareBits.empty());
+
+    // This is absurdly inefficient.  Can't BitVector have an append
+    // method or something?
+    for (int next = spareBits.find_first();
+          next != -1; next = spareBits.find_next((unsigned) next)) {
+      SpareBits.set((unsigned) next);
+    }
+  }
+
+  /// Add padding to get up to the given offset.
+  void addPaddingField(Size offset) {
+    assert(offset > NextOffset);
+    Size count = offset - NextOffset;
+    LLVMFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, count.getValue()));
+    NextOffset = offset;
+    SpareBits.resize(SpareBits.size() + offset.getValue() * 8, true);
+  }
+};
+
 }  // end anonymous namespace.
 
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
 #define FOR_STRUCT_IMPL(IGF, type, op, ...) do {                       \
   auto &structTI = IGF.getTypeInfo(type);                              \
-  if (isa<LoadableStructTypeInfo>(structTI)) {                         \
+  switch (getStructTypeInfoKind(structTI)) {                           \
+  case StructTypeInfoKind::ClangRecordTypeInfo:                        \
+    return structTI.as<ClangRecordTypeInfo>().op(IGF, __VA_ARGS__);    \
+  case StructTypeInfoKind::LoadableStructTypeInfo:                     \
     return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__); \
-  } else if (isa<FixedTypeInfo>(structTI)) {                           \
+  case StructTypeInfoKind::FixedStructTypeInfo:                        \
     return structTI.as<FixedStructTypeInfo>().op(IGF, __VA_ARGS__);    \
-  } else {                                                             \
+  case StructTypeInfoKind::NonFixedStructTypeInfo:                     \
     return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__); \
   }                                                                    \
+  llvm_unreachable("bad struct type info kind!");                      \
 } while(0)
 
 Address irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
@@ -505,18 +813,31 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 #include "llvm/Support/raw_ostream.h"
 
+
+
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
                                                  StructDecl *D) {
-  // Collect all the fields from the type.
-  SmallVector<VarDecl*, 8> fields;
-  for (VarDecl *VD : D->getStoredProperties())
-    fields.push_back(VD);
-
   // Create the struct type.
   auto ty = IGM.createNominalType(D);
 
   // Register a forward declaration before we look at any of the child types.
   addForwardDecl(key, ty);
+
+  // Use different rules for types imported from C.
+  if (D->hasClangNode()) {
+    if (auto clangDecl =
+          dyn_cast_or_null<clang::RecordDecl>(D->getClangNode().getAsDecl())) {
+      ClangRecordLowering lowering(IGM, D, clangDecl,
+                                   SILType::getPrimitiveObjectType(type));
+      lowering.collectRecordFields();
+      return lowering.createTypeInfo(ty);
+    }
+  }
+
+  // Collect all the fields from the type.
+  SmallVector<VarDecl*, 8> fields;
+  for (VarDecl *VD : D->getStoredProperties())
+    fields.push_back(VD);
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);

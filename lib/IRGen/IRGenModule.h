@@ -101,6 +101,7 @@ namespace irgen {
   class FormalType;
   class IRGenDebugInfo;
   class LinkEntity;
+  class LoadableTypeInfo;
   class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;
@@ -236,6 +237,7 @@ public:
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
+  const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size);
   llvm::Type *getStorageTypeForUnlowered(Type T);
   llvm::Type *getStorageTypeForLowered(CanType T);
   llvm::Type *getStorageType(SILType T);

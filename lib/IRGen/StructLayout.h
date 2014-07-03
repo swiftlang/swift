@@ -267,6 +267,9 @@ public:
   /// Return the spare bit mask of the structure built so far.
   const llvm::BitVector &getSpareBits() const { return CurSpareBits; }
 
+  /// Return the spare bit mask of the structure built so far.
+  llvm::BitVector &getSpareBits() { return CurSpareBits; }
+
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
 
@@ -347,6 +350,7 @@ public:
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }
   const llvm::BitVector &getSpareBits() const { return SpareBits; }
+  llvm::BitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
   IsBitwiseTakable_t isKnownBitwiseTakable() const {
