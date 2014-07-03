@@ -553,6 +553,7 @@ function(handle_swift_sources sourcesvar externalvar target name)
     else()
       # Otherwise, get the name from the first swift input file.  Also
       # a hack!
+      # TODO: Fix it, <rdar://problem/17535693>.
       list(GET swift_sources 0 swift_obj_base)
       get_filename_component(swift_obj_base ${swift_obj_base} NAME_WE)
     endif()
