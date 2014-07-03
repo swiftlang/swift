@@ -215,12 +215,9 @@ mutate_unknown itereferes-with get_element, set_element, check_bounds,
                                get_count, get_capacity
 ============== =============== ==========================================
 
-.. [#f1] Although ``check_bounds`` takes an index argument, it guards
-         all ``get_element`` and ``set_element`` operations on the
-         same Array regardless of the index. This allows the optimizer
-         to check a group of ``get/set_element`` operations with indices
-         in the range [i,N] with a single ``check_bounds(N)``
-         operation.
+.. [#f1] Any check_bounds(N) may act as a guard for
+         ``get/set_element(i)`` as long as it can be shown that ``N >=
+         i``.
 
 In addition to preserving these semantics, the optimizer must conservatively handle any unknown access to the array object.
 
