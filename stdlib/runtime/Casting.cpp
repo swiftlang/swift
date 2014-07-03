@@ -87,7 +87,8 @@ uint8_t swift::swift_classShift = 0;
 #if SWIFT_OBJC_INTEROP
 /// Does this object use a tagged-pointer representation?
 static bool isTaggedPointerOrNull(const void *object) {
-  return ((long)object & 1) || ((long)object <= 0);
+  return ((uintptr_t)object & heap_object_abi::ObjCReservedBitsMask) || 
+         object == nullptr;
 }
 #endif
 
