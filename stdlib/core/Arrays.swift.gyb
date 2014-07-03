@@ -248,7 +248,10 @@ extension ${Self} : ArrayType {
   }
 
   @public mutating func sort(isOrderedBefore: (T, T)->Bool) {
-    Swift.sort(&self, isOrderedBefore)
+    return withUnsafeMutableStorage {
+      me in Swift.sort(&me, isOrderedBefore)
+      return
+    }
   }
 
   @public func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
