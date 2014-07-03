@@ -175,3 +175,35 @@ typedef void (*fptr2)(int, long, void *);
 fptr2 getFunctionPointer2(void);
 void useFunctionPointer2(fptr2);
 
+//===---
+// Unions
+//===---
+
+union _GLKVector4 {
+    struct { float x, y, z, w; };
+    struct { float r, g, b, a; };
+    struct { float s, t, p, q; };
+    float v[4];
+} __attribute__((aligned(16)));
+typedef union _GLKVector4 GLKVector4;
+
+typedef struct AnonUnion {
+  union {
+    float a;
+    float b;
+    float c;
+    float d;
+  };
+  int x;
+} AnonUnion;
+
+//===---
+// Bitfields
+//===---
+
+typedef struct ModRM {
+  unsigned rm: 3;
+  unsigned reg: 3;
+  unsigned mod: 2;
+  unsigned opcode;
+} ModRM;

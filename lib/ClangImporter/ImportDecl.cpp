@@ -1611,7 +1611,8 @@ namespace {
       // FIXME: Skip unions for now. We can't properly map them to Swift unions,
       // because they aren't discriminated in any way. We could map them to
       // structs, but that would make them very, very unsafe to use.
-      if (decl->isUnion())
+      if (!Impl.SwiftContext.LangOpts.ImportUnions
+          && decl->isUnion())
         return nullptr;
 
       // FIXME: Skip Microsoft __interfaces.
@@ -1644,13 +1645,15 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // We don't import structs with bitfields because we can not layout them
-      // correctly in IRGen.
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        if (auto FD = dyn_cast<clang::FieldDecl>(*m))
-          if (FD->isBitField())
-            return nullptr;
+      if (!Impl.SwiftContext.LangOpts.ImportUnions) {
+        // We don't import structs with bitfields because we can not layout them
+        // correctly in IRGen.
+        for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+             m != mEnd; ++m) {
+          if (auto FD = dyn_cast<clang::FieldDecl>(*m))
+            if (FD->isBitField())
+              return nullptr;
+        }
       }
 
       // Create the struct declaration and record it.
@@ -1667,24 +1670,27 @@ namespace {
       // functions.
 
       // Import each of the members.
+      // TODO: Implement union members.
       SmallVector<Decl *, 4> members;
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        auto nd = dyn_cast<clang::NamedDecl>(*m);
-        if (!nd)
-          continue;
-
-        // Skip anonymous structs or unions; they'll be dealt with via the
-        // IndirectFieldDecls.
-        if (auto field = dyn_cast<clang::FieldDecl>(nd))
-          if (field->isAnonymousStructOrUnion())
+      if (!decl->isUnion()) {
+        for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+             m != mEnd; ++m) {
+          auto nd = dyn_cast<clang::NamedDecl>(*m);
+          if (!nd)
             continue;
 
-        auto member = Impl.importDecl(nd);
-        if (!member || !isa<VarDecl>(member))
-          continue;
+          // Skip anonymous structs or unions; they'll be dealt with via the
+          // IndirectFieldDecls.
+          if (auto field = dyn_cast<clang::FieldDecl>(nd))
+            if (field->isAnonymousStructOrUnion())
+              continue;
 
-        members.push_back(member);
+          auto member = Impl.importDecl(nd);
+          if (!member || !isa<VarDecl>(member))
+            continue;
+
+          members.push_back(member);
+        }
       }
 
       for (auto member : members) {
