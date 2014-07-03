@@ -251,14 +251,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       }
     }
 
-    if (!Lexer::isIdentifier(ModuleName)) {
+    if (!Lexer::isIdentifier(ModuleName) ||
+        (ModuleName == STDLIB_NAME && !Opts.ParseStdlib)) {
       if (!Opts.actionHasOutput() ||
           (Opts.InputKind == SourceFileKind::Main &&
            Opts.InputFilenames.size() == 1)) {
         ModuleName = "main";
       } else {
-        Diags.diagnose(SourceLoc(), diag::error_bad_module_name,
-                       ModuleName, A == nullptr);
+        auto DID = (ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
+                                               : diag::error_bad_module_name;
+        Diags.diagnose(SourceLoc(), DID, ModuleName, A == nullptr);
         ModuleName = "__bad__";
       }
     }
