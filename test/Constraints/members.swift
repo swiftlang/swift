@@ -35,7 +35,7 @@ yf.f1(i, y: 1)
 Swift.print(3)
 
 var format : String
-format._splitFirstIf({ $0.isAlpha() })
+format._splitFirstIf({ $0.isASCII() })
 
 // Archetypes
 func doGetLogicValue<T : LogicValue>(t: T) {

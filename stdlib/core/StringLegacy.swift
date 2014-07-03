@@ -137,9 +137,9 @@ extension String {
     return Swift.startsWith(lazy(self).reverse(), lazy(suffix).reverse())
   }
 
-  func _isAlpha() -> Bool { return _isAll({ $0.isAlpha() }) }
-  func _isDigit() -> Bool { return _isAll({ $0.isDigit() }) }
-  func _isSpace() -> Bool { return _isAll({ $0.isSpace() }) }
+  func _isAlpha() -> Bool { return _isAll({ $0._isAlpha() }) }
+  func _isDigit() -> Bool { return _isAll({ $0._isDigit() }) }
+  func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 
 /// Represent a positive integer value in the given radix,
@@ -287,7 +287,7 @@ extension String {
     // negative numbers; detect underflows before they happen. 
     var res : Int = 0
     for c in scalars[start..<scalars.endIndex] {
-      if !c.isDigit() {
+      if !c._isASCIIDigit() {
         // Conversion failed if a non-digit is encountered.
         return .None
       }

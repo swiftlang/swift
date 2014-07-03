@@ -124,17 +124,21 @@
   }
 
   // FIXME: Locales make this interesting
-  @public func isAlpha() -> Bool {
+  @private func _isAlpha() -> Bool {
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
-  // FIXME: Locales make this interesting
-  @public func isDigit() -> Bool {
+  @private func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"
   }
 
+  // FIXME: Locales make this interesting.
+  @private func _isDigit() -> Bool {
+    return _isASCIIDigit()
+  }
+
   // FIXME: Locales make this interesting
-  @public var uppercase : UnicodeScalar {
+  @private var _uppercase : UnicodeScalar {
     if self >= "a" && self <= "z" {
       return UnicodeScalar(UInt32(self) - 32)
     } else if self >= "à" && self <= "þ" && self != "÷" {
@@ -144,7 +148,7 @@
   }
 
   // FIXME: Locales make this interesting
-  @public var lowercase : UnicodeScalar {
+  @private var _lowercase : UnicodeScalar {
     if self >= "A" && self <= "Z" {
       return UnicodeScalar(UInt32(self) + 32)
     } else if self >= "À" && self <= "Þ" && self != "×" {
@@ -154,7 +158,7 @@
   }
 
   // FIXME: Locales make this interesting.
-  @public func isSpace() -> Bool {
+  @private func _isSpace() -> Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,
     // until we can optimize the constraint solver better.
