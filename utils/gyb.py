@@ -827,6 +827,10 @@ def main():
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
         print ast
+        
+    # Allow the template to import .py files from its own directory
+    sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
+    
     args.target.write(executeTemplate(ast, args.line_directive, **bindings))
 
 if __name__ == '__main__':
