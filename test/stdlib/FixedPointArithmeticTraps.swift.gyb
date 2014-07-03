@@ -293,26 +293,27 @@ if arg == "${testNum}" {
 
 if arg == "${testNum}" {
 %   if IntTy == 'Int8':
-  // <rdar://problem/17549300> [FastISel?] LLVM miscompiles
-  // @llvm.smul.with.overflow.i8 on x86-64
-  //
-  // Because of this bug, check that we *don't* trap instead.
   var a = get${IntTy}(${IntTy}.max / 3)
 
   expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
   a = a * get${IntTy}(2)
 
-  if _isDebugAssertConfiguration() {
-    expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
-    a = a * get${IntTy}(2)
-
+  // <rdar://problem/17549300> [FastISel?] LLVM miscompiles
+  // @llvm.smul.with.overflow.i8 on x86-64
+  var runTest = !_isDebugAssertConfiguration()
+#if arch(arm) || arch(arm64)
+  runTest = true
+#endif
+  if !runTest {
+    // There is a bug in LLVM, we can not run the test, so just crash in some
+    // way.
+    a = get${IntTy}(${IntTy}.max)
     println("OK")
-    a = a + a
-  } else {
-    expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
-    println("OK")
-    a = a * get${IntTy}(2)
+    a++
   }
+  expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
+  println("OK")
+  a = a * get${IntTy}(2)
 %   else:
   var a = get${IntTy}(${IntTy}.max / 3)
 
