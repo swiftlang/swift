@@ -28,3 +28,17 @@ func bar() {
 // OTHER-FILE-NEG-NOT: CLASS_DECL
 // OTHER-FILE: ENUM_DECL
 // THIS-FILE-NEG-NOT: ENUM_DECL
+
+
+// <rdar://problem/17251682>
+struct StructWithInheritedConformances: Sequence {
+  struct EmptyGenerator: Generator {
+    mutating func next() -> Int? {
+      return nil
+    }
+  }
+
+  func generate() -> EmptyGenerator {
+    return EmptyGenerator()
+  }
+}

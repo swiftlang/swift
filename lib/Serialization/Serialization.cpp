@@ -761,32 +761,39 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numValueWitnesses = 0;
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
-    conformance->forEachValueWitness(nullptr,
-                                     [&](ValueDecl *req,
-                                         ConcreteDeclRef witness) {
-      data.push_back(addDeclRef(req));
-      data.push_back(addDeclRef(witness.getDecl()));
-      // The substitution records are serialized later.
-      data.push_back(witness.getSubstitutions().size());
-      ++numValueWitnesses;
-    });
 
-    conformance->forEachTypeWitness(/*resolver=*/nullptr,
-                                    [&](AssociatedTypeDecl *assocType,
-                                        const Substitution &witness) {
-       data.push_back(addDeclRef(assocType));
-       // The substitution record is serialized later.
-       ++numTypeWitnesses;
-      return false;
-    });
+    // If we have an incomplete conformance, it might have just not been
+    // deserialized. That's okay if this is just a reference to it.
+    if (conformance->isIncomplete()) {
+      assert(writeIncomplete && "trying to write an incomplete conformance");
+    } else {
+      conformance->forEachValueWitness(nullptr,
+                                       [&](ValueDecl *req,
+                                           ConcreteDeclRef witness) {
+        data.push_back(addDeclRef(req));
+        data.push_back(addDeclRef(witness.getDecl()));
+        // The substitution records are serialized later.
+        data.push_back(witness.getSubstitutions().size());
+        ++numValueWitnesses;
+      });
 
-    for (auto defaulted : conf->getDefaultedDefinitions()) {
-      data.push_back(addDeclRef(defaulted));
-      ++numDefaultedDefinitions;
+      conformance->forEachTypeWitness(/*resolver=*/nullptr,
+                                      [&](AssociatedTypeDecl *assocType,
+                                          const Substitution &witness) {
+         data.push_back(addDeclRef(assocType));
+         // The substitution record is serialized later.
+         ++numTypeWitnesses;
+        return false;
+      });
+
+      for (auto defaulted : conf->getDefaultedDefinitions()) {
+        data.push_back(addDeclRef(defaulted));
+        ++numDefaultedDefinitions;
+      }
+
+      if (writeIncomplete)
+        data.clear();
     }
-
-    if (writeIncomplete)
-      data.clear();
 
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode

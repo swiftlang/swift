@@ -220,7 +220,7 @@ public:
   }
 
   /// Return true if this is a child of the specified other decl context.
-  bool isChildContextOf(DeclContext *Other) const {
+  bool isChildContextOf(const DeclContext *Other) const {
     if (this == Other) return false;
 
     for (const DeclContext *CurContext = this; CurContext;
