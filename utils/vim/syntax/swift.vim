@@ -53,6 +53,7 @@ syn match swiftOct /[+\-]\?\<0o[0-7][0-7_]*\>/
 syn match swiftBin /[+\-]\?\<0b[01][01_]*\>/
 
 syn match swiftOperator +\.\@<!\.\.\.\@!\|[/=\-+*%<>!&|^~]\@<!\(/[/*]\@![/=\-+*%<>!&|^~]*\|*/\@![/=\-+*%<>!&|^~]*\|->\@![/=\-+*%<>!&|^~]*\|[=+%<>!&|^~][/=\-+*%<>!&|^~]*\)+ skipwhite nextgroup=swiftTypeParameters
+syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
