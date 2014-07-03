@@ -65,6 +65,12 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
+static bool isInSystemModule(DeclContext *D) {
+  if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
+    return true;
+  return false;
+}
+
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        DeclContext *DC,
                                        const clang::MacroInfo *MI,
@@ -91,7 +97,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
-    auto type = Impl.importType(clangTy, ImportTypeKind::Value);
+    auto type = Impl.importType(clangTy, ImportTypeKind::Value,
+                                isInSystemModule(DC));
     if (!type)
       return nullptr;
 
@@ -313,7 +320,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         return nullptr;
 
       auto clangTy = base->getType();
-      auto type = impl.importType(clangTy, ImportTypeKind::Value);
+      auto type = impl.importType(clangTy, ImportTypeKind::Value,
+                                  isInSystemModule(DC));
       if (!type)
         return nullptr;
 

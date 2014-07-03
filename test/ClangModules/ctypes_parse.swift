@@ -5,6 +5,7 @@
 
 import ctypes
 import CoreGraphics
+import Foundation
 
 var cgPointVar: CGPoint
 

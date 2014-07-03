@@ -59,6 +59,7 @@
 
 // FOUNDATION:      {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
+// FOUNDATION-NEXT  func objectAtIndex(index: Int) -> AnyObject!
 
 // FOUNDATION:      {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}

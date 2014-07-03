@@ -29,13 +29,6 @@ typedef struct {
   };
 } AnonStructs;
 
-typedef struct __NSFastEnumerationState_s {
-  unsigned long state;
-  void *itemsPtr;
-  unsigned long *mutationsPtr;
-  unsigned long extra[5];
-} NSFastEnumerationState;
-
 typedef const void *CFTypeRef;
 typedef void const *HWND;
 typedef struct __CFString *CFMutableStringRef;

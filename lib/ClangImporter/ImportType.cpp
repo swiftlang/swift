@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -98,10 +99,12 @@ namespace {
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
     ClangImporter::Implementation &Impl;
+    bool IsUsedInSystemModule;
     
   public:
-    SwiftTypeConverter(ClangImporter::Implementation &impl)
-      : Impl(impl) {}
+    SwiftTypeConverter(ClangImporter::Implementation &impl,
+                       bool isUsedInSystemModule)
+      : Impl(impl), IsUsedInSystemModule(isUsedInSystemModule) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -213,7 +216,9 @@ namespace {
       if (pointeeQualType->isVoidType())
         pointeeType = Impl.SwiftContext.TheEmptyTupleType;
       else
-        pointeeType = Impl.importType(pointeeQualType, ImportTypeKind::Pointee);
+        pointeeType = Impl.importType(pointeeQualType,
+                                      ImportTypeKind::Pointee,
+                                      IsUsedInSystemModule);
 
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.
@@ -258,7 +263,8 @@ namespace {
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
       Type pointeeType = Impl.importType(type->getPointeeType(),
-                                         ImportTypeKind::Abstract);
+                                         ImportTypeKind::Abstract,
+                                         IsUsedInSystemModule);
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
@@ -295,7 +301,8 @@ namespace {
       // we can cheese static-offset "indexing" using .$n operations.
       
       Type elementType = Impl.importType(type->getElementType(),
-                                         ImportTypeKind::Pointee);
+                                         ImportTypeKind::Pointee,
+                                         IsUsedInSystemModule);
       if (!elementType)
         return Type();
       
@@ -325,7 +332,8 @@ namespace {
       // Import the result type.  We currently provide no mechanism
       // for this to be audited.
       auto resultTy = Impl.importType(type->getReturnType(),
-                                      ImportTypeKind::Result);
+                                      ImportTypeKind::Result,
+                                      IsUsedInSystemModule);
       if (!resultTy)
         return Type();
 
@@ -333,7 +341,8 @@ namespace {
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
-        auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter);
+        auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
+                                            IsUsedInSystemModule);
         if (!swiftParamTy)
           return Type();
 
@@ -354,7 +363,8 @@ namespace {
     VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
       // Import functions without prototypes as functions with no parameters.
       auto resultTy = Impl.importType(type->getReturnType(),
-                                      ImportTypeKind::Result);
+                                      ImportTypeKind::Result,
+                                      IsUsedInSystemModule);
       if (!resultTy)
         return Type();
 
@@ -648,6 +658,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         Type importedType,
                                         ImportTypeKind importKind,
                                         ImportHint hint,
+                                        bool isUsedInSystemModule,
                                         OptionalTypeKind optKind) {
   if (importKind == ImportTypeKind::Abstract) {
     return importedType;
@@ -667,7 +678,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     auto refType = clangType->castAs<clang::ReferenceType>();
     // Import the underlying type.
     auto objectType = impl.importType(refType->getPointeeType(),
-                                      ImportTypeKind::Pointee);
+                                      ImportTypeKind::Pointee,
+                                      isUsedInSystemModule);
     if (!objectType)
       return nullptr;
 
@@ -710,9 +722,10 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return impl.getNamedSwiftType(impl.getStdlibModule(), "Bool");
   }
 
-  // When NSUInteger is used as an enum's underlying type, make sure
-  // it stays unsigned.
-  if (hint == ImportHint::NSUInteger && importKind == ImportTypeKind::Enum) {
+  // When NSUInteger is used as an enum's underlying type or if it does not come
+  // from a system module, make sure it stays unsigned.
+  if (hint == ImportHint::NSUInteger)
+     if (importKind == ImportTypeKind::Enum || !isUsedInSystemModule) {
     return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
   }
 
@@ -765,6 +778,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
 Type ClangImporter::Implementation::importType(clang::QualType type,
                                                ImportTypeKind importKind,
+                                               bool isUsedInSystemModule,
                                                OptionalTypeKind optionality) {
   if (type.isNull())
     return Type();
@@ -798,21 +812,24 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   }
   
   // Perform abstract conversion, ignoring how the type is actually used.
-  SwiftTypeConverter converter(*this);
+  SwiftTypeConverter converter(*this, isUsedInSystemModule);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
                                      importKind, importResult.Hint,
+                                     isUsedInSystemModule,
                                      optionality);
 }
 
 Type ClangImporter::Implementation::importPropertyType(
-       const clang::ObjCPropertyDecl *decl) {
+       const clang::ObjCPropertyDecl *decl,
+       bool isFromSystemModule) {
   OptionalTypeKind optionality = ImportWithTighterObjCPointerTypes
                                  ? getKnownObjCProperty(decl)
                                  : OTK_ImplicitlyUnwrappedOptional;
-  return importType(decl->getType(), ImportTypeKind::Property, optionality);
+  return importType(decl->getType(), ImportTypeKind::Property,
+                    isFromSystemModule, optionality);
 }
 
 Type ClangImporter::Implementation::importFunctionType(
@@ -820,6 +837,7 @@ Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
+       bool isFromSystemModule,
        SmallVectorImpl<Pattern*> &bodyPatterns) {
 
   // Cannot import variadic types.
@@ -836,9 +854,11 @@ Type ClangImporter::Implementation::importFunctionType(
       clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
 
   // Import the result type.
-  auto swiftResultTy = importType(resultType, (isAuditedResult
-                                               ? ImportTypeKind::AuditedResult
-                                               : ImportTypeKind::Result));
+  auto swiftResultTy = importType(resultType,
+                                  (isAuditedResult
+                                    ? ImportTypeKind::AuditedResult
+                                    : ImportTypeKind::Result),
+                                  isFromSystemModule);
   if (!swiftResultTy)
     return Type();
 
@@ -856,7 +876,8 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Import the parameter type into Swift.
-    Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+    Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter,
+                                   isFromSystemModule);
     if (!swiftParamTy)
       return Type();
 
@@ -920,6 +941,7 @@ Type ClangImporter::Implementation::importMethodType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
+       bool isFromSystemModule,
        SmallVectorImpl<Pattern*> &bodyPatterns,
        DeclName methodName,
        SpecialMethodKind kind) {
@@ -957,7 +979,8 @@ Type ClangImporter::Implementation::importMethodType(
                                          : OTK_ImplicitlyUnwrappedOptional;
 
   // Import the result type.
-  auto swiftResultTy = importType(resultType, resultKind, OptionalityOfReturn);
+  auto swiftResultTy = importType(resultType, resultKind,
+                                  isFromSystemModule, OptionalityOfReturn);
   if (!swiftResultTy)
     return Type();
 
@@ -981,13 +1004,16 @@ Type ClangImporter::Implementation::importMethodType(
       swiftParamTy = getOptionalType(getNSCopyingType(),
                                      ImportTypeKind::Parameter);
     } else if (kind == SpecialMethodKind::PropertyAccessor) {
-      swiftParamTy = importType(paramTy, ImportTypeKind::PropertyAccessor);
+      swiftParamTy = importType(paramTy,
+                                ImportTypeKind::PropertyAccessor,
+                                isFromSystemModule);
     } else {
       OptionalTypeKind OptionalityOfParam = knownMethod
                                           ? knownMethod->getParamTypeInfo(index)
                                           : OTK_ImplicitlyUnwrappedOptional;
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::Parameter,
+                                isFromSystemModule,
                                 OptionalityOfParam);
     }
     if (!swiftParamTy)

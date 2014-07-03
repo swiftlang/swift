@@ -68,6 +68,12 @@ static Type getSelfTypeForContext(DeclContext *dc) {
   return dc->getDeclaredTypeOfContext();
 }
 
+static bool isInSystemModule(DeclContext *D) {
+  if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
+    return true;
+  return false;
+}
+
 /// Create an implicit 'self' decl for a method in the specified type.  If
 /// 'static' is true, then this is self for a static method in the type.
 ///
@@ -1147,7 +1153,8 @@ namespace {
 
       if (!SwiftType)
         SwiftType = Impl.importType(Decl->getUnderlyingType(),
-                                    ImportTypeKind::Abstract);
+                                    ImportTypeKind::Abstract,
+                                    isInSystemModule(DC));
 
       if (!SwiftType)
         return nullptr;
@@ -1419,7 +1426,8 @@ namespace {
 
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum);
+                                              ImportTypeKind::Enum,
+                                              isInSystemModule(dc));
         if (!underlyingType)
           return nullptr;
 
@@ -1458,7 +1466,8 @@ namespace {
       case EnumKind::Enum: {
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum);
+                                              ImportTypeKind::Enum,
+                                              isInSystemModule(dc));
         if (!underlyingType)
           return nullptr;
         
@@ -1490,7 +1499,8 @@ namespace {
       case EnumKind::Options: {
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum);
+                                              ImportTypeKind::Enum,
+                                              isInSystemModule(dc));
         if (!underlyingType)
           return nullptr;
 
@@ -1743,7 +1753,8 @@ namespace {
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
         auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
-                                    ImportTypeKind::Value);
+                                    ImportTypeKind::Value,
+                                    isInSystemModule(dc));
         if (!type)
           return nullptr;
         // FIXME: Importing the type will recursively revisit this same
@@ -1772,7 +1783,8 @@ namespace {
         // Import the enumeration type.
         auto enumType = Impl.importType(
                           Impl.getClangASTContext().getTagDeclType(clangEnum),
-                          ImportTypeKind::Value);
+                          ImportTypeKind::Value,
+                          isInSystemModule(dc));
         if (!enumType)
           return nullptr;
         // FIXME: Importing the type will can recursively revisit this same
@@ -1822,12 +1834,14 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
-      if (!type)
-        return nullptr;
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType(),
+                                  ImportTypeKind::Variable,
+                                  isInSystemModule(dc));
+      if (!type)
         return nullptr;
 
       // Map this indirect field to a Swift variable.
@@ -1854,6 +1868,7 @@ namespace {
                                             decl->param_size() },
                                           decl->isVariadic(),
                                           decl->isNoReturn(),
+                                          isInSystemModule(dc),
                                           bodyPatterns);
       if (!type)
         return nullptr;
@@ -1922,12 +1937,14 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
-      if (!type)
-        return nullptr;
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType(),
+                                  ImportTypeKind::Variable,
+                                  isInSystemModule(dc));
+      if (!type)
         return nullptr;
 
       auto result =
@@ -1971,14 +1988,16 @@ namespace {
       bool isAudited = (decl->getType().isConstQualified() &&
                         Impl.SwiftContext.LangOpts.ImportCFTypes);
 
-      auto type = Impl.importType(decl->getType(), (isAudited
-                                                    ? ImportTypeKind::AuditedVariable
-                                                    : ImportTypeKind::Variable));
-      if (!type)
-        return nullptr;
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
+        return nullptr;
+
+      auto type = Impl.importType(decl->getType(),
+                                  (isAudited
+                                     ? ImportTypeKind::AuditedVariable
+                                     : ImportTypeKind::Variable),
+                                  isInSystemModule(dc));
+      if (!type)
         return nullptr;
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
@@ -2248,6 +2267,7 @@ namespace {
                                             decl->param_size() },
                                           decl->isVariadic(),
                                           decl->hasAttr<clang::NoReturnAttr>(),
+                                          isInSystemModule(dc),
                                           bodyPatterns,
                                           name,
                                           kind);
@@ -2595,6 +2615,7 @@ namespace {
                                         args,
                                         variadic,
                                         objcMethod->hasAttr<clang::NoReturnAttr>(),
+                                        isInSystemModule(dc),
                                         bodyPatterns,
                                         name,
                                         SpecialMethodKind::Constructor);
@@ -3436,7 +3457,8 @@ namespace {
       // Re-import the type as a property type.
       auto clangGetter = cast<clang::ObjCMethodDecl>(getter->getClangDecl());
       auto type = Impl.importType(clangGetter->getReturnType(),
-                                  ImportTypeKind::Property);
+                                  ImportTypeKind::Property,
+                                  isInSystemModule(dc));
       if (!type)
         return nullptr;
 
@@ -4260,7 +4282,7 @@ namespace {
         }
       }
 
-      Type type = Impl.importPropertyType(decl);
+      Type type = Impl.importPropertyType(decl, isInSystemModule(dc));
       if (!type)
         return nullptr;
 

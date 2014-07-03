@@ -864,10 +864,14 @@ public:
   ///
   /// \param kind The kind of type import we're performing.
   ///
+  /// \param isUsedInSystemModule Tells us that the use of the type is comming
+  ///        from system module.
+  ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
+                  bool isUsedInSystemModule,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
 
   /// \brief Import the given function type.
@@ -891,9 +895,11 @@ public:
                           clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
+                          bool isFromSystemModule,
                           SmallVectorImpl<Pattern*> &bodyPatterns);
 
-  Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl);
+  Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
+                          bool isFromSystemModule);
 
   /// \brief Import the type of an Objective-C method.
   ///
@@ -920,6 +926,7 @@ public:
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
+                        bool isFromSystemModule,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
                         DeclName methodName,
                         SpecialMethodKind kind);
