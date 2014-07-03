@@ -611,6 +611,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
 
+  Opts.ImportWithTighterObjCPointerTypes |=
+    Args.hasArg(OPT_import_tighter_objc_types);
+
   return false;
 }
 

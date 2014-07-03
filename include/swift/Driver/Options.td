@@ -113,9 +113,14 @@ def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>, Alias<I>;
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
+
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
+
+def import_tighter_objc_types : Flag<["-"], "import-tighter-objc-types">,
+  Flags<[FrontendOption,HelpHidden]>,
+  HelpText<"Import audited APIs with tighter types, not unwrapped optionals">;
 
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;

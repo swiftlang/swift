@@ -160,6 +160,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_g);
   inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
+  inputArgs.AddLastArg(arguments, options::OPT_import_tighter_objc_types);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);

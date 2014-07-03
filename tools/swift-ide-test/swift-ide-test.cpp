@@ -162,7 +162,7 @@ ImplicitObjCWith("implicit-objc-with",
                  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-ImportWithTighterObjCPointerTypes("import-with-tighter-objc-types",
+ImportWithTighterObjCPointerTypes("import-tighter-objc-types",
                  llvm::cl::desc("import audited APIs with the tighter types, not unwrapped optionals"),
                  llvm::cl::init(false));
 
