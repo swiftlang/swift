@@ -63,6 +63,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   REPL.swift
   Range.swift.gyb
+  RangeMirrors.swift.gyb
   Reflection.swift
   Repeat.swift
   Reverse.swift.gyb

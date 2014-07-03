@@ -60,7 +60,7 @@ else:
 }%
 
 extension ${introspecteeType} : Reflectable {
-  func getMirror() -> Mirror {
+  @public func getMirror() -> Mirror {
     return _${introspecteeType}Mirror(self)
   }
 }

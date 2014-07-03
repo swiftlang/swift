@@ -299,12 +299,10 @@ println("Character:")
 println(reflect(Character("a")).summary)
 
 let range = 3...9
-// CHECK-NEXT: Range(3 to 10)
+// CHECK-NEXT: RandomAccessRange(3,10)
 println(reflect(range).summary)
 // CHECK-NEXT: startIndex=3
 println("startIndex=\(reflect(range)[0].1.summary)")
-// CHECK-NEXT: stride=2
-println("stride=\(reflect(range.by(2))[2].1.summary)")
 
 protocol Fooable {}
 extension Int : Fooable {}
