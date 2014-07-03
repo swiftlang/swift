@@ -9,7 +9,7 @@
   func internalReq()
 }
 
-// expected-note@+1 5 {{type declared here}}
+// expected-note@+1 + {{type declared here}}
 @private protocol PrivateProto {
   func privateReq()
 }
@@ -20,14 +20,14 @@
   @private func privateReq() {}
 }
 
-// expected-note@+1 4 {{type declared here}}
+// expected-note@+1 + {{type declared here}}
 @internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-11=@internal}}
   @private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-11=@internal}}
   @private func privateReq() {}
 }
 
-// expected-note@+1 40 {{type declared here}}
+// expected-note@+1 + {{type declared here}}
 @private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   @private func publicReq() {}
   @private func internalReq() {}

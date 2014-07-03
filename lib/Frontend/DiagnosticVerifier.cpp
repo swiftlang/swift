@@ -170,6 +170,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       continue;
     }
 
+    bool AtLeastOne = false;
     unsigned MatchCount = 1;
     int LineOffset = 0;
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
@@ -203,14 +204,18 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }
 
     if (TextStartIdx > 0) {
-      if (MatchStart.substr(0, TextStartIdx).rtrim()
-          .getAsInteger(10, MatchCount)) {
+      StringRef CountStr = MatchStart.substr(0, TextStartIdx).rtrim();
+      if (CountStr == "+") {
+        // Rely on wraparound to bring this to UINT_MAX after the first match,
+        // thus continuing to search for diagnostics until we've matched all
+        // of them.
+        MatchCount = 0;
+        AtLeastOne = true;
+      } else if (CountStr.getAsInteger(10, MatchCount)) {
         Errors.push_back(std::make_pair(MatchStart.data(),
                                         "expected match count before '{{'"));
         continue;
-      }
-
-      if (MatchCount == 0) {
+      } else if (MatchCount == 0) {
         Errors.push_back({ MatchStart.data(),
           "expected positive match count before '{{'" });
         continue;
@@ -218,8 +223,6 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       // Resync up to the '{{'.
       MatchStart = MatchStart.substr(TextStartIdx);
-    } else {
-      MatchCount = 1;
     }
 
     size_t End = MatchStart.find("}}");
@@ -249,11 +252,13 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       PrevExpectedContinuationLine = 0;
 
     // Check to see if we had this expected diagnostic.
-    while (MatchCount--) {
+    do {
       auto FoundDiagnosticIter = findDiagnostic(Expected, BufferName);
       if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
-        Errors.push_back(std::make_pair(ExpectedStringStart,
-                                        "expected diagnostic not produced"));
+        if (!AtLeastOne || MatchCount == 0) {
+          Errors.push_back(std::make_pair(ExpectedStringStart,
+                                          "expected diagnostic not produced"));
+        }
         break;
       }
       auto &FoundDiagnostic = *FoundDiagnosticIter;
@@ -352,7 +357,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // again. We do have to do this after checking fix-its, though, because
       // the diagnostic owns its fix-its.
       CapturedDiagnostics.erase(FoundDiagnosticIter);
-    }
+    } while (--MatchCount);
   }
 
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
