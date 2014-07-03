@@ -444,6 +444,16 @@ func testInoutViolation() {
     X(10), X(8), X(6), X(4), X(2), X(0), X(9), X(7), X(5), X(3), X(1)
   ]
 
+%for A in ['ContiguousArray', 'Array', 'Slice']:
+  if true {
+    var b = ${A}(a)
+    b.sort { x, y in
+      b.removeAll()
+      return x < y
+    }
+  }
+%end
+  
   // An overload of sort for Arrays uses withUnsafeMutableStorage,
   // which disables bounds checks.
   sort(&a) { x, y in
