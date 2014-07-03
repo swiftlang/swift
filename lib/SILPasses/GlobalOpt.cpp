@@ -37,8 +37,9 @@ namespace {
 ///
 /// - When the addressor is local to the module, be sure it is inlined to allow
 ///   constant propagation in case of statically initialized "lets".
-class SILGlobalOpt : public SILModuleTransform
-{
+class SILGlobalOpt {
+  SILModule *Module;
+
   // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   llvm::MapVector<SILFunction*, GlobalInitCalls> GlobalInitCallMap;
@@ -49,9 +50,9 @@ class SILGlobalOpt : public SILModuleTransform
   llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
 
 public:
-  void run() override;
+  SILGlobalOpt(SILModule *M): Module(M) {}
 
-  StringRef getName() override { return "SIL Global Optimization"; }
+  void run();
 
 protected:
   void collectGlobalInitCall(ApplyInst *AI);
@@ -135,7 +136,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 }
 
 void SILGlobalOpt::run() {
-  for (auto &F : *getModule())
+  for (auto &F : *Module)
     for (auto &BB : F)
       for (auto &I : BB)
         if (ApplyInst *AI = dyn_cast<ApplyInst>(&I))
@@ -143,10 +144,19 @@ void SILGlobalOpt::run() {
 
   for (auto &InitCalls : GlobalInitCallMap)
     placeInitializers(InitCalls.first, InitCalls.second);
-
-  GlobalInitCallMap.clear();
 }
 
+namespace {
+class SILGlobalOptPass : public SILModuleTransform
+{
+  void run() override {
+    SILGlobalOpt(getModule()).run();
+  }
+
+  StringRef getName() override { return "SIL Global Optimization"; }
+};
+} // anonymous
+
 SILTransform *swift::createGlobalOpt() {
-  return new SILGlobalOpt();
+  return new SILGlobalOptPass();
 }
