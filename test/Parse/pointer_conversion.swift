@@ -1,4 +1,4 @@
-// RUN: %swift -enable-string-pointer-conversion -parse -verify %s
+// RUN: %swift -parse -verify %s
 
 class C {}
 class D {}

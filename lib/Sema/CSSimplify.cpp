@@ -1799,8 +1799,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
               
               // The pointer can be converted from a string, if the element type
               // is compatible.
-              if (TC.Context.LangOpts.EnableStringPointerConversion &&
-                  type1->isEqual(TC.getStringType(DC))) {
+              if (type1->isEqual(TC.getStringType(DC))) {
                 TypeVariableType *tv = nullptr;
                 auto baseTy = getFixedTypeRecursive(bgt2->getGenericArgs()[0],
                                                     tv, false, false);

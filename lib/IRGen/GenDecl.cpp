@@ -355,18 +355,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   auto accessorTy
     = llvm::FunctionType::get(Int8PtrTy, {}, /*varArg*/ false);
   
-  // TODO: Remove this when String pointer interop is staged in.
-  const char *argvAccessor = Context.LangOpts.EnableStringPointerConversion
-    // global accessor for Swift.C_ARGV : UnsafePointer<UnsafePointer<Int8>>
-    ? "_TFSsa6C_ARGVGVSs13UnsafePointerGS_VSs4Int8__"
-    // global accessor for Swift.C_ARGV : UnsafePointer<CString>
-    : "_TFSsa6C_ARGVGVSs13UnsafePointerVSs7CString_";
-  
   for (auto varNames : {
     // global accessor for Swift.C_ARGC : CInt
     std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
     // global accessor for Swift.C_ARGV : UnsafePointer<CString>
-    std::make_pair("argv", argvAccessor),
+    std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerGS_VSs4Int8__"),
   }) {
     StringRef fnParameterName;
     StringRef accessorName;

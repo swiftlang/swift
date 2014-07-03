@@ -82,9 +82,6 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = false;
     
-    /// Enable string-to-pointer argument conversions.
-    bool EnableStringPointerConversion = true;
-
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)

@@ -163,12 +163,7 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!parsed)
     return nullptr;
 
-  Type importTy;
-  if (isObjC || Impl.SwiftContext.LangOpts.EnableStringPointerConversion) {
-    importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
-  } else {
-    importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
-  }
+  Type importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
   if (!importTy)
     return nullptr;
 
