@@ -714,29 +714,10 @@ macro(add_swift_library_single target name)
   
   set_output_directory(${target} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+  # Collect compile and link flags for the static and non-static targets.
+  # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly. 
   set(compile_flags "${SWIFTLIB_SINGLE_COMPILE_FLAGS}")
   set(link_flags "${SWIFTLIB_SINGLE_LINK_FLAGS}")
-
-  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
-    set(target_static "${target}_static")
-    add_library( ${target_static} STATIC
-      ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
-    set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
-    add_dependencies(${target_static} ${name})
-    set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
-    if (SWIFT_SDKS)
-      # FIXME: Deal with library variants here
-      set(compile_flags
-        "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
-    endif()
-
-    set_target_properties(${target_static} PROPERTIES 
-      COMPILE_FLAGS "${compile_flags}")
-    set_target_properties(${target_static} PROPERTIES 
-      LINK_FLAGS "${link_flags}")
-  endif()
   
   if (MODULE)
     set_target_properties(${target} PROPERTIES
@@ -756,7 +737,8 @@ macro(add_swift_library_single target name)
   set_source_files_properties(${SWIFTLIB_SINGLE_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
 
-  target_link_libraries( ${target} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}" ${SWIFTLIB_SINGLE_DEPENDS} )
+  set(link_flags "${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+  target_link_libraries(${target} ${SWIFTLIB_SINGLE_DEPENDS})
   
   # Link against system frameworks.
   foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
@@ -842,15 +824,9 @@ macro(add_swift_library_single target name)
     if (SWIFT_SDKS)
       # Deployment flags.
       set(compile_flags "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
-      set(link_flags "${link_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ${SWIFTLIB_SINGLE_LINK_FLAGS}")
+      set(link_flags "${link_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
     endif()
   endif()
-
-  # Set compile flags.
-  set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${compile_flags}")
-
-  # Set link flags.
-  set_target_properties(${target} PROPERTIES LINK_FLAGS "${link_flags}")
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(${target}
@@ -871,14 +847,13 @@ macro(add_swift_library_single target name)
     endif()
 
     set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
-    target_link_libraries(${target}
-      "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
+    set(link_flags "${link_flags} -Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
     configure_file("${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in" "${PLIST_INFO_PLIST_OUT}" @ONLY)
 
     # If Application Extensions are enabled, pass the linker flag marking
     # the dylib as safe.
     if (CXX_SUPPORTS_FAPPLICATION_EXTENSION AND (NOT DISABLE_APPLICATION_EXTENSION))
-      target_link_libraries(${target} "-Wl,-application_extension")
+      set(link_flags "${link_flags} -Wl,-application_extension")
     endif()
 
     set(PLIST_INFO_UTI)
@@ -888,6 +863,38 @@ macro(add_swift_library_single target name)
   endif()
 
   set_target_properties(${target} PROPERTIES FOLDER "Swift libraries")
+
+  # Configure the static library target.
+  # Set compile and link flags for the non-static target. 
+  # Do these LAST.
+
+  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
+    set(target_static "${target}_static")
+    add_library( ${target_static} STATIC
+      ${SWIFTLIB_SINGLE_SOURCES}
+      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+    set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
+    add_dependencies(${target_static} ${name})
+    set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+    if (SWIFT_SDKS)
+      # FIXME: Deal with library variants here
+      set(compile_flags
+        "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
+    endif()
+
+    set_target_properties(${target_static} PROPERTIES 
+      COMPILE_FLAGS "${compile_flags}"
+      LINK_FLAGS "${link_flags}")
+  endif()
+
+  # Do not add code here.
+
+  set_target_properties(${target} PROPERTIES 
+    COMPILE_FLAGS "${compile_flags}"
+    LINK_FLAGS "${link_flags}")
+
+  # Do not add code here.
 endmacro(add_swift_library_single)
 
 # Translate a yes/no variable to the presence of a given string in a
@@ -1141,32 +1148,31 @@ macro(add_swift_executable name)
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
 
-  target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTEXE_DEPENDS} )
+  set_property(TARGET ${name} APPEND_STRING PROPERTY
+    LINK_FLAGS " -L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}")
+  target_link_libraries( ${name} ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
 
   if (SWIFT_SDKS)
-    set_target_properties(${name} PROPERTIES
-      COMPILE_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} "
-      LINK_FLAGS "${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS} ")
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+      COMPILE_FLAGS " ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+      LINK_FLAGS    " ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
   endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
+
+  if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+      LINK_FLAGS " -Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR}")
+  endif()
+ 
   # ASan does not play well with exported_symbol option. This should be fixed soon.
   if(NOT SWIFT_ASAN_BUILD)
-    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main -Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR} ")
-    endif()
-  else()
-    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR} ")
-    endif()
+    set_property(TARGET ${name} APPEND_STRING PROPERTY
+      LINK_FLAGS " -Xlinker -exported_symbol -Xlinker _main")
   endif()
-
 endmacro(add_swift_executable)
 
 macro(manpage PODFILE DESC MANFILE SECTION)
