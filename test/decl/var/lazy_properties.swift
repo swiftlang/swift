@@ -43,7 +43,7 @@ class TestClass {
   }*/
 
   init() {
-    @lazy var localvar = 42  // expected-error {{@lazy is only valid members of a struct or class}}
+    @lazy var localvar = 42  // expected-error {{@lazy is only valid for members of a struct or class}}
   }
 }
 
