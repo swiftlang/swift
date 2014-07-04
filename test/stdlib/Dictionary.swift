@@ -10,6 +10,7 @@
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
 import Darwin
+import StdlibUnittest
 
 //===---
 // Utilities.
@@ -3713,44 +3714,52 @@ func getDerivedAPIsDictionary() -> Dictionary<Int, Int> {
   return d
 }
 
-func testDerivedAPIs_keys() {
+var DictionaryDerivedAPIs = TestCase("DictionaryDerivedAPIs")
+
+DictionaryDerivedAPIs.test("isEmpty") {
+  if true {
+    var empty = Dictionary<Int, Int>()
+    expectTrue(empty.isEmpty)
+  }
+  if true {
+    var d = getDerivedAPIsDictionary()
+    expectFalse(d.isEmpty)
+  }
+}
+
+DictionaryDerivedAPIs.test("keys") {
   if true {
     var empty = Dictionary<Int, Int>()
     var keys = Array(empty.keys)
-    assert(equalsUnordered(keys, []))
+    expectTrue(equalsUnordered(keys, []))
   }
   if true {
     var d = getDerivedAPIsDictionary()
     var keys = Array(d.keys)
-    assert(equalsUnordered(keys, [ 10, 20, 30 ]))
+    expectTrue(equalsUnordered(keys, [ 10, 20, 30 ]))
   }
-
-  println("testDerivedAPIs_keys done")
 }
-testDerivedAPIs_keys()
-// CHECK: testDerivedAPIs_keys done
 
-func testDerivedAPIs_values() {
+DictionaryDerivedAPIs.test("values") {
   if true {
     var empty = Dictionary<Int, Int>()
     var values = Array(empty.values)
-    assert(equalsUnordered(values, []))
+    expectTrue(equalsUnordered(values, []))
   }
   if true {
     var d = getDerivedAPIsDictionary()
 
     var values = Array(d.values)
-    assert(equalsUnordered(values, [ 1010, 1020, 1030 ]))
+    expectTrue(equalsUnordered(values, [ 1010, 1020, 1030 ]))
 
     d[11] = 1010
     values = Array(d.values)
-    assert(equalsUnordered(values, [ 1010, 1010, 1020, 1030 ]))
+    expectTrue(equalsUnordered(values, [ 1010, 1010, 1020, 1030 ]))
   }
-
-  println("testDerivedAPIs_values done")
 }
-testDerivedAPIs_values()
-// CHECK: testDerivedAPIs_values done
+
+DictionaryDerivedAPIs.run()
+// CHECK: {{^}}DictionaryDerivedAPIs: All tests passed
 
 //===---
 // Misc tests.

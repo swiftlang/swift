@@ -1772,6 +1772,10 @@ struct Dictionary<
   // API itself.
   //
 
+  @public var isEmpty: Bool {
+    return count == 0
+  }
+
   @public var keys: LazyBidirectionalCollection<
     MapCollectionView<Dictionary, KeyType>
   > {
