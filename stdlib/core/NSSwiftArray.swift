@@ -21,7 +21,7 @@ import SwiftShims
 
 // Base class of the heap buffer implementation backing the new Array
 // design.  
-@objc @internal
+@internal objc
 class _NSSwiftArray : HeapBufferStorageBase, _CocoaArray {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   

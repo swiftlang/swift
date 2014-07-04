@@ -171,7 +171,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return getLinkageForLocalContext(closure->getParent());
   
   // Native function-local declarations have local linkage.
-  // FIXME: @objc declarations should be too, but we currently have no way
+  // FIXME: objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
   DeclContext *dc = d->getDeclContext();

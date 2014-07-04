@@ -145,7 +145,7 @@ public:
 
     return Text == "mutating" || Text == "nonmutating" ||
            Text == "override" || Text == "weak" || Text == "unowned" ||
-           Text == "strong" || Text == "convenience";
+           Text == "strong" || Text == "convenience" || Text == "objc";
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {

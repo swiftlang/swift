@@ -2973,7 +2973,7 @@ public:
   /// Note that this can find methods, initializers, getters, and setters.
   ArrayRef<ValueDecl *> lookupDirect(ObjCSelector selector);
 
-  /// Record the presence of an @objc member whose Objective-C name has been
+  /// Record the presence of an objc member whose Objective-C name has been
   /// finalized.
   void recordObjCMember(ValueDecl *vd);
 
@@ -3139,7 +3139,7 @@ public:
     /// since they never have storage.
     ///
     /// These accessors are used for several different purposes:
-    ///   1) In an @objc variable, these accessors are dynamically dispatched
+    ///   1) In an objc variable, these accessors are dynamically dispatched
     ///      to and may be overridden.
     ///   2) When a stored property satisfies a protocol requirement, these
     ///      accessors end up as entries in the witness table.

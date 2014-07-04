@@ -151,7 +151,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   }
 
   case DAK_ObjC: {
-    Printer << "@objc";
+    Printer << "objc";
     llvm::SmallString<32> scratch;
     if (auto Name = cast<ObjCAttr>(this)->getName()) {
       Printer << "(" << Name->getString(scratch) << ")";
@@ -229,10 +229,13 @@ StringRef DeclAttribute::getAttrName() const {
 }
 
 
-ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
+ObjCAttr::ObjCAttr(SourceLoc ObjCLoc,
                    Optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
-  : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
+  : DeclAttribute(DAK_ObjC, ObjCLoc,
+                  SourceRange(ObjCLoc,
+                              parenRange.isValid() ? parenRange.End : ObjCLoc),
+                  /*Implicit=*/false),
     NameData(nullptr)
 {
   if (name) {
@@ -255,24 +258,22 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name) {
   return new (Ctx) ObjCAttr(name);
 }
 
-ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
+ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx,
                                   SourceLoc ObjCLoc) {
-  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), Nothing,
-                            SourceRange(), { });
+  return new (Ctx) ObjCAttr(ObjCLoc, Nothing, SourceRange(), { });
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
   return new (Ctx) ObjCAttr(Nothing);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
+ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx,
                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
   unsigned size = sizeof(ObjCAttr) + 3 * sizeof(SourceLoc);
   void *mem = Ctx.Allocate(size, alignof(ObjCAttr));
-  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
-                            ObjCSelector(Ctx, 0, Name),
+  return new (mem) ObjCAttr(ObjCLoc, ObjCSelector(Ctx, 0, Name),
                             SourceRange(LParenLoc, RParenLoc),
                             NameLoc);
 }
@@ -281,7 +282,7 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name) {
   return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name));
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx,
                                    SourceLoc ObjCLoc, SourceLoc LParenLoc, 
                                    ArrayRef<SourceLoc> NameLocs,
                                    ArrayRef<Identifier> Names,
@@ -289,8 +290,7 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
   assert(NameLocs.size() == Names.size());
   unsigned size = sizeof(ObjCAttr) + (NameLocs.size() + 2) * sizeof(SourceLoc);
   void *mem = Ctx.Allocate(size, alignof(ObjCAttr));
-  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
-                            ObjCSelector(Ctx, Names.size(), Names),
+  return new (mem) ObjCAttr(ObjCLoc, ObjCSelector(Ctx, Names.size(), Names),
                             SourceRange(LParenLoc, RParenLoc),
                             NameLocs);
 }

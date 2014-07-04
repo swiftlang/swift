@@ -65,7 +65,7 @@
 ; CHECK: _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 ; CHECK: _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
-; CHECK: _TToFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> @objc foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
+; CHECK: _TToFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> objc foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
 ; CHECK: _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ @infix (foo.bar, foo.bas) -> foo.zim
 ; CHECK: _TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ @postfix (foo.bar, foo.bas) -> foo.zim

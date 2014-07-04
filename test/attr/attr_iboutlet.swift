@@ -11,7 +11,7 @@ struct IBStructTy {}
 @IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
 func IBFunction() -> () {}
 
-@objc
+objc
 class IBOutletWrapperTy {
   @IBOutlet
   var value : IBOutletWrapperTy = IBOutletWrapperTy() // no-warning
@@ -42,21 +42,21 @@ protocol P2 { }
 @class_protocol protocol CP1 { }
 @class_protocol protocol CP2 { }
 
-@objc protocol OP1 { }
-@objc protocol OP2 { }
+objc protocol OP1 { }
+objc protocol OP2 { }
 
 class NonObjC {}
 
 // Check where @IBOutlet can occur
-@objc class X {
+objc class X {
   // Class type
   @IBOutlet var outlet1: X
   @IBOutlet var outlet2: X?
   @IBOutlet var outlet3: X!
 
-  @IBOutlet var outlet1a: NonObjC // expected-error{{'IBOutlet' property cannot have non-'@objc' class type 'NonObjC'}}
-  @IBOutlet var outlet2a: NonObjC? // expected-error{{'IBOutlet' property cannot have non-'@objc' class type 'NonObjC'}}
-  @IBOutlet var outlet3a: NonObjC! // expected-error{{'IBOutlet' property cannot have non-'@objc' class type 'NonObjC'}}
+  @IBOutlet var outlet1a: NonObjC // expected-error{{'IBOutlet' property cannot have non-'objc' class type 'NonObjC'}}
+  @IBOutlet var outlet2a: NonObjC? // expected-error{{'IBOutlet' property cannot have non-'objc' class type 'NonObjC'}}
+  @IBOutlet var outlet3a: NonObjC! // expected-error{{'IBOutlet' property cannot have non-'objc' class type 'NonObjC'}}
 
   // AnyObject
   @IBOutlet var outlet4: AnyObject
@@ -130,14 +130,14 @@ class NonObjC {}
   @IBOutlet var collection5b: ([String])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var collection5c: ([String])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
 
-  @IBOutlet var collection6a: [NonObjC] // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
-  @IBOutlet var collection6b: ([NonObjC])? // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
-  @IBOutlet var collection6c: ([NonObjC])! // expected-error{{'IBOutlet' property cannot be an array of non-'@objc' class type}}
+  @IBOutlet var collection6a: [NonObjC] // expected-error{{'IBOutlet' property cannot be an array of non-'objc' class type}}
+  @IBOutlet var collection6b: ([NonObjC])? // expected-error{{'IBOutlet' property cannot be an array of non-'objc' class type}}
+  @IBOutlet var collection6c: ([NonObjC])! // expected-error{{'IBOutlet' property cannot be an array of non-'objc' class type}}
 
   init() { }
 }
 
-@objc class Infer {
+objc class Infer {
   @IBOutlet var outlet1: Infer!
   @IBOutlet weak var outlet2: Infer!
 
@@ -166,10 +166,10 @@ class NonObjC {}
 
 
 
-@objc class C {
+objc class C {
 }
 
-@objc protocol Proto {
+objc protocol Proto {
 }
 
 class SwiftGizmo {

@@ -161,11 +161,11 @@ class SwiftGizmo : Gizmo {
   deinit { var x = 10 }
 
   var enabled: Bool {
-    @objc(isEnabled) get {
+    objc(isEnabled) get {
       return true
     }
 
-    @objc(setIsEnabled:) set {
+    objc(setIsEnabled:) set {
     }  
   }
 }

@@ -2342,7 +2342,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     Printer << "@!objc ";
     return;
   case Node::Kind::ObjCAttribute:
-    Printer << "@objc ";
+    Printer << "objc ";
     return;
   case Node::Kind::SpecializedAttribute:
     Printer << "specialization <";

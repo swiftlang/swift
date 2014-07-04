@@ -12,9 +12,9 @@
 // this class only exists to allow AnyObject lookup of _copyImageData
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
-@objc class _SpriteKitMethodProvider : NSObject {
+objc class _SpriteKitMethodProvider : NSObject {
   init() { _fatalError("don't touch me") }
-  @objc func _copyImageData() -> NSData! { return nil }
+  objc func _copyImageData() -> NSData! { return nil }
 }
 
 // HACK - these four mirrors do the exact same thing, they should be one and the same

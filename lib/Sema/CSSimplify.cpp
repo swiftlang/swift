@@ -1686,7 +1686,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return addSolvedRestrictedConstraint(
                            ConversionRestrictionKind::ClassMetatypeToAnyObject);
       }
-      // Single @objc protocol value metatypes can be converted to the ObjC
+      // Single objc protocol value metatypes can be converted to the ObjC
       // Protocol class type.
       auto isProtocolClassType = [&](Type t) -> bool {
         if (auto classDecl = t->getClassOrBoundGenericClass())

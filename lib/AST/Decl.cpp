@@ -1941,7 +1941,7 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
 }
 
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
-  // If the getter has an @objc attribute with a name, use that.
+  // If the getter has an objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
       if (auto name = objcAttr->getName())
@@ -1967,7 +1967,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
-  // If the setter has an @objc attribute with a name, use that.
+  // If the setter has an objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
@@ -2135,7 +2135,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   // Unwrap metatypes for remaining checks.
   bool allowExistential = true;
   if (auto metaTy = type->getAs<AnyMetatypeType>()) {
-    // Foo.Protocol is not an @objc type.
+    // Foo.Protocol is not an objc type.
     allowExistential = !isa<MetatypeType>(metaTy);
     type = metaTy->getInstanceType();
   }
@@ -2144,7 +2144,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   if (type->is<ClassType>())
     return true;
 
-  // @objc protocols
+  // objc protocols
   if (allowExistential && type->isObjCExistentialType())
     return true;
   
@@ -2709,7 +2709,7 @@ ObjCSelector FuncDecl::getObjCSelector() const {
                       : asd->getObjCSetterSelector();
   }
 
-  // If there is an @objc attribute with a name, use that name.
+  // If there is an objc attribute with a name, use that name.
   auto objc = getAttrs().getAttribute<ObjCAttr>();
   if (objc) {
     if (auto name = objc->getName())
@@ -2832,7 +2832,7 @@ Type ConstructorDecl::getResultType() const {
 }
 
 ObjCSelector ConstructorDecl::getObjCSelector() const {
-  // If there is an @objc attribute with a name, use that name.
+  // If there is an objc attribute with a name, use that name.
   auto objc = getAttrs().getAttribute<ObjCAttr>();
   if (objc) {
     if (auto name = objc->getName())

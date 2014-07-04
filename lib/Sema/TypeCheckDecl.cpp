@@ -2650,7 +2650,7 @@ public:
     validateAttributes(TC, VD);
     TC.checkDeclAttributesEarly(VD);
 
-    // The instance var requires ObjC interop if it has an @objc or @iboutlet
+    // The instance var requires ObjC interop if it has an objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
     Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
@@ -2939,7 +2939,7 @@ public:
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
 
-    // A subscript is ObjC-compatible if it's explicitly @objc, or a
+    // A subscript is ObjC-compatible if it's explicitly objc, or a
     // member of an ObjC-compatible class or protocol.
     if (dc->getDeclaredTypeInContext()) {
       ClassDecl *classContext = dc->getDeclaredTypeInContext()
@@ -3344,7 +3344,7 @@ public:
       classDecl = classDecl->getSuperclass()->getClassOrBoundGenericClass();
     }
 
-    // If all of the variables are @objc, we can use @NSManaged.
+    // If all of the variables are objc, we can use @NSManaged.
     for (auto var : vars) {
       if (!var->isObjC())
         return false;
@@ -4095,7 +4095,7 @@ public:
 
     validateAttributes(TC, FD);
 
-    // A method is ObjC-compatible if it's explicitly @objc, a member of an
+    // A method is ObjC-compatible if it's explicitly objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
     Type ContextTy = FD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
@@ -4121,7 +4121,7 @@ public:
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
         // The only additional condition we need to check is if the var decl
-        // had an @objc or @iboutlet property.
+        // had an objc or @iboutlet property.
 
         ValueDecl *prop = cast<ValueDecl>(FD->getAccessorStorageDecl());
         // Validate the subscript or property because it might not be type
@@ -4544,7 +4544,7 @@ public:
       if (!attr->hasName())
         return;
 
-      // If the overriding declaration already has an @objc attribute, check
+      // If the overriding declaration already has an objc attribute, check
       // whether the names are consistent.
       auto name = *attr->getName();
       if (auto overrideAttr = Override->getAttrs().getAttribute<ObjCAttr>()) {
@@ -4968,7 +4968,7 @@ public:
 
     validateAttributes(TC, CD);
 
-    // An initializer is ObjC-compatible if it's explicitly @objc or a member
+    // An initializer is ObjC-compatible if it's explicitly objc or a member
     // of an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
@@ -5059,7 +5059,7 @@ public:
 
     DD->setType(FnTy);
 
-    // Destructors are always @objc, because their Objective-C entry point is
+    // Destructors are always objc, because their Objective-C entry point is
     // -dealloc.
     markAsObjC(DD, true);
 
@@ -5184,7 +5184,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     validateAttributes(*this, D);
     checkInheritanceClause(D);
 
-    // Mark a class as @objc. This must happen before checking its members.
+    // Mark a class as objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
       ClassDecl *superclassDecl = nullptr;
       if (CD->hasSuperclass())
@@ -5240,7 +5240,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
 
-    // If the protocol is @objc, it may only refine other @objc protocols.
+    // If the protocol is objc, it may only refine other objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       bool isObjC = true;
@@ -5691,7 +5691,7 @@ createDesignatedInitOverride(TypeChecker &tc,
   if (superclassCtor->isObjC()) {
     ctor->setIsObjC(true);
 
-    // Inherit the @objc name from the superclass initializer, if it
+    // Inherit the objc name from the superclass initializer, if it
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
       if (objcAttr->hasName())
@@ -6274,9 +6274,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                       numParameters,
                       numParameters != 1);
           D->getMutableAttrs().add(
-            ObjCAttr::createUnnamed(TC.Context,
-                                    objcAttr->AtLoc,
-                                    objcAttr->Range.Start));
+            ObjCAttr::createUnnamed(TC.Context, objcAttr->Range.Start));
           D->getMutableAttrs().removeAttribute(objcAttr);
         }
       }
@@ -6458,7 +6456,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  // Only protocols that are @objc can have "unavailable" methods.
+  // Only protocols that are objc can have "unavailable" methods.
   if (auto AvAttr = Attrs.getUnavailable()) {
     if (auto PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
       if (!PD->isObjC()) {

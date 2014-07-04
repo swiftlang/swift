@@ -1754,7 +1754,7 @@ static void lookupLibraryTypes(TypeChecker &TC,
   }
 }
 
-/// Emit an additional diagnostic describing why we are applying @objc to the
+/// Emit an additional diagnostic describing why we are applying objc to the
 /// decl, if this is not obvious from the decl itself.
 static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
                                ObjCReason Reason) {
@@ -1769,10 +1769,10 @@ static bool isClassOrObjCProtocol(Type T) {
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
     if (Protocols.empty()) {
-      // protocol<> is not @objc.
+      // protocol<> is not objc.
       return false;
     }
-    // Check that all protocols are @objc.
+    // Check that all protocols are objc.
     for (auto PD : Protocols) {
       if (!PD->isObjC())
         return false;
@@ -1920,7 +1920,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
       }
 
       // FIXME: Egregious hack to avoid our conversion operations becoming
-      // @objc for bridged classes, which causes extraneous thunks.
+      // objc for bridged classes, which causes extraneous thunks.
       if (FD->getAttrs().isConversion())
         return false;
     }
@@ -2301,11 +2301,11 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
     if (Protocols.empty()) {
-      // protocol<> is not @objc.
+      // protocol<> is not objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }
-    // Find a protocol that is not @objc.
+    // Find a protocol that is not objc.
     for (auto PD : Protocols) {
       if (!PD->isObjC()) {
         diagnose(TypeRange.Start, diag::not_objc_protocol,

@@ -2922,7 +2922,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
 
 void IRGenSILFunction::visitObjCMetatypeToObjectInst(
                                                   ObjCMetatypeToObjectInst *i){
-  // Bitcast the @objc metatype reference, which is already an ObjC object, to
+  // Bitcast the objc metatype reference, which is already an ObjC object, to
   // the destination type.
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *value = from.claimNext();
@@ -2934,7 +2934,7 @@ void IRGenSILFunction::visitObjCMetatypeToObjectInst(
 
 void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(
                                        ObjCExistentialMetatypeToObjectInst *i){
-  // Bitcast the @objc metatype reference, which is already an ObjC object, to
+  // Bitcast the objc metatype reference, which is already an ObjC object, to
   // the destination type. The metatype may carry additional witness tables we
   // can drop.
   Explosion from = getLoweredExplosion(i->getOperand());

@@ -249,7 +249,7 @@ class _NSContiguousString : NSString {
     }
   }
 
-  @objc
+  objc
   func _fastCharacterContents() -> UnsafePointer<unichar> {
     return value.elementWidth == 2 ? UnsafePointer(value.startUTF16) : nil
   }
@@ -1267,7 +1267,7 @@ extension NSArray {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // Use Imported:
-    // @objc(initWithObjects:count:)
+    // objc(initWithObjects:count:)
     //    init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //    count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
@@ -1304,7 +1304,7 @@ extension NSOrderedSet {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
-    // @objc(initWithObjects:count:)
+    // objc(initWithObjects:count:)
     // init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //      count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
@@ -1319,7 +1319,7 @@ extension NSSet {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
-    // @objc(initWithObjects:count:)
+    // objc(initWithObjects:count:)
     // init(withObjects objects: ConstUnsafePointer<AnyObject?>, count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)

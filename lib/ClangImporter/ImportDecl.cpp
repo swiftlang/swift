@@ -2047,7 +2047,7 @@ namespace {
       return nullptr;
     }
 
-    /// Add an @objc(name) attribute with the given, optional name expressed as
+    /// Add an objc(name) attribute with the given, optional name expressed as
     /// selector.
     ///
     /// The importer should use this rather than adding the attribute directly.
@@ -2064,7 +2064,7 @@ namespace {
       }
     }
 
-    /// Add an @objc(name) attribute with the given, optional name expressed as
+    /// Add an objc(name) attribute with the given, optional name expressed as
     /// selector.
     ///
     /// The importer should use this rather than adding the attribute directly.
@@ -2338,7 +2338,7 @@ namespace {
           isa<ProtocolDecl>(dc))
         result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
-      // Mark this method @objc.
+      // Mark this method objc.
       addObjCAttribute(result, selector);
 
       // Mark class methods as static.

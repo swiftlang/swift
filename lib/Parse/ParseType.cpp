@@ -953,21 +953,34 @@ bool Parser::canParseTypeComposition() {
 }
 
 bool Parser::canParseAttributes() {
-  while (consumeIf(tok::at_sign)) {
-    if (!consumeIf(tok::identifier)) return false;
-    
-    if (consumeIf(tok::equal)) {
-      if (Tok.isNot(tok::identifier) &&
-          Tok.isNot(tok::integer_literal) &&
-          Tok.isNot(tok::floating_literal))
-        return false;
-      consumeToken();
-    } else if (Tok.is(tok::l_paren)) {
-      // Attributes like cc(x,y,z)
-      skipSingle();
+  while (1) {
+    if (consumeIf(tok::at_sign)) {
+      if (!consumeIf(tok::identifier)) return false;
+
+      if (consumeIf(tok::equal)) {
+        if (Tok.isNot(tok::identifier) &&
+            Tok.isNot(tok::integer_literal) &&
+            Tok.isNot(tok::floating_literal))
+          return false;
+        consumeToken();
+      } else if (Tok.is(tok::l_paren)) {
+        // Attributes like cc(x,y,z)
+        skipSingle();
+      }
+      continue;
     }
-    
-    consumeIf(tok::comma);
+
+    if (Tok.isContextualKeyword("objc")) {
+      consumeToken(tok::identifier);
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.is(tok::colon) || Tok.is(tok::identifier) ||
+               Tok.isKeyword())
+          consumeToken();
+        if (!consumeIf(tok::r_paren))
+          return false;
+      }
+    }
+    break;
   }
   return true;
 }

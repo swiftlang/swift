@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------
 // Declaring optional requirements
 // -----------------------------------------------------------------------
-@class_protocol @objc protocol P1 {
+@class_protocol objc protocol P1 {
   @optional func method(x: Int)
 
   @optional var prop: Int { get }
@@ -130,10 +130,10 @@ func optionalSubscriptExistential(t: P1) {
 }
   
 protocol optErrorProtocol {
-  @optional func foo(x: Int) // expected-error{{'optional' attribute can only be applied to members of an @objc protocol}}
+  @optional func foo(x: Int) // expected-error{{'optional' attribute can only be applied to members of an objc protocol}}
   @optional typealias Assoc // expected-error{{invalid attributes specified for typealias}}
 }
 
-@objc protocol optionalInitProto {
+objc protocol optionalInitProto {
   @optional init() // expected-error{{'optional' attribute cannot be applied to an initializer}}
 }

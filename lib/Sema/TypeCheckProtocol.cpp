@@ -409,7 +409,7 @@ namespace {
 
 static std::pair<Type,Type> getTypesToCompare(ValueDecl *reqt, Type reqtType,
                                               Type witnessType) {
-  // Only do this hack when the protocol is @objc.
+  // Only do this hack when the protocol is objc.
   if (reqt->isObjC()) {
     // If the requirement type is an ImplicitlyUnwrappedOptional type, pretend it isn't.
     if (auto reqtValueType = reqtType->getImplicitlyUnwrappedOptionalObjectType()) {

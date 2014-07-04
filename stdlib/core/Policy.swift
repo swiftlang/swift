@@ -53,7 +53,7 @@
 //===----------------------------------------------------------------------===//
 
 @public typealias Any = protocol<>
-@class_protocol @objc @public
+@class_protocol @public objc
 protocol AnyObject {}
 
 @public typealias AnyClass = AnyObject.Type

@@ -509,10 +509,10 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
 }
 
 /// This class existis only to work around a compiler limitation.
-/// Specifically, we can not have @objc members in a generic class.  When this
+/// Specifically, we can not have objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_NativeDictionaryStorageKeyNSEnumerator`.
-@objc
+objc
 class _NativeDictionaryStorageKeyNSEnumeratorBase
     : _NSSwiftEnumerator, _SwiftNSEnumerator {
 
@@ -536,18 +536,18 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   // Do not call any of these methods from the standard library!
   //
 
-  @objc
+  objc
   init() {
     _fatalError("don't call this designated initializer")
   }
 
-  @objc
+  objc
   func nextObject() -> AnyObject? {
     return bridgingNextObject(())
   }
 }
 
-@final @objc
+@final objc
 class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
     : _NativeDictionaryStorageKeyNSEnumeratorBase {
 
@@ -584,10 +584,10 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
 }
 
 /// This class existis only to work around a compiler limitation.
-/// Specifically, we can not have @objc members in a generic class.  When this
+/// Specifically, we can not have objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_NativeDictionaryStorageOwner`.
-@objc @public
+@public objc
 class _NativeDictionaryStorageOwnerBase
     : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverrides {
 
@@ -595,7 +595,7 @@ class _NativeDictionaryStorageOwnerBase
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
-  // subclass of an @objc class has no effect
+  // subclass of an objc class has no effect
   var bridgingCount: (Int, ()) {
     _fatalError("'bridgingCount' should be overridden")
   }
@@ -626,7 +626,7 @@ class _NativeDictionaryStorageOwnerBase
   // `nativeStorage`.
   //
 
-  @objc @public
+  @public objc
   init(
     objects: ConstUnsafePointer<AnyObject?>,
     forKeys: ConstUnsafePointer<Void>,
@@ -635,12 +635,12 @@ class _NativeDictionaryStorageOwnerBase
     _fatalError("don't call this designated initializer")
   }
 
-  @objc @public
+  @public objc
   var count: Int {
     return bridgingCount.0
   }
 
-  @objc @public
+  @public objc
   func objectForKey(aKey: AnyObject?) -> AnyObject? {
     if let nonNullKey: AnyObject = aKey {
       return bridgingObjectForKey(nonNullKey, dummy: ())
@@ -648,19 +648,19 @@ class _NativeDictionaryStorageOwnerBase
     return nil
   }
 
-  @objc @public
+  @public objc
   func keyEnumerator() -> _SwiftNSEnumerator? {
     return bridgingKeyEnumerator(())
   }
 
-  @objc @public
+  @public objc
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
   }
 
-  @objc @public
+  @public objc
   func countByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int
@@ -1996,7 +1996,7 @@ extension Dictionary : Reflectable {
 
 import SwiftShims
 
-@objc @public
+@public objc
 protocol _SwiftNSFastEnumeration {
   func countByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
@@ -2004,7 +2004,7 @@ protocol _SwiftNSFastEnumeration {
   ) -> Int
 }
 
-@objc @public
+@public objc
 protocol _SwiftNSEnumerator {
   init()
   func nextObject() -> AnyObject?
@@ -2013,12 +2013,12 @@ protocol _SwiftNSEnumerator {
 @public
 typealias _SwiftNSZone = COpaquePointer
 
-@objc @public
+@public objc
 protocol _SwiftNSCopying {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
-@objc @public
+@public objc
 protocol _SwiftNSArrayRequiredOverrides :
     _SwiftNSCopying, _SwiftNSFastEnumeration {
 
@@ -2037,12 +2037,12 @@ protocol _SwiftNSArrayRequiredOverrides :
 }
 
 // FIXME: replace _CocoaArray with this.
-@objc @unsafe_no_objc_tagged_pointer @public
+@unsafe_no_objc_tagged_pointer @public objc
 protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
   func indexOfObject(anObject: AnyObject) -> Int
 }
 
-@objc @public
+@public objc
 protocol _SwiftNSDictionaryRequiredOverrides :
     _SwiftNSCopying, _SwiftNSFastEnumeration {
 
@@ -2068,7 +2068,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   ) -> Int
 }
 
-@objc @unsafe_no_objc_tagged_pointer @public
+@unsafe_no_objc_tagged_pointer @public objc
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
   var allKeys: _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool
@@ -2088,7 +2088,7 @@ func _stdlib_NSDictionary_isEqual(
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
-@objc @public
+@public objc
 class _NSSwiftDictionary {}
 
 /// This class is derived from `_NSSwiftEnumeratorBase` (through runtime magic),
@@ -2096,14 +2096,14 @@ class _NSSwiftDictionary {}
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
-@objc
+objc
 class _NSSwiftEnumerator {}
 
 //===--- Compiler conversion/casting entry points -------------------------===//
 
 /// Perform a non-bridged upcast from the source to another dictionary.
 ///
-/// Requires: BaseKey and BaseValue are base classs or base @objc
+/// Requires: BaseKey and BaseValue are base classs or base objc
 /// protocols (such as AnyObject) of DerivedKey and DerivedValue,
 /// respectively.
 ///
