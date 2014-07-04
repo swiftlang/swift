@@ -132,6 +132,7 @@ static bool isConditional(TermInst *I) {
   case ValueKind::SwitchIntInst:
   case ValueKind::SwitchEnumInst:
   case ValueKind::SwitchEnumAddrInst:
+  case ValueKind::CheckedCastBranchInst:
     return true;
   default:
     return false;
@@ -175,6 +176,18 @@ static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
     SILBuilder(SEI).createBranch(SEI->getLoc(), Dest, Args);
   }
   SEI->eraseFromParent();
+}
+
+static void simplifyCheckedCastBranchInst(CheckedCastBranchInst *CCBI,
+                                          bool SuccessTaken,
+                                          SILBasicBlock *DomBB) {
+  if (SuccessTaken)
+    SILBuilder(CCBI).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
+                                  SILValue(DomBB->getBBArg(0)));
+  else
+    SILBuilder(CCBI).createBranch(CCBI->getLoc(), CCBI->getFailureBB());
+
+  CCBI->eraseFromParent();
 }
 
 static bool getBranchTaken(CondBranchInst *CondBr, SILBasicBlock *BB) {
@@ -242,6 +255,22 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     case ValueKind::SwitchEnumAddrInst:
       // FIXME: Handle these.
       return false;
+    case ValueKind::CheckedCastBranchInst: {
+      // We need to verify that the result type is the same in the
+      // dominating checked_cast_br.
+      auto *PredCCBI = cast<CheckedCastBranchInst>(PredTerm);
+      auto *CCBI = cast<CheckedCastBranchInst>(Term);
+      if (PredCCBI->getCastType() != CCBI->getCastType())
+        continue;
+
+      assert((DomBB == PredCCBI->getSuccessBB() ||
+              DomBB == PredCCBI->getFailureBB()) &&
+          "Dominating block is not a successor of predecessor checked_cast_br");
+
+      simplifyCheckedCastBranchInst(CCBI, DomBB == PredCCBI->getSuccessBB(),
+                                    DomBB);
+      return true;
+    }
     default:
       llvm_unreachable("Should only see conditional terminators here!");
     }
