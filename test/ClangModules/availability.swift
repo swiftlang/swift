@@ -45,3 +45,11 @@ func test_unavailable_app_extension() {
 func test_swift_unavailable() {
   NSSwiftUnavailableFunction() // expected-error {{Not available in Swift}}
 }
+
+func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColorRef ) {
+  CFRelease(x)              // expected-error {{'CFRelease' is unavailable: Core Foundation objects are automatically memory managed}}
+  CGColorRelease(color)     // expected-error {{'CGColorRelease' is unavailable: Core Foundation objects are automatically memory managed}}
+  CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
+  CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}}
+  CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}}
+}

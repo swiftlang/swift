@@ -52,10 +52,6 @@
   /// This is useful when passing an object to an API which Swift
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
-  ///
-  /// ::
-  ///
-  ///   CFAutorelease(.passRetained(object))
   @transparent @public
   static func passRetained(value: T) -> Unmanaged {
     return Unmanaged(_private: value).retain()

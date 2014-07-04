@@ -397,3 +397,10 @@ typedef struct {
 
 @end
 
+typedef struct CGColor *CGColorRef;
+typedef const void * CFTypeRef;
+extern CFTypeRef CFRetain(CFTypeRef cf);
+extern void CFRelease(CFTypeRef cf);
+extern CFTypeRef CFAutorelease(CFTypeRef __attribute__((cf_consumed)) arg) __attribute__((availability(macosx,introduced=10.9)));
+extern CGColorRef CGColorRetain(CGColorRef color) __attribute__((availability(macosx,introduced=10.3)));
+extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,introduced=10.3)));

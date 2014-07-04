@@ -900,6 +900,13 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
   return forInvalid();
 }
 
+static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
+  if (Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX))
+    if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
+      return pointee.isValid();
+  return false;
+}
+
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
@@ -4638,6 +4645,21 @@ void ClangImporter::Implementation::importAttributes(
       return;
     }
   }
+
+  // Ban CFRelease|CFRetain|CFAutorelease(CFTypeRef) as well as custom ones
+  // such as CGColorRelease(CGColorRef).
+  if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl))
+    if (FD->getNumParams() == 1 &&
+         (FD->getName().endswith("Release") ||
+          FD->getName().endswith("Retain") ||
+          FD->getName().endswith("Autorelease")))
+      if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>())
+        if (isCFTypeDecl(t->getDecl())) {
+          auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
+            "Core Foundation objects are automatically memory managed");
+          MappedDecl->getMutableAttrs().add(attr);
+          return;
+        }
 }
 
 Decl *
