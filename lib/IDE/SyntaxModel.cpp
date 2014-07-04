@@ -138,16 +138,17 @@ struct StructureElement {
     :StructureNode(StructureNode), ASTNode(ASTNode) { }
 };
 
-static const char *RegexStrURL = "(acap|afp|afs|cid|data|fax|feed|file|ftp|go|"
+static const char *const RegexStrURL =
+  "(acap|afp|afs|cid|data|fax|feed|file|ftp|go|"
   "gopher|http|https|imap|ldap|mailserver|mid|modem|news|nntp|opaquelocktoken|"
   "pop|prospero|rdar|rtsp|service|sip|soap\\.beep|soap\\.beeps|tel|telnet|tip|"
   "tn3270|urn|vemmi|wais|xcdoc|z39\\.50r|z39\\.50s)://"
   "([a-zA-Z0-9\\-_.]+/)?[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
 
-static const char *RegexStrMailURL =
+static const char *const RegexStrMailURL =
   "(mailto|im):[a-zA-Z0-9\\-_]+@[a-zA-Z0-9\\-_\\.!%]+";
 
-static const char *RegexStrRadarURL =
+static const char *const RegexStrRadarURL =
   "radar:[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
 
 class ModelASTWalker : public ASTWalker {

@@ -24,9 +24,9 @@
 using namespace swift;
 using namespace ide;
 
-static const char *skipStringInCode (const char *p, const char *End);
+static const char *skipStringInCode(const char *p, const char *End);
 
-static const char *skipParenExpression (const char *p, const char *End) {
+static const char *skipParenExpression(const char *p, const char *End) {
   const char *e = p;
   if (*e == '(') {
     uint32_t ParenCount = 1;
@@ -58,7 +58,7 @@ static const char *skipParenExpression (const char *p, const char *End) {
   return e;
 }
 
-static const char *skipStringInCode (const char *p, const char *End) {
+static const char *skipStringInCode(const char *p, const char *End) {
   const char *e = p;
   if (*e == '"') {
     bool done = false;
