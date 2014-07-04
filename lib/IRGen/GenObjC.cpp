@@ -941,6 +941,14 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   return findSwiftAsObjCThunk(IGM, declRef);
 }
 
+void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
+                                           Type t, std::string &s) {
+  // FIXME: Property encoding differs in slight ways that aren't publicly
+  // exposed from Clang.
+  IGM.getClangASTContext()
+    .getObjCEncodingForType(IGM.getClangType(t->getCanonicalType()), s);
+}
+
 /// True if the value is of class type, or of a type that is bridged to class
 /// type.
 bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {

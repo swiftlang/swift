@@ -48,17 +48,17 @@ class LazyPropertyCrash  {
 
 
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
-// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,R,N,Vreadonly\00"
+// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T@,N,R\00"
 
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 
 // CHECK: [[READWRITE_NAME:@.*]] = private unnamed_addr constant [10 x i8] c"readwrite\00"
-// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [30 x i8] c"T@\22SomeObject\22,&,N,Vreadwrite\00"
+// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T@,N,&\00"
 
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
 // CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
-// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,&,N,VbareIvar\00"
+// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [17 x i8] c"T@,N,&,VbareIvar\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 24,
@@ -95,18 +95,17 @@ class LazyPropertyCrash  {
 // CHECK:   i32 3,
 // CHECK:   [3 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* [[READONLY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([29 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([10 x i8]* [[READWRITE_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([30 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* [[BAREIVAR_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([29 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([17 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
-// CHECK: [[EXTENSIONPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [38 x i8] c"T@\22SomeObject\22,&,N,VextensionProperty\00"
 
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK:   i32 24,
@@ -127,7 +126,7 @@ class LazyPropertyCrash  {
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([18 x i8]* [[EXTENSIONPROPERTY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([38 x i8]* [[EXTENSIONPROPERTY_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 

@@ -43,7 +43,7 @@
 // CHECK:   i8* null,
 // CHECK:   @_IVARS__TtC17objc_class_export3Foo,
 // CHECK:   i8* null,
-// CHECK:   i8* null
+// CHECK:   _PROPERTIES__TtC17objc_class_export3Foo
 // CHECK: }, section "__DATA, __objc_const", align 8
 // CHECK: @_TMdC17objc_class_export3Foo = global {{.*i64}} } {
 // CHECK:   void ([[FOO]]*)* @_TFC17objc_class_export3FooD,

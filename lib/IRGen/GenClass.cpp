@@ -1515,27 +1515,55 @@ namespace {
     }
     
     /// Build the property attribute string for a property decl.
-    void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out,
-                                 ClassDecl *theClass) {
+    void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
+
+      auto propTy = prop->getType()->getReferenceStorageReferent();
       
-      // Emit the type encoding.
-      // FIXME: Only correct for class types.
-      outs << "T@";
-      // FIXME: Assume 'NSObject' really means 'id'.
-      if (theClass->getName() != prop->getASTContext().getIdentifier("NSObject"))
-        outs << '"' << theClass->getName().str() << '"';
+      // Emit the type encoding for the property.
+      outs << 'T';
       
-      // FIXME: Emit attributes for (nonatomic, strong) if the property has a
-      // setter, or (nonatomic, readonly) if the property has only a getter.
-      // Are these attributes always appropriate?
-      outs << (prop->isSettable(prop->getDeclContext())
-        ? ",&,N" // strong, nonatomic
-        : ",R,N"); // readonly, nonatomic
+      std::string typeEnc;
+      getObjCEncodingForPropertyType(IGM, propTy, typeEnc);
+      outs << typeEnc;
       
-      // Emit the selector name for the getter. Clang only appears to emit the
-      // setter name if the property has an explicit setter= attribute.
-      outs << ",V" << prop->getName();
+      // Emit other attributes.
+
+      // All Swift properties are (nonatomic).
+      outs << ",N";
+      
+      // @NSManaged properties are @dynamic.
+      if (prop->getAttrs().hasAttribute<NSManagedAttr>())
+        outs << ",D";
+      
+      auto isObject = propTy->hasRetainablePointerRepresentation();
+      auto hasObjectEncoding = typeEnc[0] == '@';
+      
+      // Determine the assignment semantics.
+      // Get-only properties are (readonly).
+      if (!prop->isSettable(prop->getDeclContext()))
+        outs << ",R";
+      // Weak properties are (weak).
+      else if (prop->getAttrs().getOwnership() == Ownership::Weak
+               || prop->getAttrs().getOwnership() == Ownership::Unowned)
+        outs << ",W";
+      // If the property is @NSCopying, or is bridged to a value class, the
+      // property is (copy).
+      else if (prop->getAttrs().hasAttribute<NSCopyingAttr>()
+               || (hasObjectEncoding && !isObject))
+        outs << ",C";
+      // If it's of a managed object type, it is (retain).
+      else if (isObject
+               && prop->getAttrs().getOwnership() == Ownership::Strong)
+        outs << ",&";
+      // Otherwise, the property is of a value type, so it is
+      // the default (assign).
+      else
+        (void)0;
+      
+      // If the property has storage, emit the ivar name last.
+      if (prop->hasStorage())
+        outs << ",V" << prop->getName();
       
       outs.flush();
     }
@@ -1545,18 +1573,8 @@ namespace {
     ///   const char *attributes;
     /// };
     llvm::Constant *buildProperty(VarDecl *prop) {
-      // FIXME: For now we only emit properties of ObjC class type.
-      ClassDecl *theClass
-        = IGM.SILMod->Types.getLoweredBridgedType(prop->getType(),
-                                                  AbstractCC::ObjCMethod)
-          ->getClassOrBoundGenericClass();
-      if (!theClass)
-        return nullptr;
-      if (!theClass->isObjC())
-        return nullptr;
-
       llvm::SmallString<16> propertyAttributes;
-      buildPropertyAttributes(prop, propertyAttributes, theClass);
+      buildPropertyAttributes(prop, propertyAttributes);
       
       llvm::Constant *fields[] = {
         IGM.getAddrOfGlobalString(prop->getName().str()),
