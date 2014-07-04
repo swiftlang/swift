@@ -138,13 +138,22 @@ objc class A200_ParamAndReturns {
 
   /// Aaa.  f3.
   ///
+  /// :param: first Bbb.
+  /// :param: second Ccc.
+  /// :param: third Ddd.
+  func f3(first: Int, second: Double, third: Float) {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f3 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f3(_:second:third:)</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f3FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f3(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f3.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ddd.</Para></Discussion></Parameter></Parameters></Function>]
+
+
+  /// Aaa.  f4.
+  ///
   /// :returns: Ccc.
   ///   Ddd.
   ///
   /// :returns: Eee.
   ///   Fff.
-  func f3() {}
-// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f3 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f3()</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f3FS0_FT_T_</USR><Declaration>func f3()</Declaration><Abstract><Para>Aaa.  f3.</Para></Abstract><ResultDiscussion><Para>Ccc. Ddd.</Para><Para>Eee. Fff.</Para></ResultDiscussion></Function>]
+  func f4() {}
+// CHECK: swift:[[@LINE-1]]:8: Func/A200_ParamAndReturns.f4 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f4()</Name><USR>s:FC14swift_ide_test20A200_ParamAndReturns2f4FS0_FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.  f4.</Para></Abstract><ResultDiscussion><Para>Ccc. Ddd.</Para><Para>Eee. Fff.</Para></ResultDiscussion></Function>]
 }
 
 objc class A210_BulletList {

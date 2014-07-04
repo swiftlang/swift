@@ -481,7 +481,8 @@ TEST_P(ExtractBriefTest, Test) {
     DocutilsXML = DocutilsXML.drop_front(10);
   if (DocutilsXML.endswith("</document>"))
     DocutilsXML = DocutilsXML.drop_back(11);
-  EXPECT_EQ(Test.DocutilsXML, DocutilsXML.str());
+  EXPECT_EQ(Test.DocutilsXML, DocutilsXML.str())
+      << "ReST document: " << ::testing::PrintToString(Test.InText);
 }
 
 struct ExtractBriefTestData ExtractBriefTests[] = {
@@ -1149,6 +1150,60 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "</field>"
     "</field_list>" }, // Correct.
   { { ":aaa: bbb",
+      ":ccc: ddd",
+    }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+      "<field>"
+        "<field_name>ccc</field_name>"
+        "<field_body><paragraph>ddd</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "",
+      ":ccc: ddd",
+    }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+      "<field>"
+        "<field_name>ccc</field_name>"
+        "<field_body><paragraph>ddd</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "",
+      ":ccc: ddd",
+      " eee"
+    }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+      "<field>"
+        "<field_name>ccc</field_name>"
+        "<field_body><paragraph>ddd\neee</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "bbb",
+      ":ddd: eee",
+    }, "",
+    // FIXME: missing diagnostic.
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+    "</field_list>"
+    "<paragraph>bbb\n:ddd: eee</paragraph>" }, // Correct.
+  { { ":aaa: bbb",
       "  ccc",
       ":ddd: eee",
       "  fff"
@@ -1187,6 +1242,26 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
         "<field_body><paragraph>bbb\nccc\nddd</paragraph></field_body>"
       "</field>"
     "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "   ccc",
+      " ddd" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body>"
+          "<block_quote>"
+            "<paragraph>bbb\nccc</paragraph>"
+          "</block_quote>"
+          "<paragraph>ddd</paragraph>"
+        "</field_body>"
+      "</field>"
+    "</field_list>"
+    // REST-FIXME: LLVM-REST-DIFFERENCE: Docutils parses the above as
+    // [field_list ... [field_body [definition_list ...] [paragraph "ddd"]]]
+    // The definition list does not make any sense in this context, it is
+    // clearly a block quote -- the "ddd" line has less indentation, not more.
+  },
+
   { { ":aaa: bbb",
       "       ccc" }, "",
     // Note: this should be parsed without the nested definition list, because
@@ -1301,12 +1376,66 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
           "<field>"
             "<field_name>bbb</field_name>"
             "<field_body>"
-              "<paragraph>ccc\n:ddd: eee\n:fff: ggg</paragraph>"
+              "<paragraph>ccc</paragraph>"
+            "</field_body>"
+          "</field>"
+          "<field>"
+            "<field_name>ddd</field_name>"
+            "<field_body>"
+              "<paragraph>eee</paragraph>"
+            "</field_body>"
+          "</field>"
+          "<field>"
+            "<field_name>fff</field_name>"
+            "<field_body>"
+              "<paragraph>ggg</paragraph>"
             "</field_body>"
           "</field>"
         "</field_list>"
       "</list_item>"
-    "</bullet_list>" }, // FIXME: WRONG
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "  :bbb: ccc",
+      "* ddd" }, "",
+    "<bullet_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<field_list>"
+          "<field>"
+            "<field_name>bbb</field_name>"
+            "<field_body><paragraph>ccc</paragraph></field_body>"
+          "</field>"
+        "</field_list>"
+      "</list_item>"
+      "<list_item>"
+        "<paragraph>ddd</paragraph>"
+      "</list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "  :bbb: ccc",
+      "  :ddd: eee",
+      "* fff" }, "",
+    "<bullet_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<field_list>"
+          "<field>"
+            "<field_name>bbb</field_name>"
+            "<field_body><paragraph>ccc</paragraph></field_body>"
+          "</field>"
+          "<field>"
+            "<field_name>ddd</field_name>"
+            "<field_body><paragraph>eee</paragraph></field_body>"
+          "</field>"
+        "</field_list>"
+      "</list_item>"
+      "<list_item>"
+        "<paragraph>fff</paragraph>"
+      "</list_item>"
+    "</bullet_list>" }, // Correct.
+
 
   // Definition lists.
   { { "aaa",

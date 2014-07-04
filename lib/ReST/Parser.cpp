@@ -610,6 +610,10 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseFieldList(LineListRef LL) {
                        LL[i].getClassification().getFieldNameBytes());
     auto FieldName = new (Context) TextAndInline(FieldNameText);
 
+    // [ReST/Syntax Details/Body Elements/Field Lists]
+    // Quote:
+    //     The first line after the field name marker determines the
+    //     indentation of the field body.
     ColumnNum ItemBaseIndentation;
     if (i + 1 != e) {
       for (unsigned j = i + 1; j != e; ++j) {
@@ -619,6 +623,13 @@ std::pair<ReSTASTNode *, unsigned> Parser::parseFieldList(LineListRef LL) {
         }
       }
     }
+    // If the line that we found does not have more indentation than the colon,
+    // then it is not related.  Set the desired base indentation to be larger
+    // than that so that parseLevelImpl() below does not pick up this unrelated
+    // line.
+    if (ItemBaseIndentation <= FirstColonIndentation)
+      ItemBaseIndentation = FirstColonIndentation + ColumnNum::make(1);
+
     SmallVector<ReSTASTNode *, 4> BodyChildren;
     auto SubLL = LL.dropFrontLines(i);
     SubLL.fromFirstLineDropFront(

@@ -52,7 +52,8 @@ void LineListBuilder::addLine(StringRef Text, SourceRange Range) {
 }
 
 LineList LineListBuilder::takeLineList(ReSTContext &Context) {
-  return LineList(Context.allocateCopy(ArrayRef<Line>(Lines)));}
+  return LineList(Context.allocateCopy(ArrayRef<Line>(Lines)));
+}
 
 // FIXME: this could work a little faster if we could call LLVM's
 // charWidth().
