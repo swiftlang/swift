@@ -214,7 +214,7 @@ func ... <Pos : RandomAccessIndex> (
     self._bounds = (fwd.startIndex, fwd.endIndex)
   }
 
-  @public func isEmpty() -> Bool {
+  @public var isEmpty: Bool {
     return _bounds.0 == _bounds.1
   }
 

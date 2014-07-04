@@ -1,15 +1,67 @@
-//===--- Range.swift ------------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
+
+import StdlibUnittest
+
+var RangeTestCase = TestCase("Range")
+
+RangeTestCase.test("ReverseRange") {
+  if true {
+    let r = ReverseRange(range: 0..<0)
+    expectTrue(r.isEmpty)
+    expectEqual(0, r.bounds().0)
+    expectEqual(0, r.bounds().1)
+    checkSequence([], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(start: 0, pastEnd: 0)
+    expectTrue(r.isEmpty)
+    expectEqual(0, r.bounds().0)
+    expectEqual(0, r.bounds().1)
+    checkSequence([], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(range: 10..<10)
+    expectTrue(r.isEmpty)
+    expectEqual(10, r.bounds().0)
+    expectEqual(10, r.bounds().1)
+    checkSequence([], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(range: 0..<4)
+    expectFalse(r.isEmpty)
+    expectEqual(0, r.bounds().0)
+    expectEqual(4, r.bounds().1)
+    checkSequence([ 3, 2, 1, 0 ], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(start: 0, pastEnd: 4)
+    expectFalse(r.isEmpty)
+    expectEqual(0, r.bounds().0)
+    expectEqual(4, r.bounds().1)
+    checkSequence([ 3, 2, 1, 0 ], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(range: 10..<11)
+    expectFalse(r.isEmpty)
+    expectEqual(10, r.bounds().0)
+    expectEqual(11, r.bounds().1)
+    checkSequence([ 10 ], r, SourceLocStack().withCurrentLoc())
+  }
+  if true {
+    let r = ReverseRange(range: -11..<(-10))
+    expectFalse(r.isEmpty)
+    expectEqual(-11, r.bounds().0)
+    expectEqual(-10, r.bounds().1)
+    checkSequence([ -11 ], r, SourceLocStack().withCurrentLoc())
+  }
+}
+
+RangeTestCase.run()
+// CHECK: {{^}}Range: All tests passed
+
+//===---
+// Misc tests.
+//===---
 
 // CHECK: testing...
 println("testing...")
