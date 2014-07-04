@@ -2045,25 +2045,11 @@ static void configureConstructorType(ConstructorDecl *ctor,
   ctor->setInitializerType(initFnType);
 }
 
-const AccessibilityAttr *findAccessibilityAttr(const DeclAttributes &attrs,
-                                               bool forSetter = false) {
-  auto explicitAttrIter = std::find_if(attrs.begin(), attrs.end(),
-                                       [=](const DeclAttribute *attr) -> bool {
-    if (auto AA = dyn_cast<AccessibilityAttr>(attr))
-      return AA->isForSetter() == forSetter;
-    return false;
-  });
-
-  if (explicitAttrIter != attrs.end())
-    return cast<AccessibilityAttr>(*explicitAttrIter);
-  return nullptr;
-}
-
 static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return;
 
-  if (const AccessibilityAttr *AA = findAccessibilityAttr(ED->getAttrs())) {
+  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
     ED->setDefaultAccessibility(AA->getAccess());
     return;
   }
@@ -2084,7 +2070,7 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
     return;
 
   // Check if the decl has an explicit accessibility attribute.
-  if (const AccessibilityAttr *AA = findAccessibilityAttr(D->getAttrs())) {
+  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>()) {
     D->setAccessibility(AA->getAccess());
     return;
   }
@@ -4488,26 +4474,27 @@ public:
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    UNINTERESTING_ATTR(Accessibility)
+    UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Assignment)
+    UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
+    UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Lazy)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
-    UNINTERESTING_ATTR(Accessibility)
-    UNINTERESTING_ATTR(Asmname)
-    UNINTERESTING_ATTR(Semantics)
-    UNINTERESTING_ATTR(Assignment)
-    UNINTERESTING_ATTR(ClassProtocol)
-    UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
-    UNINTERESTING_ATTR(Exported)
+    UNINTERESTING_ATTR(NSCopying)
+    UNINTERESTING_ATTR(NSManaged)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Required)
-    UNINTERESTING_ATTR(NSCopying)
-    UNINTERESTING_ATTR(NSManaged)
+    UNINTERESTING_ATTR(Semantics)
+    UNINTERESTING_ATTR(SetterAccessibility)
     UNINTERESTING_ATTR(UIApplicationMain)
-    UNINTERESTING_ATTR(Lazy)
-    UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
 
 #undef UNINTERESTING_ATTR
 

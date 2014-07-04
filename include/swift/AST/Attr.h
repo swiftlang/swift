@@ -308,11 +308,10 @@ protected:
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
   class AccessibilityAttrBitFields {
-    friend class AccessibilityAttr;
+    friend class AbstractAccessibilityAttr;
     unsigned : NumDeclAttrBits;
 
     unsigned AccessLevel : 2;
-    unsigned IsForSetter : 1;
   };
   enum { NumAccessibilityAttrBits = NumDeclAttrBits + 2 };
   static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
@@ -752,29 +751,50 @@ public:
   }
 };
 
-/// Represents a 'private', 'internal', or 'public' marker on a declaration.
-class AccessibilityAttr : public DeclAttribute {
-public:
-  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
-                    bool forSetter = false, bool implicit = false)
-      : DeclAttribute(DAK_Accessibility, atLoc, range, implicit) {
-    AccessibilityAttrBits.IsForSetter = forSetter;
+/// Represents any sort of accessibility modifier.
+class AbstractAccessibilityAttr : public DeclAttribute {
+protected:
+  AbstractAccessibilityAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
+                            Accessibility access, bool implicit)
+      : DeclAttribute(DK, atLoc, range, implicit) {
     AccessibilityAttrBits.AccessLevel = static_cast<unsigned>(access);
     assert(getAccess() == access && "not enough bits for accessibility");
   }
 
+public:
   Accessibility getAccess() const {
     return static_cast<Accessibility>(AccessibilityAttrBits.AccessLevel);
   }
 
-  /// Returns true if this attribute is for a property or subscript setter,
-  /// e.g. "private(set)".
-  bool isForSetter() const {
-    return AccessibilityAttrBits.IsForSetter;
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Accessibility ||
+           DA->getKind() == DAK_SetterAccessibility;
   }
+};
+
+/// Represents a 'private', 'internal', or 'public' marker on a declaration.
+class AccessibilityAttr : public AbstractAccessibilityAttr {
+public:
+  AccessibilityAttr(SourceLoc atLoc, SourceRange range, Accessibility access,
+                    bool implicit = false)
+      : AbstractAccessibilityAttr(DAK_Accessibility, atLoc, range, access,
+                                  implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Accessibility;
+  }
+};
+
+/// Represents a 'private', 'internal', or 'public' marker on a declaration.
+class SetterAccessibilityAttr : public AbstractAccessibilityAttr {
+public:
+  SetterAccessibilityAttr(SourceLoc atLoc, SourceRange range,
+                          Accessibility access, bool implicit = false)
+      : AbstractAccessibilityAttr(DAK_SetterAccessibility, atLoc, range, access,
+                                  implicit) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SetterAccessibility;
   }
 };
 

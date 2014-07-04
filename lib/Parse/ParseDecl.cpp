@@ -345,6 +345,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_RawDocComment:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
+  case DAK_SetterAccessibility:
+    llvm_unreachable("handled by DAK_Accessibility");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) \
   case DAK_##CLASS: \
@@ -401,16 +403,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!consumeIf(tok::l_paren)) {
       // Normal accessibility attribute.
       AttrRange = Loc;
-      auto previousIter = std::find_if(Attributes.begin(), Attributes.end(),
-                                       [](const DeclAttribute *attr) -> bool {
-        if (auto AA = dyn_cast<AccessibilityAttr>(attr))
-          return !AA->isForSetter();
-        return false;
-      });
-      if (previousIter == Attributes.end())
+      DuplicateAttribute = Attributes.getAttribute<AccessibilityAttr>();
+      if (!DuplicateAttribute)
         Attributes.add(new (Context) AccessibilityAttr(AtLoc, Loc, access));
-      else
-        DuplicateAttribute = *previousIter;
       break;
     }
 
@@ -437,17 +432,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return false;
     }
 
-    auto previousIter = std::find_if(Attributes.begin(), Attributes.end(),
-                                     [](const DeclAttribute *attr) -> bool {
-      if (auto AA = dyn_cast<AccessibilityAttr>(attr))
-        return AA->isForSetter();
-      return false;
-    });
-    if (previousIter == Attributes.end()) {
-      Attributes.add(new (Context) AccessibilityAttr(AtLoc, AttrRange, access,
-                                                     /*forSetter=*/true));
-    } else {
-      DuplicateAttribute = *previousIter;
+    DuplicateAttribute = Attributes.getAttribute<SetterAccessibilityAttr>();
+    if (!DuplicateAttribute) {
+      Attributes.add(new (Context) SetterAccessibilityAttr(AtLoc, AttrRange,
+                                                           access));
     }
 
     break;

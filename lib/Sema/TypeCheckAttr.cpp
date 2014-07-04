@@ -44,7 +44,6 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Asmname)
-  IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
@@ -53,8 +52,11 @@ public:
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
+  IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
 #undef IGNORED_ATTR
+
+  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
 
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -68,6 +70,7 @@ public:
   void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
+  void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
   void visitInlineAttr(InlineAttr *attr);
 };
 } // end anonymous namespace
@@ -301,21 +304,39 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
 }
 
-void AttributeEarlyChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
+bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(
+    AbstractAccessibilityAttr *attr) {
   // Accessibility attr may only be used on value decls and extensions.
-  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+    return true;
+  }
 
   // And not on certain value decls.
-  if (isa<DestructorDecl>(D) || isa<EnumElementDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+  if (isa<DestructorDecl>(D) || isa<EnumElementDecl>(D)) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+    return true;
+  }
 
   // Or within protocols.
-  if (isa<ProtocolDecl>(D->getDeclContext()))
-    return diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
+  if (isa<ProtocolDecl>(D->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
+    return true;
+  }
 
-  // If its subject is a setter, that only works on vars and subscripts.
-  if (attr->isForSetter() && !isa<AbstractStorageDecl>(D))
+  return false;
+}
+
+void AttributeEarlyChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
+  visitAbstractAccessibilityAttr(attr);
+}
+
+void AttributeEarlyChecker::visitSetterAccessibilityAttr(
+    SetterAccessibilityAttr *attr) {
+  if (visitAbstractAccessibilityAttr(attr))
+    return;
+
+  if (!isa<AbstractStorageDecl>(D))
     return diagnoseAndRemoveAttr(attr, diag::access_control_setter, attr);
 }
 
@@ -353,18 +374,19 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet) // checked early.
+    UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Lazy)      // checked early.
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
-    UNINTERESTING_ATTR(Semantics)
-    UNINTERESTING_ATTR(Exported)
+    UNINTERESTING_ATTR(NSManaged) // checked early.
     UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
-    UNINTERESTING_ATTR(Lazy)      // checked early.
-    UNINTERESTING_ATTR(NSManaged) // checked early.
-    UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Semantics)
+    UNINTERESTING_ATTR(SetterAccessibility)
 
 #undef UNINTERESTING_ATTR
 

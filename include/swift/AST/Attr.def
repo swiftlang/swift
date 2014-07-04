@@ -161,6 +161,9 @@ DECL_ATTR_ALIAS(private, Accessibility)
 DECL_ATTR_ALIAS(internal, Accessibility)
 DECL_ATTR_ALIAS(public, Accessibility)
 
+VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript,
+                  /* Not serialized */ 65535)
+
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
                   /* Not serialized */ 65535)
