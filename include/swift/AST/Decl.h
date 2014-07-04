@@ -3296,6 +3296,12 @@ public:
   /// Returns the location of 'override' keyword, if any.
   SourceLoc getOverrideLoc() const;
 
+  /// Returns true if this declaration has a setter accessible from the given
+  /// context.
+  ///
+  /// If \p DC is null, returns true only if the setter is public.
+  bool isSetterAccessibleFrom(const DeclContext *DC) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&

@@ -397,6 +397,9 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
   // Get-only VarDecls always produce rvalues.
   if (!VD->isSettable(UseDC))
     return false;
+  if (UseDC->getASTContext().LangOpts.EnableAccessControl &&
+      !VD->isSetterAccessibleFrom(UseDC))
+    return false;
 
   // If there is no base, or if the base isn't being used, it is settable.
   if (!baseType || VD->isStatic())
@@ -414,10 +417,14 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
 
 /// doesSubscriptDeclProduceLValue - Return true if a reference to the specified
 /// SubscriptDecl should produce an lvalue.
-static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType) {
+static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType,
+                                           const DeclContext *UseDC) {
   assert(baseType && "Subscript without a base expression?");
   // Get-only SubscriptDecls always produce rvalues.
   if (!SD->isSettable())
+    return false;
+  if (UseDC->getASTContext().LangOpts.EnableAccessControl &&
+      !SD->isSetterAccessibleFrom(UseDC))
     return false;
 
   // If the base is a reference type, or if the base is mutable, then a
@@ -433,9 +440,7 @@ static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType) {
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                              DeclContext *UseDC,
                                              bool wantInterfaceType) {
-  if (!value->hasType())
-    typeCheckDecl(value, true);
-  
+  validateDecl(value);
   if (value->isInvalid())
     return ErrorType::get(Context);
 
@@ -450,7 +455,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 
   // Check to see if the subscript-decl produces an lvalue.
   if (auto *SD = dyn_cast<SubscriptDecl>(value))
-    if (doesSubscriptDeclProduceLValue(SD, baseType)) {
+    if (doesSubscriptDeclProduceLValue(SD, baseType, UseDC)) {
       // Subscript decls have function type.  For the purposes of later type
       // checker consumption, model this as returning an lvalue.
       auto *RFT = requestedType->castTo<FunctionType>();

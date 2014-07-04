@@ -261,7 +261,10 @@ private:
     // For now, never promise atomicity.
     os << "@property (nonatomic";
 
-    if (!VD->isSettable(nullptr))
+    bool isSettable = VD->isSettable(nullptr);
+    if (isSettable && ctx.LangOpts.EnableAccessControl)
+      isSettable = VD->isSetterAccessibleFrom(VD->getModuleContext());
+    if (!isSettable)
       os << ", readonly";
 
     // FIXME: Include "weak", "strong", "assign" here.

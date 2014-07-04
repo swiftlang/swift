@@ -1609,12 +1609,6 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
 /// variable, enabling the witness table to use those accessors.
 void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
   addAccessorsToStoredVar(VD, *this);
-
-  // Type check the body of the getter and setter.
-  definedFunctions.push_back(VD->getGetter());
-
-  if (auto *setter = VD->getSetter())
-    definedFunctions.push_back(setter);
 }
 
 
@@ -2073,6 +2067,21 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
   if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>()) {
     D->setAccessibility(AA->getAccess());
     return;
+  }
+
+  // Special case for accessors, which inherit the access of their storage decl.
+  // A setter attribute can also override this.
+  if (auto fn = dyn_cast<FuncDecl>(D)) {
+    if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
+      const DeclAttributes &attrs = storage->getAttrs();
+      if (auto accessAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
+        fn->setAccessibility(accessAttr->getAccess());
+      } else {
+        computeAccessibility(TC, storage);
+        fn->setAccessibility(storage->getAccessibility());
+      }
+      return;
+    }
   }
 
   // If not, it inherits the default accessibility of its parent context.
@@ -4588,6 +4597,7 @@ public:
       // Make sure that an observing property isn't observing something
       // read-only.  Observing properties look at change, read-only properties
       // have nothing to observe!
+      // FIXME: What happens with properties with private setters?
       if (overrideASD->getStorageKind() == VarDecl::Observing &&
           !baseASD->isSettable(baseASD->getDeclContext())) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
@@ -5308,11 +5318,13 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
       // @lazy getters are mutating on an enclosing struct.
       getter->setMutating();
+      getter->setAccessibility(VD->getAccessibility());
 
       VarDecl *newValueParam = nullptr;
       auto *setter = createSetterPrototype(VD, newValueParam, *this);
       VD->makeComputed(VD->getLoc(), getter, setter, VD->getLoc());
       VD->setIsBeingTypeChecked(false);
+      computeAccessibility(*this, setter);
 
       addMemberToContextIfNeeded(getter, VD->getDeclContext());
       addMemberToContextIfNeeded(setter, VD->getDeclContext());
@@ -5321,16 +5333,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   }
       
   case DeclKind::Func: {
-    auto fn = cast<FuncDecl>(D);
+    computeAccessibility(*this, D);
     if (D->hasType())
       return;
-    if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
-      computeAccessibility(*this, storage);
-      // FIXME: Handle setter accessibility.
-      fn->setAccessibility(storage->getAccessibility());
-    } else {
-      computeAccessibility(*this, D);
-    }
     typeCheckDecl(D, true);
     break;
   }

@@ -946,20 +946,33 @@ void ClassDecl::recordObjCMember(ValueDecl *vd) {
   (*ObjCMemberLookup)[afd->getObjCSelector()].push_back(afd);
 }
 
-bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  assert(hasAccessibility());
-  if (!DC)
-    return getAccessibility() == Accessibility::Public;
+static bool checkAccessibility(const DeclContext *useDC,
+                               const DeclContext *sourceDC,
+                               Accessibility access) {
+  if (!useDC)
+    return access == Accessibility::Public;
 
-  DC = DC->getModuleScopeContext();
-  switch (getAccessibility()) {
+  switch (access) {
   case Accessibility::Private:
-    return DC == getDeclContext()->getModuleScopeContext();
+    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal:
-    return DC->getParentModule() == getModuleContext();
+    return useDC->getParentModule() == sourceDC->getParentModule();
   case Accessibility::Public:
     return true;
   }
+}
+
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
+  return checkAccessibility(DC, getDeclContext(), getAccessibility());
+}
+
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
+  assert(hasAccessibility());
+  if (auto setter = getSetter())
+    return setter->isAccessibleFrom(DC);
+  if (auto setterAttr = getAttrs().getAttribute<SetterAccessibilityAttr>())
+    return checkAccessibility(DC, getDeclContext(), setterAttr->getAccess());
+  return isAccessibleFrom(DC);
 }
 
 bool DeclContext::lookupQualified(Type type,
