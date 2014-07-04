@@ -79,41 +79,14 @@ func testStringToInt() {
 
   var s1 = "  \t 20ddd"
   var i1 : Optional<Int> = s1.toInt()
-  if (!i1) {
-    println("none")
-  }
-  // CHECK-NEXT: none
+  if (!i1) { println("none") } // CHECK-NEXT: none
 
-  if (!"".toInt()) {
-    println("empty is none")
-  }
-  // CHECK-NEXT: empty is none
-
-  if ("+20".toInt()! == 20) {
-    println("20")
-  }
-  // CHECK-NEXT: 20
-
-  if ("0".toInt()! == 0) {
-    println("0")
-  }
-  // CHECK-NEXT: 0
-
-  if ("-20".toInt()! == -20) {
-    println("-20")
-  }
-  // CHECK-NEXT: -20
-
-  if (!"-cc20".toInt()) {
-    println("none")
-  }
-  // CHECK-NEXT: none
-
-  if (!"  -20".toInt()) {
-    println("none")
-  }
-  // CHECK-NEXT: none
-
+  if (!"".toInt()) { println("empty is none") }   // CHECK-NEXT: empty is none
+  if ("+20".toInt()! == 20) { println("20") }     // CHECK-NEXT: 20
+  if ("0".toInt()! == 0) { println("0") }         // CHECK-NEXT: 0
+  if ("-20".toInt()! == -20) { println("-20") }   // CHECK-NEXT: -20
+  if (!"-cc20".toInt()) { println("none") }       // CHECK-NEXT: none
+  if (!"  -20".toInt()) { println("none") }       // CHECK-NEXT: none
 
   if (String(Int.min).toInt()! == Int.min) {
     println("round-trip Int.min")
