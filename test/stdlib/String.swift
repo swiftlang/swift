@@ -82,6 +82,8 @@ func testStringToInt() {
   if (!i1) { println("none") } // CHECK-NEXT: none
 
   if (!"".toInt()) { println("empty is none") }   // CHECK-NEXT: empty is none
+  if (!"+".toInt()) { println("+ is none") }      // CHECK-NEXT: + is none
+  if (!"-".toInt()) { println("- is none") }      // CHECK-NEXT: - is none
   if ("+20".toInt()! == 20) { println("20") }     // CHECK-NEXT: 20
   if ("0".toInt()! == 0) { println("0") }         // CHECK-NEXT: 0
   if ("-20".toInt()! == -20) { println("-20") }   // CHECK-NEXT: -20

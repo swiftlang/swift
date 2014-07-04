@@ -203,9 +203,19 @@ extension String {
     var firstC = scalars[start]
     if (firstC == "+") {
       ++start
+      
+      // Reject "+" alone.
+      if start == scalars.endIndex {
+        return .None
+      }
     } else if (firstC == "-") {
       ++start
       negativeFactor = 1
+
+      // Reject "-" alone.
+      if start == scalars.endIndex {
+        return .None
+      }
     }
 
     // Interpret the string as an integer.
