@@ -76,7 +76,7 @@
       return "\\\'"
     } else if self == "\"" {
       return "\\\""
-    } else if isPrint() {
+    } else if _isPrintableASCII() {
       return String(self)
     } else if self == "\0" {
       return "\\0"
@@ -128,16 +128,17 @@
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
+  // FIXME: Is there an similar term of art in Unicode?
   func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"
   }
 
-  // FIXME: Locales make this interesting.
+  // FIXME: Unicode makes this interesting
   func _isDigit() -> Bool {
     return _isASCIIDigit()
   }
 
-  // FIXME: Locales make this interesting
+  // FIXME: Unicode and locales make this interesting
   var _uppercase : UnicodeScalar {
     if self >= "a" && self <= "z" {
       return UnicodeScalar(UInt32(self) - 32)
@@ -147,7 +148,7 @@
     return self
   }
 
-  // FIXME: Locales make this interesting
+  // FIXME: Unicode and locales make this interesting
   var _lowercase : UnicodeScalar {
     if self >= "A" && self <= "Z" {
       return UnicodeScalar(UInt32(self) + 32)
@@ -157,7 +158,7 @@
     return self
   }
 
-  // FIXME: Locales make this interesting.
+  // FIXME: Unicode makes this interesting.
   func _isSpace() -> Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,
@@ -165,6 +166,11 @@
     if self == " "  || self == "\t" { return true }
     if self == "\n" || self == "\r" { return true }
     return self == "\u{0B}" || self == "\u{0C}"
+  }
+
+  // FIXME: Unicode makes this interesting.
+  func _isPrintableASCII() -> Bool {
+    return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
   }
 }
 
@@ -216,12 +222,6 @@ extension UnicodeScalar : Comparable {
 
 @public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
-}
-
-extension UnicodeScalar {
-  @public func isPrint() -> Bool {
-    return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
-  }
 }
 
 /// Helpers to provide type context to guide type inference in code like::
