@@ -204,7 +204,13 @@ public:
   /// After restoring the state, lexer will return this token and continue from
   /// there.
   State getStateForBeginningOfToken(const Token &Tok) const {
-    return getStateForBeginningOfTokenLoc(Tok.getLoc());
+    // If the token has a comment attached to it, rewind to before the comment,
+    // not just the start of the token.  This ensures that we will re-lex and
+    // reattach the comment to the token if rewound to this state.
+    SourceLoc TokStart = Tok.getCommentStart();
+    if (TokStart.isInvalid())
+      TokStart = Tok.getLoc();
+    return getStateForBeginningOfTokenLoc(TokStart);
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {

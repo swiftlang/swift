@@ -197,6 +197,12 @@ public:
         SourceLoc(llvm::SMLoc::getFromPointer(Text.begin() - CommentLength)),
         CommentLength);
   }
+  
+  SourceLoc getCommentStart() const {
+    if (CommentLength == 0) return SourceLoc();
+    return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin() - CommentLength));
+  }
+  
 
   StringRef getText() const { return Text; }
   void setText(StringRef T) { Text = T; }
