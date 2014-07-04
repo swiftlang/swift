@@ -902,6 +902,8 @@ namespace {
         // vector.
         addConstantInt32(0);
         addConstantInt32(0);
+        addConstantInt32(0);
+
         return;
       }
       
@@ -920,6 +922,9 @@ namespace {
       
       // uint32_t NumGenericParameters;
       addConstantInt32(allArchetypes.size());
+
+      // uint32_t NumPrimaryGenericParameters;
+      addConstantInt32(ntd->getGenericParams()->getPrimaryArchetypes().size());
       
       // GenericParameter Parameters[NumGenericParameters];
       // struct GenericParameter {

@@ -566,7 +566,10 @@ layout is as follows:
   * The **offset of the generic parameter vector** is stored at **offset 6**.
     This is the offset in pointer-sized words of the generic parameter vector
     inside the metadata record. If the type is not generic, this is zero.
-  * The **number of type parameters** is stored at **offset 7**.
+  * The **number of type parameters** is stored at **offset 7**. This count
+    includes associated types of type parameters with protocol constraints.
+  * The **number of type parameters** is stored at **offset 8**. This count
+    includes only the primary formal type parameters.
   * For each type parameter **n**, the following fields are stored:
 
     + The **number of witnesses** for the type parameter is stored at

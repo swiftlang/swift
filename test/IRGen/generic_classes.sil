@@ -23,8 +23,8 @@ import gizmo
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       generic parameter vector offset
 // CHECK:   i32 8,
-// --       generic parameter count, witness table counts
-// CHECK:   i32 1, i32 0
+// --       generic parameter count, primary count, witness table counts
+// CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
 // CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}}* } } {
 // --       template fill function
@@ -60,8 +60,8 @@ import gizmo
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       0 = no generic parameter vector
 // CHECK:   i32 0,
-// --       number of generic params
-// CHECK:   i32 0
+// --       number of generic params, primary params
+// CHECK:   i32 0, i32 0
 // CHECK: }
 
 // CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {

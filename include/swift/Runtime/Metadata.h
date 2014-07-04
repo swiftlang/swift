@@ -889,8 +889,13 @@ struct GenericParameterDescriptor {
   /// this value is meaningless.
   uint32_t Offset;
   /// The number of type parameters. A value of zero means there is no generic
-  /// parameter vector.
+  /// parameter vector. This includes associated types of the primary type
+  /// parameters.
   uint32_t NumParams;
+  /// The number of primary type parameters. This is always less than or equal
+  /// to NumParams; it counts only the primary type parameters and not their
+  /// associated types.
+  uint32_t NumPrimaryParams;
   
   /// True if the nominal type has generic parameters.
   bool hasGenericParams() const { return NumParams > 0; }
