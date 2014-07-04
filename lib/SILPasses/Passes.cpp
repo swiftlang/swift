@@ -111,6 +111,7 @@ void ConstructSSAPassManager(SILPassManager &PM, SILModule &Module,
   // Use either the early inliner that does not inline functions with defined
   // semantics or the late performance inliner that inlines everything.
   PM.add(useEarlyInliner ? createEarlyInliner() :createPerfInliner());
+  PM.add(createSimplifyCFG());
   PM.add(createGlobalARCOpts());
 }
 
