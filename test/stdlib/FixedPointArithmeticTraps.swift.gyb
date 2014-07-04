@@ -1,4 +1,5 @@
 // These tests should crash.
+// REQUIRES: long_tests
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/FixedPointArithmeticTraps.swift

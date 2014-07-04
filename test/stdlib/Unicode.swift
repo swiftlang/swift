@@ -1,5 +1,7 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
+// REQUIRES: long_tests
+
 import Foundation
 import Swift
 
