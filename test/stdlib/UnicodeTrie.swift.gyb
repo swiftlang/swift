@@ -4,6 +4,8 @@
 
 %{
 
+// REQUIRES: long_tests
+
 from GYBUnicodeDataUtils import *
 
 grapheme_cluster_break_property_table = \

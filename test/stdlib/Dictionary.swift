@@ -9,6 +9,8 @@
 // RUN: FileCheck %s < %t.txt
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
+// REQUIRES: long_tests
+
 import Darwin
 import StdlibUnittest
 
