@@ -314,7 +314,7 @@ func _formatNumChildren(count: Int) -> String {
 // -- Implementation details for the runtime's Mirror implementation
 
 @asmname("swift_MagicMirrorData_summary")
-func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
+func _swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
 
 @public struct _MagicMirrorData {
   let owner: Builtin.NativeObject
@@ -337,7 +337,7 @@ func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer
   
   var summary: String {
     var resultPtr = UnsafePointer<String>.alloc(1)
-    swift_MagicMirrorData_summaryImpl(metadata, resultPtr)
+    _swift_MagicMirrorData_summaryImpl(metadata, resultPtr)
     let result = resultPtr.memory
     resultPtr.dealloc(1)
     return result
