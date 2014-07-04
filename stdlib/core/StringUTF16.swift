@@ -19,7 +19,7 @@ extension String {
       return _length
     }
 
-    @private func _toInternalIndex(i: Int) -> Int {
+    func _toInternalIndex(i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
 

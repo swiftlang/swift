@@ -346,7 +346,7 @@ extension String : Collection {
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
-    @private static func _measureExtendedGraphemeClusterForward(
+    static func _measureExtendedGraphemeClusterForward(
         var start: UnicodeScalarView.IndexType
     ) -> Int {
       let end = start._viewEndIndex
@@ -384,7 +384,7 @@ extension String : Collection {
 
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
-    @private static func _measureExtendedGraphemeClusterBackward(
+    static func _measureExtendedGraphemeClusterBackward(
         end: UnicodeScalarView.IndexType
     ) -> Int {
       var start = end._viewStartIndex
