@@ -87,12 +87,12 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
   let storage: Storage?
   
   static func _valueOffset() -> Int {
-    return roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
+    return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
 
   static func _elementOffset() -> Int {
-    return roundUpToAlignment(_valueOffset() + sizeof(Value.self),
-                              alignof(Element.self))
+    return _roundUpToAlignment(_valueOffset() + sizeof(Value.self),
+        alignof(Element.self))
   }
 
   static func _requiredAlignMask() -> Int {

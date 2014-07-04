@@ -44,7 +44,7 @@ func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
-@public func roundUpToAlignment(offset: Int, alignment: Int) -> Int {
+func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
   return (offset + alignment - 1) / alignment * alignment
 }
 
