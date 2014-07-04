@@ -14,6 +14,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/MapVector.h"
@@ -39,6 +40,7 @@ namespace {
 ///   constant propagation in case of statically initialized "lets".
 class SILGlobalOpt {
   SILModule *Module;
+  DominanceAnalysis* DA;
 
   // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
@@ -50,7 +52,7 @@ class SILGlobalOpt {
   llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
 
 public:
-  SILGlobalOpt(SILModule *M): Module(M) {}
+  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA) {}
 
   void run();
 
@@ -91,11 +93,21 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
   return LoopBlocks.count(CurBB);
 }
 
+/// Place an ApplyInst's FuncRef so that it dominates the call site. FuncRef's
+/// may be shared by multiple ApplyInsts.
+static void placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
+  FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
+  SILBasicBlock *DomBB =
+    DT->findNearestCommonDominator(AI->getParent(), FuncRef->getParent());
+  FuncRef->moveBefore(DomBB->begin());
+}
+
 /// Optimize placement of initializer calls given a list of calls to the
 /// same initializer. All original initialization points must be dominated by
 /// the final initialization calls.
 ///
-/// For now, just hoist all initializers to their function entry.
+/// The current heuristic hoists all initialization points within a function to
+/// a single dominating call in the outer loop preheader.
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst*> Calls) {
   DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
@@ -105,33 +117,52 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
   llvm::DenseMap<SILFunction*, ApplyInst*> ParentFuncs;
   for (auto *AI : Calls) {
     assert(AI->getNumArguments() == 0 && "ill-formed global init call");
+    assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
+           == InitF && "wrong init call");
 
-    auto PFI = ParentFuncs.find(AI->getFunction());
-    if (PFI != ParentFuncs.end()) {
-      // This call is redundant. Replace it.
-      assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
-             == InitF &&
-             "ill-formed global init call");
-      AI->replaceAllUsesWith(PFI->second);
-      AI->eraseFromParent();
-      continue;
-    }
-    // Check if this call is inside a loop. If not, don't move it.
-    if (!isInLoop(AI->getParent())) {
-      DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *AI
-            << "  in " << AI->getFunction()->getName() << "\n");
-      continue;
-    }
-    DEBUG(llvm::dbgs() << "  hoisting: " << *AI
-          << "  in " << AI->getFunction()->getName() << "\n");
-
-    // Move this call to the parent function's entry.
-    FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getOperand(0));
-    assert(FuncRef->getReferencedFunction() == InitF && "wrong init call");
     SILFunction *ParentF = AI->getFunction();
-    AI->moveBefore(ParentF->front().begin());
-    FuncRef->moveBefore(AI);
-    ParentFuncs[ParentF] = AI;
+    DominanceInfo *DT = DA->getDomInfo(ParentF);
+    auto PFI = ParentFuncs.find(ParentF);
+    if (PFI != ParentFuncs.end()) {
+      // Found a replacement for this init call.
+      // Ensure the replacement dominates the original call site.
+      ApplyInst *CommonAI = PFI->second;
+      assert(cast<FunctionRefInst>(CommonAI->getCallee())
+             ->getReferencedFunction() == InitF &&
+             "ill-formed global init call");
+      SILBasicBlock *DomBB =
+        DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
+      if (DomBB != CommonAI->getParent()) {
+        CommonAI->moveBefore(DomBB->begin());
+        placeFuncRef(CommonAI, DT);
+      }
+      AI->replaceAllUsesWith(CommonAI);
+      AI->eraseFromParent();
+    }
+    else {
+      // Move this call to the outermost loop preheader.
+      SILBasicBlock *BB = AI->getParent();
+      typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
+      DomTreeNode *Node = DT->getNode(BB);
+      while (Node) {
+        BB = Node->getBlock();
+        if (!isInLoop(BB))
+          break;
+        Node = Node->getIDom();
+      }
+      if (BB == AI->getParent()) {
+        // BB is either unreachable or not in a loop.
+        DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *AI
+              << "  in " << AI->getFunction()->getName() << "\n");
+      }
+      else {
+        DEBUG(llvm::dbgs() << "  hoisting: " << *AI
+              << "  in " << AI->getFunction()->getName() << "\n");
+        AI->moveBefore(BB->begin());
+        placeFuncRef(AI, DT);
+        ParentFuncs[ParentF] = AI;
+      }
+    }
   }
 }
 
@@ -150,7 +181,8 @@ namespace {
 class SILGlobalOptPass : public SILModuleTransform
 {
   void run() override {
-    SILGlobalOpt(getModule()).run();
+    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    SILGlobalOpt(getModule(), DA).run();
   }
 
   StringRef getName() override { return "SIL Global Optimization"; }
