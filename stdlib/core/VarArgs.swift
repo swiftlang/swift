@@ -46,7 +46,7 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
   return builder.va_list()
 }
 
-@public func encodeBitsAsWords<T: CVarArg>(x: T) -> [Word] {
+@public func _encodeBitsAsWords<T: CVarArg>(x: T) -> [Word] {
   var result = [Word](
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
@@ -64,80 +64,80 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 // Signed types
 extension Int : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension Int64 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension Int32 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension Int16 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(CInt(self))
   }
 }
 
 extension Int8 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(CInt(self))
   }
 }
 
 // Unsigned types
 extension UInt : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt64 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt32 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt16 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(CUnsignedInt(self))
+    return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension UInt8 : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(CUnsignedInt(self))
+    return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension COpaquePointer : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
 extension Float : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(Double(self))
+    return _encodeBitsAsWords(Double(self))
   }
 }
 
 extension Double : CVarArg {
   @public func encode() -> [Word] {
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 

@@ -791,7 +791,7 @@ extension NSDictionary : Reflectable {
 extension NSObject : CVarArg {
   @public func encode() -> [Word] {
     _autorelease(self)
-    return encodeBitsAsWords(self)
+    return _encodeBitsAsWords(self)
   }
 }
 
