@@ -371,8 +371,19 @@ ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
 ERROR(access_control_in_protocol,sema_tcd,none,
       "%0 attribute cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,sema_tcd,none,
-      "%0(set) attribute can only be applied to variables and subscripts",
-      (DeclAttribute))
+      "'%select{private|internal|public}0(set)' attribute can only be applied "
+      "to variables and subscripts",
+      (Accessibility))
+ERROR(access_control_setter_read_only,sema_tcd,none,
+      "'%select{private|internal|public}0(set)' attribute cannot be applied to "
+      "%select{constants|read-only variables|read-only properties"
+      "|read-only subscripts}1",
+      (Accessibility, unsigned))
+ERROR(access_control_setter_more,sema_tcd,none,
+      "%select{private|internal|PUBLIC}0 "
+      "%select{variable|property|subscript}1 cannot have "
+      "%select{PRIVATE|an internal|a public}2 setter",
+      (Accessibility, unsigned, Accessibility))
 
 ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())

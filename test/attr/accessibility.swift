@@ -82,3 +82,49 @@ duplicateAttr(1) // expected-error{{}}
   @internal var Bar: Int { get } // expected-error {{'internal' attribute cannot be used in protocols}}
   @public func baz() // expected-error {{'public' attribute cannot be used in protocols}}
 }
+
+@public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
+@internal(set) @private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
+@private(set) var defaultVisOK = 0
+@private(set) @public var publicVis = 0
+
+@private(set) var computed: Int { // expected-error {{'private(set)' attribute cannot be applied to read-only variables}}
+  return 42
+}
+@private(set) var computedRW: Int {
+  get { return 42 }
+  set { }
+}
+@private(set) let constant = 42 // expected-error {{'private(set)' attribute cannot be applied to constants}}
+
+@public struct Properties {
+  @private(set) var stored = 42
+  @private(set) var computed: Int { // expected-error {{'private(set)' attribute cannot be applied to read-only properties}}
+    return 42
+  }
+  @private(set) var computedRW: Int {
+    get { return 42 }
+    set { }
+  }
+  @private(set) let constant = 42 // expected-error {{'private(set)' attribute cannot be applied to read-only properties}}
+  @public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
+
+  @public(set) subscript(#a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
+    get { return 0 }
+    set {}
+  }
+  @internal(set) @private subscript(#b: Int) -> Int { // expected-error {{private subscript cannot have an internal setter}}
+    get { return 0 }
+    set {}
+  }
+  @private(set) subscript(#c: Int) -> Int {
+    get { return 0 }
+    set {}
+  }
+  @private(set) @public subscript(#d: Int) -> Int {
+    get { return 0 }
+    set {}
+  }
+
+  @private(set) subscript(#e: Int) -> Int { return 0 } // expected-error {{'private(set)' attribute cannot be applied to read-only subscripts}}
+}

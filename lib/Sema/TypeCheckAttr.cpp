@@ -336,8 +336,30 @@ void AttributeEarlyChecker::visitSetterAccessibilityAttr(
   if (visitAbstractAccessibilityAttr(attr))
     return;
 
-  if (!isa<AbstractStorageDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::access_control_setter, attr);
+  auto storage = dyn_cast<AbstractStorageDecl>(D);
+  if (!storage)
+    return diagnoseAndRemoveAttr(attr, diag::access_control_setter,
+                                 attr->getAccess());
+
+  if (!storage->isSettable(storage->getDeclContext())) {
+    // This must stay in sync with diag::access_control_setter_read_only.
+    enum {
+      SK_Constant = 0,
+      SK_Variable,
+      SK_Property,
+      SK_Subscript
+    } storageKind;
+    if (isa<SubscriptDecl>(storage))
+      storageKind = SK_Subscript;
+    else if (storage->getDeclContext()->isTypeContext())
+      storageKind = SK_Property;
+    else if (cast<VarDecl>(storage)->isLet())
+      storageKind = SK_Constant;
+    else
+      storageKind = SK_Variable;
+    return diagnoseAndRemoveAttr(attr, diag::access_control_setter_read_only,
+                                 attr->getAccess(), storageKind);
+  }
 }
 
 
@@ -386,7 +408,6 @@ public:
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Semantics)
-    UNINTERESTING_ATTR(SetterAccessibility)
 
 #undef UNINTERESTING_ATTR
 
@@ -395,22 +416,16 @@ public:
     // one it overrides.
   }
 
-  void visitIBActionAttr(IBActionAttr *attr);
-
   void visitAssignmentAttr(AssignmentAttr *attr);
-
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
-  void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
-
   void visitFinalAttr(FinalAttr *attr);
-
-  void visitNSCopyingAttr(NSCopyingAttr *attr);
-
+  void visitIBActionAttr(IBActionAttr *attr);
   void visitNoReturnAttr(NoReturnAttr *attr);
-
-  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
-
+  void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
+  void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
+  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
+  void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
 };
 } // end anonymous namespace
 
@@ -739,6 +754,29 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
       TC.diagnose(ctor, diag::required_initializer_nonclass, parentTy)
         .highlight(attr->getLocation());
     }
+    attr->setInvalid();
+    return;
+  }
+}
+
+void
+AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
+  auto getterAccess = cast<ValueDecl>(D)->getAccessibility();
+  if (attr->getAccess() > getterAccess) {
+    // This must stay in sync with diag::access_control_setter_more.
+    enum {
+      SK_Variable = 0,
+      SK_Property,
+      SK_Subscript
+    } storageKind;
+    if (isa<SubscriptDecl>(D))
+      storageKind = SK_Subscript;
+    else if (D->getDeclContext()->isTypeContext())
+      storageKind = SK_Property;
+    else
+      storageKind = SK_Variable;
+    TC.diagnose(attr->getLocation(), diag::access_control_setter_more,
+                getterAccess, storageKind, attr->getAccess());
     attr->setInvalid();
     return;
   }
