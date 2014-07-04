@@ -224,7 +224,7 @@ extension String {
       }
       res = res * 10
 
-      var d : Int = (c - "0")
+      var d = Int(c.value - _asUnicodeCodePoint("0"))
       // Underflow occurs if res - d < Int.min.
       if res < Int.min + d {
         return .None

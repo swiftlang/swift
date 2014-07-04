@@ -8,15 +8,6 @@ println(UInt8(CharA)) // CHECK: {{^65$}}
 println(UInt32(CharA)) // CHECK: {{^65$}}
 println(UInt64(CharA)) // CHECK: {{^65$}}
 
-println(CharA - "B") // CHECK: {{^-1$}}
-println("B" - CharA) // CHECK: {{^1$}}
-
-println((CharA - 2).value) // CHECK {{^63$}}
-println((CharA - -2).value) // CHECK {{^67$}}
-
-println((CharA + 3).value) // CHECK: {{^68$}}
-println((4 + CharA).value) // CHECK: {{^69$}}
-
 if CharA == "A" && "A" == CharA &&
    CharA != "B" && "B" != CharA {
   println("equality comparison works") // CHECK: equality comparison works

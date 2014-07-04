@@ -207,22 +207,6 @@ extension UInt64 {
   }
 }
 
-@public func - (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Int {
-  return Int(lhs.value) - Int(rhs.value)
-}
-
-@public func - (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
-  return UnicodeScalar(Int(lhs.value) - rhs)
-}
-
-@public func + (lhs: UnicodeScalar, rhs: Int) -> UnicodeScalar {
-  return UnicodeScalar(Int(lhs.value) + rhs)
-}
-
-@public func + (lhs: Int, rhs: UnicodeScalar) -> UnicodeScalar {
-  return rhs + lhs
-}
-
 @public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value == rhs.value
 }
