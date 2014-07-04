@@ -101,7 +101,7 @@ class Task {
         case TaskID(var i):
           return i
         default:
-          assert(false, "Task value is not a task ID")
+          fatalError("Task value is not a task ID")
           return 0
         }
       }
@@ -117,7 +117,7 @@ class Task {
         case None:
           return .None
         default:
-          assert(false, "Task value is not a worklist")
+          fatalError("Task value is not a worklist")
           return .None
         }
       }
@@ -138,7 +138,7 @@ class Task {
         case Count(var i):
           return i
         default:
-          assert(false, "Task value is not a count")
+          fatalError("Task value is not a count")
           return 0
         }
       }
@@ -154,7 +154,7 @@ class Task {
         case None:
           return .None
         default:
-          assert(false, "Task value is not a worklist")
+          fatalError("Task value is not a worklist")
           return .None
         }
       }
@@ -366,7 +366,7 @@ struct Richards {
     case .Count:
       break
     default:
-      assert(false, "Task value is not a count")
+      fatalError("Task value is not a count")
     }
     for i in 0..<BufSize {
       ++v2.count
