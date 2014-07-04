@@ -748,7 +748,44 @@ NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
       NSLocale(localeIdentifier: "en")))
 
   expectEqual("абвг", "абВГ".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+  expectEqual("абвг", "абВГ".lowercaseStringWithLocale(
       NSLocale(localeIdentifier: "ru")))
+
+  expectEqual("たちつてと", "たちつてと".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "ru")))
+
+  //
+  // Special casing.
+  //
+
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  // to lower case:
+  // U+0069 LATIN SMALL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  // to lower case in Turkish locale:
+  // U+0069 LATIN SMALL LETTER I
+  expectEqual("\u{0069}", "\u{0130}".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "tr")))
+
+  // U+0049 LATIN CAPITAL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  // to lower case:
+  // U+0069 LATIN SMALL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  // U+0049 LATIN CAPITAL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  // to lower case in Turkish locale:
+  // U+0069 LATIN SMALL LETTER I
+  expectEqual("\u{0069}", "\u{0049}\u{0307}".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "tr")))
 }
 
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
@@ -1003,7 +1040,50 @@ NSStringAPIs.test("substringWithRange(_:)") {
 }
 
 NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
-  // FIXME
+  expectEqual("ABCD", "abCD".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  expectEqual("АБВГ", "абВГ".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+  expectEqual("АБВГ", "абВГ".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "ru")))
+
+  expectEqual("たちつてと", "たちつてと".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "ru")))
+
+  //
+  // Special casing.
+  //
+
+  // U+0069 LATIN SMALL LETTER I
+  // to upper case:
+  // U+0049 LATIN CAPITAL LETTER I
+  expectEqual("\u{0049}", "\u{0069}".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  // U+0069 LATIN SMALL LETTER I
+  // to upper case in Turkish locale:
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  expectEqual("\u{0130}", "\u{0069}".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "tr")))
+
+  // U+00DF LATIN SMALL LETTER SHARP S
+  // to upper case:
+  // U+0053 LATIN CAPITAL LETTER S
+  // U+0073 LATIN SMALL LETTER S
+  // But because the whole string is converted to uppercase, we just get two
+  // U+0053.
+  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  // U+FB01 LATIN SMALL LIGATURE FI
+  // to upper case:
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+0069 LATIN SMALL LETTER I
+  // But because the whole string is converted to uppercase, we get U+0049
+  // LATIN CAPITAL LETTER I.
+  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseStringWithLocale(
+      NSLocale(localeIdentifier: "ru")))
 }
 
 NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
@@ -1020,6 +1100,62 @@ NSStringAPIs.test("OperatorEquals") {
   // NSString == NSString
   // String == NSString
   // NSString == String
+}
+
+// FIXME: these properties should be implemented in the core library.
+// <rdar://problem/17550602> [unicode] Implement case folding
+NSStringAPIs.test("lowercaseString") {
+  expectEqual("abcd", "abCD".lowercaseString)
+  expectEqual("абвг", "абВГ".lowercaseString)
+  expectEqual("たちつてと", "たちつてと".lowercaseString)
+
+  //
+  // Special casing.
+  //
+
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  // to lower case:
+  // U+0069 LATIN SMALL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercaseString)
+
+  // U+0049 LATIN CAPITAL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  // to lower case:
+  // U+0069 LATIN SMALL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseString)
+}
+
+NSStringAPIs.test("uppercaseString") {
+  expectEqual("ABCD", "abCD".uppercaseString)
+  expectEqual("АБВГ", "абВГ".uppercaseString)
+  expectEqual("たちつてと", "たちつてと".uppercaseString)
+
+  //
+  // Special casing.
+  //
+
+  // U+0069 LATIN SMALL LETTER I
+  // to upper case:
+  // U+0049 LATIN CAPITAL LETTER I
+  expectEqual("\u{0049}", "\u{0069}".uppercaseString)
+
+  // U+00DF LATIN SMALL LETTER SHARP S
+  // to upper case:
+  // U+0053 LATIN CAPITAL LETTER S
+  // U+0073 LATIN SMALL LETTER S
+  // But because the whole string is converted to uppercase, we just get two
+  // U+0053.
+  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercaseString)
+
+  // U+FB01 LATIN SMALL LIGATURE FI
+  // to upper case:
+  // U+0046 LATIN CAPITAL LETTER F
+  // U+0069 LATIN SMALL LETTER I
+  // But because the whole string is converted to uppercase, we get U+0049
+  // LATIN CAPITAL LETTER I.
+  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
 }
 
 NSStringAPIs.run()

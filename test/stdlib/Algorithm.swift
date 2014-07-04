@@ -1,6 +1,10 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
+import StdlibUnittest
+
+var Algorithm = TestCase("Algorithm")
+
 typealias CodePoints = String.UnicodeScalarView
 
 extension CodePoints {
@@ -196,9 +200,32 @@ func testMinMax() {
   println(max(3, 2))
   // CHECK-NEXT: 7
   println(max(3, 7, 5))
+
+  // FIXME: add tests that check that min/max return the
+  // first element of the sequence (by reference equailty) that satisfy the
+  // condition.
 }
 
 testMinMax()
+
+Algorithm.test("minElement,maxElement") {
+  var arr = [Int](count: 10, repeatedValue: 0)
+  for i in 0..<10 {
+    arr[i] = i % 7 + 2
+  }
+  expectEqual([2, 3, 4, 5, 6, 7, 8, 2, 3, 4], arr)
+
+  expectEqual(2, minElement(arr))
+  expectEqual(8, maxElement(arr))
+
+  // min and max element of a slice
+  expectEqual(3, minElement(arr[1..<5]))
+  expectEqual(6, maxElement(arr[1..<5]))
+
+  // FIXME: add tests that check that minElement/maxElement return the
+  // first element of the sequence (by reference equailty) that satisfy the
+  // condition.
+}
 
 func testFilter() {
   var count = 0
@@ -219,5 +246,19 @@ func testFilter() {
 }
 testFilter()
 
+Algorithm.test("sorted") {
+  expectEqual([ "Banana", "apple", "cherry" ],
+      sorted([ "apple", "Banana", "cherry" ]))
+
+  expectEqual([ "Banana", "cherry", "apple" ],
+      sorted(["apple", "Banana", "cherry"]) {
+        countElements($0) > countElements($1)
+      })
+}
+
+Algorithm.run()
+// CHECK: {{^}}Algorithm: All tests passed
+
 // CHECK-NEXT: all done.
 println("all done.")
+

@@ -63,6 +63,13 @@ StringTests.test("unicodeScalars") {
   checkUnicodeScalarViewIteration([ 0x10ffff ], "\u{0010ffff}")
 }
 
+StringTests.test("_splitFirst") {
+  var (before, after, found) = "foo.bar"._splitFirst(".")
+  expectTrue(found)
+  expectEqual("foo", before)
+  expectEqual("bar", after)
+}
+
 StringTests.run()
 // CHECK: {{^}}StringTests: All tests passed
 
