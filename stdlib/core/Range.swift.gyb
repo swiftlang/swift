@@ -72,7 +72,7 @@
 > : LogicValue, Sliceable, Reflectable {
 
 % if Self == 'RandomAccessRange':
-  @conversion
+  @conversion @public
   func __conversion() -> Range<T> {
     return Range(start: startIndex, end: endIndex)
   }

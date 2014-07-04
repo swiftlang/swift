@@ -4,8 +4,8 @@
 // RUN: %S/../../utils/gyb %s -o %t/FixedPointArithmeticTraps.swift
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/OpaqueIdentityFunctions/OpaqueIdentityFunctions.m -c -o %t/OpaqueIdentityFunctions.o -g
-// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Debug
-// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Release -O
+// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Debug -Xfrontend -disable-access-control
+// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Release -O -Xfrontend -disable-access-control
 //
 // RUN: %target-run %t/a.out_Debug 1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Debug 2 2>&1 | FileCheck %s -check-prefix=CHECK

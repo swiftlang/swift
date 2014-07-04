@@ -1,6 +1,6 @@
 import AppKit
 
-class MyObjectFactorySub : NSObjectFactorySub {
-  init() { }
+@public class MyObjectFactorySub : NSObjectFactorySub {
+  @public init() { }
 }
 

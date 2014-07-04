@@ -62,6 +62,8 @@ struct _EmptyGeneratorMirror<T>: Mirror {
 @public struct EmptyCollection<T> : Collection, Reflectable {
   @public typealias IndexType = Int
   
+  @public init() {}
+  
   @public var startIndex: IndexType {
     return 0
   }

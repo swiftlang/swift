@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DunicodeGraphemeBreakPropertyFile=%S/../../utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%S/../../utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
-// RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/UnicodeTrie.swift -o %t/a.out -g
+// RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
 // RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/UnicodeTrie.swift -- FileCheck %t/UnicodeTrie.swift
 
 %{
