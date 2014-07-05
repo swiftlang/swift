@@ -2305,7 +2305,8 @@ public:
 
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
-  SILResultInfo transform(const std::function<Type(Type)> &fn) const {
+  template <typename F>
+  SILResultInfo transform(F &&fn) const {
     return SILResultInfo(fn(getType())->getCanonicalType(), getConvention());
   }
 

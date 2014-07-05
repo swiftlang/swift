@@ -254,11 +254,7 @@ public:
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  SILType mapTypeIntoContext(SILType type) const {
-    return SILType::getPrimitiveType(
-             mapTypeIntoContext(type.getSwiftRValueType())->getCanonicalType(),
-             type.getCategory());
-  }
+  SILType mapTypeIntoContext(SILType type) const;
 
   //===--------------------------------------------------------------------===//
   // Block List Access

@@ -21,6 +21,7 @@
 #include "llvm/Support/GraphWriter.h"
 
 using namespace swift;
+using namespace Lowering;
 
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
@@ -120,6 +121,68 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
   return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
                                               getContextGenericParams(),
                                               type);
+}
+
+namespace {
+struct MapSILTypeIntoContext : CanTypeVisitor<MapSILTypeIntoContext, CanType> {
+  const SILFunction *ContextFn;
+  
+  MapSILTypeIntoContext(const SILFunction *ContextFn) : ContextFn(ContextFn) {}
+  
+  CanType visitDependentMemberType(CanDependentMemberType t) {
+    // If a dependent member type appears in lowered position, we need to lower
+    // its context substitution against the associated type's abstraction
+    // pattern.
+    CanType astTy = ContextFn->mapTypeIntoContext(t)->getCanonicalType();
+    AbstractionPattern origTy(t->getAssocType()->getArchetype());
+    
+    return ContextFn->getModule().Types.getLoweredType(origTy, astTy)
+      .getSwiftRValueType();
+  }
+  
+  CanType visitTupleType(CanTupleType t) {
+    // Dependent members can appear in lowered position inside tuples.
+    
+    SmallVector<TupleTypeElt, 4> elements;
+    
+    for (auto &elt : t->getFields())
+      elements.push_back(elt.getWithType(visit(CanType(elt.getType()))));
+    
+    return TupleType::get(elements, t->getASTContext())
+      ->getCanonicalType();
+  }
+  
+  CanType visitSILFunctionType(CanSILFunctionType t) {
+    // Dependent members can appear in lowered position inside SIL functions.
+    
+    SmallVector<SILParameterInfo, 4> params;
+    for (auto &param : t->getInterfaceParameters())
+      params.push_back(param.transform([&](CanType pt) -> CanType {
+        return visit(pt);
+      }));
+    
+    SILResultInfo result = t->getInterfaceResult()
+      .transform([&](CanType elt) -> CanType {
+        return visit(elt);
+      });
+    
+    return SILFunctionType::get(t->getGenericSignature(),
+                                t->getExtInfo(),
+                                t->getCalleeConvention(),
+                                params, result,
+                                t->getASTContext());
+  }
+  
+  CanType visitType(CanType t) {
+    // Other types get substituted into context normally.
+    return ContextFn->mapTypeIntoContext(t)->getCanonicalType();
+  }
+};
+} // end anonymous namespace
+
+SILType SILFunction::mapTypeIntoContext(SILType type) const {
+  CanType astTy = MapSILTypeIntoContext(this).visit(type.getSwiftRValueType());
+  return SILType::getPrimitiveType(astTy, type.getCategory());
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
