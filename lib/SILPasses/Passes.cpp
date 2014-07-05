@@ -133,14 +133,17 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   GenericsPM.add(createGenericSpecializer());
   GenericsPM.run();
 
-  // Construct SSA pass manager.
-  SILPassManager SSAPM(&Module, Options);
-  ConstructSSAPassManager(SSAPM, Module, false);
+  // Run two iteration of the high-level SSA pass mananger.
+  SILPassManager HighLevelSILPM(&Module, Options);
+  ConstructSSAPassManager(HighLevelSILPM, Module, false);
+  HighLevelSILPM.runOneIteration();
+  HighLevelSILPM.runOneIteration();
 
-  // Run three iteration of the SSA pass mananger.
-  SSAPM.runOneIteration();
-  SSAPM.runOneIteration();
-  SSAPM.runOneIteration();
+  // Run two iteration of the low-level SSA pass mananger.
+  SILPassManager LowLevelSILPM(&Module, Options);
+  ConstructSSAPassManager(LowLevelSILPM, Module, true);
+  LowLevelSILPM.runOneIteration();
+  LowLevelSILPM.runOneIteration();
 
   // Perform lowering optimizations.
   SILPassManager LoweringPM(&Module, Options);
@@ -158,8 +161,8 @@ void swift::runSILOptimizationPasses(SILModule &Module,
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches.
-  SSAPM.invalidateAnalysis(SILAnalysis::InvalidationKind::All);
-  SSAPM.runOneIteration();
+  LowLevelSILPM.invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+  LowLevelSILPM.runOneIteration();
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.
   Module.invalidateSILLoader();
