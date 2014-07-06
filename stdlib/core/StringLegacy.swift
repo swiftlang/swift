@@ -171,15 +171,15 @@ extension String {
   typealias _Float = Float
   typealias _Bool = Bool
   
-  @public init(_ v : _Double) {
+  init(_ v : _Double) {
     self = _doubleToString(v)
   }
 
-  @public init(_ v : _Float) {
+  init(_ v : _Float) {
     self = String(Double(v))
   }
 
-  @public init(_ b : _Bool) {
+  init(_ b : _Bool) {
     if b {
       self = "true"
     } else {

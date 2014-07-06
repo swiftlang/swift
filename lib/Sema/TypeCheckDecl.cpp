@@ -2139,10 +2139,10 @@ class TypeAccessibilityChecker : private TypeWalker {
     }
 
     Accessibility current;
-    if (auto nominal = ty->getAnyNominal())
-      current = nominal->getAccessibility();
-    else if (auto alias = ty->getAs<NameAliasType>())
+    if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
       current = alias->getDecl()->getAccessibility();
+    else if (auto nominal = ty->getAnyNominal())
+      current = nominal->getAccessibility();
     else
       current = Accessibility::Public;
     AccessStack.push_back(current);
@@ -2191,8 +2191,11 @@ public:
   static const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
     if (const ValueDecl *VD = TR->getBoundDecl())
       return VD;
-    if (Type ty = TR->getBoundType())
+    if (Type ty = TR->getBoundType()) {
+      if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
+        return alias->getDecl();
       return ty->getAnyNominal();
+    }
     assert(TR->isBoundModule());
     return nullptr;
   }
