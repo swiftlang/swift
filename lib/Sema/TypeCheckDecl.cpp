@@ -2272,6 +2272,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     llvm_unreachable("cannot appear in a type context");
 
   case DeclKind::Param:
+  case DeclKind::GenericTypeParam:
     llvm_unreachable("does not have accessibility");
 
   case DeclKind::IfConfig:
@@ -2345,6 +2346,34 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     });
+    return;
+  }
+
+  case DeclKind::Enum: {
+    auto ED = cast<EnumDecl>(D);
+
+    if (ED->hasRawType()) {
+      Type rawType = ED->getRawType();
+      auto rawTypeLocIter = std::find_if(ED->getInherited().begin(),
+                                         ED->getInherited().end(),
+                                         [&](TypeLoc inherited) {
+        if (!inherited.wasValidated())
+          return false;
+        return inherited.getType().getPointer() == rawType.getPointer();
+      });
+      if (rawTypeLocIter == ED->getInherited().end())
+        return;
+      checkTypeAccessibility(TC, *rawTypeLocIter, ED->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *complainRepr) {
+        bool isExplicit = ED->getAttrs().hasAttribute<AccessibilityAttr>();
+        auto diag = TC.diagnose(ED, diag::enum_raw_type_access,
+                                isExplicit, ED->getAccessibility(),
+                                typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
+
     return;
   }
 
@@ -2550,8 +2579,6 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
-  case DeclKind::GenericTypeParam:
-  case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::EnumElement:
@@ -3168,6 +3195,8 @@ public:
 
     Type rawTy;
     if (!IsFirstPass) {
+      checkAccessibility(TC, ED);
+
       if (ED->hasRawType()) {
         rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
 

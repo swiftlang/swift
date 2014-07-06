@@ -754,6 +754,11 @@ ERROR(raw_type_not_literal_convertible,sema_tcd,none,
 ERROR(enum_raw_type_not_equatable,sema_tcd,none,
       "'fromRaw' method cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
+ERROR(enum_raw_type_access,sema_tcd,none,
+      "enum %select{must be declared %select{private|internal|PUBLIC}2"
+      "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
+      "raw type uses %select{a private|an internal|PUBLIC}2 type",
+      (bool, Accessibility, Accessibility))
 
 NOTE(enum_here,sema_tcd,none,
      "enum %0 declared here", (Identifier))

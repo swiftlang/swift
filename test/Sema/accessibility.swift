@@ -171,3 +171,17 @@ protocol DefaultRefinesPrivate : PrivateProto {} // expected-error {{protocol mu
 @public protocol PublicRefinesInternal : InternalProto {} // expected-error {{public protocol cannot refine an internal protocol}}
 @public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a private protocol}}
 @public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
+
+
+// expected-note@+1 + {{type declared here}}
+@private typealias PrivateInt = Int
+enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared private because its raw type uses a private type}}
+  case A
+}
+@public enum PublicRawPrivate : PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a private type}}
+  case A
+}
+@public enum MultipleConformance : PrivateProto, PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a private type}} expected-error {{must appear first}}
+  case A
+  func privateReq() {}
+}
