@@ -2927,7 +2927,7 @@ static Type simplifyForTypePropertyConstraint(ConstraintSystem &cs, Type type) {
     type = fixed;
 
     // Look through parentheses.
-    while (auto paren = type->getAs<ParenType>())
+    while (auto paren = dyn_cast<ParenType>(type.getPointer()))
       type = paren->getUnderlyingType();
   }
 

@@ -423,11 +423,7 @@ namespace {
         // obtain the archetype from its decl.
         if (!archetype) {
           auto type = nestedType.get<Type>();
-          
-          if (auto ST = type->getAs<SubstitutedType>()) {
-            type = ST->getOriginal();
-          }
-          
+                    
           if (auto GTPT = type->getAs<GenericTypeParamType>()) {
             if (auto gpDecl = GTPT->getDecl()) {
               archetype = gpDecl->getArchetype();

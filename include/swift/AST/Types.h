@@ -192,6 +192,15 @@ class alignas(8) TypeBase {
   enum { NumTypeBaseBits = RecursiveTypeProperties::BitWidth };
   static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
 
+  /// Returns true if the given type is a sugared type.
+  ///
+  /// Only intended for use in compile-time assertions.
+  // Specializations of this are at the end of the file.
+  template <typename T>
+  static constexpr bool isSugaredType() {
+    return false;
+  }
+
 protected:
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -291,16 +300,19 @@ public:
   /// the minimal amount of sugar required to get a pointer to the type.
   template <typename T>
   T *getAs() {
+    static_assert(!isSugaredType<T>(), "getAs desugars types");
     return dyn_cast<T>(getDesugaredType());
   }
 
   template <typename T>
   bool is() {
+    static_assert(!isSugaredType<T>(), "isa desugars types");
     return isa<T>(getDesugaredType());
   }
   
   template <typename T>
   T *castTo() {
+    static_assert(!isSugaredType<T>(), "castTo desugars types");
     return cast<T>(getDesugaredType());
   }
 
@@ -3723,6 +3735,15 @@ inline unsigned SubstitutableType::getPrimaryIndex() const {
 inline CanType Type::getCanonicalTypeOrNull() const {
   return isNull() ? CanType() : getPointer()->getCanonicalType();
 }
+
+
+#define TYPE(id, parent)
+#define SUGARED_TYPE(id, parent) \
+template <> \
+constexpr bool TypeBase::isSugaredType<id##Type>() { \
+  return true; \
+}
+#include "swift/AST/TypeNodes.def"
 
 } // end namespace swift
 
