@@ -231,8 +231,6 @@ extension UnicodeScalar : Comparable {
   return us
 }
 @public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
-  var codePoint = us.value
-  _precondition(codePoint <= UInt32(UInt16.max))
-  return UTF16.CodeUnit(codePoint)
+  return UTF16.CodeUnit(us.value)
 }
 
