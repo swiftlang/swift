@@ -139,8 +139,11 @@ struct Initializers {
 }
 
 
-// expected-note@+1 {{type declared here}}
-class InternalClass {}
+@public class PublicClass {}
+// expected-note@+1 + {{type declared here}}
+@internal class InternalClass {}
+// expected-note@+1 + {{type declared here}}
+@private class PrivateClass {}
 
 @public protocol AssocTypes {
   typealias Foo
@@ -185,3 +188,12 @@ enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared 
   case A
   func privateReq() {}
 }
+
+@public class PublicSubclassPublic : PublicClass {}
+@public class PublicSubclassInternal : InternalClass {} // expected-error {{class cannot be declared public because its superclass is internal}}
+@public class PublicSubclassPrivate : PrivateClass {} // expected-error {{class cannot be declared public because its superclass is private}}
+
+class DefaultSubclassPublic : PublicClass {}
+class DefaultSubclassInternal : InternalClass {}
+class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private because its superclass is private}}
+

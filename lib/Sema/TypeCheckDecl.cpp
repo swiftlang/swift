@@ -2275,6 +2275,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::GenericTypeParam:
     llvm_unreachable("does not have accessibility");
 
+  case DeclKind::Struct:
+    // Nothing to check.
   case DeclKind::IfConfig:
     // Does not have accessibility.
   case DeclKind::EnumCase:
@@ -2369,6 +2371,34 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         bool isExplicit = ED->getAttrs().hasAttribute<AccessibilityAttr>();
         auto diag = TC.diagnose(ED, diag::enum_raw_type_access,
                                 isExplicit, ED->getAccessibility(),
+                                typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
+
+    return;
+  }
+
+  case DeclKind::Class: {
+    auto CD = cast<ClassDecl>(D);
+
+    if (CD->hasSuperclass()) {
+      Type superclass = CD->getSuperclass();
+      auto superclassLocIter = std::find_if(CD->getInherited().begin(),
+                                            CD->getInherited().end(),
+                                            [&](TypeLoc inherited) {
+        if (!inherited.wasValidated())
+          return false;
+        return inherited.getType().getPointer() == superclass.getPointer();
+      });
+      if (superclassLocIter == CD->getInherited().end())
+        return;
+      checkTypeAccessibility(TC, *superclassLocIter, CD->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *complainRepr) {
+        bool isExplicit = CD->getAttrs().hasAttribute<AccessibilityAttr>();
+        auto diag = TC.diagnose(CD, diag::class_super_access,
+                                isExplicit, CD->getAccessibility(),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -2579,8 +2609,6 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
-  case DeclKind::Struct:
-  case DeclKind::Class:
   case DeclKind::EnumElement:
     // unimplemented
     return;
@@ -3555,6 +3583,8 @@ public:
           return;
         }
       }
+
+      checkAccessibility(TC, CD);
 
       // Check for inconsistencies between the initializers of our
       // superclass and our own initializers.
