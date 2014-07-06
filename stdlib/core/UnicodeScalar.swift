@@ -224,14 +224,11 @@ extension UnicodeScalar : Comparable {
   return lhs.value < rhs.value
 }
 
-/// Helpers to provide type context to guide type inference in code like::
+/// Helper to provide type context to guide type inference in code like::
 ///
-///   var zero = _asUnicodeCodePoint("0")
-func _asUnicodeCodePoint(us: UnicodeScalar) -> Builtin.Int32 {
-  return us._value
-}
-@public func _asUnicodeCodePoint(us: UnicodeScalar) -> UInt32 {
-  return us.value
+///   var value = digit - _asUnicodeScalar("0")
+@public func _asUnicodeScalar(us: UnicodeScalar) -> UnicodeScalar {
+  return us
 }
 @public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
   var codePoint = us.value

@@ -84,8 +84,10 @@ func _formatPositiveInteger(
 
   _formatPositiveInteger(value / radix, radix, ten: ten)(stream: stream)
   var digit = UInt32(value % radix)
-  var baseCharOrd: UInt32 = digit <= 9 ? _asUnicodeCodePoint("0")
-                                       : _asUnicodeCodePoint(ten) - 10
+  var baseCharOrd: UInt32 =
+      digit <= 9
+          ? _asUnicodeScalar("0").value
+          : _asUnicodeScalar(ten).value - 10
   stream(UTF8.CodeUnit(baseCharOrd + digit))
 }
 
@@ -95,12 +97,12 @@ func _formatSignedInteger(
   ten: UnicodeScalar = "a") (  stream: (UTF8.CodeUnit)->Void ) {
   
   if value == 0 {
-    stream(UTF8.CodeUnit(_asUnicodeCodePoint("0")))
+    stream(UTF8.CodeUnit(_asUnicodeScalar("0").value))
   }
   else {
     if (value < 0) {
       let minusCharacter: UnicodeScalar = "-"
-      stream(UTF8.CodeUnit(_asUnicodeCodePoint("-")))
+      stream(UTF8.CodeUnit(_asUnicodeScalar("-").value))
     }
     // Compute the absolute value without causing overflow when value
     // == Int64.min
@@ -235,7 +237,7 @@ extension String {
       }
       res = res * 10
 
-      var d = Int(c.value - _asUnicodeCodePoint("0"))
+      var d = Int(c.value - _asUnicodeScalar("0").value)
       // Underflow occurs if res - d < Int.min.
       if res < Int.min + d {
         return .None
