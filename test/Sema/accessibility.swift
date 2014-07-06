@@ -4,7 +4,7 @@
   func publicReq()
 }
 
-// expected-note@+1 {{type declared here}}
+// expected-note@+1 + {{type declared here}}
 @internal protocol InternalProto {
   func internalReq()
 }
@@ -162,3 +162,9 @@ class InternalClass {}
   func foo() -> PrivateStruct // expected-error {{method cannot be declared public because its result uses a private type}}
   init(x: PrivateStruct) // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
 }
+
+protocol DefaultRefinesPrivate : PrivateProto {} // expected-error {{protocol must be declared private because it refines a private protocol}}
+@public protocol PublicRefinesPrivate : PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
+@public protocol PublicRefinesInternal : InternalProto {} // expected-error {{public protocol cannot refine an internal protocol}}
+@public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a private protocol}}
+@public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}

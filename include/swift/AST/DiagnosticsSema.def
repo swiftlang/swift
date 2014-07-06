@@ -526,10 +526,15 @@ ERROR(witness_not_accessible_type,sema_tcd,none,
       "protocol %3",
       (RequirementKind, DeclName, Accessibility, DeclName))
 
+ERROR(protocol_refine_access,sema_tcd,none,
+      "%select{protocol must be declared %select{private|internal|PUBLIC}2 "
+      "because it refines"
+      "|%select{PRIVATE|internal|public}1 protocol cannot refine}0 "
+      "%select{a private|an internal|PUBLIC}2 protocol",
+      (bool, Accessibility, Accessibility))
 ERROR(protocol_property_must_be_computed_var,sema_tcd,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
-
 ERROR(protocol_property_must_be_computed,sema_tcd,none,
       "property in protocol must have explicit { get } or { get set } specifier",
       ())

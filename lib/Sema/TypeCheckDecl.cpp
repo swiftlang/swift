@@ -2517,11 +2517,40 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
+
+    Optional<Accessibility> minAccess;
+    const TypeRepr *complainRepr = nullptr;
+
+    std::for_each(proto->getInherited().begin(),
+                  proto->getInherited().end(),
+                  [&](TypeLoc requirement) {
+      checkTypeAccessibility(TC, requirement, proto->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+        }
+      });
+    });
+
+    if (minAccess) {
+      bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
+      auto diag = TC.diagnose(proto, diag::protocol_refine_access,
+                              isExplicit,
+                              proto->getAccessibility(),
+                              *minAccess);
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+    return;
+  }
+
   case DeclKind::GenericTypeParam:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
-  case DeclKind::Protocol:
   case DeclKind::EnumElement:
     // unimplemented
     return;
@@ -3595,6 +3624,7 @@ public:
     computeAccessibility(TC, PD);
 
     if (IsSecondPass) {
+      checkAccessibility(TC, PD);
       for (auto member : PD->getMembers())
         checkAccessibility(TC, member);
       return;
