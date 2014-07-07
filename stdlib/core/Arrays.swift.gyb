@@ -23,8 +23,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-% arrayTypes = ['ContiguousArray', 'Slice', 'Array']
-% for Self in arrayTypes:
+% arrayTypes = [
+%     ('ContiguousArray', 'a ContiguousArray'),
+%     ('Slice', 'a Slice'),
+%     ('Array', 'an Array')
+% ]
+% for (Self, a_Self) in arrayTypes:
 @public struct ${Self}<T> : MutableCollection, Sliceable {
   @public typealias Element = T
   @public var startIndex: Int {
@@ -260,7 +264,7 @@ extension ${Self} : ArrayType {
     return result
   }
 
-  /// Return a ${Self} containing the results of calling
+  /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
   @public func map<U>(transform: (T)->U) -> ${Self}<U> {
     return ${Self}<U>(lazy(self).map(transform))
@@ -271,7 +275,7 @@ extension ${Self} : ArrayType {
     return ${Self}(lazy(self).reverse())
   }
 
-  /// Return a ${Self} containing the elements `x` of `self` for which
+  /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   @public func filter(includeElement: (T)->Bool) -> ${Self} {
     return ${Self}(lazy(self).filter(includeElement))
@@ -525,7 +529,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
   return capacity * 2
 }
 
-% for Self in arrayTypes:
+% for (Self, a_Self) in arrayTypes:
 extension ${Self} {
   @public mutating func replaceRange<
     C: Collection where C.GeneratorType.Element == _Buffer.Element
@@ -803,7 +807,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
   return !(lhs === rhs)
 }
 
-% for Self in arrayTypes:
+% for (Self, a_Self) in arrayTypes:
 // NOTE: The '==' and '!=' below only handles array types
 // that are the same, e.g. Array<Int> and Array<Int>, not
 // Slice<Int> and Array<Int>.
