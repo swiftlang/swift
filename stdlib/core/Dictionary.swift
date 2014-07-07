@@ -1388,8 +1388,17 @@ func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
   return lhs.nextKeyIndex == rhs.nextKeyIndex
 }
 
+enum _DictionaryIndexRepresentation<KeyType : Hashable, ValueType> {
+  typealias _Index = DictionaryIndex<KeyType, ValueType>
+  typealias _NativeIndex = _Index._NativeIndex
+  typealias _CocoaIndex = _Index._CocoaIndex
+
+  case _Native(_NativeIndex)
+  case _Cocoa(_CocoaIndex)
+}
+
 @public
-enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
+struct DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -1399,8 +1408,15 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
 
   typealias _NativeIndex = _NativeDictionaryIndex<KeyType, ValueType>
   typealias _CocoaIndex = _CocoaDictionaryIndex
-  case _Native(_NativeIndex)
-  case _Cocoa(_CocoaIndex)
+
+  var value: _DictionaryIndexRepresentation<KeyType, ValueType>
+
+  static func _Native(index: _NativeIndex) -> DictionaryIndex {
+    return DictionaryIndex(value: ._Native(index))
+  }
+  static func _Cocoa(index: _CocoaIndex) -> DictionaryIndex {
+    return DictionaryIndex(value: ._Cocoa(index))
+  }
 
   @transparent
   var _guaranteedNative: Bool {
@@ -1409,7 +1425,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
 
   @transparent
   var _nativeIndex: _NativeIndex {
-    switch self {
+    switch value {
     case ._Native(let nativeIndex):
       return nativeIndex
     case ._Cocoa:
@@ -1419,7 +1435,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
 
   @transparent
   var _cocoaIndex: _CocoaIndex {
-    switch self {
+    switch value {
     case ._Native:
       _fatalError("internal error: does not contain a Cocoa index")
     case ._Cocoa(let cocoaIndex):
@@ -1434,7 +1450,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
       return ._Native(_nativeIndex.predecessor())
     }
 
-    switch self {
+    switch value {
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.predecessor())
     case ._Cocoa(let cocoaIndex):
@@ -1447,7 +1463,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
       return ._Native(_nativeIndex.successor())
     }
 
-    switch self {
+    switch value {
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.successor())
     case ._Cocoa(let cocoaIndex):
@@ -1464,7 +1480,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
     return lhs._nativeIndex == rhs._nativeIndex
   }
 
-  switch (lhs, rhs) {
+  switch (lhs.value, rhs.value) {
   case (._Native(let lhsNative), ._Native(let rhsNative)):
     return lhsNative == rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
@@ -1571,7 +1587,15 @@ class _CocoaDictionaryGenerator : Generator {
   }
 }
 
-@public enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
+enum _DictionaryGeneratorRepresentation<KeyType : Hashable, ValueType> {
+  typealias _Generator = DictionaryGenerator<KeyType, ValueType>
+  typealias _NativeIndex = _Generator._NativeIndex
+  case _Native(start: _NativeIndex, end: _NativeIndex)
+  case _Cocoa(_CocoaDictionaryGenerator)
+}
+
+@public
+struct DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
   // Dictionary has a separate Generator and Index because of efficiency
   // and implementability reasons.
   //
@@ -1584,8 +1608,18 @@ class _CocoaDictionaryGenerator : Generator {
 
   typealias _NativeIndex = _NativeDictionaryIndex<KeyType, ValueType>
 
-  case _Native(start: _NativeIndex, end: _NativeIndex)
-  case _Cocoa(_CocoaDictionaryGenerator)
+  var state: _DictionaryGeneratorRepresentation<KeyType, ValueType>
+
+  static func _Native(
+    #start: _NativeIndex, end: _NativeIndex
+  ) -> DictionaryGenerator {
+    return DictionaryGenerator(state: ._Native(start: start, end: end))
+  }
+  static func _Cocoa(
+    generator: _CocoaDictionaryGenerator
+  ) -> DictionaryGenerator{
+    return DictionaryGenerator(state: ._Cocoa(generator))
+  }
 
   @transparent
   var _guaranteedNative: Bool {
@@ -1593,16 +1627,16 @@ class _CocoaDictionaryGenerator : Generator {
   }
 
   mutating func _nativeNext() -> (KeyType, ValueType)? {
-    switch self {
+    switch state {
     case ._Native(var startIndex, var endIndex):
       if startIndex == endIndex {
         return .None
       }
       let result = startIndex.nativeStorage.assertingGet(startIndex)
-      self = ._Native(start: startIndex.successor(), end: endIndex)
+      state = ._Native(start: startIndex.successor(), end: endIndex)
       return result
     case ._Cocoa:
-      _fatalError("internal error: not baked by NSDictionary")
+      _fatalError("internal error: not backed by NSDictionary")
     }
   }
 
@@ -1611,7 +1645,7 @@ class _CocoaDictionaryGenerator : Generator {
       return _nativeNext()
     }
 
-    switch self {
+    switch state {
     case ._Native(var startIndex, var endIndex):
       return _nativeNext()
     case ._Cocoa(var cocoaGenerator):
