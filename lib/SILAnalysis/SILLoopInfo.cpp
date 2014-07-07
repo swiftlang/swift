@@ -48,3 +48,21 @@ SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
 SILAnalysis *swift::createLoopInfoAnalysis(SILModule *M, SILPassManager *PM) {
   return new SILLoopAnalysis(M, PM);
 }
+
+void SILLoopInfo::verify() const {
+  llvm::DenseSet<const SILLoop*> Loops;
+  for (iterator I = begin(), E = end(); I != E; ++I) {
+    assert(!(*I)->getParentLoop() && "Top-level loop has a parent!");
+    (*I)->verifyLoopNest(&Loops);
+  }
+
+  // We need access to the map for this.
+  // Verify that blocks are mapped to valid loops.
+  for (llvm::DenseMap<SILBasicBlock *, SILLoop *>::const_iterator
+           I = LI.getBlockMap().begin(),
+           E = LI.getBlockMap().end();
+       I != E; ++I) {
+    assert(Loops.count(I->second) && "orphaned loop");
+    assert(I->second->contains(I->first) && "orphaned block");
+  }
+}
