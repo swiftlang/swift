@@ -36,6 +36,25 @@ public:
 
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
+
+  void verify() const;
+
+  /// Return true if the other dominator tree does not match this dominator
+  /// tree.
+  inline bool errorOccuredOnComparison(const DominanceInfo &Other) const {
+    const auto *R = getRootNode();
+    const auto *OtherR = Other.getRootNode();
+
+    if (!R || !OtherR || R->getBlock() != OtherR->getBlock())
+      return true;
+
+    // Returns *false* if they match.
+    if (compare(Other))
+      return true;
+
+    return false;
+  }
+
   using DominatorTreeBase::properlyDominates;
 
   bool isValid(SILFunction *F) const {

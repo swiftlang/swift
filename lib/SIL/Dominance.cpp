@@ -49,6 +49,21 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
   return false;
 }
 
+void DominanceInfo::verify() const {
+  // Recompute.
+  auto *F = getRoot()->getParent();
+  DominanceInfo OtherDT(F);
+
+  // And compare.
+  if (errorOccuredOnComparison(OtherDT)) {
+    llvm::errs() << "DominatorTree is not up to date!\nComputed:\n";
+    print(llvm::errs());
+    llvm::errs() << "\nActual:\n";
+    OtherDT.print(llvm::errs());
+    abort();
+  }
+}
+
 /// Compute the immmediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
