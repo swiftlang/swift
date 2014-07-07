@@ -194,12 +194,12 @@ public:
   }
 
   std::pair<unsigned, unsigned>
-  getLineAndColumn(SourceLoc Loc, int BufferID = -1) const {
+  getLineAndColumn(SourceLoc Loc, unsigned BufferID = 0) const {
     return getLineAndColumn(Loc.Value, BufferID);
   }
 
   std::pair<unsigned, unsigned> getLineAndColumn(llvm::SMLoc Loc,
-                                                 int BufferID = -1) const {
+                                                 unsigned BufferID = 0) const {
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
@@ -208,7 +208,7 @@ public:
     return { LineOffset + l, c };
   }
 
-  unsigned getLineNumber(SourceLoc Loc, int BufferID = -1) const {
+  unsigned getLineNumber(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
   }
