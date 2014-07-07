@@ -10,16 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
+%import gyb
+%TMirrorDecl = gyb.parseTemplate("../common/MirrorDecl.gyb")
+%TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
+%TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
+
 % for mutable in (True, False):
 %  Self = 'UnsafePointer' if mutable else 'ConstUnsafePointer'
 %  a_Self = 'an UnsafePointer' if mutable else 'a ConstUnsafePointer'
+%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
+%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
+%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 
 /// This type stores a pointer to an object of type T. It provides no
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
 @public struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
-                            LogicValue, NilLiteralConvertible, _Pointer,
-                            Reflectable {
+                            LogicValue, NilLiteralConvertible, _Pointer {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -265,25 +272,11 @@
   @public func predecessor() -> ${Self} {
     return self - 1
   }
-  
-  @public func getMirror() -> Mirror {
-    return _${Self}Mirror(self)
-  }
 }
 
-@public struct _${Self}Mirror<T>: Mirror {
-  let _value: ${Self}<T>
+${MirrorDecl} {
+  ${MirrorBoilerplate}
   
-  init(_ v: ${Self}<T>) {
-    _value = v
-  }
-  
-  @public var value: Any { return _value }
-
-  @public var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  @public var objectIdentifier: ObjectIdentifier? { return .None }
-
   @public var count: Int { return 1 }
   
   func _getPointerValue() -> UInt64 {
@@ -304,10 +297,10 @@
     return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @public var quickLookObject: QuickLookObject? { return .None }
-
-  @public var disposition: MirrorDisposition { return .Struct }
+  @public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
+
+${MirrorConformance}
 
 @transparent @public
 func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
