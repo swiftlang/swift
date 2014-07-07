@@ -55,6 +55,16 @@ bool isCriticalEdge(TermInst *T, unsigned EdgeIdx);
 SILBasicBlock *splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
                                  DominanceInfo *DT = nullptr,
                                  SILLoopInfo *LI = nullptr);
+
+/// \brief Rotate a loop's header as long as it is exiting and not equal to the
+/// passed basic block.
+/// If \p RotateSingleBlockLoops is true a single basic block loop will be
+/// rotated once. ShouldVerify specifies whether to perform verification after
+/// the transformation.
+/// Returns true if the loop could be rotated.
+bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
+                bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
+                bool ShouldVerify);
 }
 
 #endif

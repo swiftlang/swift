@@ -38,4 +38,5 @@ add_swift_library(swiftSILPasses
   LoopInfoPrinter.cpp
   FunctionSignatureOpts.cpp
   CFGPrinter.cpp
+  LoopRotate.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)

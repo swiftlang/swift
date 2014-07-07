@@ -38,6 +38,7 @@ static void registerAnalysisPasses(SILPassManager &PM, SILModule *Mod) {
   PM.registerAnalysis(createCallGraphAnalysis(Mod));
   PM.registerAnalysis(createAliasAnalysis(Mod));
   PM.registerAnalysis(createDominanceAnalysis(Mod));
+  PM.registerAnalysis(createLoopInfoAnalysis(Mod, &PM));
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module,
@@ -77,6 +78,18 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
   // If errors were produced during SIL analysis, return true.
   return Ctx.hadError();
+}
+
+/// Perform semantic annotation/loop base optimizations.
+void ConstructLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
+  registerAnalysisPasses(PM, &Mod);
+  // Get rid of int->enum->uncheck_enum_data.
+  PM.add(createSILCombine());
+  PM.add(createLoopRotatePass());
+  PM.add(createDCE());
+  PM.add(createCSE());
+  PM.add(createSILCombine());
+  PM.add(createSimplifyCFG());
 }
 
 void ConstructSSAPassManager(SILPassManager &PM, SILModule &Module,
@@ -138,6 +151,17 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   ConstructSSAPassManager(HighLevelSILPM, Module, true);
   HighLevelSILPM.runOneIteration();
   HighLevelSILPM.runOneIteration();
+
+#if 0
+  // TODO: figure out what is really needed here to simplify the enums I still
+  // see sticking around without this iteration.
+  HighLevelSILPM.runOneIteration();
+
+  SILPassManager LoopPM(&Module, Options);
+  ConstructLoopOptPassManager(LoopPM, Module);
+  LoopPM.runOneIteration();
+#endif
+
 
   // Run two iteration of the low-level SSA pass mananger.
   SILPassManager LowLevelSILPM(&Module, Options);

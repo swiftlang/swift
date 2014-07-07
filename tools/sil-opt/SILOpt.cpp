@@ -75,6 +75,7 @@ enum class PassKind {
   LoopInfoPrinter,
   FunctionSignatureOpts,
   ViewCFG,
+  LoopRotate,
 };
 
 enum class OptGroup {
@@ -245,6 +246,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::ViewCFG,
                                    "view-cfg",
                                    "View the CFG of all passed in functions."),
+                        clEnumValN(PassKind::LoopRotate,
+                                   "loop-rotate",
+                                   "Rotate loops."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -426,6 +430,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::ViewCFG:
       PM.add(createSILCFGPrinter());
+      break;
+    case PassKind::LoopRotate:
+      PM.add(createLoopRotatePass());
       break;
     }
   }
