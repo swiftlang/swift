@@ -159,6 +159,11 @@ private:
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
 
+
+public:
+  void setTransparent(bool T) { isTransparent = T; }
+private:
+
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
                                                                SILModule &M);
 
@@ -405,6 +410,7 @@ private:
   }
 
 public:
+
   static Callee forIndirect(ManagedValue indirectValue,
                             CanType origFormalType,
                             CanAnyFunctionType substFormalType,
@@ -1244,6 +1250,11 @@ public:
                                                : SILDeclRef::Kind::Initializer,
                                SILDeclRef::ConstructAtBestResilienceExpansion),
                                   getSubstFnType(useAllocatingCtor), fn));
+      // In direct peer delegation cases, do not mark the apply as @transparent
+      // even if the underlying implementation is @transparent.  This is a hack
+      // but is important because transparent inlining happends before DI, and
+      // DI needs to see the call to the delegated constructor.
+      callee->setTransparent(false);
     }
 
     // Set up the substitutions, if we have any.

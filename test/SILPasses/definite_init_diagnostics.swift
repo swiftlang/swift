@@ -647,3 +647,14 @@ extension r17233681Lazy {
   }
 }
 
+
+// <rdar://problem/17556858> delegating init that delegates to @transparent init fails
+struct FortyTwo { }
+
+extension Double {
+  init(v : FortyTwo) {
+    self.init(0.0)
+  }
+}
+
+
