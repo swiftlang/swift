@@ -465,9 +465,9 @@ DeclRange IterableDeclContext::getMembers() const {
 }
 
 /// Add a member to this context.
-void IterableDeclContext::addMember(Decl *member) {
+void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
-  addMemberSilently(member);
+  addMemberSilently(member, Hint);
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -492,8 +492,21 @@ void IterableDeclContext::addMember(Decl *member) {
   }
 }
 
-void IterableDeclContext::addMemberSilently(Decl *member) const {
+void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
   assert(!member->NextDecl && "Already added to a container");
+
+  // If there is a hint decl that specifies where to add this, just link into
+  // it.
+  if (hint) {
+    member->NextDecl = hint->NextDecl;
+    hint->NextDecl = member;
+
+    // If we just replaced the first decl, update it.
+    if (FirstDecl == hint)
+      FirstDecl = member;
+    return;
+  }
+
   if (auto last = LastDeclAndKind.getPointer()) {
     last->NextDecl = member;
   } else {

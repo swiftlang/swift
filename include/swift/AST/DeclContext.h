@@ -369,8 +369,9 @@ public:
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
 
-  /// Add a member to this context.
-  void addMember(Decl *member);
+  /// Add a member to this context. If the hint decl is specified, the new decl
+  /// is inserted next to the hint.
+  void addMember(Decl *member, Decl *hint = nullptr);
 
   /// Retrieve the lazy member loader.
   LazyMemberLoader *getLoader() const {
@@ -401,7 +402,7 @@ private:
   ///
   /// This is used internally when loading members, because loading a
   /// member is an invisible addition.
-  void addMemberSilently(Decl *member) const;
+  void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
 };
   
 } // end namespace swift

@@ -188,11 +188,14 @@ static Type getDeclaredType(Decl *decl) {
 }
 
 
-static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC) {
+/// Insert the specified decl into the DeclContext's member list.  If the hint
+/// decl is specified, the new decl is inserted next to the hint.
+static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
+                                       Decl *Hint = nullptr) {
   if (auto *ntd = dyn_cast<NominalTypeDecl>(DC))
-    ntd->addMember(D);
+    ntd->addMember(D, Hint);
   else if (auto *ed = dyn_cast<ExtensionDecl>(DC))
-    ed->addMember(D);
+    ed->addMember(D, Hint);
   else
     assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
@@ -1895,7 +1898,7 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
     Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
   
-  addMemberToContextIfNeeded(Storage, VD->getDeclContext());
+  addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
