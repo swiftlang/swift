@@ -233,8 +233,13 @@ func ~> <T: _BidirectionalIndex>(
   func advancedBy(DistanceType) -> Self
 }
 
-@public protocol RandomAccessIndex : BidirectionalIndex, _RandomAccessIndex {
+@public protocol RandomAccessIndex
+  : BidirectionalIndex, _RandomAccessIndex, Comparable {
   /* typealias DistanceType : IntegerArithmetic*/
+}
+
+func < <T: _RandomAccessIndex>(x: T, y: T) -> Bool {
+  return x.distanceTo(y) > 0
 }
 
 // advance and distance implementations
