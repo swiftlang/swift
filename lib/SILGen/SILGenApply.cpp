@@ -2857,8 +2857,14 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   }
 
   bool isClassDispatch = false;
-  if (auto ctx = decl->getDeclContext()->getDeclaredTypeOfContext())
-    isClassDispatch = ctx->getClassOrBoundGenericClass();
+  switch (gen.getMethodDispatch(decl)) {
+  case MethodDispatch::Class:
+    isClassDispatch = true;
+    break;
+  case MethodDispatch::Static:
+    isClassDispatch = false;
+    break;
+  }
 
   // Dispatch in a struct/enum or to an @final method is always direct.
   if (!isClassDispatch || decl->isFinal())

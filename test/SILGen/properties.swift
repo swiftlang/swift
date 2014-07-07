@@ -814,4 +814,17 @@ func testClassPropertiesInProtocol() -> Int {
   return getX(ClassWithClassProp())+getX(StructWithClassProp())
 }
 
+class GenericClass<T> {
+  var x: T
+  var y: Int
 
+  init() { fatalError("scaffold") }
+}
+
+// CHECK-LABEL: sil @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
+func genericProps(x: GenericClass<String>) {
+  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
+  let _ = x.x
+  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
+  let _ = x.y
+}
