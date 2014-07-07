@@ -334,7 +334,8 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create the target instance.
   instance.setTarget(
-    clang::TargetInfo::CreateTargetInfo(*clangDiags,&instance.getTargetOpts()));
+    clang::TargetInfo::CreateTargetInfo(*clangDiags,
+                                        instance.getInvocation().TargetOpts));
   if (!instance.hasTarget())
     return nullptr;
 
@@ -342,7 +343,7 @@ ClangImporter::create(ASTContext &ctx,
   //
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  instance.getTarget().setForcedLangOptions(instance.getLangOpts());
+  instance.getTarget().adjust(instance.getLangOpts());
 
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
