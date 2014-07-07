@@ -12,7 +12,7 @@ func computeCountLeadingZeroes(xi: Int64) -> Int64 {
 
 func testeCountLeadingZeroes() {
   for var i : Int64 = 1; i < 1000; i++ {
-     assert(countLeadingZeros(i) == computeCountLeadingZeroes(i))
+     assert(_countLeadingZeros(i) == computeCountLeadingZeroes(i))
   }
 }
 

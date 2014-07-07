@@ -17,9 +17,7 @@
 @asmname("putchar")
 func _putchar(value: Int32) -> Int32
 
-// Some file stuff
-
-@transparent @public func countLeadingZeros(value: Int64) -> Int64 {
+@transparent @public func _countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
