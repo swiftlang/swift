@@ -1442,6 +1442,9 @@ ERROR(objc_override_name_mismatch,sema_objc,none,
 ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
       "_BridgedToObjectiveC protocol is broken", ())
 
+ERROR(type_not_bridged,sema_objc,none,
+      "%0 is not bridged to Objective-C", (Type))
+
 //------------------------------------------------------------------------------
 // @availability
 //------------------------------------------------------------------------------

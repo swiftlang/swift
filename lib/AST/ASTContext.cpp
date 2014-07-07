@@ -91,7 +91,10 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.AutoreleasingUnsafePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafePointerDecl = nullptr;
-  
+
+  /// The declaration of NSObject.
+  NominalTypeDecl *NSObjectDecl = nullptr;
+
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"

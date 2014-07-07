@@ -60,7 +60,7 @@ func XCTAssertNil(expression: @auto_closure () -> AnyObject?, _ message: String 
     // TODO: @auto_string expression
     let expressionStr = "expressionStr"
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr, expressionValueStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr as NSString, expressionValueStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -92,7 +92,7 @@ func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ message: Stri
     // TODO: @auto_string expression
     let expressionStr = "expressionStr"
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr, expressionValueStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr as NSString, expressionValueStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -114,7 +114,7 @@ func XCTAssertTrue(expression: @auto_closure () -> LogicValue, _ message: String
     // TODO: @auto_string expression
     let expressionStr = expressionValue ? "true" : "false"
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -131,7 +131,7 @@ func XCTAssertFalse(expression: @auto_closure () -> LogicValue, _ message: Strin
     // TODO: @auto_string expression
     let expressionStr = expressionValue ? "true" : "false"
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -154,7 +154,7 @@ func XCTAssertEqual<T: Equatable>(expression1: @auto_closure () -> T, expression
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -177,7 +177,7 @@ func XCTAssertNotEqual<T: Equatable>(expression1: @auto_closure () -> T, express
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -225,7 +225,7 @@ func XCTAssertEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closu
     let expressionValueStr2 = reflect(expressionValue2).summary
     var accuracyStr = reflect(accuracy).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, accuracyStr, expressionValueStr1, expressionValueStr2, accuracyStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, accuracyStr as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -273,7 +273,7 @@ func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_cl
     let expressionValueStr2 = reflect(expressionValue2).summary
     var accuracyStr = reflect(accuracy).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, accuracyStr, expressionValueStr1, expressionValueStr2, accuracyStr), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, accuracyStr as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -296,7 +296,7 @@ func XCTAssertGreaterThan<T: Comparable>(expression1: @auto_closure () -> T, exp
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -320,7 +320,7 @@ func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @auto_closure () ->
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -343,7 +343,7 @@ func XCTAssertLessThan<T: Comparable>(expression1: @auto_closure () -> T, expres
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description
@@ -367,7 +367,7 @@ func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @auto_closure () -> T,
     var expressionValueStr1 = reflect(expressionValue1).summary
     let expressionValueStr2 = reflect(expressionValue2).summary
     
-    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1, expressionStr2, expressionValueStr1, expressionValueStr2), message, file, line)
+    _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionStr1 as NSString, expressionStr2 as NSString, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
   
   // TODO: handle an exception for which we can get a description

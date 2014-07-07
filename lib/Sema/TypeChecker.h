@@ -282,6 +282,7 @@ private:
   Type StringType;
   Type Int8Type;
   Type UInt8Type;
+  Type NSObjectType;
 
   /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
@@ -326,7 +327,8 @@ public:
   Type getStringType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
-  
+  Type getNSObjectType(DeclContext *dc);
+
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);

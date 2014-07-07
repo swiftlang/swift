@@ -707,6 +707,12 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
 
+  case Failure::IsNotBridgedToObjectiveC:
+    tc.diagnose(loc, diag::type_not_bridged, failure.getFirstType());
+    if (targetLocator)
+      noteTargetOfDiagnostic(cs, failure, targetLocator);
+    break;
+
   case Failure::IsForbiddenLValue:
     if (auto iotTy = failure.getSecondType()->getAs<InOutType>()) {
       tc.diagnose(loc, diag::reference_non_inout, iotTy->getObjectType())

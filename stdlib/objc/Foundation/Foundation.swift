@@ -108,12 +108,6 @@ extension NSString : StringLiteralConvertible {
 }
 
 
-extension NSString {
-  @conversion @public func __conversion() -> String {
-    return String(self)
-  }
-}
-
 extension CFString {
   @conversion @public func __conversion() -> String {
     return String(self as NSString)
@@ -339,21 +333,6 @@ class _NSOpaqueString : NSString {
 }
 
 //
-// Conversion from Swift's native representations to NSString
-// 
-extension String {
-  @conversion @public func __conversion() -> NSString {
-    if let ns = core.cocoaBuffer {
-      if _cocoaStringLength(source: ns) == core.count {
-        return ns as NSString
-      }
-    }
-    _sanityCheck(core.hasContiguousStorage)
-    return _NSContiguousString(core)
-  }
-}
-
-//
 // Conversion from NSString to Swift's native representation
 //
 extension String {
@@ -405,7 +384,13 @@ extension String : _BridgedToObjectiveC {
   }
 
   @public func bridgeToObjectiveC() -> NSString {
-    return self
+    if let ns = core.cocoaBuffer {
+      if _cocoaStringLength(source: ns) == core.count {
+        return ns as NSString
+      }
+    }
+    _sanityCheck(core.hasContiguousStorage)
+    return _NSContiguousString(core)
   }
 
   @public static func bridgeFromObjectiveC(x: NSString) -> String {
@@ -426,16 +411,12 @@ extension Int : _BridgedToObjectiveC {
     value = number.integerValue.value
   }
 
-  @conversion @public func __conversion() -> NSNumber {
-    return NSNumber(integer: self)
-  }
-
   @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
   @public func bridgeToObjectiveC() -> NSNumber {
-    return self
+    return NSNumber(integer: self)
   }
 
   @public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
@@ -448,18 +429,14 @@ extension UInt : _BridgedToObjectiveC {
     value = number.unsignedIntegerValue.value
   }
 
-  @conversion @public func __conversion() -> NSNumber {
-    // FIXME: Need a blacklist for certain methods that should not
-    // import NSUInteger as Int.
-    return NSNumber(unsignedInteger: Int(value))
-  }
-
   @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
   @public func bridgeToObjectiveC() -> NSNumber {
-    return self
+    // FIXME: Need a blacklist for certain methods that should not
+    // import NSUInteger as Int.
+    return NSNumber(unsignedInteger: Int(self.value))
   }
 
   @public static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
@@ -472,16 +449,12 @@ extension Float : _BridgedToObjectiveC {
     value = number.floatValue.value
   }
 
-  @conversion @public func __conversion() -> NSNumber {
-    return NSNumber(float: self)
-  }
-
   @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
   @public func bridgeToObjectiveC() -> NSNumber {
-    return self
+    return NSNumber(float: self)
   }
 
   @public static func bridgeFromObjectiveC(x: NSNumber) -> Float {
@@ -494,16 +467,12 @@ extension Double : _BridgedToObjectiveC {
     value = number.doubleValue.value
   }
 
-  @conversion @public func __conversion() -> NSNumber {
-    return NSNumber(double: self)
-  }
-
   @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
   @public func bridgeToObjectiveC() -> NSNumber {
-    return self
+    return NSNumber(double: self)
   }
 
   @public static func bridgeFromObjectiveC(x: NSNumber) -> Double {
@@ -517,16 +486,12 @@ extension Bool: _BridgedToObjectiveC {
     else { self = Bool.false }
   }
 
-  @conversion @public func __conversion() -> NSNumber {
-    return NSNumber(bool: self)
-  }
-
   @public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
   @public func bridgeToObjectiveC() -> NSNumber {
-    return self
+    return NSNumber(bool: self)
   }
 
   @public static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
@@ -625,10 +590,6 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     }
 
     return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
-  }
-
-  @conversion @public func __conversion() -> NSArray {
-    return self.bridgeToObjectiveC()
   }
 }
 
@@ -760,20 +721,6 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   @public static func isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(KeyType.self) &&
            Swift._isBridgedToObjectiveC(ValueType.self)
-  }
-}
-
-extension NSDictionary {
-  @conversion @public
-  func __conversion() -> [NSObject : AnyObject] {
-    return _convertNSDictionaryToDictionary(reinterpretCast(self))
-  }
-}
-
-extension Dictionary {
-  @conversion @public
-  func __conversion() -> NSDictionary {
-    return _convertDictionaryToNSDictionary(self)
   }
 }
 
@@ -1272,12 +1219,6 @@ extension NSArray {
     //    count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
-  }
-
-  @final @conversion @public
-  func __conversion() -> [AnyObject] {
-    return Array(
-             ArrayBuffer(reinterpretCast(self.copyWithZone(nil)) as _CocoaArray))
   }
 }
 

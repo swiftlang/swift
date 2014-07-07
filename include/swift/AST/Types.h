@@ -527,6 +527,13 @@ public:
   /// AnyObject.
   bool isBridgeableObjectType();
 
+  /// Determine whether this type is a potentially-bridged value type.
+  ///
+  /// This predicate doesn't guarantee that the type is bridged, but rather is
+  /// a quick way to check whether the type is a value type that could
+  /// conceivably be bridged to an Objective-C class type.
+  bool isPotentiallyBridgedValueType();
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();

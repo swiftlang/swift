@@ -9,10 +9,9 @@
 // RUN: FileCheck %s < %t.txt
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
-// REQUIRES: long_tests
-
 import Darwin
 import StdlibUnittest
+import Foundation
 
 //===---
 // Utilities.
@@ -1288,8 +1287,6 @@ test_convertFromDictionaryLiteral()
 //===---
 // NSDictionary -> Dictionary bridging tests.
 //===---
-
-import Foundation
 
 func isNativeNSDictionary(d: NSDictionary) -> Bool {
   var className: NSString = NSStringFromClass(d.dynamicType)

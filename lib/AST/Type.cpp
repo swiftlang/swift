@@ -1456,6 +1456,14 @@ bool TypeBase::isBridgeableObjectType() {
   return ::isBridgeableObjectType(getCanonicalType());
 }
 
+bool TypeBase::isPotentiallyBridgedValueType() {
+  if (auto nominal = getAnyNominal()) {
+    return isa<StructDecl>(nominal) || isa<EnumDecl>(nominal);
+  }
+  
+  return false;
+}
+
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
 static bool canOverride(CanType t1, CanType t2,

@@ -112,6 +112,29 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
   return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
 }
 
+Type TypeChecker::getNSObjectType(DeclContext *dc) {
+  if (NSObjectType)
+    return NSObjectType;
+
+  // FIXME: Does not respect visibility of the module.
+  Module *module = Context.getLoadedModule(
+                     Context.getIdentifier(OBJC_MODULE_NAME));
+  if (!module)
+    return nullptr;
+
+  if (auto result = lookupMember(ModuleType::get(module), Context.Id_NSObject,
+                                 dc)) {
+    for (auto decl : result) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        NSObjectType = nominal->getDeclaredType();
+        return NSObjectType;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 Type 
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,

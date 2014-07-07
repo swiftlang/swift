@@ -3993,6 +3993,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) PointerToPointerExpr(expr, toType);
     }
+
+    case ConversionRestrictionKind::BridgeToObjC: {
+      Expr *objcExpr = bridgeToObjectiveC(expr);
+      if (!objcExpr)
+        return nullptr;
+
+      return coerceToType(objcExpr, toType, locator);
+    }
+
+    case ConversionRestrictionKind::BridgeFromObjC:
+      return bridgeFromObjectiveC(expr, toType);
     }
   }
 

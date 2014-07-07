@@ -1744,7 +1744,30 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return matchTypes(type1, function2->getResult(), kind, subFlags,
                           locator.withPathElement(ConstraintLocator::Load));
     }
-    
+
+    // Bridging from a value type to an Objective-C class type.
+    // FIXME: Banned for operator parameters, like user conversions are.
+    if (type1->isPotentiallyBridgedValueType() &&
+        type1->getAnyNominal() 
+          != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
+        type2->isBridgeableObjectType() &&
+        !(flags & TMF_ApplyingOperatorParameter) &&
+        TC.getBridgedToObjC(DC, type1).first) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
+    }
+
+    // Bridging from an Objective-C class type to a value type.
+    // Note that specifically require a class or class-constrained archetype
+    // here, because archetypes cannot be bridged.
+    // FIXME: Banned for operator parameters, like user conversions are.
+    if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
+        type2->getAnyNominal() 
+          != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
+        !(flags & TMF_ApplyingOperatorParameter) &&
+        TC.getBridgedToObjC(DC, type2).first) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
+    }
+
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= TypeMatchKind::ArgumentConversion) {
       if (auto bgt2 = type2->getAs<BoundGenericType>()) {
@@ -3626,7 +3649,88 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
   }
-      
+
+  // T bridges to C and C < U ===> T <c U
+  case ConversionRestrictionKind::BridgeToObjC: {
+    auto objcClass = TC.getBridgedToObjC(DC, type1).first;
+    assert(objcClass && "type is not bridged to Objective-C?");
+    addContextualScore();
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+
+    // If the bridged value type is generic, the generic arguments
+    // must be bridged to Objective-C for bridging to succeed.
+    if (auto bgt1 = type1->getAs<BoundGenericType>()) {
+      unsigned argIdx = 0;
+      for (auto arg: bgt1->getGenericArgs()) {
+        addConstraint(
+          Constraint::create(*this,
+                             ConstraintKind::BridgedToObjectiveC,
+                             arg, Type(), DeclName(),
+                             getConstraintLocator(
+                               locator.withPathElement(
+                                 LocatorPathElt::getGenericArgument(
+                                   argIdx++)))));
+      }
+    }
+
+    return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subFlags,
+                      locator);
+  }
+
+  // U bridges to C and T < C ===> T <c U
+  case ConversionRestrictionKind::BridgeFromObjC: {
+    auto objcClass = TC.getBridgedToObjC(DC, type2).first;
+    assert(objcClass && "type is not bridged to Objective-C?");
+    addContextualScore();
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+
+    // If the bridged value type is generic, the generic arguments
+    // must match the 
+    // FIXME: This should be an associated type of the protocol.
+    if (auto bgt1 = type2->getAs<BoundGenericType>()) {
+      if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
+        // [AnyObject]
+        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
+                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+                        ->getDeclaredType(),
+                      getConstraintLocator(
+                        locator.withPathElement(
+                          LocatorPathElt::getGenericArgument(0))));
+      } else if (bgt1->getDecl() == TC.Context.getDictionaryDecl()) {
+        // [NSObject : AnyObject]
+        auto NSObjectType = TC.getNSObjectType(DC);
+        if (!NSObjectType) {
+          // Not a bridging case. Should we detect this earlier?
+          return SolutionKind::Error;
+        }
+
+        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
+                      NSObjectType,
+                      getConstraintLocator(
+                        locator.withPathElement(
+                          LocatorPathElt::getGenericArgument(0))));
+
+        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[1],
+                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
+                        ->getDeclaredType(),
+                      getConstraintLocator(
+                        locator.withPathElement(
+                          LocatorPathElt::getGenericArgument(1))));        
+      } else {
+        llvm_unreachable("unhandled generic bridged type");
+      }
+    }
+
+    return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
+                      locator);
+  }
+
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
   case ConversionRestrictionKind::User:
     addContextualScore();
