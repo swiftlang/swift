@@ -114,7 +114,7 @@ extension String {
           start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&value)), 
           length: size))
     case .LargeRepresentation(var value):
-      self = value
+      self = value._value
     }
   }
 }
@@ -122,7 +122,7 @@ extension String {
 @public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs, rhs) {
   case (.LargeRepresentation(let lhsValue), .LargeRepresentation(let rhsValue)):
-    return lhsValue == rhsValue
+    return lhsValue._value == rhsValue._value
 
   case (.SmallRepresentation(let lhsValue), .SmallRepresentation(let rhsValue)):
     return Character._smallValue(lhsValue) == Character._smallValue(rhsValue)

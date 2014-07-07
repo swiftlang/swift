@@ -221,9 +221,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     _storage = HeapBuffer(Buffer.Storage.self, value, 0)
   }
   
-  @conversion func __conversion() -> T {
-    return _storage._value.memory
-  }
-  
+  var _value: T { return _storage._value.memory }
+
   var _storage: Buffer
 }
