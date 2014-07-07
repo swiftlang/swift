@@ -871,6 +871,11 @@ public:
     return Types[1];
   }
 
+  const TypeLoc &getConstraintLoc() const {
+    assert(getKind() == RequirementKind::Conformance);
+    return Types[1];
+  }
+
   /// \brief Retrieve the location of the ':' in an explicitly-written
   /// conformance requirement.
   SourceLoc getColonLoc() const {

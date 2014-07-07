@@ -2216,7 +2216,7 @@ static void checkTypeAccessibility(
     std::function<void(Accessibility, const TypeRepr *)> diagnose) {
   // Don't spend time checking private access; this is always valid.
   // This includes local declarations.
-  if (access == Accessibility::Private || TL.isNull())
+  if (access == Accessibility::Private || !TL.getType())
     return;
 
   Accessibility typeAccess =
@@ -2251,6 +2251,74 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   }
 }
 
+static void checkGenericParamAccessibility(TypeChecker &TC,
+                                           const GenericParamList *params,
+                                           const ValueDecl *owner) {
+  if (!params)
+    return;
+
+  // This must stay in sync with diag::generic_param_access.
+  enum {
+    AEK_Parameter = 0,
+    AEK_Requirement
+  } accessibilityErrorKind;
+  Optional<Accessibility> minAccess;
+  const TypeRepr *complainRepr = nullptr;
+
+  for (auto param : *params) {
+    if (param->getInherited().empty())
+      continue;
+    assert(param->getInherited().size() == 1);
+    checkTypeAccessibility(TC, param->getInherited().front(),
+                           owner->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *thisComplainRepr) {
+      if (!minAccess || *minAccess > typeAccess) {
+        minAccess = typeAccess;
+        complainRepr = thisComplainRepr;
+        accessibilityErrorKind = AEK_Parameter;
+      }
+    });
+  }
+
+  for (auto &requirement : params->getRequirements()) {
+    auto callback = [&](Accessibility typeAccess,
+                        const TypeRepr *thisComplainRepr) {
+      if (!minAccess || *minAccess > typeAccess) {
+        minAccess = typeAccess;
+        complainRepr = thisComplainRepr;
+        accessibilityErrorKind = AEK_Requirement;
+      }
+    };
+    switch (requirement.getKind()) {
+    case RequirementKind::Conformance:
+      checkTypeAccessibility(TC, requirement.getSubjectLoc(),
+                             owner->getAccessibility(), callback);
+      checkTypeAccessibility(TC, requirement.getConstraintLoc(),
+                             owner->getAccessibility(), callback);
+      break;
+    case RequirementKind::SameType:
+      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(),
+                             owner->getAccessibility(), callback);
+      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(),
+                             owner->getAccessibility(), callback);
+      break;
+    case RequirementKind::WitnessMarker:
+      break;
+    }
+  }
+
+  if (minAccess.hasValue()) {
+    bool isExplicit = owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
+                      isa<ProtocolDecl>(owner->getDeclContext());
+    auto diag = TC.diagnose(owner, diag::generic_param_access,
+                            owner->getDescriptiveKind(), isExplicit,
+                            owner->getAccessibility(), minAccess.getValue(),
+                            accessibilityErrorKind);
+    highlightOffendingType(TC, diag, complainRepr);
+  }
+}
+
 /// Checks the given declaration's accessibility to make sure it is valid given
 /// the way it is defined.
 ///
@@ -2272,8 +2340,6 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::GenericTypeParam:
     llvm_unreachable("does not have accessibility");
 
-  case DeclKind::Struct:
-    // Nothing to check.
   case DeclKind::IfConfig:
     // Does not have accessibility.
   case DeclKind::EnumCase:
@@ -2413,6 +2479,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::Enum: {
     auto ED = cast<EnumDecl>(D);
 
+    checkGenericParamAccessibility(TC, ED->getGenericParams(), ED);
+
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
       auto rawTypeLocIter = std::find_if(ED->getInherited().begin(),
@@ -2438,8 +2506,16 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
+  case DeclKind::Struct: {
+    auto SD = cast<StructDecl>(D);
+    checkGenericParamAccessibility(TC, SD->getGenericParams(), SD);
+    return;
+  }
+
   case DeclKind::Class: {
     auto CD = cast<ClassDecl>(D);
+
+    checkGenericParamAccessibility(TC, CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
       Type superclass = CD->getSuperclass();
@@ -2548,6 +2624,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::Constructor: {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
+
+    checkGenericParamAccessibility(TC, fn->getGenericParams(), fn);
 
     // This must stay in sync with diag::associated_type_access.
     enum {
@@ -3367,10 +3445,13 @@ public:
     if (!IsSecondPass) {
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
-    }
-    if (!IsSecondPass) {
+
       SmallVector<Decl*, 2> NewDecls;
       TC.addImplicitConstructors(SD, NewDecls);
+    }
+
+    if (!IsFirstPass) {
+      checkAccessibility(TC, SD);
     }
     
     // Visit each of the members.
@@ -3378,18 +3459,6 @@ public:
       visit(Member);
     for (Decl *global : SD->getDerivedGlobalDecls())
       visit(global);
-
-#if 0
-    if (!IsSecondPass) {
-      SmallVector<Decl*, 2> NewDecls;
-      TC.addImplicitConstructors(SD, NewDecls);
-      
-      // Type check any generated initializers.
-      for (auto D : NewDecls)
-        visit(D);
-    }
-#endif
-
 
     if (!IsFirstPass) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());

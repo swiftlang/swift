@@ -648,6 +648,12 @@ ERROR(requires_same_type_conflict,sema_tcd,none,
 ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(generic_param_access,sema_tcd,none,
+      "%0 %select{must be declared %select{private|internal|PUBLIC}3"
+      "|cannot be declared %select{PRIVATE|internal|public}2}1 because its "
+      "generic %select{parameter|requirement}4 uses "
+      "%select{a private|an internal|PUBLIC}3 type",
+      (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool))
 
 ERROR(override_multiple_decls_base,sema_tcd,none,
       "declaration %0 cannot override more than one superclass declaration",

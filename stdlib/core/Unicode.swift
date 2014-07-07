@@ -733,24 +733,29 @@ enum UnicodeDecodingResult {
   return (nextIndex, result)
 }
 
+@public
 protocol StringElement {
   class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : StringElement {
+  @public
   static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
+  @public
   static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return utf16
   }
 }
 
 extension UTF8.CodeUnit : StringElement {
+  @public
   static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     return UTF16.CodeUnit(x)
   }
+  @public
   static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF8.CodeUnit {
     return UTF8.CodeUnit(utf16)
   }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to ArrayBufferType
-@internal protocol ArrayBufferType : MutableCollection {
+@public protocol ArrayBufferType : MutableCollection {
   /// The type of elements stored in the buffer
   typealias Element
 

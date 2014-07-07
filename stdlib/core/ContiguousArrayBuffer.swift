@@ -195,6 +195,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
+  @public
   func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
@@ -239,6 +240,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1) if T is bridged verbatim, O(N) otherwise
+  @public
   func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
@@ -255,6 +257,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
   
   /// An object that keeps the elements stored in this buffer alive
+  @public
   var owner: AnyObject? {
     return _storage
   }
@@ -262,6 +265,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
   /// have the same identity and count.
+  @public
   var identity: Word {
     return reinterpretCast(elementStorage)
   }

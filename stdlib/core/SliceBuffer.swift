@@ -23,14 +23,16 @@ struct SliceBuffer<T> : ArrayBufferType {
     self.start = start
     self._countAndFlags = (UInt(count) << 1) | (hasNativeBuffer ? 1 : 0)
   }
-  
+
+  @public
   init() {
     owner = .None
     start = nil
     _countAndFlags = 0
     _invariantCheck()
   }
-  
+
+  @public
   init(_ buffer: NativeBuffer) {
     owner = buffer._storage
     start = buffer.elementStorage
@@ -67,7 +69,8 @@ struct SliceBuffer<T> : ArrayBufferType {
   /// ContiguousArrayBuffer,
   ///
   /// Requires: insertCount <= numericCast(countElements(newValues))
-  /// 
+  ///
+  @public
   mutating func replace<C: Collection where C.GeneratorType.Element == T>(
     #subRange: Range<Int>, with insertCount: Int, elementsOf newValues: C
   ) {
@@ -100,18 +103,21 @@ struct SliceBuffer<T> : ArrayBufferType {
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
   /// have the same identity and count.
+  @public
   var identity: Word {
     return reinterpretCast(start)
   }
   
   
   /// An object that keeps the elements stored in this buffer alive
+  @public
   var owner: AnyObject?
   var start: UnsafePointer<T>
   var _countAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
-  
+
+  @public
   func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
@@ -121,6 +127,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     return _extractOrCopyToNativeArrayBuffer(self)._asCocoaArray()
   }
 
+  @public
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
@@ -150,6 +157,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     return nil
   }
 
+  @public
   mutating func isMutableAndUniquelyReferenced() -> Bool {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
@@ -157,6 +165,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, since we are a SliceBuffer.
+  @public
   func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer) {
@@ -164,7 +173,8 @@ struct SliceBuffer<T> : ArrayBufferType {
     }
     return nil
   }
-  
+
+  @public
   func _uninitializedCopy(
     subRange: Range<Int>, var target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
@@ -178,10 +188,12 @@ struct SliceBuffer<T> : ArrayBufferType {
     return target
   }
 
+  @public
   var elementStorage: UnsafePointer<T> {
     return start
   }
 
+  @public
   var count: Int {
     get {
       return Int(_countAndFlags >> 1)
@@ -203,7 +215,8 @@ struct SliceBuffer<T> : ArrayBufferType {
   mutating func setLocalCount(newValue: Int) {
     _countAndFlags = (UInt(newValue) << 1) | (_countAndFlags & 1)
   }
-  
+
+  @public
   var capacity: Int {
     let count = self.count
     if _slowPath(!_hasNativeBuffer) {
@@ -234,6 +247,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     }
   }
 
+  @public
   subscript (subRange: Range<Int>) -> SliceBuffer {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
@@ -261,6 +275,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
 
   //===--- misc -----------------------------------------------------------===//
+  @public
   func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
     let start = self.start
     return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)

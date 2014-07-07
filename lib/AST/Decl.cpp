@@ -157,7 +157,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      if (func->getDeclContext()->isLocalContext())
        return DescriptiveDeclKind::LocalFunction;
 
-     if (func->getDeclContext()->isModuleContext())
+     if (func->getDeclContext()->isModuleScopeContext())
        return DescriptiveDeclKind::GlobalFunction;
 
      // We have a method.
@@ -2558,6 +2558,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
+  assert(getDeclContext()->isTypeContext());
   if (!isStatic())
     return StaticSpellingKind::None;
 
