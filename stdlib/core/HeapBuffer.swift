@@ -107,7 +107,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 
   var _address: UnsafePointer<Int8> {
     return UnsafePointer(
-      Builtin.bridgeToRawPointer(self as Builtin.NativeObject))
+      Builtin.bridgeToRawPointer(self._nativeObject))
   }
 
   var _value: UnsafePointer<Value> {
@@ -185,8 +185,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     }
   }
 
-  @conversion
-  func __conversion() -> Builtin.NativeObject {
+  var _nativeObject: Builtin.NativeObject {
     return reinterpretCast(storage)
   }
 
@@ -207,7 +206,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 @public func == <Value, Element> (
   lhs: HeapBuffer<Value, Element>,
   rhs: HeapBuffer<Value, Element>) -> Bool {
-  return (lhs as Builtin.NativeObject) == (rhs as Builtin.NativeObject)
+  return lhs._nativeObject == rhs._nativeObject
 }
 
 // OnHeap<T>
