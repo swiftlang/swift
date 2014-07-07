@@ -110,7 +110,7 @@ void ConstructSSAPassManager(SILPassManager &PM, SILModule &Module,
 
   // Use either the early inliner that does not inline functions with defined
   // semantics or the late performance inliner that inlines everything.
-  PM.add(useEarlyInliner ? createEarlyInliner() :createPerfInliner());
+  PM.add(useEarlyInliner ? createEarlyInliner() : createPerfInliner());
   PM.add(createSimplifyCFG());
   PM.add(createGlobalARCOpts());
 }
@@ -135,13 +135,13 @@ void swift::runSILOptimizationPasses(SILModule &Module,
 
   // Run two iteration of the high-level SSA pass mananger.
   SILPassManager HighLevelSILPM(&Module, Options);
-  ConstructSSAPassManager(HighLevelSILPM, Module, false);
+  ConstructSSAPassManager(HighLevelSILPM, Module, true);
   HighLevelSILPM.runOneIteration();
   HighLevelSILPM.runOneIteration();
 
   // Run two iteration of the low-level SSA pass mananger.
   SILPassManager LowLevelSILPM(&Module, Options);
-  ConstructSSAPassManager(LowLevelSILPM, Module, true);
+  ConstructSSAPassManager(LowLevelSILPM, Module, false);
   LowLevelSILPM.runOneIteration();
   LowLevelSILPM.runOneIteration();
 
