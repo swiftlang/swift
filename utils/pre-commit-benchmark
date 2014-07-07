@@ -1,0 +1,238 @@
+#!/usr/bin/env python
+
+# Note: it doesn't matter what directory you invoke this in; it uses
+# your SWIFT_BUILD_ROOT and SWIFT_SOURCE_ROOT settings, just like
+# build-script.sh
+
+import subprocess
+import sys
+import os
+import re
+import shutil
+import argparse
+
+HOME = os.environ['HOME']
+SWIFT_SOURCE_ROOT = os.environ.get('SWIFT_SOURCE_ROOT', os.path.join(HOME, 'src', 's'))
+SWIFT_BUILD_ROOT = os.environ.get('SWIFT_BUILD_ROOT', os.path.join(HOME, 'build', 'swift'))
+VERBOSE = False
+
+variantDir = os.path.join(SWIFT_BUILD_ROOT, 'Ninja-Release')
+buildDir = os.path.join(variantDir, 'swift')
+binDir = os.path.join(buildDir, 'bin')
+benchDir = os.path.join(variantDir, 'bench')
+sourceDir = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
+
+import os
+
+exeNames = ['PrecommitBench_O' + x for x in ('3', 'fast', '0')]
+
+def getTreeSha(treeish):
+    return subprocess.check_output(['git', 'show', treeish, '-s', '--format=%t'], cwd=sourceDir).rstrip()
+    
+def getWorkTreeSha():
+    if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=sourceDir) == '':
+        return getTreeSha('HEAD')
+        
+    # Create a stash without updating the working tree
+    stashId = subprocess.check_output(['git', 'stash', 'create', 'benchmark stash'], cwd=sourceDir).rstrip()
+    subprocess.check_call(['git', 'update-ref', '-m', 'benchmark stash', 'refs/stash', stashId], cwd=sourceDir)
+    sha = getTreeSha('stash@{0}')
+    subprocess.check_call(['git', 'stash', 'drop', '-q'], cwd=sourceDir)
+    return sha
+    
+def buildBenchmarks(cacheDir):
+    print('Building executables...')
+    
+    configVars = {'SWIFT_INCLUDE_PRECOMMIT_BENCHMARKS':'ON', 'SWIFT_OPTIMIZED':'ON', 'SWIFT_STDLIB_INTERNAL_CHECKS':'OFF'}
+    
+    cmakeCache = os.path.join(buildDir, 'CMakeCache.txt')
+    
+    configArgs = ['-D%s=%s' % i for i in configVars.items()]
+    
+    # Ensure swift is built with the appropriate options
+    if os.path.isfile(cmakeCache):
+        subprocess.check_call(['cmake', '.'] + configArgs, cwd=buildDir)
+
+    subprocess.check_call(
+        [ os.path.join(sourceDir, 'utils', 'build-script.sh'),
+          '-R', '--', '--config-args=%s' % ' '.join(configArgs)
+      ])
+
+    # Doing this requires copying or linking all the libraries to the
+    # same executable-relative location.  Probably not worth it.
+    # Instead we'll just run the executables where they're built and
+    # cache the timings
+    #
+    # print('  Copying executables to cache directory %r...' % cacheDir)
+    # for exe in exeNames:
+    #    shutil.copy(os.path.join(binDir, exe), os.path.join(cacheDir, exe))
+    print('done.')
+
+def collectBenchmarks(treeish = None, repeat = 3):
+    treeSha = getWorkTreeSha() if treeish is None else getTreeSha(treeish)
+    cacheDir = os.path.join(benchDir, treeSha)
+    print('Collecting benchmarks for %s in %s ' % (treeish if treeish else 'working tree', cacheDir))
+    
+    if not os.path.isdir(cacheDir):
+        os.makedirs(cacheDir)
+
+    rebuilt = False
+    for exe in exeNames:
+        timingsFile = os.path.join(cacheDir, exe) + '.out'
+        timingsText = ''
+        if not os.path.exists(timingsFile):
+            print('Missing timings file for %s' % exe)
+            m = re.search(
+                r'^\* (?:\(detached from (.*)\)|(.*))$',
+                subprocess.check_output(['git', 'branch'], cwd=sourceDir),
+                re.MULTILINE
+            )
+            
+            saveHead = m.group(1) or m.group(2)
+
+            if not rebuilt:
+                if treeish is not None:
+                    subprocess.check_call(['git', 'stash', 'save', '--include-untracked'], cwd=sourceDir)
+
+                    try:
+                        subprocess.check_call(['git', 'checkout', treeish], cwd=sourceDir)
+                        buildBenchmarks(cacheDir)
+                    finally:
+                        subprocess.call(['git', 'checkout', saveHead], cwd=sourceDir)
+                        subprocess.call(['git', 'stash', 'pop'], cwd=sourceDir)
+                else:
+                    buildBenchmarks(cacheDir)
+                    
+                rebuilt = True
+        else:
+            timingsText = open(timingsFile).read()
+            oldRepeat = timingsText.count('\nTotal, ')
+            if oldRepeat < repeat:
+                print('Only %s repeats in existing %s timings file' % (oldRepeat, exe))
+                timingsText = ''
+                
+        if timingsText == '':
+            print('Running new benchmarks...')
+            for iteration in range(0, repeat):
+                print('  %s iteration %s' % (exe, iteration))
+                output = subprocess.check_output(os.path.join(binDir, exe))
+                print(output)
+                timingsText += output
+                
+            open(timingsFile, 'w').write(timingsText)
+            print('done.')
+            
+    return cacheDir
+
+SCORERE=re.compile(r"(\w+),[ \t]+([\d.]+)")
+KEYGROUP=1
+VALGROUP=2
+
+IsTime=1
+
+def parseFloat(word):
+    try:
+        return float(word)
+    except:
+        raise ScoreParserException("Expected float val, not "+word)
+
+def getScores(fname):
+    scores = {}
+    runs = 0
+    f = open(fname)
+    try:
+        for line in f:
+            if VERBOSE: print "Parsing", line,
+            m = SCORERE.match(line)
+            if not m:
+                continue
+
+            if not m.group(KEYGROUP) in scores:
+                scores[m.group(KEYGROUP)] = []
+            scores[m.group(KEYGROUP)].append(parseFloat(m.group(VALGROUP)))
+            if len(scores[m.group(KEYGROUP)]) > runs:
+                runs = len(scores[m.group(KEYGROUP)])
+    finally:
+        f.close()
+    return scores, runs
+
+def compareScores(key, score1, score2, runs):
+    print key,
+    bestscore1 = None
+    bestscore2 = None
+    r = 0
+    for score in score1:
+        if not bestscore1 or (IsTime and score < bestscore1) or (not IsTime and score > bestscore1):
+            bestscore1 = score
+        print ", %.2f" % score,
+    for score in score2:
+        if not bestscore2 or (IsTime and score < bestscore2) or (not IsTime and score > bestscore2):
+            bestscore2 = score
+        print ", %.2f" % score,
+        r += 1
+    while r < runs:
+        print ", 0.0"
+
+    if IsTime:
+        print ", %.2f" % abs(bestscore1-bestscore2),
+    else:
+        print ", %.2f" % abs(bestscore2-bestscore1),
+    Num=bestscore2
+    Den=bestscore1
+    if IsTime:
+        Num, Den = Den, Num
+    if Den > 0:
+        print ", %.1f%%"%(((Num/Den)-1)*100)
+    else:
+        print ", *"    
+
+def compareTimingsFiles(file1, file2):
+    scores1, runs1 = getScores(file1)
+    scores2, runs2 = getScores(file2)
+    runs = runs1
+    if runs2 > runs:
+        runs = runs2
+    if VERBOSE: print scores1; print scores2
+    keys = [f for f in set(scores1.keys() + scores2.keys())]
+    keys.sort()
+    if VERBOSE:
+        print "comparing ", file1, "vs", file2, "=",
+        if IsTime: print file1, "/", file2
+        else: print file2, "/", file1
+    print "benchmark",
+    for i in range(0,runs):
+        print ", baserun%d" % i,
+    for i in range(0,runs):
+        print ", optrun%d" % i,
+    print ", delta, speedup"
+    for key in keys:
+        if not key in scores1:
+            print key, "not in", dir1
+            continue
+        if not key in scores2:
+            print fkey, "not in", dir2
+            continue
+        compareScores(key, scores1[key], scores2[key], runs)
+    
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Show performance improvements/regressions in your Git working tree state')
+    parser.add_argument('-r', '--repeat', dest='repeat', metavar='int', default=3, type=int,
+                        help='number of times to repeat each test')
+    parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
+                        help='the baseline Git commit to compare with.')
+    args = parser.parse_args()
+
+    workCacheDir = collectBenchmarks(None, args.repeat)    
+    baselineCacheDir = collectBenchmarks(args.baseline, args.repeat)
+    
+    if baselineCacheDir == workCacheDir:
+        print('No changes between work tree and %s; nothing to compare.' % args.baseline)
+    else:
+        for exe in exeNames:
+            print("============ %s =============" % exe)
+            timingsFileName = exe + '.out'
+            compareTimingsFiles(
+                os.path.join(baselineCacheDir, timingsFileName),
+                os.path.join(workCacheDir, timingsFileName)
+            )
