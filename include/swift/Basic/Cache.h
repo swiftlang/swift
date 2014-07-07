@@ -211,7 +211,7 @@ private:
 template <typename T>
 struct CacheValueInfo<llvm::IntrusiveRefCntPtr<T>>{
   static void *enterCache(const llvm::IntrusiveRefCntPtr<T> &Val) {
-    T *Ptr = Val.getPtr();
+    T *Ptr = Val.get();
     Ptr->Retain();
     return Ptr;
   }
