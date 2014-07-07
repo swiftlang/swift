@@ -28,6 +28,9 @@ public:
   static SILUndef *get(SILType Ty, SILModule *M);
   static SILUndef *get(SILType Ty, SILModule &M) { return get(Ty, &M); }
 
+  template<class OwnerTy>
+  static SILUndef *getSentinelValue(SILType Ty, OwnerTy Owner) { return new (*Owner) SILUndef(Ty); }
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
