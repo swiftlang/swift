@@ -69,7 +69,7 @@
 
 @public struct ${Self}<
   T: ${IndexProtocol}
-> : LogicValue, Equatable, Sliceable, Reflectable {
+> : LogicValue, Equatable, Sliceable {
 
 % if Self == 'RandomAccessRange':
   @conversion @public

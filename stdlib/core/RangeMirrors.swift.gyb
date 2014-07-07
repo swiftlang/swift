@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 %import gyb
-%MirrorDecl = gyb.parseTemplate("../common/Mirrors.gyb")
+%TMirrorDecl = gyb.parseTemplate("../common/MirrorDecl.gyb")
+%TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
+%TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
 % for Type in [['Range','ForwardIndex','startIndex','endIndex'],\
 %              ['RandomAccessRange','RandomAccessIndex','startIndex','endIndex'],\
@@ -20,8 +22,12 @@
 %   Protocol = Type[1]
 %   StartIndex = Type[2]
 %   EndIndex = Type[3]
-%   Mirror = gyb.executeTemplate(MirrorDecl,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
-${Mirror}
+%   MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
+%   MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
+%   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
+
+${MirrorDecl} {
+  ${MirrorBoilerplate}
   @public var count: Int { return 2 }
 
   @public subscript(i: Int) -> (String, Mirror) {
@@ -38,4 +44,6 @@ ${Mirror}
 
   @public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
+
+${MirrorConformance}
 
