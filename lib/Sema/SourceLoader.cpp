@@ -31,18 +31,26 @@
 using namespace swift;
 
 // FIXME: Basically the same as SerializedModuleLoader.
-static std::error_code findModule(ASTContext &ctx, StringRef moduleID,
-                                  SourceLoc importLoc,
-                                  std::unique_ptr<llvm::MemoryBuffer> &buffer) {
+using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+
+static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
+                              SourceLoc importLoc) {
   llvm::SmallString<128> inputFilename;
 
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
-    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err || err != std::errc::no_such_file_or_directory)
-      return err;
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFile(inputFilename.str());
+
+    // Return if we loaded a file
+    if (FileBufOrErr)
+      return FileBufOrErr;
+    // Or if we get any error other than the file not existing
+    auto err = FileBufOrErr.getError();
+    if (err != std::errc::no_such_file_or_directory)
+      return FileBufOrErr;
   }
 
   return make_error_code(std::errc::no_such_file_or_directory);
@@ -70,9 +78,10 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto moduleID = path[0];
 
-  std::unique_ptr<llvm::MemoryBuffer> inputFile;
-  if (std::error_code err = findModule(Ctx, moduleID.first.str(),
-                                       moduleID.second, inputFile)) {
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.first.str(),
+                                            moduleID.second);
+  if (!inputFileOrError) {
+    auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
       Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
                          moduleID.first.str(), err.message());
@@ -80,6 +89,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
     return nullptr;
   }
+  std::unique_ptr<llvm::MemoryBuffer> inputFile =
+    std::move(inputFileOrError.get());
 
   addDependency(inputFile->getBufferIdentifier());
 

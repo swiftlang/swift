@@ -45,20 +45,23 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   // module documentation file.
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleFilename);
-  if (auto Err = llvm::MemoryBuffer::getFile(
-          StringRef(Scratch.data(), Scratch.size()), ModuleBuffer))
-    return Err;
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
+    llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+  if (!ModuleOrErr)
+    return ModuleOrErr.getError();
 
   // Try to open the module documentation file.  If it does not exist, ignore
   // the error.  However, pass though all other errors.
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
-  auto Err = llvm::MemoryBuffer::getFile(
-      StringRef(Scratch.data(), Scratch.size()), ModuleDocBuffer);
-  if (Err && Err != std::errc::no_such_file_or_directory) {
-    ModuleBuffer.reset(nullptr);
-    return Err;
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
+    llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+  if (!ModuleDocOrErr &&
+      ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+    return ModuleDocOrErr.getError();
   }
+  ModuleBuffer = std::move(ModuleOrErr.get());
+  ModuleDocBuffer = std::move(ModuleDocOrErr.get());
   return std::error_code();
 }
 

@@ -88,17 +88,18 @@ int main(int argc, char **argv) {
   Invocation.setParseStdlib();
 
   // Load the input file.
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+  if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
   }
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  Invocation.addInputBuffer(InputFile.get());
+  Invocation.addInputBuffer(FileBufOrErr.get().get());
   bool IsModule = false;
-  if (SerializedModuleLoader::isSerializedAST(InputFile->getBuffer())) {
+  if (SerializedModuleLoader::isSerializedAST(FileBufOrErr.get()->getBuffer())){
     IsModule = true;
     const StringRef Stem = ModuleName.size() ?
                              StringRef(ModuleName) :

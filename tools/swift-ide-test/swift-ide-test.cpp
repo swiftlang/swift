@@ -311,17 +311,18 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics) {
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (std::error_code Err =
-          llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
-    llvm::errs() << "error opening input file: " << Err.message() << '\n';
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
 
   unsigned CodeCompletionOffset;
 
   std::unique_ptr<llvm::MemoryBuffer> CleanFile(
-      removeCodeCompletionTokens(InputFile.get(), CodeCompletionToken,
+      removeCodeCompletionTokens(FileBufOrErr.get().get(), CodeCompletionToken,
                                  &CodeCompletionOffset));
 
   if (CodeCompletionOffset == ~0U) {
@@ -367,14 +368,15 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
                                 StringRef SourceFilename) {
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (std::error_code Err =
-          llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
-    llvm::errs() << "error opening input file: " << Err.message() << '\n';
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
 
-  StringRef BufferText = InputFile->getBuffer();
+  StringRef BufferText = FileBufOrErr.get()->getBuffer();
   // Drop a single newline character from the buffer.
   if (BufferText.endswith("\n"))
     BufferText = BufferText.drop_back(1);
@@ -937,16 +939,17 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
 }
 
 static int doInputCompletenessTest(StringRef SourceFilename) {
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (std::error_code Err =
-          llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
-    llvm::errs() << "error opening input file: " << Err.message() << '\n';
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFile(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(InputFile)).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBufOrErr.get())).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -1551,17 +1554,18 @@ static int doParseReST(StringRef SourceFilename) {
   llvm::rest::ReSTContext Context;
   llvm::rest::SourceManager<unsigned> SM;
   llvm::SmallString<64> DocutilsXML;
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (std::error_code Err =
-          llvm::MemoryBuffer::getFileOrSTDIN(SourceFilename, InputFile)) {
-    llvm::errs() << "error opening input file: " << Err.message() << '\n';
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    llvm::MemoryBuffer::getFileOrSTDIN(SourceFilename);
+  if (!FileBufOrErr) {
+    llvm::errs() << "error opening input file: "
+                 << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
 
   llvm::rest::LineList LL({});
   {
     SmallVector<StringRef, 16> Lines;
-    splitIntoLines(InputFile->getBuffer(), Lines);
+    splitIntoLines(FileBufOrErr.get()->getBuffer(), Lines);
     llvm::rest::LineListBuilder Builder;
     for (auto S : Lines) {
       Builder.addLine(S, SM.registerLine(S, 0));

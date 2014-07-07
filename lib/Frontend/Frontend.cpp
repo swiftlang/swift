@@ -199,33 +199,35 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     }
 
     // Open the input file.
-    std::unique_ptr<llvm::MemoryBuffer> InputFile;
-    if (std::error_code Err =
-          llvm::MemoryBuffer::getFileOrSTDIN(File, InputFile)) {
+    using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+    FileOrError InputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(File);
+    if (!InputFileOrErr) {
       Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                           File, Err.message());
+                           File, InputFileOrErr.getError().message());
       return true;
     }
 
-    if (SerializedModuleLoader::isSerializedAST(InputFile->getBuffer())) {
+    if (SerializedModuleLoader::isSerializedAST(
+                                          InputFileOrErr.get()->getBuffer())) {
       llvm::SmallString<128> ModuleDocFilePath(File);
       llvm::sys::path::replace_extension(ModuleDocFilePath,
                                          SERIALIZED_MODULE_DOC_EXTENSION);
-      std::unique_ptr<llvm::MemoryBuffer> ModuleDocFile;
-      auto Err = llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath,
-                                                    ModuleDocFile);
-      if (Err && Err != std::errc::no_such_file_or_directory) {
+      FileOrError ModuleDocOrErr =
+        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath);
+      if (!ModuleDocOrErr &&
+          ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                             File, Err.message());
+                             File, ModuleDocOrErr.getError().message());
         return true;
       }
-      PartialModules.push_back({ std::move(InputFile),
-                                 std::move(ModuleDocFile) });
+      PartialModules.push_back({ std::move(InputFileOrErr.get()),
+                                 std::move(ModuleDocOrErr.get()) });
       continue;
     }
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(InputFile));
+    unsigned BufferID =
+      SourceMgr.addNewSourceBuffer(std::move(InputFileOrErr.get()));
 
     BufferIDs.push_back(BufferID);
 
