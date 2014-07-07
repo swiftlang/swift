@@ -70,21 +70,6 @@
   return result
 }
 
-// FIXME: this function can die once <rdar://problem/14497260> (need
-// support for CF bridging) is solved.
-
-/// Pass a given object as a `COpaquePointer` at +0 to the given
-/// function, returning its result.  This function is useful for
-/// calling CoreFoundation functions on NS types that are toll-free
-/// bridged; you have to declare these functions as taking
-/// COpaquePointer, obviously.
-@internal func withObjectAtPlusZero<Result>(x: AnyObject, f: (COpaquePointer)->Result) -> Result {
-  return withExtendedLifetime(x) {
-    return f(
-      COpaquePointer(UnsafePointer<Void>(Builtin.bridgeToRawPointer(Builtin.castToNativeObject(x)))))
-  }
-}
-
 extension String {
 
   /// Invoke `f` on the contents of this string, represented as
