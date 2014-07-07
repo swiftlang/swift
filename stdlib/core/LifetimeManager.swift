@@ -10,12 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This function should be opaque to the optimizer.
-// BLOCKED: <rdar://problem/16464507> This function will be unnecessary when
-// fix_lifetime is honored by the ARC optimizer.
-@asmname("swift_keepAlive")@internal
-func swift_keepAlive<T>(inout _: T)
-
 /// An instance of this struct keeps the references registered with it
 /// at +1 reference count until the call to `release()`.
 ///
@@ -118,7 +112,14 @@ extension String {
   }
 }
 
+// This function should be opaque to the optimizer.
+// BLOCKED: <rdar://problem/16464507> This function will be unnecessary when
+// fix_lifetime is honored by the ARC optimizer.
+@asmname("swift_keepAlive") @internal
+func _swift_keepAlive<T>(inout _: T)
+
 @transparent @public
 func _fixLifetime<T>(var x: T) {
-  swift_keepAlive(&x)
+  _swift_keepAlive(&x)
 }
+
