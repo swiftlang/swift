@@ -6,7 +6,7 @@ import Foundation
 
 // CHECK: 17 bridges to 17
 var i = 17
-if let obj: AnyObject = bridgeToObjectiveC(i) {
+if let obj: AnyObject = _bridgeToObjectiveC(i) {
   println("\(i) bridges to \(obj.description!)")
 } else {
   println("\(i) is not bridged to Objective-C")
@@ -14,7 +14,7 @@ if let obj: AnyObject = bridgeToObjectiveC(i) {
 
 // CHECK: 3.14159 bridges to 3.14159
 var d = 3.14159
-if let obj: AnyObject = bridgeToObjectiveC(d) {
+if let obj: AnyObject = _bridgeToObjectiveC(d) {
   println("\(d) bridges to \(obj.description!)")
 } else {
   println("\(d) is not bridged to Objective-C")
@@ -22,7 +22,7 @@ if let obj: AnyObject = bridgeToObjectiveC(d) {
 
 // CHECK: Hello, world! bridges to Hello, world!
 var s = "Hello, world!"
-if let obj: AnyObject = bridgeToObjectiveC(s) {
+if let obj: AnyObject = _bridgeToObjectiveC(s) {
   println("\(s) bridges to \(obj.description!)")
 } else {
   println("\(s) is not bridged to Objective-C")
@@ -34,7 +34,7 @@ if let obj: AnyObject = bridgeToObjectiveC(s) {
 // CHECK:     3
 // CHECK: )
 var a = [1, 2, 3]
-if let obj: AnyObject = bridgeToObjectiveC(a) {
+if let obj: AnyObject = _bridgeToObjectiveC(a) {
   println("int array bridges to \(obj.description!)")
 } else {
   println("int array is not bridged to Objective-C")
@@ -46,7 +46,7 @@ if let obj: AnyObject = bridgeToObjectiveC(a) {
 // CHECK:     3
 // CHECK: )
 var aui: [UInt] = [1, 2, 3]
-if let obj: AnyObject = bridgeToObjectiveC(aui) {
+if let obj: AnyObject = _bridgeToObjectiveC(aui) {
   println("uint array bridges to \(obj.description!)")
 } else {
   println("uint array is not bridged to Objective-C")
@@ -58,7 +58,7 @@ if let obj: AnyObject = bridgeToObjectiveC(aui) {
 // CHECK:     3.5
 // CHECK: )
 var af: [Float] = [1.5, 2.5, 3.5]
-if let obj: AnyObject = bridgeToObjectiveC(af) {
+if let obj: AnyObject = _bridgeToObjectiveC(af) {
   println("float array bridges to \(obj.description!)")
 } else {
   println("float array is not bridged to Objective-C")
@@ -70,7 +70,7 @@ if let obj: AnyObject = bridgeToObjectiveC(af) {
 // CHECK:     3.5
 // CHECK: )
 var ad = [1.5, 2.5, 3.5]
-if let obj: AnyObject = bridgeToObjectiveC(ad) {
+if let obj: AnyObject = _bridgeToObjectiveC(ad) {
   println("double array bridges to \(obj.description!)")
 } else {
   println("double array is not bridged to Objective-C")
@@ -82,7 +82,7 @@ if let obj: AnyObject = bridgeToObjectiveC(ad) {
 // CHECK:     World
 // CHECK: )
 var a2 = ["Hello", "Swift", "World"]
-if let obj: AnyObject = bridgeToObjectiveC(a2) {
+if let obj: AnyObject = _bridgeToObjectiveC(a2) {
   println("string array bridges to \(obj.description!)")
 } else {
   println("string array is not bridged to Objective-C")
@@ -94,7 +94,7 @@ if let obj: AnyObject = bridgeToObjectiveC(a2) {
 // CHECK:     0
 // CHECK: )
 var ab = [false, true, false]
-if let obj: AnyObject = bridgeToObjectiveC(ab) {
+if let obj: AnyObject = _bridgeToObjectiveC(ab) {
   println("bool array bridges to \(obj.description!)")
 } else {
   println("bool array is not bridged to Objective-C")
@@ -102,7 +102,7 @@ if let obj: AnyObject = bridgeToObjectiveC(ab) {
 
 // CHECK: tuple array is not bridged to Objective-C
 var a3 = [(1, 1), (1, 1), (1, 2)]
-if let obj: AnyObject = bridgeToObjectiveC(a3) {
+if let obj: AnyObject = _bridgeToObjectiveC(a3) {
   println("tuple array bridges to \(obj.description!)")
 } else {
   println("tuple array is not bridged to Objective-C")
@@ -113,7 +113,7 @@ if let obj: AnyObject = bridgeToObjectiveC(a3) {
 // CHECK-NEXT:   2 = World;
 // CHECK-NEXT: }
 var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
-if let obj: AnyObject = bridgeToObjectiveC(dict) {
+if let obj: AnyObject = _bridgeToObjectiveC(dict) {
   println("dictionary bridges to \(obj.description!)")
 } else {
   println("dictionary is not bridged to Objective-C")
@@ -124,7 +124,7 @@ if let obj: AnyObject = bridgeToObjectiveC(dict) {
 // CHECK-NEXT:   2 = World;
 // CHECK-NEXT: }
 var dict2 = [1: "Hello", 2: "World"]
-if let obj: AnyObject = bridgeToObjectiveC(dict2) {
+if let obj: AnyObject = _bridgeToObjectiveC(dict2) {
   println("dictionary bridges to \(obj.description!)")
 } else {
   println("dictionary is not bridged to Objective-C")
@@ -132,7 +132,7 @@ if let obj: AnyObject = bridgeToObjectiveC(dict2) {
 
 // CHECK: dictionary is not bridged to Objective-C
 var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
-if let obj: AnyObject = bridgeToObjectiveC(dict3) {
+if let obj: AnyObject = _bridgeToObjectiveC(dict3) {
   println("dictionary bridges to \(obj.description!)")
 } else {
   println("dictionary is not bridged to Objective-C")

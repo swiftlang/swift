@@ -127,79 +127,79 @@ class BridgedVerbatimRefType {}
 var RuntimeBridging = TestCase("RuntimeBridging")
 
 RuntimeBridging.test("bridgeToObjectiveC") {
-  expectEmpty(bridgeToObjectiveC(NotBridgedValueType()))
+  expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
 
-  expectEqual(42, (bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA).value)
 
-  expectEqual(42, (bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA).value)
 
-  expectEqual(42, (bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA).value)
+  expectEqual(42, (_bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA).value)
 
-  expectEmpty(bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
+  expectEmpty(_bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
-  expectTrue(bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
+  expectTrue(_bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
 }
 
 RuntimeBridging.test("bridgeFromObjectiveC") {
   // Bridge back using NotBridgedValueType.
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 21), NotBridgedValueType.self))
 
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 42), NotBridgedValueType.self))
 
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), NotBridgedValueType.self))
 
   // Bridge back using BridgedValueType.
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedValueType.self))
 
-  expectEqual(42, bridgeFromObjectiveC(
+  expectEqual(42, _bridgeFromObjectiveC(
       ClassA(value: 42), BridgedValueType.self).value)
-  expectEqual(42, bridgeFromObjectiveCConditional(
+  expectEqual(42, _bridgeFromObjectiveCConditional(
       ClassA(value: 42), BridgedValueType.self)!.value)
 
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedValueType.self))
 
   // Bridge back using BridgedLargeValueType.
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedLargeValueType.self))
 
-  expectEqual(42, bridgeFromObjectiveC(
+  expectEqual(42, _bridgeFromObjectiveC(
       ClassA(value: 42), BridgedLargeValueType.self).value)
-  expectEqual(42, bridgeFromObjectiveCConditional(
+  expectEqual(42, _bridgeFromObjectiveCConditional(
       ClassA(value: 42), BridgedLargeValueType.self)!.value)
 
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       BridgedVerbatimRefType(), BridgedLargeValueType.self))
 
   // Bridge back using BridgedVerbatimRefType.
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 21), BridgedVerbatimRefType.self))
 
-  expectEmpty(bridgeFromObjectiveCConditional(
+  expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 42), BridgedVerbatimRefType.self))
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
-  expectTrue(bridgeFromObjectiveC(
+  expectTrue(_bridgeFromObjectiveC(
       bridgedVerbatimRef, BridgedVerbatimRefType.self) === bridgedVerbatimRef)
-  expectTrue(bridgeFromObjectiveCConditional(
+  expectTrue(_bridgeFromObjectiveCConditional(
       bridgedVerbatimRef, BridgedVerbatimRefType.self)! === bridgedVerbatimRef)
 }
 
 RuntimeBridging.test("isBridgedToObjectiveC") {
-  expectFalse(isBridgedToObjectiveC(NotBridgedValueType))
-  expectTrue(isBridgedToObjectiveC(BridgedValueType))
-  expectTrue(isBridgedToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedToObjectiveC(NotBridgedValueType))
+  expectTrue(_isBridgedToObjectiveC(BridgedValueType))
+  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
 }
 
 RuntimeBridging.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(isBridgedVerbatimToObjectiveC(NotBridgedValueType))
-  expectFalse(isBridgedVerbatimToObjectiveC(BridgedValueType))
-  expectTrue(isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(NotBridgedValueType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
+  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
 
 //===---------------------------------------------------------------------===//

@@ -569,7 +569,7 @@ extension NSArray : ArrayLiteralConvertible {
 /// to Objective-C code as a method that accepts an NSArray.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
 @public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
-  if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
+  if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
     return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   }
@@ -591,7 +591,7 @@ extension NSArray : ArrayLiteralConvertible {
 
 extension Array : _ConditionallyBridgedToObjectiveC {
   @public static func isBridgedToObjectiveC() -> Bool {
-    return Swift.isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(T.self)
   }
 
   @public static func getObjectiveCType() -> Any.Type {
@@ -603,9 +603,9 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 
   @public static func bridgeFromObjectiveC(source: NSArray) -> Array {
-    _precondition(Swift.isBridgedToObjectiveC(T.self), 
-                  "array element type is not bridged to Objective-C")
-    if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
+    _precondition(Swift._isBridgedToObjectiveC(T.self),
+        "array element type is not bridged to Objective-C")
+    if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
       return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     }
@@ -620,7 +620,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
       = [AnyObject](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
-    if isBridgedVerbatimToObjectiveC(T.self) {
+    if _isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }
 
@@ -666,13 +666,13 @@ extension NSDictionary : DictionaryLiteralConvertible {
 ) -> NSDictionary {
   switch d._variantStorage {
   case .Native(let nativeOwner):
-    _precondition(isBridgedToObjectiveC(KeyType.self),
-                  "KeyType is not bridged to Objective-C")
-    _precondition(isBridgedToObjectiveC(ValueType.self),
-                  "ValueType is not bridged to Objective-C")
+    _precondition(_isBridgedToObjectiveC(KeyType.self),
+        "KeyType is not bridged to Objective-C")
+    _precondition(_isBridgedToObjectiveC(ValueType.self),
+        "ValueType is not bridged to Objective-C")
 
-    let isKeyBridgedVerbatim = isBridgedVerbatimToObjectiveC(KeyType.self)
-    let isValueBridgedVerbatim = isBridgedVerbatimToObjectiveC(ValueType.self)
+    let isKeyBridgedVerbatim = _isBridgedVerbatimToObjectiveC(KeyType.self)
+    let isValueBridgedVerbatim = _isBridgedVerbatimToObjectiveC(ValueType.self)
 
     // If both `KeyType` and `ValueType` can be bridged verbatim, return the
     // underlying storage.
@@ -693,14 +693,14 @@ extension NSDictionary : DictionaryLiteralConvertible {
         // Avoid calling the runtime.
         bridgedKey = _reinterpretCastToAnyObject(key)
       } else {
-        bridgedKey = bridgeToObjectiveC(key)!
+        bridgedKey = _bridgeToObjectiveC(key)!
       }
       var bridgedValue: AnyObject
       if _fastPath(isValueBridgedVerbatim) {
         // Avoid calling the runtime.
         bridgedValue = _reinterpretCastToAnyObject(value)
       } else {
-        if let theBridgedValue: AnyObject = bridgeToObjectiveC(value) {
+        if let theBridgedValue: AnyObject = _bridgeToObjectiveC(value) {
           bridgedValue = theBridgedValue
         } else {
           _preconditionFailure("Dictionary to NSDictionary bridging: value failed to bridge")
@@ -749,8 +749,8 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     x: NSDictionary
   ) -> Dictionary? {
     let anyDict = x as [NSObject : AnyObject]
-    if isBridgedVerbatimToObjectiveC(KeyType.self) &&
-       isBridgedVerbatimToObjectiveC(ValueType.self) {
+    if _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+       _isBridgedVerbatimToObjectiveC(ValueType.self) {
       return Swift._dictionaryDownCastConditional(anyDict)
     }
 
@@ -758,8 +758,8 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   @public static func isBridgedToObjectiveC() -> Bool {
-    return Swift.isBridgedToObjectiveC(KeyType.self) &&
-           Swift.isBridgedToObjectiveC(ValueType.self)
+    return Swift._isBridgedToObjectiveC(KeyType.self) &&
+           Swift._isBridgedToObjectiveC(ValueType.self)
   }
 }
 

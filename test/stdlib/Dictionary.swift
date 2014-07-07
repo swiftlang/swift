@@ -2834,8 +2834,8 @@ test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries()
 //===---
 
 func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
-  assert(isBridgedVerbatimToObjectiveC(TestObjCKeyTy.self))
-  assert(isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
+  assert(_isBridgedVerbatimToObjectiveC(TestObjCKeyTy.self))
+  assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
 
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
@@ -2989,8 +2989,8 @@ test_BridgedToObjC_FastEnumeration_Empty()
 //===---
 
 func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary {
-  assert(!isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
-  assert(!isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
+  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
+  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>()
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
@@ -3021,8 +3021,8 @@ test_BridgedToObjC_KeyValue_ValueTypesCustomBridged()
 
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
-  assert(!isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
-  assert(isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
+  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
+  assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
 
   var d = Dictionary<TestBridgedKeyTy, TestObjCValueTy>()
   d[TestBridgedKeyTy(10)] = TestObjCValueTy(1010)
@@ -3053,8 +3053,8 @@ test_BridgedToObjC_Key_ValueTypeCustomBridged()
 
 
 func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
-  assert(isBridgedVerbatimToObjectiveC(TestObjCKeyTy.self))
-  assert(!isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
+  assert(_isBridgedVerbatimToObjectiveC(TestObjCKeyTy.self))
+  assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var d = Dictionary<TestObjCKeyTy, TestBridgedValueTy>()
   d[TestObjCKeyTy(10)] = TestBridgedValueTy(1010)

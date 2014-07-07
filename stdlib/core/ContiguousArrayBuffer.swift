@@ -61,7 +61,7 @@ let emptyNSSwiftArray : _NSSwiftArray
 
     var bridged = false
     if _canBeClass(T.self) {
-      bridged = isBridgedVerbatimToObjectiveC(T.self)
+      bridged = _isBridgedVerbatimToObjectiveC(T.self)
     }
 
     _base.value = _ArrayBody(count: count, capacity: _base._capacity(),  
@@ -241,15 +241,17 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// O(1) if T is bridged verbatim, O(N) otherwise
   func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
-      isBridgedToObjectiveC(T.self),
-      "Array element type is not bridged to ObjectiveC")
+        _isBridgedToObjectiveC(T.self),
+        "Array element type is not bridged to ObjectiveC")
     if count == 0 {
       return emptyNSSwiftArray
     }
     if _fastPath(_base.value.elementTypeIsBridgedVerbatim) {
       return reinterpretCast(_base.storage)
     }
-    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }._buffer._storage!
+    return ContiguousArray(self).map {
+      _bridgeToObjectiveC($0)!
+    }._buffer._storage!
   }
   
   /// An object that keeps the elements stored in this buffer alive

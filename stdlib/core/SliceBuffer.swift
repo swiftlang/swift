@@ -114,7 +114,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   
   func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
-      isBridgedToObjectiveC(T.self),
+      _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     _invariantCheck()
 

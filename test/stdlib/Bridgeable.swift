@@ -6,8 +6,8 @@ println("testing...")
 class C {}
 
 func bridgedStatus<T>(_: T.Type) -> String {
-  let bridged = isBridgedToObjectiveC(T.self)
-  let verbatim = isBridgedVerbatimToObjectiveC(T.self)
+  let bridged = _isBridgedToObjectiveC(T.self)
+  let verbatim = _isBridgedVerbatimToObjectiveC(T.self)
   if !bridged && verbatim {
     return "IS NOT BRIDGED BUT IS VERBATIM?!"
   }
@@ -19,7 +19,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
 func testBridging<T>(x: T, name: String) {
   println("\(name) \(bridgedStatus(T.self))")
   var b : String
-  if let result: AnyObject = bridgeToObjectiveC(x) {
+  if let result: AnyObject = _bridgeToObjectiveC(x) {
     b = "bridged as " + (
       (result as? C) ? "C" : (result as? T) ? "itself" : "an unknown type")
   }

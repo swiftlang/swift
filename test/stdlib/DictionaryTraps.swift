@@ -43,11 +43,11 @@ func == (lhs: NotBridgedKeyTy, rhs: NotBridgedKeyTy) -> Bool {
   return lhs.value == rhs.value
 }
 
-assert(!isBridgedToObjectiveC(NotBridgedKeyTy.self))
+assert(!_isBridgedToObjectiveC(NotBridgedKeyTy.self))
 
 struct NotBridgedValueTy {}
 
-assert(!isBridgedToObjectiveC(NotBridgedValueTy.self))
+assert(!_isBridgedToObjectiveC(NotBridgedValueTy.self))
 
 class BridgedVerbatimRefTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -63,8 +63,8 @@ func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
   return lhs.value == rhs.value
 }
 
-assert(isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
-assert(isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
+assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
+assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 if true {
   // Sanity checks.  This code should not trap.

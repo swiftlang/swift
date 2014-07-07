@@ -111,7 +111,7 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
   @public typealias ObjectiveCType = AnyObject
 
   @public static func getObjectiveCType() -> Any.Type {
-    return getBridgedObjectiveCType(T.self)!
+    return Swift._getBridgedObjectiveCType(T.self)!
   }
 
   @public func bridgeToObjectiveC() -> AnyObject {
@@ -120,16 +120,16 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .Some(let x):
-      return Swift.bridgeToObjectiveC(x)!
+      return Swift._bridgeToObjectiveC(x)!
     }
   }
 
   @public static func bridgeFromObjectiveC(x: AnyObject) -> T! {
-    return Swift.bridgeFromObjectiveC(x, T.self)
+    return Swift._bridgeFromObjectiveC(x, T.self)
   }
 
   @public static func bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {
-    let bridged: T? = Swift.bridgeFromObjectiveCConditional(x, T.self)
+    let bridged: T? = Swift._bridgeFromObjectiveCConditional(x, T.self)
     if let value = bridged {
       return value
     }
@@ -138,6 +138,6 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
   }
 
   @public static func isBridgedToObjectiveC() -> Bool {
-    return Swift.isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(T.self)
   }
 }

@@ -852,8 +852,8 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
 @public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
 
   let native = a._buffer.requestNativeBuffer()
     
@@ -881,8 +881,8 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 @public func _arrayDownCastConditional<Base, Derived>(
   a: Array<Base>
 ) -> [Derived]? {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
   
   if _fastPath(!a.isEmpty) {
     let native = a._buffer.requestNativeBuffer()
@@ -916,12 +916,12 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 @public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   source: Array<BridgesToDerived>
 ) -> Array<Base> {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
   var buf = ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
   var p = buf._unsafeElementStorage
   for value in source {
-    let bridged: AnyObject? = bridgeToObjectiveC(value)
+    let bridged: AnyObject? = _bridgeToObjectiveC(value)
     _precondition(bridged, "array element cannot be bridged to Objective-C")
     p++.initialize(reinterpretCast(bridged!))
   }
@@ -954,8 +954,8 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 @public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
        source: Array<Base>
      ) -> Array<BridgesToDerived>? {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
   var buf = ContiguousArrayBuffer<BridgesToDerived>(count: source.count, 
                                                     minimumCapacity: 0)
   var p = buf._unsafeElementStorage
@@ -963,7 +963,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 ElementwiseBridging:
   do {
     for object: Base in source {
-      let value = Swift.bridgeFromObjectiveCConditional(
+      let value = Swift._bridgeFromObjectiveCConditional(
         reinterpretCast(object), BridgesToDerived.self)
       if _slowPath(!value) {
         break ElementwiseBridging

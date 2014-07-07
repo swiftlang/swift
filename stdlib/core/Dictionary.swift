@@ -555,9 +555,10 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
   typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
   init(_ nativeStorage: NativeStorage) {
-    _precondition(isBridgedVerbatimToObjectiveC(KeyType.self) &&
-           isBridgedVerbatimToObjectiveC(ValueType.self),
-           "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
+    _precondition(
+        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+        _isBridgedVerbatimToObjectiveC(ValueType.self),
+        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
 
     nextIndex = nativeStorage.startIndex
     endIndex = nativeStorage.endIndex
@@ -709,9 +710,10 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
   }
 
   override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    _sanityCheck(isBridgedVerbatimToObjectiveC(KeyType.self) &&
-                 isBridgedVerbatimToObjectiveC(ValueType.self),
-                 "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
+    _sanityCheck(
+        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+        _isBridgedVerbatimToObjectiveC(ValueType.self),
+        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
     let nativeKey = reinterpretCast(aKey) as KeyType
     if let nativeValue = nativeStorage.maybeGet(nativeKey) {
       return _reinterpretCastToAnyObject(nativeValue)
@@ -733,9 +735,10 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
-    _sanityCheck(isBridgedVerbatimToObjectiveC(KeyType.self) &&
-                 isBridgedVerbatimToObjectiveC(ValueType.self),
-                 "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
+    _sanityCheck(
+        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+        _isBridgedVerbatimToObjectiveC(ValueType.self),
+        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
 
     var theState = state.memory
     if theState.state == 0 {
@@ -934,8 +937,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       var oldCocoaGenerator = _CocoaDictionaryGenerator(cocoaDictionary)
       while let (key: AnyObject, value: AnyObject) = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
-            key: bridgeFromObjectiveC(key, KeyType.self),
-            value: bridgeFromObjectiveC(value, ValueType.self))
+            key: _bridgeFromObjectiveC(key, KeyType.self),
+            value: _bridgeFromObjectiveC(value, ValueType.self))
       }
       newNativeStorage.count = cocoaDictionary.count
 
@@ -985,7 +988,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       }
       return .None
     case .Cocoa(let cocoaStorage):
-      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let cocoaIndex = cocoaStorage.indexForKey(anyObjectKey) {
         return .Some(._Cocoa(cocoaIndex))
       }
@@ -1000,8 +1003,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaStorage.assertingGet(i._cocoaIndex)
-      let nativeKey = bridgeFromObjectiveC(anyObjectKey, KeyType.self)
-      let nativeValue = bridgeFromObjectiveC(anyObjectValue, ValueType.self)
+      let nativeKey = _bridgeFromObjectiveC(anyObjectKey, KeyType.self)
+      let nativeValue = _bridgeFromObjectiveC(anyObjectValue, ValueType.self)
       return (nativeKey, nativeValue)
     }
   }
@@ -1012,9 +1015,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       return native.assertingGet(key)
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
-      return bridgeFromObjectiveC(anyObjectValue, ValueType.self)
+      return _bridgeFromObjectiveC(anyObjectValue, ValueType.self)
     }
   }
 
@@ -1023,9 +1026,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native:
       return native.maybeGet(key)
     case .Cocoa(let cocoaStorage):
-      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
-        return bridgeFromObjectiveC(anyObjectValue, ValueType.self)
+        return _bridgeFromObjectiveC(anyObjectValue, ValueType.self)
       }
       return .None
     }
@@ -1194,7 +1197,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       let anyObjectKey: AnyObject =
           cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
       migrateDataToNativeStorage(cocoaStorage)
-      nativeRemoveObjectForKey(bridgeFromObjectiveC(anyObjectKey, KeyType.self))
+      nativeRemoveObjectForKey(
+          _bridgeFromObjectiveC(anyObjectKey, KeyType.self))
     }
   }
 
@@ -1207,7 +1211,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native:
       return nativeRemoveObjectForKey(key)
     case .Cocoa(let cocoaStorage):
-      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
+      let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if !cocoaStorage.maybeGet(anyObjectKey) {
         return .None
       }
@@ -1613,8 +1617,8 @@ class _CocoaDictionaryGenerator : Generator {
     case ._Cocoa(var cocoaGenerator):
       if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaGenerator.next() {
-        let nativeKey = bridgeFromObjectiveC(anyObjectKey, KeyType.self)
-        let nativeValue = bridgeFromObjectiveC(anyObjectValue, ValueType.self)
+        let nativeKey = _bridgeFromObjectiveC(anyObjectKey, KeyType.self)
+        let nativeValue = _bridgeFromObjectiveC(anyObjectValue, ValueType.self)
         return (nativeKey, nativeValue)
       }
       return .None
@@ -1840,9 +1844,9 @@ struct Dictionary<
     for var index = lhsNative.startIndex; index != endIndex; ++index {
       let (key, value) = lhsNative.assertingGet(index)
       let optRhsValue: AnyObject? =
-          rhsCocoa.maybeGet(bridgeToObjectiveCUnconditional(key))
+          rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
       if let rhsValue: AnyObject = optRhsValue {
-        if value == bridgeFromObjectiveC(rhsValue, ValueType.self) {
+        if value == _bridgeFromObjectiveC(rhsValue, ValueType.self) {
           continue
         }
       }
@@ -2117,10 +2121,10 @@ class _NSSwiftEnumerator {}
 func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
        source: Dictionary<DerivedKey, DerivedValue>
      ) -> Dictionary<BaseKey, BaseValue> {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseKey.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseValue.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedKey.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedValue.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseKey.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseValue.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedKey.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedValue.self))
 
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
@@ -2134,30 +2138,29 @@ func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 /// Precondition: BridgesToKey and BridgesToValue are bridged to
 /// Objective-C, and at least one of them requires bridging.
 ///
-/// 
 @public
 func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
        source: Dictionary<BridgesToKey, BridgesToValue>
      ) -> Dictionary<Key, Value> {
-  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
-               !isBridgedVerbatimToObjectiveC(BridgesToValue.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self) ||
-               isBridgedVerbatimToObjectiveC(Value.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
+               !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
+               _isBridgedVerbatimToObjectiveC(Value.self))
 
   var result = Dictionary<Key, Value>(minimumCapacity: source.count)
-  let keyBridgesDirectly 
-    = isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
-      isBridgedVerbatimToObjectiveC(Key.self)
-  let valueBridgesDirectly 
-    = isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
-      isBridgedVerbatimToObjectiveC(Value.self)
+  let keyBridgesDirectly =
+      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) ==
+          _isBridgedVerbatimToObjectiveC(Key.self)
+  let valueBridgesDirectly =
+      _isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
+          _isBridgedVerbatimToObjectiveC(Value.self)
   for (key, value) in source {
     // Bridge the key
     var bridgedKey: Key
     if keyBridgesDirectly {
       bridgedKey = reinterpretCast(key)
     } else {
-      let bridged: AnyObject? = bridgeToObjectiveC(key)
+      let bridged: AnyObject? = _bridgeToObjectiveC(key)
       _precondition(bridged, "dictionary key cannot be bridged to Objective-C")
       bridgedKey = reinterpretCast(bridged!)
     }
@@ -2167,9 +2170,9 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
     if valueBridgesDirectly {
       bridgedValue = reinterpretCast(value)
     } else {
-      let bridged: AnyObject? = bridgeToObjectiveC(value)
-      _precondition(bridged, 
-                    "dictionary value cannot be bridged to Objective-C")
+      let bridged: AnyObject? = _bridgeToObjectiveC(value)
+      _precondition(bridged,
+          "dictionary value cannot be bridged to Objective-C")
       bridgedValue = reinterpretCast(bridged!)
     }
 
@@ -2209,10 +2212,10 @@ func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
                                     DerivedValue>(
        source: Dictionary<BaseKey, BaseValue>
      ) -> Dictionary<DerivedKey, DerivedValue>? {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseKey.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseValue.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedKey.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedValue.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseKey.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseValue.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedKey.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedValue.self))
 
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (key, value) in source {
@@ -2257,17 +2260,17 @@ func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey,
                                                 BridgesToValue>(
        source: Dictionary<Key, Value>
      ) -> Dictionary<BridgesToKey, BridgesToValue>? {
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self) || 
-               isBridgedVerbatimToObjectiveC(Value.self))
-  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
-               !isBridgedVerbatimToObjectiveC(BridgesToValue.self))
-  
-  let keyBridgesDirectly 
-    = isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
-      isBridgedVerbatimToObjectiveC(Key.self)
-  let valueBridgesDirectly 
-    = isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
-      isBridgedVerbatimToObjectiveC(Value.self)
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
+               _isBridgedVerbatimToObjectiveC(Value.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
+               !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
+
+  let keyBridgesDirectly =
+      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
+          _isBridgedVerbatimToObjectiveC(Key.self)
+  let valueBridgesDirectly =
+      _isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
+          _isBridgedVerbatimToObjectiveC(Value.self)
 
   var result = Dictionary<BridgesToKey, BridgesToValue>()
   for (key, value) in source {
@@ -2281,8 +2284,8 @@ func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey,
         return nil
       }
     } else {
-      if let bridgedKey = bridgeFromObjectiveCConditional(reinterpretCast(key), 
-                                                          BridgesToKey.self) {
+      if let bridgedKey = _bridgeFromObjectiveCConditional(
+          reinterpretCast(key), BridgesToKey.self) {
         resultKey = bridgedKey
       } else {
         return nil
@@ -2299,9 +2302,8 @@ func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey,
         return nil
       }
     } else {
-      if let bridgedValue = bridgeFromObjectiveCConditional(
-                              reinterpretCast(value), 
-                              BridgesToValue.self) {
+      if let bridgedValue = _bridgeFromObjectiveCConditional(
+          reinterpretCast(value), BridgesToValue.self) {
         resultValue = bridgedValue
       } else {
         return nil

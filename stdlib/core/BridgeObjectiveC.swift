@@ -126,16 +126,17 @@
 ///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
 ///   + otherwise, returns the result of `x.bridgeToObjectiveC()`;
 /// - otherwise, the result is empty.
-@public func bridgeToObjectiveC<T>(x: T) -> AnyObject? {
+@public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return reinterpretCast(x) as AnyObject
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
 
-@public func bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
-  let optResult: AnyObject? = bridgeToObjectiveC(x)
-  _precondition(optResult, "value failed to bridge from Swift type to a Objective-C type")
+@public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
+  let optResult: AnyObject? = _bridgeToObjectiveC(x)
+  _precondition(optResult,
+      "value failed to bridge from Swift type to a Objective-C type")
   return optResult!
 }
 
@@ -153,7 +154,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///     or a subclass of it, trap
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveC(x)`;
 /// - otherwise, trap
-@public func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
+@public func _bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as T
   }
@@ -173,7 +174,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveCConditional(x)`;
 /// - otherwise, the result is empty.
-@public func bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
+@public func _bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as? T
   }
@@ -194,7 +195,7 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject,
 /// - otherwise, `T` conforms to `_ConditionallyBridgedToObjectiveC`, returns
 ///   `T.isBridgedToObjectiveC()`;
 /// - otherwise, if `T` conforms to `_BridgedToObjectiveC`, returns `true`.
-@public func isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
+@public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
   }
@@ -205,15 +206,15 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject,
 func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
 /// A type that's bridged "verbatim" does not conform to
-/// _BridgedToObjectiveC, and can have its bits reinterpreted as an
-/// AnyObject.  When this function returns true, the storage of an
-/// Array<T> can be reinterpretCast as an array of AnyObject
-@public func isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
+/// `_BridgedToObjectiveC`, and can have its bits reinterpreted as an
+/// `AnyObject`.  When this function returns true, the storage of an
+/// `Array<T>` can be `reinterpretCast` as an array of `AnyObject`.
+@public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
   return _isClassOrObjCExistential(T.self)
 }
 
 /// Retrieve the Objective-C type to which the given type is bridged.
-@public func getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?  {
+@public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?  {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
   }
