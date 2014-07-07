@@ -28,3 +28,8 @@ func constructDictionary(n: Int) {
 var y1: [String : Int = ["hello" : 1] // expected-error{{expected ']' in dictionary type}}
   // expected-note @-1{{to match this opening '['}}
 var y2: [String : ] // expected-error{{expected dictionary value type}}
+
+
+struct NotHashable { }
+
+var nh1 : [NotHashable : Int ] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}

@@ -1516,8 +1516,18 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     return valueTy;
   
   if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
-                                         valueTy))
+                                         valueTy)) {
+    // Check the requirements on the generic arguments.
+    auto unboundTy = UnboundGenericType::get(TC.Context.getDictionaryDecl(),
+                                             nullptr, TC.Context);
+    TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
+
+    if (!TC.applyGenericArguments(unboundTy, repr->getStartLoc(), DC, args,
+                                  Resolver))
+      return ErrorType::get(TC.Context);
+
     return dictTy;
+  }
 
   return ErrorType::get(Context);
 }
