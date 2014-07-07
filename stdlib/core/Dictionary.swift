@@ -863,12 +863,12 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
 
   mutating func isUniquelyReferenced() -> Bool {
     if _fastPath(guaranteedNative) {
-      return Swift.isUniquelyReferenced(&self)
+      return Swift._isUniquelyReferenced(&self)
     }
 
     switch self {
     case .Native:
-      return Swift.isUniquelyReferenced(&self)
+      return Swift._isUniquelyReferenced(&self)
     case .Cocoa:
       // Don't consider Cocoa storage mutable, even if it is mutable and is
       // uniquely referenced.

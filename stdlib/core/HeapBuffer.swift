@@ -78,7 +78,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 // to be in that case, without affecting its reference count.  Instead
 // we accept everything; reinterpretCast will at least catch
 // inappropriately-sized things at runtime.
-@public func isUniquelyReferenced<T>(inout x: T) -> Bool {
+@public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
   return _swift_isUniquelyReferenced(reinterpretCast(x))
 }
 
@@ -199,7 +199,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
       return false
     }
     var workaroundForRadar16119895 = reinterpretCast(storage) as COpaquePointer
-    return Swift.isUniquelyReferenced(&workaroundForRadar16119895)
+    return Swift._isUniquelyReferenced(&workaroundForRadar16119895)
   }
 }
 

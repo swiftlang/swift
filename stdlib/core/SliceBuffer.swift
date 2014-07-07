@@ -217,7 +217,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return Swift.isUniquelyReferenced(&owner)
+    return Swift._isUniquelyReferenced(&owner)
   }
 
   @public
