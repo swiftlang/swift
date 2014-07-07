@@ -1057,7 +1057,7 @@ public:
       SILOpts(),
       Input(*this),
       RC{
-        /*BufferID*/ ~0U,
+        /*BufferID*/ 0U,
         /*CurElem*/ 0,
         /*CurIRGenElem*/ 0,
         /*RanREPLApplicationMain*/ false

@@ -25,11 +25,11 @@ namespace swift {
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
 
-  unsigned CodeCompletionBufferID = ~0U;
+  unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
   /// \brief The buffer ID where a hashbang line #! is allowed.
-  unsigned HashbangBufferID = ~0U;
+  unsigned HashbangBufferID = 0U;
 
   /// Associates buffer identifiers to buffer IDs.
   llvm::StringMap<unsigned> BufIdentIDMap;
@@ -55,7 +55,7 @@ public:
   }
 
   void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
-    assert(BufferID != ~0U && "Buffer should be valid");
+    assert(BufferID != 0U && "Buffer should be valid");
 
     CodeCompletionBufferID = BufferID;
     CodeCompletionOffset = Offset;
@@ -72,7 +72,7 @@ public:
   SourceLoc getCodeCompletionLoc() const;
 
   void setHashbangBufferID(unsigned BufferID) {
-    assert(HashbangBufferID == ~0U && "Hashbang buffer ID already set");
+    assert(HashbangBufferID == 0U && "Hashbang buffer ID already set");
     HashbangBufferID = BufferID;
   }
 

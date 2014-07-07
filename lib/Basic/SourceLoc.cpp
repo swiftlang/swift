@@ -129,7 +129,7 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
   assert(Loc.isValid());
   // Search the buffers back-to front, so later alias buffers are
   // visited first.
-  for (unsigned i = LLVMSourceMgr.getNumBuffers()-1, e = 0; i >= e; --i) {
+  for (unsigned i = LLVMSourceMgr.getNumBuffers(), e = 1; i >= e; --i) {
     auto Buf = LLVMSourceMgr.getMemoryBuffer(i);
     if (Loc.Value.getPointer() >= Buf->getBufferStart() &&
         // Use <= here so that a pointer to the null at the end of the buffer
