@@ -817,6 +817,7 @@ func testClassPropertiesInProtocol() -> Int {
 class GenericClass<T> {
   var x: T
   var y: Int
+  @final let z: T
 
   init() { fatalError("scaffold") }
 }
@@ -827,4 +828,15 @@ func genericProps(x: GenericClass<String>) {
   let _ = x.x
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
   let _ = x.y
+  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
+  // CHECK: load [[Z]] : $*String
+  let _ = x.z
 }
+
+// CHECK-LABEL: sil @_TF10properties28genericPropsInGenericContextU__FGCS_12GenericClassQ__T_
+func genericPropsInGenericContext<U>(x: GenericClass<U>) {
+  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
+  // CHECK: copy_addr [[Z]] {{.*}} : $*U
+  let _ = x.z
+}
+

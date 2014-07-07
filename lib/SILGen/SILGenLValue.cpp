@@ -735,13 +735,16 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
   lv.add<ValueComponent>(base, getUnsubstitutedTypeData(*this, baseType));
 
   auto origFormalType = getOrigFormalRValueType(ivar->getType());
-  auto substFormalType = ivar->getType()->getCanonicalType();
+  auto substFormalType = base.getType().getSwiftRValueType()
+    ->getTypeOfMember(F.getModule().getSwiftModule(),
+                      ivar, nullptr)
+    ->getCanonicalType();
   LValueTypeData typeData = { origFormalType, substFormalType,
                               getLoweredType(origFormalType, substFormalType) };
 
   // Find the substituted storage type.
   SILType varStorageType =
-    SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(ivar->getType()));
+    SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(substFormalType));
 
   if (baseType->hasReferenceSemantics())
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
