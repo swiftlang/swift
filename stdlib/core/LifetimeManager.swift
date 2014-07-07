@@ -10,46 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// An instance of this struct keeps the references registered with it
-/// at +1 reference count until the call to `release()`.
-///
-/// It is absolutely necessary to call `release()`.  Forgetting to call
-/// `release()` will not cause a memory leak.  Instead, the managed objects will be
-/// released earlier than expected.
-///
-/// This class can be used to extend lifetime of objects to pass UnsafePointers
-/// to them to C APIs.
-@internal class LifetimeManager {
-  var _managedRefs : [Builtin.NativeObject]
-  var _releaseCalled : Bool
-
-  init() {
-    _managedRefs = []
-    _releaseCalled = false
-  }
-
-  deinit {
-    if !_releaseCalled {
-      _fatalError("release() should have been called")
-    }
-  }
-
-  func put(objPtr: Builtin.NativeObject) {
-    _managedRefs.append(objPtr)
-  }
-
-  // FIXME: Need class constraints for this to work properly.
-  // func put<T>(obj: T) {
-  //   put(Builtin.castToNativeObject(obj))
-  // }
-
-  /// Call this function to end the forced lifetime extension.
-  func release() {
-    _fixLifetime(_managedRefs._owner)
-    _releaseCalled = true
-  }
-}
-
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 @public func withExtendedLifetime<T, Result>(
