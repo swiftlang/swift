@@ -197,3 +197,18 @@ class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
 class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private because its superclass is private}}
 
+
+@public enum PublicEnumPrivate {
+  case A(PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+}
+enum DefaultEnumPrivate {
+  case A(PrivateStruct) // expected-error {{enum case in an internal enum uses a private type}}
+}
+@public enum PublicEnumPI {
+  case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+}
+enum DefaultEnumPublic {
+  case A(PublicStruct) // no-warning
+}

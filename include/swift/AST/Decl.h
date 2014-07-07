@@ -4124,7 +4124,8 @@ public:
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
   TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-  
+  const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
+
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
   void setRawValueExpr(LiteralExpr *e) { RawValueExpr = e; }

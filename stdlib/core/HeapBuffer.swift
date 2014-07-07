@@ -215,7 +215,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 // A way to store a value on the heap.  These values are likely to be
 // implicitly shared, so it's safest if they're immutable.
 //
-@internal struct OnHeap<T> {
+@public struct OnHeap<T> {
   typealias Buffer = HeapBuffer<T, Void>
   
   init(_ value: T) {

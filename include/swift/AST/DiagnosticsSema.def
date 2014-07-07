@@ -560,7 +560,7 @@ NOTE(no_witnesses_type,sema_tcd,none,
 NOTE(default_assocated_type_req_fail,sema_tcd,none,
      "default associated type definition %0 does not conform to %1", 
      (Type, Type))
-ERROR(assocated_type_access,sema_tcd,none,
+ERROR(associated_type_access,sema_tcd,none,
       "associated type in %select{PRIVATE|an internal|a public}0 protocol "
       "uses %select{a private|an internal|PUBLIC}1 type in its "
       "%select{default definition|requirement}2 ",
@@ -745,6 +745,13 @@ NOTE(class_here,sema_tcd,none,
 ERROR(inheritance_from_final_class,sema_tcd,none,
 "inheritance from a final class %0", (Identifier))
 
+
+// Enums
+ERROR(enum_case_access,sema_tcd,none,
+      "enum case in %select{PRIVATE|an internal|a public}0 enum uses "
+      "%select{a private|an internal|PUBLIC}1 type",
+      (Accessibility, Accessibility))
+
 // Enum raw types
 ERROR(multiple_enum_raw_types,sema_tcd,none,
   "multiple enum raw types %0 and %1", (Type, Type))
@@ -798,6 +805,7 @@ ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,
       "Int type is broken: does not conform to IntegerLiteralConvertible", ())
 ERROR(broken_equatable_eq_operator,sema_tcd,none,
       "Equatable protocol is broken: no operator infix declaration for '=='", ())
+
 // Dynamic Self
 ERROR(dynamic_self_non_method,sema_tcd,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))

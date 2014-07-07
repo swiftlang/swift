@@ -2351,6 +2351,68 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
+  case DeclKind::TypeAlias: {
+    auto TAD = cast<TypeAliasDecl>(D);
+
+    checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
+                           TAD->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *complainRepr) {
+      bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
+      auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
+                              isExplicit, TAD->getAccessibility(),
+                              typeAccess);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+
+    return;
+  }
+
+  case DeclKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeDecl>(D);
+
+    // This must stay in sync with diag::associated_type_access.
+    enum {
+      AEK_DefaultDefinition = 0,
+      AEK_Requirement
+    } accessibilityErrorKind;
+    Optional<Accessibility> minAccess;
+    const TypeRepr *complainRepr = nullptr;
+
+    std::for_each(assocType->getInherited().begin(),
+                  assocType->getInherited().end(),
+                  [&](TypeLoc requirement) {
+      checkTypeAccessibility(TC, requirement,
+                             assocType->getAccessibility(),
+                             [&](Accessibility typeAccess,
+                                 const TypeRepr *thisComplainRepr) {
+        if (!minAccess || *minAccess > typeAccess) {
+          minAccess = typeAccess;
+          complainRepr = thisComplainRepr;
+          accessibilityErrorKind = AEK_Requirement;
+        }
+      });
+    });
+    checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(),
+                           assocType->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *thisComplainRepr) {
+      if (!minAccess || *minAccess > typeAccess) {
+        minAccess = typeAccess;
+        complainRepr = thisComplainRepr;
+        accessibilityErrorKind = AEK_DefaultDefinition;
+      }
+    });
+
+    if (minAccess) {
+      auto diag = TC.diagnose(assocType, diag::associated_type_access,
+                              assocType->getAccessibility(),
+                              *minAccess, accessibilityErrorKind);
+      highlightOffendingType(TC, diag, complainRepr);
+    }
+    return;
+  }
+
   case DeclKind::Enum: {
     auto ED = cast<EnumDecl>(D);
 
@@ -2407,63 +2469,31 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
-  case DeclKind::TypeAlias: {
-    auto TAD = cast<TypeAliasDecl>(D);
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
 
-    checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
-                           TAD->getAccessibility(),
-                           [&](Accessibility typeAccess,
-                               const TypeRepr *complainRepr) {
-      bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
-      auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
-                              isExplicit, TAD->getAccessibility(),
-                              typeAccess);
-      highlightOffendingType(TC, diag, complainRepr);
-    });
-
-    return;
-  }
-
-  case DeclKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeDecl>(D);
-
-    // This must stay in sync with diag::assocated_type_access.
-    enum {
-      AEK_DefaultDefinition = 0,
-      AEK_Requirement
-    } accessibilityErrorKind;
     Optional<Accessibility> minAccess;
     const TypeRepr *complainRepr = nullptr;
 
-    std::for_each(assocType->getInherited().begin(),
-                  assocType->getInherited().end(),
+    std::for_each(proto->getInherited().begin(),
+                  proto->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccessibility(TC, requirement,
-                             assocType->getAccessibility(),
+      checkTypeAccessibility(TC, requirement, proto->getAccessibility(),
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
           minAccess = typeAccess;
           complainRepr = thisComplainRepr;
-          accessibilityErrorKind = AEK_Requirement;
         }
       });
     });
-    checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(),
-                           assocType->getAccessibility(),
-                           [&](Accessibility typeAccess,
-                               const TypeRepr *thisComplainRepr) {
-      if (!minAccess || *minAccess > typeAccess) {
-        minAccess = typeAccess;
-        complainRepr = thisComplainRepr;
-        accessibilityErrorKind = AEK_DefaultDefinition;
-      }
-    });
 
     if (minAccess) {
-      auto diag = TC.diagnose(assocType, diag::assocated_type_access,
-                              assocType->getAccessibility(),
-                              *minAccess, accessibilityErrorKind);
+      bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
+      auto diag = TC.diagnose(proto, diag::protocol_refine_access,
+                              isExplicit,
+                              proto->getAccessibility(),
+                              *minAccess);
       highlightOffendingType(TC, diag, complainRepr);
     }
     return;
@@ -2522,7 +2552,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
-    // This must stay in sync with diag::assocated_type_access.
+    // This must stay in sync with diag::associated_type_access.
     enum {
       FK_Function = 0,
       FK_Method,
@@ -2579,39 +2609,22 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     return;
   }
 
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
+  case DeclKind::EnumElement: {
+    auto EED = cast<EnumElementDecl>(D);
 
-    Optional<Accessibility> minAccess;
-    const TypeRepr *complainRepr = nullptr;
-
-    std::for_each(proto->getInherited().begin(),
-                  proto->getInherited().end(),
-                  [&](TypeLoc requirement) {
-      checkTypeAccessibility(TC, requirement, proto->getAccessibility(),
-                             [&](Accessibility typeAccess,
-                                 const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
-          complainRepr = thisComplainRepr;
-        }
-      });
+    if (!EED->hasArgumentType())
+      return;
+    checkTypeAccessibility(TC, EED->getArgumentTypeLoc(),
+                           EED->getAccessibility(),
+                           [&](Accessibility typeAccess,
+                               const TypeRepr *complainRepr) {
+      auto diag = TC.diagnose(EED, diag::enum_case_access,
+                              EED->getAccessibility(), typeAccess);
+      highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (minAccess) {
-      bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
-      auto diag = TC.diagnose(proto, diag::protocol_refine_access,
-                              isExplicit,
-                              proto->getAccessibility(),
-                              *minAccess);
-      highlightOffendingType(TC, diag, complainRepr);
-    }
     return;
   }
-
-  case DeclKind::EnumElement:
-    // unimplemented
-    return;
   }
 }
 
@@ -4810,7 +4823,11 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    if (IsSecondPass || EED->hasType())
+    if (IsSecondPass) {
+      checkAccessibility(TC, EED);
+      return;
+    }
+    if (EED->hasType())
       return;
 
     TC.checkDeclAttributesEarly(EED);
