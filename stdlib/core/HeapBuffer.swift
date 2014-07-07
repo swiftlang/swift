@@ -19,7 +19,7 @@ typealias _HeapObject = SwiftShims.HeapObject
 @public objc class HeapBufferStorageBase {}
 
 @asmname("swift_bufferAllocate")
-func swift_bufferAllocate(
+func _swift_bufferAllocate(
   bufferType: HeapBufferStorageBase.Type, size: Int, alignMask: Int) -> AnyObject
 
 @asmname("malloc_size")
@@ -158,7 +158,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     let alignMask = HeapBuffer._requiredAlignMask()
 
     self.storage = reinterpretCast(
-      swift_bufferAllocate(storageClass, totalSize, alignMask))
+      _swift_bufferAllocate(storageClass, totalSize, alignMask))
     self._value.initialize(initializer)
   }
 
