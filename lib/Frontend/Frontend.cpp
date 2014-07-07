@@ -221,7 +221,8 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
         return true;
       }
       PartialModules.push_back({ std::move(InputFileOrErr.get()),
-                                 std::move(ModuleDocOrErr.get()) });
+                                 ModuleDocOrErr? std::move(ModuleDocOrErr.get())
+                                               : nullptr });
       continue;
     }
 

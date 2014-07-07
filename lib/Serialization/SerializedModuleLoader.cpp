@@ -61,7 +61,8 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
     return ModuleDocOrErr.getError();
   }
   ModuleBuffer = std::move(ModuleOrErr.get());
-  ModuleDocBuffer = std::move(ModuleDocOrErr.get());
+  if (ModuleDocOrErr)
+    ModuleDocBuffer = std::move(ModuleDocOrErr.get());
   return std::error_code();
 }
 
