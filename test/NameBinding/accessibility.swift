@@ -24,3 +24,9 @@ println(a)
 println(b)
 println(c) // expected-error {{use of unresolved identifier 'c'}}
 
+Foo.x()
+Foo.y() // expected-error {{'Foo.Type' does not have a member named 'y'}}
+Foo.z() // expected-error {{'Foo.Type' does not have a member named 'z'}}
+Foo.a()
+Foo.b()
+Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
