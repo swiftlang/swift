@@ -513,6 +513,7 @@ namespace {
     SILValue remapValue(SILValue Value) {
       return Value;
     }
+    SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
   };
 }
 
