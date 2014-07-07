@@ -930,7 +930,44 @@ NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
 }
 
 NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
-  // FIXME
+  if true {
+    let s = ""
+    expectEmpty(s.rangeOfString(""))
+    expectEmpty(s.rangeOfString("abc"))
+  }
+  if true {
+    let s = "abc"
+    expectEmpty(s.rangeOfString(""))
+    expectEmpty(s.rangeOfString("def"))
+    expectOptionalEqual(s.startIndex..<s.endIndex, s.rangeOfString("abc"))
+  }
+  if true {
+    let s = "さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+    expectEqual("す\u{3099}", s[s.rangeOfString("す\u{3099}")!])
+    expectEqual("す\u{3099}", s[s.rangeOfString("\u{305a}")!])
+
+    expectEmpty(s.rangeOfString("\u{3099}す"))
+    expectEmpty(s.rangeOfString("す"))
+
+    // Note: here `rangeOfString` API produces indexes that don't point between
+    // grapheme cluster boundaries -- these can not be created with public
+    // String interface.
+    //
+    // FIXME: why does this seach succeed and the above queries fail?  There is
+    // no apparent pattern.
+    expectEqual("\u{3099}", s[s.rangeOfString("\u{3099}")!])
+  }
+  if true {
+    let s = "а\u{0301}б\u{0301}в\u{0301}г\u{0301}"
+    expectEqual("а\u{0301}", s[s.rangeOfString("а\u{0301}")!])
+    expectEqual("б\u{0301}", s[s.rangeOfString("б\u{0301}")!])
+
+    expectEmpty(s.rangeOfString("б"))
+    expectEmpty(s.rangeOfString("\u{0301}б"))
+
+    // Again, indexes that don't correspond to grapheme cluster boundaries.
+    expectEqual("\u{0301}", s[s.rangeOfString("\u{0301}")!])
+  }
 }
 
 NSStringAPIs.test("smallestEncoding") {

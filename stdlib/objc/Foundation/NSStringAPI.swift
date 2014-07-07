@@ -1124,8 +1124,8 @@ extension String {
     options mask: NSStringCompareOptions = nil,
     range searchRange: Range<Index>? = nil,
     locale: NSLocale? = nil
-  ) -> Range<Index> {
-    return _range(
+  ) -> Range<Index>? {
+    return _optionalRange(
       locale ? _ns.rangeOfString(
         aString, options: mask,
         range: _toNSRange(searchRange ? searchRange! : indices(self)),

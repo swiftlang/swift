@@ -69,7 +69,7 @@
 
 @public struct ${Self}<
   T: ${IndexProtocol}
-> : LogicValue, Sliceable, Reflectable {
+> : LogicValue, Equatable, Sliceable, Reflectable {
 
 % if Self == 'RandomAccessRange':
   @conversion @public
@@ -129,6 +129,11 @@
   
   var _startIndex: T
   var _endIndex: T
+}
+
+@public func ==<T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+  return lhs._startIndex == rhs._startIndex &&
+      lhs._endIndex == rhs._endIndex
 }
 
 % end

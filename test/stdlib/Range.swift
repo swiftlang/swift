@@ -56,6 +56,28 @@ RangeTestCase.test("ReverseRange") {
   }
 }
 
+func isEquatable<E : Equatable>(e: E) {}
+
+RangeTestCase.test("Range/Equatable") {
+  let r1 = Range(start: 0, end: 0)
+  let r2 = Range(start: 0, end: 1)
+  isEquatable(r1)
+  expectTrue(r1 == r1)
+  expectFalse(r1 != r1)
+  expectFalse(r1 == r2)
+  expectTrue(r1 != r2)
+}
+
+RangeTestCase.test("RandomAccessRange/Equatable") {
+  let r1 = RandomAccessRange(start: 0, end: 0)
+  let r2 = RandomAccessRange(start: 0, end: 1)
+  isEquatable(r1)
+  expectTrue(r1 == r1)
+  expectFalse(r1 != r1)
+  expectFalse(r1 == r2)
+  expectTrue(r1 != r2)
+}
+
 RangeTestCase.run()
 // CHECK: {{^}}Range: All tests passed
 
