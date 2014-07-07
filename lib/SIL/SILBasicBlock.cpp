@@ -129,3 +129,12 @@ SILBasicBlock *SILBasicBlock::splitBasicBlockAndBranch(iterator I,
                        BranchInst::create(BranchLoc, New, *getParent()));
   return New;
 }
+
+/// \brief Move the basic block to after the specified basic block in the IR.
+void SILBasicBlock::moveAfter(SILBasicBlock *After) {
+  assert(getParent() && getParent() == After->getParent() &&
+         "Blocks must be in the same function");
+  auto InsertPt = std::next(SILFunction::iterator(After));
+  auto &BlkList = getParent()->getBlocks();
+  BlkList.splice(InsertPt, BlkList, this);
+}

@@ -111,6 +111,10 @@ public:
   /// \sa splitBasicBlock
   SILBasicBlock *splitBasicBlockAndBranch(iterator I, SILLocation BranchLoc);
 
+  /// \brief Move the basic block to after the specified basic block in the IR.
+  /// The basic blocks must reside in the same function.
+  void moveAfter(SILBasicBlock *After);
+
   //===--------------------------------------------------------------------===//
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
