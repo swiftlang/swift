@@ -54,7 +54,7 @@ static void printNode(llvm::raw_ostream &out, const Node *node,
   }
   out << '\n';
   for (auto &child : *node) {
-    printNode(out, child.getPtr(), depth + 1);
+    printNode(out, child.get(), depth + 1);
   }
 }
 
@@ -99,7 +99,7 @@ namespace {
   struct FindPtr {
     FindPtr(Node *v) : Target(v) {}
     bool operator()(NodePointer sp) const {
-      return sp.getPtr() == Target;
+      return sp.get() == Target;
     }
   private:
     Node *Target;
@@ -296,7 +296,7 @@ private:
     if (!RootNode) {
       RootNode = Node::create(Node::Kind::Global);
     }
-    return RootNode.getPtr();
+    return RootNode.get();
   }
 
   Node *appendNode(NodePointer n) {
@@ -1689,11 +1689,11 @@ private:
       return nullptr;
 
     // Demangle the parameters.
-    if (!demangleImplParameters(type.getPtr()))
+    if (!demangleImplParameters(type.get()))
       return nullptr;
 
     // Demangle the result type.
-    if (!demangleImplResults(type.getPtr()))
+    if (!demangleImplResults(type.get()))
       return nullptr;
 
     return type;
@@ -1823,7 +1823,7 @@ private:
                      Node::iterator end,
                      const char *sep = nullptr) {
     for (; begin != end;) {
-      print(begin->getPtr());
+      print(begin->get());
       ++begin;
       if (sep && begin != end)
         Printer << sep;
@@ -1842,7 +1842,7 @@ private:
       return nullptr;
     for (NodePointer &child : *pointer) {
       if (child && child->getKind() == kind)
-        return child.getPtr();
+        return child.get();
     }
     return nullptr;
   }
@@ -2132,14 +2132,14 @@ private:
       if (child->getKind() == Node::Kind::ImplParameter) {
         if (curState == Inputs) Printer << ", ";
         transitionTo(Inputs);
-        print(child.getPtr());
+        print(child.get());
       } else if (child->getKind() == Node::Kind::ImplResult) {
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
-        print(child.getPtr());
+        print(child.get());
       } else {
         assert(curState == Attrs);
-        print(child.getPtr());
+        print(child.get());
         Printer << ' ';
       }
     }
@@ -2708,8 +2708,8 @@ std::string Demangle::nodeToString(NodePointer root,
   if (!root)
     return "";
 
-  PrettyStackTraceNode trace("printing", root.getPtr());
-  return NodePrinter(options).printRoot(root.getPtr());
+  PrettyStackTraceNode trace("printing", root.get());
+  return NodePrinter(options).printRoot(root.get());
 }
 
 std::string Demangle::demangleSymbolAsString(llvm::StringRef mangled,

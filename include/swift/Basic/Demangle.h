@@ -124,8 +124,8 @@ public:
   const_iterator begin() const { return Children.begin(); }
   const_iterator end() const { return Children.end(); }
 
-  Node *getFirstChild() const { return Children.front().getPtr(); }
-  Node *getChild(size_t index) const { return Children[index].getPtr(); }
+  Node *getFirstChild() const { return Children.front().get(); }
+  Node *getChild(size_t index) const { return Children[index].get(); }
 
   /// Add a new node as a child of this one.
   ///
@@ -133,7 +133,7 @@ public:
   /// \returns child
   Node *addChild(NodePointer child) {
     assert(child && "adding null child!");
-    auto childRaw = child.getPtr();
+    auto childRaw = child.get();
     Children.push_back(std::move(child));
     return childRaw;
   }
