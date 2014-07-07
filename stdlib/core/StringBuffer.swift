@@ -48,11 +48,6 @@ struct _StringBufferIVars {
   // aligned for them if that's what we store.
   typealias _Storage = HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>
 
-  @conversion 
-  func __conversion() -> _Storage {
-    return _storage
-  }
-
   init(_ storage: _Storage) {
     _storage = storage
   }
@@ -183,8 +178,7 @@ struct _StringBufferIVars {
     return false
   }
 
-  @conversion
-  func __conversion() -> AnyObject? {
+  var _anyObject: AnyObject? {
     return _storage.storage ? .Some(_storage.storage!) : .None
   }
 

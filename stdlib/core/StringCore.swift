@@ -154,7 +154,7 @@
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
-      owner: buffer
+      owner: buffer._anyObject
     )
   }
   
