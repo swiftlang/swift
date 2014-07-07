@@ -236,9 +236,6 @@ struct _DictionaryBody {
 struct _DictionaryElement<KeyType : Hashable, ValueType> {
   let key: KeyType
   var value: ValueType
-  @conversion func __conversion() -> (KeyType, ValueType) {
-    return (key, value)
-  }
 }
 
 /// An instance of this class has all dictionary data tail-allocated.  It is
@@ -457,7 +454,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     let e = self[i.offset]
     _precondition(
       e, "attempting to access Dictionary elements using an invalid Index")
-    return e!
+    return (e!.key, e!.value)
   }
 
   @public func assertingGet(key: KeyType) -> ValueType {
