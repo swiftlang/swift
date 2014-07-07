@@ -33,7 +33,15 @@ class RValue;
 class RValueSource;
 class TemporaryInitialization;
 
-/// SGFContext - Internal context information for the SILGenFunction visitor.
+/// How a method is dispatched.
+enum class MethodDispatch {
+  // The method implementation can be referenced statically.
+  Static,
+  // The method implementation uses class_method dispatch.
+  Class,
+};
+  
+/// Internal context information for the SILGenFunction visitor.
 ///
 /// In general, emission methods which take an SGFContext indicate
 /// that they've initialized the emit-into buffer (if they have) by
@@ -1008,6 +1016,9 @@ public:
   /// intrinsic.
   Substitution getPointerSubstitution(Type pointerType,
                                       ArchetypeType *archetype);
+  
+  /// Get the method dispatch mechanism for a method.
+  MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 };
 
 } // end namespace Lowering

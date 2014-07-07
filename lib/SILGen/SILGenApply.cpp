@@ -27,6 +27,19 @@
 using namespace swift;
 using namespace Lowering;
 
+/// Get the method dispatch mechanism for a method.
+MethodDispatch
+SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
+  // If this declaration is in a class but not marked @final, then it is
+  // always dynamically dispatched. This includes (non-objc) extension methods.
+  if ((isa<ClassDecl>(method->getDeclContext()) || method->isObjC()) &&
+      !method->isFinal())
+    return MethodDispatch::Class;
+  
+  // Otherwise, it can be referenced statically.
+  return MethodDispatch::Static;
+}
+
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
                                                      SILValue proto,
@@ -883,22 +896,25 @@ public:
     // emit class_method to do so.
     if (auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
       Optional<SILDeclRef::Kind> kind;
-      bool isDynamicallyDispatched = false;
+      bool isDynamicallyDispatched;
       bool requiresAllocRefDynamic = false;
-
-      if (auto fd = dyn_cast<FuncDecl>(afd)) {
-        // If this declaration is in a class but not marked @final, then it is
-        // always dynamically dispatched.
-        if ((isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) &&
-            !fd->isFinal()) {
-          isDynamicallyDispatched = true;
-          kind = SILDeclRef::Kind::Func;
-        }
+      
+      // Determine whether the method is dynamically dispatched.
+      switch (gen.getMethodDispatch(afd)) {
+      case MethodDispatch::Class:
+        isDynamicallyDispatched = true;
+        break;
+      case MethodDispatch::Static:
+        isDynamicallyDispatched = false;
+        break;
       }
-      // Abstract constructors are dynamically dispatched when the 'self' value
-      // is not statically derived.
-      else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+
+      if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
+        kind = SILDeclRef::Kind::Func;
+      } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
         ApplyExpr *thisCallSite = callSites.back();
+        // Required constructors are dynamically dispatched when the 'self'
+        // value is not statically derived.
         if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
@@ -913,6 +929,8 @@ public:
           } else {
             kind = SILDeclRef::Kind::Allocator;
           }
+        } else {
+          isDynamicallyDispatched = false;
         }
       }
 
