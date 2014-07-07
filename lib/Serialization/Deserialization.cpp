@@ -719,7 +719,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   ArrayRef<uint64_t> rawArchetypeIDs;
   GenericParamListLayout::readRecord(rawArchetypeIDsBuffer, rawArchetypeIDs);
 
-  SmallVector<GenericParam, 8> params;
+  SmallVector<GenericTypeParamDecl *, 8> params;
   SmallVector<RequirementRepr, 8> requirements;
   SmallVector<ArchetypeType *, 8> archetypes;
 
@@ -793,7 +793,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
               DC->isModuleScopeContext() ||
               genericParam->getDeclContext() == DC) &&
              "Mismatched decl context for generic types.");
-      params.push_back(GenericParam(genericParam));
+      params.push_back(genericParam);
       break;
     }
     case GENERIC_REQUIREMENT: {
@@ -1252,7 +1252,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       }
 
       values.clear();
-      values.push_back(paramList->getParams()[paramIndex].getDecl());
+      values.push_back(paramList->getParams()[paramIndex]);
       assert(values.back());
       break;
     }
@@ -1758,7 +1758,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theStruct->getGenericParams()) {
-        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+        paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
 
@@ -2180,8 +2180,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       proto->setGenericParams(genericParams);
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *proto->getGenericParams()) {
-        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
-                             ->castTo<GenericTypeParamType>());
+        paramTypes.push_back(genericParam->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
       }
 
       // Read the generic requirements.
@@ -2312,7 +2312,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {
-        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+        paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
 
@@ -2380,7 +2380,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theEnum->getGenericParams()) {
-        paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
+        paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
 

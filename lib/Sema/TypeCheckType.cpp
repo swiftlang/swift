@@ -351,7 +351,7 @@ Type TypeChecker::applyGenericArguments(Type type,
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
       auto GP = genericParams->getParams()[Index++];
-      auto Archetype = GP.getAsTypeParam()->getArchetype();
+      auto Archetype = GP->getArchetype();
       Substitutions[Archetype] = Arg;
     }
 

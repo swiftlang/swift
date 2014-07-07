@@ -271,7 +271,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return;
 
     for (auto P : *Params) {
-      checkValueDecl(P.getDecl());
+      checkValueDecl(P);
     }
   }
 

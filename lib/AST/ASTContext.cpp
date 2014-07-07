@@ -904,13 +904,12 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
 Optional<ArrayRef<Substitution>>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT) const {
   assert(BGT->isCanonical() && "Requesting non-canonical substitutions");
-  ArrayRef<GenericParam> Params =
-      BGT->getDecl()->getGenericParams()->getParams();
+  auto Params = BGT->getDecl()->getGenericParams()->getParams();
   assert(Params.size() == 1);
   auto Param = Params[0];
-  assert(Param.getAsTypeParam()->getArchetype() && "Not type-checked yet");
+  assert(Param->getArchetype() && "Not type-checked yet");
   Substitution Subst;
-  Subst.Archetype = Param.getAsTypeParam()->getArchetype();
+  Subst.Archetype = Param->getArchetype();
   Subst.Replacement = BGT->getGenericArgs()[0];
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
   auto arena = getArena(BGT->getRecursiveProperties());

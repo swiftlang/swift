@@ -494,7 +494,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   unsigned index = 0;
   for (Type arg : canon->getGenericArgs()) {
     auto gp = genericParams->getParams()[index++];
-    auto archetype = gp.getAsTypeParam()->getArchetype();
+    auto archetype = gp->getArchetype();
     substitutions[archetype] = arg;
   }
 

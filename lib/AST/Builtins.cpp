@@ -193,7 +193,7 @@ getBuiltinGenericFunction(Identifier Id,
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
   for (auto gp : *GenericParams) {
-    GenericParamTypes.push_back(gp.getAsTypeParam()->getDeclaredType()
+    GenericParamTypes.push_back(gp->getDeclaredType()
                                   ->castTo<GenericTypeParamType>());
   }
   // Create witness markers for all of the generic param types.
@@ -446,8 +446,7 @@ getGenericParam(ASTContext &Context) {
     new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                        GenericName, SourceLoc(), 0, 0);
   GenericTyDecl->setArchetype(Archetype);
-  GenericParam Param = GenericTyDecl;
-  auto ParamList = GenericParamList::create(Context, SourceLoc(), Param,
+  auto ParamList = GenericParamList::create(Context, SourceLoc(), GenericTyDecl,
                                             SourceLoc());
   ParamList->setAllArchetypes(
     Context.AllocateCopy(ArrayRef<ArchetypeType *>(&Archetype, 1)));
@@ -641,7 +640,7 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
   Module *M = Context.TheBuiltinModule;
 
   SmallVector<ArchetypeType *, 2> Archetypes;
-  SmallVector<GenericParam, 2> GenericParams;
+  SmallVector<GenericTypeParamDecl *, 2> GenericParams;
   unsigned index = 0;
   for (char const *name : {"T", "U"}) {
     Identifier GenericName = Context.getIdentifier(name);
@@ -663,12 +662,12 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &Context,
                                             SourceLoc());
   ParamList->setAllArchetypes(Context.AllocateCopy(Archetypes));
   
-  TupleTypeElt Params(GenericParams[0].getAsTypeParam()->getDeclaredType());
+  TupleTypeElt Params(GenericParams[0]->getDeclaredType());
   TupleTypeElt BodyArgs(Archetypes[0]);
   
   return getBuiltinGenericFunction(Id, Params, BodyArgs,
-                           GenericParams[1].getAsTypeParam()->getDeclaredType(),
-                           Archetypes[1], ParamList);
+                                   GenericParams[1]->getDeclaredType(),
+                                   Archetypes[1], ParamList);
 }
 
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {

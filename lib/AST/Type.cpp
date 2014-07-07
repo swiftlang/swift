@@ -1381,7 +1381,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     auto boundTy = specializedTy->castTo<BoundGenericType>();
     auto gp = boundTy->getDecl()->getGenericParams()->getParams();
     for (unsigned i = 0, n = boundTy->getGenericArgs().size(); i != n; ++i) {
-      auto archetype = gp[i].getAsTypeParam()->getArchetype();
+      auto archetype = gp[i]->getArchetype();
       substitutions[archetype] = boundTy->getGenericArgs()[i];
     }
 
@@ -1800,7 +1800,8 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanProtocolTypes);
 }
 
-ArrayRef<GenericParam> PolymorphicFunctionType::getGenericParameters() const {
+ArrayRef<GenericTypeParamDecl *>
+PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
@@ -1812,8 +1813,7 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
                                                         ArrayRef<Type> args) {
   TypeSubstitutionMap map;
   for (auto &param : getGenericParams().getNestedGenericParams()) {
-    map.insert(std::make_pair(param.getAsTypeParam()->getArchetype(),
-                              args.front()));
+    map.insert(std::make_pair(param->getArchetype(), args.front()));
     args = args.slice(1);
   }
   
@@ -2205,9 +2205,9 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         // FIXME: Shouldn't need both archetype and generic parameter mappings.
-        substitutions[params[i].getAsTypeParam()->getArchetype()] = args[i];
-        substitutions[params[i].getAsTypeParam()->getDeclaredType()
-                        ->getCanonicalType()->getAs<GenericTypeParamType>()]
+        substitutions[params[i]->getArchetype()] = args[i];
+        substitutions[params[i]->getDeclaredType()->getCanonicalType()
+                        ->castTo<GenericTypeParamType>()]
           = args[i];
       }
 

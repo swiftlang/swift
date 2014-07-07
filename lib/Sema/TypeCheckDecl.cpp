@@ -749,19 +749,17 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
   // Assign archetypes to each of the generic parameters.
   unsigned Index = 0;
   for (auto GP : *genericParams) {
-    auto TypeParam = GP.getAsTypeParam();
-
     // Set the depth of this type parameter.
-    TypeParam->setDepth(Depth);
+    GP->setDepth(Depth);
 
     // Check the constraints on the type parameter.
-    TC.checkInheritanceClause(TypeParam, DC);
+    TC.checkInheritanceClause(GP, DC);
 
     // Add the generic parameter to the builder.
-    builder.addGenericParameter(TypeParam, Index++);
+    builder.addGenericParameter(GP, Index++);
 
     // Infer requirements from the "inherited" types.
-    for (auto &inherited : TypeParam->getInherited()) {
+    for (auto &inherited : GP->getInherited()) {
       builder.inferRequirements(inherited);
     }
   }
@@ -826,10 +824,8 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
                                          DeclContext *dc) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
-    auto typeParam = param.getAsTypeParam();
-
-    typeParam->setCheckedInheritanceClause(false);
-    for (auto &inherited : typeParam->getInherited())
+    param->setCheckedInheritanceClause(false);
+    for (auto &inherited : param->getInherited())
       revertDependentTypeLoc(inherited);
   }
 
@@ -865,10 +861,8 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
   // Wire up the archetypes.
   builder.assignArchetypes();
   for (auto GP : *genericParams) {
-    auto TypeParam = GP.getAsTypeParam();
-    TypeParam->setArchetype(builder.getArchetype(TypeParam));
-
-    TC.checkInheritanceClause(TypeParam);
+    GP->setArchetype(builder.getArchetype(GP));
+    TC.checkInheritanceClause(GP);
   }
   genericParams->setAllArchetypes(
     TC.Context.AllocateCopy(builder.getAllArchetypes()));

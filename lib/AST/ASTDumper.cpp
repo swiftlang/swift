@@ -50,10 +50,10 @@ void GenericParamList::print(llvm::raw_ostream &OS) {
     } else {
       OS << ", ";
     }
-    OS << P.getDecl()->getName();
-    if (!P.getAsTypeParam()->getInherited().empty()) {
+    OS << P->getName();
+    if (!P->getInherited().empty()) {
       OS << " : ";
-      P.getAsTypeParam()->getInherited()[0].getType().print(OS);
+      P->getInherited()[0].getType().print(OS);
     }
   }
   OS << '>';

@@ -368,7 +368,7 @@ bool Decl::isPrivateStdlibDecl() const {
 }
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
-                                   ArrayRef<GenericParam> Params,
+                                   ArrayRef<GenericTypeParamDecl *> Params,
                                    SourceLoc WhereLoc,
                                    MutableArrayRef<RequirementRepr> Requirements,
                                    SourceLoc RAngleLoc)
@@ -376,15 +376,17 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     WhereLoc(WhereLoc), Requirements(Requirements),
     OuterParameters(nullptr), Builder(nullptr)
 {
-  memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
+  std::uninitialized_copy(Params.begin(), Params.end(),
+                          reinterpret_cast<GenericTypeParamDecl **>(this + 1));
 }
 
-GenericParamList *GenericParamList::create(ASTContext &Context,
-                                           SourceLoc LAngleLoc,
-                                           ArrayRef<GenericParam> Params,
-                                           SourceLoc RAngleLoc) {
+GenericParamList *
+GenericParamList::create(ASTContext &Context,
+                         SourceLoc LAngleLoc,
+                         ArrayRef<GenericTypeParamDecl *> Params,
+                         SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
-                + sizeof(GenericParam) * Params.size();
+                + sizeof(GenericTypeParamDecl *) * Params.size();
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
                                     MutableArrayRef<RequirementRepr>(),
@@ -394,12 +396,12 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
 GenericParamList *
 GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
-                         ArrayRef<GenericParam> Params,
+                         ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
                          MutableArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
-                + sizeof(GenericParam) * Params.size();
+                + sizeof(GenericTypeParamDecl *) * Params.size();
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
                                     WhereLoc,
@@ -509,12 +511,10 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
   for (auto paramIndex : indices(getParams())) {
     auto param = getParams()[paramIndex];
     
-    GenericTypeParamDecl *typeParam = param.getAsTypeParam();
-    auto typeParamTy = typeParam->getDeclaredType()
-      ->castTo<GenericTypeParamType>();
+    auto typeParamTy = param->getDeclaredType()->castTo<GenericTypeParamType>();
 
     // Make sure we didn't visit this param already in the parent.
-    auto found = archetypeMap.find(typeParam->getArchetype());
+    auto found = archetypeMap.find(param->getArchetype());
     if (found != archetypeMap.end()) {
       assert(found->second->isEqual(typeParamTy));
       continue;
@@ -587,7 +587,7 @@ void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
 }
 
 ArrayRef<ArchetypeType*>
-GenericParamList::deriveAllArchetypes(ArrayRef<GenericParam> params,
+GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
                                       SmallVectorImpl<ArchetypeType*> &all) {
   // This should be kept in sync with ArchetypeBuilder::getAllArchetypes().
 
@@ -596,19 +596,15 @@ GenericParamList::deriveAllArchetypes(ArrayRef<GenericParam> params,
 
   // Collect all the primary archetypes.
   for (auto param : params) {
-    if (auto typeParam = param.getAsTypeParam()) {
-      auto archetype = typeParam->getArchetype();
-      if (archetype->isPrimary() && known.insert(archetype))
-        all.push_back(archetype);
-    }
+    auto archetype = param->getArchetype();
+    if (archetype->isPrimary() && known.insert(archetype))
+      all.push_back(archetype);
   }
 
   // Collect all the nested archetypes.
   for (auto param : params) {
-    if (auto typeParam = param.getAsTypeParam()) {
-      auto archetype = typeParam->getArchetype();
-      addNestedArchetypes(archetype, known, all);
-    }
+    auto archetype = param->getArchetype();
+    addNestedArchetypes(archetype, known, all);
   }
 
   return all;
@@ -1274,7 +1270,7 @@ void NominalTypeDecl::setGenericParams(GenericParamList *params) {
   
   if (params)
     for (auto Param : *params)
-      Param.setDeclContext(this);
+      Param->setDeclContext(this);
 }
 
 
@@ -1364,8 +1360,7 @@ void NominalTypeDecl::computeType() {
       selfDecl->setImplicit();
       
       // The generic parameter list itself.
-      GenericParams = GenericParamList::create(ctx, SourceLoc(),
-                                               GenericParam(selfDecl),
+      GenericParams = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                                SourceLoc());
     }
   }
@@ -1382,7 +1377,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     NominalTypeDecl *D = UGT->getDecl();
     SmallVector<Type, 4> GenericArgs;
     for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param.getAsTypeParam()->getArchetype());
+      GenericArgs.push_back(Param->getArchetype());
     Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
                                GenericArgs);
   }
@@ -1408,7 +1403,7 @@ Type NominalTypeDecl::computeInterfaceType() const {
     // in the type's definition.
     SmallVector<Type, 4> genericArgs;
     for (auto param : *params)
-      genericArgs.push_back(param.getAsTypeParam()->getDeclaredType());
+      genericArgs.push_back(param->getDeclaredType());
 
     type = BoundGenericType::get(const_cast<NominalTypeDecl *>(this),
                                  parentType, genericArgs);
@@ -1838,7 +1833,7 @@ bool ProtocolDecl::requiresClassSlow() {
 }
 
 GenericTypeParamDecl *ProtocolDecl::getSelf() const {
-  return getGenericParams()->getParams()[0].getAsTypeParam();
+  return getGenericParams()->getParams().front();
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(
@@ -2357,7 +2352,7 @@ void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
   GenericParams = GP;
   if (GP)
     for (auto Param : *GP)
-      Param.setDeclContext(this);
+      Param->setDeclContext(this);
 }
 
 

@@ -782,7 +782,7 @@ public:
     auto args = boundGeneric->getGenericArgs();
     for (unsigned i = 0, n = params.size(); i != n; ++i) {
       auto arg = args[i];
-      auto param = params[i].getAsTypeParam();
+      auto param = params[i];
 
       // Try to resolve the argument to a potential archetype.
       auto argPA = Builder.resolveArchetype(arg);
@@ -922,8 +922,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 
       // During type-checking, we may try to mapTypeInContext before
       // AllArchetypes has been built, so fall back to the generic params.
-      return myGenericParams->getParams()[index].getAsTypeParam()
-        ->getArchetype();
+      return myGenericParams->getParams()[index]->getArchetype();
     }
 
     // Map a dependent member to the corresponding nested archetype.

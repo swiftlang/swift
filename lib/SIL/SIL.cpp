@@ -51,12 +51,13 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   return Entry;
 }
 
-static FormalLinkage getGenericClauseLinkage(ArrayRef<GenericParam> params) {
+static FormalLinkage
+getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
   FormalLinkage result = FormalLinkage::Top;
   for (auto &param : params) {
-    for (auto proto : param.getAsTypeParam()->getProtocols())
+    for (auto proto : param->getProtocols())
       result ^= getTypeLinkage(CanType(proto->getDeclaredType()));
-    if (auto superclass = param.getAsTypeParam()->getSuperclass())
+    if (auto superclass = param->getSuperclass())
       result ^= getTypeLinkage(superclass->getCanonicalType());
   }
   return result;

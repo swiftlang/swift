@@ -810,7 +810,7 @@ static bool hasDifferentTypeOfRValue(const TypeLowering &srcTL) {
 static Substitution getSimpleSubstitution(GenericParamList &generics,
                                           CanType typeArg) {
   assert(generics.getParams().size() == 1);
-  auto typeParamDecl = generics.getParams()[0].getAsTypeParam();
+  auto typeParamDecl = generics.getParams().front();
   return Substitution{typeParamDecl->getArchetype(), typeArg, {}};
 }
 

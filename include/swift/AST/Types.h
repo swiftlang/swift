@@ -44,7 +44,6 @@ namespace swift {
   class ExprHandle;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
-  class GenericParam;
   class GenericParamList;
   class GenericSignature;
   class Identifier;
@@ -2023,7 +2022,7 @@ public:
                                       GenericParamList *params,
                                       const ExtInfo &Info);
 
-  ArrayRef<GenericParam> getGenericParameters() const;
+  ArrayRef<GenericTypeParamDecl *> getGenericParameters() const;
   ArrayRef<ArchetypeType *> getAllArchetypes() const;
 
   GenericParamList &getGenericParams() const { return *Params; }

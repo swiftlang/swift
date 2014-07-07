@@ -503,9 +503,8 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       Printer << ", ";
     }
 
-    auto TypeParam = GP.getAsTypeParam();
-    Printer.printName(TypeParam->getName());
-    printInherited(TypeParam);
+    Printer.printName(GP->getName());
+    printInherited(GP);
   }
 
   auto Requirements = Params->getRequirements();

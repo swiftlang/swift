@@ -784,32 +784,6 @@ public:
   }
 };
 
-/// GenericParam - A parameter to a generic function or type, as declared in
-/// the list of generic parameters, e.g., the T and U in:
-///
-/// \code
-/// func f<T : Range, U>(t : T, u : U) { /* ... */ }
-/// \endcode
-class GenericParam {
-  GenericTypeParamDecl *TypeParam;
-
-public:
-  /// Construct a generic parameter from a type parameter.
-  GenericParam(GenericTypeParamDecl *TypeParam) : TypeParam(TypeParam) { }
-
-  /// getDecl - Retrieve the generic parameter declaration.
-  ValueDecl *getDecl() const {
-    return reinterpret_cast<ValueDecl *>(TypeParam);
-  }
-
-  /// getAsTypeParam - Retrieve the generic parameter as a type parameter.
-  GenericTypeParamDecl *getAsTypeParam() const { return TypeParam; }
-
-  /// setDeclContext - Set the declaration context for the generic parameter,
-  /// once it is known.
-  void setDeclContext(DeclContext *DC);
-};
-
 /// \brief A single requirement in a 'where' clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
@@ -973,7 +947,7 @@ class GenericParamList {
   ArchetypeBuilder *Builder;
 
   GenericParamList(SourceLoc LAngleLoc,
-                   ArrayRef<GenericParam> Params,
+                   ArrayRef<GenericTypeParamDecl *> Params,
                    SourceLoc WhereLoc,
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
@@ -998,7 +972,7 @@ public:
   /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(ASTContext &Context,
                                   SourceLoc LAngleLoc,
-                                  ArrayRef<GenericParam> Params,
+                                  ArrayRef<GenericTypeParamDecl *> Params,
                                   SourceLoc RAngleLoc);
 
   /// create - Create a new generic parameter list and "where" clause within
@@ -1015,7 +989,7 @@ public:
   /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(const ASTContext &Context,
                                   SourceLoc LAngleLoc,
-                                  ArrayRef<GenericParam> Params,
+                                  ArrayRef<GenericTypeParamDecl *> Params,
                                   SourceLoc WhereLoc,
                                   MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
@@ -1042,21 +1016,22 @@ public:
     return create(Context, SourceLoc(), {}, SourceLoc(), {}, SourceLoc());
   }
   
-  MutableArrayRef<GenericParam> getParams() {
-    return MutableArrayRef<GenericParam>(
-             reinterpret_cast<GenericParam *>(this + 1), NumParams);
+  MutableArrayRef<GenericTypeParamDecl *> getParams() {
+    return { reinterpret_cast<GenericTypeParamDecl **>(this + 1), NumParams };
   }
 
-  ArrayRef<GenericParam> getParams() const {
-    return ArrayRef<GenericParam>(
-             reinterpret_cast<const GenericParam *>(this + 1), NumParams);
+  ArrayRef<GenericTypeParamDecl *> getParams() const {
+    return const_cast<GenericParamList *>(this)->getParams();
   }
+
+  using iterator = GenericTypeParamDecl **;
+  using const_iterator = const GenericTypeParamDecl * const *;
 
   unsigned size() const { return NumParams; }
-  GenericParam *begin() { return getParams().begin(); }
-  GenericParam *end()   { return getParams().end(); }
-  const GenericParam *begin() const { return getParams().begin(); }
-  const GenericParam *end()   const { return getParams().end(); }
+  iterator begin() { return getParams().begin(); }
+  iterator end()   { return getParams().end(); }
+  const_iterator begin() const { return getParams().begin(); }
+  const_iterator end()   const { return getParams().end(); }
 
   /// Get the total number of parameters, including those from parent generic
   /// parameter lists.
@@ -1133,7 +1108,7 @@ public:
     = NestedGenericParamListIterator<ArchetypeType*,
                                      &GenericParamList::getAllArchetypes>;
   using NestedGenericParamIterator
-    = NestedGenericParamListIterator<GenericParam,
+    = NestedGenericParamListIterator<GenericTypeParamDecl*,
                                      &GenericParamList::getParams>;
   
   /// \brief Retrieves a list containing all archetypes from this generic
@@ -1198,7 +1173,7 @@ public:
   /// Derive the all-archetypes list for the given list of generic
   /// parameters.
   static ArrayRef<ArchetypeType*>
-  deriveAllArchetypes(ArrayRef<GenericParam> params,
+  deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
 
   void setBuilder(ArchetypeBuilder *builder) {
@@ -4612,10 +4587,6 @@ public:
     return D->getKind() == DeclKind::PostfixOperator;
   }
 };
-
-inline void GenericParam::setDeclContext(DeclContext *DC) {
-  TypeParam->setDeclContext(DC);
-}
 
 inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
   if (auto vd = dyn_cast<VarDecl>(this)) {

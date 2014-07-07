@@ -213,24 +213,22 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
   unsigned depth = genericParams->getDepth();
   unsigned index = 0;
   for (auto param : *genericParams) {
-    auto typeParam = param.getAsTypeParam();
-
     // Check the generic type parameter.
     // Set the depth of this type parameter.
-    typeParam->setDepth(depth);
+    param->setDepth(depth);
 
     // Check the inheritance clause of this type parameter.
-    tc.checkInheritanceClause(typeParam, parentDC, &resolver);
+    tc.checkInheritanceClause(param, parentDC, &resolver);
 
     if (builder) {
       // Add the generic parameter to the builder.
-      if (builder->addGenericParameter(typeParam, index++))
+      if (builder->addGenericParameter(param, index++))
         invalid = true;
 
       // Infer requirements from the inherited types.
       // FIXME: This doesn't actually do what we want for outer generic
       // parameters, because they've been resolved to archetypes too eagerly.
-      for (const auto &inherited : typeParam->getInherited()) {
+      for (const auto &inherited : param->getInherited()) {
         if (builder->inferRequirements(inherited))
           invalid = true;
       }
@@ -347,8 +345,8 @@ static void collectGenericParamTypes(
   if (genericParams ) {
     // Add our parameters.
     for (auto param : *genericParams) {
-      allParams.push_back(param.getAsTypeParam()->getDeclaredType()
-                          ->castTo<GenericTypeParamType>());
+      allParams.push_back(param->getDeclaredType()
+                            ->castTo<GenericTypeParamType>());
     }
   }
 }
@@ -819,8 +817,7 @@ Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
   for (auto params = dc->getGenericParamsOfContext(); params;
        params = params->getOuterParameters()) {
     for (auto param : *params) {
-      substitutions[param.getAsTypeParam()->getArchetype()]
-        = param.getAsTypeParam()->getDeclaredType();
+      substitutions[param->getArchetype()] = param->getDeclaredType();
     }
   }
 

@@ -672,7 +672,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
   abbrCode = abbrCodes[GenericParamLayout::Code];
   for (auto next : genericParams->getParams()) {
     GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addDeclRef(next.getDecl()));
+                                   addDeclRef(next));
   }
 
   abbrCode = abbrCodes[GenericRequirementLayout::Code];

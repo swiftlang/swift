@@ -195,8 +195,8 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     // are visible.
     if (D->getGenericParams())
       for (auto Param : *D->getGenericParams())
-        if (isDeclVisibleInLookupMode(Param.getDecl(), LS))
-          FoundDecls.push_back(Param.getDecl());
+        if (isDeclVisibleInLookupMode(Param, LS))
+          FoundDecls.push_back(Param);
   }
 
   for (Decl *Member : D->getMembers()) {
@@ -591,7 +591,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return;
 
     for (auto P : *Params)
-      checkValueDecl(P.getDecl(), Reason);
+      checkValueDecl(P, Reason);
   }
 
   void checkSourceFile(const SourceFile &SF) {
