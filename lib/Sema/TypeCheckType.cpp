@@ -1901,11 +1901,32 @@ static bool checkObjCInGenericContext(TypeChecker &tc,
   return true;
 }
 
+static bool isForeignClassContext(DeclContext *DC) {
+  auto type = DC->getDeclaredTypeInContext();
+  if (!type)
+    return false;
+  auto clas = type->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+  return clas->isForeign();
+}
+
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+  
+  // CF types cannot have @objc methods, because they don't have real class
+  // objects.
+  if (isForeignClassContext(AFD->getDeclContext())) {
+    if (Diagnose) {
+      diagnose(AFD->getLoc(), diag::objc_invalid_on_foreign_class);
+      describeObjCReason(*this, AFD, Reason);
+    }
+    return false;
+  }
+  
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (!FD->isGetterOrSetter()) {
       unsigned ExpectedParamPatterns = 1;
@@ -1982,6 +2003,16 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
     return false;
 
+  // CF types cannot have @objc methods, because they don't have real class
+  // objects.
+  if (isForeignClassContext(VD->getDeclContext())) {
+    if (Diagnose) {
+      diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class);
+      describeObjCReason(*this, VD, Reason);
+    }
+    return false;
+  }
+  
   if (!Diagnose || Result)
     return Result;
 
@@ -2012,6 +2043,16 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
 
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
 
+  // CF types cannot have @objc methods, because they don't have real class
+  // objects.
+  if (isForeignClassContext(SD->getDeclContext())) {
+    if (Diagnose) {
+      diagnose(SD->getLoc(), diag::objc_invalid_on_foreign_class);
+      describeObjCReason(*this, SD, Reason);
+    }
+    return false;
+  }
+  
   // Figure out the type of the indices.
   Type IndicesType = SD->getIndicesType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {

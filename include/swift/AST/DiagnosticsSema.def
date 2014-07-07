@@ -509,6 +509,10 @@ ERROR(type_does_not_inherit,sema_tcd,none,
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
+ERROR(foreign_class_cannot_conform_to_objc_protocol,sema_tcd,none,
+      "Core Foundation class %0 cannot conform to objc protocol %1 because "
+      "Core Foundation types are not classes in Objective-C",
+      (Type, Type))
 ERROR(protocol_has_missing_requirements,sema_tcd,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
@@ -1427,6 +1431,9 @@ ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
 ERROR(objc_invalid_on_func_result_type,sema_objc,none,
       "method cannot be marked objc because its result type cannot be "
       "represented in Objective-C", ())
+ERROR(objc_invalid_on_foreign_class,sema_objc,none,
+      "method cannot be marked objc because Core Foundation types are not "
+      "classes in Objective-C", ())
 
 ERROR(objc_override_name_mismatch,sema_objc,none,
       "declaration has a different objc name from the declaration it "
