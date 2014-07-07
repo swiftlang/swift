@@ -111,7 +111,7 @@ func testScope() {
 
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
-  println("getObjects yields them at +0: \(isUniquelyReferenced(&x))")
+  println("getObjects yields them at +0: \(_isUniquelyReferenced(&x))")
   // CHECK-NEXT: trackedCount = 3 .
   
   println("trackedCount = \(trackedCount) .")

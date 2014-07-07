@@ -294,7 +294,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
   /// buffer having at least minimumCapacity elements.  Return true
   /// iff this results in a change of capacity.
   mutating func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
-    var isUnique: Bool = isUniquelyReferenced(&_owner)
+    var isUnique: Bool = _isUniquelyReferenced(&_owner)
 
     if !isUnique || capacity < minimumCapacity {
       var newOwner = _Self(minimumCapacity: minimumCapacity)
