@@ -28,3 +28,5 @@ typedef struct NSZone NSZone;
 
 @interface NSData: NSObject <NSCopying>
 @end
+
+typedef struct __CGImage *CGImageRef;

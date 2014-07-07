@@ -1654,6 +1654,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   }
   
   if (needsCategory) {
+    assert(origClass && !origClass->isForeign() &&
+           "CF types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
     ObjCCategories.push_back(category);
