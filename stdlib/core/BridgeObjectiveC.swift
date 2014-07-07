@@ -51,23 +51,6 @@
   }
 }
 
-/// Invokes `body` with an `UnsafePointer` to a `nil` `T`, sets `arg` to
-/// the value of that `T` (or `.None` if the `T` is still `nil`), and returns
-/// the result of the invocation.
-///
-/// Useful for calling Objective-C APIs that take class instances by
-/// pointer as `@autorelease` "out" parameters.
-@public func withUnsafePointerToObject<T: AnyObject, Result>(
-  inout arg: T?,
-  body: (UnsafePointer<ImplicitlyUnwrappedOptional<T>>)->Result
-) -> Result {
-  var buffer: Builtin.RawPointer = Builtin.inttoptr_Word(0.value)
-  var address = UnsafePointer<ImplicitlyUnwrappedOptional<T>>(Builtin.addressof(&buffer))
-  var result = body(address)
-  arg = address.memory
-  return result
-}
-
 /// A Swift Array or Dictionary of types conforming to
 /// _BridgedToObjectiveC can be passed to ObjectiveC as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
