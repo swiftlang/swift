@@ -76,6 +76,7 @@ set(SWIFTLIB_ESSENTIAL
   StringLegacy.swift
   StringUTF16.swift
   StringUTF8.swift
+  StringUTFViewsMirrors.swift.gyb
   StringUnicodeScalarView.swift
   Unicode.swift
   UnicodeScalar.swift

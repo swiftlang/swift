@@ -76,7 +76,7 @@ extension _StringCore {
 }
 
 extension String {
-  @public struct UTF8View : Collection {
+  @public struct UTF8View : Collection, Reflectable {
     let _core: _StringCore
     
     init(_ _core: _StringCore) {
@@ -131,6 +131,10 @@ extension String {
 
     @public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
+    }
+    
+    @public func getMirror() -> Mirror {
+      return _UTF8ViewMirror(self)
     }
   }
 

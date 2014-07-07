@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 extension String {
-  @public struct UTF16View : Sliceable {
+  @public struct UTF16View : Sliceable, Reflectable {
     @public var startIndex: Int {
       return 0
     }
@@ -83,6 +83,10 @@ extension String {
       self._offset = offset
       self._length = length
       self._core = _core
+    }
+    
+    @public func getMirror() -> Mirror {
+      return _UTF16ViewMirror(self)
     }
 
     var _offset: Int
