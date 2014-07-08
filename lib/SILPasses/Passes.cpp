@@ -81,11 +81,20 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 }
 
 /// Perform semantic annotation/loop base optimizations.
-void ConstructLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
+void ConstructHighLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
   registerAnalysisPasses(PM, &Mod);
   // Get rid of int->enum->uncheck_enum_data.
   PM.add(createSILCombine());
   PM.add(createLoopRotatePass());
+  PM.add(createDCE());
+  PM.add(createCSE());
+  PM.add(createSILCombine());
+  PM.add(createSimplifyCFG());
+}
+
+void ConstructLowLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
+  registerAnalysisPasses(PM, &Mod);
+  PM.add(createLICMPass());
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
@@ -156,9 +165,10 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // TODO: figure out what is really needed here to simplify the enums I still
   // see sticking around without this iteration.
   HighLevelSILPM.runOneIteration();
-
+  // TODO: this should run as part of the last iteration of the previous
+  // pass manager so that we can reuse analysis info.
   SILPassManager LoopPM(&Module, Options);
-  ConstructLoopOptPassManager(LoopPM, Module);
+  ConstructHighLevelLoopOptPassManager(LoopPM, Module);
   LoopPM.runOneIteration();
 #endif
 
@@ -187,6 +197,14 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // devirtualized inline caches.
   LowLevelSILPM.invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   LowLevelSILPM.runOneIteration();
+
+#if 0
+  SILPassManager LowLevelLoopPM(&Module, Options);
+  // TODO: this should run as part of the last iteration of the previous
+  // pass manager so that we can reuse analysis info.
+  ConstructLowLevelLoopOptPassManager(LowLevelLoopPM, Module);
+  LowLevelLoopPM.runOneIteration();
+#endif
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.
   Module.invalidateSILLoader();

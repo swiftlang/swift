@@ -76,6 +76,7 @@ enum class PassKind {
   FunctionSignatureOpts,
   ViewCFG,
   LoopRotate,
+  LICM,
 };
 
 enum class OptGroup {
@@ -249,6 +250,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::LoopRotate,
                                    "loop-rotate",
                                    "Rotate loops."),
+                        clEnumValN(PassKind::LICM,
+                                   "licm",
+                                   "Loop invariant code motion."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -433,6 +437,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::LoopRotate:
       PM.add(createLoopRotatePass());
+      break;
+    case PassKind::LICM:
+      PM.add(createLICMPass());
       break;
     }
   }

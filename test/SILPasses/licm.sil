@@ -1,0 +1,95 @@
+// RUN: %sil-opt %s -licm -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: @memset
+
+// CHECK: bb0
+// CHECK:  load %0
+// CHECK: br bb2
+
+// CHECK: bb2({{.*}}):
+// CHECK-NOT: load
+// CHECK: cond_br
+
+sil @memset : $@thin (@inout Builtin.NativeObject, Int) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Int):
+  %5 = integer_literal $Builtin.Int1, -1
+  %43 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %46 = integer_literal $Builtin.Word, 0
+  br bb2(%46 : $Builtin.Word)
+
+bb1:
+  %52 = tuple ()
+  return %52 : $()
+
+bb2(%54 : $Builtin.Word):
+  %55 = integer_literal $Builtin.Word, 1
+  %56 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %57 = apply %56(%54, %55, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %58 = tuple_extract %57 : $(Builtin.Word, Builtin.Int1), 0
+  %59 = load %0 : $*Builtin.NativeObject
+  %60 = integer_literal $Builtin.Word, 100
+  %96 = ref_to_raw_pointer %59 : $Builtin.NativeObject to $Builtin.RawPointer
+  %97 = index_raw_pointer %96 : $Builtin.RawPointer, %58 : $Builtin.Word
+  %98 = pointer_to_address %97 : $Builtin.RawPointer to $*Int
+  %99 = index_addr %98 : $*Int, %54 : $Builtin.Word
+  store %1 to %99 : $*Int
+  %101 = apply %43(%58, %60) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+}
+
+// CHECK-LABEL: @must_move_condfail
+
+// CHECK: bb0
+// CHECK: load %0
+// CHECK: cond_fail
+// CHECK: [[INVARIANTADDR:%.*]] = pointer_to_address
+// CHECK: load [[INVARIANTADDR]]
+// CHECK: br bb2
+
+// CHECK: bb2({{.*}}):
+// The address computation of the load was guarded by the cond_fail. If we hoist
+// the load we must also hoist the cond_fail.
+// CHECK-NOT: cond_fail
+// CHECK-NOT: load
+// CHECK: cond_br
+
+sil @must_move_condfail : $@thin (@inout Builtin.NativeObject, Int, Builtin.Word) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Int, %2: $Builtin.Word):
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = load %0 : $*Builtin.NativeObject
+  %43 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %46 = integer_literal $Builtin.Word, 0
+  br bb2(%46 : $Builtin.Word)
+
+bb1:
+  %102 = tuple ()
+  return %102 : $()
+
+bb2(%48 : $Builtin.Word):
+  %50 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %51 = apply %50(%2, %46, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %52 = tuple_extract %51 : $(Builtin.Word, Builtin.Int1), 0
+  %53 = tuple_extract %51 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %53 : $Builtin.Int1
+  %55 = integer_literal $Builtin.Word, 1
+  %56 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %57 = apply %56(%48, %55, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %58 = tuple_extract %57 : $(Builtin.Word, Builtin.Int1), 0
+  %60 = integer_literal $Builtin.Word, 100
+  %61 = ref_to_raw_pointer %6 : $Builtin.NativeObject to $Builtin.RawPointer
+  %62 = index_raw_pointer %61 : $Builtin.RawPointer, %52 : $Builtin.Word
+  %63 = pointer_to_address %62 : $Builtin.RawPointer to $*Builtin.NativeObject
+  %64 = load %63 : $*Builtin.NativeObject
+  %96 = ref_to_raw_pointer %64 : $Builtin.NativeObject to $Builtin.RawPointer
+  %97 = index_raw_pointer %96 : $Builtin.RawPointer, %58 : $Builtin.Word
+  %98 = pointer_to_address %97 : $Builtin.RawPointer to $*Int
+  %99 = index_addr %98 : $*Int, %48 : $Builtin.Word
+  store %1 to %99 : $*Int
+  %101 = apply %43(%58, %60) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+}
