@@ -13,7 +13,7 @@
 //  To implement bridging, the core standard library needs to interact
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
-//  directly.  We _can_, however, use an objc protocol with a
+//  directly.  We _can_, however, use an @objc protocol with a
 //  compatible API.  That's _CocoaArray.
 //
 //===----------------------------------------------------------------------===//
@@ -26,7 +26,7 @@ import SwiftShims
 /// when T isBridgedToObjectiveC, it can be used directly as an
 /// NSArray.  It is safe to convert between NSArray and _CocoaArray via
 /// reinterpretCast.
-@class_protocol @unsafe_no_objc_tagged_pointer public objc
+@class_protocol @unsafe_no_objc_tagged_pointer @objc public
 protocol _CocoaArray {
   func objectAtIndex(index: Int) -> AnyObject
   

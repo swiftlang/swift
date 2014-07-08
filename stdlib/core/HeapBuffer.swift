@@ -16,7 +16,7 @@ typealias _HeapObject = SwiftShims.HeapObject
 // Provides a common type off of which to hang swift_bufferAllocate.
 // If you introduce a new most-derived subclass of this, you need
 // to define __deallocate in it.
-public objc class HeapBufferStorageBase {}
+@objc public class HeapBufferStorageBase {}
 
 @asmname("swift_bufferAllocate")
 func _swift_bufferAllocate(
@@ -44,7 +44,7 @@ func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
-public objc class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
+@objc public class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
   public typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()

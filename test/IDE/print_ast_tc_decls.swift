@@ -208,7 +208,7 @@ struct d0100_FooStruct {
 
   class NestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class NestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -284,7 +284,7 @@ extension d0100_FooStruct {
 
   class ExtNestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class ExtNestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -413,21 +413,21 @@ protocol d0130_TestProtocol {
 // PASS_COMMON-NEXT: {{^}}  func protocolFunc1(){{$}}
 }
 
-objc protocol d0140_TestObjCProtocol {
-// PASS_COMMON-LABEL: {{^}}objc protocol d0140_TestObjCProtocol {{{$}}
+@objc protocol d0140_TestObjCProtocol {
+// PASS_COMMON-LABEL: {{^}}@objc protocol d0140_TestObjCProtocol {{{$}}
 
   @optional var property1: Int { get }
-// PASS_COMMON-NEXT: {{^}}  objc @optional var property1: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @optional var property1: Int { get }{{$}}
 
   @optional func protocolFunc1()
-// PASS_COMMON-NEXT: {{^}}  objc @optional func protocolFunc1(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @optional func protocolFunc1(){{$}}
 }
 
 @class_protocol protocol d0150_TestClassProtocol {}
 // PASS_COMMON-LABEL: {{^}}@class_protocol protocol d0150_TestClassProtocol {{{$}}
 
-@class_protocol objc protocol d0151_TestClassProtocol {}
-// PASS_COMMON-LABEL: {{^}}objc @class_protocol protocol d0151_TestClassProtocol {{{$}}
+@objc @class_protocol protocol d0151_TestClassProtocol {}
+// PASS_COMMON-LABEL: {{^}}@class_protocol @objc protocol d0151_TestClassProtocol {{{$}}
 
 
 @noreturn @asmname("exit") func d0160_testNoReturn()
@@ -464,11 +464,11 @@ class d0170_TestAvailability {
 // PASS_COMMON-NEXT: {{^}}  @availability(OSX, unavailable) @availability(iOS, unavailable) func f3(){{$}}
 }
 
-objc class d0180_TestIBAttrs {
-// PASS_COMMON-LABEL: {{^}}objc class d0180_TestIBAttrs {{{$}}
+@objc class d0180_TestIBAttrs {
+// PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  objc @IBAction func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -476,14 +476,14 @@ objc class d0180_TestIBAttrs {
 
 }
 
-objc class d0181_TestIBAttrs {
-// PASS_EXPLODE_PATTERN-LABEL: {{^}}objc class d0181_TestIBAttrs {{{$}}
+@objc class d0181_TestIBAttrs {
+// PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  objc @IBOutlet var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  objc @IBInspectable var inspectableProp: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable var inspectableProp: Int{{$}}
 }
 
 struct d0190_LetVarDecls {
@@ -527,7 +527,7 @@ struct d0200_EscapedIdentifiers {
 
   class `class` {}
 // PASS_COMMON-NEXT: {{^}}  class `class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    objc deinit {{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit {{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -538,7 +538,7 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
-// PASS_COMMON: {{^}}    objc deinit {{$}}
+// PASS_COMMON: {{^}}    @objc deinit {{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -891,7 +891,7 @@ class d1100_ExplicitDestructor1 {
 // PASS_COMMON-LABEL: d1100_ExplicitDestructor1
 
   deinit {}
-// PASS_COMMON: {{^}}  objc deinit {{$}}
+// PASS_COMMON: {{^}}  @objc deinit {{$}}
 }
 
 //===---

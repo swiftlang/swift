@@ -154,7 +154,7 @@ public:
     case 'n':
       return Text == "nonmutating";
     case 'o':
-      return Text == "override" || Text == "objc";
+      return Text == "override";
     case 'p':
       return Text == "private" || Text == "public";
     case 's':

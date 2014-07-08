@@ -225,7 +225,7 @@ withoutContext(TypeResolutionOptions options) {
   return options;
 }
 
-/// Describes the reason why are we trying to apply objc to a declaration.
+/// Describes the reason why are we trying to apply @objc to a declaration.
 ///
 /// Should only affect diagnostics.
 enum class ObjCReason {

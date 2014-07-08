@@ -1094,7 +1094,7 @@ public:
       return;
     
     // @NSManaged property getters/setters don't have vtable entries, because
-    // they are only accessible via the objc entry points.
+    // they are only accessible via the @objc entry points.
     if (auto func = dyn_cast<FuncDecl>(member.getDecl())) {
       if (auto ads = func->getAccessorStorageDecl()) {
         if (ads->getAttrs().hasAttribute<NSManagedAttr>())
@@ -1344,7 +1344,7 @@ public:
           
           ValueDecl *vd = witness.getDecl();
           // Don't rethunk definitions from the original class or other
-          // extensions that are already objc.
+          // extensions that are already @objc.
           if (vd->getDeclContext() != extension && vd->isObjC())
             return;
           

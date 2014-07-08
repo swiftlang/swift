@@ -55,12 +55,12 @@ def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
            
 def enable_objc_attr_requires_objc_module :
   Flag<["-"], "enable-objc-attr-requires-objc-module">,
-  HelpText<"Enable requiring uses of objc require importing the "
+  HelpText<"Enable requiring uses of @objc require importing the "
            "ObjectiveC module">;
 
 def disable_objc_attr_requires_objc_module :
   Flag<["-"], "disable-objc-attr-requires-objc-module">,
-  HelpText<"Disable requiring uses of objc require importing the "
+  HelpText<"Disable requiring uses of @objc require importing the "
            "ObjectiveC module">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,

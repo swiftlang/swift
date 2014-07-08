@@ -219,7 +219,7 @@ bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (protocols.empty())
     return false;
 
-  // Any non-objc protocol makes this no longer ObjC-compatible.
+  // Any non-@objc protocol makes this no longer ObjC-compatible.
   for (auto proto : protocols) {
     if (!proto->isObjC())
       return false;
@@ -1431,7 +1431,7 @@ static bool isBridgeableObjectType(CanType type) {
     return instanceType->mayHaveSuperclass();
   }
 
-  // objc protocol metatypes.
+  // @objc protocol metatypes.
   if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
     return metatype.getInstanceType()->isObjCExistentialType();
   }

@@ -395,7 +395,7 @@ struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'Str
   var next : StructDNode
 }
 
-@class_protocol objc protocol ObjCProtocol {
+@class_protocol @objc protocol ObjCProtocol {
   func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}}
 }
 @class_protocol protocol NonObjCProtocol { //expected-note{{protocol 'NonObjCProtocol' declared here}}
@@ -405,9 +405,9 @@ struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'Str
 class DoesntConformToObjCProtocol : ObjCProtocol { // expected-error{{type 'DoesntConformToObjCProtocol' does not conform to protocol 'ObjCProtocol'}}
 }
 
-objc protocol ObjCProtocolRefinement : ObjCProtocol { }
+@objc protocol ObjCProtocolRefinement : ObjCProtocol { }
 
-objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{objc protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-objc protocol 'NonObjCProtocol'}}
+@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{@objc protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-@objc protocol 'NonObjCProtocol'}}
 
 
 // rdar://15735537 - mutating conversions should be allowed on protocol lvalues.

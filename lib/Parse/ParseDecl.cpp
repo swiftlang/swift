@@ -313,110 +313,6 @@ void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
       SF->FirstObjCAttrLoc = L;
 }
 
-
-/// Check to see if this is the start of a parenthesized objc attribute, of the
-/// form objc(foo), objc(foo:bar:) etc.  The parser is stopped at the opening
-/// lparen.  If Attr is specified, this forms and returns the attribute and
-/// emits any diagnostics required.  If it is null, then nothing is emitted
-// because a lookahead parse is under way.
-static bool isParenthesizedObjCAttribute(Parser &P, ObjCAttr **Attr = nullptr,
-                                         SourceLoc ObjCLoc = SourceLoc()) {
-  auto &Tok = P.Tok;
-  auto &Context = P.Context;
-
-  assert(Tok.is(tok::l_paren) && "Invariant violated");
-
-  // Look ahead to parse the parenthesized expression.
-  SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
-
-  // Parse the names, with trailing colons (if there are present).
-  SmallVector<Identifier, 4> Names;
-  SmallVector<SourceLoc, 4> NameLocs;
-  bool sawColon = false;
-
-  while (Tok.isNot(tok::r_paren)) {
-    // Empty selector piece.
-    if (Tok.is(tok::colon)) {
-      Names.push_back(Identifier());
-      NameLocs.push_back(Tok.getLoc());
-      sawColon = true;
-      P.consumeToken();
-      continue;
-    }
-
-    // This must be a name, otherwise it isn't gramatically valid.
-    if (Tok.isNot(tok::identifier) && !Tok.isKeyword())
-      return false;
-
-    Names.push_back(Context.getIdentifier(Tok.getText()));
-    NameLocs.push_back(Tok.getLoc());
-    P.consumeToken();
-
-    // If we have a colon, consume it.
-    if (Tok.is(tok::colon)) {
-      P.consumeToken();
-      sawColon = true;
-      continue;
-    }
-
-    // If we see a closing parentheses, we're done.
-    if (Tok.is(tok::r_paren)) {
-      // If we saw more than one identifier, there's a ':'
-      // missing here. Complain and pretend we saw it.
-      if (Names.size() > 1) {
-        SourceLoc afterLast = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                         NameLocs.back());
-        if (Attr)
-          P.diagnose(Tok, diag::attr_objc_missing_colon)
-          .fixItInsert(afterLast, ":");
-        sawColon = true;
-      }
-
-      continue;
-    }
-
-    // If we see another identifier or keyword, complain about
-    // the missing colon and keep going.
-    if (Tok.is(tok::identifier) || Tok.isKeyword()) {
-      if (Attr) {
-        SourceLoc afterLast
-        = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
-        P.diagnose(Tok, diag::attr_objc_missing_colon)
-        .fixItInsert(afterLast, ":");
-      }
-      sawColon = true;
-      continue;
-    }
-
-    // We don't know what happened. Fail.
-    return false;
-  }
-
-  // Parse the matching ')'.
-  SourceLoc RParenLoc = P.consumeToken(tok::r_paren);
-
-  // If thie client wants us to, create the attribute for this now.
-  if (Attr) {
-    if (Names.empty()) {
-      // When there are no names, recover as if there were no parentheses.
-      P.diagnose(LParenLoc, diag::attr_objc_empty_name);
-      *Attr = ObjCAttr::createUnnamed(Context, ObjCLoc);
-    } else if (!sawColon) {
-      // When we didn't see a colon, this is a nullary name.
-      assert(Names.size() == 1 && "Forgot to set sawColon?");
-      *Attr = ObjCAttr::createNullary(Context, ObjCLoc, LParenLoc,
-                                      NameLocs.front(), Names.front(),
-                                      RParenLoc);
-    } else {
-      // When we did see a colon, this is a selector.
-      *Attr = ObjCAttr::createSelector(Context, ObjCLoc,
-                                       LParenLoc, NameLocs, Names,
-                                       RParenLoc);
-    }
-  }
-  return true;
-}
-
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                    SourceLoc AtLoc,
                                    SourceLoc InversionLoc,
@@ -729,17 +625,100 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DAK_ObjC: {
-    // Unnamed objc attribute.
+    // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {
-      Attributes.add(ObjCAttr::createUnnamed(Context, Loc));
-    } else {
-      ObjCAttr *Result = nullptr;
-      isParenthesizedObjCAttribute(*this, &Result, Loc);
-
-      if (Result)
-        Attributes.add(Result);
+      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+      setFirstObjCAttributeLocation(Loc);
+      break;
     }
 
+    // Parse the leading '('.
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+    // Parse the names, with trailing colons (if there are present).
+    SmallVector<Identifier, 4> Names;
+    SmallVector<SourceLoc, 4> NameLocs;
+    bool sawColon = false;
+    while (true) {
+      // Empty selector piece.
+      if (Tok.is(tok::colon)) {
+        Names.push_back(Identifier());
+        NameLocs.push_back(Tok.getLoc());
+        sawColon = true;
+        consumeToken();
+        continue;
+      }
+
+      // Name.
+      if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+        Names.push_back(Context.getIdentifier(Tok.getText()));
+        NameLocs.push_back(Tok.getLoc());
+        consumeToken();
+
+        // If we have a colon, consume it.
+        if (Tok.is(tok::colon)) {
+          consumeToken();
+          sawColon = true;
+          continue;
+        } 
+        
+        // If we see a closing parentheses, we're done.
+        if (Tok.is(tok::r_paren)) {
+          // If we saw more than one identifier, there's a ':'
+          // missing here. Complain and pretend we saw it.
+          if (Names.size() > 1) {
+            SourceLoc afterLast
+              = Lexer::getLocForEndOfToken(Context.SourceMgr, 
+                                           NameLocs.back());
+            diagnose(Tok, diag::attr_objc_missing_colon)
+              .fixItInsert(afterLast, ":");
+            sawColon = true;
+          }
+
+          break;
+        }
+
+        // If we see another identifier or keyword, complain about
+        // the missing colon and keep going.
+        if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+          SourceLoc afterLast
+            = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
+          diagnose(Tok, diag::attr_objc_missing_colon)
+            .fixItInsert(afterLast, ":");
+          sawColon = true;
+          continue;
+        }
+
+        // We don't know what happened. Break out.
+        break;
+      }
+
+      break;
+    }
+    
+    // Parse the matching ')'.
+    SourceLoc RParenLoc;
+    bool Invalid = parseMatchingToken(tok::r_paren, RParenLoc,
+                                      diag::attr_objc_expected_rparen,
+                                      LParenLoc);
+
+    if (Names.empty()) {
+      // When there are no names, recover as if there were no parentheses.
+      if (!Invalid)
+        diagnose(LParenLoc, diag::attr_objc_empty_name);
+      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+    } else if (!sawColon) {
+      // When we didn't see a colon, this is a nullary name.
+      assert(Names.size() == 1 && "Forgot to set sawColon?");
+      Attributes.add(ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
+                                             NameLocs.front(), Names.front(),
+                                             RParenLoc));
+    } else {
+      // When we did see a colon, this is a selector.
+      Attributes.add(ObjCAttr::createSelector(Context, AtLoc, Loc,
+                                              LParenLoc, NameLocs, Names,
+                                              RParenLoc));
+    }
     setFirstObjCAttributeLocation(Loc);
     break;
   }
@@ -754,8 +733,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   return false;
 }
-
-
 
 /// \verbatim
 ///   attribute:
@@ -1194,7 +1171,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
 
 /// Given a current token of 'unowned', check to see if it is followed by a
 /// "(safe)" or "(unsafe)" specifier.
-static bool isParenthesizedUnownedAttribute(Parser &P) {
+static bool isParenthesizedUnowned(Parser &P) {
   assert(P.Tok.getText() == "unowned" && P.peekToken().is(tok::l_paren) &&
          "Invariant violated");
   
@@ -1205,6 +1182,8 @@ static bool isParenthesizedUnownedAttribute(Parser &P) {
   return P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren) &&
           (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
 }
+
+  
 
 bool Parser::isStartOfDecl() {
   // If this is obviously not the start of a decl, then we're done.
@@ -1231,44 +1210,31 @@ bool Parser::isStartOfDecl() {
       
   // If it might be, we do some more digging.
 
-  if (Tok2.is(tok::l_paren)) {
   // If this is 'unowned', check to see if it is valid.
-    if (Tok.getText() == "unowned" && isParenthesizedUnownedAttribute(*this)) {
-      Parser::BacktrackingScope Backtrack(*this);
-      consumeToken(tok::identifier);
-      consumeToken(tok::l_paren);
-      consumeToken(tok::identifier);
-      consumeToken(tok::r_paren);
-      return isStartOfDecl();
-    }
+  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren) &&
+      isParenthesizedUnowned(*this)) {
+    Parser::BacktrackingScope Backtrack(*this);
+    consumeToken(tok::identifier);
+    consumeToken(tok::l_paren);
+    consumeToken(tok::identifier);
+    consumeToken(tok::r_paren);
+    return isStartOfDecl();
+  }
 
-    // If this is 'objc', check to see if it is valid.
-    if (Tok.getText() == "objc") {
-      Parser::BacktrackingScope Backtrack(*this);
-      consumeToken(tok::identifier);
-      // Check to see if the parenthesized body is a valid objc attribute,
-      // if not, this could be a call to a free standanding function like
-      // "objc(foo, 42)"
-      if (!isParenthesizedObjCAttribute(*this))
-        return false;
-      // If it is valid, consume it and check to see if this is a prefix for
-      // another decl.
-      return isStartOfDecl();
-    }
 
-    if (Tok.getText() == "private" || Tok.getText() == "public" ||
-        Tok.getText() == "internal") {
-      Parser::BacktrackingScope Backtrack(*this);
-      consumeToken(tok::identifier);
-      consumeToken(tok::l_paren);
-      // FIXME: Ugh at hardcoding this here.
-      if (!Tok.is(tok::identifier) || Tok.getText() != "set")
-        return false;
-      consumeToken(tok::identifier);
-      if (!consumeIf(tok::r_paren))
-        return false;
-      return isStartOfDecl();
-    }
+  if (Tok2.is(tok::l_paren) &&
+      (Tok.getText() == "private" || Tok.getText() == "public" ||
+       Tok.getText() == "internal")) {
+    Parser::BacktrackingScope Backtrack(*this);
+    consumeToken(tok::identifier);
+    consumeToken(tok::l_paren);
+    // FIXME: Ugh at hardcoding this here.
+    if (!Tok.is(tok::identifier) || Tok.getText() != "set")
+      return false;
+    consumeToken(tok::identifier);
+    if (!consumeIf(tok::r_paren))
+      return false;
+    return isStartOfDecl();
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -1411,7 +1377,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
         SourceLoc Loc = Tok.getLoc();
         if (isUnowned && peekToken().is(tok::l_paren) &&
-            isParenthesizedUnownedAttribute(*this)) {
+            isParenthesizedUnowned(*this)) {
           consumeToken(tok::identifier);
           consumeToken(tok::l_paren);
           // TODO, no "safe" variant?
@@ -1434,21 +1400,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
           Attributes.setAttr(attr, Loc);
         continue;
       }
-
-      if (Tok.isContextualKeyword("objc")) {
-        SourceLoc ObjCLoc = consumeToken(tok::identifier);
-        if (Tok.isNot(tok::l_paren)) {
-          Attributes.add(ObjCAttr::createUnnamed(Context, ObjCLoc));
-          setFirstObjCAttributeLocation(ObjCLoc);
-        } else {
-          ObjCAttr *Result = nullptr;
-          isParenthesizedObjCAttribute(*this, &Result, ObjCLoc);
-          if (Result)
-            Attributes.add(Result);
-        }
-        continue;
-      }
-
         
       if (Tok.isContextualKeyword("mutating") ||
           Tok.isContextualKeyword("nonmutating")) {
@@ -2377,19 +2328,6 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       DeclAttributes Attributes;
       parseDeclAttributeList(Attributes);
 
-      if (Tok.isContextualKeyword("objc")) {
-        SourceLoc ObjCLoc = consumeToken(tok::identifier);
-        if (Tok.isNot(tok::l_paren)) {
-          Attributes.add(ObjCAttr::createUnnamed(Context, ObjCLoc));
-          setFirstObjCAttributeLocation(ObjCLoc);
-        } else {
-          ObjCAttr *Result = nullptr;
-          isParenthesizedObjCAttribute(*this, &Result, ObjCLoc);
-          if (Result)
-            Attributes.add(Result);
-        }
-      }
-
       // Parse the contextual keywords for 'mutating' and 'nonmutating' before
       // get and set.
       if ((Tok.isContextualKeyword("mutating") ||
@@ -2471,19 +2409,6 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // Parse any leading attributes.
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
-
-    if (Tok.isContextualKeyword("objc")) {
-      SourceLoc ObjCLoc = consumeToken(tok::identifier);
-      if (Tok.isNot(tok::l_paren)) {
-        Attributes.add(ObjCAttr::createUnnamed(Context, ObjCLoc));
-        setFirstObjCAttributeLocation(ObjCLoc);
-      } else {
-        ObjCAttr *Result = nullptr;
-        isParenthesizedObjCAttribute(*this, &Result, ObjCLoc);
-        if (Result)
-          Attributes.add(Result);
-      }
-    }
 
     // Parse the contextual keywords for 'mutating' and 'nonmutating' before
     // get and set.

@@ -324,7 +324,7 @@ private:
       buildSubstSelfType(polyFormalType.getInput(), selfType, ctx);
 
     // Existential witnesses are always "thick" with the polymorphic info,
-    // unless objc.
+    // unless @objc.
     auto rep = name.isForeign
       ? FunctionType::Representation::Thin
       : FunctionType::Representation::Thick;
@@ -1358,7 +1358,7 @@ public:
     ManagedValue existential =
       gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
 
-    assert(fd->isObjC() && "Dynamic member references require objc");
+    assert(fd->isObjC() && "Dynamic member references require @objc");
     SILValue val;
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");

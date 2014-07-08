@@ -392,7 +392,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
-  // Emit an error if there is a declaration with the objc attribute
+  // Emit an error if there is a declaration with the @objc attribute
   // but we have not imported the ObjectiveC module.
   if (Ctx.LangOpts.EnableObjCAttrRequiresObjCModule &&
       SF.Kind == SourceFileKind::Main &&

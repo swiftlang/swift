@@ -125,7 +125,7 @@ public struct ArrayBuffer<T> : ArrayBufferType {
   
   /// Returns an `ArrayBuffer<U>` containing the same elements.
   /// Requires: the elements actually have dynamic type `U`, and `U`
-  /// is a class or `objc` existential.
+  /// is a class or `@objc` existential.
   func castToBufferOf<U>(_: U.Type) -> ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))

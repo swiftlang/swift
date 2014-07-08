@@ -389,7 +389,7 @@ public:
 
   /// isObjCExistentialType - Determines whether this type is an
   /// class-bounded existential type whose required conformances are
-  /// all objc.  Such types are compatible with ObjC.
+  /// all @objc.  Such types are compatible with ObjC.
   bool isObjCExistentialType();
   
   /// Determines whether this type is an existential type with a class protocol

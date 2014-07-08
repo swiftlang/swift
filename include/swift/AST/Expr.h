@@ -1057,7 +1057,7 @@ public:
 ///
 /// \code
 /// class C {
-///   func objc foo(i : Int) -> String { ... }
+///   func @objc foo(i : Int) -> String { ... }
 /// };
 ///
 /// var x : AnyObject = <some value>
@@ -1116,7 +1116,7 @@ public:
 ///
 /// \code
 /// class C {
-///   objc subscript (i : Int) -> String {
+///   @objc subscript (i : Int) -> String {
 ///     get {
 ///       ...
 ///     }

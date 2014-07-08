@@ -67,7 +67,7 @@ namespace swift {
     /// a selector).
     bool ImplicitObjCWith = true;
 
-    /// Enables checking that uses of objc require importing
+    /// Enables checking that uses of @objc require importing
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;
 

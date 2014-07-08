@@ -974,11 +974,11 @@ ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
 
 // objc
 ERROR(attr_objc_missing_colon,attribute_parsing,none,
-      "missing ':' after selector piece in 'objc' attribute", ())
+      "missing ':' after selector piece in '@objc' attribute", ())
 ERROR(attr_objc_expected_rparen,attribute_parsing,none,
-      "expected ')' after name for 'objc' attribute", ())
+      "expected ')' after name for '@objc' attribute", ())
 ERROR(attr_objc_empty_name,attribute_parsing,none,
-      "expected name within parentheses of 'objc' attribute", ())
+      "expected name within parentheses of '@objc' attribute", ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,attribute_parsing,none,

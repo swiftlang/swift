@@ -1487,7 +1487,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying ProtocolDecl", PD);
 
       if (PD->isObjC() && !PD->requiresClass()) {
-        Out << "objc protocols should be class protocols as well";
+        Out << "@objc protocols should be class protocols as well";
         abort();
       }
       verifyCheckedBase(PD);

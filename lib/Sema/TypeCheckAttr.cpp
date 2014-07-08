@@ -110,13 +110,13 @@ void AttributeEarlyChecker::visitInlineAttr(InlineAttr *attr) {
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
   if (type->isObjCExistentialType())
-    return {}; // objc existential types are okay
+    return {}; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
 
   if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
-      return {}; // objc class types are okay.
+      return {}; // @objc class types are okay.
     return diag::iboutlet_nonobjc_class;
   }
 
@@ -436,7 +436,7 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
     ty = unwrapped;
 
   if (auto classDecl = ty->getClassOrBoundGenericClass()) {
-    // objc class types are okay.
+    // @objc class types are okay.
     if (!classDecl->isObjC()) {
       TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
                   argPattern->getType())
@@ -444,7 +444,7 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
       return true;
     }
   } else if (ty->isObjCExistentialType()) {
-    // objc existential types are okay
+    // @objc existential types are okay
     // Nothing to do.
   } else {
     // No other types are permitted.

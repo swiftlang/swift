@@ -622,7 +622,7 @@ class ObjCAttr : public DeclAttribute {
   /// representation so that we can use null as an indicator for "no name".
   void *NameData;
 
-  /// Create an implicit objc attribute with the given (optional) name.
+  /// Create an implicit @objc attribute with the given (optional) name.
   explicit ObjCAttr(Optional<ObjCSelector> name)
     : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
       NameData(nullptr)
@@ -634,8 +634,8 @@ class ObjCAttr : public DeclAttribute {
     }
   }
 
-  /// Create an objc attribute written in the source.
-  ObjCAttr(SourceLoc ObjCLoc, Optional<ObjCSelector> name,
+  /// Create an @objc attribute written in the source.
+  ObjCAttr(SourceLoc atLoc, SourceRange baseRange, Optional<ObjCSelector> name,
            SourceRange parenRange, ArrayRef<SourceLoc> nameLocs);
 
   /// Determine whether this attribute has trailing location information.
@@ -665,8 +665,9 @@ public:
   /// Create implicit ObjC attribute with a given (optional) name.
   static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name);
 
-  /// Create an unnamed Objective-C attribute, i.e., objc.
-  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc ObjCLoc);
+  /// Create an unnamed Objective-C attribute, i.e., @objc.
+  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+                                 SourceLoc ObjCLoc);
 
   static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
 
@@ -676,7 +677,7 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx,
+  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
@@ -691,7 +692,7 @@ public:
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, 
+  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
                                   ArrayRef<SourceLoc> NameLocs,
                                   ArrayRef<Identifier> Names,

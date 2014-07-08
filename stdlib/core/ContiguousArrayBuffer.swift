@@ -280,7 +280,7 @@ public struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
 
   /// Return true if the buffer stores only elements of type `U`.
-  /// Requires: `U` is a class or `objc` existential. O(N)
+  /// Requires: `U` is a class or `@objc` existential. O(N)
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {

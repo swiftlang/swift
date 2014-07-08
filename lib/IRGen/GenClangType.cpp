@@ -214,7 +214,7 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
 
 clang::CanQualType GenClangType::visitBoundGenericClassType(
                                                 CanBoundGenericClassType type) {
-  // Any objc class type in Swift that shows up in an objc method maps 1-1 to
+  // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
   // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
   return getClangIdType(getClangASTContext());
 }
@@ -430,7 +430,7 @@ clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
 }
 
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
-  // We see these in the case where we invoke an objc function
+  // We see these in the case where we invoke an @objc function
   // through a protocol.
   return getClangIdType(getClangASTContext());
 }
@@ -443,7 +443,7 @@ clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
 
 clang::CanQualType GenClangType::visitGenericTypeParamType(
   CanGenericTypeParamType type) {
-  // We see these in the case where we invoke an objc function
+  // We see these in the case where we invoke an @objc function
   // through a protocol argument that is a generic type.
   return getClangIdType(getClangASTContext());
 }

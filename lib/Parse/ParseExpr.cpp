@@ -672,8 +672,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
     return true;
 
   // If we don't have attributes, then it can not be an accessor block.
-  if (NextToken.isNot(tok::at_sign) &&
-      !NextToken.isContextualDeclKeyword())
+  if (NextToken.isNot(tok::at_sign))
     return false;
 
   Parser::BacktrackingScope Backtrack(P);

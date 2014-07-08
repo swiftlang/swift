@@ -209,7 +209,7 @@ ERROR(conditional_downcast_coercion,sema_tcc,none,
 ERROR(downcast_to_unrelated,sema_tcc,none,
       "downcast from %0 to unrelated type %1", (Type, Type))
 ERROR(downcast_to_non_objc_existential,sema_tcc,none,
-      "cannot downcast from %0 to non-objc protocol type %1",
+      "cannot downcast from %0 to non-@objc protocol type %1",
       (Type, Type))
 ERROR(downcast_from_existential_to_unrelated,sema_tcc,none,
       "cannot cast from protocol type %0 to non-conforming type %1",
@@ -341,7 +341,7 @@ ERROR(invalid_iboutlet,sema_tcd,none,
       "only instance properties can be declared 'IBOutlet'", ())
 ERROR(iboutlet_nonobjc_class,sema_tcd,none,
       "'IBOutlet' property cannot %select{have|be an array of}0 "
-      "non-'objc' class type %1", (bool, Type))
+      "non-'@objc' class type %1", (bool, Type))
 ERROR(iboutlet_nonobject_type,sema_tcd,none,
       "'IBOutlet' property cannot %select{have|be an array of}0 "
       "non-object type %1", (bool, Type))
@@ -357,7 +357,7 @@ ERROR(invalid_ibaction_argument_count,sema_tcd,none,
       "'IBAction' methods %select{must have a single argument"
       "|can only have up to 2 arguments}0", (bool))
 ERROR(ibaction_nonobjc_class_argument,sema_tcd,none,
-      "argument to 'IBAction' method cannot have non-'objc' class type %0",
+      "argument to 'IBAction' method cannot have non-'@objc' class type %0",
       (Type))
 ERROR(ibaction_nonobject_argument,sema_tcd,none,
       "argument to 'IBAction' method cannot have non-object type %0", (Type))
@@ -394,12 +394,12 @@ ERROR(attribute_does_not_apply_to_type,type_parsing,none,
 ERROR(optional_attribute_non_protocol,sema_tcd,none,
       "'optional' attribute can only be applied to protocol members", ())
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
-      "'optional' attribute can only be applied to members of an objc protocol", 
+      "'optional' attribute can only be applied to members of an @objc protocol", 
       ())
 ERROR(optional_attribute_initializer,sema_tcd,none,
       "'optional' attribute cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
-      "protocol members can only be marked unavailable in an objc protocol",
+      "protocol members can only be marked unavailable in an @objc protocol",
       ())
 ERROR(missing_in_class_init_1,sema_tcd,none,
       "stored property %0 requires an initial value%select{| or should be "
@@ -510,7 +510,7 @@ ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
 ERROR(foreign_class_cannot_conform_to_objc_protocol,sema_tcd,none,
-      "Core Foundation class %0 cannot conform to objc protocol %1 because "
+      "Core Foundation class %0 cannot conform to @objc protocol %1 because "
       "Core Foundation types are not classes in Objective-C",
       (Type, Type))
 ERROR(protocol_has_missing_requirements,sema_tcd,none,
@@ -614,7 +614,7 @@ NOTE(protocol_here,sema_tcd,none,
 ERROR(protocol_composition_not_protocol,sema_tcd,none, 
       "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
-      "objc protocol %0 cannot refine non-objc protocol %1", (Type, Type))
+      "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
 ERROR(protocol_composition_dynamic_lookup,sema_tcd,none,
       "'AnyObject' cannot be part of a protocol composition", ())
@@ -1362,7 +1362,7 @@ ERROR(sil_metatype_multiple_reprs,type_parsing,none,
       ())
 
 //------------------------------------------------------------------------------
-// objc
+// @objc
 //------------------------------------------------------------------------------
 
 ERROR(objc_decl_used_without_required_module, sema_tcd, none,
@@ -1370,51 +1370,51 @@ ERROR(objc_decl_used_without_required_module, sema_tcd, none,
 
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, properties, and subscript "
-      "declarations can be declared 'objc'", ())
+      "declarations can be declared '@objc'", ())
 ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a generic class "
       "cannot be represented in Objective-C", (int))
 ERROR(objc_getter_for_nonobjc_property,sema_tcd,none,
-      "'objc' getter for non-'objc' property", ())
+      "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,sema_tcd,none,
-      "'objc' getter for non-'objc' subscript", ())
+      "'@objc' getter for non-'@objc' subscript", ())
 ERROR(objc_setter_for_nonobjc_property,sema_tcd,none,
-      "'objc' setter for non-'objc' property", ())
+      "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,sema_tcd,none,
-      "'objc' setter for non-'objc' subscript", ())
+      "'@objc' setter for non-'@objc' subscript", ())
 
 ERROR(objc_name_req_nullary,sema_objc,none,
-      "'objc' %select{class|protocol|property}0 must have a simple name", (int))
+      "'@objc' %select{class|protocol|property}0 must have a simple name", (int))
 ERROR(objc_name_subscript,sema_objc,none,
-      "'objc' subscript cannot have a name; did you mean to put "
+      "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
 ERROR(objc_name_func_mismatch,sema_objc,none,
-      "'objc' %select{initializer|method}0 name provides "
+      "'@objc' %select{initializer|method}0 name provides "
       "%select{one argument name|names for %1 arguments}2, but "
       "%select{initializer|method}0 has %select{one parameter|%3 parameters}4", 
       (bool, unsigned, bool, unsigned, bool))
 
 ERROR(objc_invalid_on_var,sema_objc,none,
-      "property cannot be marked %select{objc|@IBOutlet|@NSManaged}0 because "
+      "property cannot be marked %select{@objc|@IBOutlet|@NSManaged}0 because "
       "its type cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_subscript_key_type,sema_objc,none,
-      "subscript cannot be marked objc because its key "
+      "subscript cannot be marked @objc because its key "
       "type is neither an integer nor an object", ())
 ERROR(objc_invalid_on_subscript,sema_objc,none,
-      "subscript cannot be marked objc because its type "
+      "subscript cannot be marked @objc because its type "
       "cannot be represented in Objective-C", ())
 ERROR(objc_block_invalid,sema_objc,none,
       "@objc_block type is not representable in Objective-C", ())
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
-     "'protocol<>' is not considered 'objc'; use 'AnyObject' instead", ())
+     "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,sema_objc,none,
-     "protocol %0 is not 'objc'", (Type))
+     "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_empty_tuple,sema_objc,none,
       "empty tuple type cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,sema_objc,none,
       "tuples cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_class,sema_objc,none,
-     "classes not annotated with objc cannot be represented "
+     "classes not annotated with @objc cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_swift_struct,sema_objc,none,
       "Swift structs cannot be represented in Objective-C", ())
@@ -1426,31 +1426,31 @@ NOTE(not_objc_function_type_param,sema_objc,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
 NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
-     "inferring 'objc' because the declaration is a member of "
-     "an 'objc' protocol", ())
+     "inferring '@objc' because the declaration is a member of "
+     "an '@objc' protocol", ())
 
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
-      "method cannot be marked objc because curried functions cannot be "
+      "method cannot be marked @objc because curried functions cannot be "
       "represented in Objective-C", ())
 ERROR(objc_observing_accessor,sema_objc, none,
-      "observing accessors are not allowed to be marked objc", ())
+      "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_func_variadic,sema_objc,none,
-      "method cannot be marked objc because it has a variadic parameter", ())
+      "method cannot be marked @objc because it has a variadic parameter", ())
 ERROR(objc_invalid_on_func_param_type,sema_objc,none,
-      "method cannot be marked objc because the type of the parameter %0 "
+      "method cannot be marked @objc because the type of the parameter %0 "
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
-      "method cannot be marked objc because the type of the parameter "
+      "method cannot be marked @objc because the type of the parameter "
       "cannot be represented in Objective-C", ())
 ERROR(objc_invalid_on_func_result_type,sema_objc,none,
-      "method cannot be marked objc because its result type cannot be "
+      "method cannot be marked @objc because its result type cannot be "
       "represented in Objective-C", ())
 ERROR(objc_invalid_on_foreign_class,sema_objc,none,
-      "method cannot be marked objc because Core Foundation types are not "
+      "method cannot be marked @objc because Core Foundation types are not "
       "classes in Objective-C", ())
 
 ERROR(objc_override_name_mismatch,sema_objc,none,
-      "declaration has a different objc name from the declaration it "
+      "declaration has a different @objc name from the declaration it "
       "overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
 
 ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,

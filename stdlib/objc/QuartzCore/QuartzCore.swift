@@ -16,7 +16,7 @@ import Foundation
 // sdk overlays:
 extension CIFilter {
   // - (CIImage *)apply:(CIKernel *)k, ...
-  // objc(apply:arguments:options:)
+  // @objc(apply:arguments:options:)
   // func apply(k: CIKernel!,
   //            arguments args: [AnyObject]!,
   //            options dict: Dictionary<NSObject, AnyObject>!) -> CIImage!
@@ -47,7 +47,7 @@ extension CISampler {
             dict[key] = value
         }
 
-        // objc(initWithImage:options:)
+        // @objc(initWithImage:options:)
         //   init(image im: CIImage!,
         //        options dict: NSDictionary!)
         self.init(image: im, options: dict)
