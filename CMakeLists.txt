@@ -81,7 +81,7 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
 
   set(SWIFT_PATH_TO_CLANG_SOURCE "${SWIFT_PATH_TO_LLVM_SOURCE}/tools/clang"
       CACHE PATH "Path to Clang source code.")
-  set(SWIFT_PATH_TO_CLANG_BUILD "" CACHE PATH
+  set(SWIFT_PATH_TO_CLANG_BUILD "${SWIFT_PATH_TO_LLVM_BUILD}" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
   if( NOT EXISTS "${SWIFT_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h" )
