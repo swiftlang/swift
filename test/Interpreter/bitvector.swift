@@ -35,7 +35,7 @@ for i in 0..<64 {
 
 // Print all elements
 for i in 0..<64 {
-  println(String(vec[i]))
+  println("\(vec[i])")
 }
 // CHECK: true
 // CHECK-NEXT: false

@@ -238,6 +238,7 @@ func ~> <T: _BidirectionalIndex>(
   /* typealias DistanceType : IntegerArithmetic*/
 }
 
+@public
 func < <T: _RandomAccessIndex>(x: T, y: T) -> Bool {
   return x.distanceTo(y) > 0
 }

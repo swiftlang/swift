@@ -30,9 +30,9 @@ var aString = String() // CHECK: aString : String = ""
 "\n\r\t\"' abcd\u{45}\u{01}"  // CHECK: "\n\r\t\"\' abcdE\u{01}"
 
 
-String(-1) // CHECK: String = "-1"
-String(-112312312)  // CHECK: String = "-112312312"
-String(4.0)  // CHECK: String = "4.0"
+toString(-1) // CHECK: String = "-1"
+toString(-112312312)  // CHECK: String = "-112312312"
+toString(4.0)  // CHECK: String = "4.0"
 
 1 +
 44
@@ -113,7 +113,7 @@ var dict = [ "Hello" : 1.5, "World" : 3.0 ]
 -2 ... -1
 // r2 : Range<Int> = -2...-1
 
-String(0)
+toString(0)
 // CHECK: "0"
 
 for i in 0..<10 { println(i); }
