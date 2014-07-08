@@ -1,4 +1,6 @@
 // RUN: %swift -sil-verify-all -O3 %s -emit-sil | FileCheck %s
+
+// <rdar://problem/17584370> Assertion failed: (!isPolymorphic() && "no args for polymorphic substitution"), function substInterfaceGenericArgs
 // XFAIL: *
 
 // This file consists of tests for making sure that protocol conformances and
