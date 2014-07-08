@@ -268,7 +268,7 @@ public struct _StringCore {
     _sanityCheck(position >= 0)
     _sanityCheck(position <= count)
 
-    if (_baseAddress != .null()) {
+    if _fastPath(_baseAddress != .null()) {
       return _nthContiguous(position)
     }
     
