@@ -435,7 +435,7 @@ extension String : Collection {
   }
 
   public subscript(i: Index) -> Character {
-    return Character(unicodeScalars[i._base..<i._endBase])
+    return Character(unicodeScalars[i._base..<i._endBase].string)
   }
 
   public func generate() -> IndexingGenerator<String> {

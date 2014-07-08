@@ -125,8 +125,7 @@ extension String {
       return GeneratorType(_core.generate())
     }
 
-    @conversion public
-    func __conversion() -> String {
+    public var string: String {
       return String(_core)
     }
 
