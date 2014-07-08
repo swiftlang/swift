@@ -182,6 +182,11 @@ public:
     return SemanticsAttr;
   }
 
+  /// @returns True if the function has the semantics flag \p Value;
+  bool hasSemanticsString(StringRef Value) const {
+    return SemanticsAttr == Value;
+  }
+
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
