@@ -92,6 +92,7 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Bit.swift
+  CollectionMirrors.swift.gyb
   CollectionOfOne.swift
   Process.swift
   SliceBuffer.swift

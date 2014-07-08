@@ -27,7 +27,7 @@
   }
 }
 
-@public struct EmptyCollection<T> : Collection, Reflectable {
+@public struct EmptyCollection<T> : Collection {
   @public typealias IndexType = Int
   
   @public init() {}
@@ -47,38 +47,6 @@
   @public subscript(i: IndexType) -> T {
     _preconditionFailure("Index out of range")
   }
-  
-  @public func getMirror() -> Mirror {
-    return _EmptyCollectionMirror(self)
-  }
-}
-
-struct _EmptyCollectionMirror<T>: Mirror {
-  let _value: EmptyCollection<T>
-  
-  init(_ val: EmptyCollection<T>) {
-    self._value = val
-  }
-  
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return 0 }
-
-  subscript(i: Int) -> (String, Mirror) {
-    _preconditionFailure("cannot extract this child index")
-  }
-
-  var summary: String { 
-    return "EmptyCollection"
-  }
-
-  var quickLookObject: QuickLookObject? { return .None }
-
-  var disposition: MirrorDisposition { return .Struct }
 }
 
 // Specialization of countElements for EmptyCollection<T>
