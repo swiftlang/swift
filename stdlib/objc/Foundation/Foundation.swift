@@ -108,13 +108,6 @@ extension NSString : StringLiteralConvertible {
   }
 }
 
-
-extension CFString {
-  @conversion public func __conversion() -> String {
-    return String(self as NSString)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // New Strings
 //===----------------------------------------------------------------------===//
