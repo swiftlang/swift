@@ -22,6 +22,7 @@
 % Types.append(('Int','.Int','Int64($0)'))
 % Types.append(('UInt','.UInt','UInt64($0)'))
 % Types.append(('Character','.Text','String($0)'))
+% Types.append(('UnicodeScalar','.UInt','UInt64($0)'))
 
 % for Type in Types:
 extension ${Type[0]} : Reflectable {
