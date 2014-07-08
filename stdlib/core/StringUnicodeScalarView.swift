@@ -125,10 +125,6 @@ extension String {
       return GeneratorType(_core.generate())
     }
 
-    public var string: String {
-      return String(_core)
-    }
-
     public func compare(other : UnicodeScalarView) -> Int {
       // Try to compare the string without decoding the UTF-16 string.
       var aIdx = self._core.startIndex
@@ -215,6 +211,10 @@ extension String {
 }
 
 extension String {
+  public init(_ view: UnicodeScalarView) {
+    self = String(view._core)
+  }
+
   public func compare(other : String) -> Int {
     return(UnicodeScalarView(core).compare(UnicodeScalarView(other.core)))
   }

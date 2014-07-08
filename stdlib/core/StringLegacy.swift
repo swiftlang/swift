@@ -36,7 +36,7 @@ extension String {
   
   public func _split(separator: UnicodeScalar) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
-    return scalarSlices.map { $0.string }
+    return scalarSlices.map { String($0) }
   }
   
   public var isEmpty : Bool {
@@ -264,7 +264,7 @@ extension String {
     for i in 0..<start {
       ++startIndex
     }
-    return rng[startIndex..<rng.endIndex].string
+    return String(rng[startIndex..<rng.endIndex])
   }
 
   /// Split the given string at the given delimiter character, returning 
@@ -276,8 +276,8 @@ extension String {
     var rng = unicodeScalars
     for i in indices(rng) {
       if rng[i] == delim {
-        return (rng[rng.startIndex..<i].string, 
-                rng[i.successor()..<rng.endIndex].string, 
+        return (String(rng[rng.startIndex..<i]), 
+                String(rng[i.successor()..<rng.endIndex]), 
                 true)
       }
     }
@@ -294,9 +294,9 @@ extension String {
     var rng = unicodeScalars
     for i in indices(rng) {
       if predicate(rng[i]) {
-        return (rng[rng.startIndex..<i].string, 
+        return (String(rng[rng.startIndex..<i]),
                 rng[i], 
-                rng[i.successor()..<rng.endIndex].string, 
+                String(rng[i.successor()..<rng.endIndex]), 
                 true)
       }
     }
@@ -308,7 +308,7 @@ extension String {
   /// before/between/after those delimiters.
   func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, predicate)
-    return scalarSlices.map { $0.string }
+    return scalarSlices.map { String($0) }
   }
 }
 
