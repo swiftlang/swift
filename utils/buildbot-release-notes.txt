@@ -1,6 +1,20 @@
 Latest
 ------
 
+* Access control has been implemented.
+
+  - 'public' declarations can be accessed from any module.
+  - 'internal' declarations (the default) can be accessed from within the
+    current module.
+  - 'private' declarations can be accessed only from within the current file.
+
+  There are still details to iron out here, but the model is in place. 
+  The general principle is that an entity cannot be defined in terms of another
+  entity with less accessibility.
+
+2014-07-03
+----------
+
 * C function pointer types are now imported as CFunctionPointer<T>, where 'T'
   is a Swift function type. CFunctionPointer and COpaquePointer can be
   explicitly constructed from one another, but they do not freely convert, nor

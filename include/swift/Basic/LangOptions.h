@@ -83,7 +83,7 @@ namespace swift {
     bool StrictKeywordArguments = true;
     
     /// Should access control be respected?
-    bool EnableAccessControl = false;
+    bool EnableAccessControl = true;
     
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
