@@ -43,7 +43,7 @@ bb0(%0 : $@thick Foo.Type):
   return %3 : $Foo                                // id: %4
 }
 
-sil [semantics "pure"] @_TF4main9pure_funcFT_CS_3Foo : $@thin () -> @owned Foo {
+sil [semantics "readonly"] @_TF4main9readonly_funcFT_CS_3Foo : $@thin () -> @owned Foo {
 bb0:
   // function_ref main.Foo.__allocating_init (main.Foo.Type)() -> main.Foo
   %0 = function_ref @_TFC4main3FooCfMS0_FT_S0_ : $@thin (@thick Foo.Type) -> @owned Foo // user: %2
@@ -59,8 +59,8 @@ bb0:
 //CHECK-NEXT: return
 sil @_TF4main3bazFT_T_ : $@thin () -> () {
 bb0:
-  // function_ref main.pure_func () -> main.Foo
-  %0 = function_ref @_TF4main9pure_funcFT_CS_3Foo : $@thin () -> @owned Foo // user: %1
+  // function_ref main.readonly_func () -> main.Foo
+  %0 = function_ref @_TF4main9readonly_funcFT_CS_3Foo : $@thin () -> @owned Foo // user: %1
   %1 = apply %0() : $@thin () -> @owned Foo       // users: %2, %3
   debug_value %1 : $Foo  // let unused            // id: %2
   strong_release %1 : $Foo                        // id: %3

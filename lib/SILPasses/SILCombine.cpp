@@ -978,9 +978,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
-  // Optimize pure functions with no meaningful users.
+  // Optimize readonly functions with no meaningful users.
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (FRI && FRI->getReferencedFunction()->hasSemanticsString("pure")) {
+  if (FRI && FRI->getReferencedFunction()->hasSemanticsString("readonly")) {
     UserListTy Users;
 
     if (recursivelyCollectARCUsers(Users, AI)) {

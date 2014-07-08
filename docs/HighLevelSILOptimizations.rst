@@ -232,10 +232,10 @@ TBD.
 Other semantic attributes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-pure
+readonly
 
-  Marking a function with @semantics("pure") indicates that the function computes its result strictly based on its arguments.
+  Marking a function with @semantics("readonly") indicates that the function computes its result strictly based on its arguments.
   The function may dereference memory based on pointer arguments but it may not mutate any state.
-  Pure functions do not write through any pointer arguments and never change any state visible to callers.
+  Readonly functions do not write through any pointer arguments and never change any state visible to callers.
 
 
