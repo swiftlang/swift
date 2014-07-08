@@ -692,6 +692,11 @@ public:
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
 
+  /// Get the linkage for a protocol conformance's witness table.
+  static SILLinkage getLinkageForProtocolConformance(
+                                             const NormalProtocolConformance *C,
+                                             ForDefinition_t definition);
+  
 private:
   Type getLoweredCBridgedType(Type t);
 };

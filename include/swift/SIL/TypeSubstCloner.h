@@ -180,9 +180,13 @@ protected:
     // table declaration for it.
     SILFunction &Cloned = getBuilder().getFunction();
     SILModule &OtherMod = Cloned.getModule();
-    if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first)
-      OtherMod.createWitnessTableDeclaration(sub.Conformance[0]);
-
+    if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first) {
+      auto normal = sub.Conformance[0]->getRootNormalConformance();
+      auto linkage = Lowering::TypeConverter
+                  ::getLinkageForProtocolConformance(normal, NotForDefinition);
+      OtherMod.createWitnessTableDeclaration(sub.Conformance[0],
+                                             linkage);
+    }
     // We already subst so getOpConformance is not needed.
     SILBuilder &Builder = getBuilder();
     doPostProcess(Inst, Builder.createWitnessMethod(

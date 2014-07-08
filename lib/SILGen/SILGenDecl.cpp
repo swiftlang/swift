@@ -23,7 +23,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
 using namespace swift;
@@ -1920,19 +1919,6 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
   return IsNotFreeFunctionWitness;
 }
   
-static SILLinkage
-getLinkageForProtocolConformance(NormalProtocolConformance *C) {
-  // If the conformance is imported from Clang, give it shared linkage.
-  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
-  auto typeUnit = typeDecl->getModuleScopeContext();
-  if (isa<ClangModuleUnit>(typeUnit)
-      && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
-    return SILLinkage::Shared;
-  
-  // TODO Access control
-  return SILLinkage::Public;
-}
-  
 /// Emit a witness table for a protocol conformance.
 class SILGenConformance : public Lowering::ASTVisitor<SILGenConformance> {
 public:
@@ -1944,7 +1930,8 @@ public:
   SILGenConformance(SILGenModule &SGM, ProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C)),
-      Linkage(getLinkageForProtocolConformance(Conformance))
+      Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
+                                                         ForDefinition))
   {
     // Not all protocols use witness tables.
     if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))

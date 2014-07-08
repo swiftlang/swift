@@ -22,6 +22,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+using namespace Lowering;
 
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
@@ -109,7 +110,8 @@ SILModule::~SILModule() {
 }
 
 SILWitnessTable *
-SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
+SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
+                                         SILLinkage linkage) {
   // If we are passed in a null conformance (a valid value), just return nullptr
   // since we can not map a witness table to it.
   if (!C)
@@ -139,7 +141,7 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
     = cast<NormalProtocolConformance>(ParentC);
 
   SILWitnessTable *WT = SILWitnessTable::create(*this,
-                                                SILLinkage::PublicExternal,
+                                                linkage,
                                                 NormalC);
   return WT;
 }
@@ -485,7 +487,9 @@ public:
     // If we don't find any witness table for the conformance, bail and return
     // false.
     if (!WT) {
-      Mod.createWitnessTableDeclaration(C);
+      Mod.createWitnessTableDeclaration(C,
+                          TypeConverter::getLinkageForProtocolConformance(
+                              C->getRootNormalConformance(), NotForDefinition));
       return false;
     }
 

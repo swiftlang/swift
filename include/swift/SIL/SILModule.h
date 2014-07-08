@@ -369,7 +369,7 @@ public:
   // Given a protocol conformance, attempt to create a witness table declaration
   // for it.
   SILWitnessTable *
-  createWitnessTableDeclaration(ProtocolConformance *C);
+  createWitnessTableDeclaration(ProtocolConformance *C, SILLinkage linkage);
 
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }

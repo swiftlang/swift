@@ -21,11 +21,13 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
+using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
 // Instruction-specific properties on SILValue
@@ -1169,6 +1171,33 @@ DynamicMethodBranchInst *DynamicMethodBranchInst::create(
                                                 HasMethodBB, NoMethodBB);
 }
 
+SILLinkage
+TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+                                                ForDefinition_t definition) {
+  // If the conformance is imported from Clang, give it shared linkage.
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeUnit = typeDecl->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(typeUnit)
+      && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
+    return SILLinkage::Shared;
+  
+  // TODO Access control
+  if (definition)
+    return SILLinkage::Public;
+  else
+    return SILLinkage::PublicExternal;
+}
+
+static void declareWitnessTable(SILModule &Mod,
+                                ProtocolConformance *C) {
+  if (!C) return;
+  if (!Mod.lookUpWitnessTable(C, false).first)
+    Mod.createWitnessTableDeclaration(C,
+        TypeConverter::getLinkageForProtocolConformance(
+                                                  C->getRootNormalConformance(),
+                                                  NotForDefinition));
+}
+
 /// Create a witness method, creating a witness table declaration if we don't
 /// have a witness table for it. Later on if someone wants the real definition,
 /// lookUpWitnessTable will deserialize it for us if we can.
@@ -1184,8 +1213,7 @@ WitnessMethodInst::create(SILLocation Loc, SILType LookupType,
   void *Buffer = Mod.allocate(sizeof(WitnessMethodInst),
                               alignof(WitnessMethodInst));
 
-  if (!Mod.lookUpWitnessTable(Conformance, false).first)
-    Mod.createWitnessTableDeclaration(Conformance);
+  declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
                                           Ty, Volatile);
 }
@@ -1199,8 +1227,7 @@ InitExistentialInst::create(SILLocation Loc, SILValue Existential,
   void *Buffer = Mod.allocate(sizeof(InitExistentialInst),
                               alignof(InitExistentialInst));
   for (ProtocolConformance *C : Conformances)
-    if (!Mod.lookUpWitnessTable(C, false).first)
-      Mod.createWitnessTableDeclaration(C);
+    declareWitnessTable(Mod, C);
   return ::new (Buffer) InitExistentialInst(Loc, Existential, ConcreteType,
                                             Conformances);
 }
@@ -1215,7 +1242,7 @@ InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
                               alignof(InitExistentialRefInst));
   for (ProtocolConformance *C : Conformances)
     if (!Mod.lookUpWitnessTable(C, false).first)
-      Mod.createWitnessTableDeclaration(C);
+      declareWitnessTable(Mod, C);
 
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
                                                Instance,
