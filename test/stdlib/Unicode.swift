@@ -2348,7 +2348,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.toRaw()).getLogicValue())
       expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
-      checkUTF8View(expected, cfstring, test.loc.withCurrentLoc())
+      checkUTF8View(expected, String(cfstring), test.loc.withCurrentLoc())
       return ()
     }
   }
@@ -2433,7 +2433,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
         CFStringBuiltInEncodings.UTF8.toRaw()))
     assert(!CFStringGetCharactersPtr(cfstring))
 
-    checkUTF8View(bytes, cfstring, SourceLocStack().withCurrentLoc())
+    checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
     _fixLifetime(bytes)
   }
 
@@ -2454,7 +2454,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
           CFStringBuiltInEncodings.UTF8.toRaw()))
       assert(!CFStringGetCharactersPtr(cfstring))
 
-      checkUTF8View(bytes, cfstring, SourceLocStack().withCurrentLoc())
+      checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
     }
   }
 }
