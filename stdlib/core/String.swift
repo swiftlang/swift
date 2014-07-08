@@ -302,7 +302,7 @@ extension String {
 /// String is a Collection of Character
 extension String : Collection {
   // An adapter over UnicodeScalarView that advances by whole Character
-  @public struct Index : BidirectionalIndex {
+  @public struct Index : BidirectionalIndex, Reflectable {
     @public init(_ _base: UnicodeScalarView.IndexType) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
@@ -419,6 +419,10 @@ extension String : Collection {
 
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
+    
+    @public func getMirror() -> Mirror {
+      return _IndexMirror(self)
+    }
   }
 
   @public var startIndex: Index {
@@ -435,6 +439,32 @@ extension String : Collection {
 
   @public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
+  }
+  
+  @internal struct _IndexMirror : Mirror {
+    var _value: Index
+
+    init(_ x: Index) {
+      _value = x
+    }
+
+    @public var value: Any { return _value }
+
+    @public var valueType: Any.Type { return (_value as Any).dynamicType }
+
+    @public var objectIdentifier: ObjectIdentifier? { return .None }
+
+    @public var disposition: MirrorDisposition { return .Aggregate }
+    
+    @public var count: Int { return 0 }
+
+    @public subscript(i: Int) -> (String,Mirror) { 
+      _fatalError("Mirror access out of bounds")
+    }
+
+    @public var summary: String { return "\(_value._utf16Index)" }
+
+    @public var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
   }
 }
 
