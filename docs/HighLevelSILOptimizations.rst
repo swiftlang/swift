@@ -46,7 +46,7 @@ them together, especially for code that uses Generics.
 In order to perform both high-level optimizations, that are common in
 high-level languages, and low-level optimizations we annotate parts of the
 standard library and describe the semantics of a domain-specific high-level
-Swift bytecode. 
+operations on data types in the Swift standard library. 
 
 Annotation of code in the standard library
 ------------------------------------------
@@ -71,10 +71,11 @@ The ``@semantics`` attribute allows us to define "builtin" SIL-level
 operations implemented in Swift code. In SIL code they are encoded as
 apply instructions, but the optimizer can operate on them as atomic
 instructions. The semantic annotations don't necessarily need to be on
-public APIs. For example, the Array subscript operator may contain two
-bytecode instructions. One for checking the bounds and another one for
-accessing the elements. With this abstraction the optimizer can remove
-the ``checkBounds`` instruction and keep the getElement instruction::
+public APIs. For example, the Array subscript operator may invoke two
+operations in the semantic model. One for checking the bounds and
+another one for accessing the elements. With this abstraction the
+optimizer can remove the ``checkBounds`` instruction and keep the
+getElement instruction::
  
   @public subscript(index: Int) -> Element {
      get {
@@ -98,7 +99,7 @@ The swift optimizer can access the information that is provided by the
 stages of the optimization pipeline the optimizer does not inline functions
 with special semantics in order to allow the early high-level optimization
 passes to operate on them. In the later stages of the optimization pipeline
-the optimize inlines functions with special semantics to allow low-level
+the optimizer inlines functions with special semantics to allow low-level
 optimizations.
 
 
@@ -123,11 +124,9 @@ that may only be executed on the control flow paths in which the
 operation originally appeared, ignoring potential program
 exits. Generally, operations that only read state are not control
 dependent. One exception is ``check_bounds`` which is readonly but
-control dependent. Some operation are *guarded* by others. A guarded
-operation may execute on any path as long as the guard/operation
-sequence is preserved. All semantic operations are idempotent if they
-call the same function with the same argument values, only with the
-exception of ``mutate_unknown``.
+control dependent because it may trap. Some operations are *guarded*
+by others. A guarded operation can never be executed before its
+guard.
 
 array.get_element(index: Int) -> Element
 
@@ -197,6 +196,10 @@ interferes-with
   semantically equivalent to the sequence "``OpA, OpB``" *iff* ``OpB``
   does not interfere with ``OpA``.
 
+  All array operations marked with semantics are idempotent as long as
+  they call the same function with the same argument values, with the
+  exception of ``mutate_unknown``.
+
 guards
 
   If ``OpA`` guards ``OpB``, then the sequence of operations
@@ -219,7 +222,12 @@ mutate_unknown itereferes-with get_element, set_element, check_bounds,
          ``get/set_element(i)`` as long as it can be shown that ``N >=
          i``.
 
-In addition to preserving these semantics, the optimizer must conservatively handle any unknown access to the array object.
+In addition to preserving these semantics, the optimizer must
+conservatively handle any unknown access to the array object. For
+example, if a SIL operation takes the address to any member of the
+Array, any subsequent operations that may have visibility of that
+address are considered to interfere with any array operations with
+explicit semantics.
 
 String
 ~~~~~~
