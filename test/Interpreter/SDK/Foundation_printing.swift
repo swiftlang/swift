@@ -5,7 +5,7 @@ import Foundation
 func foundationOverlayTypesHaveDescription() {
   func hasDescription(_: Printable) {}
 
-  var a: ObjCBool = true
+  var a = ObjCBool(true)
   hasDescription(a)
 }
 
@@ -22,8 +22,8 @@ func printedIs<T>(
 }
 
 func test_ObjCBoolPrinting() {
-  var true_: ObjCBool = true
-  var false_: ObjCBool = false
+  var true_ = ObjCBool(true)
+  var false_ = ObjCBool(false)
   printedIs(true_, "true")
   printedIs(false_, "false")
 

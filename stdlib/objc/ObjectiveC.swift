@@ -25,7 +25,7 @@ import ObjectiveC
 /// The compiler has special knowledge of this type.
 ///
 /// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
-public struct ObjCBool {
+public struct ObjCBool : LogicValue {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var value: Int8
@@ -33,6 +33,11 @@ public struct ObjCBool {
   public init(_ value: Int8) {
     self.value = value
   }
+
+  public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
+
 #else
   // Everywhere else it is C/C++'s "Bool"
   var value : Bool
@@ -50,28 +55,11 @@ public struct ObjCBool {
     return value == true
 #endif
   }
-
-  /// Implicit conversion from C Boolean type to Swift Boolean type.
-  @conversion public func __conversion() -> Bool {
-    return self.getLogicValue()
-  }
 }
 
 extension ObjCBool : Reflectable {
   public func getMirror() -> Mirror {
     return reflect(getLogicValue())
-  }
-}
-
-extension Bool {
-  /// Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
-  @conversion public func __conversion() -> ObjCBool {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
-    return ObjCBool(self ? 1 : 0)
-#else
-    return ObjCBool(self ? Bool.true : Bool.false)
-#endif
   }
 }
 
@@ -158,10 +146,10 @@ extension Selector : Reflectable {
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
 internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
-  return x
+  return ObjCBool(x)
 }
 internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
-  return x
+  return Bool(x)
 }
 
 public func ~=(x: NSObject, y: NSObject) -> Bool {
@@ -187,7 +175,7 @@ public func autoreleasepool(code: () -> ()) {
 //===----------------------------------------------------------------------===//
 
 @availability(*, unavailable, message="Use 'Bool' value 'true' instead") public
-var YES : ObjCBool = Bool.true
+let YES = ObjCBool(true)
 @availability(*, unavailable, message="Use 'Bool' value 'false' instead") public
-var NO : ObjCBool = Bool.false
+let NO = ObjCBool(false)
 
