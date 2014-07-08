@@ -157,6 +157,18 @@ public:
 }
 
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
+  auto swiftDecl = type->getDecl();
+  auto &swiftCtx = type->getASTContext();
+  if (swiftDecl->getName().str() == "CGFloat") {
+    // Dig out the underlying type.
+    auto underlyingTypeDecl
+      = cast<TypeDecl>(
+          swiftDecl->lookupDirect(swiftCtx.getIdentifier("NativeType"))[0]);
+    return Converter.convert(IGM,
+                             underlyingTypeDecl->getDeclaredType()
+                               ->getCanonicalType());
+  }
+
   // Everything else should have been handled as an imported type
   // or an importer-primitive type.
   llvm_unreachable("Unhandled struct type in Clang type generation");

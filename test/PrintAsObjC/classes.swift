@@ -151,7 +151,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
   func getOrigin(r: NSRect) -> NSPoint { return r.origin }
-  func getOriginX(r: AliasForNSRect) -> CGFloat { return r.origin.x }
+  @objc func getOriginX(r: AliasForNSRect) -> CGFloat { return r.origin.x }
   func getOriginY(r: CGRect) -> CGFloat { return r.origin.y }
 
   func emptyArray() -> NSArray { return NSArray() }

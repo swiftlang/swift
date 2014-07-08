@@ -1113,12 +1113,15 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
     return Type();
 
   // Look for the type.
-  UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module,
-                           getTypeResolver());
-  if (auto type = lookup.getSingleTypeResult()) {
-    if (typeResolver)
-      typeResolver->resolveDeclSignature(type);
-    return type->getDeclaredType();
+  SmallVector<ValueDecl *, 2> results;
+  module->lookupValue({ }, SwiftContext.getIdentifier(name),
+                      NLKind::UnqualifiedLookup, results);
+  if (results.size() == 1) {
+    if (auto type = dyn_cast<TypeDecl>(results.front())) {
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(type);
+      return type->getDeclaredType();
+    }
   }
 
   return Type();

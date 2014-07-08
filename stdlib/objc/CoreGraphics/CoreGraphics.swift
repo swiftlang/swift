@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @exported import CoreGraphics
-
+import Darwin
 
 //===----------------------------------------------------------------------===//
 // CGGeometry
@@ -55,7 +55,7 @@ public extension CGVector : Equatable {
   static var zeroVector: CGVector { get { return CGVector(0, 0) } }
 
   init(_ dx: CGFloat, _ dy: CGFloat) {
-    self.init(dx: CGFloat(dx), dy: CGFloat(dy))
+    self.init(dx: dx, dy: dy)
   }
 
   init(_ dx: Int, _ dy: Int) {

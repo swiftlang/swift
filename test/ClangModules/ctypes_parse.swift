@@ -96,10 +96,10 @@ extension NSFastEnumerationState {
 
 extension CGRectTy {
   init(x: Double, y: Double, w: Double, h: Double) {
-    origin.x = x
-    origin.y = y
-    size.width = w
-    size.height = h
+    origin.x = CGFloat(x)
+    origin.y = CGFloat(y)
+    size.width = CGFloat(w)
+    size.height = CGFloat(h)
   }
 }
 

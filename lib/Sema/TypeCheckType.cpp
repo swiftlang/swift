@@ -2446,6 +2446,15 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
   }
 
+  Identifier ID_CoreGraphics = Context.getIdentifier("CoreGraphics");
+  if (auto CoreGraphicsModule = Context.getLoadedModule(ID_CoreGraphics)) {
+    StdlibTypeNames.clear();
+    StdlibTypeNames.push_back(Context.getIdentifier("CGFloat"));
+    lookupLibraryTypes(*this, CoreGraphicsModule, StdlibTypeNames,
+                       ObjCMappedTypes);
+  }
+
+
   Identifier ID_Foundation = Context.getIdentifier(FOUNDATION_MODULE_NAME);
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();

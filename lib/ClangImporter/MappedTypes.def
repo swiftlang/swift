@@ -103,6 +103,9 @@ MAP_STDLIB_TYPE("NSInteger", SignedWord, 0, "Int",  ObjC1, false, DefineOnly)
 // confusing.
 MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", ObjC1, false, DoNothing)
 
+// CoreGraphics types.
+MAP_TYPE("CGFloat", CGFloat, 0, "CoreGraphics", "CGFloat", All, false, 
+         DoNothing)
 
 // CoreFoundation types.
 // Note that we're preserving the typealias for CFIndex.

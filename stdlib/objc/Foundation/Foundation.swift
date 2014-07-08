@@ -12,6 +12,7 @@
 
 @exported import Foundation // Clang module
 import CoreFoundation
+import CoreGraphics
 
 //===----------------------------------------------------------------------===//
 // Enums
@@ -496,6 +497,25 @@ extension Bool: _BridgedToObjectiveC {
 
   public static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
     return x.boolValue
+  }
+}
+
+// CGFloat bridging.
+extension CGFloat : _BridgedToObjectiveC {
+  public init(_ number: NSNumber) {
+    self.native = CGFloat.NativeType(number)
+  }
+
+  public static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
+  public func bridgeToObjectiveC() -> NSNumber {
+    return self.native.bridgeToObjectiveC()
+  }
+
+  public static func bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
+    return CGFloat(CGFloat.NativeType.bridgeFromObjectiveC(x))
   }
 }
 

@@ -279,6 +279,11 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
                               ClangCtx.getObjCClassRedefinitionType()))
       return std::make_pair(Type(), "");
     break;
+
+  case MappedCTypeKind::CGFloat:
+    if (!ClangType->isFloatingType())
+      return std::make_pair(Type(), "");
+    break;
   }
 
   Module *M;

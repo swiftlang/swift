@@ -158,6 +158,7 @@ enum class MappedCTypeKind {
   ObjCSel,
   ObjCId,
   ObjCClass,
+  CGFloat,
 };
 
 /// \brief Describes what to do with the C name of a type that can be mapped to

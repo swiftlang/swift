@@ -33,12 +33,7 @@ class Foo {
   // armv7-ios: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
   @objc func getXFromNSRect(r: NSRect) -> Double {
-    // FIXME: return Double(r.origin.x) fails when x is already Double <rdar://16219891>
-#if arch(arm) || arch(i386)
     return Double(r.origin.x)
-#else
-    return r.origin.x
-#endif
   }
 
   // x86_64-macosx: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {

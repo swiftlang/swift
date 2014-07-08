@@ -92,3 +92,15 @@ extension Dictionary : _BridgedToObjectiveC {
     return [:]
   }
 }
+
+extension CGFloat : _BridgedToObjectiveC {
+  public static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+  public func bridgeToObjectiveC() -> NSNumber {
+    return NSNumber()
+  }
+  public static func bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
+    return CGFloat()
+  }
+}
