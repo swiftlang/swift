@@ -215,7 +215,7 @@ protocol _DictionaryStorage {
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@transparent 
+@transparent
 var _dictionaryDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
@@ -765,8 +765,7 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
   }
 }
 
-public
-struct _CocoaDictionaryStorage : _DictionaryStorage {
+public struct _CocoaDictionaryStorage : _DictionaryStorage {
   public var cocoaDictionary: _SwiftNSDictionary
 
   typealias Index = _CocoaDictionaryIndex
@@ -836,18 +835,15 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   }
 }
 
-public
-enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
+public enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     _DictionaryStorage {
 
   typealias _NativeStorageElement = _DictionaryElement<KeyType, ValueType>
   typealias NativeStorage =
       _NativeDictionaryStorage<KeyType, ValueType>
-  public
-  typealias NativeStorageOwner =
+  public typealias NativeStorageOwner =
       _NativeDictionaryStorageOwner<KeyType, ValueType>
-  public
-  typealias CocoaStorage = _CocoaDictionaryStorage
+  public typealias CocoaStorage = _CocoaDictionaryStorage
   typealias NativeIndex = _NativeDictionaryIndex<KeyType, ValueType>
 
   case Native(NativeStorageOwner)
@@ -1062,7 +1058,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   mutating func updateValue(
     value: ValueType, forKey key: KeyType
   ) -> ValueType? {
-    
+
     if _fastPath(guaranteedNative) {
       return nativeUpdateValue(value, forKey: key)
     }
@@ -1591,8 +1587,7 @@ enum _DictionaryGeneratorRepresentation<KeyType : Hashable, ValueType> {
   case _Cocoa(_CocoaDictionaryGenerator)
 }
 
-public
-struct DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
+public struct DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
   // Dictionary has a separate Generator and Index because of efficiency
   // and implementability reasons.
   //
@@ -1661,7 +1656,7 @@ public
 struct Dictionary<
   KeyType : Hashable, ValueType
 > : Collection, DictionaryLiteralConvertible {
-  
+
   typealias _Self = Dictionary<KeyType, ValueType>
   public
   typealias _VariantStorage = _VariantDictionaryStorage<KeyType, ValueType>
@@ -2093,7 +2088,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   init(
     objects: ConstUnsafePointer<AnyObject?>,
     forKeys: ConstUnsafePointer<Void>, count: Int)
-  
+
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?
   func keyEnumerator() -> _SwiftNSEnumerator?
@@ -2141,22 +2136,21 @@ class _NSSwiftEnumerator {}
 
 //===--- Compiler conversion/casting entry points -------------------------===//
 
-/// Perform a non-bridged upcast from the source to another dictionary.
+/// Perform a non-bridged upcast from the `source` to another dictionary.
 ///
-/// Requires: BaseKey and BaseValue are base classs or base objc
-/// protocols (such as AnyObject) of DerivedKey and DerivedValue,
+/// Requires: `BaseKey` and `BaseValue` are base classes or base objc
+/// protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
 /// respectively.
-///
-/// FIXME: This crappy implementation is O(n) because it copies the
-/// data; a proper implementation would be O(1).
-public
-func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
-       source: Dictionary<DerivedKey, DerivedValue>
-     ) -> Dictionary<BaseKey, BaseValue> {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseKey.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseValue.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedKey.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedValue.self))
+public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
+    source: Dictionary<DerivedKey, DerivedValue>
+) -> Dictionary<BaseKey, BaseValue> {
+  // FIXME: This crappy implementation is O(n) because it copies the
+  // data; a proper implementation would be O(1).
+
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
@@ -2165,15 +2159,15 @@ func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   return result
 }
 
-/// Perform a bridged upcast from the source to another dictionary.
+/// Perform a bridged upcast from the `source` to another dictionary.
 ///
-/// Precondition: BridgesToKey and BridgesToValue are bridged to
+/// Precondition: `BridgesToKey` and `BridgesToValue` are bridged to
 /// Objective-C, and at least one of them requires bridging.
-///
-public
-func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
-       source: Dictionary<BridgesToKey, BridgesToValue>
-     ) -> Dictionary<Key, Value> {
+public func _dictionaryBridgeToObjectiveC<
+    BridgesToKey, BridgesToValue, Key, Value
+>(
+    source: Dictionary<BridgesToKey, BridgesToValue>
+) -> Dictionary<Key, Value> {
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
                !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
@@ -2214,18 +2208,28 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
   return result
 }
 
-/// Implements a forced downcast from a Dictionary<BaseKey,
-/// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
+/// Implements a forced downcast.
 ///
-/// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
-/// a subtype of BaseValue, and all of these types are objects.
-///
-public
-func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
-       source: Dictionary<BaseKey, BaseValue>
-     ) -> Dictionary<DerivedKey, DerivedValue> {
+/// Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
+/// a subtype of `BaseValue`, and all of these types are reference types.
+public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
+    source: Dictionary<BaseKey, BaseValue>
+) -> Dictionary<DerivedKey, DerivedValue> {
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
+
   switch source._variantStorage {
   case .Native(let nativeOwner):
+    // FIXME(performance): this introduces an indirection through Objective-C
+    // runtime, even though we access native storage.  But we can not
+    // reinterpretCast the owner object, because that would change the generic
+    // arguments.
+    //
+    // One way to solve this is to add a third, read-only, representation to
+    // variant storage: like _NativeDictionaryStorageOwner, but it would
+    // perform casts when accessing elements.
     return Dictionary(_cocoaDictionary: reinterpretCast(nativeOwner))
 
   case .Cocoa(let cocoaStorage):
@@ -2233,26 +2237,24 @@ func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   }
 }
 
-/// Implements a conditional downcast from a Dictionary<BaseKey,
-/// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
+/// Implements a conditional downcast.
 ///
-/// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
-/// a subtype of BaseValue, and all of these types are objects.
-///
-public
-func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
-                                    DerivedValue>(
-       source: Dictionary<BaseKey, BaseValue>
-     ) -> Dictionary<DerivedKey, DerivedValue>? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseKey.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(BaseValue.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedKey.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(DerivedValue.self))
+/// Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
+/// a subtype of `BaseValue`, and all of these types are reference types.
+public func _dictionaryDownCastConditional<
+    BaseKey, BaseValue, DerivedKey, DerivedValue
+>(
+    source: Dictionary<BaseKey, BaseValue>
+) -> Dictionary<DerivedKey, DerivedValue>? {
+  _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
+  _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
+  _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (key, value) in source {
     // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-    if reinterpretCast(key) as AnyObject is DerivedKey && 
+    if reinterpretCast(key) as AnyObject is DerivedKey &&
        reinterpretCast(value) as AnyObject is DerivedValue {
       result[reinterpretCast(key)] = reinterpretCast(value)
       continue;
@@ -2271,12 +2273,13 @@ func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
 /// Precondition: at least one of BridgesToKey or BridgesToValue is an
 /// object type, and at least one of Key or Value is a bridged value
 /// type.
-public
-func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
-       source: Dictionary<Key, Value>
-     ) -> Dictionary<BridgesToKey, BridgesToValue> {
-  let result: Dictionary<BridgesToKey, BridgesToValue>?
-    = _dictionaryBridgeFromObjectiveCConditional(source);
+public func _dictionaryBridgeFromObjectiveC<
+    Key, Value, BridgesToKey, BridgesToValue
+>(
+    source: Dictionary<Key, Value>
+) -> Dictionary<BridgesToKey, BridgesToValue> {
+  let result: Dictionary<BridgesToKey, BridgesToValue>? =
+      _dictionaryBridgeFromObjectiveCConditional(source);
   _precondition(result, "dictionary cannot be bridged from Objective-C")
   return result!
 }
@@ -2287,18 +2290,18 @@ func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
 /// Precondition: at least one of BridgesToKey or BridgesToValue is an
 /// object type, and at least one of Key or Value is a bridged value
 /// type.
-public
-func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey, 
-                                                BridgesToValue>(
-       source: Dictionary<Key, Value>
-     ) -> Dictionary<BridgesToKey, BridgesToValue>? {
+public func _dictionaryBridgeFromObjectiveCConditional<
+    Key, Value, BridgesToKey, BridgesToValue
+>(
+    source: Dictionary<Key, Value>
+) -> Dictionary<BridgesToKey, BridgesToValue>? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
                _isBridgedVerbatimToObjectiveC(Value.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
                !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
 
   let keyBridgesDirectly =
-      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
+      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) ==
           _isBridgedVerbatimToObjectiveC(Key.self)
   let valueBridgesDirectly =
       _isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
