@@ -47,7 +47,7 @@ public func find<
   return nil
 }
 
-public func _insertionSort<
+func _insertionSort<
   C: MutableCollection where C.IndexType: BidirectionalIndex
 >(
   inout elements: C,
@@ -253,7 +253,7 @@ public func sorted<
   return result
 }
 
-public func _insertionSort<
+func _insertionSort<
   C: MutableCollection where C.IndexType: RandomAccessIndex,
   C.GeneratorType.Element: Comparable>(
   inout elements: C,
