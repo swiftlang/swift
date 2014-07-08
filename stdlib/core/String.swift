@@ -420,7 +420,7 @@ extension String : Collection {
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
     
-    @public func getMirror() -> Mirror {
+    public func getMirror() -> Mirror {
       return _IndexMirror(self)
     }
   }
@@ -441,30 +441,30 @@ extension String : Collection {
     return IndexingGenerator(self)
   }
   
-  @internal struct _IndexMirror : Mirror {
+  internal struct _IndexMirror : Mirror {
     var _value: Index
 
     init(_ x: Index) {
       _value = x
     }
 
-    @public var value: Any { return _value }
+    public var value: Any { return _value }
 
-    @public var valueType: Any.Type { return (_value as Any).dynamicType }
+    public var valueType: Any.Type { return (_value as Any).dynamicType }
 
-    @public var objectIdentifier: ObjectIdentifier? { return .None }
+    public var objectIdentifier: ObjectIdentifier? { return .None }
 
-    @public var disposition: MirrorDisposition { return .Aggregate }
+    public var disposition: MirrorDisposition { return .Aggregate }
     
-    @public var count: Int { return 0 }
+    public var count: Int { return 0 }
 
-    @public subscript(i: Int) -> (String,Mirror) { 
+    public subscript(i: Int) -> (String,Mirror) { 
       _fatalError("Mirror access out of bounds")
     }
 
-    @public var summary: String { return "\(_value._utf16Index)" }
+    public var summary: String { return "\(_value._utf16Index)" }
 
-    @public var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
+    public var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
   }
 }
 
