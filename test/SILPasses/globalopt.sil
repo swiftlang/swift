@@ -213,3 +213,59 @@ bb8:                                              // Preds: bb6
 bb9(%47 : $Int):                                  // Preds: bb1 bb4
   return %47 : $Int                               // id: %48
 }
+
+
+// Do NOT hoist this initializer out of a cold block.
+// CHECK-LABEL: sil @_TF9ginitcold3runFSiSi
+// CHECK-NOT: addressor
+// CHECK: {{^bb3}}
+// CHECK: cond_br
+// CHECK: {{^bb4}}
+// CHECK: function_ref @_TF4libga8MyGlobalSi
+// CHECK-NEXT: apply
+// CHECK: pointer_to_address
+// CHECK: br
+sil @_TF9ginitcold3runFSiSi : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0           // users: %4, %19
+  %2 = integer_literal $Builtin.Word, 1           // users: %4, %14
+  %3 = struct_extract %0 : $Int, #Int.value       // user: %8
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)  // id: %4
+
+bb1(%5 : $Builtin.Word, %6 : $Builtin.Word):      // Preds: bb0 bb5
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // users: %8, %19
+  %8 = apply %7(%6, %3) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %9
+  cond_br %8, bb2, bb3                            // id: %9
+
+bb2:                                              // Preds: bb1
+  %10 = struct $Int (%5 : $Builtin.Word)          // user: %11
+  return %10 : $Int                               // id: %11
+
+bb3:                                              // Preds: bb1
+  %12 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %14, %29
+  %13 = integer_literal $Builtin.Int1, -1         // users: %14, %29
+  %14 = apply %12(%6, %2, %13) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %15
+  %15 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 0 // user: %33
+  %16 = integer_literal $Builtin.Word, 10         // user: %18
+  %17 = builtin_function_ref "srem_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %18
+  %18 = apply %17(%5, %16) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %19
+  %19 = apply %7(%18, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %22
+  %20 = integer_literal $Builtin.Int1, 0          // user: %22
+  %21 = builtin_function_ref "int_expect_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 // user: %22
+  %22 = apply %21(%19, %20) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 // user: %23
+  cond_br %22, bb4, bb5(%5 : $Builtin.Word)       // id: %23
+
+bb4:                                              // Preds: bb3
+  // function_ref libg.MyGlobal.addressor : Swift.Int
+  %24 = function_ref @_TF4libga8MyGlobalSi : $@thin () -> Builtin.RawPointer // user: %25
+  %25 = apply %24() : $@thin () -> Builtin.RawPointer // user: %26
+  %26 = pointer_to_address %25 : $Builtin.RawPointer to $*Int // user: %27
+  %27 = struct_element_addr %26 : $*Int, #Int.value // user: %28
+  %28 = load %27 : $*Builtin.Word                 // user: %29
+  %29 = apply %12(%5, %28, %13) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %30
+  %30 = tuple_extract %29 : $(Builtin.Word, Builtin.Int1), 0 // user: %31
+  br bb5(%30 : $Builtin.Word)                     // id: %31
+
+bb5(%32 : $Builtin.Word):                         // Preds: bb3 bb4
+  br bb1(%32 : $Builtin.Word, %15 : $Builtin.Word) // id: %33
+}

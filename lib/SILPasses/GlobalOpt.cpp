@@ -42,6 +42,7 @@ namespace {
 class SILGlobalOpt {
   SILModule *Module;
   DominanceAnalysis* DA;
+  bool HasChanged = false;
 
   // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
@@ -58,7 +59,7 @@ public:
   SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
                                                      ColdBlocks(DA) {}
 
-  void run();
+  bool run();
 
 protected:
   void collectGlobalInitCall(ApplyInst *AI);
@@ -142,6 +143,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       }
       AI->replaceAllUsesWith(CommonAI);
       AI->eraseFromParent();
+      HasChanged = true;
     }
     else {
       // Move this call to the outermost loop preheader.
@@ -165,20 +167,28 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
         AI->moveBefore(BB->begin());
         placeFuncRef(AI, DT);
         ParentFuncs[ParentF] = AI;
+        HasChanged = true;
       }
     }
   }
 }
 
-void SILGlobalOpt::run() {
-  for (auto &F : *Module)
-    for (auto &BB : F)
+bool SILGlobalOpt::run() {
+  for (auto &F : *Module) {
+    // Cache cold blocks per function.
+    ColdBlockInfo ColdBlocks(DA);
+    for (auto &BB : F) {
+      if (ColdBlocks.isCold(&BB))
+        continue;
       for (auto &I : BB)
         if (ApplyInst *AI = dyn_cast<ApplyInst>(&I))
           collectGlobalInitCall(AI);
-
+    }
+  }
   for (auto &InitCalls : GlobalInitCallMap)
     placeInitializers(InitCalls.first, InitCalls.second);
+
+  return HasChanged;
 }
 
 namespace {
@@ -186,7 +196,8 @@ class SILGlobalOptPass : public SILModuleTransform
 {
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-    SILGlobalOpt(getModule(), DA).run();
+    if (SILGlobalOpt(getModule(), DA).run())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "SIL Global Optimization"; }

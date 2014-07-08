@@ -40,7 +40,7 @@ static BranchHint getBranchHint(const ApplyInst *AI) {
   if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
     if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
       // peek through an extract of Bool.value.
-      SILValue ExpectedValue = getCondition(AI->getArgument(0));
+      SILValue ExpectedValue = getCondition(AI->getArgument(1));
       if (auto *Literal = dyn_cast<IntegerLiteralInst>(ExpectedValue)) {
         return (Literal->getValue() == 0)
           ? BranchHint::LikelyFalse : BranchHint::LikelyTrue;
@@ -121,6 +121,11 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) {
   while (Node) {
     if (isSlowPath(Node->getBlock(), DomChain.back())) {
       IsCold = true;
+      break;
+    }
+    auto I = ColdBlockMap.find(Node->getBlock());
+    if (I != ColdBlockMap.end()) {
+      IsCold = I->second;
       break;
     }
     DomChain.push_back(Node->getBlock());
