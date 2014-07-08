@@ -10,7 +10,7 @@ println(hello)
 
 // CHECK: ello,
 var helloStr: String = hello
-println(String(helloStr.core[NSRange(location: 1, length: 5)]))
+println(String(helloStr.core[NSRange(location: 1, length: 5).toRange()!]))
 
 var upperHello = hello.uppercaseString
 // CHECK: HELLO, WORLD!

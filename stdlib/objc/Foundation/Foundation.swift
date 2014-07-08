@@ -912,7 +912,9 @@ extension NSRange {
     location = x.startIndex
     length = countElements(x)
   }
-  @conversion public func __conversion() -> Range<Int> {
+
+  public func toRange() -> Range<Int>? {
+    if location == NSNotFound { return nil }
     return Range(start: location, end: location + length)
   }
 }
