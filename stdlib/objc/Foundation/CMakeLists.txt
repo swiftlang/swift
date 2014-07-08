@@ -2,6 +2,7 @@ set(SHARED_LIBRARY ON)
 
 add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
   Foundation.swift
+  FoundationMirrors.swift.gyb
   ExtraStringAPIs.swift
   Misc.mm
   NSStringAPI.swift

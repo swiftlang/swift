@@ -1,0 +1,138 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%import gyb
+%TMirrorDecl = gyb.parseTemplate("../../common/MirrorDecl.gyb")
+%TMirrorConformance = gyb.parseTemplate("../../common/MirrorConformance.gyb")
+%TMirrorBoilerplate = gyb.parseTemplate("../../common/MirrorBoilerplate.gyb")
+
+// helper functions - these Mirrors are dissimilar enough that it's probably not worth
+// trying to write one unique generator - let's just use these helpers manually
+// and write the bulk of each one
+%{
+def getMirrorConformance(Self,Disp = None):
+   return gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,disposition=Disp)
+
+def getMirrorBoilerplate(Self,Disp = None):
+   return gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,disposition=Disp)
+
+def getMirrorDecl(Self,Disp = None):
+   return gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,disposition=Disp)
+}%
+
+// actual Mirrors
+${getMirrorDecl("NSURL")} {
+  ${getMirrorBoilerplate("NSURL")}
+  
+  @public var count: Int { get { return 0 } }
+  
+  @public subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
+  
+  @public var summary: String { get { return _value.absoluteString } }
+  
+  @public var quickLookObject: QuickLookObject? { get { return .Some(.URL(summary)) } }
+}
+
+${getMirrorDecl("NSRange")} {
+  ${getMirrorBoilerplate("NSRange")}
+  
+  @public var count: Int { get { return 2 } }
+  
+  @public subscript(i: Int) -> (String,Mirror) {
+    switch i {
+      case 0: return ("location",reflect(_value.location))
+      case 1: return ("length",reflect(_value.length))
+      default: _fatalError("Mirror access out of bounds")
+    }
+  }
+  
+  @public var summary: String { return "(\(_value.location),\(_value.length))" }
+  
+  @public var quickLookObject: QuickLookObject? { return .Some(.Range(UInt64(_value.location),UInt64(_value.length))) }
+}
+
+${getMirrorDecl("NSDate")} {
+  ${getMirrorBoilerplate("NSDate")}
+  
+  @public var count: Int { get { return 0 } }
+  
+  @public subscript(i: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
+  
+  @public var summary: String {
+    let df = NSDateFormatter()
+    df.dateStyle = .MediumStyle
+    df.timeStyle = .ShortStyle
+    return df.stringFromDate(_value)
+  }
+  
+  @public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+}
+
+${getMirrorDecl("NSSet","MembershipContainer")} {
+  var _a : NSArray!
+  var _value: NSSet
+
+  init(_ x: NSSet) {
+    _value = x
+    _a = _value.allObjects
+  }
+  
+  @public var disposition: MirrorDisposition { return .MembershipContainer }
+
+  @public var value: Any { return _value }
+
+  @public var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  @public var objectIdentifier: ObjectIdentifier? { return .None }
+  
+  // this is the only member that needs to validate _a - others either don't touch it or call into this
+  @public var count: Int {
+    if _a {
+      return _a.count
+    }
+    return 0
+  }
+  
+  @public subscript(i: Int) -> (String,Mirror) {
+    if i >= 0 && i < count {
+      return ("[\(i)]",reflect(_a[i]))
+    }
+    _fatalError("Mirror access out of bounds")
+  }
+  
+  @public var summary: String { return "\(count) elements" }
+  
+  @public var quickLookObject: QuickLookObject? { return nil }
+}
+
+// conformances
+${getMirrorConformance("NSURL")}
+${getMirrorConformance("NSRange")}
+${getMirrorConformance("NSDate")}
+${getMirrorConformance("NSSet","MembershipContainer")}
+
+extension NSArray : Reflectable {
+  @public func getMirror() -> Mirror {
+    return reflect(self as [AnyObject])
+  }
+}
+extension NSDictionary : Reflectable {
+  @public func getMirror() -> Mirror {
+    let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
+    return reflect(dict)
+  }
+}
+extension NSString : Reflectable {
+  @public func getMirror() -> Mirror {
+    return reflect(self as String)
+  }
+}

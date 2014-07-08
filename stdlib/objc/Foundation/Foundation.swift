@@ -593,12 +593,6 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 }
 
-extension NSArray : Reflectable {
-  @public func getMirror() -> Mirror {
-    return reflect(self as [AnyObject])
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
@@ -721,13 +715,6 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   @public static func isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(KeyType.self) &&
            Swift._isBridgedToObjectiveC(ValueType.self)
-  }
-}
-
-extension NSDictionary : Reflectable {
-  @public func getMirror() -> Mirror {
-    let dict : [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
-    return reflect(dict)
   }
 }
 
@@ -1004,113 +991,6 @@ struct _ObjCSuperMirror: Mirror {
   var disposition: MirrorDisposition { return .Class }
 }
 
-struct _NSURLMirror : Mirror {
-  var _u : NSURL
-  
-  init(_ u : NSURL) {_u = u}
-  
-  var value : Any { get { return _u } }
-  
-  var valueType : Any.Type { get { return (_u as Any).dynamicType } }
-  
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
-  
-  var count: Int { get { return 0 } }
-  
-  subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
-  
-  var summary: String { get { return _u.absoluteString } }
-  
-  var quickLookObject: QuickLookObject? { get { return .Some(.URL(summary)) } }
-  
-  var disposition : MirrorDisposition { get { return .Aggregate } }
-}
-
-extension NSURL : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _NSURLMirror(self)
-  }
-}
-
-struct _NSRangeMirror : Mirror {
-  var _r : NSRange
-  
-  init(_ r : NSRange) {_r = r}
-  
-  var value : Any { get { return _r } }
-  
-  var valueType : Any.Type { get { return (_r as Any).dynamicType } }
-  
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
-  
-  var count: Int { get { return 2 } }
-  
-  subscript(i: Int) -> (String,Mirror) {
-    switch i {
-      case 0: return ("location",reflect(_r.location))
-      case 1: return ("length",reflect(_r.length))
-      default: _fatalError("Mirror access out of bounds")
-    }
-  }
-  
-  var summary: String { return "(\(_r.location),\(_r.length))" }
-  
-  var quickLookObject: QuickLookObject? { return .Some(.Range(UInt64(_r.location),UInt64(_r.length))) }
-  
-  var disposition : MirrorDisposition { return .Aggregate }
-}
-
-extension NSRange : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _NSRangeMirror(self)
-  }
-}
-
-extension NSString : Reflectable {
-  @public func getMirror() -> Mirror {
-    return reflect(self as String)
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// NSDate
-//===----------------------------------------------------------------------===//
-
-struct _NSDateMirror : Mirror {
-  var _d : NSDate
-  
-  init(_ d : NSDate) {_d = d}
-  
-  var value : Any { get { return _d } }
-  
-  var valueType : Any.Type { get { return (_d as Any).dynamicType } }
-  
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
-  
-  var count: Int { get { return 0 } }
-  
-  subscript(i: Int) -> (String,Mirror) {
-    _fatalError("Mirror access out of bounds")
-  }
-  
-  var summary: String {
-    let df = NSDateFormatter()
-    df.dateStyle = .MediumStyle
-    df.timeStyle = .ShortStyle
-    return df.stringFromDate(_d)
-  }
-  
-  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
-  
-  var disposition : MirrorDisposition { return .Aggregate }
-}
-
-extension NSDate : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _NSDateMirror(self)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // NSLog
 //===----------------------------------------------------------------------===//
@@ -1264,48 +1144,6 @@ extension NSSet {
     // init(withObjects objects: ConstUnsafePointer<AnyObject?>, count cnt: Int)
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
-  }
-}
-
-struct _NSSetMirror : Mirror {
-  var _s : NSSet
-  var _a : NSArray!
-  
-  init(_ s : NSSet) {
-    _s = s
-    _a = _s.allObjects
-  }
-  
-  var value : Any { get { return _s } }
-  
-  var valueType : Any.Type { get { return (_s as Any).dynamicType } }
-  
-  var objectIdentifier: ObjectIdentifier? { get { return .None } }
-  
-  var count: Int { 
-    if _a {
-      return _a.count
-    }
-    return 0
-  }
-  
-  subscript(i: Int) -> (String,Mirror) {
-    if i >= 0 && i < count {
-      return ("[\(i)]",reflect(_a[i]))
-    }
-    _fatalError("Mirror access out of bounds")
-  }
-  
-  var summary: String { return "\(count) elements" }
-  
-  var quickLookObject: QuickLookObject? { return nil }
-  
-  var disposition : MirrorDisposition { return .MembershipContainer }
-}
-
-extension NSSet : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _NSSetMirror(self)
   }
 }
 
