@@ -944,6 +944,28 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
                            *FRI->getReferencedFunction());
 }
 
+typedef SmallVector<SILInstruction*, 4> UserListTy;
+/// \brief Returns a list of instructions that project or perform reference
+/// counting operations on the instruction or its uses in argument \p Inst.
+/// The function returns False if there are non-ARC instructions.
+static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
+  Uses.push_back(Inst);
+  for (auto Inst : Inst->getUses()) {
+    if (isa<RefCountingInst>(Inst->getUser()) ||
+        isa<DebugValueInst>(Inst->getUser())) {
+      Uses.push_back(Inst->getUser());
+      continue;
+    }
+    if (auto SI = dyn_cast<StructExtractInst>(Inst->getUser()))
+      if (recursivelyCollectARCUsers(Uses, SI))
+        continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -955,6 +977,21 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
+
+  // Optimize pure functions with no meaningful users.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (FRI && FRI->getReferencedFunction()->hasSemanticsString("pure")) {
+    UserListTy Users;
+
+    if (recursivelyCollectARCUsers(Users, AI)) {
+      // Erase all of the reference counting instructions and the Apply itself.
+      for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+        eraseInstFromFunction(**rit);
+    }
+
+    // We found a user that we can't handle.
+    return nullptr;
+  }
 
   // Optimize sub(x - x) -> 0.
   if (AI->getNumOperands() == 3 &&
