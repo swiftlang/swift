@@ -26,19 +26,19 @@ class Foo: NSManagedObject {
   // TODO: These should use the elaborated @"ClassName" encoding.
 
   // nonatomic, retain, ivar f
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,&,Vf\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,&,Vf\00"
   var f: NSData = NSData()
   // nonatomic, weak, assign, ivar g
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,W,Vg\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,W,Vg\00"
   weak var g: NSData? = nil
   // nonatomic, copy, ivar h
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,C,Vh\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,C,Vh\00"
   @NSCopying var h: NSData! = nil
   // nonatomic, dynamic, assign
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,D,&\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,D,&\00"
   @NSManaged var i: NSData
   // nonatomic, readonly
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,R\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSData\22,N,R\00"
   var j: NSData { return NSData() }
 
   // -- Bridged value types

@@ -946,7 +946,7 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
   // FIXME: Property encoding differs in slight ways that aren't publicly
   // exposed from Clang.
   IGM.getClangASTContext()
-    .getObjCEncodingForType(IGM.getClangType(t->getCanonicalType()), s);
+    .getObjCEncodingForPropertyType(IGM.getClangType(t->getCanonicalType()), s);
 }
 
 /// True if the value is of class type, or of a type that is bridged to class
