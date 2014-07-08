@@ -46,7 +46,7 @@ namespace {
       : InlineCostThreshold(threshold), LinkMode(M),
     InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
 
-    bool inlineCallsIntoFunction(SILFunction *F, DominanceInfo *DT);
+    bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA);
   };
 }
 
@@ -116,7 +116,7 @@ static bool transitivelyReferencesLessVisibleLinkage(const SILFunction &F,
 /// \brief Attempt to inline all calls smaller than our threshold into F until.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
-                                                    DominanceInfo *DT) {
+                                                    DominanceAnalysis *DA) {
   bool Changed = false;
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
@@ -126,9 +126,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Keep track of the cold blocks.
   // Avoid recomputing dominance by checking cold call blocks before inlining.
+  DominanceInfo *DT = DA->getDomInfo(Caller);
   if (!DT->isValid(Caller))
     DT->recalculate(*Caller);
-  ColdBlockInfo ColdBlocks(DT);
+  ColdBlockInfo ColdBlocks(DA);
 
   // Collect all of the ApplyInsts in this function. We will be changing the
   // control flow and collecting the AIs simplifies the scan.
@@ -285,7 +286,7 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= inliner.inlineCallsIntoFunction(F, DA->getDomInfo(F));
+      Changed |= inliner.inlineCallsIntoFunction(F, DA);
     }
 
     // Invalidate the call graph.

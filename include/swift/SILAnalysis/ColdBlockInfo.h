@@ -16,7 +16,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-class DominanceInfo;
+class DominanceAnalysis;
 class SILBasicBlock;
 
 /// Cache a set of basic blocks that have been determined to be cold or hot.
@@ -24,7 +24,7 @@ class SILBasicBlock;
 /// This does not inherit from SILAnalysis because it is not worth preserving
 /// across passes.
 class ColdBlockInfo {
-  DominanceInfo *DT;
+  DominanceAnalysis *DA;
 
   /// Each block in this map has been determined to be either cold or hot.
   llvm::DenseMap<const SILBasicBlock*, bool> ColdBlockMap;
@@ -34,7 +34,7 @@ class ColdBlockInfo {
   ColdBlockInfo &operator=(const ColdBlockInfo &) LLVM_DELETED_FUNCTION;
 
 public:
-  ColdBlockInfo(DominanceInfo *DT): DT(DT) {}
+  ColdBlockInfo(DominanceAnalysis *DA): DA(DA) {}
 
   bool isCold(const SILBasicBlock *BB);
 };

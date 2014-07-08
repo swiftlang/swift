@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILAnalysis/ColdBlockInfo.h"
-#include "swift/SIL/Dominance.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 
 using namespace swift;
 
@@ -108,6 +108,7 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) {
     return I->second;
 
   typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
+  DominanceInfo *DT = DA->getDomInfo(const_cast<SILFunction*>(BB->getParent()));
   DomTreeNode *Node = DT->getNode(const_cast<SILBasicBlock*>(BB));
   // Always consider unreachable code cold.
   if (!Node)

@@ -14,6 +14,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -50,9 +51,12 @@ class SILGlobalOpt {
   llvm::DenseSet<SILBasicBlock*> LoopBlocks;
   // Mark any functions for which loops have been analyzed.
   llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
+  // Keep track of cold blocks.
+  ColdBlockInfo ColdBlocks;
 
 public:
-  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA) {}
+  SILGlobalOpt(SILModule *M, DominanceAnalysis *DA): Module(M), DA(DA),
+                                                     ColdBlocks(DA) {}
 
   void run();
 
