@@ -15,36 +15,36 @@
 %  Self = 'Lazy%sCollection' % traversal
 
 /// Augments `S` with lazy versions of various collection algorithms.
-@public
+public
 struct ${Self}<S: Collection ${whereClause}> : Collection {
-  @public
+  public
   init(_ base: S) {
     self._base = base
   }
 
-  @public
+  public
   func generate() -> S.GeneratorType {
     return self._base.generate()
   }
 
-  @public
+  public
   var startIndex: S.IndexType {
     return _base.startIndex
   }
   
-  @public
+  public
   var endIndex: S.IndexType {
     return _base.endIndex
   }
 
-  @public
+  public
   subscript(i: S.IndexType) -> S.GeneratorType.Element {
     return _base[i]
   }
   
   /// an Array, created on-demand, containing the elements of this
   /// lazy Collection.
-  @public var array: [S.GeneratorType.Element] {
+  public var array: [S.GeneratorType.Element] {
     return Array(_base)
   }
 
@@ -52,7 +52,7 @@ struct ${Self}<S: Collection ${whereClause}> : Collection {
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-@public
+public
 func lazy<S: Collection ${whereClause}>(s: S) -> ${Self}<S> {
   return ${Self}(s)
 }

@@ -10,20 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public struct String {
-  @public init() {
+public struct String {
+  public init() {
     core = _StringCore()
   }
 
-  @public init(_ _core: _StringCore) {
+  public init(_ _core: _StringCore) {
     self.core = _core
   }
 
-  @public var core: _StringCore
+  public var core: _StringCore
 }
 
 extension String {
-  @public static func _fromWellFormedCodeUnitSequence<
+  public static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -32,7 +32,7 @@ extension String {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
-  @public static func _fromCodeUnitSequence<
+  public static func _fromCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -48,7 +48,7 @@ extension String {
     }
   }
 
-  @public static func _fromCodeUnitSequenceWithRepair<
+  public static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodec, Input: Collection
     where Input.GeneratorType.Element == Encoding.CodeUnit
   >(
@@ -62,7 +62,7 @@ extension String {
 }
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
-  @public
+  public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -77,7 +77,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : ExtendedGraphemeClusterLiteralConvertible {
-  @public static func convertFromExtendedGraphemeClusterLiteral(
+  public static func convertFromExtendedGraphemeClusterLiteral(
     value: String
   ) -> String {
     return value
@@ -85,7 +85,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
-  @public
+  public
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
   ) -> String {
@@ -101,7 +101,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 }
 
 extension String : _BuiltinStringLiteralConvertible {
-  @public
+  public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -127,13 +127,13 @@ extension String : _BuiltinStringLiteralConvertible {
 }
 
 extension String : StringLiteralConvertible {
-  @public static func convertFromStringLiteral(value: String) -> String {
+  public static func convertFromStringLiteral(value: String) -> String {
     return value
   }
 }
 
 extension String : DebugPrintable {
-  @public var debugDescription: String {
+  public var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
       result += us.escape(asASCII: false)
@@ -173,7 +173,7 @@ extension String {
 extension String: Equatable {
 }
 
-@public func ==(lhs: String, rhs: String) -> Bool {
+public func ==(lhs: String, rhs: String) -> Bool {
   // FIXME: Compares UnicodeScalars, but should eventually do proper
   // Unicode string comparison. This is above the level of the
   // standard equal algorithm because even the largest units
@@ -185,7 +185,7 @@ extension String: Equatable {
   return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)
 }
 
-@public func <(lhs: String, rhs: String) -> Bool {
+public func <(lhs: String, rhs: String) -> Bool {
   // FIXME: Does lexicographical ordering on component UnicodeScalars,
   // but should eventually do a proper unicode String collation.  See
   // the comment on == for more information.
@@ -213,7 +213,7 @@ extension String {
 }
 
 extension String : Hashable {
-  @public var hashValue: Int {
+  public var hashValue: Int {
     var r : Int = 5381
     _encode(
       UTF8.self,
@@ -226,7 +226,7 @@ extension String : Hashable {
 }
 
 extension String : StringInterpolationConvertible {
-  @public
+  public
   static func convertFromStringInterpolation(strings: String...) -> String {
     var result = String()
     for str in strings {
@@ -235,13 +235,13 @@ extension String : StringInterpolationConvertible {
     return result
   }
 
-  @public
+  public
   static func convertFromStringInterpolationSegment<T>(expr: T) -> String {
     return toString(expr)
   }
 }
 
-@public func +(var lhs: String, rhs: String) -> String {
+public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
   }
@@ -249,16 +249,16 @@ extension String : StringInterpolationConvertible {
   return lhs
 }
 
-@public func +(var lhs: String, rhs: Character) -> String {
+public func +(var lhs: String, rhs: Character) -> String {
   lhs._append(String(rhs))
   return lhs
 }
-@public func +(lhs: Character, rhs: String) -> String {
+public func +(lhs: Character, rhs: String) -> String {
   var result = String(lhs)
   result._append(rhs)
   return result
 }
-@public func +(lhs: Character, rhs: Character) -> String {
+public func +(lhs: Character, rhs: Character) -> String {
   var result = String(lhs)
   result += String(rhs)
   return result
@@ -266,7 +266,7 @@ extension String : StringInterpolationConvertible {
 
 
 // String append
-@assignment @public func += (inout lhs: String, rhs: String) {
+@assignment public func += (inout lhs: String, rhs: String) {
   if (lhs.isEmpty) {
     lhs = rhs
   }
@@ -275,7 +275,7 @@ extension String : StringInterpolationConvertible {
   }
 }
 
-@assignment @public func += (inout lhs: String, rhs: Character) {
+@assignment public func += (inout lhs: String, rhs: Character) {
   lhs += String(rhs)
 }
 
@@ -302,8 +302,8 @@ extension String {
 /// String is a Collection of Character
 extension String : Collection {
   // An adapter over UnicodeScalarView that advances by whole Character
-  @public struct Index : BidirectionalIndex, Reflectable {
-    @public init(_ _base: UnicodeScalarView.IndexType) {
+  public struct Index : BidirectionalIndex, Reflectable {
+    public init(_ _base: UnicodeScalarView.IndexType) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
@@ -313,12 +313,12 @@ extension String : Collection {
       self._lengthUTF16 = _lengthUTF16
     }
 
-    @public func successor() -> Index {
+    public func successor() -> Index {
       _precondition(_base != _base._viewEndIndex, "can not increment endIndex")
       return Index(_endBase)
     }
 
-    @public func predecessor() -> Index {
+    public func predecessor() -> Index {
       _precondition(_base != _base._viewStartIndex,
           "can not decrement startIndex")
       let predecessorLengthUTF16 =
@@ -333,7 +333,7 @@ extension String : Collection {
     let _lengthUTF16: Int
 
     /// The integer offset of this index in UTF-16 code units.
-    @public var _utf16Index: Int {
+    public var _utf16Index: Int {
       return _base._position
     }
 
@@ -425,19 +425,19 @@ extension String : Collection {
     }
   }
 
-  @public var startIndex: Index {
+  public var startIndex: Index {
     return Index(unicodeScalars.startIndex)
   }
 
-  @public var endIndex: Index {
+  public var endIndex: Index {
     return Index(unicodeScalars.endIndex)
   }
 
-  @public subscript(i: Index) -> Character {
+  public subscript(i: Index) -> Character {
     return Character(unicodeScalars[i._base..<i._endBase])
   }
 
-  @public func generate() -> IndexingGenerator<String> {
+  public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
   }
   
@@ -468,12 +468,12 @@ extension String : Collection {
   }
 }
 
-@public func == (lhs: String.Index, rhs: String.Index) -> Bool {
+public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
 
 extension String : Sliceable {
-  @public subscript(subRange: Range<Index>) -> String {
+  public subscript(subRange: Range<Index>) -> String {
     return String(
       unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
   }
@@ -481,7 +481,7 @@ extension String : Sliceable {
 
 // Algorithms
 extension String {
-  @public func join<
+  public func join<
       S : Sequence where S.GeneratorType.Element == String
   >(elements: S) -> String{
     return Swift.join(self, elements)

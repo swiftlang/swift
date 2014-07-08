@@ -12,7 +12,7 @@
 
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
-@public func withExtendedLifetime<T, Result>(
+public func withExtendedLifetime<T, Result>(
   x: T, f: ()->Result
 ) -> Result {
   let result = f()
@@ -22,7 +22,7 @@
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
-@public func withExtendedLifetime<T, Result>(
+public func withExtendedLifetime<T, Result>(
   x: T, f: (T)->Result
 ) -> Result {
   let result = f(x)
@@ -35,7 +35,7 @@ extension String {
   /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
-  @public func withCString<Result>(
+  public func withCString<Result>(
     f: (ConstUnsafePointer<Int8>)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafePointerToElements {
@@ -46,7 +46,7 @@ extension String {
   /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
-  @public func withCString<Result>(
+  public func withCString<Result>(
     f: (UnsafePointer<CChar>)->Result
   ) -> Result {
     // FIXME: This interface isn't const-correct; only the UnsafePointer variant
@@ -60,10 +60,10 @@ extension String {
 // This function should be opaque to the optimizer.
 // BLOCKED: <rdar://problem/16464507> This function will be unnecessary when
 // fix_lifetime is honored by the ARC optimizer.
-@asmname("swift_keepAlive") @internal
+@asmname("swift_keepAlive") internal
 func _swift_keepAlive<T>(inout _: T)
 
-@transparent @public
+@transparent public
 func _fixLifetime<T>(var x: T) {
   _swift_keepAlive(&x)
 }

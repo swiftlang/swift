@@ -17,7 +17,7 @@
 // CGGeometry
 //===----------------------------------------------------------------------===//
 
-@public extension CGPoint : Equatable {
+public extension CGPoint : Equatable {
   static var zeroPoint: CGPoint { get { return CGPoint(x: 0, y: 0) } }
 
   init() {
@@ -29,12 +29,12 @@
   }
 }
 
-@public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
+public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
 
 
-@public extension CGSize : Equatable {
+public extension CGSize : Equatable {
   static var zeroSize: CGSize { return CGSize(width: 0, height: 0) }
 
   init() {
@@ -46,12 +46,12 @@
   }
 }
 
-@public func == (lhs: CGSize, rhs: CGSize) -> Bool {
+public func == (lhs: CGSize, rhs: CGSize) -> Bool {
   return lhs.width == rhs.width  &&  lhs.height == rhs.height
 }
 
 
-@public extension CGVector : Equatable {
+public extension CGVector : Equatable {
   static var zeroVector: CGVector { get { return CGVector(0, 0) } }
 
   init(_ dx: CGFloat, _ dy: CGFloat) {
@@ -63,12 +63,12 @@
   }
 }
 
-@public func == (lhs: CGVector, rhs: CGVector) -> Bool {
+public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
 
 
-@public extension CGRect : Equatable {
+public extension CGRect : Equatable {
   static var zeroRect:     CGRect { 
     return CGRect(x: 0, y: 0, width: 0, height: 0) 
   }
@@ -179,7 +179,7 @@
   }
 }
 
-@public func == (lhs: CGRect, rhs: CGRect) -> Bool {
+public func == (lhs: CGRect, rhs: CGRect) -> Bool {
   return CGRectEqualToRect(lhs, rhs)
 }
 

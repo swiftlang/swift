@@ -13,28 +13,28 @@
 //  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
-@public enum Bit : Int, RandomAccessIndex, Reflectable {
+public enum Bit : Int, RandomAccessIndex, Reflectable {
   case zero = 0, one = 1
 
-  @public func successor() -> Bit {
+  public func successor() -> Bit {
     _precondition(self == .zero, "Can't increment past one")
     return .one
   }
 
-  @public func predecessor() -> Bit {
+  public func predecessor() -> Bit {
     _precondition(self == .one, "Can't decrement past zero")
     return .zero
   }
 
-  @public func distanceTo(other: Bit) -> Int {
+  public func distanceTo(other: Bit) -> Int {
     return toRaw().distanceTo(other.toRaw())
   }
 
-  @public func advancedBy(distance: Int) -> Bit {
+  public func advancedBy(distance: Int) -> Bit {
     return toRaw().advancedBy(distance) > 0 ? one : zero
   }
 
-  @public
+  public
   func getMirror() -> Mirror {
     return _BitMirror(self)
   }
@@ -71,11 +71,11 @@ struct _BitMirror: Mirror {
   var disposition: MirrorDisposition { return .Enum }
 }
 
-@public func == (lhs: Bit, rhs: Bit) -> Bool {
+public func == (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() == rhs.toRaw()
 }
 
-@public func < (lhs: Bit, rhs: Bit) -> Bool {
+public func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() < rhs.toRaw()
 }
 
@@ -84,27 +84,27 @@ extension Bit : IntegerArithmetic {
     return (Bit.fromRaw(v.0)!, v.overflow)
   }
   
-  @public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.addWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.subtractWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.multiplyWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public static func remainderWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func remainderWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.remainderWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  @public func toIntMax() -> IntMax {
+  public func toIntMax() -> IntMax {
     return IntMax(toRaw())
   }
 }

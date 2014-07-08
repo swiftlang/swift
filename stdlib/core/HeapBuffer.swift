@@ -16,7 +16,7 @@ typealias _HeapObject = SwiftShims.HeapObject
 // Provides a common type off of which to hang swift_bufferAllocate.
 // If you introduce a new most-derived subclass of this, you need
 // to define __deallocate in it.
-@public objc class HeapBufferStorageBase {}
+public objc class HeapBufferStorageBase {}
 
 @asmname("swift_bufferAllocate")
 func _swift_bufferAllocate(
@@ -44,12 +44,12 @@ func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
-@public objc class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
-  @public typealias Buffer = HeapBuffer<Value, Element>
+public objc class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
+  public typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
   }
-  @public func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  public func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
@@ -78,12 +78,12 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 // to be in that case, without affecting its reference count.  Instead
 // we accept everything; reinterpretCast will at least catch
 // inappropriately-sized things at runtime.
-@public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
+public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
   return _swift_isUniquelyReferenced(reinterpretCast(x))
 }
 
-@public struct HeapBuffer<Value, Element> : LogicValue, Equatable {
-  @public typealias Storage = HeapBufferStorage<Value, Element>
+public struct HeapBuffer<Value, Element> : LogicValue, Equatable {
+  public typealias Storage = HeapBufferStorage<Value, Element>
   let storage: Storage?
   
   static func _valueOffset() -> Int {
@@ -147,7 +147,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
   
   /// Create a `HeapBuffer` with `self.value = initializer` and
   /// `self._capacity() >= capacity`.
-  @public init(
+  public init(
     _ storageClass: HeapBufferStorageBase.Type,
     _ initializer: Value, _ capacity: Int
   ) {
@@ -171,7 +171,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     }
   }
 
-  @public
+  public
   func getLogicValue() -> Bool {
     return storage.getLogicValue()
   }
@@ -193,7 +193,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
     return HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
   }
 
-  @public mutating func isUniquelyReferenced() -> Bool {
+  public mutating func isUniquelyReferenced() -> Bool {
     if !storage {
       return false
     }
@@ -203,7 +203,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 }
 
 // HeapBuffers are equal when they reference the same buffer
-@public func == <Value, Element> (
+public func == <Value, Element> (
   lhs: HeapBuffer<Value, Element>,
   rhs: HeapBuffer<Value, Element>) -> Bool {
   return lhs._nativeObject == rhs._nativeObject
@@ -214,7 +214,7 @@ func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
 // A way to store a value on the heap.  These values are likely to be
 // implicitly shared, so it's safest if they're immutable.
 //
-@public struct OnHeap<T> {
+public struct OnHeap<T> {
   typealias Buffer = HeapBuffer<T, Void>
   
   init(_ value: T) {

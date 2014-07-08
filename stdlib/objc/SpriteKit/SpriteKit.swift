@@ -3,9 +3,9 @@
 // SpriteKit defines SKColor using a macro.
 
 #if os(OSX)
-@public typealias SKColor = NSColor
+public typealias SKColor = NSColor
 #elseif os(iOS)
-@public typealias SKColor = UIColor
+public typealias SKColor = UIColor
 #endif
 
 #if os(OSX)
@@ -21,7 +21,7 @@ objc class _SpriteKitMethodProvider : NSObject {
 #endif
 
 extension SKNode {
-  @public subscript (name: String) -> [SKNode] {
+  public subscript (name: String) -> [SKNode] {
      var nodes = [SKNode]()
      enumerateChildNodesWithName(name) { node, stop in
        if let n = node { nodes.append(n) }

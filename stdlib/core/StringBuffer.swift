@@ -42,7 +42,7 @@ struct _StringBufferIVars {
 // HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
-@public struct _StringBuffer {
+public struct _StringBuffer {
 
   // Make this a buffer of UTF-16 code units so that it's properly
   // aligned for them if that's what we store.
@@ -52,7 +52,7 @@ struct _StringBufferIVars {
     _storage = storage
   }
 
-  @public init(capacity: Int, initialSize: Int, elementWidth: Int) {
+  public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     let elementShift = elementWidth - 1
 
@@ -116,7 +116,7 @@ struct _StringBufferIVars {
   }
 
   /// a pointer to the start of this buffer's data area
-  @public var start: UnsafePointer<RawByte> {
+  public var start: UnsafePointer<RawByte> {
     return UnsafePointer(_storage.elementStorage)
   }
 
@@ -140,7 +140,7 @@ struct _StringBufferIVars {
   }
 
   /// The number of elements that can be stored in this buffer
-  @public var capacity: Int {
+  public var capacity: Int {
     return _storage.value.byteCapacity >> elementShift
   }
 

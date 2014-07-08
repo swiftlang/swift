@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@internal protocol ArrayType
+internal protocol ArrayType
   : _ArrayType,
     ExtensibleCollection,
     MutableSliceable,
@@ -103,7 +103,7 @@
   init(_ buffer: _Buffer)
 }
 
-@internal struct _ArrayTypeMirror<T : ArrayType> : Mirror {
+internal struct _ArrayTypeMirror<T : ArrayType> : Mirror {
   let _value : T
   
   init(_ v : T) { _value = v }

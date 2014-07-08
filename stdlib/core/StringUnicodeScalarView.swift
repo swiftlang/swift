@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public func ==(
+public func ==(
   lhs: String.UnicodeScalarView.IndexType,
   rhs: String.UnicodeScalarView.IndexType
 ) -> Bool {
@@ -18,7 +18,7 @@
 }
 
 extension String {
-  @public struct UnicodeScalarView : Sliceable, Sequence {
+  public struct UnicodeScalarView : Sliceable, Sequence {
     init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -38,20 +38,20 @@ extension String {
       }
     }
 
-    @public struct IndexType : BidirectionalIndex {
-      @public init(_ _position: Int, _ _core: _StringCore) {
+    public struct IndexType : BidirectionalIndex {
+      public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core
       }
 
-      @public func successor() -> IndexType {
+      public func successor() -> IndexType {
         var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()
         let (result, length) = decoder._decodeOne(&scratch)
         return IndexType(_position + length, _core)
       }
 
-      @public func predecessor() -> IndexType {
+      public func predecessor() -> IndexType {
         var i = _position
         let codeUnit = _core[--i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
@@ -63,12 +63,12 @@ extension String {
       }
 
       /// The end index that for this view.
-      @internal var _viewStartIndex: IndexType {
+      internal var _viewStartIndex: IndexType {
         return IndexType(_core.startIndex, _core)
       }
 
       /// The end index that for this view.
-      @internal var _viewEndIndex: IndexType {
+      internal var _viewEndIndex: IndexType {
         return IndexType(_core.endIndex, _core)
       }
 
@@ -76,15 +76,15 @@ extension String {
       var _core: _StringCore
     }
 
-    @public var startIndex: IndexType {
+    public var startIndex: IndexType {
       return IndexType(_core.startIndex, _core)
     }
 
-    @public var endIndex: IndexType {
+    public var endIndex: IndexType {
       return IndexType(_core.endIndex, _core)
     }
 
-    @public subscript(i: IndexType) -> UnicodeScalar {
+    public subscript(i: IndexType) -> UnicodeScalar {
       var scratch = _ScratchGenerator(_core, i._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
@@ -97,17 +97,17 @@ extension String {
       }
     }
 
-    @public subscript(r: Range<IndexType>) -> UnicodeScalarView {
+    public subscript(r: Range<IndexType>) -> UnicodeScalarView {
       return UnicodeScalarView(
         _core[r.startIndex._position..<r.endIndex._position])
     }
 
-    @public struct GeneratorType : Generator {
+    public struct GeneratorType : Generator {
       init(_ _base: _StringCore.GeneratorType) {
         self._base = _base
       }
 
-      @public mutating func next() -> UnicodeScalar? {
+      public mutating func next() -> UnicodeScalar? {
         switch _decoder.decode(&self._base) {
         case .Result(let us):
           return us
@@ -121,16 +121,16 @@ extension String {
       var _base: _StringCore.GeneratorType
     }
 
-    @public func generate() -> GeneratorType {
+    public func generate() -> GeneratorType {
       return GeneratorType(_core.generate())
     }
 
-    @conversion @public
+    @conversion public
     func __conversion() -> String {
       return String(_core)
     }
 
-    @public func compare(other : UnicodeScalarView) -> Int {
+    public func compare(other : UnicodeScalarView) -> Int {
       // Try to compare the string without decoding the UTF-16 string.
       var aIdx = self._core.startIndex
       var bIdx = other._core.startIndex
@@ -216,10 +216,10 @@ extension String {
 }
 
 extension String {
-  @public func compare(other : String) -> Int {
+  public func compare(other : String) -> Int {
     return(UnicodeScalarView(core).compare(UnicodeScalarView(other.core)))
   }
-  @public var unicodeScalars : UnicodeScalarView {
+  public var unicodeScalars : UnicodeScalarView {
     return UnicodeScalarView(core)
   }
 }

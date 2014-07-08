@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public func minElement<
+public func minElement<
      R : Sequence
        where R.GeneratorType.Element : Comparable>(range: R)
   -> R.GeneratorType.Element {
@@ -22,7 +22,7 @@
   return result
 }
 
-@public func maxElement<
+public func maxElement<
      R : Sequence
        where R.GeneratorType.Element : Comparable>(range: R)
   -> R.GeneratorType.Element {
@@ -36,7 +36,7 @@
 
 // Returns the first index where value appears in domain or nil if
 // domain doesn't contain the value. O(countElements(domain))
-@public func find<
+public func find<
   C: Collection where C.GeneratorType.Element : Equatable
 >(domain: C, value: C.GeneratorType.Element) -> C.IndexType? {
   for i in indices(domain) {
@@ -47,7 +47,7 @@
   return nil
 }
 
-@public func insertionSort<
+public func insertionSort<
   C: MutableCollection where C.IndexType: BidirectionalIndex
 >(
   inout elements: C,
@@ -94,7 +94,7 @@
 /// Partition a non empty range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
-@public func partition<
+public func partition<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout elements: C,
@@ -138,7 +138,7 @@
 }
 
 
-@public func quickSort<
+public func quickSort<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout elements: C,
@@ -176,7 +176,7 @@ struct Less<T: Comparable> {
   }
 }
 
-@public func sort<
+public func sort<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout collection: C,
@@ -185,7 +185,7 @@ struct Less<T: Comparable> {
   quickSort(&collection, indices(collection), predicate)
 }
 
-@public func sort<
+public func sort<
   C: MutableCollection 
     where C.IndexType: RandomAccessIndex, C.GeneratorType.Element: Comparable
 >(
@@ -194,7 +194,7 @@ struct Less<T: Comparable> {
   quickSort(&collection, indices(collection))
 }
 
-@public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
+public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
   return array.withUnsafeMutableStorage {
     a in sort(&a, predicate)
     return
@@ -204,14 +204,14 @@ struct Less<T: Comparable> {
 // The functions below are a copy of the functions above except that
 // they don't accept a predicate and they are hardcoded to use the less-than
 // comparator.
-@public func sort<T : Comparable>(inout array: [T]) {
+public func sort<T : Comparable>(inout array: [T]) {
   return array.withUnsafeMutableStorage {
     a in sort(&a)
     return
   }
 }
 
-@public func sorted<
+public func sorted<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   source: C,
@@ -222,7 +222,7 @@ struct Less<T: Comparable> {
   return result
 }
 
-@public func sorted<
+public func sorted<
   C: MutableCollection 
     where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
 >(source: C) -> C {
@@ -231,7 +231,7 @@ struct Less<T: Comparable> {
   return result
 }
 
-@public func sorted<
+public func sorted<
   S: Sequence
 >(
   source: S,
@@ -242,7 +242,7 @@ struct Less<T: Comparable> {
   return result
 }
 
-@public func sorted<
+public func sorted<
   S: Sequence 
     where S.GeneratorType.Element: Comparable
 >(
@@ -253,7 +253,7 @@ struct Less<T: Comparable> {
   return result
 }
 
-@public func insertionSort<
+public func insertionSort<
   C: MutableCollection where C.IndexType: RandomAccessIndex,
   C.GeneratorType.Element: Comparable>(
   inout elements: C,
@@ -299,7 +299,7 @@ struct Less<T: Comparable> {
 /// Partition a non empty range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
-@public func partition<
+public func partition<
   C: MutableCollection where C.GeneratorType.Element: Comparable
 , C.IndexType: RandomAccessIndex
 >(
@@ -338,7 +338,7 @@ struct Less<T: Comparable> {
   return i.predecessor()
 }
 
-@public func quickSort<
+public func quickSort<
   C: MutableCollection
     where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
 >(
@@ -367,7 +367,7 @@ func _quickSort<
 //// End of non-predicate sort functions.
 
 
-@public func swap<T>(inout a : T, inout b : T) {
+public func swap<T>(inout a : T, inout b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)
@@ -382,7 +382,7 @@ func _quickSort<
 }
 
 
-@public func min<T : Comparable>(x: T, y: T) -> T {
+public func min<T : Comparable>(x: T, y: T) -> T {
   var r = x
   if y < x {
     r = y
@@ -390,7 +390,7 @@ func _quickSort<
   return r
 }
 
-@public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   var r = x
   if y < x {
     r = y
@@ -406,7 +406,7 @@ func _quickSort<
   return r
 }
 
-@public func max<T : Comparable>(x: T, y: T) -> T {
+public func max<T : Comparable>(x: T, y: T) -> T {
   var r = y
   if y < x {
     r = x
@@ -414,7 +414,7 @@ func _quickSort<
   return r
 }
 
-@public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   var r = y
   if y < x {
     r = x
@@ -430,7 +430,7 @@ func _quickSort<
   return r
 }
 
-@public func split<Seq: Sliceable, R:LogicValue>(
+public func split<Seq: Sliceable, R:LogicValue>(
   seq: Seq, 
   isSeparator: (Seq.GeneratorType.Element)->R, 
   maxSplit: Int = Int.max,
@@ -477,7 +477,7 @@ func _quickSort<
 
 /// Return true iff the elements of `e1` are equal to the initial
 /// elements of `e2`.
-@public func startsWith<
+public func startsWith<
   S0: Sequence, S1: Sequence
   where 
     S0.GeneratorType.Element == S1.GeneratorType.Element, 
@@ -496,8 +496,8 @@ func _quickSort<
   return g1.next() ? false : true
 }
 
-@public struct EnumerateGenerator<Base: Generator> : Generator, Sequence {
-  @public typealias Element = (index: Int, element: Base.Element)
+public struct EnumerateGenerator<Base: Generator> : Generator, Sequence {
+  public typealias Element = (index: Int, element: Base.Element)
   var base: Base
   var count: Int
 
@@ -506,20 +506,20 @@ func _quickSort<
     count = 0
   }
 
-  @public mutating func next() -> Element? {
+  public mutating func next() -> Element? {
     var b = base.next()
     if !b { return .None }
     return .Some((index: count++, element: b!))
   }
 
   // Every Generator is also a single-pass Sequence
-  @public typealias GeneratorType = EnumerateGenerator<Base>
-  @public func generate() -> GeneratorType {
+  public typealias GeneratorType = EnumerateGenerator<Base>
+  public func generate() -> GeneratorType {
     return self
   }
 }
 
-@public func enumerate<Seq : Sequence>(
+public func enumerate<Seq : Sequence>(
   seq: Seq
 ) -> EnumerateGenerator<Seq.GeneratorType> {
   return EnumerateGenerator(seq.generate())
@@ -527,7 +527,7 @@ func _quickSort<
 
 
 /// Return true iff `a1` and `a2` contain the same elements.
-@public func equal<
+public func equal<
     S1 : Sequence, S2 : Sequence
   where
     S1.GeneratorType.Element == S2.GeneratorType.Element,
@@ -552,7 +552,7 @@ func _quickSort<
 
 /// Return true iff `a1` and `a2` contain the same elements, using
 /// `pred` as equality `==` comparison.
-@public func equal<
+public func equal<
     S1 : Sequence, S2 : Sequence
   where
     S1.GeneratorType.Element == S2.GeneratorType.Element
@@ -577,7 +577,7 @@ func _quickSort<
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
-@public func lexicographicalCompare<
+public func lexicographicalCompare<
     S1 : Sequence, S2 : Sequence
   where 
     S1.GeneratorType.Element == S2.GeneratorType.Element,
@@ -606,7 +606,7 @@ func _quickSort<
 
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `less` as the comparison between elements.
-@public func lexicographicalCompare<
+public func lexicographicalCompare<
     S1 : Sequence, S2 : Sequence
   where 
     S1.GeneratorType.Element == S2.GeneratorType.Element
@@ -636,7 +636,7 @@ func _quickSort<
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
-@public func contains<
+public func contains<
   S: Sequence, L: LogicValue
 >(seq: S, predicate: (S.GeneratorType.Element)->L) -> Bool {
   for a in seq {
@@ -648,13 +648,13 @@ func _quickSort<
 }
 
 /// Return `true` iff `x` is in `seq`.
-@public func contains<
+public func contains<
   S: Sequence where S.GeneratorType.Element: Equatable
 >(seq: S, x: S.GeneratorType.Element) -> Bool {
   return contains(seq, { $0 == x })
 }
 
-@public func reduce<S: Sequence, U>(
+public func reduce<S: Sequence, U>(
   sequence: S, initial: U, combine: (U, S.GeneratorType.Element)->U
 ) -> U {
   var result = initial

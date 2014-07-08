@@ -26,7 +26,7 @@ import SwiftShims
 /// when T isBridgedToObjectiveC, it can be used directly as an
 /// NSArray.  It is safe to convert between NSArray and _CocoaArray via
 /// reinterpretCast.
-@class_protocol @unsafe_no_objc_tagged_pointer @public objc
+@class_protocol @unsafe_no_objc_tagged_pointer public objc
 protocol _CocoaArray {
   func objectAtIndex(index: Int) -> AnyObject
   
@@ -45,7 +45,7 @@ protocol _CocoaArray {
 /// A wrapper around any _CocoaArray that gives it Collection
 /// conformance.  Why not make _CocoaArray conform directly?  It's a
 /// class, and I don't want to pay for the dynamic dispatch overhead.
-@internal struct _CocoaArrayWrapper : Collection {
+internal struct _CocoaArrayWrapper : Collection {
   var startIndex: Int {
     return 0
   }

@@ -20,7 +20,7 @@
 extension _StringCore {
   /// An integral type that holds a sequence of UTF-8 code units, starting in
   /// its low byte.
-  @public typealias UTF8Chunk = UInt64
+  public typealias UTF8Chunk = UInt64
   
   /// Encode text starting at `i` as UTF-8.  Returns a pair whose first
   /// element is the index of the text following whatever got encoded,
@@ -76,14 +76,14 @@ extension _StringCore {
 }
 
 extension String {
-  @public struct UTF8View : Collection, Reflectable {
+  public struct UTF8View : Collection, Reflectable {
     let _core: _StringCore
     
     init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    @public struct Index : ForwardIndex {
+    public struct Index : ForwardIndex {
       init(_ _core: _StringCore, _ _coreIndex: Int, 
            _ _buffer: _StringCore.UTF8Chunk) {
         self._core = _core
@@ -93,7 +93,7 @@ extension String {
         _sanityCheck(_coreIndex <= _core.count)
       }
       
-      @public func successor() -> Index {
+      public func successor() -> Index {
         let newBuffer0 = (_buffer >> 8) | (
           0xFF << numericCast((sizeofValue(_buffer) - 1) * 8)
         )
@@ -113,7 +113,7 @@ extension String {
       let _buffer: _StringCore.UTF8Chunk
     }
   
-    @public var startIndex: Index {
+    public var startIndex: Index {
       if _fastPath(_core.count != 0) {
         let (coreIndex, buffer) = _core._encodeSomeUTF8(0)
         return Index(_core, coreIndex, buffer)
@@ -121,32 +121,32 @@ extension String {
       return endIndex
     }
     
-    @public var endIndex: Index {
+    public var endIndex: Index {
       return Index(_core, _core.endIndex, ~0)
     }
 
-    @public subscript(i: Index) -> UTF8.CodeUnit {
+    public subscript(i: Index) -> UTF8.CodeUnit {
       return numericCast(i._buffer & 0xFF)
     }
 
-    @public func generate() -> IndexingGenerator<UTF8View> {
+    public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
     }
     
-    @public func getMirror() -> Mirror {
+    public func getMirror() -> Mirror {
       return _UTF8ViewMirror(self)
     }
   }
 
-  @public var utf8: UTF8View {
+  public var utf8: UTF8View {
     return UTF8View(self.core)
   }
 
-  @public var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
+  public var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 
-  @public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
     result.reserveCapacity(countElements(utf8) + 1)
     result += utf8
@@ -155,7 +155,7 @@ extension String {
   }
 }
 
-@public
+public
 func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
   return lhs._coreIndex == rhs._coreIndex && lhs._buffer == rhs._buffer
 }

@@ -25,25 +25,25 @@ import ObjectiveC
 /// The compiler has special knowledge of this type.
 ///
 /// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
-@public struct ObjCBool {
+public struct ObjCBool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var value: Int8
 
-  @public init(_ value: Int8) {
+  public init(_ value: Int8) {
     self.value = value
   }
 #else
   // Everywhere else it is C/C++'s "Bool"
   var value : Bool
 
-  @public init(_ value: Bool) {
+  public init(_ value: Bool) {
     self.value = value
   }
 #endif
 
   /// Allow use in a Boolean context.
-  @public func getLogicValue() -> Bool {
+  public func getLogicValue() -> Bool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
     return value != 0
 #else
@@ -52,13 +52,13 @@ import ObjectiveC
   }
 
   /// Implicit conversion from C Boolean type to Swift Boolean type.
-  @conversion @public func __conversion() -> Bool {
+  @conversion public func __conversion() -> Bool {
     return self.getLogicValue()
   }
 }
 
 extension ObjCBool : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return reflect(getLogicValue())
   }
 }
@@ -66,7 +66,7 @@ extension ObjCBool : Reflectable {
 extension Bool {
   /// Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
-  @conversion @public func __conversion() -> ObjCBool {
+  @conversion public func __conversion() -> ObjCBool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
     return ObjCBool(self ? 1 : 0)
 #else
@@ -76,7 +76,7 @@ extension Bool {
 }
 
 extension ObjCBool : Printable {
-  @public var description: String {
+  public var description: String {
     return self.getLogicValue().description
   }
 }
@@ -88,16 +88,16 @@ extension ObjCBool : Printable {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-@public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
+public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   var ptr : COpaquePointer
 
   /// Create a selector from a string.
-  @public init(_ str : String) {
+  public init(_ str : String) {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
   /// Construct a selector from a string literal.
-  @public static func convertFromExtendedGraphemeClusterLiteral(
+  public static func convertFromExtendedGraphemeClusterLiteral(
     value: String) -> Selector {
 
     return convertFromStringLiteral(value)
@@ -107,32 +107,32 @@ extension ObjCBool : Printable {
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
-  @public static func convertFromStringLiteral(value: String) -> Selector {
+  public static func convertFromStringLiteral(value: String) -> Selector {
     return sel_registerName(value)
   }
 
-  @public init() {
+  public init() {
     ptr = nil
   }
   
-  @transparent @public
+  @transparent public
   static func convertFromNilLiteral() -> Selector {
     return Selector()
   }
 }
 
-@public func ==(lhs: Selector, rhs: Selector) -> Bool {
+public func ==(lhs: Selector, rhs: Selector) -> Bool {
   return sel_isEqual(lhs, rhs)
 }
 
 extension Selector : Equatable, Hashable {
-  @public var hashValue: Int {
+  public var hashValue: Int {
     return ptr.hashValue
   }
 }
 
 extension Selector : Printable {
-  @public var description: String {
+  public var description: String {
     if let s = String.fromCStringRepairingIllFormedUTF8(sel_getName(self)).0 {
       return s
     }
@@ -142,14 +142,14 @@ extension Selector : Printable {
 
 extension String {
   /// Construct the C string representation of an Objective-C selector.
-  @public init(_sel: Selector) {
+  public init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
     self = String.fromCString(sel_getName(_sel))!
   }
 }
 
 extension Selector : Reflectable {
-  @public
+  public
   func getMirror() -> Mirror {
     return reflect(String(_sel: self))
   }
@@ -157,14 +157,14 @@ extension Selector : Reflectable {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-@internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return x
 }
-@internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
 }
 
-@public func ~=(x: NSObject, y: NSObject) -> Bool {
+public func ~=(x: NSObject, y: NSObject) -> Bool {
   return x.isEqual(y)
 }
 
@@ -176,7 +176,7 @@ func __pushAutoreleasePool() -> COpaquePointer
 @asmname("objc_autoreleasePoolPop") 
 func __popAutoreleasePool(pool: COpaquePointer)
 
-@public func autoreleasepool(code: () -> ()) {
+public func autoreleasepool(code: () -> ()) {
   var pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
@@ -186,8 +186,8 @@ func __popAutoreleasePool(pool: COpaquePointer)
 // Mark YES and NO unavailable.
 //===----------------------------------------------------------------------===//
 
-@availability(*, unavailable, message="Use 'Bool' value 'true' instead") @public
+@availability(*, unavailable, message="Use 'Bool' value 'true' instead") public
 var YES : ObjCBool = Bool.true
-@availability(*, unavailable, message="Use 'Bool' value 'false' instead") @public
+@availability(*, unavailable, message="Use 'Bool' value 'false' instead") public
 var NO : ObjCBool = Bool.false
 

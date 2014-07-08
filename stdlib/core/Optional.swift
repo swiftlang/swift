@@ -12,16 +12,16 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-@public enum Optional<T>: LogicValue, Reflectable, NilLiteralConvertible {
+public enum Optional<T>: LogicValue, Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
-  @public init() { self = .None }
+  public init() { self = .None }
 
-  @public init(_ some: T) { self = .Some(some) }
+  public init(_ some: T) { self = .Some(some) }
 
   /// Allow use in a Boolean context.
-  @transparent @public
+  @transparent public
   func getLogicValue() -> Bool {
     switch self {
     case .Some:
@@ -32,7 +32,7 @@
   }
 
   /// Haskell's fmap, which was mis-named
-  @public func map<U>(f: (T)->U) -> U? {
+  public func map<U>(f: (T)->U) -> U? {
     switch self {
     case .Some(var y):
       return .Some(f(y))
@@ -41,18 +41,18 @@
     }
   }
 
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return _OptionalMirror(self)
   }
   
-  @transparent @public
+  @transparent public
   static func convertFromNilLiteral() -> Optional<T> {
     return .None
   }
 }
 
 extension Optional : DebugPrintable {
-  @public var debugDescription: String {
+  public var debugDescription: String {
     switch self {
     case .Some(var value):
       var result = "Optional("
@@ -73,7 +73,7 @@ extension Optional : DebugPrintable {
 //   (x as T).map { ... }
 //
 /// Haskell's fmap for Optionals.
-@public func map<T, U>(x: T?, f: (T)->U) -> U? {
+public func map<T, U>(x: T?, f: (T)->U) -> U? {
   switch x {
     case .Some(var y):
     return .Some(f(y))
@@ -83,12 +83,12 @@ extension Optional : DebugPrintable {
 }
 
 // Intrinsics for use by language features.
-@transparent @internal
+@transparent internal
 func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
   return v.getLogicValue().value
 }
 
-@transparent @internal
+@transparent internal
 func _getOptionalValue<T>(v: T?) -> T {
   switch v {
   case .Some(var x):
@@ -99,18 +99,18 @@ func _getOptionalValue<T>(v: T?) -> T {
   }
 }
 
-@transparent @internal
+@transparent internal
 func _injectValueIntoOptional<T>(v: T) -> Optional<T> {
   return .Some(v)
 }
 
-@transparent @internal
+@transparent internal
 func _injectNothingIntoOptional<T>() -> Optional<T> {
   return .None
 }
 
 // Comparisons
-@public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l == r
@@ -121,24 +121,24 @@ func _injectNothingIntoOptional<T>() -> Optional<T> {
   }
 }
 
-@public func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
-@public struct _OptionalNilComparisonType : NilLiteralConvertible {
+public struct _OptionalNilComparisonType : NilLiteralConvertible {
   @transparent
-  @public static func convertFromNilLiteral() -> _OptionalNilComparisonType {
+  public static func convertFromNilLiteral() -> _OptionalNilComparisonType {
     return _OptionalNilComparisonType()
   }
 }
-@transparent @infix @public
+@transparent @infix public
 func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   return !rhs.getLogicValue()
 }
 
-@internal struct _OptionalMirror<T> : Mirror {
+internal struct _OptionalMirror<T> : Mirror {
   let _value : Optional<T>
 
   init(_ x : Optional<T>) {
@@ -173,7 +173,7 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 }
 
 
-@public func < <T: _Comparable> (lhs: T?, rhs: T?) -> Bool {
+public func < <T: _Comparable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l < r
@@ -184,7 +184,7 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-@public func > <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func > <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l > r
@@ -193,7 +193,7 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-@public func <= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func <= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l <= r
@@ -202,7 +202,7 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-@public func >= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func >= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case (.Some(let l), .Some(let r)):
     return l >= r

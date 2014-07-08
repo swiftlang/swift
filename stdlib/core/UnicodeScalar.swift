@@ -12,23 +12,23 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-@public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
+public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
 
   var _value: Builtin.Int32
 
-  @public var value: UInt32 {
+  public var value: UInt32 {
     get {
       return UInt32(_value)
     }
   }
 
-  @public static func convertFromExtendedGraphemeClusterLiteral(
+  public static func convertFromExtendedGraphemeClusterLiteral(
       value: String) -> UnicodeScalar {
     let unicodeScalars = value.unicodeScalars
     return unicodeScalars[unicodeScalars.startIndex]
   }
 
-  @public init() {
+  public init() {
     self._value = Int32(0).value
   }
 
@@ -36,7 +36,7 @@
     self._value = value
   }
 
-  @public init(_ v : UInt32) {
+  public init(_ v : UInt32) {
     // Unicode 6.3.0:
     //
     //     D9.  Unicode codespace: A range of integers from 0 to 10FFFF.
@@ -54,13 +54,13 @@
     self._value = v.value
   }
 
-  @public init(_ v: UnicodeScalar) {
+  public init(_ v: UnicodeScalar) {
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
     self = v
   }
 
-  @public func escape(#asASCII: Bool) -> String {
+  public func escape(#asASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       var nibble = v & 15
       if nibble < 10 {
@@ -119,7 +119,7 @@
 
   /// Returns true if this is an ASCII character (code point 0 to 127
   /// inclusive).
-  @public func isASCII() -> Bool {
+  public func isASCII() -> Bool {
     return value <= 127
   }
 
@@ -175,62 +175,62 @@
 }
 
 extension UnicodeScalar : Printable, DebugPrintable {
-  @public var description: String {
+  public var description: String {
     return "\"\(escape(asASCII: false))\""
   }
-  @public var debugDescription: String {
+  public var debugDescription: String {
     return "\"\(escape(asASCII: true))\""
   }
 }
 
 extension UnicodeScalar : Hashable {
-  @public var hashValue: Int {
+  public var hashValue: Int {
     return Int(self.value)
   }
 }
 
 extension UnicodeScalar {
-  @public init(_ v : Int) {
+  public init(_ v : Int) {
     self = UnicodeScalar(UInt32(v))
   }
 }
 
 extension UInt8 {
-  @public init(_ v : UnicodeScalar) {
+  public init(_ v : UnicodeScalar) {
     _precondition(v.value <= UInt32(UInt8.max),
         "Code point value does not fit into UInt8")
     self = UInt8(v.value)
   }
 }
 extension UInt32 {
-  @public init(_ v : UnicodeScalar) {
+  public init(_ v : UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
-  @public init(_ v : UnicodeScalar) {
+  public init(_ v : UnicodeScalar) {
     self = UInt64(v.value)
   }
 }
 
-@public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value == rhs.value
 }
 
 extension UnicodeScalar : Comparable {
 }
 
-@public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
 }
 
 /// Helper to provide type context to guide type inference in code like::
 ///
 ///   var value = digit - _asUnicodeScalar("0")
-@public func _asUnicodeScalar(us: UnicodeScalar) -> UnicodeScalar {
+public func _asUnicodeScalar(us: UnicodeScalar) -> UnicodeScalar {
   return us
 }
-@public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
+public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
   return UTF16.CodeUnit(us.value)
 }
 

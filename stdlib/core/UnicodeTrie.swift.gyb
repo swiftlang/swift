@@ -44,7 +44,7 @@ SuppDataBytesOffset = 12817
 
 import SwiftShims
 
-@internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
+internal enum _GraphemeClusterBreakPropertyValue : Int, Printable {
   case Other = 0
   case CR = 1
   case LF = 2
@@ -108,7 +108,7 @@ struct _GraphemeClusterBreakPropertyRawValue {
   }
 }
 
-@internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
+internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
   static func _checkParameters() {
     let metadata = _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata
 
@@ -231,7 +231,7 @@ struct _GraphemeClusterBreakPropertyRawValue {
   }
 }
 
-@internal struct _UnicodeExtendedGraphemeClusterSegmenter {
+internal struct _UnicodeExtendedGraphemeClusterSegmenter {
   let _noBoundaryRulesMatrix: ConstUnsafePointer<UInt16>
 
   init() {

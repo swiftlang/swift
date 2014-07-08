@@ -15,7 +15,7 @@ import Foundation
 
 // These are un-imported macros in UIKit.
 
-@public extension UIDeviceOrientation {
+public extension UIDeviceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
   }
@@ -40,17 +40,17 @@ import Foundation
   }
 }
 
-@public
+public
 func UIDeviceOrientationIsLandscape(orientation: UIDeviceOrientation) -> Bool {
   return orientation.isLandscape
 }
 
-@public
+public
 func UIDeviceOrientationIsPortrait(orientation: UIDeviceOrientation) -> Bool {
   return orientation.isPortrait 
 }
 
-@public
+public
 func UIDeviceOrientationIsValidInterfaceOrientation(
   orientation: UIDeviceOrientation) -> Bool 
 {
@@ -58,7 +58,7 @@ func UIDeviceOrientationIsValidInterfaceOrientation(
 }
 
 
-@public extension UIInterfaceOrientation {
+public extension UIInterfaceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
   }
@@ -68,14 +68,14 @@ func UIDeviceOrientationIsValidInterfaceOrientation(
   }
 }
 
-@public
+public
 func UIInterfaceOrientationIsPortrait(orientation: UIInterfaceOrientation) 
   -> Bool 
 {
   return orientation.isPortrait
 }
 
-@public
+public
 func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation) 
   -> Bool 
 {
@@ -84,7 +84,7 @@ func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation)
 
 // Overlays for variadic initializers.
 
-@public extension UIActionSheet {
+public extension UIActionSheet {
   convenience init(title: String?,
        delegate: UIActionSheetDelegate?,
        cancelButtonTitle: String?,
@@ -104,7 +104,7 @@ func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation)
   }
 }
 
-@public extension UIAlertView {
+public extension UIAlertView {
   convenience init(title: String,
        message: String,
        delegate: UIAlertViewDelegate?,
@@ -175,7 +175,7 @@ struct _UIViewMirror : Mirror {
 }
 
 extension UIView : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return _UIViewMirror(self)
   }
 }

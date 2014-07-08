@@ -13,11 +13,11 @@
 // FIXME: these properties should be implemented in the core library.
 // <rdar://problem/17550602> [unicode] Implement case folding
 extension String {
-  @public var lowercaseString: String {
+  public var lowercaseString: String {
     return _ns.lowercaseString
   }
 
-  @public var uppercaseString: String {
+  public var uppercaseString: String {
     return _ns.uppercaseString
   }
 }

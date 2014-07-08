@@ -17,12 +17,12 @@
 /// out, or whether all Collections should also be Streams; consider
 /// this an experiment.
 
-@public struct UnsafeArrayGenerator<T>: Generator, Sequence {
-  @public mutating func next() -> T? {
+public struct UnsafeArrayGenerator<T>: Generator, Sequence {
+  public mutating func next() -> T? {
     return position == end ? nil : (position++).memory
   }
 
-  @public func generate() -> UnsafeArrayGenerator {
+  public func generate() -> UnsafeArrayGenerator {
     return self
   }
   
@@ -30,17 +30,17 @@
 }
 
 %for Mutable in ('Mutable', ''):
-@public struct Unsafe${Mutable}Array<T> : ${Mutable}Collection {
+public struct Unsafe${Mutable}Array<T> : ${Mutable}Collection {
 
-  @public var startIndex: Int {
+  public var startIndex: Int {
     return 0
   }
 
-  @public var endIndex: Int {
+  public var endIndex: Int {
     return _end - _position
   }
 
-  @public subscript(i: Int) -> T {
+  public subscript(i: Int) -> T {
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
@@ -55,13 +55,13 @@
 %end    
   }
   
-  @public init(start: UnsafePointer<T>, length: Int) {
+  public init(start: UnsafePointer<T>, length: Int) {
     _precondition(length >= 0, "Unsafe${Mutable}Array with negative length")
     _position = start
     _end = start + length
   }
 
-  @public func generate() -> UnsafeArrayGenerator<T> {
+  public func generate() -> UnsafeArrayGenerator<T> {
     return UnsafeArrayGenerator(position: _position, end: _end)
   }
   

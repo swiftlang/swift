@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 extension String {
-  @public struct UTF16View : Sliceable, Reflectable {
-    @public var startIndex: Int {
+  public struct UTF16View : Sliceable, Reflectable {
+    public var startIndex: Int {
       return 0
     }
-    @public var endIndex: Int {
+    public var endIndex: Int {
       return _length
     }
 
@@ -24,10 +24,10 @@ extension String {
     }
 
     // This is to avoid printing "func generate() -> GeneratorOf<UInt16>"
-    @public typealias _GeneratorType = GeneratorOf<UInt16>
-    @public typealias GeneratorType = _GeneratorType
+    public typealias _GeneratorType = GeneratorOf<UInt16>
+    public typealias GeneratorType = _GeneratorType
 
-    @public func generate() -> GeneratorType {
+    public func generate() -> GeneratorType {
       var index = startIndex
       return GeneratorOf<UInt16> {
         if _fastPath(index != self.endIndex) {
@@ -37,7 +37,7 @@ extension String {
       }
     }
 
-    @public subscript(i: Int) -> GeneratorType.Element {
+    public subscript(i: Int) -> GeneratorType.Element {
       _precondition(i >= 0 && i < _length,
           "out-of-range access on a UTF16View")
 
@@ -68,24 +68,24 @@ extension String {
       return 0xfffd
     }
 
-    @public subscript(subRange: Range<Int>) -> UTF16View {
+    public subscript(subRange: Range<Int>) -> UTF16View {
       return UTF16View(_core, offset: _toInternalIndex(subRange.startIndex),
           length: subRange.endIndex - subRange.startIndex)
     }
 
-    @internal init(_ _core: _StringCore) {
+    internal init(_ _core: _StringCore) {
       self._offset = 0
       self._length = _core.count
       self._core = _core
     }
 
-    @internal init(_ _core: _StringCore, offset: Int, length: Int) {
+    internal init(_ _core: _StringCore, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
       self._core = _core
     }
     
-    @public func getMirror() -> Mirror {
+    public func getMirror() -> Mirror {
       return _UTF16ViewMirror(self)
     }
 
@@ -94,7 +94,7 @@ extension String {
     let _core: _StringCore
   }
 
-  @public var utf16: UTF16View {
+  public var utf16: UTF16View {
     return UTF16View(core)
   }
 }

@@ -12,19 +12,19 @@
 
 import Darwin
 
-@public struct SourceLoc {
+public struct SourceLoc {
   let file: String
   let line: UWord
   let comment: String?
 
-  @public
+  public
   init(_ file: String, _ line: UWord, comment: String? = nil) {
     self.file = file
     self.line = line
     self.comment = comment
   }
 
-  @public
+  public
   func withCurrentLoc(
       file: String = __FILE__, line: UWord = __LINE__
   ) -> SourceLocStack {
@@ -32,10 +32,10 @@ import Darwin
   }
 }
 
-@public struct SourceLocStack {
+public struct SourceLocStack {
   let locs: [SourceLoc] = []
 
-  @public
+  public
   init() {}
 
   init(_ loc: SourceLoc) {
@@ -56,7 +56,7 @@ import Darwin
     return SourceLocStack(_locs: locs)
   }
 
-  @public
+  public
   func withCurrentLoc(
       file: String = __FILE__, line: UWord = __LINE__
   ) -> SourceLocStack {
@@ -64,7 +64,7 @@ import Darwin
   }
 }
 
-@internal func _printStackTrace(stackTrace: SourceLocStack?) {
+internal func _printStackTrace(stackTrace: SourceLocStack?) {
   if let s = stackTrace {
     println("stacktrace:")
     for i in 0..<s.locs.count {
@@ -77,7 +77,7 @@ import Darwin
 
 var _anyExpectFailed = false
 
-@public func expectEqual<T : Equatable>(
+public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
@@ -92,7 +92,7 @@ var _anyExpectFailed = false
   }
 }
 
-@public func expectEqual<T : Equatable>(
+public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     stackTrace: SourceLocStack? = nil,
     collectMoreInfo: () -> String,
@@ -109,7 +109,7 @@ var _anyExpectFailed = false
   }
 }
 
-@public func expectNotEqual<T : Equatable>(
+public func expectNotEqual<T : Equatable>(
     expected: T, actual: T,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -123,7 +123,7 @@ var _anyExpectFailed = false
 
 // Can not write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
-@public func expectOptionalEqual<T : Equatable>(
+public func expectOptionalEqual<T : Equatable>(
     expected: T, actual: T?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -145,7 +145,7 @@ var _anyExpectFailed = false
 %    ('<T, U : Equatable>', 'Dictionary<T, U>'),
 %    ('<T : ForwardIndex>', 'T')]:
 
-@public func expectEqual${Generic}(
+public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
@@ -160,7 +160,7 @@ var _anyExpectFailed = false
   }
 }
 
-@public func expectEqual${Generic}(
+public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
     collectMoreInfo: () -> String,
@@ -194,7 +194,7 @@ func _expectNotEqual${Generic}(
 
 %for ComparableType in ['Int']:
 
-@public func expectLE(
+public func expectLE(
     expected: ${ComparableType}, actual: ${ComparableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -207,7 +207,7 @@ func _expectNotEqual${Generic}(
   }
 }
 
-@public func expectGE(
+public func expectGE(
     expected: ${ComparableType}, actual: ${ComparableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -222,16 +222,16 @@ func _expectNotEqual${Generic}(
 
 %end
 
-@public struct AssertionResult : Printable, LogicValue {
+public struct AssertionResult : Printable, LogicValue {
   init(isPass: Bool) {
     self._isPass = isPass
   }
 
-  @public func getLogicValue() -> Bool {
+  public func getLogicValue() -> Bool {
     return _isPass
   }
 
-  @public func withDescription(description: String) -> AssertionResult {
+  public func withDescription(description: String) -> AssertionResult {
     var result = self
     result.description += description
     return result
@@ -239,21 +239,21 @@ func _expectNotEqual${Generic}(
 
   let _isPass: Bool
   
-  @public
+  public
   var description: String = ""
 }
 
-@public func assertionSuccess() -> AssertionResult {
+public func assertionSuccess() -> AssertionResult {
   return AssertionResult(isPass: true)
 }
 
-@public func assertionFailure() -> AssertionResult {
+public func assertionFailure() -> AssertionResult {
   return AssertionResult(isPass: false)
 }
 
 %for BoolType in ['Bool', 'AssertionResult']:
 
-@public func expectTrue(
+public func expectTrue(
     actual: ${BoolType},
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
@@ -268,7 +268,7 @@ func _expectNotEqual${Generic}(
   }
 }
 
-@public func expectFalse(
+public func expectFalse(
     actual: ${BoolType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -283,7 +283,7 @@ func _expectNotEqual${Generic}(
 
 %end
 
-@public func expectEmpty<T>(
+public func expectEmpty<T>(
     value: Optional<T>,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
@@ -298,7 +298,7 @@ func _expectNotEqual${Generic}(
   }
 }
 
-@public func expectNotEmpty<T>(
+public func expectNotEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -310,16 +310,16 @@ func _expectNotEqual${Generic}(
   }
 }
 
-@public struct TestCase {
-  @public init(_ name: String) {
+public struct TestCase {
+  public init(_ name: String) {
     self.name = name
   }
 
-  @public mutating func test(name: String, testFunction: () -> ()) {
+  public mutating func test(name: String, testFunction: () -> ()) {
     _tests.append(_Test(name: name, code: testFunction))
   }
 
-  @public mutating func run() {
+  public mutating func run() {
     var anyTestFailed = false
     for t in _tests {
       var fullTestName = "\(name).\(t.name)"
@@ -353,11 +353,11 @@ func _expectNotEqual${Generic}(
 // These APIs don't really belong in a unittesting library, but are useful
 // in tests, and stdlib does not have such facilities yet.
 
-@public func asHex(a: [UInt8]) -> String {
+public func asHex(a: [UInt8]) -> String {
   return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 
-@public func asHex(a: [UInt32]) -> String {
+public func asHex(a: [UInt32]) -> String {
   return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
 }
 
@@ -365,7 +365,7 @@ func _expectNotEqual${Generic}(
 // Helpers that verify invariants of various stdlib types.
 //
 
-@public
+public
 func checkGenerator<
     Element : Equatable, G : Generator
     where G.Element == Element>(
@@ -386,7 +386,7 @@ func checkGenerator<
   }
 }
 
-@public
+public
 func checkSequence<
     Element : Equatable, S : Sequence
     where S.GeneratorType.Element == Element>(
@@ -395,7 +395,7 @@ func checkSequence<
   expectGE(expected.count, underestimateCount(sequence))
 }
 
-@public
+public
 func checkCollection<
     Element : Equatable, C : Collection
     where C.GeneratorType.Element == Element>(
@@ -427,7 +427,7 @@ func checkCollection<
   }
 }
 
-@public
+public
 func checkSliceableWithBidirectionalIndex<
     Element : Equatable, S : Sliceable
     where S.GeneratorType.Element == Element,

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public enum FloatingPointClassification {
+public enum FloatingPointClassification {
   case SignalingNaN
   case QuietNaN
   case NegativeInfinity
@@ -25,7 +25,7 @@
 
 
 extension FloatingPointClassification : Equatable {}
-@public 
+public 
 func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
   switch (lhs, rhs) {
   case (.SignalingNaN, .SignalingNaN),
@@ -45,7 +45,7 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
   }
 }
 
-@public protocol FloatingPointNumber {
+public protocol FloatingPointNumber {
   typealias _BitsType
   class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType

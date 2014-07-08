@@ -10,16 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
-  @public typealias Element = T
+public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
+  public typealias Element = T
 
-  @public @transparent
+  @transparent public
   init(_ bounds: Range<T>) {
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
 
-  @public mutating func next() -> Element? {
+  public mutating func next() -> Element? {
     if startIndex == endIndex {
       return .None
     }
@@ -27,25 +27,25 @@
   }
 
   // Every Generator is also a single-pass Sequence
-  @public typealias GeneratorType = RangeGenerator<T>
-  @public func generate() -> GeneratorType {
+  public typealias GeneratorType = RangeGenerator<T>
+  public func generate() -> GeneratorType {
     return self
   }
 
-  @public var startIndex: T
-  @public var endIndex: T
+  public var startIndex: T
+  public var endIndex: T
 }
 
-@public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
-  @public typealias Element = T
+public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
+  public typealias Element = T
 
-  @transparent @public
+  @transparent public
   init(_ bounds: Range<T>, stride: T.DistanceType) {
     self._bounds = bounds
     self._stride = stride
   }
 
-  @public mutating func next() -> Element? {
+  public mutating func next() -> Element? {
     if !_bounds {
       return .None
     }
@@ -55,8 +55,8 @@
   }
 
   // Every Generator is also a single-pass Sequence
-  @public typealias GeneratorType = StridedRangeGenerator
-  @public func generate() -> GeneratorType {
+  public typealias GeneratorType = StridedRangeGenerator
+  public func generate() -> GeneratorType {
     return self
   }
 
@@ -67,49 +67,49 @@
 % for IndexProtocol in ['ForwardIndex', 'RandomAccessIndex']:
 %   Self = 'RandomAccessRange' if IndexProtocol.startswith('R') else 'Range'
 
-@public struct ${Self}<
+public struct ${Self}<
   T: ${IndexProtocol}
 > : LogicValue, Equatable, Sliceable {
 
 % if Self == 'RandomAccessRange':
-  @conversion @public
+  @conversion public
   func __conversion() -> Range<T> {
     return Range(start: startIndex, end: endIndex)
   }
 % end
 
-  @transparent @public
+  @transparent public
   init(start: T, end: T) {
     _startIndex = start
     _endIndex = end
   }
 
-  @public var isEmpty : Bool {
+  public var isEmpty : Bool {
     return startIndex == endIndex
   }
 
-  @public func getLogicValue() -> Bool {
+  public func getLogicValue() -> Bool {
     return !isEmpty
   }
 
-  @public subscript(i: T) -> T {
+  public subscript(i: T) -> T {
     return i
   }
 
-  @public subscript(x: Range<T>) -> ${Self} {
+  public subscript(x: Range<T>) -> ${Self} {
     return ${Self}(start: x.startIndex, end: x.endIndex)
   }
 
-  @public typealias GeneratorType = RangeGenerator<T>
-  @public func generate() -> RangeGenerator<T> {
+  public typealias GeneratorType = RangeGenerator<T>
+  public func generate() -> RangeGenerator<T> {
     return GeneratorType(self)
   }
 
-  @public func by(stride: T.DistanceType) -> StridedRangeGenerator<T> {
+  public func by(stride: T.DistanceType) -> StridedRangeGenerator<T> {
     return StridedRangeGenerator(self, stride: stride)
   }
 
-  @public var startIndex: T {
+  public var startIndex: T {
     get {
       return _startIndex
     }
@@ -118,7 +118,7 @@
     }
   }
 
-  @public var endIndex: T {
+  public var endIndex: T {
     get {
       return _endIndex
     }
@@ -131,37 +131,37 @@
   var _endIndex: T
 }
 
-@public func ==<T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func ==<T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return lhs._startIndex == rhs._startIndex &&
       lhs._endIndex == rhs._endIndex
 }
 
 % end
 
-@public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
+public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
   return r.startIndex.distanceTo(r.endIndex)
 }
 
 
 /// Forms a half open range including the minimum value but excluding the
 /// maximum value.
-@transparent @public
+@transparent
 @availability(
   *, unavailable, message="half-open range operator .. has been renamed to ..<")
-func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
+public func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   return Range(start: min, end: max)
 }
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
-@transparent @public
+@transparent public
 func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos) -> Range<Pos> {
   return Range(start: minimum, end: maximum)
 }
 
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
-@transparent @public
+@transparent public
 func ... <Pos : ForwardIndex> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
@@ -170,7 +170,7 @@ func ... <Pos : ForwardIndex> (
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
-@transparent @public
+@transparent public
 func ..< <Pos : RandomAccessIndex> (
   minimum: Pos, maximum: Pos
 ) -> RandomAccessRange<Pos> {
@@ -179,56 +179,56 @@ func ..< <Pos : RandomAccessIndex> (
 
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
-@transparent @public
+@transparent public
 func ... <Pos : RandomAccessIndex> (
   minimum: Pos, maximum: Pos
 ) -> RandomAccessRange<Pos> {
   return RandomAccessRange(start: minimum, end: maximum.successor())
 }
 
-@public struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, 
+public struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, 
                                                               Sequence {
-  @public typealias Element = T
+  public typealias Element = T
 
-  @transparent @public
+  @transparent public
   init(start: T, pastEnd: T) {
     self._bounds = (start,pastEnd)
   }
 
-  @public mutating func next() -> Element? {
+  public mutating func next() -> Element? {
     if _bounds.0 == _bounds.1 { return .None }
     _bounds.1 = _bounds.1.predecessor()
     return _bounds.1
   }
 
   // Every Generator is also a single-pass Sequence
-  @public typealias GeneratorType = ReverseRangeGenerator<T>
-  @public func generate() -> GeneratorType {
+  public typealias GeneratorType = ReverseRangeGenerator<T>
+  public func generate() -> GeneratorType {
     return self
   }
 
   var _bounds: (T, T)
 }
 
-@public struct ReverseRange<T: BidirectionalIndex> : Sequence {
-  @public init(start: T, pastEnd: T) {
+public struct ReverseRange<T: BidirectionalIndex> : Sequence {
+  public init(start: T, pastEnd: T) {
     self._bounds = (start, pastEnd)
   }
 
-  @public init(range fwd: Range<T>) {
+  public init(range fwd: Range<T>) {
     self._bounds = (fwd.startIndex, fwd.endIndex)
   }
 
-  @public var isEmpty: Bool {
+  public var isEmpty: Bool {
     return _bounds.0 == _bounds.1
   }
 
-  @public func bounds() -> (T, T) {
+  public func bounds() -> (T, T) {
     return _bounds
   }
 
-  @public typealias GeneratorType = ReverseRangeGenerator<T>
-  @public func generate() -> GeneratorType {
+  public typealias GeneratorType = ReverseRangeGenerator<T>
+  public func generate() -> GeneratorType {
     return GeneratorType(start: _bounds.0, pastEnd: _bounds.1)
   }
 
@@ -246,7 +246,7 @@ func ... <Pos : RandomAccessIndex> (
 //   println("too big")
 // }
 
-@infix @public
+@infix public
 func ~= <
   T: RandomAccessIndex where T.DistanceType : SignedInteger
 >(x: Range<T>, y: T) -> Bool {
@@ -259,7 +259,7 @@ func ~= <
 extension Range {
   /// Return an array containing the results of calling
   /// `transform(x)` on each element `x` of `self`.
-  @public func map<U>(transform: (T)->U) -> [U] {
+  public func map<U>(transform: (T)->U) -> [U] {
     return Swift.map(self, transform)
   }
 }

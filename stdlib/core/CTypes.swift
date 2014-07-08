@@ -16,71 +16,71 @@
 ///
 /// This will be the same as either `CSignedChar` (in the common
 /// case) or `CUnsignedChar`, depending on the platform.
-@public typealias CChar = Int8
+public typealias CChar = Int8
 
 /// The C 'unsigned char' type.
-@public typealias CUnsignedChar = UInt8
+public typealias CUnsignedChar = UInt8
 
 /// The C 'unsigned short' type.
-@public typealias CUnsignedShort = UInt16
+public typealias CUnsignedShort = UInt16
 
 /// The C 'unsigned int' type.
-@public typealias CUnsignedInt = UInt32
+public typealias CUnsignedInt = UInt32
 
 /// The C 'unsigned long' type.
-@public typealias CUnsignedLong = UInt
+public typealias CUnsignedLong = UInt
 
 /// The C 'unsigned long long' type.
-@public typealias CUnsignedLongLong = UInt64
+public typealias CUnsignedLongLong = UInt64
 
 /// The C 'signed char' type.
-@public typealias CSignedChar = Int8
+public typealias CSignedChar = Int8
 
 /// The C 'short' type.
-@public typealias CShort = Int16
+public typealias CShort = Int16
 
 /// The C 'int' type.
-@public typealias CInt = Int32
+public typealias CInt = Int32
 
 /// The C 'long' type.
-@public typealias CLong = Int
+public typealias CLong = Int
 
 /// The C 'long long' type.
-@public typealias CLongLong = Int64
+public typealias CLongLong = Int64
 
 /// The C 'float' type.
-@public typealias CFloat = Float
+public typealias CFloat = Float
 
 /// The C 'double' type.
-@public typealias CDouble = Double
+public typealias CDouble = Double
 
 /// FIXME: long double
 
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
-@public typealias CWideChar = UnicodeScalar
+public typealias CWideChar = UnicodeScalar
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
 /// The C++11 'char16_t' type, which has UTF-16 encoding.
-@public typealias CChar16 = UInt16
+public typealias CChar16 = UInt16
 
 /// The C++11 'char32_t' type, which has UTF-32 encoding.
-@public typealias CChar32 = UnicodeScalar
+public typealias CChar32 = UnicodeScalar
 
 /// The C '_Bool' and C++ 'bool' type.
-@public typealias CBool = Bool
+public typealias CBool = Bool
 
 /// A wrapper around an opaque C pointer.
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-@public struct COpaquePointer : Equatable, Hashable, LogicValue,
+public struct COpaquePointer : Equatable, Hashable, LogicValue,
                                 NilLiteralConvertible {
   var value : Builtin.RawPointer
   
-  @public init() {
+  public init() {
     var zero : Int = 0
     value = Builtin.inttoptr_Word(zero.value)
   }
@@ -89,7 +89,7 @@
     value = v
   }
 
-  @public static func null() -> COpaquePointer {
+  public static func null() -> COpaquePointer {
     return COpaquePointer()
   }
 
@@ -99,22 +99,22 @@
     return self == COpaquePointer.null()
   }
   
-  @transparent @public
+  @transparent public
   func getLogicValue() -> Bool {
     return !_isNull
   }
 
-  @public var hashValue: Int {
+  public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
   
-  @transparent @public
+  @transparent public
   static func convertFromNilLiteral() -> COpaquePointer {
     return COpaquePointer()
   }
 }
 
-@public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
+public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
@@ -123,55 +123,55 @@ extension COpaquePointer {
   // FIXME: This shouldn't have to be in an extension.
   //
   /// Convert a typed UnsafePointer to an opaque C pointer.
-  @public init<T>(_ from : UnsafePointer<T>) {
+  public init<T>(_ from : UnsafePointer<T>) {
     value = from.value;
   }
 }
 
-@public struct CFunctionPointer<T> : Equatable, Hashable, LogicValue,
+public struct CFunctionPointer<T> : Equatable, Hashable, LogicValue,
                                      NilLiteralConvertible {
   var value: COpaquePointer
 
-  @public init() {
+  public init() {
     value = COpaquePointer()
   }
 
-  @public init(_ value: COpaquePointer) {
+  public init(_ value: COpaquePointer) {
     self.value = value
   }
 
-  @public static func null() -> CFunctionPointer {
+  public static func null() -> CFunctionPointer {
     return CFunctionPointer()
   }
 
-  @transparent @public
+  @transparent public
   func getLogicValue() -> Bool {
     return value.getLogicValue()
   }
 
-  @public var hashValue: Int {
+  public var hashValue: Int {
     return value.hashValue
   }
 
-  @transparent @public
+  @transparent public
   static func convertFromNilLiteral() -> CFunctionPointer {
     return CFunctionPointer()
   }
 }
 
-@public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
+public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
 extension COpaquePointer {
-  @public init<T>(_ from: CFunctionPointer<T>) {
+  public init<T>(_ from: CFunctionPointer<T>) {
     self = from.value
   }
 }
 
 
 // The C va_list type
-@public struct CVaListPointer {
+public struct CVaListPointer {
   var value: UnsafePointer<Void>
 
   init(fromUnsafePointer from: UnsafePointer<Void>) {
@@ -180,11 +180,11 @@ extension COpaquePointer {
 }
 
 /// Access to the raw argc value from C.
-@public var C_ARGC : CInt = CInt()
+public var C_ARGC : CInt = CInt()
 
 /// Access to the raw argv value from C. Accessing the argument vector
 /// through this pointer is unsafe.
-@public var C_ARGV : UnsafePointer<UnsafePointer<Int8>> = UnsafePointer()
+public var C_ARGV : UnsafePointer<UnsafePointer<Int8>> = UnsafePointer()
 
 func _memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
              #size: UInt) {

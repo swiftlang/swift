@@ -14,32 +14,32 @@
 // code without gobs of boilerplate.  These APIs will probably *not*
 // be exposed outside the stdlib.
 
-@transparent @public
+@transparent public
 func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
 }
 
-@transparent @public
+@transparent public
 func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
-@transparent @public
+@transparent public
 func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
-@transparent @public
+@transparent public
 func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
 }
 
-@transparent @public
+@transparent public
 func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof(T.self))
 }
 
-@transparent @public
+@transparent public
 func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
@@ -54,7 +54,7 @@ func _canBeClass<T>(_: T.Type) -> Bool {
 }
 
 /// A brutal bit-cast of something to anything of the same size
-@transparent @public
+@transparent public
 func reinterpretCast<T, U>(var x: T) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't reinterpretCast values of different sizes")
@@ -62,7 +62,7 @@ func reinterpretCast<T, U>(var x: T) -> U {
 }
 
 /// `reinterpretCast` something to `AnyObject`
-@transparent @public
+@transparent public
 func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
   return reinterpretCast(x)
 }
@@ -90,7 +90,7 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
-@transparent @internal
+@transparent internal
 func _unreachable(condition: Bool = true) {
   if condition {
     // FIXME: use a parameterized version of Builtin.unreachable when
@@ -101,7 +101,7 @@ func _unreachable(condition: Bool = true) {
 
 /// Tell the optimizer that this code is unreachable if this builtin is
 /// reachable after constant folding build configuration builtins.
-@transparent @noreturn @internal
+@transparent @noreturn internal
 func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
@@ -111,7 +111,7 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
 /// Returns true iff T is a class type or an objc existential such as
 /// AnyObject
-@internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
+internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   return _canBeClass(x)
     // FIXME: Dirty hack; see <rdar://problem/16823238>
     && sizeof(x) == sizeof(AnyObject) 
@@ -126,17 +126,17 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
-@transparent @internal @semantics("branchhint")
+@transparent @semantics("branchhint") internal
 func _branchHint<C: LogicValue>(actual: C, expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.getLogicValue().value, expected.value))
 }
 
-@transparent @public @semantics("fastpath")
+@transparent @semantics("fastpath") public
 func _fastPath<C: LogicValue>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), true)
 }
 
-@transparent @public @semantics("slowpath")
+@transparent @semantics("slowpath") public
 func _slowPath<C: LogicValue>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), false)
 }

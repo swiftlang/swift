@@ -19,7 +19,7 @@ import SwiftShims
 
 enum _ArrayCastKind { case Up, Down, DeferredDown }
 
-@final @internal
+@final internal
 class IndirectArrayBuffer {
   
   init<T>(
@@ -87,7 +87,7 @@ class IndirectArrayBuffer {
   }
 }
 
-@public struct ArrayBuffer<T> : ArrayBufferType {
+public struct ArrayBuffer<T> : ArrayBufferType {
   var storage: Builtin.NativeObject?
 
   var indirect: IndirectArrayBuffer {
@@ -95,10 +95,10 @@ class IndirectArrayBuffer {
     return Builtin.castFromNativeObject(storage!)
   }
   
-  @public typealias Element = T
+  public typealias Element = T
 
   /// create an empty buffer
-  @public
+  public
   init() {
     storage = !_isClassOrObjCExistential(T.self)
       ? nil : Builtin.castToNativeObject(
@@ -109,7 +109,7 @@ class IndirectArrayBuffer {
       ))
   }
 
-  @public init(_ cocoa: _CocoaArray) {
+  public init(_ cocoa: _CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(
@@ -136,7 +136,7 @@ class IndirectArrayBuffer {
 
 extension ArrayBuffer {
   /// Adopt the storage of source
-  @public
+  public
   init(_ source: NativeBuffer) {
     if !_isClassOrObjCExistential(T.self) {
       self.storage
@@ -157,7 +157,7 @@ extension ArrayBuffer {
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  @public func _asCocoaArray() -> _CocoaArray {
+  public func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
@@ -176,7 +176,7 @@ extension ArrayBuffer {
   /// ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil
-  @public
+  public
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
@@ -187,7 +187,7 @@ extension ArrayBuffer {
     return nil
   }
 
-  @public
+  public
   mutating func isMutableAndUniquelyReferenced() -> Bool {
     return Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer
   }
@@ -195,7 +195,7 @@ extension ArrayBuffer {
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
-  @public
+  public
   func requestNativeBuffer() -> NativeBuffer? {
     let result = self._native
     if result { return result }
@@ -207,7 +207,7 @@ extension ArrayBuffer {
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// ContiguousArrayBuffer
-  @public
+  public
   mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
@@ -241,7 +241,7 @@ extension ArrayBuffer {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  @public
+  public
   func _uninitializedCopy(subRange: Range<Int>, target: UnsafePointer<T>)
          -> UnsafePointer<T> {
     _typeCheck(subRange)
@@ -271,7 +271,7 @@ extension ArrayBuffer {
   
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
-  @public
+  public
   subscript(subRange: Range<Int>) -> SliceBuffer<T> {
     _typeCheck(subRange)
     
@@ -305,7 +305,7 @@ extension ArrayBuffer {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  @public
+  public
   var elementStorage: UnsafePointer<T> {
     if (_fastPath(_isNative)) {
       return _native.elementStorage
@@ -314,7 +314,7 @@ extension ArrayBuffer {
   }
   
   /// How many elements the buffer stores
-  @public
+  public
   var count: Int {
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative!.count
@@ -326,13 +326,13 @@ extension ArrayBuffer {
   }
   
   /// How many elements the buffer can store without reallocation
-  @public
+  public
   var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative!.count
   }
 
   /// Get/set the value of the ith element
-  @public
+  public
   subscript(i: Int) -> T {
     get {
       _typeCheck(i..<i)
@@ -355,7 +355,7 @@ extension ArrayBuffer {
 
   /// Call body(p), where p is a pointer to the underlying contiguous storage
   /// Requires: such contiguous storage exists or the buffer is empty
-  @public
+  public
   func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
     _precondition(
       elementStorage != nil || count == 0,
@@ -367,7 +367,7 @@ extension ArrayBuffer {
   }
   
   /// An object that keeps the elements stored in this buffer alive
-  @public
+  public
   var owner: AnyObject? {
     return _fastPath(_isNative) ? _native._storage : _nonNative!
   }
@@ -375,24 +375,24 @@ extension ArrayBuffer {
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty or if their buffers
   /// have the same identity and count.
-  @public
+  public
   var identity: Word {
     let p = elementStorage
     return p != nil ? reinterpretCast(p) : reinterpretCast(owner)
   }
   
   //===--- Collection conformance -----------------------------------------===//
-  @public
+  public
   var startIndex: Int {
     return 0
   }
 
-  @public
+  public
   var endIndex: Int {
     return count
   }
 
-  @public
+  public
   func generate() -> IndexingGenerator<ArrayBuffer> {
     return IndexingGenerator(self)
   }

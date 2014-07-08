@@ -20,33 +20,33 @@ import CoreFoundation
 // FIXME: one day this will be bridged from CoreFoundation and we
 // should drop it here. <rdar://problem/14497260> (need support
 // for CF bridging)
-@public let kCFStringEncodingASCII: CFStringEncoding = 0x0600
+public let kCFStringEncodingASCII: CFStringEncoding = 0x0600
 
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
-@public typealias NSStringEncoding = UInt
-@public let NSASCIIStringEncoding: UInt = 1
-@public let NSNEXTSTEPStringEncoding: UInt = 2
-@public let NSJapaneseEUCStringEncoding: UInt = 3
-@public let NSUTF8StringEncoding: UInt = 4
-@public let NSISOLatin1StringEncoding: UInt = 5
-@public let NSSymbolStringEncoding: UInt = 6
-@public let NSNonLossyASCIIStringEncoding: UInt = 7
-@public let NSShiftJISStringEncoding: UInt = 8
-@public let NSISOLatin2StringEncoding: UInt = 9
-@public let NSUnicodeStringEncoding: UInt = 10
-@public let NSWindowsCP1251StringEncoding: UInt = 11
-@public let NSWindowsCP1252StringEncoding: UInt = 12
-@public let NSWindowsCP1253StringEncoding: UInt = 13
-@public let NSWindowsCP1254StringEncoding: UInt = 14
-@public let NSWindowsCP1250StringEncoding: UInt = 15
-@public let NSISO2022JPStringEncoding: UInt = 21
-@public let NSMacOSRomanStringEncoding: UInt = 30
-@public let NSUTF16StringEncoding: UInt = NSUnicodeStringEncoding
-@public let NSUTF16BigEndianStringEncoding: UInt = 0x90000100
-@public let NSUTF16LittleEndianStringEncoding: UInt = 0x94000100
-@public let NSUTF32StringEncoding: UInt = 0x8c000100
-@public let NSUTF32BigEndianStringEncoding: UInt = 0x98000100
-@public let NSUTF32LittleEndianStringEncoding: UInt = 0x9c000100
+public typealias NSStringEncoding = UInt
+public let NSASCIIStringEncoding: UInt = 1
+public let NSNEXTSTEPStringEncoding: UInt = 2
+public let NSJapaneseEUCStringEncoding: UInt = 3
+public let NSUTF8StringEncoding: UInt = 4
+public let NSISOLatin1StringEncoding: UInt = 5
+public let NSSymbolStringEncoding: UInt = 6
+public let NSNonLossyASCIIStringEncoding: UInt = 7
+public let NSShiftJISStringEncoding: UInt = 8
+public let NSISOLatin2StringEncoding: UInt = 9
+public let NSUnicodeStringEncoding: UInt = 10
+public let NSWindowsCP1251StringEncoding: UInt = 11
+public let NSWindowsCP1252StringEncoding: UInt = 12
+public let NSWindowsCP1253StringEncoding: UInt = 13
+public let NSWindowsCP1254StringEncoding: UInt = 14
+public let NSWindowsCP1250StringEncoding: UInt = 15
+public let NSISO2022JPStringEncoding: UInt = 21
+public let NSMacOSRomanStringEncoding: UInt = 30
+public let NSUTF16StringEncoding: UInt = NSUnicodeStringEncoding
+public let NSUTF16BigEndianStringEncoding: UInt = 0x90000100
+public let NSUTF16LittleEndianStringEncoding: UInt = 0x94000100
+public let NSUTF32StringEncoding: UInt = 0x8c000100
+public let NSUTF32BigEndianStringEncoding: UInt = 0x98000100
+public let NSUTF32LittleEndianStringEncoding: UInt = 0x9c000100
 
 
 //===----------------------------------------------------------------------===//
@@ -58,12 +58,12 @@ import CoreFoundation
 // FIXME: what about NSObjectProtocol?
 
 extension NSObject : Equatable, Hashable {
-  @public var hashValue: Int {
+  public var hashValue: Int {
     return hash
   }
 }
 
-@public func == (lhs: NSObject, rhs: NSObject) -> Bool {
+public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
@@ -76,25 +76,25 @@ extension NSObject : _PrintableNSObject {}
 // Strings
 //===----------------------------------------------------------------------===//
 
-@availability(*, unavailable, message="Please use String or NSString") @public
+@availability(*, unavailable, message="Please use String or NSString") public
 class NSSimpleCString {}
 
-@asmname("swift_convertStringToNSString") @internal
+@asmname("swift_convertStringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString {
   return string as NSString
 }
 
-@internal func _convertNSStringToString(nsstring: NSString) -> String {
+internal func _convertNSStringToString(nsstring: NSString) -> String {
   return String(nsstring)
 }
 
 extension NSString : StringLiteralConvertible {
-  @public class func convertFromExtendedGraphemeClusterLiteral(
+  public class func convertFromExtendedGraphemeClusterLiteral(
     value: StaticString) -> Self {
     return convertFromStringLiteral(value)
   }
 
-  @public class func convertFromStringLiteral(value: StaticString) -> Self {
+  public class func convertFromStringLiteral(value: StaticString) -> Self {
     
     let immutableResult = NSString(
       bytesNoCopy: UnsafePointer<Void>(value.start),
@@ -109,7 +109,7 @@ extension NSString : StringLiteralConvertible {
 
 
 extension CFString {
-  @conversion @public func __conversion() -> String {
+  @conversion public func __conversion() -> String {
     return String(self as NSString)
   }
 }
@@ -336,7 +336,7 @@ class _NSOpaqueString : NSString {
 // Conversion from NSString to Swift's native representation
 //
 extension String {
-  @public init(_ value: NSString) {
+  public init(_ value: NSString) {
     if let wrapped = value as? _NSContiguousString {
       self.core = wrapped.value
       return
@@ -379,11 +379,11 @@ extension String {
 }
 
 extension String : _BridgedToObjectiveC {
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
 
-  @public func bridgeToObjectiveC() -> NSString {
+  public func bridgeToObjectiveC() -> NSString {
     if let ns = core.cocoaBuffer {
       if _cocoaStringLength(source: ns) == core.count {
         return ns as NSString
@@ -393,7 +393,7 @@ extension String : _BridgedToObjectiveC {
     return _NSContiguousString(core)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSString) -> String {
+  public static func bridgeFromObjectiveC(x: NSString) -> String {
     return String(x)
   }
 }
@@ -407,117 +407,117 @@ extension String : _BridgedToObjectiveC {
 // back to a specific numeric type requires a cast.
 // FIXME: Incomplete list of types.
 extension Int : _BridgedToObjectiveC {
-  @public init(_ number: NSNumber) {
+  public init(_ number: NSNumber) {
     value = number.integerValue.value
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     return x.integerValue
   }
 }
 
 extension UInt : _BridgedToObjectiveC {
-  @public init(_ number: NSNumber) {
+  public init(_ number: NSNumber) {
     value = number.unsignedIntegerValue.value
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     // FIXME: Need a blacklist for certain methods that should not
     // import NSUInteger as Int.
     return NSNumber(unsignedInteger: Int(self.value))
   }
 
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
     return UInt(x.unsignedIntegerValue.value)
   }
 }
 
 extension Float : _BridgedToObjectiveC {
-  @public init(_ number: NSNumber) {
+  public init(_ number: NSNumber) {
     value = number.floatValue.value
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> Float {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> Float {
     return x.floatValue
   }
 }
 
 extension Double : _BridgedToObjectiveC {
-  @public init(_ number: NSNumber) {
+  public init(_ number: NSNumber) {
     value = number.doubleValue.value
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber(double: self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> Double {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> Double {
     return x.doubleValue
   }
 }
 
 extension Bool: _BridgedToObjectiveC {
-  @public init(_ number: NSNumber) {
+  public init(_ number: NSNumber) {
     if number.boolValue { self = Bool.true }
     else { self = Bool.false }
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
     return x.boolValue
   }
 }
 
 // Literal support for NSNumber
 extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible {
-  @public class func convertFromIntegerLiteral(value: Int) -> NSNumber {
+  public class func convertFromIntegerLiteral(value: Int) -> NSNumber {
     return NSNumber(integer: value)
   }
 
-  @public class func convertFromFloatLiteral(value: Double) -> NSNumber {
+  public class func convertFromFloatLiteral(value: Double) -> NSNumber {
     return NSNumber(double: value)
   }
 }
 
-@public let NSNotFound: Int = .max
+public let NSNotFound: Int = .max
 
 //===----------------------------------------------------------------------===//
 // Arrays
 //===----------------------------------------------------------------------===//
 
 extension NSArray : ArrayLiteralConvertible {
-  @public class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
+  public class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     let result = self(objects: UnsafePointer(x.elementStorage), count: x.count)
@@ -533,7 +533,7 @@ extension NSArray : ArrayLiteralConvertible {
 ///
 /// to Objective-C code as a method that accepts an NSArray.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
-@public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
+public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
     return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
@@ -550,24 +550,24 @@ extension NSArray : ArrayLiteralConvertible {
 ///   func f() -> [NSView] { return [] }
 ///
 /// to Objective-C code as a method that returns an NSArray.
-@public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
+public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return arr.bridgeToObjectiveC()
 }
 
 extension Array : _ConditionallyBridgedToObjectiveC {
-  @public static func isBridgedToObjectiveC() -> Bool {
+  public static func isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
 
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
 
-  @public func bridgeToObjectiveC() -> NSArray {
+  public func bridgeToObjectiveC() -> NSArray {
     return reinterpretCast(self._buffer._asCocoaArray())
   }
 
-  @public static func bridgeFromObjectiveC(source: NSArray) -> Array {
+  public static func bridgeFromObjectiveC(source: NSArray) -> Array {
     _precondition(Swift._isBridgedToObjectiveC(T.self),
         "array element type is not bridged to Objective-C")
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
@@ -580,7 +580,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
-  @public
+  public
   static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
@@ -598,7 +598,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 //===----------------------------------------------------------------------===//
 
 extension NSDictionary : DictionaryLiteralConvertible {
-  @public class func convertFromDictionaryLiteral(
+  public class func convertFromDictionaryLiteral(
     elements: (NSCopying, AnyObject)...
   ) -> Self {
     return self(
@@ -609,14 +609,14 @@ extension NSDictionary : DictionaryLiteralConvertible {
 }
 
 /// The entry point for bridging `NSDictionary` to `Dictionary`.
-@public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
+public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
        d: NSDictionary
      ) -> [K : V] {
   return [K : V](_cocoaDictionary: reinterpretCast(d))
 }
 
 /// The entry point for bridging `Dictionary` to `NSDictionary`.
-@public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
+public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     d: [KeyType : ValueType]
 ) -> NSDictionary {
   switch d._variantStorage {
@@ -688,19 +688,19 @@ extension NSDictionary : DictionaryLiteralConvertible {
 
 // Dictionary<KeyType, ValueType> is conditionally bridged to NSDictionary
 extension Dictionary : _ConditionallyBridgedToObjectiveC {
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
 
-  @public func bridgeToObjectiveC() -> NSDictionary {
+  public func bridgeToObjectiveC() -> NSDictionary {
     return _convertDictionaryToNSDictionary(self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+  public static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     return Dictionary(_cocoaDictionary: reinterpretCast(x))
   }
 
-  @public static func bridgeFromObjectiveCConditional(
+  public static func bridgeFromObjectiveCConditional(
     x: NSDictionary
   ) -> Dictionary? {
     let anyDict = x as [NSObject : AnyObject]
@@ -712,7 +712,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     return Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
   }
 
-  @public static func isBridgedToObjectiveC() -> Bool {
+  public static func isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(KeyType.self) &&
            Swift._isBridgedToObjectiveC(ValueType.self)
   }
@@ -723,7 +723,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 //===----------------------------------------------------------------------===//
 
 extension NSObject : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     _autorelease(self)
     return _encodeBitsAsWords(self)
   }
@@ -735,7 +735,7 @@ extension NSObject : CVarArg {
 
 // Give NSFastEnumerationState a default initializer, for convenience.
 extension NSFastEnumerationState {
-  @public init() {
+  public init() {
     state = 0
     itemsPtr = .null()
     mutationsPtr = .null()
@@ -748,7 +748,7 @@ extension NSFastEnumerationState {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
-@public class NSFastGenerator : Generator {
+public class NSFastGenerator : Generator {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
   var n: Int
@@ -764,7 +764,7 @@ extension NSFastEnumerationState {
   }
   var objects: [ObjectsBuffer]
 
-  @public func next() -> AnyObject? {
+  public func next() -> AnyObject? {
     if n == count {
       // FIXME: Is this check necessary before refresh()?
       if count == 0 { return .None }
@@ -785,7 +785,7 @@ extension NSFastEnumerationState {
       count: STACK_BUF_SIZE)
   }
 
-  @public init(_ enumerable: NSFastEnumeration) {
+  public init(_ enumerable: NSFastEnumeration) {
     self.enumerable = enumerable
     self.state = [NSFastEnumerationState](count: 1, repeatedValue: NSFastEnumerationState())
     self.state[0].state = 0
@@ -796,7 +796,7 @@ extension NSFastEnumerationState {
 }
 
 extension NSArray : Sequence {
-  @final @public
+  @final public
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -826,7 +826,7 @@ extension NSArray : Swift.Collection {
 extension NSMutableArray : Sequence {}
 
 extension NSSet : Sequence {
-  @public func generate() -> NSFastGenerator {
+  public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
 }
@@ -837,13 +837,13 @@ extension NSMutableSet : Sequence {}
 
 // FIXME: A class because we can't pass a struct with class fields through an
 // [objc] interface without prematurely destroying the references.
-@public class NSDictionaryGenerator : Generator {
+public class NSDictionaryGenerator : Generator {
   var fastGenerator : NSFastGenerator
   var dictionary : NSDictionary {
     return fastGenerator.enumerable as NSDictionary
   }
 
-  @public func next() -> (key: AnyObject, value: AnyObject)? {
+  public func next() -> (key: AnyObject, value: AnyObject)? {
     switch fastGenerator.next() {
     case .None:
       return .None
@@ -855,13 +855,13 @@ extension NSMutableSet : Sequence {}
     }
   }
 
-  @public init(_ dict: NSDictionary) {
+  public init(_ dict: NSDictionary) {
     self.fastGenerator = NSFastGenerator(dict)
   }
 }
 
 extension NSDictionary : Sequence {
-  @public func generate() -> NSDictionaryGenerator {
+  public func generate() -> NSDictionaryGenerator {
     return NSDictionaryGenerator(self)
   }
 }
@@ -875,25 +875,25 @@ extension NSMutableDictionary : Sequence {}
 //===----------------------------------------------------------------------===//
 
 extension NSRange {
-  @public init(_ x: Range<Int>) {
+  public init(_ x: Range<Int>) {
     location = x.startIndex
     length = countElements(x)
   }
-  @conversion @public func __conversion() -> Range<Int> {
+  @conversion public func __conversion() -> Range<Int> {
     return Range(start: location, end: location + length)
   }
 }
 
 extension NSRange : _BridgedToObjectiveC {
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSValue.self
   }
 
-  @public func bridgeToObjectiveC() -> NSValue {
+  public func bridgeToObjectiveC() -> NSValue {
     return NSValue(range: self)
   }
 
-  @public static func bridgeFromObjectiveC(x: NSValue) -> NSRange {
+  public static func bridgeFromObjectiveC(x: NSValue) -> NSRange {
     return x.rangeValue
   }
 }
@@ -902,12 +902,12 @@ extension NSRange : _BridgedToObjectiveC {
 // NSZone
 //===----------------------------------------------------------------------===//
 
-@public struct NSZone : NilLiteralConvertible {
+public struct NSZone : NilLiteralConvertible {
   var pointer : COpaquePointer
 
-  @public init() { pointer = nil }
+  public init() { pointer = nil }
   
-  @transparent @public
+  @transparent public
   static func convertFromNilLiteral() -> NSZone {
     return NSZone()
   }
@@ -918,7 +918,7 @@ extension NSRange : _BridgedToObjectiveC {
 //===----------------------------------------------------------------------===//
 
 /// Returns a localized string, using the main bundle if one is not specified.
-@public 
+public 
 func NSLocalizedString(key: String,
                        tableName: String? = nil,
                        bundle: NSBundle = NSBundle.mainBundle(),
@@ -995,7 +995,7 @@ struct _ObjCSuperMirror: Mirror {
 // NSLog
 //===----------------------------------------------------------------------===//
 
-@public func NSLog(format: String, args: CVarArg...) {
+public func NSLog(format: String, args: CVarArg...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1010,7 +1010,7 @@ struct _ObjCSuperMirror: Mirror {
 func _swift_undoProxy<T: NSObject>(undoManager: NSUndoManager, target: T) -> T
 
 extension NSUndoManager {
-  @public func prepareWithInvocationTarget<T: NSObject>(target: T) -> T {
+  public func prepareWithInvocationTarget<T: NSObject>(target: T) -> T {
     return _swift_undoProxy(self, target)
   }
 }
@@ -1019,7 +1019,7 @@ extension NSUndoManager {
 // NSError (as an out parameter).
 //===----------------------------------------------------------------------===//
 
-@public typealias NSErrorPointer = AutoreleasingUnsafePointer<NSError?>
+public typealias NSErrorPointer = AutoreleasingUnsafePointer<NSError?>
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
@@ -1027,7 +1027,7 @@ extension NSUndoManager {
 
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
-  @public
+  public
   convenience init(format predicateFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     return self.init(format: predicateFormat, arguments: va_args)
@@ -1036,7 +1036,7 @@ extension NSPredicate {
 
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
-  @public
+  public
   convenience init(format expressionFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     return self.init(format: expressionFormat, arguments: va_args)
@@ -1044,7 +1044,7 @@ extension NSExpression {
 }
 
 extension NSString {
-  @public
+  public
   convenience init(format: NSString, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1052,7 +1052,7 @@ extension NSString {
     self.init(format: format, arguments: va_args)
   }
   
-  @public
+  public
   convenience init(format: NSString, locale: NSLocale?, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1060,7 +1060,7 @@ extension NSString {
     self.init(format: format, locale: locale, arguments: va_args)
   }
 
-  @public
+  public
   class func localizedStringWithFormat(format: NSString,
                                        _ args: CVarArg...) -> NSString {
     return withVaList(args) {
@@ -1069,7 +1069,7 @@ extension NSString {
     }
   }
 
-  @public
+  public
   func stringByAppendingFormat(format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
@@ -1079,7 +1079,7 @@ extension NSString {
 }
 
 extension NSMutableString {
-  @public
+  public
   func appendFormat(format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
       self.appendString(NSString(format: format, arguments: $0))
@@ -1089,7 +1089,7 @@ extension NSMutableString {
 
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
-  @public
+  public
   convenience init(objects elements: AnyObject...) {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
@@ -1104,7 +1104,7 @@ extension NSArray {
 
 extension NSDictionary {
   // - (instancetype)initWithObjectsAndKeys:(id)firstObject, ...
-  @public
+  public
   convenience init(objectsAndKeys objects: AnyObject...) {
     // - (instancetype)initWithObjects:(NSArray *)objects forKeys:(NSArray *)keys;
     var values: [AnyObject] = []
@@ -1120,7 +1120,7 @@ extension NSDictionary {
 
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  @public
+  public
   convenience init(objects elements: AnyObject...) {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
@@ -1135,7 +1135,7 @@ extension NSOrderedSet {
 
 extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  @public
+  public
   convenience init(objects elements: AnyObject...) {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;

@@ -33,21 +33,21 @@ def getMirrorDecl(Self,Disp = None):
 ${getMirrorDecl("NSURL")} {
   ${getMirrorBoilerplate("NSURL")}
   
-  @public var count: Int { get { return 0 } }
+  public var count: Int { get { return 0 } }
   
-  @public subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
+  public subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
   
-  @public var summary: String { get { return _value.absoluteString } }
+  public var summary: String { get { return _value.absoluteString } }
   
-  @public var quickLookObject: QuickLookObject? { get { return .Some(.URL(summary)) } }
+  public var quickLookObject: QuickLookObject? { get { return .Some(.URL(summary)) } }
 }
 
 ${getMirrorDecl("NSRange")} {
   ${getMirrorBoilerplate("NSRange")}
   
-  @public var count: Int { get { return 2 } }
+  public var count: Int { get { return 2 } }
   
-  @public subscript(i: Int) -> (String,Mirror) {
+  public subscript(i: Int) -> (String,Mirror) {
     switch i {
       case 0: return ("location",reflect(_value.location))
       case 1: return ("length",reflect(_value.length))
@@ -55,26 +55,26 @@ ${getMirrorDecl("NSRange")} {
     }
   }
   
-  @public var summary: String { return "(\(_value.location),\(_value.length))" }
+  public var summary: String { return "(\(_value.location),\(_value.length))" }
   
-  @public var quickLookObject: QuickLookObject? { return .Some(.Range(UInt64(_value.location),UInt64(_value.length))) }
+  public var quickLookObject: QuickLookObject? { return .Some(.Range(UInt64(_value.location),UInt64(_value.length))) }
 }
 
 ${getMirrorDecl("NSDate")} {
   ${getMirrorBoilerplate("NSDate")}
   
-  @public var count: Int { get { return 0 } }
+  public var count: Int { get { return 0 } }
   
-  @public subscript(i: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
+  public subscript(i: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
   
-  @public var summary: String {
+  public var summary: String {
     let df = NSDateFormatter()
     df.dateStyle = .MediumStyle
     df.timeStyle = .ShortStyle
     return df.stringFromDate(_value)
   }
   
-  @public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
 
 ${getMirrorDecl("NSSet","MembershipContainer")} {
@@ -86,32 +86,32 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
     _a = _value.allObjects
   }
   
-  @public var disposition: MirrorDisposition { return .MembershipContainer }
+  public var disposition: MirrorDisposition { return .MembershipContainer }
 
-  @public var value: Any { return _value }
+  public var value: Any { return _value }
 
-  @public var valueType: Any.Type { return (_value as Any).dynamicType }
+  public var valueType: Any.Type { return (_value as Any).dynamicType }
 
-  @public var objectIdentifier: ObjectIdentifier? { return .None }
+  public var objectIdentifier: ObjectIdentifier? { return .None }
   
   // this is the only member that needs to validate _a - others either don't touch it or call into this
-  @public var count: Int {
+  public var count: Int {
     if _a {
       return _a.count
     }
     return 0
   }
   
-  @public subscript(i: Int) -> (String,Mirror) {
+  public subscript(i: Int) -> (String,Mirror) {
     if i >= 0 && i < count {
       return ("[\(i)]",reflect(_a[i]))
     }
     _fatalError("Mirror access out of bounds")
   }
   
-  @public var summary: String { return "\(count) elements" }
+  public var summary: String { return "\(count) elements" }
   
-  @public var quickLookObject: QuickLookObject? { return nil }
+  public var quickLookObject: QuickLookObject? { return nil }
 }
 
 // conformances
@@ -121,18 +121,18 @@ ${getMirrorConformance("NSDate")}
 ${getMirrorConformance("NSSet","MembershipContainer")}
 
 extension NSArray : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return reflect(self as [AnyObject])
   }
 }
 extension NSDictionary : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return reflect(dict)
   }
 }
 extension NSString : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return reflect(self as String)
   }
 }

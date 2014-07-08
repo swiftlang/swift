@@ -15,7 +15,7 @@
 // be a drop-in replacement for String
 //
 extension String {
-  @public init(count sz: Int, repeatedValue c: Character) {
+  public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_StringBuffer(capacity: s.core.count * sz, 
                                 initialSize: 0, 
@@ -25,27 +25,27 @@ extension String {
     }
   }
 
-  @public init(count: Int, repeatedValue c: UnicodeScalar) {
+  public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  @public var _lines : [String] {
+  public var _lines : [String] {
     return _split("\n")
   }
   
-  @public func _split(separator: UnicodeScalar) -> [String] {
+  public func _split(separator: UnicodeScalar) -> [String] {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
     return scalarSlices.map { $0 as String }
   }
   
-  @public var isEmpty : Bool {
+  public var isEmpty : Bool {
     return core.count == 0
   }
 }
 
 extension String {
-  @public init(_ _c: UnicodeScalar) {
+  public init(_ _c: UnicodeScalar) {
     self = String(count: 1, repeatedValue: _c)
   }
 
@@ -55,11 +55,11 @@ extension String {
     return true
   }
 
-  @public func hasPrefix(prefix: String) -> Bool {
+  public func hasPrefix(prefix: String) -> Bool {
     return Swift.startsWith(self, prefix)
   }
   
-  @public func hasSuffix(suffix: String) -> Bool {
+  public func hasSuffix(suffix: String) -> Bool {
     return Swift.startsWith(lazy(self).reverse(), lazy(suffix).reverse())
   }
 
@@ -114,7 +114,7 @@ func _formatSignedInteger(
 // Conversions to string from other types.
 extension String {
 
-  @public init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
+  public init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatSignedInteger(v, UInt64(radix), 
                                       ten: _uppercase ? "A" : "a")
     var asciiCount = 0
@@ -127,7 +127,7 @@ extension String {
   }
 
   // FIXME: This function assumes UTF-16
-  @public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
+  public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatPositiveInteger(v, UInt64(radix), 
                                         ten: _uppercase ? "A" : "a")
     var asciiCount = v == 0 ? 1 : 0
@@ -142,28 +142,28 @@ extension String {
     self = String(buffer)
   }
 
-  @public init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
     self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  @public init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
+  public init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
     self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
 
@@ -193,7 +193,7 @@ extension String {
   /// If the string represents an integer that fits into an Int, returns
   /// the corresponding integer.  This accepts strings that match the regular
   /// expression "[-+]?[0-9]+" only.
-  @public func toInt() -> Int? {
+  public func toInt() -> Int? {
     var scalars = self.unicodeScalars
 
     var start = scalars.startIndex
@@ -270,7 +270,7 @@ extension String {
   /// Split the given string at the given delimiter character, returning 
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
-  @public func _splitFirst(delim: UnicodeScalar)
+  public func _splitFirst(delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
     var rng = unicodeScalars
@@ -286,7 +286,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
-  @public func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars

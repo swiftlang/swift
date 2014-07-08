@@ -24,13 +24,13 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
-  @public var count: Int { return 0 }
+  public var count: Int { return 0 }
   
-  @public subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
+  public subscript(_: Int) -> (String,Mirror) { _fatalError("Mirror access out of bounds") }
 
-  @public var summary: String { return _value.description }
+  public var summary: String { return _value.description }
   
-  @public var quickLookObject: QuickLookObject? {
+  public var quickLookObject: QuickLookObject? {
       // this code comes straight from the quicklooks
       
       if let data = (_value as AnyObject)._copyImageData?() {

@@ -19,15 +19,15 @@
 
 /// An extremely simple string designed to represent something
 /// "statically knowable".
-@public struct StaticString
+public struct StaticString
   : _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible {
-  @public var start: Builtin.RawPointer
-  @public var byteSize: Builtin.Word
-  @public var isASCII: Builtin.Int1
+  public var start: Builtin.RawPointer
+  public var byteSize: Builtin.Word
+  public var isASCII: Builtin.Int1
 
-  @public init() {
+  public init() {
     self = ""
   }
 
@@ -39,7 +39,7 @@
     self.isASCII = isASCII
   }
 
-  @public
+  public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -49,19 +49,19 @@
         start, byteSize: byteSize, isASCII: isASCII)
   }
 
-  @public static func convertFromExtendedGraphemeClusterLiteral(
+  public static func convertFromExtendedGraphemeClusterLiteral(
       value: StaticString) -> StaticString {
     return value
   }
 
-  @public
+  public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) -> StaticString {
     return StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
 
-  @public
+  public
   static func convertFromStringLiteral(value: StaticString) -> StaticString {
     return value
   }

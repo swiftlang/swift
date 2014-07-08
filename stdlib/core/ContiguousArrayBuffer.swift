@@ -18,7 +18,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
 // The class that implements the storage for a ContiguousArray<T>
-@final @internal class ContiguousArrayStorage<T> : _NSSwiftArray {
+@final internal class ContiguousArrayStorage<T> : _NSSwiftArray {
   typealias Buffer = ContiguousArrayBuffer<T>
   
   deinit {
@@ -47,12 +47,12 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
 }
 
-@public struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
+public struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
   /// result's .elementStorage or set the result's .count to zero.
-  @public init(count: Int, minimumCapacity: Int)
+  public init(count: Int, minimumCapacity: Int)
   {
     _base = HeapBuffer(
       ContiguousArrayStorage<T>.self,
@@ -72,13 +72,13 @@ let emptyNSSwiftArray : _NSSwiftArray
     _base = reinterpretCast(storage)
   }
   
-  @public func getLogicValue() -> Bool {
+  public func getLogicValue() -> Bool {
     return _base.getLogicValue()
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  @public var elementStorage: UnsafePointer<T> {
+  public var elementStorage: UnsafePointer<T> {
     return _base ? _base.elementStorage : nil
   }
 
@@ -88,12 +88,12 @@ let emptyNSSwiftArray : _NSSwiftArray
     return _base.elementStorage
   }
 
-  @public func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+  public func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
     let p = _base.elementStorage
     return withExtendedLifetime(_base) { body(p) }
   }
 
-  @public mutating func take() -> ContiguousArrayBuffer {
+  public mutating func take() -> ContiguousArrayBuffer {
     if !_base {
       return ContiguousArrayBuffer()
     }
@@ -105,32 +105,32 @@ let emptyNSSwiftArray : _NSSwiftArray
 
   //===--- ArrayBufferType conformance ------------------------------------===//
   /// The type of elements stored in the buffer
-  @public typealias Element = T
+  public typealias Element = T
 
   /// create an empty buffer
-  @public init() {
+  public init() {
     _base = HeapBuffer()
   }
 
   /// Adopt the storage of x
-  @public init(_ buffer: ContiguousArrayBuffer) {
+  public init(_ buffer: ContiguousArrayBuffer) {
     self = buffer
   }
   
-  @public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> ContiguousArrayBuffer<Element>?
   {
     return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil
   }
 
-  @public mutating func isMutableAndUniquelyReferenced() -> Bool {
+  public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
   
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
-  @public func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
+  public func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
     return self
   }
   
@@ -139,7 +139,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// ContiguousArrayBuffer
-  @public
+  public
   mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
@@ -147,7 +147,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
   
   /// Get/set the value of the ith element
-  @public subscript(i: Int) -> T {
+  public subscript(i: Int) -> T {
     get {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
@@ -168,7 +168,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
 
   /// How many elements the buffer stores
-  @public var count: Int {
+  public var count: Int {
     get {
       return _base ? _base.value.count : 0
     }
@@ -188,14 +188,14 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
 
   /// How many elements the buffer can store without reallocation
-  @public var capacity: Int {
+  public var capacity: Int {
     return _base ? _base.value.capacity : 0
   }
 
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  @public
+  public
   func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
@@ -214,7 +214,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
-  @public subscript(subRange: Range<Int>) -> SliceBuffer<T>
+  public subscript(subRange: Range<Int>) -> SliceBuffer<T>
   {
     return SliceBuffer(
       owner: _base.storage,
@@ -227,20 +227,20 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// NOTE: this does not mean the buffer is mutable.  Other factors
   /// may need to be considered, such as whether the buffer could be
   /// some immutable Cocoa container.
-  @public mutating func isUniquelyReferenced() -> Bool {
+  public mutating func isUniquelyReferenced() -> Bool {
     return _base.isUniquelyReferenced()
   }
 
   /// Returns true iff this buffer is mutable. NOTE: a true result
   /// does not mean the buffer is uniquely-referenced.
-  @public func isMutable() -> Bool {
+  public func isMutable() -> Bool {
     return true
   }
 
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1) if T is bridged verbatim, O(N) otherwise
-  @public
+  public
   func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
@@ -257,7 +257,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   }
   
   /// An object that keeps the elements stored in this buffer alive
-  @public
+  public
   var owner: AnyObject? {
     return _storage
   }
@@ -265,7 +265,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
   /// have the same identity and count.
-  @public
+  public
   var identity: Word {
     return reinterpretCast(elementStorage)
   }
@@ -313,7 +313,7 @@ let emptyNSSwiftArray : _NSSwiftArray
 }
 
 /// Append the elements of rhs to lhs
-@public func += <
+public func += <
   T, C: Collection where C._Element == T
 > (
   inout lhs: ContiguousArrayBuffer<T>, rhs: C
@@ -341,35 +341,35 @@ let emptyNSSwiftArray : _NSSwiftArray
 }
 
 /// Append rhs to lhs
-@public func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
+public func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
 
-@public func === <T>(
+public func === <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base == rhs._base
 }
 
-@public func !== <T>(
+public func !== <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base != rhs._base
 }
 
 extension ContiguousArrayBuffer : Collection {
-  @public var startIndex: Int {
+  public var startIndex: Int {
     return 0
   }
-  @public var endIndex: Int {
+  public var endIndex: Int {
     return count
   }
-  @public func generate() -> IndexingGenerator<ContiguousArrayBuffer> {
+  public func generate() -> IndexingGenerator<ContiguousArrayBuffer> {
     return IndexingGenerator(self)
   }
 }
 
-@public func ~> <
+public func ~> <
   S: _Sequence_
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
@@ -385,7 +385,7 @@ extension ContiguousArrayBuffer : Collection {
   return result.take()
 }
 
-@public func ~> <  
+public func ~> <  
   C: protocol<_Collection,_Sequence_>
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
@@ -394,7 +394,7 @@ extension ContiguousArrayBuffer : Collection {
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
-@internal func _copyCollectionToNativeArrayBuffer<
+internal func _copyCollectionToNativeArrayBuffer<
   C: protocol<_Collection,_Sequence_>
 >(source: C) -> ContiguousArrayBuffer<C.GeneratorType.Element>
 {
@@ -416,7 +416,7 @@ extension ContiguousArrayBuffer : Collection {
   return result
 }
 
-@internal protocol _ArrayType : Collection {
+internal protocol _ArrayType : Collection {
   var count: Int {get}
 
   typealias _Buffer : ArrayBufferType

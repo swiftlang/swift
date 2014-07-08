@@ -14,13 +14,13 @@
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
 
-@public
+public
 enum UnicodeDecodingResult {
   case Result(UnicodeScalar)
   case EmptyInput
   case Error
 
-  @public
+  public
   func isEmptyInput() -> Bool {
     switch self {
     case .EmptyInput:
@@ -31,7 +31,7 @@ enum UnicodeDecodingResult {
   }
 }
 
-@public protocol UnicodeCodec {
+public protocol UnicodeCodec {
   typealias CodeUnit
 
   init()
@@ -55,16 +55,16 @@ enum UnicodeDecodingResult {
   >(input: UnicodeScalar, inout output: S)
 }
 
-@public struct UTF8 : UnicodeCodec {
+public struct UTF8 : UnicodeCodec {
 
-  @public typealias CodeUnit = UInt8
+  public typealias CodeUnit = UInt8
 
-  @public init() {}
+  public init() {}
 
   /// Returns the number of expected trailing bytes for a given first byte: 0,
   /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
   /// sequence, returns 4.
-  @public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
+  public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
     if _fastPath(cu0 & 0x80 == 0) {
       // 0x00 -- 0x7f: 1-byte sequences.
       return 0
@@ -300,7 +300,7 @@ enum UnicodeDecodingResult {
     return 1
   }
 
-  @public mutating func decode<
+  public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
@@ -411,7 +411,7 @@ enum UnicodeDecodingResult {
     return .Result(UnicodeScalar(result & 0x001fffff)) // 21 bits
   }
 
-  @public static func encode<
+  public static func encode<
     S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var c = UInt32(input)
@@ -446,10 +446,10 @@ enum UnicodeDecodingResult {
   var _value =  UInt8()
 }
 
-@public struct UTF16 : UnicodeCodec {
-  @public typealias CodeUnit = UInt16
+public struct UTF16 : UnicodeCodec {
+  public typealias CodeUnit = UInt16
 
-  @public init() {}
+  public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
   var _decodeLookahead: UInt32 = 0
@@ -461,7 +461,7 @@ enum UnicodeDecodingResult {
   /// `x` is set when `_decodeLookahead` contains a code unit.
   var _lookaheadFlags: UInt8 = 0
 
-  @public mutating func decode<
+  public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
@@ -555,7 +555,7 @@ enum UnicodeDecodingResult {
     }
   }
 
-  @public static func encode<
+  public static func encode<
       S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var scalarValue: UInt32 = UInt32(input)
@@ -573,12 +573,12 @@ enum UnicodeDecodingResult {
   var _value = UInt16()
 }
 
-@public struct UTF32 : UnicodeCodec {
-  @public typealias CodeUnit = UInt32
+public struct UTF32 : UnicodeCodec {
+  public typealias CodeUnit = UInt32
 
-  @public init() {}
+  public init() {}
 
-  @public mutating func decode<
+  public mutating func decode<
     G : Generator where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
@@ -597,14 +597,14 @@ enum UnicodeDecodingResult {
     return .EmptyInput
   }
 
-  @public static func encode<
+  public static func encode<
     S : Sink where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     output.put(UInt32(input))
   }
 }
 
-@public func transcode<
+public func transcode<
   Input : Generator,
   Output : Sink,
   InputEncoding : UnicodeCodec,
@@ -644,7 +644,7 @@ enum UnicodeDecodingResult {
 ///
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
-@internal func _transcodeSomeUTF16AsUTF8<
+internal func _transcodeSomeUTF16AsUTF8<
   Input : Collection
   where Input.GeneratorType.Element == UInt16>(
   input: Input, startIndex: Input.IndexType
@@ -733,50 +733,50 @@ enum UnicodeDecodingResult {
   return (nextIndex, result)
 }
 
-@public
+public
 protocol StringElement {
   class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
 extension UTF16.CodeUnit : StringElement {
-  @public
+  public
   static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
   }
-  @public
+  public
   static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return utf16
   }
 }
 
 extension UTF8.CodeUnit : StringElement {
-  @public
+  public
   static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     return UTF16.CodeUnit(x)
   }
-  @public
+  public
   static func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> UTF8.CodeUnit {
     return UTF8.CodeUnit(utf16)
   }
 }
 
 extension UTF16 {
-  @public static func width(x: UnicodeScalar) -> Int {
+  public static func width(x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
-  @public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) >> 10) + 0xD800
   }
 
-  @public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
   }
 
-  @public static func copy<T: StringElement, U: StringElement>(
+  public static func copy<T: StringElement, U: StringElement>(
     source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
   ) {
     if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
@@ -800,7 +800,7 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
-  @public static func measure<
+  public static func measure<
       Encoding : UnicodeCodec, Input : Generator
       where Encoding.CodeUnit == Input.Element
   >(

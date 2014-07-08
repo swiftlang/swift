@@ -12,8 +12,8 @@
 
 /// The `Generator` used by `FilterSequenceView` and
 /// `FilterCollectionView`
-@public struct FilterGenerator<Base: Generator> : Generator, Sequence {
-  @public mutating func next() -> Base.Element? {
+public struct FilterGenerator<Base: Generator> : Generator, Sequence {
+  public mutating func next() -> Base.Element? {
     var n: Base.Element?
     for/*ever*/;; {
       n = _base.next()
@@ -23,7 +23,7 @@
     }
   }
   
-  @public func generate() -> FilterGenerator {
+  public func generate() -> FilterGenerator {
     return self
   }
 
@@ -33,8 +33,8 @@
 
 /// The lazy `Sequence` returned by `filter(c)` where `c` is a
 /// `Sequence`
-@public struct FilterSequenceView<Base: Sequence> : Sequence {
-  @public func generate() -> FilterGenerator<Base.GeneratorType> {
+public struct FilterSequenceView<Base: Sequence> : Sequence {
+  public func generate() -> FilterGenerator<Base.GeneratorType> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
@@ -43,8 +43,8 @@
 }
 
 /// The `IndexType` used for subscripting a `FilterCollectionView`
-@public struct FilterCollectionViewIndex<Base: Collection> : ForwardIndex {
-  @public func successor() -> FilterCollectionViewIndex {
+public struct FilterCollectionViewIndex<Base: Collection> : ForwardIndex {
+  public func successor() -> FilterCollectionViewIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {
         return FilterCollectionViewIndex(
@@ -61,7 +61,7 @@
   var _include: (Base.GeneratorType.Element)->Bool
 }
 
-@public func == <Base: Collection>(
+public func == <Base: Collection>(
   lhs: FilterCollectionViewIndex<Base>,
   rhs: FilterCollectionViewIndex<Base>
 ) -> Bool {
@@ -81,17 +81,17 @@
 ///   of the collection before traversing it to read the elements.
 ///   This causes the filter predicate to be called twice for each
 ///   element of the underlying collection, which is surprising.
-@public struct FilterCollectionView<Base: Collection> : Collection {
+public struct FilterCollectionView<Base: Collection> : Collection {
 
-  @public typealias IndexType = FilterCollectionViewIndex<Base>
+  public typealias IndexType = FilterCollectionViewIndex<Base>
 
-  @public
+  public
   init(_ base: Base, includeElement: (Base.GeneratorType.Element)->Bool) {
     self._base = base
     self._include = includeElement
   }
 
-  @public var startIndex: IndexType {
+  public var startIndex: IndexType {
     var first = _base.startIndex
     while first != _base.endIndex {
       if _include(_base[first]) {
@@ -103,17 +103,17 @@
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
   
-  @public var endIndex: IndexType {
+  public var endIndex: IndexType {
     return FilterCollectionViewIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
       _base: _base, _include: _include)
   }
 
-  @public subscript(index: IndexType) -> Base.GeneratorType.Element {
+  public subscript(index: IndexType) -> Base.GeneratorType.Element {
     return _base[index._pos]
   }
 
-  @public func generate() -> FilterGenerator<Base.GeneratorType> {
+  public func generate() -> FilterGenerator<Base.GeneratorType> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
@@ -123,7 +123,7 @@
 
 /// Return an `Array` containing the elements of `source`,
 /// in order, that satisfy the predicate `includeElement`.
-@public func filter<S:Sequence>(
+public func filter<S:Sequence>(
   source: S, includeElement: (S.GeneratorType.Element)->Bool
 ) -> [S.GeneratorType.Element] {
   return lazy(source).filter(includeElement).array
@@ -134,7 +134,7 @@
 extension ${Self} {
   /// Return a lazy Sequence containing the elements `x` of `source` for
   /// which `includeElement(x)` is `true`
-  @public
+  public
   func filter(
     includeElement: (S.GeneratorType.Element)->Bool
   ) -> LazySequence<FilterSequenceView<S>> {
@@ -151,7 +151,7 @@ extension ${Self} {
 
 /// Return a lazy Collection containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
-@public func filter<C:Collection>(
+public func filter<C:Collection>(
   source: C, includeElement: (C.GeneratorType.Element)->Bool
 ) -> FilterCollectionView<C> {
   return FilterCollectionView(_base: source, _include: includeElement)

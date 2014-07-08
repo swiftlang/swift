@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public protocol CVarArg {
+public protocol CVarArg {
   func encode() -> [Word]
 }
 
@@ -21,7 +21,7 @@ let _x86_64SSERegisterWords = 2
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
-@public func withVaList<R>(args: [CVarArg], f: (CVaListPointer)->R) -> R {
+public func withVaList<R>(args: [CVarArg], f: (CVaListPointer)->R) -> R {
   var builder = VaListBuilder()
   for a in args {
     builder.append(a)
@@ -29,13 +29,13 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
   return withVaList(builder, f)
 }
 
-@public func withVaList<R>(builder: VaListBuilder, f: (CVaListPointer)->R) -> R {
+public func withVaList<R>(builder: VaListBuilder, f: (CVaListPointer)->R) -> R {
   let result = f(builder.va_list())
   _fixLifetime(builder)
   return result
 }
 
-@public func getVaList(args: [CVarArg]) -> CVaListPointer {
+public func getVaList(args: [CVarArg]) -> CVaListPointer {
   var builder = VaListBuilder()
   for a in args {
     builder.append(a)
@@ -46,7 +46,7 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
   return builder.va_list()
 }
 
-@public func _encodeBitsAsWords<T: CVarArg>(x: T) -> [Word] {
+public func _encodeBitsAsWords<T: CVarArg>(x: T) -> [Word] {
   var result = [Word](
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
@@ -63,87 +63,87 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 
 // Signed types
 extension Int : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int64 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int32 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Int16 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
 
 extension Int8 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
 
 // Unsigned types
 extension UInt : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt64 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt32 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension UInt16 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension UInt8 : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
 extension COpaquePointer : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 extension Float : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(Double(self))
   }
 }
 
 extension Double : CVarArg {
-  @public func encode() -> [Word] {
+  public func encode() -> [Word] {
     return _encodeBitsAsWords(self)
   }
 }
 
 #if !arch(x86_64)
 
-@final @public
+@final public
 class VaListBuilder {
   
   func append(arg: CVarArg) {
@@ -161,7 +161,7 @@ class VaListBuilder {
 
 #else
 
-@final @public
+@final public
 class VaListBuilder {
 
   struct Header {

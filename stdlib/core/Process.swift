@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@public struct _Process {
+public struct _Process {
   // Use lazy initialization of static properties to safely initialize the
   // public 'arguments' property on first use.
   static var _arguments: [String] = {
@@ -22,9 +22,9 @@
     }
   }()
 
-  @public var arguments : [String] {
+  public var arguments : [String] {
     return _Process._arguments
   }
 }
 
-@public var Process = _Process()
+public var Process = _Process()

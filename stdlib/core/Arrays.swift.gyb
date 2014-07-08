@@ -29,17 +29,17 @@
 %     ('Array', 'an Array')
 % ]
 % for (Self, a_Self) in arrayTypes:
-@public struct ${Self}<T> : MutableCollection, Sliceable {
-  @public typealias Element = T
-  @public var startIndex: Int {
+public struct ${Self}<T> : MutableCollection, Sliceable {
+  public typealias Element = T
+  public var startIndex: Int {
     return 0
   }
 
-  @public var endIndex: Int {
+  public var endIndex: Int {
     return _buffer.count
   }
 
-  @public subscript(index: Int) -> Element {
+  public subscript(index: Int) -> Element {
     get {
       _precondition(index < count, "${Self} index out of range")
       _precondition(index >= 0, "Negative ${Self} index is out of range")
@@ -57,12 +57,12 @@
     }
   }
 
-  @public func generate() -> IndexingGenerator<${Self}> {
+  public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }
   
-  @public typealias SliceType = Slice<T>
-  @public subscript(subRange: Range<Int>) -> SliceType {
+  public typealias SliceType = Slice<T>
+  public subscript(subRange: Range<Int>) -> SliceType {
     get {
       return Slice(_buffer[subRange])
     }
@@ -87,36 +87,36 @@
     buffer = _Buffer(newBuffer)
   }
 
-  @public
+  public
   typealias _Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
 
-  @public
+  public
   init(_ buffer: _Buffer) {
     self._buffer = buffer
   }
 
-  @public var _buffer: _Buffer
+  public var _buffer: _Buffer
 }
 
 extension ${Self} : ArrayLiteralConvertible {
-  @public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
+  public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
     return ${Self}(_extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
 }
 
 extension ${Self} {
-  @public func _asCocoaArray() -> _CocoaArray {
+  public func _asCocoaArray() -> _CocoaArray {
     return _buffer._asCocoaArray()
   }
 }
 
 extension ${Self} : ArrayType {
   /// Construct an empty ${Self}
-  @public init() {
+  public init() {
     _buffer = _Buffer()
   }
 
-  @public init<
+  public init<
     S: Sequence where S.GeneratorType.Element == _Buffer.Element
   >(_ s: S) {
     self = ${Self}(_Buffer(s~>_copyToNativeArrayBuffer()))
@@ -124,7 +124,7 @@ extension ${Self} : ArrayType {
 
   /// Construct an array of `count` elements, each initialized to
   /// `repeatedValue`.
-  @public init(count: Int, repeatedValue: T) {
+  public init(count: Int, repeatedValue: T) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
     reserveCapacity(count)
@@ -136,29 +136,29 @@ extension ${Self} : ArrayType {
   }
   
   /// How many elements the ${Self} stores
-  @public var count: Int {
+  public var count: Int {
     return _buffer.count
   }
 
   /// How many elements the ${Self} can store without reallocation
-  @public var capacity: Int {
+  public var capacity: Int {
     return _buffer.capacity
   }
 
   /// true if and only if the ${Self} is empty
-  @public var isEmpty: Bool {
+  public var isEmpty: Bool {
     return count == 0
   }
   
   /// An object that guarantees the lifetime of this array's elements
-  @public
+  public
   var _owner: AnyObject? {
     return _buffer.owner
   }
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  @public var _elementStorageIfContiguous: UnsafePointer<Element> {
+  public var _elementStorageIfContiguous: UnsafePointer<Element> {
     return _buffer.elementStorage
   }
 
@@ -173,7 +173,7 @@ extension ${Self} : ArrayType {
   /// Ensure the array has enough mutable contiguous storage to store
   /// minimumCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
-  @public mutating func reserveCapacity(minimumCapacity: Int) {
+  public mutating func reserveCapacity(minimumCapacity: Int) {
     if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
 
       var newBuffer = ContiguousArrayBuffer<T>(
@@ -186,12 +186,12 @@ extension ${Self} : ArrayType {
   }
   
   /// Append newElement to the ${Self} in O(1) (amortized)
-  @public mutating func append(newElement: T) {
+  public mutating func append(newElement: T) {
     _arrayAppend(&_buffer, newElement)
   }
 
   /// Append elements from `sequence` to the Array
-  @public mutating func extend<
+  public mutating func extend<
       S : Sequence
       where S.GeneratorType.Element == T
   >(sequence: S) {
@@ -206,7 +206,7 @@ extension ${Self} : ArrayType {
 
   /// Remove an element from the end of the ${Self} in O(1).
   /// Requires: count > 0
-  @public mutating func removeLast() -> T {
+  public mutating func removeLast() -> T {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
     let result = self[c - 1]
@@ -216,13 +216,13 @@ extension ${Self} : ArrayType {
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
-  @public mutating func insert(newElement: T, atIndex: Int) {
+  public mutating func insert(newElement: T, atIndex: Int) {
     self.replaceRange(atIndex..<atIndex, with: CollectionOfOne(newElement))
   }
 
   /// Remove the element at the given index.  Worst case complexity:
   /// O(N).  Requires: index < count
-  @public mutating func removeAtIndex(index: Int) -> T {
+  public mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
     return result
@@ -230,7 +230,7 @@ extension ${Self} : ArrayType {
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not change
-  @public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
     }
@@ -241,24 +241,24 @@ extension ${Self} : ArrayType {
   
   //===--- algorithms -----------------------------------------------------===//
 
-  @public func join<
+  public func join<
       S : Sequence where S.GeneratorType.Element == ${Self}<T>
   >(elements: S) -> ${Self}<T> {
     return Swift.join(self, elements)
   }
 
-  @public func reduce<U>(initial: U, combine: (U, T)->U) -> U {
+  public func reduce<U>(initial: U, combine: (U, T)->U) -> U {
     return Swift.reduce(self, initial, combine)
   }
 
-  @public mutating func sort(isOrderedBefore: (T, T)->Bool) {
+  public mutating func sort(isOrderedBefore: (T, T)->Bool) {
     return withUnsafeMutableStorage {
       me in Swift.sort(&me, isOrderedBefore)
       return
     }
   }
 
-  @public func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
+  public func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
     var result = self
     result.sort(isOrderedBefore)
     return result
@@ -266,18 +266,18 @@ extension ${Self} : ArrayType {
 
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
-  @public func map<U>(transform: (T)->U) -> ${Self}<U> {
+  public func map<U>(transform: (T)->U) -> ${Self}<U> {
     return ${Self}<U>(lazy(self).map(transform))
   }
 
   /// A ${Self} containing the elements of `self` in reverse order
-  @public func reverse() -> ${Self} {
+  public func reverse() -> ${Self} {
     return ${Self}(lazy(self).reverse())
   }
 
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
-  @public func filter(includeElement: (T)->Bool) -> ${Self} {
+  public func filter(includeElement: (T)->Bool) -> ${Self} {
     return ${Self}(lazy(self).filter(includeElement))
   }
 }
@@ -290,7 +290,7 @@ func _${Self}Extend<
 }
 
 extension ${Self} : Reflectable {
-  @public func getMirror() -> Mirror {
+  public func getMirror() -> Mirror {
     return _ArrayTypeMirror(self)
   }
 }
@@ -315,11 +315,11 @@ extension ${Self} : Printable, DebugPrintable {
     return result
   }
 
-  @public var description: String {
+  public var description: String {
     return _makeDescription(isDebug: false)
   }
 
-  @public var debugDescription: String {
+  public var debugDescription: String {
     return _makeDescription(isDebug: true)
   }
 }
@@ -342,7 +342,7 @@ extension ${Self} {
 %if Self != 'Array':
   /// Requires: the Array's storage is not provided by an opaque NSArray
 %end
-  @public func withUnsafePointerToElements<R>(
+  public func withUnsafePointerToElements<R>(
     body: (UnsafePointer<T>) -> R
   ) -> R {
     return _buffer.withUnsafePointerToElements(body)
@@ -350,7 +350,7 @@ extension ${Self} {
 }
 
 extension ${Self} {
-  @public mutating func withUnsafeMutableStorage<R>(
+  public mutating func withUnsafeMutableStorage<R>(
     body: (inout UnsafeMutableArray<T>)->R
   ) -> R {
     // Ensure unique storage
@@ -377,7 +377,7 @@ extension ${Self} {
 
 extension Array {
   /// This function "seeds" the ArrayLiteralConvertible protocol
-  @public static func convertFromHeapArray(
+  public static func convertFromHeapArray(
     base: Builtin.RawPointer,
     owner: Builtin.NativeObject,
     count: Builtin.Word
@@ -531,7 +531,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
 
 % for (Self, a_Self) in arrayTypes:
 extension ${Self} {
-  @public mutating func replaceRange<
+  public mutating func replaceRange<
     C: Collection where C.GeneratorType.Element == _Buffer.Element
   >(
     subRange: Range<Int>, with newValues: C
@@ -540,7 +540,7 @@ extension ${Self} {
   }
 }
 
-@assignment @public
+@assignment public
 func += <
   T, S: Sequence
 where S.GeneratorType.Element == T
@@ -556,7 +556,7 @@ where S.GeneratorType.Element == T
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
-@assignment @public
+@assignment public
 func += <
   T, C: Collection
 where C.GeneratorType.Element == T
@@ -581,7 +581,7 @@ where C.GeneratorType.Element == T
   lhs._buffer.count = newCount
 }
 
-@assignment @public
+@assignment public
 func += <T>(inout lhs: ${Self}<T>, rhs: T) {
   _arrayAppend(&lhs._buffer, rhs)
 }
@@ -746,7 +746,7 @@ func _arrayReserve<_Buffer: ArrayBufferType>(
   }
 }
 
-@public func _extractOrCopyToNativeArrayBuffer<
+public func _extractOrCopyToNativeArrayBuffer<
   _Buffer: ArrayBufferType
     where _Buffer.GeneratorType.Element == _Buffer.Element
 >(source: _Buffer) 
@@ -813,7 +813,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 // Slice<Int> and Array<Int>.
 
 /// Returns true if these arrays contain the same elements.
-@public func ==<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func ==<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   let lhsCount = lhs.count
   if lhsCount != rhs.count {
     return false
@@ -840,7 +840,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 }
 
 /// Returns true if the arrays do not contain the same elements.
-@public func !=<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func !=<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return !(lhs == rhs)
 }
 %end
@@ -848,14 +848,14 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// Returns an Array<Base> containing the same elements as a in
 /// O(1). Requires: Base is a base class or base @objc protocol (such
 /// as AnyObject) of Derived.
-@public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
+public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   return Array(a._buffer.castToBufferOf(Base.self))
 }
 
 /// Implements the semantics of `x as [Derived]` where `x` has type
 /// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
-@public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
+public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
 
@@ -882,7 +882,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// Returns an Array<Derived> containing the same elements as a in
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
-@public func _arrayDownCastConditional<Base, Derived>(
+public func _arrayDownCastConditional<Base, Derived>(
   a: Array<Base>
 ) -> [Derived]? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
@@ -917,7 +917,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// Convert a to its corresponding bridged array type.
 /// Precondition: T is bridged non-verbatim to objective C
 /// O(N), because each element must be bridged separately.
-@public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
+public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   source: Array<BridgesToDerived>
 ) -> Array<Base> {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
@@ -939,7 +939,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// Precondition: Base is a class type.
 /// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
 /// O(n), because each element must be bridged separately.
-@public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
+public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
   source: Array<Base>
 ) -> Array<BridgesToDerived> {
   let result: Array<BridgesToDerived>?
@@ -955,7 +955,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// Precondition: Base is a class type.
 /// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
 /// O(n), because each element must be bridged separately.
-@public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
+public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
        source: Array<Base>
      ) -> Array<BridgesToDerived>? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))

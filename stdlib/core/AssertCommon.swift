@@ -17,7 +17,7 @@
 // FIXME: We could go farther with this simplification, e.g. avoiding
 // UnsafePointer
 
-@transparent @internal
+@transparent internal
 func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -26,7 +26,7 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0;
 }
 
-@transparent @internal
+@transparent internal
 func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -35,7 +35,7 @@ func _isReleaseAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 1;
 }
 
-@transparent @internal
+@transparent internal
 func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -70,7 +70,7 @@ func _reportUnimplementedInitializer(
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
-@noreturn @internal
+@noreturn internal
 func _assertionFailed(prefix: StaticString, message: StaticString,
                         file: StaticString, line: UWord) {
   _reportFatalErrorInFile(
@@ -82,7 +82,7 @@ func _assertionFailed(prefix: StaticString, message: StaticString,
 
 /// This function should be used only in the implementation of stdlib
 /// assertions.
-@transparent @noreturn @internal
+@transparent @noreturn internal
 func _fatalErrorMessage(prefix: StaticString, message: StaticString,
                         file: StaticString, line: UWord) {
 #if INTERNAL_CHECKS_ENABLED
@@ -99,7 +99,7 @@ func _fatalErrorMessage(prefix: StaticString, message: StaticString,
 
 /// Prints a fatal error message when a unimplemented initializer gets
 /// called by the Objective-C runtime.
-@transparent @noreturn @internal
+@transparent @noreturn internal
 func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,

@@ -14,7 +14,7 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
-@public struct Unmanaged<T: AnyObject> {
+public struct Unmanaged<T: AnyObject> {
   unowned(unsafe) var _value: T
 
   @transparent 
@@ -28,7 +28,7 @@
   /// ::
   ///
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @transparent @public
+  @transparent public
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
     return Unmanaged(_private: reinterpretCast(value))
   }
@@ -41,7 +41,7 @@
   /// ::
   ///
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @transparent @public
+  @transparent public
   func toOpaque() -> COpaquePointer {
     return reinterpretCast(_value)
   }
@@ -52,7 +52,7 @@
   /// This is useful when passing an object to an API which Swift
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
-  @transparent @public
+  @transparent public
   static func passRetained(value: T) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
@@ -68,7 +68,7 @@
   ///
   ///   CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                          .passUnretained(object))
-  @transparent @public
+  @transparent public
   static func passUnretained(value: T) -> Unmanaged {
     return Unmanaged(_private: value)
   }
@@ -78,7 +78,7 @@
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
-  @public func takeUnretainedValue() -> T {
+  public func takeUnretainedValue() -> T {
     return _value
   }
 
@@ -87,27 +87,27 @@
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
-  @public func takeRetainedValue() -> T {
+  public func takeRetainedValue() -> T {
     let result = _value
     release()
     return result
   }
 
   /// Perform an unbalanced retain of the object.
-  @transparent @public
+  @transparent public
   func retain() -> Unmanaged {
     Builtin.retain(_value)
     return self
   }
 
   /// Perform an unbalanced release of the object.
-  @transparent @public
+  @transparent public
   func release() {
     Builtin.release(_value)
   }
 
   /// Perform an unbalanced autorelease of the object.
-  @transparent @public
+  @transparent public
   func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)
     return self

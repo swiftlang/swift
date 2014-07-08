@@ -11,21 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 /// Augments `S` with lazy versions of various sequence algorithms.
-@public
+public
 struct LazySequence<S: Sequence> : Sequence {
-  @public
+  public
   init(_ base: S) {
     self._base = base
   }
 
-  @public
+  public
   func generate() -> S.GeneratorType {
     return self._base.generate()
   }
 
   /// an Array, created on-demand, containing the elements of this
   /// lazy Sequence.
-  @public var array: [S.GeneratorType.Element] {
+  public var array: [S.GeneratorType.Element] {
     return Array(_base)
   }
 
@@ -33,7 +33,7 @@ struct LazySequence<S: Sequence> : Sequence {
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-@public
+public
 func lazy<S: Sequence>(s: S) -> LazySequence<S> {
   return LazySequence(s)
 }

@@ -38,9 +38,9 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
-  @public var count: Int { return ${Count} }
+  public var count: Int { return ${Count} }
 
-  @public subscript(i: Int) -> (String, Mirror) {
+  public subscript(i: Int) -> (String, Mirror) {
     if i >= 0 && i < count {
       return ("${ElementName}",reflect(_value[advance(_value.startIndex,i)]))
     } else {
@@ -48,9 +48,9 @@ ${MirrorDecl} {
     }
   }
 
-  @public var summary: String { return "${SummaryString}" }
+  public var summary: String { return "${SummaryString}" }
 
-  @public var quickLookObject: QuickLookObject? { return .None }
+  public var quickLookObject: QuickLookObject? { return .None }
 }
 
 ${MirrorConformance}

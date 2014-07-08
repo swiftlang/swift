@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@internal struct IntEncoder : Sink {
+internal struct IntEncoder : Sink {
   var asInt: UInt64 = 0
   var shift: UInt64 = 0
   mutating func put(x: UTF8.CodeUnit) {
@@ -22,7 +22,7 @@
 /// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
-@public enum Character :
+public enum Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
   ExtendedGraphemeClusterLiteralConvertible, Equatable {
 
@@ -38,14 +38,14 @@
   case LargeRepresentation(OnHeap<String>)
   case SmallRepresentation(Builtin.Int63)
 
-  @public init(_ scalar: UnicodeScalar) {
+  public init(_ scalar: UnicodeScalar) {
     var IE  = IntEncoder()
     UTF8.encode(scalar, output: &IE)
     IE.asInt |= (~0) << IE.shift
     self = SmallRepresentation(Builtin.trunc_Int64_Int63(IE.asInt.value))
   }
 
-  @public
+  public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
       start: Builtin.RawPointer,
       byteSize: Builtin.Word,
@@ -55,12 +55,12 @@
             start, byteSize: byteSize, isASCII: isASCII))
   }
 
-  @public static func convertFromExtendedGraphemeClusterLiteral(
+  public static func convertFromExtendedGraphemeClusterLiteral(
       value: Character) -> Character {
     return value
   }
 
-  @public init(_ s: String) {
+  public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
     // last byte is used for the enum's discriminator, we have to
@@ -103,7 +103,7 @@
 }
 
 extension String {
-  @public init(_ c: Character) {
+  public init(_ c: Character) {
     switch c {
     case .SmallRepresentation(var _63bits):
       var value = Character._smallValue(_63bits)
@@ -119,7 +119,7 @@ extension String {
   }
 }
 
-@public func ==(lhs: Character, rhs: Character) -> Bool {
+public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs, rhs) {
   case (.LargeRepresentation(let lhsValue), .LargeRepresentation(let rhsValue)):
     return lhsValue._value == rhsValue._value
