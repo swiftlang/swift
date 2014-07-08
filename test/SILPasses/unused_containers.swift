@@ -1,4 +1,4 @@
-// RUN: %swift %s -O3 -emit-sil | Filecheck %s
+// RUN: %swift %s -O3 -emit-sil | FileCheck %s
 
 //CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
 //CHECK-NEXT: bb0:
