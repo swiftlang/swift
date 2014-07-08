@@ -475,25 +475,24 @@ public func split<Seq: Sliceable, R:LogicValue>(
   return result
 }
 
-/// Return true iff the elements of `e1` are equal to the initial
-/// elements of `e2`.
+/// Return true iff the the initial elements of `s` are equal to `prefix`.
 public func startsWith<
   S0: Sequence, S1: Sequence
-  where 
-    S0.GeneratorType.Element == S1.GeneratorType.Element, 
+  where
+    S0.GeneratorType.Element == S1.GeneratorType.Element,
     S0.GeneratorType.Element : Equatable
->(s0: S0, s1: S1) -> Bool
+>(s: S0, prefix: S1) -> Bool
 {
-  var g1 = s1.generate()
+  var prefixGenerator = prefix.generate()
 
-  for e0 in s0 {
-    var e1 = g1.next()
+  for e0 in s {
+    var e1 = prefixGenerator.next()
     if !e1 { return true }
     if e0 != e1! {
       return false
     }
   }
-  return g1.next() ? false : true
+  return prefixGenerator.next() ? false : true
 }
 
 public struct EnumerateGenerator<Base: Generator> : Generator, Sequence {
