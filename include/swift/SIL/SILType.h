@@ -374,7 +374,7 @@ public:
   /// metatype type.
   ///
   /// *NOTE* Only call on SILTypes for metatype types.
-  SILType getMetatypeInstanceType() const;
+  SILType getMetatypeInstanceType(SILModule& M) const;
 
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;

@@ -1214,7 +1214,8 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
                                  m_ValueBase()))) {
-      SILType InstanceType = Metatype->getType().getMetatypeInstanceType();
+      SILType InstanceType =
+        Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
 
       // Make sure that the type of the metatype matches the type that we are
       // casting to so we stride by the correct amount.

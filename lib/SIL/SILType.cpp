@@ -129,7 +129,7 @@ bool SILType::isHeapObjectReferenceType() const {
   return false;
 }
 
-SILType SILType::getMetatypeInstanceType() const {
+SILType SILType::getMetatypeInstanceType(SILModule &M) const {
   CanType MetatypeType = getSwiftRValueType();
   assert(MetatypeType->is<AnyMetatypeType>() &&
          "This method should only be called on SILTypes with an underlying "
@@ -138,7 +138,7 @@ SILType SILType::getMetatypeInstanceType() const {
   Type instanceType =
     MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
 
-  return SILType::getPrimitiveObjectType(instanceType->getCanonicalType());
+  return M.Types.getLoweredType(instanceType->getCanonicalType());
 }
 
 bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
