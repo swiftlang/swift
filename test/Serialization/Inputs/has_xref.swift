@@ -1,14 +1,14 @@
 import has_alias
 @exported import struct_with_operators
 
-@public func numeric(x: MyInt64) {}
-@public func conditional(x: AliasWrapper.Boolean) {}
-@public func longInt(x: Int.EspeciallyMagicalInt) {}
+public func numeric(x: MyInt64) {}
+public func conditional(x: AliasWrapper.Boolean) {}
+public func longInt(x: Int.EspeciallyMagicalInt) {}
 
-@public func numericArray(x: IntSlice) {}
+public func numericArray(x: IntSlice) {}
 
 
-@public protocol ExtraIncrementable {
+public protocol ExtraIncrementable {
   @prefix func +++(inout base: Self)
 }
 

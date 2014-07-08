@@ -1,6 +1,6 @@
-@public var funcOrVar : Int = Int()
+public var funcOrVar : Int = Int()
 
-@public struct SomeStruct {}
-@public var someVar : () = ()
+public struct SomeStruct {}
+public var someVar : () = ()
 
-@public func overloadedFunc(x: Int) {}
+public func overloadedFunc(x: Int) {}

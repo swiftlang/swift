@@ -1,31 +1,31 @@
-@public enum Basic {
+public enum Basic {
   case Untyped
   case HasType(Int)
 
-  @public init() {
+  public init() {
     self = .Untyped
   }
-  @public func doSomething() {}
+  public func doSomething() {}
 }
 
-@public enum Generic<A> {
+public enum Generic<A> {
   case Left(A)
   case Right(A)
 }
 
-@public protocol Computable {
+public protocol Computable {
   func compute()
 }
 
-@public enum Lazy<T> : Computable {
+public enum Lazy<T> : Computable {
   case Thunk(() -> T)
   case Value(T)
 
-  @public init(value: T) {
+  public init(value: T) {
     self = .Value(value)
   }
 
-  @public func compute() {
+  public func compute() {
 //    if (this ~= .Thunk(var fn)) {
 //      this = .Value(fn())
 //    }

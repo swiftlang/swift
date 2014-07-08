@@ -1,6 +1,6 @@
-@public func funcOrVar() {}
+public func funcOrVar() {}
 
-@public struct SomeStruct {}
-@public var someVar : () = ()
+public struct SomeStruct {}
+public var someVar : () = ()
 
-@public func overloadedFunc() {}
+public func overloadedFunc() {}

@@ -1,48 +1,48 @@
-@public func getZero() -> Int {
+public func getZero() -> Int {
   return 0
 }
 
-@public func getInput(#x: Int) -> Int {
+public func getInput(#x: Int) -> Int {
   return x
 }
 
-@public func getSecond(Int, #y: Int) -> Int {
+public func getSecond(Int, #y: Int) -> Int {
   return y
 }
 
-@public func useNested((x: Int, y: Int), #n: Int) {}
+public func useNested((x: Int, y: Int), #n: Int) {}
 
-@public func variadic(#x: Double, y: Int...) {}
+public func variadic(#x: Double, y: Int...) {}
 
-@public func slice(#x: [Int]) {}
-@public func optional(#x: Int?) {}
+public func slice(#x: [Int]) {}
+public func optional(#x: Int?) {}
 
-@public func overloaded(#x: Int) {}
-@public func overloaded(#x: Bool) {}
+public func overloaded(#x: Int) {}
+public func overloaded(#x: Bool) {}
 
 // Generic functions.
-@public func makePair<A, B>(#a: A, #b: B) -> (A, B) {
+public func makePair<A, B>(#a: A, #b: B) -> (A, B) {
   return (a, b)
 }
 
-@public func different<T : Equatable>(#a: T, #b: T) -> Bool {
+public func different<T : Equatable>(#a: T, #b: T) -> Bool {
   return a != b
 }
 
-@public func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
+public func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
   return a != b
 }
 
-@public func selectorFunc1(#a: Int, b x: Int) {}
+public func selectorFunc1(#a: Int, b x: Int) {}
 
-@public protocol Wrapped {
+public protocol Wrapped {
   typealias ValueType : Equatable
   
   //var value : ValueType
   func getValue() -> ValueType
 }
 
-@public func differentWrapped<
+public func differentWrapped<
   T : Wrapped, U : Wrapped
   where
   T.ValueType == U.ValueType
@@ -50,14 +50,14 @@
   return a.getValue() != b.getValue()
 }
 
-@noreturn @asmname("exit") @public func exit ()->()
+@noreturn @asmname("exit") public func exit ()->()
 
-@noreturn @public func testNoReturnAttr() -> () { exit() }
-@noreturn @public func testNoReturnAttrPoly<T>(#x: T) -> () { exit() }
+@noreturn public func testNoReturnAttr() -> () { exit() }
+@noreturn public func testNoReturnAttrPoly<T>(#x: T) -> () { exit() }
 
 
-@asmname("primitive") @public func primitive()
+@asmname("primitive") public func primitive()
 
-@public protocol EqualOperator {
+public protocol EqualOperator {
   func ==(x: Self, y: Self) -> Bool
 }

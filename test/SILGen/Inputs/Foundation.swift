@@ -32,39 +32,39 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 extension String : _BridgedToObjectiveC {
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
-  @public func bridgeToObjectiveC() -> NSString {
+  public func bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  @public static func bridgeFromObjectiveC(x: NSString) -> String {
+  public static func bridgeFromObjectiveC(x: NSString) -> String {
     fatal("implement")
   }
 }
 
 extension Int : _BridgedToObjectiveC {
-  @public static func getObjectiveCType() -> Any.Type {
+  public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
-  @public func bridgeToObjectiveC() -> NSNumber {
+  public func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  @public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
     fatal("implement")
   }
 }
 
 extension Array : _ConditionallyBridgedToObjectiveC {
-  @public
+  public
   static func getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
-  @public
+  public
   func bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  @public
+  public
   static func bridgeFromObjectiveC(x: NSArray) -> Array {
     fatal("implement")
   }
@@ -77,15 +77,15 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 }
 
 extension Dictionary : _ConditionallyBridgedToObjectiveC {
-  @public
+  public
   static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
-  @public
+  public
   func bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  @public
+  public
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     fatal("implement")
   }
@@ -98,7 +98,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 }
 
 extension NSObject : Hashable {
-  @public var hashValue: Int { return 0 }
+  public var hashValue: Int { return 0 }
 }
 
-@public func == (x: NSObject, y: NSObject) -> Bool { return true }
+public func == (x: NSObject, y: NSObject) -> Bool { return true }

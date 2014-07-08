@@ -1,7 +1,7 @@
 @exported import def_class
 
-@public class OverrideComputedProperty : ComputedProperty {
-  @public override var value : Int {
+public class OverrideComputedProperty : ComputedProperty {
+  public override var value : Int {
     get {
       return super.value + 1
     }
@@ -11,30 +11,30 @@
     }
   }
 
-  @public override var readOnly : Int {
+  public override var readOnly : Int {
     return super.readOnly + 1
   }
 
-  @public init () { super.init() }
+  public init () { super.init() }
 }
 
-@public class OverrideAddsSetter : ComputedProperty {
-  @public override var readOnly : Int {
+public class OverrideAddsSetter : ComputedProperty {
+  public override var readOnly : Int {
     get { return 1 }
     set { /* do nothing */ }
   }
-  @public init () { super.init() }
+  public init () { super.init() }
 }
 
-@public class OverrideSimpleSubscript : ReadonlySimpleSubscript {
-  @public override subscript(x: Int) -> Bool {
+public class OverrideSimpleSubscript : ReadonlySimpleSubscript {
+  public override subscript(x: Int) -> Bool {
     return false
   }
-  @public init () {}
+  public init () {}
 }
 
-@public class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
-  @public override subscript(x: Int) -> Bool {
+public class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
+  public override subscript(x: Int) -> Bool {
     set(newValue) {
       // do nothing!
     }
@@ -42,11 +42,11 @@
       return super[x]
     }
   }
-  @public init () {}
+  public init () {}
 }
 
-@public class OverrideComplexSubscript : ComplexSubscript {
-  @public override subscript(x : Int, y : Bool) -> Int {
+public class OverrideComplexSubscript : ComplexSubscript {
+  public override subscript(x : Int, y : Bool) -> Int {
     set(newValue) {
       // do nothing!
     }
@@ -54,12 +54,12 @@
       return super[x, y]
     }
   }
-  @public init () {}
+  public init () {}
 }
 
-@public class OverrideFunc : StillEmpty {
-  @public override func reset() {
+public class OverrideFunc : StillEmpty {
+  public override func reset() {
     println("ha!")
   }
-  @public init () {}
+  public init () {}
 }

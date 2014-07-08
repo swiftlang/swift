@@ -1,9 +1,9 @@
-@public typealias MyInt64 = ()
+public typealias MyInt64 = ()
 
-@public struct AliasWrapper {
-  @public typealias Boolean = ()
+public struct AliasWrapper {
+  public typealias Boolean = ()
 }
 
-@public extension Int {
-  @public typealias EspeciallyMagicalInt = ()
+public extension Int {
+  public typealias EspeciallyMagicalInt = ()
 }

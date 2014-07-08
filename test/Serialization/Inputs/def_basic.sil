@@ -891,7 +891,7 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
-@public func serialize_all() {
+public func serialize_all() {
 }
 
 // CHECK: sil public_external @cond_fail_test : $@thin (Builtin.Int1) -> () {

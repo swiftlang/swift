@@ -1,7 +1,7 @@
 @exported import MixedWithHeader
 
-@public func testLineImpl(line: Line) {
+public func testLineImpl(line: Line) {
   doSomethingElse(line)
 }
 
-@public func testOriginal(a: ForwardClass, b: Base, c: ProtoConformer) {}
+public func testOriginal(a: ForwardClass, b: Base, c: ProtoConformer) {}

@@ -1,1 +1,1 @@
-@public typealias TheBuiltinInt64 = Builtin.Int64
+public typealias TheBuiltinInt64 = Builtin.Int64

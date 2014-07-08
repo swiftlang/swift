@@ -1,2 +1,2 @@
-@public var ExportedVar = 3
+public var ExportedVar = 3
 

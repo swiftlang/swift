@@ -1,14 +1,14 @@
 @exported import ProtoWithInitializer
 @exported import TypeAndValue
 
-@public class Impl : InitProto {
-  @public init(int i: CInt) {}
+public class Impl : InitProto {
+  public init(int i: CInt) {}
 
-  @public func takeStruct(input: testStruct) {
+  public func takeStruct(input: testStruct) {
     testStruct(input)
   }
 
-  @public func getEnum() -> testEnum {
+  public func getEnum() -> testEnum {
     return testEnum
   }
 }

@@ -57,7 +57,7 @@ extension Bar : NSRuncing, NSFunging {
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
   // -- The runce() implementation comes from the original definition.
-  @public
+  public
   func foo() {}
 }
 
@@ -92,10 +92,10 @@ class Zim : Frungible {
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Frungible {
-  @public
+  public
   func runce() {}
   // funge() implementation from original definition of Zang
-  @public
+  public
   func foo() {}
 
   func frunge() {}

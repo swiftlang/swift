@@ -1,18 +1,18 @@
 
-@public protocol P {
+public protocol P {
   func doSomething()
 }
 
-@asmname("unknown") @public
+@asmname("unknown") public
 func unknown() -> ()
 
-@public class Y : P {
-  @public func doAnotherThing() {
+public class Y : P {
+  public func doAnotherThing() {
     unknown()
   }
 
-  @public func doSomething() {
+  public func doSomething() {
     doAnotherThing()
   }
-  @public init() {}
+  public init() {}
 }

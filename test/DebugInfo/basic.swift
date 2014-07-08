@@ -14,7 +14,7 @@
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] ={{.*}}i32 [[@LINE+2]], metadata ![[FOOTYPE:[0-9]+]],{{.*}} [ DW_TAG_subprogram ] {{.*}} [foo]
-@public
+public
 func foo(var a: Int, var b: Int) -> Int {
      // CHECK-DAG: metadata ![[FOO]], i32 [[@LINE-1]], i32 41{{.*}}DW_TAG_lexical_block
      // CHECK-DAG: ![[ASCOPE:.*]] = metadata !{i32 [[@LINE-2]], i32 14, metadata ![[FOO]], null}
