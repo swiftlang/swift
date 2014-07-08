@@ -235,13 +235,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
     Printer << "/*";
     switch (access) {
     case Accessibility::Private:
-      Printer << "@private";
+      Printer << "private";
       break;
     case Accessibility::Internal:
-      Printer << "@internal";
+      Printer << "internal";
       break;
     case Accessibility::Public:
-      Printer << "@public";
+      Printer << "public";
       break;
     }
     Printer << suffix << "*/ ";

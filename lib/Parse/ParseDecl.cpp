@@ -1230,29 +1230,45 @@ bool Parser::isStartOfDecl() {
     return false;
       
   // If it might be, we do some more digging.
-  
-  // If this is 'unowned', check to see if it is valid.
-  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren) &&
-      isParenthesizedUnownedAttribute(*this)) {
-    Parser::BacktrackingScope Backtrack(*this);
-    consumeToken(tok::identifier);
-    consumeToken(tok::l_paren);
-    consumeToken(tok::identifier);
-    consumeToken(tok::r_paren);
-    return isStartOfDecl();
-  }
 
-  // If this is 'objc', check to see if it is valid.
-  if (Tok.getText() == "objc" && Tok2.is(tok::l_paren)) {
-    Parser::BacktrackingScope Backtrack(*this);
-    consumeToken(tok::identifier);
-    // Check to see if the parenthesized body is a valid objc attribute, if not,
-    // this could be a call to a free standanding function like "objc(foo, 42)"
-    if (!isParenthesizedObjCAttribute(*this))
-      return false;
-    // If it is valid, consume it and check to see if this is a prefix for
-    // another decl.
-    return isStartOfDecl();
+  if (Tok2.is(tok::l_paren)) {
+  // If this is 'unowned', check to see if it is valid.
+    if (Tok.getText() == "unowned" && isParenthesizedUnownedAttribute(*this)) {
+      Parser::BacktrackingScope Backtrack(*this);
+      consumeToken(tok::identifier);
+      consumeToken(tok::l_paren);
+      consumeToken(tok::identifier);
+      consumeToken(tok::r_paren);
+      return isStartOfDecl();
+    }
+
+    // If this is 'objc', check to see if it is valid.
+    if (Tok.getText() == "objc") {
+      Parser::BacktrackingScope Backtrack(*this);
+      consumeToken(tok::identifier);
+      // Check to see if the parenthesized body is a valid objc attribute,
+      // if not, this could be a call to a free standanding function like
+      // "objc(foo, 42)"
+      if (!isParenthesizedObjCAttribute(*this))
+        return false;
+      // If it is valid, consume it and check to see if this is a prefix for
+      // another decl.
+      return isStartOfDecl();
+    }
+
+    if (Tok.getText() == "private" || Tok.getText() == "public" ||
+        Tok.getText() == "internal") {
+      Parser::BacktrackingScope Backtrack(*this);
+      consumeToken(tok::identifier);
+      consumeToken(tok::l_paren);
+      // FIXME: Ugh at hardcoding this here.
+      if (!Tok.is(tok::identifier) || Tok.getText() != "set")
+        return false;
+      consumeToken(tok::identifier);
+      if (!consumeIf(tok::r_paren))
+        return false;
+      return isStartOfDecl();
+    }
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -1465,6 +1481,14 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
           ConvenienceLoc = Tok.getLoc();
         }
         consumeToken(tok::identifier);
+        continue;
+      }
+
+      if (Tok.isContextualKeyword("private") ||
+          Tok.isContextualKeyword("internal") ||
+          Tok.isContextualKeyword("public")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                              Tok.getText(), DAK_Accessibility);
         continue;
       }
         

@@ -157,9 +157,6 @@ VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
                   OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor,
                   /* Not serialized */ 65535)
-DECL_ATTR_ALIAS(private, Accessibility)
-DECL_ATTR_ALIAS(internal, Accessibility)
-DECL_ATTR_ALIAS(public, Accessibility)
 
 VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript,
                   /* Not serialized */ 65535)

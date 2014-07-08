@@ -141,11 +141,31 @@ public:
   /// Return true if this is a contextual keyword that could be the start of a
   /// decl.
   bool isContextualDeclKeyword() const {
-    if (isNot(tok::identifier) || isEscapedIdentifier()) return false;
+    if (isNot(tok::identifier) || isEscapedIdentifier() || Text.empty())
+      return false;
 
-    return Text == "mutating" || Text == "nonmutating" ||
-           Text == "override" || Text == "weak" || Text == "unowned" ||
-           Text == "strong" || Text == "convenience" || Text == "objc";
+    switch (Text[0]) {
+    case 'c':
+      return Text == "convenience";
+    case 'i':
+      return Text == "internal";
+    case 'm':
+      return Text == "mutating";
+    case 'n':
+      return Text == "nonmutating";
+    case 'o':
+      return Text == "override" || Text == "objc";
+    case 'p':
+      return Text == "private" || Text == "public";
+    case 's':
+      return Text == "strong";
+    case 'u':
+      return Text == "unowned";
+    case 'w':
+      return Text == "weak";
+    default:
+      return false;
+    }
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {

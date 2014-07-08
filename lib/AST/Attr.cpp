@@ -68,6 +68,8 @@ void DeclAttributes::print(ASTPrinter &Printer,
   for (auto DA : *this) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
+    if (isa<AbstractAccessibilityAttr>(DA))
+      continue;
     if (std::find(Options.ExcludeAttrList.begin(),
                   Options.ExcludeAttrList.end(),
                   DA->getKind()) != Options.ExcludeAttrList.end())
@@ -98,6 +100,11 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (isOptional())
     Printer << "@optional ";
 
+  if (auto accessAttr = getAttribute<AccessibilityAttr>())
+    Printer << accessAttr->getAttrName() << " ";
+  if (auto setterAccessAttr = getAttribute<SetterAccessibilityAttr>())
+    Printer << setterAccessAttr->getAttrName() << " ";
+
   Optional<bool> MutatingAttr = getMutating();
   if (MutatingAttr)
     Printer << (MutatingAttr.getValue() ? "mutating " : "nonmutating ");
@@ -123,12 +130,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_Lazy:
   case DAK_LLDBDebuggerFunction:
   case DAK_Inline:
-  case DAK_Accessibility:
     Printer << "@" << getAttrName();
-    break;
-
-  case DAK_SetterAccessibility:
-    Printer << "@" << getAttrName() << "(set)";
     break;
 
   case DAK_Semantics:
@@ -158,6 +160,15 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     }
     break;
   }
+
+  case DAK_Accessibility:
+    Printer << getAttrName();
+    break;
+
+  case DAK_SetterAccessibility:
+    Printer << getAttrName() << "(set)";
+    break;
+
   case DAK_Override:
     // A virtual attribute should be handled elsewhere.
     return;
