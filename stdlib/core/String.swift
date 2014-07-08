@@ -85,6 +85,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
+  @semantics("readonly")
   public
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
