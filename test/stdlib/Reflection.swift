@@ -632,5 +632,12 @@ class SubScene: SKScene {
 println("SKScene subclass:")
 dump(SubScene())
 
+// CHECK-NEXT: (3.0,6.0)
+println(reflect(CGPoint(x: 3,y: 6)).summary)
+// CHECK-NEXT: (30.0,60.0)
+println(reflect(CGSize(width: 30, height: 60)).summary)
+// CHECK-NEXT: (50.0,60.0,100.0,150.0)
+println(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")

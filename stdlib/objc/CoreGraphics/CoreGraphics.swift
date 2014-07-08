@@ -29,42 +29,6 @@
   }
 }
 
-struct _CGPointMirror : Mirror {
-  let _value : CGPoint
-
-  init(_ x : CGPoint) {
-    _value = x
-  }
-
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return 2 }
-
-  subscript(i: Int) -> (String, Mirror) { 
-    switch i {
-    case 0: return ("x",reflect(_value.x))
-    case 1: return ("y",reflect(_value.y))
-    default: _preconditionFailure("cannot extract this child index")
-    }
-  }
-
-  var summary: String { return "(\(_value.x),\(_value.y))" }
-
-  var quickLookObject: QuickLookObject? { return .Some(.Point(Double(_value.x),Double(_value.y))) }
-
-  var disposition: MirrorDisposition { return .Aggregate }
-}
-
-extension CGPoint : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _CGPointMirror(self)
-  }
-}
-
 @public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
@@ -79,42 +43,6 @@ extension CGPoint : Reflectable {
 
   init(width: Int, height: Int) {
     self.init(width: CGFloat(width), height: CGFloat(height))
-  }
-}
-
-struct _CGSizeMirror : Mirror {
-  let _value : CGSize
-
-  init(_ x : CGSize) {
-    _value = x
-  }
-
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return 2 }
-
-  subscript(i: Int) -> (String, Mirror) { 
-    switch i {
-    case 0: return ("x",reflect(_value.width))
-    case 1: return ("y",reflect(_value.height))
-    default: _preconditionFailure("cannot extract this child index")
-    }
-  }
-
-  var summary: String { return "(\(_value.width),\(_value.height))" }
-
-  var quickLookObject: QuickLookObject? { return .Some(.Size(Double(_value.width),Double(_value.height))) }
-
-  var disposition: MirrorDisposition { return .Aggregate }
-}
-
-extension CGSize : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _CGSizeMirror(self)
   }
 }
 
@@ -248,42 +176,6 @@ extension CGSize : Reflectable {
 
   func intersects(rect: CGRect) -> Bool {
     return CGRectIntersectsRect(self, rect)
-  }
-}
-
-struct _CGRectMirror : Mirror {
-  let _value : CGRect
-
-  init(_ x : CGRect) {
-    _value = x
-  }
-
-  var value: Any { return _value }
-
-  var valueType: Any.Type { return (_value as Any).dynamicType }
-
-  var objectIdentifier: ObjectIdentifier? { return .None }
-
-  var count: Int { return 2 }
-
-  subscript(i: Int) -> (String, Mirror) { 
-    switch i {
-    case 0: return ("x",reflect(_value.origin))
-    case 1: return ("y",reflect(_value.size))
-    default: _preconditionFailure("cannot extract this child index")
-    }
-  }
-
-  var summary: String { return "(\(_value.origin.x),\(_value.origin.y),\(_value.size.width),\(_value.size.height))" }
-
-  var quickLookObject: QuickLookObject? { return .Some(.Rectangle(Double(_value.origin.x),Double(_value.origin.y),Double(_value.size.width),Double(_value.size.height))) }
-
-  var disposition: MirrorDisposition { return .Aggregate }
-}
-
-extension CGRect : Reflectable {
-  @public func getMirror() -> Mirror {
-    return _CGRectMirror(self)
   }
 }
 
