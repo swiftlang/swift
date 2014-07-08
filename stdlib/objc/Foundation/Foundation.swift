@@ -609,13 +609,26 @@ extension NSDictionary : DictionaryLiteralConvertible {
 }
 
 /// The entry point for bridging `NSDictionary` to `Dictionary`.
-public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
-       d: NSDictionary
-     ) -> [K : V] {
-  return [K : V](_cocoaDictionary: reinterpretCast(d))
+///
+/// This is a forced downcast.  This operation should have O(1) complexity.
+///
+/// The cast can fail if bridging fails.  The actual checks and bridging can be
+/// deferred.
+public func _convertNSDictionaryToDictionary<
+    KeyType : NSObject, ValueType : AnyObject>(d: NSDictionary)
+    -> [KeyType : ValueType] {
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(KeyType.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(ValueType.self))
+  return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(d))
 }
 
 /// The entry point for bridging `Dictionary` to `NSDictionary`.
+///
+/// This is a forced downcast.  This operation should have O(1) complexity.
+/// FIXME: right now it is O(n).
+///
+/// The cast can fail if bridging fails.  The actual checks and bridging can be
+/// deferred.
 public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     d: [KeyType : ValueType]
 ) -> NSDictionary {

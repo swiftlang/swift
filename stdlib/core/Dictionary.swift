@@ -2136,7 +2136,7 @@ class _NSSwiftEnumerator {}
 
 //===--- Compiler conversion/casting entry points -------------------------===//
 
-/// Perform a non-bridged upcast from the `source` to another dictionary.
+/// Perform a non-bridged upcast that always succeeds.
 ///
 /// Requires: `BaseKey` and `BaseValue` are base classes or base objc
 /// protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
@@ -2159,30 +2159,34 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   return result
 }
 
-/// Perform a bridged upcast from the `source` to another dictionary.
+/// Implements an unconditional upcast that involves bridging.
 ///
-/// Precondition: `BridgesToKey` and `BridgesToValue` are bridged to
-/// Objective-C, and at least one of them requires bridging.
+/// The cast can fail if bridging fails.
+///
+/// Precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
+/// and at least one of them requires non-trivial bridging.
 public func _dictionaryBridgeToObjectiveC<
-    BridgesToKey, BridgesToValue, Key, Value
+    SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
-    source: Dictionary<BridgesToKey, BridgesToValue>
-) -> Dictionary<Key, Value> {
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
-               !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
-               _isBridgedVerbatimToObjectiveC(Value.self))
+    source: Dictionary<SwiftKey, SwiftValue>
+) -> Dictionary<ObjCKey, ObjCValue> {
+  _sanityCheck(
+      !_isBridgedVerbatimToObjectiveC(SwiftKey.self) ||
+      !_isBridgedVerbatimToObjectiveC(SwiftValue.self))
+  _sanityCheck(
+      _isClassOrObjCExistential(ObjCKey.self) ||
+      _isClassOrObjCExistential(ObjCValue.self))
 
-  var result = Dictionary<Key, Value>(minimumCapacity: source.count)
+  var result = Dictionary<ObjCKey, ObjCValue>(minimumCapacity: source.count)
   let keyBridgesDirectly =
-      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) ==
-          _isBridgedVerbatimToObjectiveC(Key.self)
+      _isBridgedVerbatimToObjectiveC(SwiftKey.self) ==
+          _isBridgedVerbatimToObjectiveC(ObjCKey.self)
   let valueBridgesDirectly =
-      _isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
-          _isBridgedVerbatimToObjectiveC(Value.self)
+      _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
+          _isBridgedVerbatimToObjectiveC(ObjCValue.self)
   for (key, value) in source {
     // Bridge the key
-    var bridgedKey: Key
+    var bridgedKey: ObjCKey
     if keyBridgesDirectly {
       bridgedKey = reinterpretCast(key)
     } else {
@@ -2192,7 +2196,7 @@ public func _dictionaryBridgeToObjectiveC<
     }
 
     // Bridge the value
-    var bridgedValue: Value
+    var bridgedValue: ObjCValue
     if valueBridgesDirectly {
       bridgedValue = reinterpretCast(value)
     } else {
@@ -2208,7 +2212,10 @@ public func _dictionaryBridgeToObjectiveC<
   return result
 }
 
-/// Implements a forced downcast.
+/// Implements a forced downcast.  This operation should have O(1) complexity.
+///
+/// The cast can fail if bridging fails.  The actual checks and bridging can be
+/// deferred.
 ///
 /// Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 /// a subtype of `BaseValue`, and all of these types are reference types.
@@ -2239,6 +2246,9 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 
 /// Implements a conditional downcast.
 ///
+/// If the cast fails, the function returns `.None`.  All checks should be
+/// performed eagerly.
+///
 /// Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 /// a subtype of `BaseValue`, and all of these types are reference types.
 public func _dictionaryDownCastConditional<
@@ -2257,7 +2267,7 @@ public func _dictionaryDownCastConditional<
     if reinterpretCast(key) as AnyObject is DerivedKey &&
        reinterpretCast(value) as AnyObject is DerivedValue {
       result[reinterpretCast(key)] = reinterpretCast(value)
-      continue;
+      continue
     }
 
     // Either the key or the value wasn't of the appropriate derived
@@ -2267,60 +2277,61 @@ public func _dictionaryDownCastConditional<
   return result
 }
 
-/// Implements a conditional downcast from a Dictionary<Key, Value> to
-/// Dictionary<BridgesToKey, BridgesToValue> that involves bridging.
+/// Implements an unconditional downcast that involves bridging.
 ///
-/// Precondition: at least one of BridgesToKey or BridgesToValue is an
-/// object type, and at least one of Key or Value is a bridged value
-/// type.
+/// Precondition: at least one of `SwiftKey` or `SwiftValue` is a bridged value
+/// type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
 public func _dictionaryBridgeFromObjectiveC<
-    Key, Value, BridgesToKey, BridgesToValue
+    ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-    source: Dictionary<Key, Value>
-) -> Dictionary<BridgesToKey, BridgesToValue> {
-  let result: Dictionary<BridgesToKey, BridgesToValue>? =
-      _dictionaryBridgeFromObjectiveCConditional(source);
+    source: Dictionary<ObjCKey, ObjCValue>
+) -> Dictionary<SwiftKey, SwiftValue> {
+  let result: Dictionary<SwiftKey, SwiftValue>? =
+      _dictionaryBridgeFromObjectiveCConditional(source)
   _precondition(result, "dictionary cannot be bridged from Objective-C")
   return result!
 }
 
-/// Implements a conditional downcast from a Dictionary<Key, Value> to
-/// Dictionary<BridgesToKey, BridgesToValue> that involves bridging.
+/// Implements a conditional downcast that involves bridging.
 ///
-/// Precondition: at least one of BridgesToKey or BridgesToValue is an
-/// object type, and at least one of Key or Value is a bridged value
-/// type.
+/// If the cast fails, the function returns `.None`.  All checks should be
+/// performed eagerly.
+///
+/// Precondition: at least one of `SwiftKey` or `SwiftValue` is a bridged value
+/// type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
 public func _dictionaryBridgeFromObjectiveCConditional<
-    Key, Value, BridgesToKey, BridgesToValue
+    ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-    source: Dictionary<Key, Value>
-) -> Dictionary<BridgesToKey, BridgesToValue>? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self) ||
-               _isBridgedVerbatimToObjectiveC(Value.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
-               !_isBridgedVerbatimToObjectiveC(BridgesToValue.self))
+    source: Dictionary<ObjCKey, ObjCValue>
+) -> Dictionary<SwiftKey, SwiftValue>? {
+  _sanityCheck(
+      _isClassOrObjCExistential(ObjCKey.self) ||
+      _isClassOrObjCExistential(ObjCValue.self))
+  _sanityCheck(
+      !_isBridgedVerbatimToObjectiveC(SwiftKey.self) ||
+      !_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
   let keyBridgesDirectly =
-      _isBridgedVerbatimToObjectiveC(BridgesToKey.self) ==
-          _isBridgedVerbatimToObjectiveC(Key.self)
+      _isBridgedVerbatimToObjectiveC(SwiftKey.self) ==
+          _isBridgedVerbatimToObjectiveC(ObjCKey.self)
   let valueBridgesDirectly =
-      _isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
-          _isBridgedVerbatimToObjectiveC(Value.self)
+      _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
+          _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Dictionary<BridgesToKey, BridgesToValue>()
+  var result = Dictionary<SwiftKey, SwiftValue>()
   for (key, value) in source {
     // Downcast the key.
-    var resultKey: BridgesToKey
+    var resultKey: SwiftKey
     if keyBridgesDirectly {
       // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-      if reinterpretCast(key) as AnyObject is BridgesToKey {
+      if reinterpretCast(key) as AnyObject is SwiftKey {
         resultKey = reinterpretCast(key)
       } else {
         return nil
       }
     } else {
       if let bridgedKey = _bridgeFromObjectiveCConditional(
-          reinterpretCast(key), BridgesToKey.self) {
+          reinterpretCast(key), SwiftKey.self) {
         resultKey = bridgedKey
       } else {
         return nil
@@ -2328,17 +2339,17 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     }
 
     // Downcast the value.
-    var resultValue: BridgesToValue
+    var resultValue: SwiftValue
     if valueBridgesDirectly {
       // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-      if reinterpretCast(value) as AnyObject is BridgesToValue {
+      if reinterpretCast(value) as AnyObject is SwiftValue {
         resultValue = reinterpretCast(value)
       } else {
         return nil
       }
     } else {
       if let bridgedValue = _bridgeFromObjectiveCConditional(
-          reinterpretCast(value), BridgesToValue.self) {
+          reinterpretCast(value), SwiftValue.self) {
         resultValue = bridgedValue
       } else {
         return nil
