@@ -16,7 +16,7 @@ confusing jumble.
 
 The best solution to this is to burn the user model into the language, giving
 function applications special powers to provide the user model for pointers. We
-then provide only one set of plain pointer types, with nice C-ish sugar, and
+then provide only one set of plain pointer types, with 
 special intrinsic behavior when used as function arguments.
 
 The Pointer Types
@@ -42,22 +42,6 @@ being stored by either initialize() or assign(), and no release is done on
 reassignment. Loading from any of the three kinds of pointer does a strong
 load, so there is no need for a separate ``AutoreleasingConstUnsafePointer``.
 
-Sugar for Pointer Types
------------------------
-
-We add syntactic sugar for the pointer types:
-
-- ``T*`` by itself is sugar for ``UnsafePointer<T>``.
-- ``@const T*`` is sugar for ``ConstUnsafePointer<T>``.
-
-To avoid blowing ObjC programmers' minds, we prevent either sugar from being
-applied to class types, since ``NSObject*`` in Swift would be the equivalent of
-the very different type ``NSObject* __strong *`` in ObjC. We won't provide any
-sugar for ``AutoreleasingUnsafePointer<T>`` at first, except for a type alias
-for the common pointer-to-NSError case::
-
-  typealias NSErrorResult = AutoreleasingUnsafePointer<NSError>
-
 Conversion behavior for pointer arguments
 =========================================
 
@@ -82,12 +66,12 @@ As a special case, when a function is declared as taking an
 
 So if you have a function declared::
 
-  func foo(x: Float*)
+  func foo(x: UnsafePointer<Float>)
 
 You can call it as any of::
 
   var x: Float = 0.0
-  var p: Float* = nil
+  var p: UnsafePointer<Float> = nil
   var a: Float[] = [1.0, 2.0, 3.0]
   foo(nil)
   foo(p)
@@ -96,12 +80,12 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func bar(x: Void*)
+  func bar(x: UnsafePointer<Void>)
 
 You can call it as any of::
 
   var x: Float = 0.0, y: Int = 0
-  var p: Float* = nil, q: Int* = nil
+  var p: UnsafePointer<Float> = nil, q: UnsafePointer<Int> = nil
   var a: Float[] = [1.0, 2.0, 3.0], b: Int = [1, 2, 3]
   bar(nil)
   bar(p)
@@ -161,12 +145,12 @@ types can furthermore interoperate with strings; see `Strings`_ below.
 
 So if you have a function declared::
 
-  func zim(x: @const Float*)
+  func zim(x: ConstUnsafePointer<Float>)
 
 You can call it as any of::
 
   var x: Float = 0.0
-  var p: @const Float* = nil
+  var p: ConstUnsafePointer<Float> = nil
   zim(nil)
   zim(p)
   zim(&x)
@@ -174,12 +158,12 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func zang(x: @const Void*)
+  func zang(x: ConstUnsafePointer<Void>)
 
 You can call it as any of::
 
   var x: Float = 0.0, y: Int = 0
-  var p: @const Float* = nil, q: @const Int* = nil
+  var p: ConstUnsafePointer<Float> = nil, q: ConstUnsafePointer<Int> = nil
   zang(nil)
   zang(p)
   zang(q)
