@@ -12,6 +12,12 @@ Latest
   The general principle is that an entity cannot be defined in terms of another
   entity with less accessibility.
 
+* CGFloat is now a distinct floating-point type that wraps either a
+  Float (on 32-bit architectures) or a Double (on 64-bit
+  architectures). It provides all of the same comparison and
+  arithmetic operations of Float and Double, and can be created using
+  numeric literals.
+
 2014-07-03
 ----------
 
