@@ -123,12 +123,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
-  if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
-    for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
-      Opts.ImmediateArgv.push_back(A->getValue(i));
-    }
-  }
-
   // Determine what the user has asked the frontend to do.
   FrontendOptions::ActionType Action;
   if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
@@ -205,6 +199,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (Opts.InputFilenames.empty()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
+    }
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::Immediate) {
+    assert(!Opts.InputFilenames.empty());
+    Opts.ImmediateArgv.push_back(Opts.InputFilenames[0]); // argv[0]
+    if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
+      for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
+        Opts.ImmediateArgv.push_back(A->getValue(i));
+      }
     }
   }
 

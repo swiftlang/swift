@@ -271,11 +271,8 @@ static bool performCompile(CompilerInstance &Instance,
     // JITCodeEmitter doesn't support it. This can be fixed by
     // migrating to MCJIT.
     IRGenOpts.DebugInfo = false;
-    const std::vector<std::string> &ImmediateArgv = opts.ImmediateArgv;
-    const ProcessCmdLine &CmdLine = ImmediateArgv.empty() ?
-                                      ProcessCmdLine(Args.begin(), Args.end()) :
-                                      ProcessCmdLine(ImmediateArgv.begin(),
-                                                     ImmediateArgv.end());
+    const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
+                                                   opts.ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));
     RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
     return false;
