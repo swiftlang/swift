@@ -260,7 +260,7 @@ testCocoa()
 
 extension Slice {
   mutating func qsort(compare: (T,T)->Bool) {
-    quickSort(&self, indices(self), compare)
+    _quickSort(&self, indices(self), compare)
   }
 }
 

@@ -47,7 +47,7 @@ public func find<
   return nil
 }
 
-public func insertionSort<
+public func _insertionSort<
   C: MutableCollection where C.IndexType: BidirectionalIndex
 >(
   inout elements: C,
@@ -138,7 +138,7 @@ public func partition<
 }
 
 
-public func quickSort<
+func _quickSort<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout elements: C,
@@ -146,10 +146,10 @@ public func quickSort<
   less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
 ) {
   var comp = less
-  _quickSort(&elements, range, &comp)
+  _quickSortImpl(&elements, range, &comp)
 }
 
-func _quickSort<
+func _quickSortImpl<
   C: MutableCollection where C.IndexType: RandomAccessIndex
 >(
   inout elements: C,
@@ -160,14 +160,14 @@ func _quickSort<
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
   if cnt < 20 {
-    insertionSort(&elements, range, &less)
+    _insertionSort(&elements, range, &less)
     return
   }
 
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
-  _quickSort(&elements, range.startIndex..<part_idx, &less);
-  _quickSort(&elements, (part_idx.successor())..<range.endIndex, &less);
+  _quickSortImpl(&elements, range.startIndex..<part_idx, &less);
+  _quickSortImpl(&elements, (part_idx.successor())..<range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -182,7 +182,7 @@ public func sort<
   inout collection: C,
   predicate: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) {
-  quickSort(&collection, indices(collection), predicate)
+  _quickSort(&collection, indices(collection), predicate)
 }
 
 public func sort<
@@ -191,7 +191,7 @@ public func sort<
 >(
   inout collection: C
 ) {
-  quickSort(&collection, indices(collection))
+  _quickSort(&collection, indices(collection))
 }
 
 public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
@@ -253,7 +253,7 @@ public func sorted<
   return result
 }
 
-public func insertionSort<
+public func _insertionSort<
   C: MutableCollection where C.IndexType: RandomAccessIndex,
   C.GeneratorType.Element: Comparable>(
   inout elements: C,
@@ -338,16 +338,16 @@ public func partition<
   return i.predecessor()
 }
 
-public func quickSort<
+func _quickSort<
   C: MutableCollection
     where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
 >(
   inout elements: C,
   range: Range<C.IndexType>) {
-  _quickSort(&elements, range)
+  _quickSortImpl(&elements, range)
 }
 
-func _quickSort<
+func _quickSortImpl<
   C: MutableCollection
     where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
 >(
@@ -356,13 +356,13 @@ func _quickSort<
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
   if cnt < 20 {
-    insertionSort(&elements, range)
+    _insertionSort(&elements, range)
     return
   }
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
-  _quickSort(&elements, range.startIndex..<part_idx);
-  _quickSort(&elements, (part_idx.successor())..<range.endIndex);
+  _quickSortImpl(&elements, range.startIndex..<part_idx);
+  _quickSortImpl(&elements, (part_idx.successor())..<range.endIndex);
 }
 //// End of non-predicate sort functions.
 
