@@ -124,9 +124,9 @@ def collectBenchmarks(treeish = None, repeat = 3):
             
     return cacheDir
 
-SCORERE=re.compile(r"(\w+),[ \t]+([\d.]+)")
-KEYGROUP=1
-VALGROUP=2
+SCORERE=re.compile(r"(?:(\d+),[ \t]+)?(\w+),[ \t]+([\d.]+)")
+KEYGROUP=2
+VALGROUP=3
 
 IsTime=1
 
@@ -207,10 +207,10 @@ def compareTimingsFiles(file1, file2):
     print ", delta, speedup"
     for key in keys:
         if not key in scores1:
-            print key, "not in", dir1
+            print key, "not in", file1
             continue
         if not key in scores2:
-            print fkey, "not in", dir2
+            print key, "not in", file2
             continue
         compareScores(key, scores1[key], scores2[key], runs)
     
