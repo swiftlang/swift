@@ -144,10 +144,11 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
+  // If the value type canot be bridged, we're done.
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, valueType).first;
+  return getBridgedToObjC(dc, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -2202,35 +2203,25 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-std::pair<Type, bool> TypeChecker::getBridgedToObjC(const DeclContext *dc,
-                                                    Type type) {
-  // Class types and ObjC existential types are always bridged verbatim.
-  if (type->getClassOrBoundGenericClass() || type->isObjCExistentialType())
-    return { type, true };
-
-  // Class archetypes are always bridged verbatim.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    if (archetype->requiresClass()) {
-      return { type, true };
-    }
-  }
+Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
+  if (type->isBridgeableObjectType())
+    return type;
 
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto
     = Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
   if (!bridgedProto)
-    return { nullptr, false };
+    return nullptr;
 
   // Check whether the type conforms to _BridgedToObjectiveC.
   ProtocolConformance *conformance = nullptr;
   if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
                           &conformance))
-    return { nullptr, false };
+    return nullptr;
 
-  return { getWitnessType(type, bridgedProto, conformance,
-                          Context.getIdentifier("ObjectiveCType"),
-                             diag::broken_bridged_to_objc_protocol),
-           false };
+  return getWitnessType(type, bridgedProto, conformance,
+                        Context.getIdentifier("ObjectiveCType"),
+                        diag::broken_bridged_to_objc_protocol);
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
@@ -2279,7 +2270,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == arrayDecl) {
         auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, elementType).first.isNull();
+        return !getBridgedToObjC(DC, elementType).isNull();
       }
     }
   }
@@ -2290,12 +2281,12 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
       if (boundGeneric->getDecl() == dictDecl) {
         // The key type must be bridged to Objective-C.
         auto keyType = boundGeneric->getGenericArgs()[0];
-        if (getBridgedToObjC(DC, keyType).first.isNull())
+        if (getBridgedToObjC(DC, keyType).isNull())
           return false;
 
         // The value type must be bridged to Objective-C.
         auto valueType = boundGeneric->getGenericArgs()[1];
-        if (getBridgedToObjC(DC, valueType).first.isNull())
+        if (getBridgedToObjC(DC, valueType).isNull())
           return false;
 
         return true;

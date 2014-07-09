@@ -1752,7 +1752,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
         type2->isBridgeableObjectType() &&
         !(flags & TMF_ApplyingOperatorParameter) &&
-        TC.getBridgedToObjC(DC, type1).first) {
+        TC.getBridgedToObjC(DC, type1)) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
     }
 
@@ -1764,7 +1764,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         type2->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
         !(flags & TMF_ApplyingOperatorParameter) &&
-        TC.getBridgedToObjC(DC, type2).first) {
+        TC.getBridgedToObjC(DC, type2)) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
     }
 
@@ -2753,7 +2753,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   Type bridgedClass;
   Type bridgedType;
   if (instanceTy->getAnyNominal() == TC.Context.getStringDecl()) {
-    if (Type classType = TC.getBridgedToObjC(DC, instanceTy).first) {
+    if (Type classType = TC.getBridgedToObjC(DC, instanceTy)) {
       bridgedClass = classType;
       bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
     }
@@ -2986,7 +2986,7 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
   if (!baseTy)
     return SolutionKind::Unsolved;
   
-  if (TC.getBridgedToObjC(DC, baseTy).first) {
+  if (TC.getBridgedToObjC(DC, baseTy)) {
     increaseScore(SK_UserConversion);
     return SolutionKind::Solved;
   }
@@ -3520,7 +3520,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_CollectionUpcastConversion);
     } else {
       // Check whether this is a bridging upcast.
-      Type bridgedType1 = TC.getBridgedToObjC(DC, baseType1).first;
+      Type bridgedType1 = TC.getBridgedToObjC(DC, baseType1);
       if (!bridgedType1) {
         // FIXME: Record error.
         return SolutionKind::Error;
@@ -3583,10 +3583,10 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_CollectionUpcastConversion);
     } else {
       // This might be a bridged upcast.
-      Type bridgedKey1 = TC.getBridgedToObjC(DC, key1).first;
+      Type bridgedKey1 = TC.getBridgedToObjC(DC, key1);
       Type bridgedValue1;
       if (bridgedKey1) {
-        bridgedValue1 = TC.getBridgedToObjC(DC, value1).first;
+        bridgedValue1 = TC.getBridgedToObjC(DC, value1);
       }
 
       // Both the key and value types need to be bridged.
@@ -3652,7 +3652,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // T bridges to C and C < U ===> T <c U
   case ConversionRestrictionKind::BridgeToObjC: {
-    auto objcClass = TC.getBridgedToObjC(DC, type1).first;
+    auto objcClass = TC.getBridgedToObjC(DC, type1);
     assert(objcClass && "type is not bridged to Objective-C?");
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
@@ -3682,7 +3682,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // U bridges to C and T < C ===> T <c U
   case ConversionRestrictionKind::BridgeFromObjC: {
-    auto objcClass = TC.getBridgedToObjC(DC, type2).first;
+    auto objcClass = TC.getBridgedToObjC(DC, type2);
     assert(objcClass && "type is not bridged to Objective-C?");
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
