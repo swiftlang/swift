@@ -174,11 +174,8 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       // Can't hoist terminators.
       if (isa<TermInst>(Inst))
         continue;
-      // Can't hoist stack allocation.
-      if (isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
-        continue;
-      // Can't hoist allocation.
-      if (isa<AllocationInst>(Inst))
+      // Can't hoist allocation and dealloc stacks.
+      if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
         continue;
 
       // Can't hoist instructions which may have side effects.
