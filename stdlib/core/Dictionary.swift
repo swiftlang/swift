@@ -2286,11 +2286,11 @@ public func _dictionaryDownCastConditional<
 
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (key, value) in source {
-    // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-    if reinterpretCast(key) as AnyObject is DerivedKey &&
-       reinterpretCast(value) as AnyObject is DerivedValue {
-      result[reinterpretCast(key)] = reinterpretCast(value)
-      continue
+    if let derivedKey = key as? DerivedKey {
+      if let derivedValue = value as? DerivedValue {
+        result[derivedKey] = derivedValue
+        continue
+      }
     }
 
     // Either the key or the value wasn't of the appropriate derived
@@ -2346,15 +2346,14 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     // Downcast the key.
     var resultKey: SwiftKey
     if keyBridgesDirectly {
-      // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-      if reinterpretCast(key) as AnyObject is SwiftKey {
-        resultKey = reinterpretCast(key)
+      if let bridgedKey = key as? SwiftKey {
+        resultKey = bridgedKey
       } else {
         return nil
       }
     } else {
       if let bridgedKey = _bridgeFromObjectiveCConditional(
-          reinterpretCast(key), SwiftKey.self) {
+          _reinterpretCastToAnyObject(key), SwiftKey.self) {
         resultKey = bridgedKey
       } else {
         return nil
@@ -2364,15 +2363,14 @@ public func _dictionaryBridgeFromObjectiveCConditional<
     // Downcast the value.
     var resultValue: SwiftValue
     if valueBridgesDirectly {
-      // FIXME: reinterpretCasts work around <rdar://problem/16953026>
-      if reinterpretCast(value) as AnyObject is SwiftValue {
-        resultValue = reinterpretCast(value)
+      if let bridgedValue = value as? SwiftValue {
+        resultValue = bridgedValue
       } else {
         return nil
       }
     } else {
       if let bridgedValue = _bridgeFromObjectiveCConditional(
-          reinterpretCast(value), SwiftValue.self) {
+          _reinterpretCastToAnyObject(value), SwiftValue.self) {
         resultValue = bridgedValue
       } else {
         return nil
