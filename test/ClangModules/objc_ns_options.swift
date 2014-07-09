@@ -40,3 +40,7 @@ let bitmapFormat2: NSBitmapFormat2 = .NSU16a | .NSU32a;
 let bitmapFormat3: NSBitmapFormat3 = .NSU16b | .NSS32b;
 let bitmapFormat4: NSUBitmapFormat4 = .NSU16c | .NSU32c;
 let bitmapFormat5: NSABitmapFormat5 = .NSAA16d | .NSAB32d;
+
+// Drop trailing underscores when possible.
+let timeFlags: CMTimeFlags = .Valid | .HasBeenRounded
+let timeFlags2: CMTimeFlagsWithNumber = ._Valid | ._888

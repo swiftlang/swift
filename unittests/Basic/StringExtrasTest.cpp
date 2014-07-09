@@ -56,6 +56,36 @@ TEST(CamelCaseWordsTest, Iteration) {
   EXPECT_EQ(iter, words.end());
 }
 
+TEST(CamelCaseWordsTest, WordsWithUnderscores) {
+  auto words = camel_case::getWords("CF_Flags_789");
+  EXPECT_EQ(5, std::distance(words.begin(), words.end()));
+
+  auto iter = words.begin();
+  EXPECT_EQ("CF", *iter++);
+  EXPECT_EQ("_", *iter++);
+  EXPECT_EQ("Flags", *iter++);
+  EXPECT_EQ("_", *iter++);
+  EXPECT_EQ("789", *iter++);
+  EXPECT_EQ("789", *--iter);
+  EXPECT_EQ("_", *--iter);
+  EXPECT_EQ("Flags", *--iter);
+  EXPECT_EQ("_", *--iter);
+  EXPECT_EQ("CF", *--iter);
+
+  auto manyUnderscores = camel_case::getWords("___ABC");
+  EXPECT_EQ(4, std::distance(manyUnderscores.begin(), manyUnderscores.end()));
+
+  iter = manyUnderscores.begin();
+  EXPECT_EQ("_", *iter++);
+  EXPECT_EQ("_", *iter++);
+  EXPECT_EQ("_", *iter++);
+  EXPECT_EQ("ABC", *iter++);
+  EXPECT_EQ("ABC", *--iter);
+  EXPECT_EQ("_", *--iter);
+  EXPECT_EQ("_", *--iter);
+  EXPECT_EQ("_", *--iter);
+}
+
 TEST(ToLowercaseTest, Words) {
   llvm::SmallString<64> scratch;
 

@@ -1317,18 +1317,21 @@ namespace {
       if (!commonPrefix.empty()) {
         StringRef checkPrefix = commonPrefix;
 
+        // Account for the 'EnumName_Constant' convention on enumerators.
+        if (checkPrefix.back() == '_' && !followedByNonIdentifier)
+          checkPrefix = checkPrefix.drop_back();
+
         // Account for the 'kConstant' naming convention on enumerators.
-        bool dropKPrefix = false;
         if (checkPrefix[0] == 'k' &&
             ((checkPrefix.size() >= 2 && clang::isUppercase(checkPrefix[1])) ||
              !followedByNonIdentifier)) {
-          checkPrefix = checkPrefix.substr(1);
-          dropKPrefix = true;
+          checkPrefix = checkPrefix.drop_front();
         }
 
         StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
                                                          enumName.str());
-        commonPrefix = commonPrefix.slice(0, commonWithEnum.size()+dropKPrefix);
+        size_t delta = commonPrefix.size() - checkPrefix.size();
+        commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
       }
       Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
     }

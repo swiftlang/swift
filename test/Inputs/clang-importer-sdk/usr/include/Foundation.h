@@ -269,6 +269,21 @@ typedef NS_OPTIONS(NSInteger, CBCharacteristicProperties) {
   CBCharacteristicPropertyIndicateEncryptionRequired /*NS_ENUM_AVAILABLE(10_9, 6_0)*/ = 0x200
 };
 
+// From CoreMedia
+typedef CF_OPTIONS(unsigned int, CMTimeFlags) {
+  kCMTimeFlags_Valid = 1UL<<0,
+  kCMTimeFlags_HasBeenRounded = 1UL<<1,
+  kCMTimeFlags_PositiveInfinity = 1UL<<2,
+  kCMTimeFlags_NegativeInfinity = 1UL<<3,
+  kCMTimeFlags_Indefinite = 1UL<<4,
+  kCMTimeFlags_ImpliedValueFlagsMask = kCMTimeFlags_PositiveInfinity | kCMTimeFlags_NegativeInfinity | kCMTimeFlags_Indefinite
+};
+typedef CF_OPTIONS(unsigned int, CMTimeFlagsWithNumber) {
+  kCMTimeFlagsWithNumber_Valid = 1UL<<0,
+  kCMTimeFlagsWithNumber_888 = 1UL<<1,
+};
+
+
 // Contrived name with a plural "-es"...normally these are "beeps".
 typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
   AlertBuzzFunk,

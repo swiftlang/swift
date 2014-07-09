@@ -48,8 +48,16 @@ bool swift::isLinkingVerb(StringRef word) {
 void WordIterator::computeNextPosition() const {
   assert(Position < String.size() && "Already at end of string");
 
-  // Skip over any uppercase letters at the beginning of the word.
   unsigned i = Position, n = String.size();
+
+  // Treat _ as a word on its own. Don't coalesce.
+  if (String[i] == '_') {
+    NextPosition = i + 1;
+    NextPositionValid = true;
+    return;
+  }
+
+  // Skip over any uppercase letters at the beginning of the word.
   while (i < n && clang::isUppercase(String[i]))
     ++i;
 
@@ -57,15 +65,15 @@ void WordIterator::computeNextPosition() const {
   // acronym.
   if (i - Position > 1) {
     // If we hit the end of the string, that's it. Otherwise, this
-    // word ends at the last uppercase letter, so that the next word
-    // starts with the last uppercase letter.
+    // word ends before the last uppercase letter if the next word is alphabetic
+    // (URL_Loader) or after the last uppercase letter if it's not (UTF_8).
     NextPosition = (i == n || !clang::isLowercase(String[i])) ? i : i-1;
     NextPositionValid = true;
     return;
   }
 
   // Skip non-uppercase letters.
-  while (i < n && !clang::isUppercase(String[i]))
+  while (i < n && !clang::isUppercase(String[i]) && String[i] != '_')
     ++i;
 
   NextPosition = i;
@@ -75,18 +83,28 @@ void WordIterator::computeNextPosition() const {
 void WordIterator::computePrevPosition() const {
   assert(Position > 0 && "Already at beginning of string");
 
-  // While we see non-uppercase letters, keep moving back.
   unsigned i = Position;
-  while (i > 0 && !clang::isUppercase(String[i-1]))
+
+  // While we see non-uppercase letters, keep moving back.
+  while (i > 0 && !clang::isUppercase(String[i-1]) && String[i-1] != '_')
     --i;
 
   // If we found any lowercase letters, this was a normal camel case
   // word (not an acronym).
   if (i < Position) {
-    // If we hit the beginning of the string, that's it. Otherwise,
-    // this word starts at the uppercase letter that terminated the
-    // search above.
-    PrevPosition = (i == 0 || !clang::isLowercase(String[i])) ? i : i-1;
+    // If we hit the beginning of the string, that's it. Otherwise, this
+    // word starts with an uppercase letter if the next word is alphabetic
+    // (URL_Loader) or after the last uppercase letter if it's not (UTF_8).
+    PrevPosition = i;
+    if (i != 0 && clang::isLowercase(String[i]) && String[i-1] != '_')
+      --PrevPosition;
+    PrevPositionValid = true;
+    return;
+  }
+
+  // Treat _ as a word on its own. Don't coalesce.
+  if (String[i-1] == '_') {
+    PrevPosition = i - 1;
     PrevPositionValid = true;
     return;
   }
