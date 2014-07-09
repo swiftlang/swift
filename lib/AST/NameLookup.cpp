@@ -14,14 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleNameLookup.h"
-#include "swift/Basic/SourceManager.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"

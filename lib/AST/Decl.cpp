@@ -691,7 +691,7 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   assert(!Decls.empty());
   ImportKind FirstKind = ImportDecl::getBestImportKind(Decls.front());
 
-  // Only functions can be overloaded.
+  // FIXME: Only functions can be overloaded.
   if (Decls.size() == 1)
     return FirstKind;
   if (FirstKind != ImportKind::Func)

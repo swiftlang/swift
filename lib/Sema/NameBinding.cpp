@@ -152,12 +152,14 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
 
   // If we're importing a specific decl, validate the import kind.
   if (ID->getImportKind() != ImportKind::Module) {
+    using namespace namelookup;
     auto declPath = ID->getDeclPath();
 
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    M->lookupQualified(ModuleType::get(M), declPath.front().first,
-                       NL_QualifiedDefault, nullptr, decls);
+    lookupInModule(M, declPath, declPath.front().first, decls,
+                   NLKind::QualifiedLookup, ResolutionKind::Overloadable,
+                   /*resolver*/nullptr);
 
     if (decls.empty()) {
       diagnose(ID, diag::no_decl_in_module)

@@ -15,11 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleNameLookup.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
