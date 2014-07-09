@@ -288,9 +288,8 @@ def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
   ModeOpt;
 def integrated_repl : Flag<["-"], "integrated-repl">, Flags<[FrontendOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
-
-def i : Flag<["-"], "i">, HelpText<"Immediate mode">, Flags<[FrontendOption]>,
-  ModeOpt;
+def i : Option<["-"], "i", KIND_REMAINING_ARGS>,
+  HelpText<"Immediate mode">, ModeOpt;
 
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,

@@ -1,4 +1,4 @@
-// RUN: %swift -I %S -enable-source-import -i %s | FileCheck %s
+// RUN: %swift -I %S -enable-source-import -interpret %s | FileCheck %s
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors

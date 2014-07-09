@@ -222,12 +222,23 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
 
   for (Arg *A : ArgList) {
     // If we're not in immediate mode, pick up inputs via the -- option.
-    if (!ImmediateMode && A->getOption().matches(options::OPT__DASH_DASH)) {
+    if (A->getOption().matches(options::OPT__DASH_DASH)) {
+      assert(!ImmediateMode && "-i and -- are both KIND_REMAINING_ARGS");
       A->claim();
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         DAL->append(makeInputArg(*DAL, *Opts, A->getValue(i)));
       }
       continue;
+    }
+
+    // In immediate mode, synthesize an input for -i INPUT ARGS...
+    if (ImmediateMode && A->getOption().matches(options::OPT_i)) {
+      if (A->getNumValues() < 1) {
+        Diags.diagnose(SourceLoc(), diag::error_expected_immediate_input,
+                       A->getSpelling());
+        continue;
+      }
+      DAL->append(makeInputArg(*DAL, *Opts, A->getValue(0)));
     }
     DAL->append(A);
   }

@@ -1,4 +1,4 @@
-// RUN: %swift -i -I=%S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %swift -interpret -I=%S/Inputs -enable-source-import %s | FileCheck %s
 // REQUIRES: swift_interpreter
 
 // Make sure we actually IRGen this.

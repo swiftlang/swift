@@ -196,4 +196,6 @@ def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
 
+def interpret : Flag<["-"], "interpret">, HelpText<"Immediate mode">, ModeOpt;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

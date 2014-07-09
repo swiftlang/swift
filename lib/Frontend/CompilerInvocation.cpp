@@ -149,7 +149,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::PrintAST;
     } else if (Opt.matches(OPT_repl) || Opt.matches(OPT_integrated_repl)) {
       Action = FrontendOptions::REPL;
-    } else if (Opt.matches(OPT_i)) {
+    } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;
     } else {
       llvm_unreachable("Unhandled mode option");

@@ -3,7 +3,7 @@
 // RUN: %swift -parse %S/Inputs/MutualDependencyHelper.swift -enable-source-import -I=%S
 
 // FIXME: We should be able to handle this even in -i mode.
-// RUN: %swift -i -I=%S/Inputs -enable-source-import %s -verify
+// RUN: %swift -interpret -I=%S/Inputs -enable-source-import %s -verify
 
 
 import MutualDependencyHelper

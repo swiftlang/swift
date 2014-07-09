@@ -18,6 +18,12 @@ Latest
   arithmetic operations of Float and Double, and can be created using
   numeric literals.
 
+* The immediate mode 'swift -i' now works for writing #! scripts that take
+  command line arguments. The '-i' option to the swift driver must now come at
+  the end of the compiler arguments, directly before the input filename. Any
+  arguments that come after -i and the input filename are treated as arguments
+  to the interpreted file and forwarded to Process.arguments.
+
 2014-07-03
 ----------
 

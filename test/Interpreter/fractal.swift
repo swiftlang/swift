@@ -1,4 +1,4 @@
-// RUN: ulimit -c unlimited && %swift -I %S -enable-source-import -i %s | tee /var/tmp/fractal.out | FileCheck %s
+// RUN: ulimit -c unlimited && %swift -I %S -enable-source-import -interpret %s | tee /var/tmp/fractal.out | FileCheck %s
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors

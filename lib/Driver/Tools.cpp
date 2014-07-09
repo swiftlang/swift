@@ -258,7 +258,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     break;
   }
   case OutputInfo::Mode::Immediate:
-    FrontendModeOption = "-i";
+    FrontendModeOption = "-interpret";
     break;
   case OutputInfo::Mode::REPL:
     FrontendModeOption = "-repl";
@@ -355,8 +355,15 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
   }
 
-  if (OI.CompilerMode == OutputInfo::Mode::Immediate)
-    Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
+  // In immediate mode, pass through any arguments following -i INPUT after --.
+  if (OI.CompilerMode == OutputInfo::Mode::Immediate) {
+    Arg *A = Args.getLastArg(options::OPT_i);
+    assert(A && "expected -i option in immediate mode");
+    if (A->getNumValues() > 1) {
+      Arguments.push_back("--");
+      Arguments.append(A->getValues().begin() + 1, A->getValues().end());
+    }
+  }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
