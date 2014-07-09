@@ -498,6 +498,9 @@ ERROR(function_type_access,sema_tcd,none,
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
+ERROR(extension_access_with_conformances,sema_tcd,none,
+      "%0 attribute cannot be used with extensions that declare "
+      "protocol conformances", (DeclAttribute))
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,

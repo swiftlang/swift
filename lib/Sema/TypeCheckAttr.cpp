@@ -312,6 +312,14 @@ bool AttributeEarlyChecker::visitAbstractAccessibilityAttr(
     return true;
   }
 
+  if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    if (!extension->getInherited().empty()) {
+      diagnoseAndRemoveAttr(attr, diag::extension_access_with_conformances,
+                            attr);
+      return true;
+    }
+  }
+
   // And not on certain value decls.
   if (isa<DestructorDecl>(D) || isa<EnumElementDecl>(D)) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);

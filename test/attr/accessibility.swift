@@ -112,3 +112,6 @@ private extension Properties {
     set { }
   }
 }
+
+internal protocol EmptyProto {}
+private extension Properties : EmptyProto {} // expected-error {{'private' attribute cannot be used with extensions that declare protocol conformances}}
