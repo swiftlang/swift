@@ -78,6 +78,9 @@ ERROR(error_unknown_file_type,driver,none,
 ERROR(error_invalid_arch,driver,none,
       "invalid target architecture '%0'", (StringRef))
 
+ERROR(error_framework_bridging_header,driver,none,
+      "using bridging headers with framework targets is unsupported", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

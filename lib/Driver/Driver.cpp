@@ -68,6 +68,13 @@ Driver::~Driver() {
   llvm::DeleteContainerSeconds(ToolChains);
 }
 
+static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
+  if (Args.hasArgNoClaim(options::OPT_import_underlying_module) &&
+      Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+    diags.diagnose({}, diag::error_framework_bridging_header);
+  }
+}
+
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
@@ -91,6 +98,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     DefaultTargetTriple = A->getValue();
 
   const ToolChain &TC = getToolChain(*ArgList);
+
+  validateArgs(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;

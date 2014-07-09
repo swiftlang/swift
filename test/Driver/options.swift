@@ -51,3 +51,6 @@
 
 // RUN: %swift_driver -assert-config DisableReplacement -### | FileCheck -check-prefix=ASSERTCONFIG6 %s
 // ASSERTCONFIG6: -assert-config DisableReplacement
+
+// RUN: not %swift_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
+// FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
