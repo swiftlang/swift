@@ -391,6 +391,11 @@ namespace {
       return true;
     }
 
+    bool visitRefToRawPointerInst(RefToRawPointerInst *RHS) {
+      // We already checked operands and types.
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };
