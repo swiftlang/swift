@@ -785,7 +785,10 @@ public:
 
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(PatternBindingDecl *D);
-  
+
+  /// Type-check a for-each loop's pattern binding and sequence together.
+  bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);
 

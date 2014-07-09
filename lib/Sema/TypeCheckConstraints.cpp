@@ -1180,6 +1180,102 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   return hadError;
 }
 
+bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
+  /// Type checking listener for for-each binding.
+  class BindingListener : public ExprTypeCheckListener {
+    /// The for-each statement.
+    ForEachStmt *Stmt;
+
+    /// The locator we're using.
+    ConstraintLocator *Locator;
+
+    /// The type of the initializer.
+    Type InitType;
+
+  public:
+    explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
+
+    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      // Save the locator we're using for the expression.
+      Locator = cs.getConstraintLocator(expr);
+
+      // The expression type must conform to the Sequence.
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *sequenceProto
+        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
+      if (!sequenceProto) {
+        return true;
+      }
+
+      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       sequenceProto->getDeclaredType(), Locator);
+
+      // Collect constraints from the element pattern.
+      auto pattern = Stmt->getPattern();
+      InitType = cs.generateConstraints(pattern, Locator);
+      if (!InitType)
+        return true;
+
+      // Determine the generator type of the sequence.
+      // FIXME: Should look up the type witness.
+      auto generatorType = cs.createTypeVariable(Locator, /*options=*/0);
+      cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
+                                          expr->getType(), generatorType,
+                                          tc.Context.Id_GeneratorType,
+                                          Locator));
+
+      // Determine the element type of the generator.
+      // FIXME: Should look up the type witness.
+      auto elementType = cs.createTypeVariable(Locator, /*options=*/0);
+      cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
+                                          generatorType, elementType,
+                                          tc.Context.Id_Element,
+                                          Locator));
+
+      // Add a conversion constraint between the element type of the sequence
+      // and the type of the element pattern.
+      cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
+                       Locator);
+      return false;
+    }
+
+    virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
+      // Figure out what type the constraints decided on.
+      auto &cs = solution.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
+      InitType = solution.simplifyType(tc, InitType);
+
+      // Force the sequence to be materializable.
+      // FIXME: work this into the constraint system
+      expr = tc.coerceToMaterializable(expr);
+
+      // Apply the solution to the iteration pattern as well.
+      Pattern *pattern = Stmt->getPattern();
+      TypeResolutionOptions options;
+      options |= TR_OverrideType;
+      options |= TR_EnumerationVariable;
+      if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
+        return nullptr;
+      }
+
+      Stmt->setPattern(pattern);
+      Stmt->setSequence(expr);
+      return expr;
+    }
+  };
+
+  BindingListener listener(stmt);
+  Expr *seq = stmt->getSequence();
+  assert(seq && "type-checking an uninitialized for-each statement?");
+
+  // Type-check the for-each loop sequence and element pattern.
+  if (typeCheckExpression(seq, dc, Type(), Type(), /*discardedExpr=*/false,
+                          FreeTypeVariableBinding::Disallow, &listener))
+    return true;
+
+  return false;
+}
+
 /// \brief Compute the rvalue type of the given expression, which is the
 /// destination of an assignment statement.
 Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {

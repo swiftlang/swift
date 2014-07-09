@@ -145,15 +145,6 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
   TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
 }
 
-static bool isImplicitlyUnwrappedOptionalType(Type &T) {
-  if(auto bgt = T->castTo<BoundGenericType>()) {
-    return bgt->getDecl()->classifyAsOptionalType() ==
-              OTK_ImplicitlyUnwrappedOptional;
-  }
-  
-  return false;
-}
-
 namespace {
 /// StmtChecker - This class implements 
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
@@ -373,94 +364,86 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    // Type-check the container and convert it to an rvalue.
-    Expr *Sequence = S->getSequence();
-    if (TC.typeCheckExpression(Sequence, DC, Type(), Type(),
-                               /*discardedExpr=*/false))
+    TypeResolutionOptions options;
+    options |= TR_AllowUnspecifiedTypes;
+    options |= TR_AllowUnboundGenerics;
+    if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
+      // FIXME: Handle errors better.
+      S->getPattern()->setType(ErrorType::get(TC.Context));
       return nullptr;
-    S->setSequence(Sequence);
+    }
+
+    if (TC.typeCheckForEachBinding(DC, S))
+      return nullptr;
 
     // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *SequenceProto
+    ProtocolDecl *sequenceProto
       = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
-    if (!SequenceProto) {
+    if (!sequenceProto) {
       return nullptr;
     }
 
     // Retrieve the 'Generator' protocol.
-    ProtocolDecl *GeneratorProto
+    ProtocolDecl *generatorProto
       = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Generator);
-    if (!GeneratorProto) {
+    if (!generatorProto) {
       return nullptr;
     }
     
-    // Verify that the container conforms to the Sequence protocol, and
-    // invoke getElements() on it container to retrieve the range of elements.
-    Type GeneratorTy;
-    VarDecl *Generator;
+    // If the sequence is an implicitly unwrapped optional, force it.
+    Expr *sequence = S->getSequence();
+    if (auto objectTy
+          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
+      sequence = new (TC.Context) ForceValueExpr(sequence,
+                                                 sequence->getEndLoc());
+      sequence->setType(objectTy);
+      sequence->setImplicit();
+      S->setSequence(sequence);
+    }
+
+    // Invoke generate() to get a generator from the sequence.
+    Type generatorTy;
+    VarDecl *generator;
     {
-      Type SequenceType = Sequence->getType()->getRValueType();
-      
-      // If necessary, unwrap the implicitly unwrapped optional type before
-      // checking for a conformance.
-      auto desugaredSequence = SequenceType->getDesugaredType();
-      if (auto bgt = dyn_cast<BoundGenericType>(desugaredSequence)) {
-        if(bgt->getDecl()->classifyAsOptionalType() ==
-           OTK_ImplicitlyUnwrappedOptional) {
-          
-          // If we're a one-level implicitly unwrapped optional expression,
-          // force the sequence expression.
-          SequenceType = bgt->getGenericArgs()[0];
-          
-          if (!isImplicitlyUnwrappedOptionalType(SequenceType)) {
-            auto forceExpr = new (TC.Context) ForceValueExpr(
-                                                           Sequence,
-                                                           Sequence->getLoc());
-            forceExpr->setType(SequenceType);
-            Sequence = forceExpr;
-            S->setSequence(forceExpr);
-          }
-        }
-      }
-
-      ProtocolConformance *Conformance = nullptr;
-      if (!TC.conformsToProtocol(SequenceType, SequenceProto, DC,
-                                 &Conformance, Sequence->getLoc()))
+      Type sequenceType = sequence->getType();
+      ProtocolConformance *conformance = nullptr;
+      if (!TC.conformsToProtocol(sequenceType, sequenceProto, DC,
+                                 &conformance, sequence->getLoc()))
         return nullptr;
       
-      if (Conformance && Conformance->isInvalid())
+      if (conformance && conformance->isInvalid())
         return nullptr;
 
-      GeneratorTy = TC.getWitnessType(SequenceType, SequenceProto,
-                                      Conformance,
-                                      TC.Context.getIdentifier("GeneratorType"),
+      generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
+                                      conformance,
+                                      TC.Context.Id_GeneratorType,
                                       diag::sequence_protocol_broken);
       
-      Expr *GetGenerator
-        = TC.callWitness(Sequence, DC, SequenceProto, Conformance,
-                         TC.Context.getIdentifier("generate"),
+      Expr *getGenerator
+        = TC.callWitness(sequence, DC, sequenceProto, conformance,
+                         TC.Context.Id_generate,
                          {}, diag::sequence_protocol_broken);
-      if (!GetGenerator) return nullptr;
+      if (!getGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
-      StringRef Name = "$generator";
-      if (auto NP = dyn_cast_or_null<NamedPattern>(S->getPattern()))
-        Name = NP->getBoundName().str();
-      Generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
+      StringRef name = "$generator";
+      if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
+        name = np->getBoundName().str();
+      generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                            S->getInLoc(),
-                                     TC.Context.getIdentifier(Name),
-                                     GeneratorTy, DC);
-      Generator->setImplicit();
+                                           TC.Context.getIdentifier(name),
+                                           generatorTy, DC);
+      generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
-      auto GenPat = new (TC.Context) NamedPattern(Generator);
-      GenPat->setImplicit();
-      auto GenBinding = new (TC.Context)
+      auto genPat = new (TC.Context) NamedPattern(generator);
+      genPat->setImplicit();
+      auto genBinding = new (TC.Context)
           PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
-                             S->getForLoc(), GenPat, GetGenerator,
+                             S->getForLoc(), genPat, getGenerator,
                              /*conditional*/ false, DC);
-      GenBinding->setImplicit();
-      S->setGenerator(GenBinding);
+      genBinding->setImplicit();
+      S->setGenerator(genBinding);
     }
     
     // Working with generators requires Optional.
@@ -469,67 +452,33 @@ public:
     
     // Gather the witnesses from the Generator protocol conformance, which
     // we'll use to drive the loop.
-    
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    ProtocolConformance *GenConformance = nullptr;
-    if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, DC, &GenConformance,
-                               Sequence->getLoc()))
+    ProtocolConformance *genConformance = nullptr;
+    if (!TC.conformsToProtocol(generatorTy, generatorProto, DC, &genConformance,
+                               sequence->getLoc()))
       return nullptr;
     
-    Type ElementTy = TC.getWitnessType(GeneratorTy, GeneratorProto,
-                                       GenConformance,
-                                       TC.Context.getIdentifier("Element"),
+    Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
+                                       genConformance, TC.Context.Id_Element,
                                        diag::generator_protocol_broken);
-    if (!ElementTy)
+    if (!elementTy)
       return nullptr;
     
     // Compute the expression that advances the generator.
-    Expr *GenNext
-      = TC.callWitness(TC.buildCheckedRefExpr(Generator, DC, S->getInLoc(),
+    Expr *genNext
+      = TC.callWitness(TC.buildCheckedRefExpr(generator, DC, S->getInLoc(),
                                               /*implicit*/true),
-                       DC, GeneratorProto, GenConformance,
-                       TC.Context.getIdentifier("next"),
-                       {}, diag::generator_protocol_broken);
-    if (!GenNext) return nullptr;
+                       DC, generatorProto, genConformance,
+                       TC.Context.Id_next, {}, diag::generator_protocol_broken);
+    if (!genNext) return nullptr;
     // Check that next() produces an Optional<Element> value.
-    if (GenNext->getType()->getCanonicalType()->getAnyNominal()
+    if (genNext->getType()->getCanonicalType()->getAnyNominal()
           != TC.Context.getOptionalDecl()) {
       TC.diagnose(S->getForLoc(), diag::generator_protocol_broken);
       return nullptr;
     }
-    S->setGeneratorNext(GenNext);
-    
-    // Coerce the pattern to the element type, now that we know the element
-    // type.
-    // FIXME: Could allow unbound generic types in this pattern, then override
-    // here.
-    Pattern *pattern = S->getPattern();
-    TypeResolutionOptions TROptions;
-    TROptions |= TR_EnumerationVariable;
-    TROptions |= TR_FromNonInferredPattern;
-
-    if (TC.coercePatternToType(pattern, DC, ElementTy, TROptions))
-      return nullptr;
-    S->setPattern(pattern);
-    
-    if (pattern->getType()->getImplicitlyUnwrappedOptionalObjectType() &&
-        GenNext->getType()->getOptionalObjectType() &&
-        GenNext->getType()->getOptionalObjectType()->isAnyObject()) {
-      
-      // Need to coerce the genNext expression's type to the pattern type.
-      TypeLoc patternTy;
-      patternTy.setType(pattern->getType(), true);
-      
-      auto castExpr = new (TC.Context) ForcedCheckedCastExpr(GenNext,
-                                                             SourceLoc(),
-                                                             patternTy);
-      castExpr->setImplicit();
-      castExpr->setType(pattern->getType());
-      castExpr->setCastKind(CheckedCastKind::Downcast);
-      S->setGeneratorNext(castExpr);
-    }
-    
+    S->setGeneratorNext(genNext);
     
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);

@@ -60,7 +60,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{type annotation does not match contextual type 'Int'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{'Int' is not convertible to 'Float'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
@@ -72,7 +72,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
 
-  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{type annotation does not match contextual type 'Element'}}
+  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'Float' is not convertible to 'Int'}}
 
   for (i = 7, f) in gtr {} // expected-error{{default argument is only permitted for a non-curried function parameter}}
 }
@@ -90,4 +90,62 @@ func slices(i_s: [Int], ias: [[Int]]) {
 
 func discard_binding() {
   for _ in [0] {}
+}
+
+struct X<T> { 
+  var value: T
+}
+
+struct Gen<T> : Generator {
+  func next() -> T? { return nil }
+}
+
+struct Seq<T> : Sequence {
+  func generate() -> Gen<T> { return Gen() }
+}
+
+func getIntSeq() -> Seq<Int> { return Seq() }
+
+func getOvlSeq() -> Seq<Int> { return Seq() }
+func getOvlSeq() -> Seq<Double> { return Seq() }
+func getOvlSeq() -> Seq<X<Int>> { return Seq() }
+
+func getGenericSeq<T>() -> Seq<T> { return Seq() }
+
+func getXIntSeq() -> Seq<X<Int>> { return Seq() }
+
+func getXIntSeqIUO() -> Seq<X<Int>>! { return nil }
+
+func testForEachInference() {
+  for i in getIntSeq() { }
+
+  // Overloaded sequence resolved contextually
+  for i: Int in getOvlSeq() { }
+  for d: Double in getOvlSeq() { }
+
+  // Overloaded sequence not resolved contextually
+  for v in getOvlSeq() { } // expected-error{{could not find an overload for 'getOvlSeq' that accepts the supplied arguments}}
+
+  // Generic sequence resolved contextually
+  for i: Int in getGenericSeq() { }
+  for d: Double in getGenericSeq() { }
+  
+  // Inference of generic arguments in the element type from the
+  // sequence.
+  for x: X in getXIntSeq() { 
+    let z = x.value + 1
+  }
+
+  for x: X in getOvlSeq() { 
+    let z = x.value + 1
+  }
+
+  // Inference with implicitly unwrapped optional
+  for x: X in getXIntSeqIUO() {
+    let z = x.value + 1
+  }
+
+  // Range overloading.
+  for i: Int8 in 0..<10 { }
+  for i: Float in 0.0...10.0 { }
 }

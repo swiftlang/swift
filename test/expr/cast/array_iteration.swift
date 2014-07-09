@@ -14,11 +14,8 @@ for view in rootView.subviews as [View] {
 	println("found subview")
 }
 
-for view:View! in rootView.subviews {
-	println("found subview")
-}
-
-for view:View in rootView.subviews { // expected-error{{type annotation does not match contextual type 'AnyObject'}}
+// FIXME: Somewhat misleading diagnostic here.
+for view:View in rootView.subviews { // expected-error{{type 'Array<AnyObject>!' cannot be implicitly downcast to 'View'; did you mean to use 'as' to force downcast?}}
 	println("found subview")
 }
 

@@ -24,6 +24,16 @@ Latest
   arguments that come after -i and the input filename are treated as arguments
   to the interpreted file and forwarded to Process.arguments.
 
+* Type inference for for..in loops have been improved to consider the
+  sequence along with the pattern being bound. For example, this
+  allows the following loops to be type-checked that were previously
+  rejected:
+
+      for i: Int8 in 0..<10 { }
+      for i: Float in 0.0...10.0 { }
+
+For-each loops have improved type inference for 
+
 2014-07-03
 ----------
 
