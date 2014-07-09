@@ -9,23 +9,9 @@ public struct ObjCBool : Printable {
     return value != 0
   }
 
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
-  @conversion public func __conversion() -> Bool {
-    return self.getLogicValue()
-  }
-
   public var description: String {
     // Dispatch to Bool.
     return self.getLogicValue().description
-  }
-}
-
-extension Bool {
-  /// \brief Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
-  @conversion public func __conversion() -> ObjCBool {
-    return ObjCBool(self ? 1 : 0)
   }
 }
 

@@ -14,22 +14,10 @@ public struct ObjCBool : LogicValue {
   public func getLogicValue() -> Bool {
     return value
   }
-
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
-  @conversion public func __conversion() -> Bool {
-    return self.getLogicValue()
-  }
 }
 
-extension Bool {
-  /// \brief Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
-  @conversion public func __conversion() -> ObjCBool {
-    return ObjCBool(self ? true : false)
-  }
-}
 #else
+
 public struct ObjCBool : LogicValue {
   private var value : UInt8
 
@@ -45,20 +33,6 @@ public struct ObjCBool : LogicValue {
   public func getLogicValue() -> Bool {
     if value == 0 { return false }
     return true
-  }
-
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
-  @conversion public func __conversion() -> Bool {
-    return self  
-  }
-}
-
-extension Bool {
-  /// \brief Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
-  @conversion public func __conversion() -> ObjCBool {
-    return ObjCBool(self ? 1 : 0)
   }
 }
 #endif
@@ -78,11 +52,11 @@ public struct Selector : StringLiteralConvertible {
 }
 
 internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
-  return x
+  return ObjCBool(x)
 }
 
 internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
-  return x
+  return Bool(x)
 }
 
 public func ~=(x: NSObject, y: NSObject) -> Bool {

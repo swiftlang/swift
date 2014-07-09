@@ -10,12 +10,6 @@ public struct ObjCBool : LogicValue {
     if value == 0 { return false }
     return true
   }
-
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
-  @conversion public func __conversion() -> Bool {
-    return self
-  }
 }
 
 @asmname("swift_BoolToObjCBool")

@@ -21,7 +21,7 @@ var xSerial = 0
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-class X : ForwardIndex, Comparable, Printable {
+class X : ForwardIndex, Comparable, Printable, IntegerLiteralConvertible {
   init(_ value: Int) {
     ++xCount
     serial = ++xSerial
@@ -43,6 +43,10 @@ class X : ForwardIndex, Comparable, Printable {
     return X(self.value.successor())
   }
   
+  class func convertFromIntegerLiteral(value: Int) -> X {
+    return X(value)
+  }
+
   var value: Int
   var serial: Int
 }
@@ -53,13 +57,6 @@ func == (x: X, y: X) -> Bool {
 
 func < (x: X, y: X) -> Bool {
   return x.value < y.value
-}
-
-extension Int {
-  @conversion
-  func __conversion() -> X {
-    return X(self)
-  }
 }
 
 //===----------------------------------------------------------------------===//
