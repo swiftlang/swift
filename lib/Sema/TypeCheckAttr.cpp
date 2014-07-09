@@ -341,13 +341,13 @@ void AttributeEarlyChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 
 void AttributeEarlyChecker::visitSetterAccessibilityAttr(
     SetterAccessibilityAttr *attr) {
-  if (visitAbstractAccessibilityAttr(attr))
-    return;
-
   auto storage = dyn_cast<AbstractStorageDecl>(D);
   if (!storage)
     return diagnoseAndRemoveAttr(attr, diag::access_control_setter,
                                  attr->getAccess());
+
+  if (visitAbstractAccessibilityAttr(attr))
+    return;
 
   if (!storage->isSettable(storage->getDeclContext())) {
     // This must stay in sync with diag::access_control_setter_read_only.

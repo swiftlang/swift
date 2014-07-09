@@ -60,6 +60,8 @@ private protocol TestProtocol {
   public func baz() // expected-error {{'public' attribute cannot be used in protocols}}
 }
 
+public(set) func publicSetFunc() {} // expected-error {{'public(set)' attribute can only be applied to variables and subscripts}}
+
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
 private(set) var defaultVisOK = 0
@@ -115,3 +117,4 @@ private extension Properties {
 
 internal protocol EmptyProto {}
 private extension Properties : EmptyProto {} // expected-error {{'private' attribute cannot be used with extensions that declare protocol conformances}}
+private(set) extension Properties : EmptyProto {} // expected-error {{'private(set)' attribute can only be applied to variables and subscripts}}
