@@ -190,6 +190,13 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
   return false;
 }
 
+bool SILType::aggregateHasUnreferenceableStorage() const {
+  if (auto s = getStructOrBoundGenericStruct()) {
+    return s->hasUnreferenceableStorage();
+  }
+  return false;
+}
+
 /// Prove that \p Ty is layout compatible with RawPointer.
 static bool isLayoutCompatibleWithRawPointer(SILType Ty, SILModule &Mod) {
   // Builtin.RawPointer is layout compatible with heap object reference types.

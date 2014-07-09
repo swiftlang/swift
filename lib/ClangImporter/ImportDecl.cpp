@@ -1630,12 +1630,19 @@ namespace {
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
-      // FIXME: Skip unions for now. We can't properly map them to Swift unions,
-      // because they aren't discriminated in any way. We could map them to
-      // structs, but that would make them very, very unsafe to use.
-      if (!Impl.SwiftContext.LangOpts.ImportUnions
-          && decl->isUnion())
-        return nullptr;
+      // Track whether this record contains fields we can't reference in Swift
+      // yet.
+      bool hasUnreferenceableStorage = false;
+      
+      if (decl->isUnion()) {
+        if (Impl.SwiftContext.LangOpts.ImportUnions) {
+          // Import the union, but don't make its storage accessible for now.
+          hasUnreferenceableStorage = true;
+        } else {
+          // FIXME: Skip unions for now.
+          return nullptr;
+        }
+      }
 
       // FIXME: Skip Microsoft __interfaces.
       if (decl->isInterface())
@@ -1667,15 +1674,19 @@ namespace {
       if (!dc)
         return nullptr;
 
-      if (!Impl.SwiftContext.LangOpts.ImportUnions) {
-        // We don't import structs with bitfields because we can not layout them
-        // correctly in IRGen.
-        for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-             m != mEnd; ++m) {
-          if (auto FD = dyn_cast<clang::FieldDecl>(*m))
-            if (FD->isBitField())
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        if (auto FD = dyn_cast<clang::FieldDecl>(*m))
+          if (FD->isBitField()) {
+            if (Impl.SwiftContext.LangOpts.ImportUnions) {
+              // We don't make bitfields accessible in Swift yet.
+              hasUnreferenceableStorage = true;
+            } else {
+              // We don't import structs with bitfields because we can not
+              // lay them out correctly in IRGen.
               return nullptr;
-        }
+            }
+          }
       }
 
       // Create the struct declaration and record it.
@@ -1698,8 +1709,11 @@ namespace {
         for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
              m != mEnd; ++m) {
           auto nd = dyn_cast<clang::NamedDecl>(*m);
-          if (!nd)
+          if (!nd) {
+            // We couldn't import the member, so we can't reference it in Swift.
+            hasUnreferenceableStorage = true;
             continue;
+          }
 
           // Skip anonymous structs or unions; they'll be dealt with via the
           // IndirectFieldDecls.
@@ -1708,8 +1722,11 @@ namespace {
               continue;
 
           auto member = Impl.importDecl(nd);
-          if (!member || !isa<VarDecl>(member))
+          if (!member || !isa<VarDecl>(member)) {
+            // We couldn't import the field, so we can't reference it in Swift.
+            hasUnreferenceableStorage = true;
             continue;
+          }
 
           members.push_back(member);
         }
@@ -1718,6 +1735,8 @@ namespace {
       for (auto member : members) {
         result->addMember(member);
       }
+      
+      result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
       
       // Add the struct decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.

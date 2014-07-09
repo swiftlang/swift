@@ -500,6 +500,17 @@ class alignas(8) Decl {
   enum { NumClassDeclBits = NumNominalTypeDeclBits + 7 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
+  class StructDeclBitfields {
+    friend class StructDecl;
+    unsigned : NumNominalTypeDeclBits;
+    
+    /// True if this struct has storage for fields that aren't accessible in
+    /// Swift.
+    unsigned HasUnreferenceableStorage : 1;
+  };
+  enum { NumStructDeclBits = NumNominalTypeDeclBits + 1 };
+  static_assert(NumStructDeclBits <= 32, "fits in an unsigned");
+  
   class EnumDeclBitfields {
     friend class EnumDecl;
     unsigned : NumNominalTypeDeclBits;
@@ -557,6 +568,7 @@ protected:
     NominalTypeDeclBitFields NominalTypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
+    StructDeclBitfields StructDeclBits;
     EnumDeclBitfields EnumDeclBits;
     InfixOperatorDeclBitfields InfixOperatorDeclBits;
     ImportDeclBitfields ImportDeclBits;
@@ -2844,6 +2856,16 @@ public:
   }
   static bool classof(const IterableDeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
+  }
+  
+  /// Does this struct contain unreferenceable storage, such as C fields that
+  /// cannot be represented in Swift?
+  bool hasUnreferenceableStorage() const {
+    return StructDeclBits.HasUnreferenceableStorage;
+  }
+  
+  void setHasUnreferenceableStorage(bool v) {
+    StructDeclBits.HasUnreferenceableStorage = true;
   }
 };
 

@@ -378,6 +378,10 @@ public:
 
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
+  
+  /// Returns true if this SILType is an aggregate with unreferenceable storage,
+  /// meaning it cannot be fully destructured in SIL.
+  bool aggregateHasUnreferenceableStorage() const;
 
   /// Returns true if this Type is layout compatible with Ty. *NOTE* This does
   /// not imply that Ty is layout compatible with this type (i.e. this does not
