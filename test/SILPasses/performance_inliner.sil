@@ -563,14 +563,14 @@ bb0(%0 : $UWord):
 
 // Make sure that private symbol references do not get inlined into
 // transparent functions.
-sil private @private : $@thin () -> () {
+sil private @private_ret_undef : $@thin () -> () {
 entry:
   return undef : $()
 }
 
 sil @uses_private : $@thin () -> () {
 entry:
-  %f = function_ref @private : $@thin () -> ()
+  %f = function_ref @private_ret_undef : $@thin () -> ()
   %z = apply %f() : $@thin () -> ()
   return %z : $()
 }

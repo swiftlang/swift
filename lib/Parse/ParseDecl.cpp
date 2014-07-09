@@ -1153,7 +1153,11 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_func:
   case tok::kw_import:
   case tok::kw_init:
+  case tok::kw_internal:
   case tok::kw_let:
+  case tok::kw_private:
+  case tok::kw_protocol:
+  case tok::kw_public:
   case tok::kw_static:
   case tok::kw_struct:
   case tok::kw_subscript:
@@ -1161,7 +1165,6 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_var:
   case tok::pound_if:
   case tok::pound_line:
-  case tok::kw_protocol:
   case tok::identifier:
     return true;
   default:
@@ -1218,22 +1221,6 @@ bool Parser::isStartOfDecl() {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfDecl();
-  }
-
-
-  if (Tok2.is(tok::l_paren) &&
-      (Tok.getText() == "private" || Tok.getText() == "public" ||
-       Tok.getText() == "internal")) {
-    Parser::BacktrackingScope Backtrack(*this);
-    consumeToken(tok::identifier);
-    consumeToken(tok::l_paren);
-    // FIXME: Ugh at hardcoding this here.
-    if (!Tok.is(tok::identifier) || Tok.getText() != "set")
-      return false;
-    consumeToken(tok::identifier);
-    if (!consumeIf(tok::r_paren))
-      return false;
     return isStartOfDecl();
   }
 
@@ -1358,7 +1345,15 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = DeclResult;
       break;
     }
-        
+
+    case tok::kw_private:
+    case tok::kw_internal:
+    case tok::kw_public:
+      // We still model these specifiers as attributes.
+      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                            Tok.getText(), DAK_Accessibility);
+      continue;
+
     // Context sensitive keywords.
     case tok::identifier:
       // If this is the start of an operator, parse it as such.
@@ -1435,14 +1430,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         continue;
       }
 
-      if (Tok.isContextualKeyword("private") ||
-          Tok.isContextualKeyword("internal") ||
-          Tok.isContextualKeyword("public")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
-                              Tok.getText(), DAK_Accessibility);
-        continue;
-      }
-        
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 

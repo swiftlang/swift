@@ -40,11 +40,15 @@ KEYWORD(import)
 KEYWORD(init)
 KEYWORD(let)
 KEYWORD(protocol)
-KEYWORD(static)
 KEYWORD(struct)
 KEYWORD(subscript)
 KEYWORD(typealias)
 KEYWORD(var)
+
+KEYWORD(internal)
+KEYWORD(private)
+KEYWORD(public)
+KEYWORD(static)
 
 KEYWORD(undef)      // This is only enabled when parsing .sil files.
 KEYWORD(sil)        // This is only enabled when parsing .sil files.
@@ -69,7 +73,7 @@ KEYWORD(case)
 KEYWORD(default)
 KEYWORD(where)
 
-// Expression and type keywords.
+// Expression keywords.
 KEYWORD(as)
 KEYWORD(dynamicType)
 KEYWORD(false)

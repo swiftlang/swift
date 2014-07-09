@@ -147,16 +147,12 @@ public:
     switch (Text[0]) {
     case 'c':
       return Text == "convenience";
-    case 'i':
-      return Text == "internal";
     case 'm':
       return Text == "mutating";
     case 'n':
       return Text == "nonmutating";
     case 'o':
       return Text == "override";
-    case 'p':
-      return Text == "private" || Text == "public";
     case 's':
       return Text == "strong";
     case 'u':
