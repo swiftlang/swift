@@ -1295,7 +1295,8 @@ func isNativeNSDictionary(d: NSDictionary) -> Bool {
 
 func isCocoaNSDictionary(d: NSDictionary) -> Bool {
   var className: NSString = NSStringFromClass(d.dynamicType)
-  return className.rangeOfString("NSDictionary").length > 0
+  return className.rangeOfString("NSDictionary").length > 0 ||
+    className.rangeOfString("NSCFDictionary").length > 0
 }
 
 var objcKeyCount = 0
@@ -1576,6 +1577,8 @@ func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
     keys.addObject(TestObjCKeyTy(k))
     values.addObject(TestObjCValueTy(v))
   }
+  // Return an `NSMutableDictionary` to make sure that it has a unique
+  // pointer identity.
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
@@ -1585,6 +1588,18 @@ func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   for (k, v) in d {
     keys.addObject(TestObjCKeyTy(k))
     values.addObject(TestObjCEquatableValueTy(v))
+  }
+  // Return an `NSMutableDictionary` to make sure that it has a unique
+  // pointer identity.
+  return NSMutableDictionary(objects: values, forKeys: keys)
+}
+
+func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
+  let keys = NSMutableArray()
+  let values = NSMutableArray()
+  for (k, v) in d {
+    keys.addObject(TestObjCKeyTy(k))
+    values.addObject(TestObjCValueTy(v))
   }
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
@@ -1599,14 +1614,26 @@ func getBridgedVerbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObjec
   return _convertNSDictionaryToDictionary(nsd)
 }
 
+func getBridgedVerbatimDictionaryAndNSMutableDictionary()
+    -> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
+  var nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  return (_convertNSDictionaryToDictionary(nsd), nsd)
+}
+
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+  return Dictionary.bridgeFromObjectiveC(nsd)
 }
 
 func getBridgedNonverbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getAsNSDictionary(d)
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+  return Dictionary.bridgeFromObjectiveC(nsd)
+}
+
+func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
+    -> (Dictionary<TestBridgedKeyTy, TestBridgedValueTy>, NSMutableDictionary) {
+  var nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  return (Dictionary.bridgeFromObjectiveC(nsd), nsd)
 }
 
 func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
@@ -1654,8 +1681,13 @@ class ParallelArrayDictionary : NSDictionary {
   var value: AnyObject = TestObjCValueTy(1111)
 
   init() {
-    keys += Keys()
     super.init()
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    // Ensure that copying this dictionary does not produce a CoreFoundation
+    // object.
+    return self
   }
 
   override func countByEnumeratingWithState(
@@ -1665,6 +1697,7 @@ class ParallelArrayDictionary : NSDictionary {
     if theState.state == 0 {
       theState.state = 1
       theState.itemsPtr = AutoreleasingUnsafePointer(keys._elementStorageIfContiguous)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       state.memory = theState
       return 4
     }
@@ -1673,6 +1706,10 @@ class ParallelArrayDictionary : NSDictionary {
 
   override func objectForKey(aKey: AnyObject?) -> AnyObject? {
     return value
+  }
+
+  override var count: Int {
+    return 4
   }
 }
 
@@ -1685,6 +1722,65 @@ func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKey
   var nsd: NSDictionary = ParallelArrayDictionary()
   return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
+
+func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {
+  var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  // Find an existing key.
+  if true {
+    var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
+    assert(kv.0 == TestObjCKeyTy(10))
+    assert(kv.1.value == 1010)
+  }
+
+  // Delete the key from the NSMutableDictionary.
+  assert(nsd[TestObjCKeyTy(10)])
+  nsd.removeObjectForKey(TestObjCKeyTy(10))
+  assert(!nsd[TestObjCKeyTy(10)])
+
+  // Find an existing key, again.
+  if true {
+    var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
+    assert(kv.0 == TestObjCKeyTy(10))
+    assert(kv.1.value == 1010)
+  }
+
+  println("test_BridgedFromObjC_Verbatim_DictionaryIsCopied done")
+}
+test_BridgedFromObjC_Verbatim_DictionaryIsCopied()
+// CHECK: test_BridgedFromObjC_Verbatim_DictionaryIsCopied done
+
+func test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied() {
+  var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  // Find an existing key.
+  if true {
+    var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
+    assert(kv.0 == TestBridgedKeyTy(10))
+    assert(kv.1.value == 1010)
+  }
+
+  // Delete the key from the NSMutableDictionary.
+  assert(nsd[TestBridgedKeyTy(10)])
+  nsd.removeObjectForKey(TestBridgedKeyTy(10))
+  assert(!nsd[TestBridgedKeyTy(10)])
+
+  // Find an existing key, again.
+  if true {
+    var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
+    assert(kv.0 == TestBridgedKeyTy(10))
+    assert(kv.1.value == 1010)
+  }
+
+  println("test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied done")
+}
+test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied()
+// CHECK: test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied done
+
 
 func test_BridgedFromObjC_Verbatim_IndexForKey() {
   var d = getBridgedVerbatimDictionary()

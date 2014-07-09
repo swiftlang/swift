@@ -632,7 +632,7 @@ public func _convertNSDictionaryToDictionary<
     -> [KeyType : ValueType] {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(KeyType.self))
   _sanityCheck(_isBridgedVerbatimToObjectiveC(ValueType.self))
-  return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(d))
+  return Dictionary.bridgeFromObjectiveC(d)
 }
 
 /// The entry point for bridging `Dictionary` to `NSDictionary`.
@@ -722,8 +722,18 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     return _convertDictionaryToNSDictionary(self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
-    return Dictionary(_cocoaDictionary: reinterpretCast(x))
+  public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
+    if _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+       _isBridgedVerbatimToObjectiveC(ValueType.self) {
+      let cfValue: CFDictionary = reinterpretCast(d)
+      let copy = CFDictionaryCreateCopy(nil, cfValue)
+      return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(copy))
+    }
+    // FIXME: this is incorrect.  Dictionary<T, U> where either T or U is a
+    // value type may never have a Cocoa representation.
+    let cfValue: CFDictionary = reinterpretCast(d)
+    let copy = CFDictionaryCreateCopy(nil, cfValue)
+    return Dictionary(_cocoaDictionary: reinterpretCast(copy))
   }
 
   public static func bridgeFromObjectiveCConditional(
