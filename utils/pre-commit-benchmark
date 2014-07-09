@@ -24,8 +24,6 @@ sourceDir = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 
 import os
 
-exeNames = ['PrecommitBench_O' + x for x in ('3', 'fast', '0')]
-
 def getTreeSha(treeish):
     return subprocess.check_output(['git', 'show', treeish, '-s', '--format=%t'], cwd=sourceDir).rstrip()
     
@@ -68,7 +66,7 @@ def buildBenchmarks(cacheDir):
     #    shutil.copy(os.path.join(binDir, exe), os.path.join(cacheDir, exe))
     print('done.')
 
-def collectBenchmarks(treeish = None, repeat = 3):
+def collectBenchmarks(exeNames, treeish = None, repeat = 3):
     treeSha = getWorkTreeSha() if treeish is None else getTreeSha(treeish)
     cacheDir = os.path.join(benchDir, treeSha)
     print('Collecting benchmarks for %s in %s ' % (treeish if treeish else 'working tree', cacheDir))
@@ -215,14 +213,18 @@ def compareTimingsFiles(file1, file2):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Show performance improvements/regressions in your Git working tree state')
-    parser.add_argument('-r', '--repeat', dest='repeat', metavar='int', default=3, type=int,
+    parser.add_argument('-r', '--repeat', dest='repeat', metavar='int', default=1, type=int,
                         help='number of times to repeat each test')
+    parser.add_argument('-O', dest='optimization', default=set('3'), choices=('3', 'fast', '0'),
+                        help='Optimization levels to test')
     parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
                         help='the baseline Git commit to compare with.')
     args = parser.parse_args()
 
-    workCacheDir = collectBenchmarks(None, args.repeat)    
-    baselineCacheDir = collectBenchmarks(args.baseline, args.repeat)
+    exeNames = ['PrecommitBench_O' + x for x in args.optimization]
+
+    workCacheDir = collectBenchmarks(exeNames, None, args.repeat)    
+    baselineCacheDir = collectBenchmarks(exeNames, args.baseline, args.repeat)
     
     if baselineCacheDir == workCacheDir:
         print('No changes between work tree and %s; nothing to compare.' % args.baseline)
