@@ -22,31 +22,18 @@ public struct Bool {
 
   @transparent public
   init(_ v : Builtin.Int1) { value = v }
-
-  public static var false : Bool {
-    @transparent
-    get {
-      return Bool()
-    }
-  }
-  public static var true : Bool {
-    @transparent
-    get {
-      return Bool(Builtin.trunc_Word_Int1(1.value))
-    }
-  }
 }
 
-public var true : Bool {
+extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
   @transparent
-  get {
-    return Bool.true
+  public static func _convertFromBuiltinBooleanLiteral(value: Builtin.Int1) 
+                       -> Bool {
+    return Bool(value)
   }
-}
-public var false : Bool {
+
   @transparent
-  get {
-    return Bool.false
+  public static func convertFromBooleanLiteral(value: Bool) -> Bool {
+    return value
   }
 }
 

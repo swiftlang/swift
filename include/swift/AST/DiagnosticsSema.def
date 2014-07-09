@@ -1065,6 +1065,11 @@ ERROR(builtin_float_literal_broken_proto,sema_tce,none,
 ERROR(float_literal_broken_proto,sema_tce,none,
       "protocol 'FloatLiteralConvertible' is broken", ())
 
+ERROR(builtin_boolean_literal_broken_proto,sema_tce,none,
+      "protocol '_BuiltinBooleanLiteralConvertible' is broken", ())
+ERROR(boolean_literal_broken_proto,sema_tce,none,
+      "protocol 'BooleanLiteralConvertible' is broken", ())
+
 ERROR(builtin_character_literal_broken_proto,sema_tce,none,
       "protocol '_BuiltinCharacterLiteralConvertible' is broken", ())
 ERROR(character_literal_broken_proto,sema_tce,none,

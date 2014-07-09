@@ -172,6 +172,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::NilLiteral:
           case ExprKind::IntegerLiteral:
           case ExprKind::FloatLiteral:
+          case ExprKind::BooleanLiteral:
           case ExprKind::CharacterLiteral:
           case ExprKind::StringLiteral:
           case ExprKind::InterpolatedStringLiteral:

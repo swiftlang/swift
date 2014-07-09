@@ -183,6 +183,15 @@ class alignas(8) Expr {
   enum { NumSubscriptExprBits = NumExprBits + 1 };
   static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
 
+  class BooleanLiteralExprBitfields {
+    friend class BooleanLiteralExpr;
+    unsigned : NumLiteralExprBits;
+
+    unsigned Value : 1;
+  };
+  enum { NumBooleanLiteralExprBits = NumLiteralExprBits + 1 };
+  static_assert(NumBooleanLiteralExprBits <= 32, "fits in an unsigned");
+
   class MagicIdentifierLiteralExprBitfields {
     friend class MagicIdentifierLiteralExpr;
     unsigned : NumLiteralExprBits;
@@ -254,6 +263,7 @@ protected:
     TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
+    BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
@@ -489,6 +499,28 @@ public:
   }
 };
 
+/// \brief A Boolean literal ('true' or 'false')
+///
+class BooleanLiteralExpr : public LiteralExpr {
+  SourceLoc Loc;
+
+public:
+  BooleanLiteralExpr(bool Value, SourceLoc Loc, bool Implicit = false)
+    : LiteralExpr(ExprKind::BooleanLiteral, Implicit), Loc(Loc) {
+    BooleanLiteralExprBits.Value = Value;
+  }
+
+  /// Retrieve the Boolean value of this literal.
+  bool getValue() const { return BooleanLiteralExprBits.Value; }
+
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::BooleanLiteral;
+  }
+};
   
 /// CharacterLiteral - Character literal, like 'x'.  After semantic analysis
 /// assigns types, this is guaranteed to only have a 32-bit BuiltinIntegerType.

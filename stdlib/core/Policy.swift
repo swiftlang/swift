@@ -31,6 +31,7 @@ public typealias Float64 = Double
 //===----------------------------------------------------------------------===//
 public typealias IntegerLiteralType = Int
 public typealias FloatLiteralType = Double
+public typealias BooleanLiteralType = Bool
 // typealias CharacterLiteralType = ?
 public typealias ExtendedGraphemeClusterType = String
 public typealias StringLiteralType = String

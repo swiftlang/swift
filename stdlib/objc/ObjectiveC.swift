@@ -19,18 +19,15 @@ import ObjectiveC
 
 /// The Objective-C BOOL type.
 ///
-/// On iOS, the Objective-C BOOL type is a typedef of C/C++ bool. Clang 
-/// importer imports it as ObjCBool.
-///
-/// The compiler has special knowledge of this type.
-///
-/// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
-public struct ObjCBool : LogicValue {
+/// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
+/// bool. Elsewhere, it is "signed char". The Clang importer imports it as
+/// ObjCBool.
+public struct ObjCBool : LogicValue, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var value: Int8
 
-  public init(_ value: Int8) {
+  init(_ value: Int8) {
     self.value = value
   }
 
@@ -54,6 +51,11 @@ public struct ObjCBool : LogicValue {
 #else
     return value == true
 #endif
+  }
+
+  @transparent
+  public static func convertFromBooleanLiteral(value: Bool) -> ObjCBool {
+    return ObjCBool(value)
   }
 }
 

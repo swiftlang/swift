@@ -4,8 +4,9 @@
 // rdar://14585108
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
 // A: Begin completions
-// A-DAG: Decl[GlobalVar]/OtherModule: true[#Bool#]{{$}}
-// A-DAG: Decl[GlobalVar]/OtherModule: false[#Bool#]{{$}}
+// A-DAG: Keyword/None: true[#Bool#]{{$}}
+// A-DAG: Keyword/None: false[#Bool#]{{$}}
+// A-DAG: Keyword/None: nil{{$}}
 // A-DAG: Decl[Struct]/OtherModule: Int8[#Int8#]{{$}}
 // A-DAG: Decl[Struct]/OtherModule: Int16[#Int16#]{{$}}
 // A-DAG: Decl[Struct]/OtherModule: Int32[#Int32#]{{$}}

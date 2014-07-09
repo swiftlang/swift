@@ -155,6 +155,7 @@ namespace {
     RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
+    RValue visitBooleanLiteralExpr(BooleanLiteralExpr *E, SGFContext C);
     RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
         
     RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C,
@@ -729,6 +730,14 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
   return RValue(SGF, E,
                 ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
 }
+
+RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
+                                              SGFContext C) {
+  auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+  SILValue boolValue = SGF.B.createIntegerLiteral(E, i1Ty, E->getValue());
+  return RValue(SGF, E, ManagedValue::forUnmanaged(boolValue));
+}
+
 RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
                                                 SGFContext C) {
   return RValue(SGF, E,

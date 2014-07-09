@@ -13,7 +13,7 @@
 #^PLAIN_TOP_LEVEL_1^#
 
 // PLAIN_TOP_LEVEL: Begin completions
-// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule: true[#Bool#]{{$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/OtherModule: C_ARGC[#CInt#]{{$}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(a: String) {

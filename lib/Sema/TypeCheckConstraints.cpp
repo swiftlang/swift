@@ -1076,10 +1076,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // prior to coercion.
       if (Binding->isConditional()) {
         auto exprType = solution.simplifyType(tc, expr->getType());
-        auto exprNominalType = exprType->getNominalOrBoundGenericNominal();
-        if (!(exprType->getAnyOptionalObjectType() ||
-              (exprNominalType &&
-               exprNominalType->getNameStr().equals("_Nil")))) {
+        if (!exprType->getAnyOptionalObjectType()) {
           // Special-case diagnostics for 'as' downcasts that should have been
           // 'as?' conditional downcasts.
           bool diagnosed = false;

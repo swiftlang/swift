@@ -714,6 +714,9 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///     floating_literal
 ///     string_literal
 ///     character_literal
+///     nil
+///     true
+///     false
 ///     '__FILE__'
 ///     '__LINE__'
 ///     '__COLUMN__'
@@ -796,6 +799,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = makeParserResult(
                       new (Context) NilLiteralExpr(consumeToken(tok::kw_nil)));
     break;
+
+  case tok::kw_true:
+  case tok::kw_false: {
+    bool isTrue = Tok.is(tok::kw_true);
+    Result = makeParserResult(
+               new (Context) BooleanLiteralExpr(isTrue, consumeToken()));
+    break;
+  }
     
   case tok::kw___FILE__:
   case tok::kw___LINE__:

@@ -273,6 +273,7 @@ public:
 private:
   Type IntLiteralType;
   Type FloatLiteralType;
+  Type BooleanLiteralType;
   Type CharacterLiteralType;
   Type ExtendedGraphemeClusterType;
   Type StringLiteralType;

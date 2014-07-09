@@ -1862,11 +1862,16 @@ public:
                        /*IncludeTopLevel=*/false, Loc);
 
     // FIXME: The pedantically correct way to find the type is to resolve the
-    // swift.StringLiteralType type.
+    // Swift.StringLiteralType type.
     addKeyword("__FILE__", "String");
-    // Same: swift.IntegerLiteralType.
+    // Same: Swift.IntegerLiteralType.
     addKeyword("__LINE__", "Int");
     addKeyword("__COLUMN__", "Int");
+    // Same: Swift.BooleanLiteralType.
+    addKeyword("false", "Bool");
+    addKeyword("true", "Bool");
+
+    addKeyword("nil", StringRef());
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 

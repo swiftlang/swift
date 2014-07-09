@@ -548,6 +548,13 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &FloatLiteralType;
     name = "FloatLiteralType";
   }
+  // BooleanLiteralConvertible -> BoolLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::BooleanLiteralConvertible)){
+    type = &BooleanLiteralType;
+    name = "BooleanLiteralType";
+  }
   // ArrayLiteralConvertible -> Array
   else if (protocol == getProtocol(SourceLoc(),
                                    KnownProtocolKind::ArrayLiteralConvertible)){

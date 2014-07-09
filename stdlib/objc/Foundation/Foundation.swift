@@ -476,8 +476,8 @@ extension Double : _BridgedToObjectiveC {
 
 extension Bool: _BridgedToObjectiveC {
   public init(_ number: NSNumber) {
-    if number.boolValue { self = Bool.true }
-    else { self = Bool.false }
+    if number.boolValue { self = true }
+    else { self = false }
   }
 
   public static func getObjectiveCType() -> Any.Type {
@@ -513,13 +513,18 @@ extension CGFloat : _BridgedToObjectiveC {
 }
 
 // Literal support for NSNumber
-extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible {
+extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
+                     BooleanLiteralConvertible {
   public class func convertFromIntegerLiteral(value: Int) -> NSNumber {
     return NSNumber(integer: value)
   }
 
   public class func convertFromFloatLiteral(value: Double) -> NSNumber {
     return NSNumber(double: value)
+  }
+
+  public class func convertFromBooleanLiteral(value: Bool) -> NSNumber {
+    return NSNumber(bool: value)
   }
 }
 

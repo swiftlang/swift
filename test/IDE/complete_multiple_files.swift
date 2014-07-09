@@ -16,7 +16,7 @@ func topLevel1() {
   #^TOP_LEVEL_1^#
 }
 // TOP_LEVEL_1: Begin completions
-// TOP_LEVEL_1: Decl[GlobalVar]/OtherModule: true[#Bool#]{{$}}
+// TOP_LEVEL_1: Keyword/None: true[#Bool#]{{$}}
 // TOP_LEVEL_1-NOT: true
 // TOP_LEVEL_1: End completions
 

@@ -169,11 +169,11 @@ func calls() {
   a.a()
 }
 
-// CHECK-LABEL: sil  @_TF11expressions11module_pathFT_Sb
-func module_path() -> Bool {
-  return Swift.true
-  // CHECK: [[TRUE_GET:%[0-9]+]] = function_ref @_TFSsg4trueSb
-  // CHECK: apply [transparent] [[TRUE_GET]]()
+// CHECK-LABEL: sil  @_TF11expressions11module_path
+func module_path() -> CInt {
+  return Swift.C_ARGC
+  // CHECK: [[C_ARGC_GET:%[0-9]+]] = function_ref @_TFSsa6C_ARGCV
+  // CHECK-NEXT: apply [[C_ARGC_GET]]()
 }
 
 func default_args(x: Int, y: Int = 219, z: Int = 20721) {}

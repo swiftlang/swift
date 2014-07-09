@@ -5,7 +5,7 @@
 // CHECK: struct String
 // CHECK: extension String : StringInterpolationConvertible
 
-false // CHECK: false : Bool = false
+false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)
 println(10)
 println(10)

@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 113;
+const uint16_t VERSION_MINOR = 114;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1161,6 +1161,7 @@ namespace index_block {
     LogicValue = 4,
 
     ArrayLiteralConvertible,
+    BooleanLiteralConvertible,
     CharacterLiteralConvertible,
     DictionaryLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
@@ -1170,6 +1171,7 @@ namespace index_block {
     StringLiteralConvertible,
     NilLiteralConvertible,
 
+    _BuiltinBooleanLiteralConvertible,
     _BuiltinCharacterLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     _BuiltinFloatLiteralConvertible,

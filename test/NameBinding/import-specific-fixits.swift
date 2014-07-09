@@ -29,7 +29,7 @@ import class Swift.Int64 // expected-error {{'Int64' was imported as 'class', bu
 
 import class Swift.Bool // expected-error {{'Bool' was imported as 'class', but is a struct}} {{8-13=struct}}
 
-import struct Swift.true // expected-error {{'true' was imported as 'struct', but is a variable}} {{8-14=var}}
+import struct Swift.C_ARGC // expected-error {{'C_ARGC' was imported as 'struct', but is a variable}} {{8-14=var}}
 
 import struct Swift.println // expected-error {{'println' was imported as 'struct', but is a function}} {{8-14=func}}
 

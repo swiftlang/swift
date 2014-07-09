@@ -29,8 +29,6 @@ func test_partial(i: Int, j: Int) {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
-// SIL-LABEL: sil public_external [transparent] @_TFSsg5falseSb : $@thin () -> Bool
-
 // SIL-LABEL: sil public_external [transparent] @_TF15def_transparent11testBuiltinFT_Si : $@thin () -> Int {
 // SIL: bb0:
 // SIL: integer_literal $Builtin.Word, 300

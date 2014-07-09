@@ -500,7 +500,7 @@ extension String {
       var stop_ = false
       body(line: line!, stop: &stop_)
       if stop_ {
-        UnsafePointer<ObjCBool>(stop).memory = ObjCBool(true)
+        UnsafePointer<ObjCBool>(stop).memory = true
       }
     }
   }

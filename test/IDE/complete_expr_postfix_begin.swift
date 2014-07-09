@@ -86,8 +86,9 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Protocol]/CurrModule:   FooProtocol[#FooProtocol#]{{$}}
 // COMMON-DAG: Decl[TypeAlias]/CurrModule:  FooTypealias[#Int#]{{$}}
 // COMMON-DAG: Decl[GlobalVar]/CurrModule:  fooObject[#FooStruct#]{{$}}
-// COMMON-DAG: Decl[GlobalVar]/OtherModule: true[#Bool#]{{$}}
-// COMMON-DAG: Decl[GlobalVar]/OtherModule: false[#Bool#]{{$}}
+// COMMON-DAG: Keyword/None: true[#Bool#]{{$}}
+// COMMON-DAG: Keyword/None: false[#Bool#]{{$}}
+// COMMON-DAG: Keyword/None: nil{{$}}
 // COMMON-DAG: Decl[Struct]/OtherModule:    Int8[#Int8#]{{$}}
 // COMMON-DAG: Decl[Struct]/OtherModule:    Int16[#Int16#]{{$}}
 // COMMON-DAG: Decl[Struct]/OtherModule:    Int32[#Int32#]{{$}}

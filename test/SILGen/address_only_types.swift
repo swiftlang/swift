@@ -2,7 +2,7 @@
 
 typealias Int = Builtin.Int64
 
-enum Bool { case true, false }
+enum Bool { case true_, false_ }
 
 protocol Unloadable {
   func foo() -> Int
@@ -80,14 +80,14 @@ func address_only_missing_return() -> Unloadable {
 // CHECK-LABEL: sil  @_TF18address_only_types39address_only_conditional_missing_return
 func address_only_conditional_missing_return(let x: Unloadable) -> Unloadable {
   // CHECK: bb0({{%.*}} : $*Unloadable, {{%.*}} : $*Unloadable):
-  // CHECK:   switch_enum {{%.*}}, case #Bool.true!enumelt: [[TRUE:bb[0-9]+]], case #Bool.false!enumelt: [[FALSE:bb[0-9]+]]
-  switch Bool.true {
-  case .true:
+  // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE:bb[0-9]+]]
+  switch Bool.true_ {
+  case .true_:
   // CHECK: [[TRUE]]:
   // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*Unloadable
   // CHECK:   return
     return x
-  case .false:
+  case .false_:
     ()
   }
   // CHECK: [[FALSE]]:
@@ -97,19 +97,19 @@ func address_only_conditional_missing_return(let x: Unloadable) -> Unloadable {
 // CHECK-LABEL: sil  @_TF18address_only_types41address_only_conditional_missing_return
 func address_only_conditional_missing_return_2(x: Unloadable) -> Unloadable {
   // CHECK: bb0({{%.*}} : $*Unloadable, {{%.*}} : $*Unloadable):
-  // CHECK:   switch_enum {{%.*}}, case #Bool.true!enumelt: [[TRUE1:bb[0-9]+]], case #Bool.false!enumelt: [[FALSE1:bb[0-9]+]]
-  switch Bool.true {
-  case .true:
+  // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE1:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE1:bb[0-9]+]]
+  switch Bool.true_ {
+  case .true_:
     return x
-  case .false:
+  case .false_:
     ()
   }
   // CHECK: [[FALSE1]]:
-  // CHECK:   switch_enum {{%.*}}, case #Bool.true!enumelt: [[TRUE2:bb[0-9]+]], case #Bool.false!enumelt: [[FALSE2:bb[0-9]+]]
-  switch Bool.true {
-  case .true:
+  // CHECK:   switch_enum {{%.*}}, case #Bool.true_!enumelt: [[TRUE2:bb[0-9]+]], case #Bool.false_!enumelt: [[FALSE2:bb[0-9]+]]
+  switch Bool.true_ {
+  case .true_:
     return x
-  case .false:
+  case .false_:
     ()
   }
   // CHECK: [[FALSE2]]:

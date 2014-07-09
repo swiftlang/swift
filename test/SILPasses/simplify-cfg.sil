@@ -45,7 +45,7 @@ bb4(%8 : $Int64):
   return %8 : $Int64
 }
 
-enum BoolLike { case true, false }
+enum BoolLike { case true_, false_ }
 
 // func testThread(a : BoolLike) -> Int {
 //   if a { return 42 } else { return 17 } }
@@ -53,8 +53,8 @@ enum BoolLike { case true, false }
 /// CHECK-LABEL: sil @testThread
 sil @testThread : $@thin (BoolLike) -> Int64 {
 bb0(%0 : $BoolLike):
-  // CHECK: switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
-  switch_enum %0 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb3 // id: %3
+  // CHECK: switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
+  switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
 
 bb1:                                              // Preds: bb0
   %4 = integer_literal $Builtin.Int1, -1          // user: %5
@@ -104,8 +104,8 @@ bb2:
 /// CHECK-NEXT: return %0 : $Int64
 sil @testSwitchEnumFold : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = enum $BoolLike, #BoolLike.true!enumelt
-  switch_enum %1 : $BoolLike, case #BoolLike.true!enumelt: bb2, case #BoolLike.false!enumelt: bb1
+  %1 = enum $BoolLike, #BoolLike.true_!enumelt
+  switch_enum %1 : $BoolLike, case #BoolLike.true_!enumelt: bb2, case #BoolLike.false_!enumelt: bb1
 bb1:
   unreachable
 bb2:

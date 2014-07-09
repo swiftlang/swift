@@ -4,7 +4,7 @@
 // RUN: FileCheck -input-file %t.txt %s
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -module-print-submodules | FileCheck %s
 
-// CHECK: var true: Bool { get }
+// CHECK: var C_ARGC: CInt
 
 // RUN: FileCheck -check-prefix=CHECK-IMPORT -input-file %t.txt %s
 // CHECK-IMPORT-NOT: {{^}}import

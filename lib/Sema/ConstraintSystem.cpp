@@ -247,6 +247,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::StringInterpolationConvertible: index = 6; break;
   case KnownProtocolKind::StringLiteralConvertible: index = 7; break;
   case KnownProtocolKind::NilLiteralConvertible: index = 8; break;
+  case KnownProtocolKind::BooleanLiteralConvertible: index = 9; break;
   }
 
   // If we already looked for alternative literal types, return those results.

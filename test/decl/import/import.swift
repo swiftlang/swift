@@ -38,7 +38,7 @@ import class Swift.HeapBufferStorage
 import typealias Swift.Bool
 import struct Swift.Bool
 import protocol Swift.Generator
-import var Swift.true
+import var Swift.C_ARGC
 import func Swift.min
 
 import var x // expected-error {{expected module name}}

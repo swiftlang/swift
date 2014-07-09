@@ -1112,6 +1112,13 @@ public:
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr") << " value=" << E->getText() << ')';
   }
+
+  void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
+    printCommon(E, "boolean_literal_expr") 
+      << " value=" << (E->getValue() ? "true" : "false")
+      << ')';
+  }
+
   void visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
     printCommon(E, "character_literal_expr") << " value=" << E->getValue()<<')';
   }

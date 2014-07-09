@@ -248,10 +248,6 @@ func test_nonassoc(x: Int, y: Int) -> Bool {
   return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{'Int' is not convertible to 'union1'}}
 }
 
-func test_module_member() {
-  var x = Swift.true
-}
-
 // More realistic examples.
 
 func fib(n: Int) -> Int {

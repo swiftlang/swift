@@ -26,12 +26,16 @@ extension Bool {
   /// \brief Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
   @conversion public func __conversion() -> ObjCBool {
-    return ObjCBool(self ? Bool.true : Bool.false)
+    return ObjCBool(self ? true : false)
   }
 }
 #else
 public struct ObjCBool : LogicValue {
   private var value : UInt8
+
+  public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
 
   public init(_ value: UInt8) {
     self.value = value

@@ -98,8 +98,8 @@ println(P2)
 
 // Unions.
 enum TriValue {
-  case false
-  case true
+  case false_
+  case true_
   case top
 }
 // CHECK-DAG: i32 [[@LINE+2]], metadata ![[UNIONTYPE:.*]], i32 0, {{.*}}[ DW_TAG_variable ] [unknown] [line [[@LINE+2]]] [def]
@@ -107,8 +107,8 @@ enum TriValue {
 var unknown = TriValue.top
 func println(value: TriValue) {
      switch value {
-     case TriValue.false: println("false")
-     case TriValue.true:  println("true")
+     case TriValue.false_: println("false")
+     case TriValue.true_:  println("true")
      case TriValue.top:   println("⊤")
      }
 }

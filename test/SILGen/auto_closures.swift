@@ -1,7 +1,7 @@
 // RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
 struct Bool {}
-var false = Bool()
+var false_ = Bool()
 
 // CHECK-LABEL: sil @_TF13auto_closures17call_auto_closure
 func call_auto_closure(var x: @auto_closure () -> Bool) -> Bool {
@@ -36,5 +36,5 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@thin () -> Bool to $@callee_owned () -> Bool
   // CHECK: [[RET:%.*]] = apply {{%.*}}([[THICK]])
   // CHECK: return [[RET]]
-  return call_auto_closure(false)
+  return call_auto_closure(false_)
 }

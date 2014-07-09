@@ -346,12 +346,6 @@ public:
   /// Retrieve the declaration of Swift.String.
   NominalTypeDecl *getStringDecl() const;
 
-  /// Retrieve the declaration of Swift.true.
-  ValueDecl *getTrueDecl() const;
-  
-  /// Retrieve the declaration of Swift.false.
-  ValueDecl *getFalseDecl() const;
-
   /// Retrieve the declaration of Swift.Array<T>.
   NominalTypeDecl *getArrayDecl() const;
 

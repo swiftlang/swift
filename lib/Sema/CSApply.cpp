@@ -1349,6 +1349,34 @@ namespace {
                diag::builtin_float_literal_broken_proto);
     }
 
+    Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *protocol
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BooleanLiteralConvertible);
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::_BuiltinBooleanLiteralConvertible);
+      if (!protocol || !builtinProtocol)
+        return nullptr;
+
+      auto type = simplifyType(expr->getType());
+      return convertLiteral(
+               expr,
+               type,
+               expr->getType(),
+               protocol,
+               tc.Context.Id_BooleanLiteralType,
+               tc.Context.Id_ConvertFromBooleanLiteral,
+               builtinProtocol,
+               Type(BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), 
+                                            tc.Context)),
+               tc.Context.Id_ConvertFromBuiltinBooleanLiteral,
+               nullptr,
+               diag::boolean_literal_broken_proto,
+               diag::builtin_boolean_literal_broken_proto);
+    }
+
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol

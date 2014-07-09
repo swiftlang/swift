@@ -46,16 +46,45 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
   return true;
 }
 
-static Expr *getTrueExpr(ASTContext &C) {
-  auto decl = C.getTrueDecl();
-  return new (C) DeclRefExpr(decl, SourceLoc(), /*implicit*/ true,
-                             /*direct access*/false, decl->getType());
-}
+static Expr *getBooleanLiteral(ASTContext &C, bool value) {
+  // Build the boolean literal.
+  Type i1Ty = BuiltinIntegerType::get(BuiltinIntegerWidth::fixed(1), C);
+  auto lit = new (C) BooleanLiteralExpr(value, SourceLoc(), /*implicit*/ true);
+  lit->setType(i1Ty);
 
-static Expr *getFalseExpr(ASTContext &C) {
-  auto decl = C.getFalseDecl();
-  return new (C) DeclRefExpr(decl, SourceLoc(), /*implicit*/ true,
-                             /*direct access*/false, decl->getType());
+  // Find Bool._convertFromBuiltinBooleanLiteral.
+  // Note that we synthesize the type of this method so that we don't
+  // need to rely on it already having been type-checked. This only
+  // matters when building the standard library.
+  auto boolDecl = C.getBoolDecl();
+  auto convertFunc
+    = boolDecl->lookupDirect(C.Id_ConvertFromBuiltinBooleanLiteral)[0];
+  auto convertFuncAppliedTy = FunctionType::get(ParenType::get(C, i1Ty),
+                                                boolDecl->getDeclaredType());
+  auto convertFuncTy = FunctionType::get(boolDecl->getType(), 
+                                         convertFuncAppliedTy);
+  assert(!convertFunc->hasType() || 
+         convertFunc->getType()->isEqual(convertFuncTy) &&
+         "_convertFromBuiltinBooleanLiteral has unexpected type");
+  auto convertRef = new (C) DeclRefExpr(convertFunc, SourceLoc(), 
+                                        /*implicit*/ true, 
+                                        /*direct access*/false,
+                                        convertFuncTy);
+
+  // Form Bool._convertFromBuiltinBooleanLiteral
+  auto boolRef = TypeExpr::createImplicit(boolDecl->getDeclaredType(), C);
+  Expr *call = new (C) DotSyntaxCallExpr(convertRef, SourceLoc(), boolRef);
+  call->setImplicit(true);
+  call->setType(convertFuncAppliedTy);
+
+  // Call Bool._convertFromBuiltinBooleanLiteral.
+  Expr *arg = new (C) ParenExpr(SourceLoc(), lit, SourceLoc(), 
+                                /*has trailing closure*/ false,
+                                lit->getType());
+  arg->setImplicit();
+  call = new (C) CallExpr(call, arg, /*implicit*/ true, 
+                          boolDecl->getDeclaredType());
+  return call;
 }
 
 static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
@@ -98,7 +127,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
         CaseLabelItem(/*IsDefault=*/false, tuplePat, SourceLoc(), nullptr));
   }
   {
-    Expr *trueExpr = getTrueExpr(C);
+    Expr *trueExpr = getBooleanLiteral(C, true);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
     BraceStmt* body = BraceStmt::create(C, SourceLoc(),
                                         ASTNode(returnStmt), SourceLoc());
@@ -113,7 +142,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
     auto labelItem =
         CaseLabelItem(/*IsDefault=*/true, any, SourceLoc(), nullptr);
 
-    Expr *falseExpr = getFalseExpr(C);
+    Expr *falseExpr = getBooleanLiteral(C, false);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
     BraceStmt* body = BraceStmt::create(C, SourceLoc(),
                                         ASTNode(returnStmt), SourceLoc());

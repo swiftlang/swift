@@ -448,8 +448,8 @@ func testSwitchCaseWhereExprIJ1(fooObject: FooStruct) {
 }
 
 // COND_COMMON: Begin completions
-// COND_COMMON-DAG: Decl[GlobalVar]/OtherModule: true[#Bool#]{{$}}
-// COND_COMMON-DAG: Decl[GlobalVar]/OtherModule: false[#Bool#]{{$}}
+// COND_COMMON-DAG: Keyword/None: true[#Bool#]{{$}}
+// COND_COMMON-DAG: Keyword/None: false[#Bool#]{{$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{$}}

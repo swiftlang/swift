@@ -809,12 +809,12 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   // Evaluate a named reference expression.
   if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(configExpr)) {
     auto name = UDRE->getName().str();
-    if (name == "true")
-      return true;
-    if (name == "false")
-      return false;
-    
     return Context.LangOpts.hasBuildConfigOption(name);
+  }
+
+  // Evaluate a Boolean literal.
+  if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(configExpr)) {
+    return boolLit->getValue();
   }
 
   // Evaluate a negation (unary "!") expression.

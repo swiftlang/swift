@@ -69,6 +69,11 @@ IDENTIFIER(FloatLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromFloatLiteral, "convertFromFloatLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinFloatLiteral,
                      "_convertFromBuiltinFloatLiteral")
+IDENTIFIER(BooleanLiteralType)
+IDENTIFIER_WITH_NAME(ConvertFromBooleanLiteral, "convertFromBooleanLiteral")
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinBooleanLiteral,
+                     "_convertFromBuiltinBooleanLiteral")
+
 IDENTIFIER(CharacterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,
                      "convertFromCharacterLiteral")

@@ -31,6 +31,10 @@ Latest
       for i: Int8 in 0..<10 { }
       for i: Float in 0.0...10.0 { }
 
+* Introduced the new BooleanLiteralConvertible protocol, which allows
+  user-defined types to support Boolean literals. "true" and "false"
+  are now Boolean constants and keywords.
+
 2014-07-03
 ----------
 

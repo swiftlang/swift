@@ -1305,8 +1305,6 @@ func testTypeCheckWithUnsolvedVariables3() {
 func testResolveModules1() {
   Swift#^RESOLVE_MODULES_1^#
 // RESOLVE_MODULES_1: Begin completions
-// RESOLVE_MODULES_1-DAG: Decl[GlobalVar]/OtherModule: .true[#Bool#]{{$}}
-// RESOLVE_MODULES_1-DAG: Decl[GlobalVar]/OtherModule: .false[#Bool#]{{$}}
 // RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int8[#Int8#]{{$}}
 // RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int16[#Int16#]{{$}}
 // RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule:    .Int32[#Int32#]{{$}}
