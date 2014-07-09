@@ -34,7 +34,7 @@ class IBActionWrapperTy {
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-18]]:18: error: 'IBAction' methods must have a single argument
 
   @IBAction func reqBad(_: AnyObject, _: IBActionWrapperTy) {}
-  // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to 'IBAction' method cannot have non-'objc' class type
+  // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to 'IBAction' method cannot have non-'@objc' class type
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: 'IBAction' methods must have a single argument
 
   @IBAction func badReq(_: Int, _: AnyObject) {}
@@ -43,7 +43,7 @@ class IBActionWrapperTy {
 
   @IBAction func badBad(_: Int, _: IBActionWrapperTy) {}
   // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to 'IBAction' method cannot have non-object type
-  // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: argument to 'IBAction' method cannot have non-'objc' class type
+  // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: argument to 'IBAction' method cannot have non-'@objc' class type
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-3]]:18: error: 'IBAction' methods must have a single argument
 
   @IBAction func tooManyArgs(_: AnyObject, _: AnyObject, _: AnyObject) {}
