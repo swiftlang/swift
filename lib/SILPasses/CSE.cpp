@@ -399,6 +399,12 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (!SimpleValue::canHandle(Inst))
       continue;
 
+    // If an instruction can be handled here, then it must also be handled
+    // in isIdenticalTo, otherwise looking up a key in the map with fail to
+    // match itself.
+    assert(Inst->isIdenticalTo(Inst) &&
+           "Inst must match itself for map to work");
+
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
