@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -emit-module -o %t %s -module-name local
-// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 

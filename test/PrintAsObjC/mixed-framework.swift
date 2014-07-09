@@ -19,8 +19,8 @@
 
 import Foundation
 
-class Dummy: NSNumber {
-  func getIntAlias() -> CIntAlias {
+public class Dummy: NSNumber {
+  public func getIntAlias() -> CIntAlias {
     let result: CInt = 0
     return result
   }

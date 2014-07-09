@@ -97,7 +97,9 @@ static bool printAsObjC(const std::string &path, Module *M,
     return true;
   }
 
-  return printAsObjC(out, M, bridgingHeader);
+  auto requiredAccess = bridgingHeader.empty() ? Accessibility::Public
+                                               : Accessibility::Internal;
+  return printAsObjC(out, M, bridgingHeader, requiredAccess);
 }
 
 /// Performs the compile requested by the user.

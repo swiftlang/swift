@@ -29,8 +29,8 @@
 
 import Foundation
 
-class Dummy: NSNumber {
-  func getProto() -> CustomProto? {
+public class Dummy: NSNumber {
+  public func getProto() -> CustomProto? {
     return nil
   }
 }

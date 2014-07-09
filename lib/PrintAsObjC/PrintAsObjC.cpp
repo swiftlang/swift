@@ -30,10 +30,6 @@
 
 using namespace swift;
 
-static bool isNonPrivateObjC(const ValueDecl *VD) {
-  return VD->isObjC() && VD->getAccessibility() != Accessibility::Private;
-}
-
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter> {
@@ -51,17 +47,23 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
 
+  Accessibility minRequiredAccess;
   bool protocolMembersOptional = false;
 
   friend ASTVisitor<ObjCPrinter>;
   friend TypeVisitor<ObjCPrinter>;
 
 public:
-  explicit ObjCPrinter(ASTContext &context, raw_ostream &out)
-    : ctx(context), os(out) {}
+  explicit ObjCPrinter(ASTContext &context, raw_ostream &out,
+                       Accessibility access)
+    : ctx(context), os(out), minRequiredAccess(access) {}
 
   void print(const Decl *D) {
     visit(const_cast<Decl *>(D));
+  }
+
+  bool shouldInclude(const ValueDecl *VD) {
+    return VD->isObjC() && VD->getAccessibility() >= minRequiredAccess;
   }
 
 private:
@@ -75,8 +77,8 @@ private:
     SmallVector<ProtocolDecl *, 4> protosToPrint;
     std::copy_if(protos.begin(), protos.end(),
                  std::back_inserter(protosToPrint),
-                 [](const ProtocolDecl *PD) -> bool {
-      if (!isNonPrivateObjC(PD))
+                 [this](const ProtocolDecl *PD) -> bool {
+      if (!shouldInclude(PD))
         return false;
       auto knownProtocol = PD->getKnownProtocolKind();
       if (!knownProtocol)
@@ -105,7 +107,7 @@ private:
   void printMembers(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !isNonPrivateObjC(VD))
+      if (!VD || !shouldInclude(VD))
         continue;
       if (auto FD = dyn_cast<FuncDecl>(VD))
         if (FD->isAccessor())
@@ -751,8 +753,8 @@ class ModuleWriter {
   StringRef bridgingHeader;
   ObjCPrinter printer;
 public:
-  ModuleWriter(Module &mod, StringRef header)
-    : M(mod), bridgingHeader(header), printer(M.Ctx, os) {}
+  ModuleWriter(Module &mod, StringRef header, Accessibility access)
+    : M(mod), bridgingHeader(header), printer(M.Ctx, os, access) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -812,7 +814,7 @@ public:
   void forwardDeclareMemberTypes(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !isNonPrivateObjC(VD))
+      if (!VD || !printer.shouldInclude(VD))
         continue;
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
@@ -849,7 +851,7 @@ public:
       allRequirementsSatisfied &= require(superclass);
     }
     for (auto proto : CD->getProtocols())
-      if (isNonPrivateObjC(proto))
+      if (printer.shouldInclude(proto))
         allRequirementsSatisfied &= require(proto);
 
     if (!allRequirementsSatisfied)
@@ -894,7 +896,7 @@ public:
     const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getProtocols())
-      if (isNonPrivateObjC(proto))
+      if (printer.shouldInclude(proto))
         allRequirementsSatisfied &= require(proto);
 
     if (!allRequirementsSatisfied)
@@ -1018,13 +1020,13 @@ public:
     M.getTopLevelDecls(decls);
 
     auto newEnd = std::remove_if(decls.begin(), decls.end(),
-                                 [] (const Decl *D) -> bool {
+                                 [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
-        return !isNonPrivateObjC(VD);
+        return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-        return !baseClass || !isNonPrivateObjC(baseClass);
+        return !baseClass || !printer.shouldInclude(baseClass);
       }
       return true;
     });
@@ -1135,6 +1137,7 @@ public:
 }
 
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
-                        StringRef bridgingHeader) {
-  return ModuleWriter(*M, bridgingHeader).writeToStream(os);
+                        StringRef bridgingHeader,
+                        Accessibility minRequiredAccess) {
+  return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
 }

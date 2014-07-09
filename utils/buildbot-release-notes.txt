@@ -12,6 +12,10 @@ Latest
   The general principle is that an entity cannot be defined in terms of another
   entity with less accessibility.
 
+  Along with this, the generated header for a framework will only include
+  public declarations. Generated headers for applications will include public
+  and internal declarations.
+
 * CGFloat is now a distinct floating-point type that wraps either a
   Float (on 32-bit architectures) or a Double (on 64-bit
   architectures). It provides all of the same comparison and

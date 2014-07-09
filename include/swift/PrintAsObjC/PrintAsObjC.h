@@ -14,6 +14,7 @@
 #define SWIFT_PRINTASOBJC_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Attr.h"
 
 namespace swift {
   class Module;
@@ -22,7 +23,8 @@ namespace swift {
   /// header.
   ///
   /// Returns true on error.
-  bool printAsObjC(raw_ostream &out, Module *M, StringRef bridgingHeader);
+  bool printAsObjC(raw_ostream &out, Module *M, StringRef bridgingHeader,
+                   Accessibility minRequiredAccess);
 }
 
 #endif
