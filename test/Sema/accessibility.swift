@@ -15,15 +15,15 @@ private protocol PrivateProto {
 }
 
 public struct PublicStruct: PublicProto, InternalProto, PrivateProto {
-  private func publicReq() {} // expected-error {{method 'publicReq()' must have public accessibility because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must have public access because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must have internal access because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func privateReq() {}
 }
 
 // expected-note@+1 + {{type declared here}}
 internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must have internal accessibility because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must have internal access because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func privateReq() {}
 }
 
@@ -35,7 +35,7 @@ private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
 }
 
 public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivateProto {
-  func publicReq() {} // expected-error {{method 'publicReq()' must have public accessibility because it matches a requirement in public protocol 'PublicProto'}} {{3-3=public }}
+  func publicReq() {} // expected-error {{method 'publicReq()' must have public access because it matches a requirement in public protocol 'PublicProto'}} {{3-3=public }}
   func internalReq() {}
   func privateReq() {}
 }
@@ -246,8 +246,8 @@ internal protocol InternalMutationOperations {
 }
 
 public struct AccessorsControl : InternalMutationOperations {
-  private var size = 0 // expected-error {{property 'size' must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}}
-  private subscript (Int) -> Int { // expected-error {{subscript must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}}
+  private var size = 0 // expected-error {{property 'size' must have internal access because it matches a requirement in internal protocol 'InternalMutationOperations'}}
+  private subscript (Int) -> Int { // expected-error {{subscript must have internal access because it matches a requirement in internal protocol 'InternalMutationOperations'}}
     get { return 42 }
     set {}
   }
@@ -255,8 +255,8 @@ public struct AccessorsControl : InternalMutationOperations {
 
 public struct PrivateSettersPublic : InternalMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
-  public private(set) var size = 0 // expected-error {{setter for property 'size' must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
-  internal private(set) subscript (Int) -> Int { // expected-error {{subscript setter must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{12-25=}}
+  public private(set) var size = 0 // expected-error {{setter for property 'size' must have internal access because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
+  internal private(set) subscript (Int) -> Int { // expected-error {{subscript setter must have internal access because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{12-25=}}
     get { return 42 }
     set {}
   }
