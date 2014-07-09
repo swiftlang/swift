@@ -1093,16 +1093,31 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       Accessibility requiredAccess =
         std::min(Proto->getAccessibility(),
                  Adoptee->getAnyNominal()->getAccessibility());
-      if (best.Witness->getAccessibility() < requiredAccess) {
+      bool shouldDiagnose = false;
+      bool shouldDiagnoseSetter = false;
+      if (requiredAccess > Accessibility::Private) {
+        shouldDiagnose = (best.Witness->getAccessibility() < requiredAccess);
+
+        if (!shouldDiagnose && requirement->isSettable(DC)) {
+          auto ASD = cast<AbstractStorageDecl>(best.Witness);
+          const DeclContext *accessDC = nullptr;
+          if (requiredAccess == Accessibility::Internal)
+            accessDC = DC->getParentModule();
+          shouldDiagnoseSetter = !ASD->isSetterAccessibleFrom(accessDC);
+        }
+      }
+      if (shouldDiagnose || shouldDiagnoseSetter) {
         bool protoForcesAccess = (requiredAccess == Proto->getAccessibility());
         auto diagKind = protoForcesAccess ? diag::witness_not_accessible_proto
                                           : diag::witness_not_accessible_type;
         auto diag = TC.diagnose(best.Witness, diagKind,
                                 getRequirementKind(requirement),
                                 best.Witness->getFullName(),
+                                shouldDiagnoseSetter,
                                 requiredAccess,
                                 Proto->getName());
-        fixItAccessibility(diag, best.Witness, requiredAccess);
+        fixItAccessibility(diag, best.Witness, requiredAccess,
+                           shouldDiagnoseSetter);
       }
 
       // Record the match.

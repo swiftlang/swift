@@ -234,3 +234,54 @@ public enum GenericEnum<T: InternalProto> { // expected-error {{generic enum can
   case A
 }
 
+
+public protocol PublicMutationOperations {
+  var size: Int { get set }
+  subscript (Int) -> Int { get set }
+}
+
+internal protocol InternalMutationOperations {
+  var size: Int { get set }
+  subscript (Int) -> Int { get set }
+}
+
+public struct AccessorsControl : InternalMutationOperations {
+  private var size = 0 // expected-error {{property 'size' must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}}
+  private subscript (Int) -> Int { // expected-error {{subscript must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}}
+    get { return 42 }
+    set {}
+  }
+}
+
+public struct PrivateSettersPublic : InternalMutationOperations {
+  // Please don't change the formatting here; it's a precise fix-it test.
+  public private(set) var size = 0 // expected-error {{setter for property 'size' must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
+  internal private(set) subscript (Int) -> Int { // expected-error {{subscript setter must have internal accessibility because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{12-25=}}
+    get { return 42 }
+    set {}
+  }
+}
+
+internal struct PrivateSettersInternal : PublicMutationOperations {
+  // Please don't change the formatting here; it's a precise fix-it test.
+  private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{3-15=}}
+
+  public private(set)subscript (Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{10-17=internal}}
+    get { return 42 }
+    set {}
+  }
+}
+
+public protocol PublicReadOnlyOperations {
+  var size: Int { get }
+  subscript (Int) -> Int { get }
+}
+
+internal struct PrivateSettersForReadOnly : PublicReadOnlyOperations {
+  public private(set) var size = 0 // no-warning
+  internal private(set) subscript (Int) -> Int { // no-warning
+    get { return 42 }
+    set {}
+  }
+}
+

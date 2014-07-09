@@ -520,15 +520,16 @@ ERROR(witness_argument_name_mismatch,sema_tcd,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
 ERROR(witness_not_accessible_proto,sema_tcd,none,
-      "%select{initializer %1|method %1|property %1|subscript}0 must have "
-      "%select{private|internal|public}2 accessibility because it matches a "
-      "requirement in %select{private|internal|public}2 protocol %3",
-      (RequirementKind, DeclName, Accessibility, DeclName))
+      "%select{initializer %1|method %1|%select{|setter for }2property %1"
+      "|subscript%select{| setter}2}0 must have "
+      "%select{private|internal|public}3 accessibility because it matches a "
+      "requirement in %select{private|internal|public}3 protocol %4",
+      (RequirementKind, DeclName, bool, Accessibility, DeclName))
 ERROR(witness_not_accessible_type,sema_tcd,none,
-      "%select{initializer %1|method %1|property %1|subscript}0 must be as "
-      "accessible as its enclosing type because it matches a requirement in "
-      "protocol %3",
-      (RequirementKind, DeclName, Accessibility, DeclName))
+      "%select{initializer %1|method %1|%select{|setter for }2property %1"
+      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
+      "type because it matches a requirement in protocol %4",
+      (RequirementKind, DeclName, bool, Accessibility, DeclName))
 
 ERROR(protocol_refine_access,sema_tcd,none,
       "%select{protocol must be declared %select{private|internal|PUBLIC}2 "

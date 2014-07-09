@@ -572,7 +572,7 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===--------------------------------------------------------------------===//
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
-                               Accessibility desiredAccess) {
+                               Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
   case Accessibility::Private:  fixItString = "private ";  break;
@@ -580,8 +580,33 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
   case Accessibility::Public:   fixItString = "public ";   break;
   }
 
-  if (auto *attr = VD->getAttrs().getAttribute<AccessibilityAttr>())
-    diag.fixItReplace(attr->getRangeWithAt(), fixItString.drop_back());
+  const DeclAttribute *attr;
+  if (isForSetter)
+    attr = VD->getAttrs().getAttribute<SetterAccessibilityAttr>();
   else
+    attr = VD->getAttrs().getAttribute<AccessibilityAttr>();
+
+  if (isForSetter && VD->getAccessibility() == desiredAccess) {
+    assert(attr);
+    if (!attr->Range.isValid())
+      return;
+
+    // Remove the setter attribute along with a possible single trailing space.
+    SourceManager &sourceMgr = VD->getASTContext().SourceMgr;
+    SourceLoc nextCharLoc = Lexer::getLocForEndOfToken(sourceMgr,
+                                                       attr->Range.End);
+    StringRef nextChar = sourceMgr.extractText({ nextCharLoc, 1 });
+    if (nextChar == " ")
+      diag.fixItRemoveChars(attr->Range.Start, nextCharLoc.getAdvancedLoc(1));
+    else
+      diag.fixItRemove(attr->Range);
+
+  } else if (attr) {
+    // This uses getLocation() instead of getRange() because we don't want to
+    // replace the "(set)" part of a setter attribute.
+    diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+
+  } else {
     diag.fixItInsert(VD->getStartLoc(), fixItString);
+  }
 }

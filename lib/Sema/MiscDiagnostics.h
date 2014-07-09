@@ -31,7 +31,7 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 void fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
-                        Accessibility desiredAccess);
+                        Accessibility desiredAccess, bool isForSetter = false);
 
 } // namespace swift
 
