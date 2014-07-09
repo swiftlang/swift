@@ -1560,10 +1560,7 @@ func slurpFastEnumerationFromObjC(
   var objcPairs = NSMutableArray()
   slurpFastEnumerationFromObjCImpl(d, fe, objcPairs)
   var pairs = Array<(Int, Int)>()
-  // Cast to NSArray to work around
-  // <rdar://problem/16865289> type 'NSMutableArray' does not conform to
-  // protocol 'Sequence'
-  for pairAnyObject: AnyObject in (objcPairs as NSArray) {
+  for pairAnyObject: AnyObject in objcPairs {
     let pair = pairAnyObject as NSArray
     let key = (pair[0] as TestObjCKeyTy).value
     let value = (pair[1] as TestObjCValueTy).value
