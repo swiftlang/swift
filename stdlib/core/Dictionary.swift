@@ -787,13 +787,23 @@ public struct _CocoaDictionaryStorage : _DictionaryStorage {
       return .None
     }
 
-    let allKeys = cocoaDictionary.allKeys
-    let keyIndex = allKeys.indexOfObject(key)
+    let allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
+    println("allKeys: \(allKeys)")
+    var keyIndex = -1
+    for i in 0..<allKeys.value {
+      if _stdlib_NSObject_isEqual(key, allKeys[i]) {
+        keyIndex = i
+        break
+      }
+    }
+    println("keyIndex = \(keyIndex)")
+    _sanityCheck(keyIndex >= 0,
+        "key was found in fast path, but not found later?")
     return Index(cocoaDictionary, allKeys, keyIndex)
   }
 
   func assertingGet(i: Index) -> (AnyObject, AnyObject) {
-    let key: AnyObject = i.allKeys.objectAtIndex(i.nextKeyIndex)
+    let key: AnyObject = i.allKeys[i.currentKeyIndex]
     let value: AnyObject = i.cocoaDictionary.objectForKey(key)!
     return (key, value)
   }
@@ -1188,7 +1198,7 @@ public enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       // operation.
       let cocoaIndex = index._cocoaIndex
       let anyObjectKey: AnyObject =
-          cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
+          cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
       migrateDataToNativeStorage(cocoaStorage)
       nativeRemoveObjectForKey(
           _bridgeFromObjectiveC(anyObjectKey, KeyType.self))
@@ -1331,54 +1341,58 @@ func == <KeyType : Hashable, ValueType> (
 }
 
 struct _CocoaDictionaryIndex : BidirectionalIndex {
-  // Assumption: we rely on NSDictionary.allKeys, when being repeatedly
-  // called on the same NSDictionary, returning keys in the same order
-  // every time.
+  // Assumption: we rely on NSDictionary.getObjects:andKeys: when being
+  // repeatedly called on the same NSDictionary, returning keys in the same
+  // order every time.
 
-  typealias Index = _CocoaDictionaryIndex
-
+  /// A reference to the NSDictionary, which owns keys in `allKeys`.
   let cocoaDictionary: _SwiftNSDictionary
-  var allKeys: _SwiftNSArray
-  var nextKeyIndex: Int
+
+  /// An unowned array of keys.
+  var allKeys: HeapBuffer<Int, AnyObject>
+
+  /// Index into `allKeys`.
+  var currentKeyIndex: Int
 
   init(_ cocoaDictionary: _SwiftNSDictionary, startIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
-    self.allKeys = cocoaDictionary.allKeys
-    self.nextKeyIndex = 0
+    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
+    self.currentKeyIndex = 0
   }
 
   init(_ cocoaDictionary: _SwiftNSDictionary, endIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
-    self.allKeys = cocoaDictionary.allKeys
-    self.nextKeyIndex = allKeys.count
+    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
+    self.currentKeyIndex = allKeys.value
   }
 
-  init(_ cocoaDictionary: _SwiftNSDictionary, _ allKeys: _SwiftNSArray,
-       _ nextKeyIndex: Int) {
+  init(_ cocoaDictionary: _SwiftNSDictionary,
+       _ allKeys: HeapBuffer<Int, AnyObject>,
+       _ currentKeyIndex: Int) {
     self.cocoaDictionary = cocoaDictionary
     self.allKeys = allKeys
-    self.nextKeyIndex = nextKeyIndex
+    self.currentKeyIndex = currentKeyIndex
   }
 
-  func predecessor() -> Index {
-    _precondition(nextKeyIndex >= 1, "can not decrement startIndex")
-    return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex - 1)
+  func predecessor() -> _CocoaDictionaryIndex {
+    _precondition(currentKeyIndex >= 1, "can not decrement startIndex")
+    return _CocoaDictionaryIndex(cocoaDictionary, allKeys, currentKeyIndex - 1)
   }
 
-  func successor() -> Index {
+  func successor() -> _CocoaDictionaryIndex {
     _precondition(
-        nextKeyIndex < allKeys.count, "can not increment endIndex")
-    return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex + 1)
+        currentKeyIndex < allKeys.value, "can not increment endIndex")
+    return _CocoaDictionaryIndex(cocoaDictionary, allKeys, currentKeyIndex + 1)
   }
 }
 
 func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
   _precondition(lhs.cocoaDictionary === rhs.cocoaDictionary,
       "can not compare indexes pointing to different dictionaries")
-  _precondition(lhs.allKeys.count == rhs.allKeys.count,
+  _precondition(lhs.allKeys.value == rhs.allKeys.value,
       "one or both of the indexes have been invalidated")
 
-  return lhs.nextKeyIndex == rhs.nextKeyIndex
+  return lhs.currentKeyIndex == rhs.currentKeyIndex
 }
 
 enum _DictionaryIndexRepresentation<KeyType : Hashable, ValueType> {
@@ -1857,7 +1871,7 @@ public func == <KeyType : Equatable, ValueType : Equatable>(
     if lhsCocoa.cocoaDictionary === rhsCocoa.cocoaDictionary {
       return true
     }
-    return _stdlib_NSDictionary_isEqual(
+    return _stdlib_NSObject_isEqual(
         lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
 
   case (.Native(let lhsNativeOwner), .Cocoa(let rhsCocoa)):
@@ -2105,18 +2119,27 @@ protocol _SwiftNSDictionaryRequiredOverrides :
 
 @unsafe_no_objc_tagged_pointer @objc public
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
-  var allKeys: _SwiftNSArray { get }
-  func isEqual(anObject: AnyObject) -> Bool
+  func getObjects(objects: UnsafePointer<AnyObject>,
+      andKeys keys: UnsafePointer<AnyObject>)
 }
 
 /// Call `[lhs isEqual: rhs]`.
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
-@asmname("swift_stdlib_NSDictionary_isEqual")
-func _stdlib_NSDictionary_isEqual(
-    lhs: _SwiftNSDictionary, rhs: _SwiftNSDictionary
-) -> Bool
+@asmname("swift_stdlib_NSObject_isEqual")
+func _stdlib_NSObject_isEqual(lhs: AnyObject, rhs: AnyObject) -> Bool
+
+/// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
+/// autorelease pool.
+func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionary)
+    -> HeapBuffer<Int, AnyObject> {
+  let count = nsd.count
+  var buffer = HeapBuffer<Int, AnyObject>(
+      HeapBufferStorage<Int, AnyObject>.self, count, count)
+  nsd.getObjects(nil, andKeys: buffer.elementStorage)
+  return buffer
+}
 
 /// This class is derived from `_NSSwiftDictionaryBase` (through runtime magic),
 /// which is derived from `NSDictionary`.

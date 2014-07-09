@@ -87,9 +87,11 @@ using namespace swift;
 @end
 % end
 
-extern "C" bool swift_stdlib_NSDictionary_isEqual(NSDictionary *lhs,
-                                                  NSDictionary *rhs) {
-  return [lhs isEqual:rhs];
+extern "C" bool swift_stdlib_NSObject_isEqual(NSObject *lhs, NSObject *rhs) {
+  bool Result = [lhs isEqual:rhs];
+  swift_unknownRelease(lhs);
+  swift_unknownRelease(rhs);
+  return Result;
 }
 
 // ${'Local Variables'}:

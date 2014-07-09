@@ -1303,8 +1303,8 @@ var objcKeySerial = 0
 
 class TestObjCKeyTy : NSObject, NSCopying, Printable {
   init(_ value: Int) {
-    ++keyCount
-    serial = ++keySerial
+    ++objcKeyCount
+    serial = ++objcKeySerial
     self.value = value
     self._hashValue = value
   }
@@ -1316,7 +1316,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
 
   deinit {
     assert(serial > 0, "double destruction")
-    --keyCount
+    --objcKeyCount
     serial = -serial
   }
 
@@ -1357,14 +1357,14 @@ var objcValueSerial = 0
 
 class TestObjCValueTy : NSObject, Printable {
   init(_ value: Int) {
-    ++valueCount
-    serial = ++valueSerial
+    ++objcValueCount
+    serial = ++objcValueSerial
     self.value = value
   }
 
   deinit {
     assert(serial > 0, "double destruction")
-    --valueCount
+    --objcValueCount
     serial = -serial
   }
 
@@ -2591,7 +2591,11 @@ func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
 
   println("test_BridgedFromObjC_Verbatim_Generate_ParallelArray done")
 }
-test_BridgedFromObjC_Verbatim_Generate_ParallelArray()
+autoreleasepool {
+  // Add an autorelease pool because ParallelArrayDictionary autoreleases
+  // values in objectForKey.
+  test_BridgedFromObjC_Verbatim_Generate_ParallelArray()
+}
 // CHECK: test_BridgedFromObjC_Verbatim_Generate_ParallelArray done
 
 func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
@@ -2615,7 +2619,11 @@ func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
 
   println("test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done")
 }
-test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray()
+autoreleasepool {
+  // Add an autorelease pool because ParallelArrayDictionary autoreleases
+  // values in objectForKey.
+  test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray()
+}
 // CHECK: test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done
 
 assert(objcKeyCount == 0, "key leak")
@@ -3847,3 +3855,4 @@ if let three = find(d.values, 3) {
 else {
   println("three not found")
 }
+
