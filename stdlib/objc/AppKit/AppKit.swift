@@ -34,6 +34,8 @@ internal func replApplicationMain() {
 }
 
 struct _NSViewMirror : Mirror {
+  static var _views = NSMutableSet()
+
   var _v : NSView
   
   init(_ v : NSView) {_v = v}
@@ -51,21 +53,32 @@ struct _NSViewMirror : Mirror {
   var summary: String { get { return ""} }
   
   var quickLookObject: QuickLookObject? { get {
-      // this code comes straight from the quicklooks
+      // adapted from the Xcode QuickLooks implementation
       
-      /*NSBitmapImageRep *b = (NSBitmapImageRep *)[%dataValueName% bitmapImageRepForCachingDisplayInRect:(NSRect)[%dataValueName% bounds]];
-      (void)[%dataValueName% cacheDisplayInRect:(NSRect)[%dataValueName% bounds] toBitmapImageRep:b];
-      (NSData *)[b representationUsingType:4 properties:nil];*/
+      var result: QuickLookObject? = nil
       
-      let bounds = _v.bounds
-      
-      // we need to do this check to avoid the @unchecked -> Any -> NSObject cast failure
-      if var b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
-          _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
-          // don't do the last step - return the image and the encoder will translate the NSImage to a TIFF alright
-          return .Some(.View(b))
+      // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
+      // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
+      // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
+      // until you run out of stack and crash
+      // This code checks that we aren't trying to log the same view recursively - and if so just returns
+      // nil, which is probably a safer option than crashing
+      // FIXME: is there a way to say "cacheDisplayInRect butDoNotRedrawEvenIfISaidSo"?
+      switch _NSViewMirror._views.member(_v) {
+        case nil:
+          _NSViewMirror._views.addObject(_v)
+
+          let bounds = _v.bounds
+          if var b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
+              _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
+              result = .Some(.View(b))
+          }
+        default: ()
       }
-      return nil
+      
+      _NSViewMirror._views.removeObject(_v)
+      
+      return result
       
   } }
   
