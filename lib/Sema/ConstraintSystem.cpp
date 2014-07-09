@@ -422,7 +422,7 @@ namespace {
                                 
         // The nested type could be a type parameter type. If that's the case,
         // obtain the archetype from its decl.
-        if (!archetype) {
+        if (!archetype && !nestedType.isNull()) {
           auto type = nestedType.get<Type>();
                     
           if (auto GTPT = type->getAs<GenericTypeParamType>()) {
