@@ -105,3 +105,10 @@ public struct Properties {
 
   private(set) subscript(#e: Int) -> Int { return 0 } // expected-error {{'private(set)' attribute cannot be applied to read-only subscripts}}
 }
+
+private extension Properties {
+  public(set) var extProp: Int { // expected-error {{private property cannot have a public setter}}
+    get { return 42 }
+    set { }
+  }
+}
