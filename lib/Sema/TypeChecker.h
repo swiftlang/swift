@@ -721,15 +721,10 @@ public:
   ///
   /// \param type The value type being queried, e.g., String.
   ///
-  /// \param isConditionallyBridged If non-null, will be set to
-  /// indicate whether the bridging is conditional.
-  ///
   /// \returns a pair containing the bridged type (or a null type if the type
   /// cannot be bridged) and a bit indicating whether the type was bridged
   /// verbatim.
-  std::pair<Type, bool> getBridgedToObjC(const DeclContext *dc,
-                                         Type type,
-                                         bool *isConditionallyBridged=nullptr);
+  std::pair<Type, bool> getBridgedToObjC(const DeclContext *dc, Type type);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
@@ -743,8 +738,7 @@ public:
   /// dynamic type isn't something we can start from.
   Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                          Type dynamicType,
-                                         Type valueType,
-                                         bool *isConditionallyBridged=nullptr);
+                                         Type valueType);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.

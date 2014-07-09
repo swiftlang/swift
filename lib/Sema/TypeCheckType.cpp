@@ -138,15 +138,14 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
 Type 
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
-                                               Type valueType,
-                                               bool *isConditionallyBridged) {
+                                               Type valueType) {
   // We can only bridge from class or Objective-C existential types.
   if (!dynamicType->isObjCExistentialType() &&
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
   // We only interested in types that bridge non-verbatim.
-  auto bridged = getBridgedToObjC(dc, valueType, isConditionallyBridged);
+  auto bridged = getBridgedToObjC(dc, valueType);
   if (bridged.first && !bridged.second)
     return bridged.first;
 
@@ -2205,13 +2204,8 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-std::pair<Type, bool> 
-TypeChecker::getBridgedToObjC(const DeclContext *dc,
-                              Type type,
-                              bool *isConditionallyBridged) {
-  if (isConditionallyBridged)
-    *isConditionallyBridged = false;
-
+std::pair<Type, bool> TypeChecker::getBridgedToObjC(const DeclContext *dc,
+                                                    Type type) {
   // Class types and ObjC existential types are always bridged verbatim.
   if (type->getClassOrBoundGenericClass() || type->isObjCExistentialType())
     return { type, true };
@@ -2234,17 +2228,6 @@ TypeChecker::getBridgedToObjC(const DeclContext *dc,
   if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
                           &conformance))
     return { nullptr, false };
-
-  // Check conditional bridging if requested.
-  if (isConditionallyBridged) {
-    if (auto condBridgedProto
-          = Context.getProtocol(
-              KnownProtocolKind::_ConditionallyBridgedToObjectiveC)) {
-      *isConditionallyBridged
-        = conformsToProtocol(type, condBridgedProto,
-                             const_cast<DeclContext *>(dc));
-    }
-  }
 
   return { getWitnessType(type, bridgedProto, conformance,
                           Context.getIdentifier("ObjectiveCType"),
