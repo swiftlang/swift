@@ -144,12 +144,10 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
       !dynamicType->getClassOrBoundGenericClass())
     return Type();
 
-  // We only interested in types that bridge non-verbatim.
-  auto bridged = getBridgedToObjC(dc, valueType);
-  if (bridged.first && !bridged.second)
-    return bridged.first;
+  if (!valueType->isPotentiallyBridgedValueType())
+    return Type();
 
-  return Type();
+  return getBridgedToObjC(dc, valueType).first;
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
