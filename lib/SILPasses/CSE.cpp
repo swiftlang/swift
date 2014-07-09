@@ -83,6 +83,7 @@ struct SimpleValue {
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
+    case ValueKind::RefToRawPointerInst:
         return true;
     default:
         return false;
@@ -143,6 +144,10 @@ public:
 
   hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getField());
+  }
+
+  hash_code visitRefToRawPointerInst(RefToRawPointerInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
   hash_code visitStringLiteralInst(StringLiteralInst *X) {

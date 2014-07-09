@@ -636,3 +636,19 @@ bb0(%0 : $C):
   %5 = tuple()
   return %5 : $()
 }
+
+// CHECK-LABEL: sil @test2cse : $@thin (C) -> () {
+// CHECK: ref_to_raw_pointer
+// CHECK-NOT: ref_to_raw_pointer
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @test2cse : $@thin (C) -> () {
+bb0(%0 : $C):
+  %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %2 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %4 = function_ref @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  %5 = apply %4(%1, %2) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  %6 = tuple()
+  return %6 : $()
+}
