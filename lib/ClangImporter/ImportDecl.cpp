@@ -4000,6 +4000,10 @@ namespace {
         auto declModule = Impl.getClangSubmoduleForDecl(D);
         if (!declModule.hasValue())
           return false;
+        // Handle the bridging header case. This is pretty nasty since things
+        // can get added to it *later*, but there's not much we can do.
+        if (!declModule.getValue())
+          return *clangModule == nullptr;
         return *clangModule == declModule.getValue()->getTopLevelModule();
       };
 
