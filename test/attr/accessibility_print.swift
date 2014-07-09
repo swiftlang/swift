@@ -182,6 +182,11 @@ public class FE_PublicClass {}
 private extension FE_PublicClass {
   // CHECK: /*private*/ func explicitPrivateExt()
   func explicitPrivateExt() {}
+  // CHECK: /*private*/ struct PrivateNested {
+  struct PrivateNested {
+    // CHECK: /*private*/ var x
+    var x: Int
+  } // CHECK: }
 } // CHECK: {{^[}]}}
 
 // CHECK-SRC: internal
@@ -189,6 +194,11 @@ private extension FE_PublicClass {
 internal extension FE_PublicClass {
   // CHECK: /*internal*/ func explicitInternalExt()
   func explicitInternalExt() {}
+  // CHECK: /*internal*/ struct InternalNested {
+  struct InternalNested {
+    // CHECK: /*internal*/ var x
+    var x: Int
+  } // CHECK: }
 } // CHECK: {{^[}]}}
 
 // CHECK-SRC: public
@@ -196,6 +206,11 @@ internal extension FE_PublicClass {
 public extension FE_PublicClass {
   // CHECK: /*public*/ func explicitPublicExt()
   func explicitPublicExt() {}
+  // CHECK: /*public*/ struct PublicNested {
+  struct PublicNested {
+    // CHECK: /*internal*/ var x
+    var x: Int
+  } // CHECK: }
 } // CHECK: {{^[}]}}
 
 
