@@ -3528,6 +3528,36 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   return coerceToType(expr, toType, locator);
 }
 
+static uint getOptionalBindDepth(const BoundGenericType *bgt) {
+  
+  if (bgt->getDecl()->classifyAsOptionalType()) {
+    auto tyarg = bgt->getGenericArgs()[0];
+    
+    uint innerDepth = 0;
+    
+    if (auto wrappedBGT = dyn_cast<BoundGenericType>(tyarg->
+                                                     getCanonicalType())) {
+      innerDepth = getOptionalBindDepth(wrappedBGT);
+    }
+    
+    return 1 + innerDepth;
+  }
+  
+  return 0;
+}
+
+static Type getOptionalBaseType(const Type &type) {
+  
+  if (auto bgt = dyn_cast<BoundGenericType>(type->
+                                            getCanonicalType())) {
+    if (bgt->getDecl()->classifyAsOptionalType()) {
+      return getOptionalBaseType(bgt->getGenericArgs()[0]);
+    }
+  }
+  
+  return type;
+}
+
 Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
                                              ConstraintLocatorBuilder locator) {
   auto &tc = cs.getTypeChecker();
@@ -3538,9 +3568,42 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   assert(fromGenericType->getDecl()->classifyAsOptionalType());
   assert(toGenericType->getDecl()->classifyAsOptionalType());
   tc.requireOptionalIntrinsics(expr->getLoc());
-
+  
   Type fromValueType = fromGenericType->getGenericArgs()[0];
   Type toValueType = toGenericType->getGenericArgs()[0];
+
+  
+  // If the option kinds are the same, and the wrapped types are the same,
+  // but the arities are different, we can peephole the optional-to-optional
+  // conversion into a series of nested injections.
+  auto toDepth = getOptionalBindDepth(toGenericType);
+  auto fromDepth = getOptionalBindDepth(fromGenericType);
+  
+  if (toDepth > fromDepth) {
+    
+    auto toBaseType = getOptionalBaseType(toGenericType);
+    auto fromBaseType = getOptionalBaseType(fromGenericType);
+    
+    if ((toGenericType->getDecl() == fromGenericType->getDecl()) &&
+        toBaseType->isEqual(fromBaseType)) {
+    
+      auto diff = toDepth - fromDepth;
+      auto isIUO = fromGenericType->getDecl()->
+                    classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional;
+      
+      while (diff) {
+        const Type &t = expr->getType();
+        const Type &wrapped = isIUO ?
+                                Type(ImplicitlyUnwrappedOptionalType::get(t)) :
+                                Type(OptionalType::get(t));
+        expr = new (tc.Context) InjectIntoOptionalExpr(expr, wrapped);
+        diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
+        diff--;
+      }
+      
+      return expr;
+    }
+  }
 
   expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
                                            /*depth*/ 0, fromValueType);
