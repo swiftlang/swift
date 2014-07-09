@@ -189,9 +189,7 @@ def compareScores(key, score1, score2, runs):
 def compareTimingsFiles(file1, file2):
     scores1, runs1 = getScores(file1)
     scores2, runs2 = getScores(file2)
-    runs = runs1
-    if runs2 > runs:
-        runs = runs2
+    runs = min(runs1, runs2)
     if VERBOSE: print scores1; print scores2
     keys = [f for f in set(scores1.keys() + scores2.keys())]
     keys.sort()
