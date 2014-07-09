@@ -1239,6 +1239,19 @@ bb0:
   return %3 : $()
 }
 
+// CHECK-LABEL: sil @eliminiate_thin_to_thick_apply : $@thin () -> () {
+// CHECK: bb0
+// CHECK: function_ref @eliminate_dead_thin_to_thick_function_fun
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil @eliminiate_thin_to_thick_apply : $@thin () -> () {
+bb0:
+  %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
+  %1 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()
+  %2 = apply %1() : $@callee_owned () -> ()
+  return %2 : $()
+}
+
 // CHECK-LABEL: sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@thin (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
 // CHECK: bb0
 // CHECK-NEXT: enum

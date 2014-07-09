@@ -1019,6 +1019,25 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     }
   }
 
+  // (apply (thin_to_thick_function f)) to (apply f)
+  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
+    // TODO: Handle substitutions and indirect results
+    if (AI->hasSubstitutions() || AI->hasIndirectResult())
+      return nullptr;
+    SmallVector<SILValue, 4> Arguments;
+    for (auto &Op : AI->getArgumentOperands()) {
+      Arguments.push_back(Op.get());
+    }
+    // The type of the substition is the source type of the thin to thick
+    // instruction.
+    SILType substTy = TTTFI->getOperand().getType();
+    return ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
+                             substTy, AI->getType(),
+                             AI->getSubstitutions(), Arguments,
+                             AI->isTransparent(),
+                             *AI->getFunction());
+  }
+
   // Canonicalize multiplication by a stride to be such that the stride is
   // always the second argument.
   if (AI->getNumOperands() != 4)
