@@ -354,12 +354,6 @@ namespace {
       return true;
     }
 
-    bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      return true;
-    }
-
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
       if (X->isTransparent() != RHS->isTransparent())
@@ -381,18 +375,90 @@ namespace {
       return X->getElement() == RHS->getElement();
     }
 
-    bool visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *RHS) {
-      // We already checked operands and types.
+    // Conversion instructions.
+    // All of these just return true as they have already had their
+    // operands and types checked
+    bool visitUncheckedRefCastInst(UncheckedRefCastInst *RHS) {
+      return true;
+    }
+
+    bool visitUncheckedAddrCastInst(UncheckedAddrCastInst *RHS) {
       return true;
     }
 
     bool visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *RHS) {
-      // We already checked operands and types.
+      return true;
+    }
+
+    bool visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *RHS) {
+      return true;
+    }
+
+    bool visitUpcastInst(UpcastInst *RHS) {
+      return true;
+    }
+
+    bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
+      return true;
+    }
+
+    bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
       return true;
     }
 
     bool visitRefToRawPointerInst(RefToRawPointerInst *RHS) {
-      // We already checked operands and types.
+      return true;
+    }
+
+    bool visitRawPointerToRefInst(RawPointerToRefInst *RHS) {
+      return true;
+    }
+
+    bool visitRefToUnownedInst(RefToUnownedInst *RHS) {
+      return true;
+    }
+
+    bool visitUnownedToRefInst(UnownedToRefInst *RHS) {
+      return true;
+    }
+
+    bool visitRefToUnmanagedInst(RefToUnmanagedInst *RHS) {
+      return true;
+    }
+
+    bool visitUnmanagedToRefInst(UnmanagedToRefInst *RHS) {
+      return true;
+    }
+
+    bool visitThinToThickFunctionInst(ThinToThickFunctionInst *RHS) {
+      return true;
+    }
+
+    bool visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *RHS) {
+      return true;
+    }
+
+    bool visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *RHS) {
+      return true;
+    }
+
+    bool visitConvertFunctionInst(ConvertFunctionInst *RHS) {
+      return true;
+    }
+
+    bool visitUpcastExistentialRefInst(UpcastExistentialRefInst *RHS) {
+      return true;
+    }
+
+    bool visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *RHS) {
+      return true;
+    }
+
+    bool visitObjCExistentialMetatypeToObjectInst(ObjCExistentialMetatypeToObjectInst *RHS) {
+      return true;
+    }
+
+    bool visitProjectBlockStorageInst(ProjectBlockStorageInst *RHS) {
       return true;
     }
 
