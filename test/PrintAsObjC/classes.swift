@@ -196,6 +196,18 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @end
 @objc protocol MyProtocol : NSObjectProtocol {}
 
+// NEGATIVE-NOT: @interface Private :
+private class Private : A1 {}
+
+// CHECK-LABEL: @interface PrivateMembers
+// CHECK-NEXT: @end
+@objc class PrivateMembers {
+  private var i = 0
+  private func foo() {}
+  private init() {}
+  @objc private func bar() {}
+}
+
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
 // CHECK-NEXT: @property (nonatomic, readonly) Properties * this;

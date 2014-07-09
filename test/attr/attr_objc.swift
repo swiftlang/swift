@@ -1404,6 +1404,33 @@ class infer_throughConformance1 : infer_throughConformanceProto1 {
   // CHECK: @objc deinit  {
 }
 
+@class_protocol @objc
+private protocol infer_throughConformanceProto2 {
+  // CHECK-LABEL: @objc @class_protocol private protocol infer_throughConformanceProto2 {
+
+  func funcObjC1()
+  var varObjC1: Int { get }
+  var varObjC2: Int { get set }
+  // CHECK: @objc func funcObjC1()
+  // CHECK: @objc var varObjC1: Int { get }
+  // CHECK: @objc var varObjC2: Int { get set }
+}
+
+class infer_throughConformance2 : infer_throughConformanceProto2 {
+  // CHECK-LABEL: {{^}}class infer_throughConformance2 : infer_throughConformanceProto2 {
+  private func funcObjC1() {}
+  private var varObjC1: Int = 0
+  private var varObjC2: Int = 0
+  // CHECK: @objc private func funcObjC1() {
+  // CHECK: @objc private var varObjC1: Int
+  // CHECK: @objc private var varObjC2: Int
+
+  private func nonObjC1() {}
+  // CHECK: {{^}} private func nonObjC1() {
+
+  // CHECK: @objc deinit  {
+}
+
 
 class infer_class1 : PlainClass {}
 // CHECK-LABEL: {{^}}class infer_class1 : PlainClass {
@@ -1685,3 +1712,12 @@ struct NotObjCStruct {}
 typealias GoodBlock = @objc_block Int -> ()
 typealias BadBlock = @objc_block NotObjCEnum -> () // expected-error{{@objc_block type is not representable in Objective-C}}
 
+
+@objc class AccessControl {
+  // CHECK: @objc func foo
+  func foo() {}
+  // CHECK: {{^}} private func bar
+  private func bar() {}
+  // CHECK: @objc private func baz
+  @objc private func baz() {}
+}

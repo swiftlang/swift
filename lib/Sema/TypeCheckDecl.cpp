@@ -2703,6 +2703,23 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Returns true if \p VD should be exposed to Objective-C iff it is
+/// representable in Objective-C.
+static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
+  if (VD->isInvalid())
+    return false;
+  if (!allowImplicit && VD->isImplicit())
+    return false;
+  if (VD->getAccessibility() == Accessibility::Private)
+    return false;
+
+  Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+  auto classContext = contextTy->getClassOrBoundGenericClass();
+  if (!classContext)
+    return false;
+  return classContext->isObjC();
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2827,11 +2844,8 @@ public:
 
     // The instance var requires ObjC interop if it has an @objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
-    Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy) {
-      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
-      ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(VD->getDeclContext());
+    if (VD->getDeclContext()->getDeclaredTypeInContext()) {
+      auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (VD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
@@ -2843,8 +2857,7 @@ public:
         reason = ObjCReason::MemberOfObjCProtocol;
 
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    (classContext && classContext->isObjC() &&
-                     !VD->isImplicit());
+                    isImplicitlyObjC(VD);
       if (isObjC && !TC.isRepresentableInObjC(VD, reason))
         isObjC = false;
       
@@ -3117,18 +3130,14 @@ public:
     // A subscript is ObjC-compatible if it's explicitly @objc, or a
     // member of an ObjC-compatible class or protocol.
     if (dc->getDeclaredTypeInContext()) {
-      ClassDecl *classContext = dc->getDeclaredTypeInContext()
-        ->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
-      bool isMemberOfObjCProtocol =
-          protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (SD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
-      else if (isMemberOfObjCProtocol)
+      else if (protocolContext && protocolContext->isObjC())
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    (classContext && classContext->isObjC());
+                    isImplicitlyObjC(SD);
       if (isObjC && !TC.isRepresentableInObjC(SD, reason))
         isObjC = false;
       
@@ -4268,9 +4277,7 @@ public:
 
     // A method is ObjC-compatible if it's explicitly @objc, a member of an
     // ObjC-compatible class, or an accessor for an ObjC property.
-    Type ContextTy = FD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy) {
-      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+    if (FD->getDeclContext()->getDeclaredTypeInContext()) {
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(FD->getDeclContext());
       bool isMemberOfObjCProtocol =
@@ -4281,7 +4288,7 @@ public:
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    (classContext && classContext->isObjC());
+                    isImplicitlyObjC(FD);
       
       if (protocolContext && FD->isGetterOrSetter()) {
         // Don't complain about accessors in protocols.  We will emit a
@@ -5147,7 +5154,6 @@ public:
     // of an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
-      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(CD->getDeclContext());
       bool isMemberOfObjCProtocol =
@@ -5158,7 +5164,7 @@ public:
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    (classContext && classContext->isObjC());
+                    isImplicitlyObjC(CD, /*allowImplicit=*/true);
       if (isObjC &&
           (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
         isObjC = false;

@@ -101,8 +101,10 @@ private:
   void printMembers(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->isObjC())
+      if (!VD || !VD->isObjC() ||
+          VD->getAccessibility() == Accessibility::Private) {
         continue;
+      }
       if (auto FD = dyn_cast<FuncDecl>(VD))
         if (FD->isAccessor())
           continue;
@@ -798,8 +800,10 @@ public:
   void forwardDeclareMemberTypes(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->isObjC())
+      if (!VD || !VD->isObjC() ||
+          VD->getAccessibility() == Accessibility::Private) {
         continue;
+      }
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
@@ -1007,7 +1011,8 @@ public:
                                  [] (const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         // FIXME: Distinguish IBOutlet/IBAction from true interop.
-        return !VD->isObjC();
+        return !VD->isObjC() ||
+               VD->getAccessibility() == Accessibility::Private;
       }
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {

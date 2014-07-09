@@ -85,6 +85,9 @@ extension NSString : A, ZZZ {}
   @optional func f()
 }
 
+// NEGATIVE-NOT: PrivateProto
+@objc private protocol PrivateProto {}
+
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
 // CHECK-NEXT: @property (nonatomic) id <Properties> b;
