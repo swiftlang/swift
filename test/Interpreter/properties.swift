@@ -248,3 +248,20 @@ class r17192398Failure {
 let x = r17192398Failure()
 x.testLazy()
 
+// <rdar://problem/17226384> Setting an @lazy optional property to nil has a strange behavior (Swift)
+class r17226384Class {
+  @lazy var x : Int? = { println("propertyRun"); return 42 }()
+}
+func test_r17226384() {
+  var c = r17226384Class()
+  println("created")  // CHECK-NEXT: created
+                      // CHECK-NEXT: propertyRun
+  println(c.x)        // CHECK-NEXT: Optional(42)
+  println("setting")  // CHECK-NEXT: setting
+  c.x = nil
+  println(c.x)        // CHECK-NEXT: nil
+  println("done")     // CHECK-NEXT: done
+}
+test_r17226384()
+
+
