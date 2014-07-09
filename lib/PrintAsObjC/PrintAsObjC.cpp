@@ -30,6 +30,10 @@
 
 using namespace swift;
 
+static bool isNonPrivateObjC(const ValueDecl *VD) {
+  return VD->isObjC() && VD->getAccessibility() != Accessibility::Private;
+}
+
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter> {
@@ -72,7 +76,7 @@ private:
     std::copy_if(protos.begin(), protos.end(),
                  std::back_inserter(protosToPrint),
                  [](const ProtocolDecl *PD) -> bool {
-      if (!PD->isObjC())
+      if (!isNonPrivateObjC(PD))
         return false;
       auto knownProtocol = PD->getKnownProtocolKind();
       if (!knownProtocol)
@@ -101,10 +105,8 @@ private:
   void printMembers(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->isObjC() ||
-          VD->getAccessibility() == Accessibility::Private) {
+      if (!VD || !isNonPrivateObjC(VD))
         continue;
-      }
       if (auto FD = dyn_cast<FuncDecl>(VD))
         if (FD->isAccessor())
           continue;
@@ -810,10 +812,8 @@ public:
   void forwardDeclareMemberTypes(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->isObjC() ||
-          VD->getAccessibility() == Accessibility::Private) {
+      if (!VD || !isNonPrivateObjC(VD))
         continue;
-      }
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
@@ -849,7 +849,7 @@ public:
       allRequirementsSatisfied &= require(superclass);
     }
     for (auto proto : CD->getProtocols())
-      if (proto->isObjC())
+      if (isNonPrivateObjC(proto))
         allRequirementsSatisfied &= require(proto);
 
     if (!allRequirementsSatisfied)
@@ -894,7 +894,7 @@ public:
     const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getProtocols())
-      if (proto->isObjC())
+      if (isNonPrivateObjC(proto))
         allRequirementsSatisfied &= require(proto);
 
     if (!allRequirementsSatisfied)
@@ -1019,15 +1019,12 @@ public:
 
     auto newEnd = std::remove_if(decls.begin(), decls.end(),
                                  [] (const Decl *D) -> bool {
-      if (auto VD = dyn_cast<ValueDecl>(D)) {
-        // FIXME: Distinguish IBOutlet/IBAction from true interop.
-        return !VD->isObjC() ||
-               VD->getAccessibility() == Accessibility::Private;
-      }
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        return !isNonPrivateObjC(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-        return !baseClass || !baseClass->isObjC();
+        return !baseClass || !isNonPrivateObjC(baseClass);
       }
       return true;
     });

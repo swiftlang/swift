@@ -85,8 +85,18 @@ extension NSString : A, ZZZ {}
   @optional func f()
 }
 
-// NEGATIVE-NOT: PrivateProto
+// NEGATIVE-NOT: @protocol PrivateProto
 @objc private protocol PrivateProto {}
+
+// CHECK-LABEL: @interface PrivateProtoAdopter{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class PrivateProtoAdopter : PrivateProto {}
+
+// CHECK-LABEL: @interface PrivateProtoAdopter2 <A>
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class PrivateProtoAdopter2 : PrivateProto, A {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
