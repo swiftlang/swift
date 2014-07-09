@@ -40,13 +40,13 @@ func _XCTFailureDescription(assertionType: _XCTAssertionType, formatIndex: UInt,
 // --- Supported Assertions ---
 
 func XCTFail(_ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_Fail
+  let assertionType = _XCTAssertionType.Fail
   
   _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, ""), message, file, line)
 }
 
 func XCTAssertNil(expression: @auto_closure () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_Nil
+  let assertionType = _XCTAssertionType.Nil
   
   // evaluate the expression exactly once
   let expressionValueOptional: AnyObject? = expression()
@@ -77,7 +77,7 @@ func XCTAssertNil(expression: @auto_closure () -> AnyObject?, _ message: String 
 }
 
 func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_NotNil
+  let assertionType = _XCTAssertionType.NotNil
   
   // evaluate the expression exactly once
   let expressionValueOptional: AnyObject? = expression()
@@ -113,7 +113,7 @@ func XCTAssert(expression: @auto_closure () -> LogicValue, _ message: String = "
 }
 
 func XCTAssertTrue(expression: @auto_closure () -> LogicValue, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_True
+  let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
   let expressionValue = expression().getLogicValue()
@@ -129,7 +129,7 @@ func XCTAssertTrue(expression: @auto_closure () -> LogicValue, _ message: String
 }
 
 func XCTAssertFalse(expression: @auto_closure () -> LogicValue, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
-  let assertionType = _XCTAssertionType.Assertion_False
+  let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
   let expressionValue = expression().getLogicValue()
@@ -145,7 +145,7 @@ func XCTAssertFalse(expression: @auto_closure () -> LogicValue, _ message: Strin
 }
 
 func XCTAssertEqual<T: Equatable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_Equal
+  let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -166,7 +166,7 @@ func XCTAssertEqual<T: Equatable>(expression1: @auto_closure () -> T, expression
 }
 
 func XCTAssertNotEqual<T: Equatable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_NotEqual
+  let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -197,7 +197,7 @@ func _XCTCheckEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Fl
 }
 
 func XCTAssertEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_EqualWithAccuracy
+  let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -243,7 +243,7 @@ func _XCTCheckNotEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy:
 }
 
 func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_NotEqualWithAccuracy
+  let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -279,7 +279,7 @@ func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_cl
 }
 
 func XCTAssertGreaterThan<T: Comparable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_GreaterThan
+  let assertionType = _XCTAssertionType.GreaterThan
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -301,7 +301,7 @@ func XCTAssertGreaterThan<T: Comparable>(expression1: @auto_closure () -> T, exp
 
 func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
-  let assertionType = _XCTAssertionType.Assertion_GreaterThanOrEqual
+  let assertionType = _XCTAssertionType.GreaterThanOrEqual
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -322,7 +322,7 @@ func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @auto_closure () ->
 }
 
 func XCTAssertLessThan<T: Comparable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
-  let assertionType = _XCTAssertionType.Assertion_LessThan
+  let assertionType = _XCTAssertionType.LessThan
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
@@ -344,7 +344,7 @@ func XCTAssertLessThan<T: Comparable>(expression1: @auto_closure () -> T, expres
 
 func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
-  let assertionType = _XCTAssertionType.Assertion_LessThanOrEqual
+  let assertionType = _XCTAssertionType.LessThanOrEqual
   
   // evaluate each expression exactly once
   let expressionValue1 = expression1()
