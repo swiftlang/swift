@@ -93,6 +93,9 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testArrayBridging:(NSArray *)a;
 // CHECK-NEXT: - (void)testArrayBridging2:(NSArray *)a;
 // CHECK-NEXT: - (void)testArrayBridging3:(NSArray *)a;
+// CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary *)a;
+// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary *)a;
+// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary *)a;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -130,6 +133,10 @@ class NotObjC {}
   func testArrayBridging(a: [Methods]) {}
   func testArrayBridging2(a: [AnyObject]) {}
   func testArrayBridging3(a: [String]) {}
+
+  func testDictionaryBridging(a: [NSObject : AnyObject]) {}
+  func testDictionaryBridging2(a: [NSNumber : Methods]) {}
+  func testDictionaryBridging3(a: [String : String]) {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -251,7 +258,7 @@ private class Private : A1 {}
   @IBOutlet weak var outlet: AnyObject!
 
   var string = "abc"
-  var array: [AnyObject] = []
+  var array: Array<AnyObject> = []
   var dictionary: Dictionary<String, String> = [:]
 }
 

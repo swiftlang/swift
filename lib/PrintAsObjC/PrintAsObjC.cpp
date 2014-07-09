@@ -398,6 +398,7 @@ private:
   }
 
   void visitType(TypeBase *Ty) {
+    assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
     os << " */";
@@ -616,6 +617,10 @@ private:
     visitPart(SST->getSinglyDesugaredType());
   }
 
+  void visitDictionaryType(DictionaryType *DT) {
+    visitPart(DT->getSinglyDesugaredType());
+  }
+
   void visitDynamicSelfType(DynamicSelfType *DST) {
     os << "instancetype";
   }
@@ -653,6 +658,7 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
   ReferencedTypeFinder(decltype(Callback) &&callback) : Callback(callback) {}
 
   void visitType(TypeBase *base) {
+    assert(base->getDesugaredType() == base && "unhandled sugared type");
     return;
   }
 
@@ -688,6 +694,10 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   void visitSyntaxSugarType(SyntaxSugarType *sugar) {
     visit(sugar->getSinglyDesugaredType());
+  }
+
+  void visitDictionaryType(DictionaryType *DT) {
+    visit(DT->getSinglyDesugaredType());
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
