@@ -77,6 +77,10 @@ namespace swift {
     /// Enables importing of unions and other partially-importable types.
     bool ImportUnions = false;
     
+    /// Enables use of the 'dynamic' attribute to control ObjC method dispatch
+    /// codegen.
+    bool EnableDynamic = false;
+    
     /// Be strict about the use of keyword arguments.
     /// FIXME: This is the default, and the option will eventually be
     /// removed.

@@ -551,6 +551,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.ImportUnions = Args.hasArg(OPT_enable_union_import);
+  
+  Opts.EnableDynamic = Args.hasArg(OPT_enable_dynamic);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 

@@ -136,6 +136,10 @@ def enable_union_import :
   Flag<["-"], "enable-union-import">,
   HelpText<"Import C unions">;
 
+def enable_dynamic :
+  Flag<["-"], "enable-dynamic">,
+  HelpText<"Use dynamic specifier to control ObjC dispatch">;
+
 def strict_keyword_arguments :
   Flag<["-"], "strict-keyword-arguments">,
   HelpText<"Be strict about keyword argument presence/absence/ordering">;
