@@ -122,7 +122,11 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
             
     return cacheDir
 
-SCORERE=re.compile(r"(?:(\d+),[ \t]+)?(\w+),[ \t]+([\d.]+)")
+# Parse lines like this
+# MyBench, 50        (old 2-column style)
+# 1, NBody, 100      (with benchmark index)
+# Final, Total, 5000 (Total has no index)
+SCORERE=re.compile(r"(?:(\w+),[ \t]+)?(\w+),[ \t]+([\d.]+)")
 KEYGROUP=2
 VALGROUP=3
 
