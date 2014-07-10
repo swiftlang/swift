@@ -432,28 +432,17 @@ func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp 
 
 
 @transparent
-extension ${Self} : RandomAccessIndex {
+extension ${Self} : Strideable {
   @transparent public
-  func successor() -> ${Self} {
-    return self + 1.0
-  }
-  @transparent public
-  func predecessor() -> ${Self} {
-    return self - 1.0
+  func distanceTo(other: ${Self}) -> ${Self} {
+    return other - self
   }
   
   @transparent public
-  func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
-    return Int(other-self)
-  }
-  
-  @transparent public
-  func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
-    return self + ${Self}(amount)
+  func advancedBy(amount: ${Self}) -> ${Self} {
+    return self + amount
   }
 }
-
-
 
 % for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @transparent public

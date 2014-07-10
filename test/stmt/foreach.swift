@@ -147,5 +147,5 @@ func testForEachInference() {
 
   // Range overloading.
   for i: Int8 in 0..<10 { }
-  for i: Float in 0.0...10.0 { }
+  for i: UInt in 0...10 { }
 }

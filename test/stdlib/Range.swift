@@ -40,7 +40,7 @@ for a in x.by(2) {
 }
 println(".")
 
-for i in 1.4...3.4 { println(i) }
+for i in stride(from: 1.4, through: 3.4, by: 1) { println(i) }
 // CHECK-NEXT: 1.4
 // CHECK-NEXT: 2.4
 // CHECK-NEXT: 3.4
