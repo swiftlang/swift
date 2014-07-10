@@ -133,27 +133,12 @@ println("<R>")
 println("[\(distance(R(10), R(10)))]")
 // CHECK-NEXT: R.distanceTo: 10, 10
 // CHECK-NEXT: [0]
-println("[\(R(10) - R(10))]")
-// CHECK-NEXT: R.distanceTo: 10, 10
-// CHECK-NEXT: [0]
 println("[\(distance(R(10), R(20)))]")
-// CHECK-NEXT: R.distanceTo: 10, 20
-// CHECK-NEXT: [10]
-println("[\(R(20) - R(10))]")
 // CHECK-NEXT: R.distanceTo: 10, 20
 // CHECK-NEXT: [10]
 println("[\(advance(R(7), 2).x)]")
 // CHECK-NEXT: R.advancedBy: 7, 2
 // CHECK-NEXT: [9]
-println("[\((R(7) + 3).x)]")
-// CHECK-NEXT: R.advancedBy: 7, 3
-// CHECK-NEXT: [10]
-println("[\((R(7) - 3).x)]")
-// CHECK-NEXT: R.advancedBy: 7, -3
-// CHECK-NEXT: [4]
-println("[\((4 + R(7)).x)]")
-// CHECK-NEXT: R.advancedBy: 7, 4
-// CHECK-NEXT: [11]
 println("[\(advance(R(13), 99, R(17)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 17
 // CHECK-NEXT: [17]

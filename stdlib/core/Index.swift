@@ -290,19 +290,3 @@ func ~> <T: _RandomAccessIndex>(
   return (n > 0 ? d < n : d > n) ? end : start.advancedBy(n)
 }
 
-public func + <T: RandomAccessIndex> (lhs: T, rhs: T.DistanceType) -> T {
-  return lhs.advancedBy(rhs)
-}
-
-public func + <T: RandomAccessIndex> (lhs: T.DistanceType, rhs: T) -> T {
-  return rhs.advancedBy(lhs)
-}
-
-public func - <T: RandomAccessIndex> (lhs: T, rhs: T.DistanceType) -> T {
-  return lhs.advancedBy(-rhs)
-}
-
-public func - <T: RandomAccessIndex> (lhs: T, rhs: T) -> T.DistanceType {
-  return rhs.distanceTo(lhs)
-}
-
