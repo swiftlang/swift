@@ -3280,7 +3280,7 @@ func test_DictionaryUpcastEntryPoint() {
   var dAsAnyObject: Dictionary<NSObject, AnyObject> = _dictionaryUpCast(d)
 
   assert(dAsAnyObject.count == 3)
-  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  var v: AnyObject? = dAsAnyObject[TestObjCKeyTy(10)]
   assert((v! as TestObjCValueTy).value == 1010)
 
   v = dAsAnyObject[TestObjCKeyTy(20)]
@@ -3304,7 +3304,7 @@ func test_DictionaryUpcast() {
   var dAsAnyObject: Dictionary<NSObject, AnyObject> = d
 
   assert(dAsAnyObject.count == 3)
-  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  var v: AnyObject? = dAsAnyObject[TestObjCKeyTy(10)]
   assert((v! as TestObjCValueTy).value == 1010)
 
   v = dAsAnyObject[TestObjCKeyTy(20)]
@@ -3329,7 +3329,7 @@ func test_DictionaryUpcastBridgedEntryPoint() {
     var dOO: Dictionary<NSObject, AnyObject> = _dictionaryBridgeToObjectiveC(d)
 
     assert(dOO.count == 3)
-    var v = dOO[TestObjCKeyTy(10)]
+    var v: AnyObject? = dOO[TestObjCKeyTy(10)]
     assert((v! as TestBridgedValueTy).value == 1010)
 
     v = dOO[TestObjCKeyTy(20)]
@@ -3359,7 +3359,7 @@ func test_DictionaryUpcastBridgedEntryPoint() {
       = _dictionaryBridgeToObjectiveC(d)
 
     assert(dVO.count == 3)
-    var v = dVO[TestBridgedKeyTy(10)]
+    var v: AnyObject? = dVO[TestBridgedKeyTy(10)]
     assert((v! as TestBridgedValueTy).value == 1010)
 
     v = dVO[TestBridgedKeyTy(20)]
@@ -3385,7 +3385,7 @@ func test_DictionaryUpcastBridged() {
     var dOO: Dictionary<NSObject, AnyObject> = d
 
     assert(dOO.count == 3)
-    var v = dOO[TestObjCKeyTy(10)]
+    var v: AnyObject? = dOO[TestObjCKeyTy(10)]
     assert((v! as TestBridgedValueTy).value == 1010)
 
     v = dOO[TestObjCKeyTy(20)]
@@ -3413,7 +3413,7 @@ func test_DictionaryUpcastBridged() {
     var dVO: Dictionary<TestBridgedKeyTy, AnyObject> = d
 
     assert(dVO.count == 3)
-    var v = dVO[TestBridgedKeyTy(10)]
+    var v: AnyObject? = dVO[TestBridgedKeyTy(10)]
     assert((v! as TestBridgedValueTy).value == 1010)
 
     v = dVO[TestBridgedKeyTy(20)]
