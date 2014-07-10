@@ -1029,7 +1029,7 @@ struct _ObjCMirror: Mirror {
   var quickLookObject: QuickLookObject? {
     return _getClassQuickLookObject(data)
   }
-  var disposition: MirrorDisposition { return .Class }
+  var disposition: MirrorDisposition { return .ObjCObject }
 }
 
 struct _ObjCSuperMirror: Mirror {
@@ -1054,7 +1054,7 @@ struct _ObjCSuperMirror: Mirror {
   var quickLookObject: QuickLookObject? {
     return _getClassQuickLookObject(data)
   }
-  var disposition: MirrorDisposition { return .Class }
+  var disposition: MirrorDisposition { return .ObjCObject }
 }
 
 //===----------------------------------------------------------------------===//

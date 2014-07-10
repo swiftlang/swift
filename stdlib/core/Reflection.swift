@@ -143,6 +143,8 @@ public enum MirrorDisposition {
   case Container
   /// An Optional which can have either zero or one children.
   case Optional
+  /// An Objective-C object imported in Swift
+  case ObjCObject
 }
 
 /// A protocol that provides a reflection interface to an underlying value.
@@ -279,14 +281,6 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
 // -- Mirror implementations for basic data types
 
-func _formatNumChildren(count: Int) -> String {
-  if count == 1 {
-    return " (has 1 child)"
-  } else {
-    return " (has \(count) children)"
-  }
-}
-
 /// A mirror for a value that is represented as a simple value with no
 /// children.
 internal struct _LeafMirror<T>: Mirror {
@@ -392,7 +386,7 @@ struct _StructMirror: Mirror {
   }
 
   var summary: String {
-    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+    return "_Tt\(_stdlib_getTypeName(value))"
   }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Struct }
@@ -421,7 +415,7 @@ struct _ClassMirror: Mirror {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+    return "_Tt\(_stdlib_getTypeName(value))"
   }
   var quickLookObject: QuickLookObject? {
     return _getClassQuickLookObject(data)
@@ -446,7 +440,7 @@ struct _ClassSuperMirror: Mirror {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+    return "_Tt\(_stdlib_getTypeName(value))"
   }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Class }
