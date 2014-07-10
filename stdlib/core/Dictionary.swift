@@ -788,7 +788,6 @@ public struct _CocoaDictionaryStorage : _DictionaryStorage {
     }
 
     let allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
-    println("allKeys: \(allKeys)")
     var keyIndex = -1
     for i in 0..<allKeys.value {
       if _stdlib_NSObject_isEqual(key, allKeys[i]) {
@@ -796,7 +795,6 @@ public struct _CocoaDictionaryStorage : _DictionaryStorage {
         break
       }
     }
-    println("keyIndex = \(keyIndex)")
     _sanityCheck(keyIndex >= 0,
         "key was found in fast path, but not found later?")
     return Index(cocoaDictionary, allKeys, keyIndex)
