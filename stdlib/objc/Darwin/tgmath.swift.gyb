@@ -63,10 +63,7 @@ UnaryIntrinsicFunctions = ['cos', 'sin',
                   ]
 
 # (T, T) -> T
-BinaryFunctions = ['atan2', 'hypot', 'pow', 
-# FIXME: rdar://17275152 call to fmodf causes deserialization crash
-# FIXME: When we fix this, also add fmod for CGFloat to CoreGraphics
-# 'fmod', 
+BinaryFunctions = ['atan2', 'hypot', 'pow', 'fmod', 
                    'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin']
 
 # These functions have special implementations.

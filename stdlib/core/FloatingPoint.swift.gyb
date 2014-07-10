@@ -467,7 +467,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // 1) This is consistent with '%' in C#, D, Java, and JavaScript
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
-@asmname("fmod${cFuncSuffix(bits)}")public
+@asmname("_swift_fmod${cFuncSuffix(bits)}") public
 func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||

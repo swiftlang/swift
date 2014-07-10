@@ -479,7 +479,10 @@ func pow(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
   return CGFloat(pow(lhs.native, rhs.native))
 }
 
-// FIXME: fmod
+@transparent public
+func fmod(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+  return CGFloat(fmod(lhs.native, rhs.native))
+}
 
 @transparent public
 func remainder(lhs: CGFloat, rhs: CGFloat) -> CGFloat {

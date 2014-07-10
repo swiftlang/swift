@@ -116,6 +116,20 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
   return i;
 }
 
+
+extern "C" double _swift_fmodf(float lhs, float rhs) {
+    return fmodf(lhs, rhs);
+}
+
+extern "C" double _swift_fmod(double lhs, double rhs) {
+    return fmod(lhs, rhs);
+}
+
+extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
+    return fmodl(lhs, rhs);
+}
+
+
 #if __arm64__
 
 // FIXME: rdar://14883575 Libcompiler_rt omits muloti4
