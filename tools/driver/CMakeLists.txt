@@ -3,7 +3,7 @@ add_swift_executable(swift
   frontend_main.cpp
   DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
           swiftSerialization swiftFrontend swiftClangImporter swiftIDE 
-          swiftPrintAsObjC
+          swiftPrintAsObjC swiftOption
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
                     selectiondag ${LLVM_TARGETS_TO_BUILD})
 

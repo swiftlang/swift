@@ -3,7 +3,6 @@ add_swift_library(swiftDriver
   Compilation.cpp
   Driver.cpp
   Job.cpp
-  Options.cpp
   OutputFileMap.cpp
   Tool.cpp
   Tools.cpp
@@ -11,6 +10,4 @@ add_swift_library(swiftDriver
   ToolChains.cpp
   Types.cpp
   Util.cpp
-  DEPENDS swiftAST swiftBasic)
-
-add_dependencies(swiftDriver SwiftDriverOptions)
+  DEPENDS swiftAST swiftBasic swiftOption)

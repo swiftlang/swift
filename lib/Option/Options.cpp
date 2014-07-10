@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/Options.h"
+#include "swift/Option/Options.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/OptTable.h"
@@ -21,7 +21,7 @@ using namespace swift::driver::options;
 using namespace llvm::opt;
 
 #define PREFIX(NAME, VALUE) static const char *const NAME[] = VALUE;
-#include "swift/Driver/Options.inc"
+#include "swift/Option/Options.inc"
 #undef PREFIX
 
 static const OptTable::Info InfoTable[] = {
@@ -29,7 +29,7 @@ static const OptTable::Info InfoTable[] = {
 HELPTEXT, METAVAR)   \
 { PREFIX, NAME, HELPTEXT, METAVAR, OPT_##ID, Option::KIND##Class, PARAM, \
 FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS },
-#include "swift/Driver/Options.inc"
+#include "swift/Option/Options.inc"
 #undef OPTION
 };
 
