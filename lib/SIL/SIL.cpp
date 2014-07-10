@@ -110,6 +110,13 @@ bool
 swift::
 findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
                                        SmallVectorImpl<Projection> &Path) {
+  // Do not inspect the body of structs with unreferenced types such as
+  // bitfields and unions.
+  if (V1.getType().aggregateHasUnreferenceableStorage() ||
+      V2.getType().aggregateHasUnreferenceableStorage()) {
+    return false;
+  }
+
   // If V1 == V2, there is a "trivial" address projection in between the
   // two. This is represented by returning true, but putting nothing into Path.
   if (V1 == V2)

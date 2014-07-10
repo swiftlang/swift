@@ -125,8 +125,14 @@ bool SROAMemoryUseAnalyzer::analyze() {
   // We only know how to split structs and tuples... So if we have a scalar or a
   // different sort of aggregate, bail.
   SILType Type = SILValue(AI, 1).getType();
-  if (!(TT = Type.getAs<TupleType>()) &&
-      !(SD = Type.getStructOrBoundGenericStruct())) {
+
+  TT = Type.getAs<TupleType>();
+  SD = Type.getStructOrBoundGenericStruct();
+  bool HasUnrefField = AI->getElementType().aggregateHasUnreferenceableStorage();
+
+  // Check that the allocated type is a struct or a tuple and that there are
+  // no unreferenced fields.
+  if (HasUnrefField || (!TT && !SD)) {
     ++NumUnhandledAllocas;
     return false;
   }

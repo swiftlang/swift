@@ -905,6 +905,11 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
 /// doIt - returns true on error.
 bool AllocOptimize::doIt() {
   bool Changed = false;
+
+  // Don't  try to optimize incomplete aggregates.
+  if (MemoryType.aggregateHasUnreferenceableStorage())
+    return false;
+
   // If we've successfully checked all of the definitive initialization
   // requirements, try to promote loads.  This can explode copy_addrs, so the
   // use list may change size.
