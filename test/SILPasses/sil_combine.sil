@@ -391,8 +391,8 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil @a2p_p2a_reinterpret_cast_word_raw_pointer
 // CHECK: bb0
-// CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
+// CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: return
 sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
@@ -1035,8 +1035,8 @@ bb0:
 
 // CHECK-LABEL: sil @unchecked_addr_cast_formation : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
-// CHECK-NEXT: load [[CAST_PTR]]
+// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
+// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
 // CHECK-NEXT: return
 sil @unchecked_addr_cast_formation : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
@@ -1048,8 +1048,8 @@ bb0(%0 : $*Builtin.NativeObject):
 
 // CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
-// CHECK-NEXT: load [[CAST_PTR]]
+// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
+// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
 // CHECK-NEXT: return
 sil @unchecked_addr_cast_forwarding : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
@@ -1231,7 +1231,7 @@ sil @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
 sil @eliminate_dead_thin_to_thick_function : $@thin () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
-  %1 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()  
+  %1 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()
   strong_release %1 : $@callee_owned () -> ()
   %2 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()
   strong_retain %2 : $@callee_owned () -> ()
@@ -1265,7 +1265,7 @@ bb0(%0 : $Builtin.NativeObject):
   %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
   retain_value %1 : $FakeOptional<Builtin.NativeObject>
   br bb1
-  
+
 bb1:
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   return %1 : $FakeOptional<Builtin.NativeObject>
@@ -1426,11 +1426,13 @@ enum TwoStateEnum {
 // CHECK-NEXT: [[RS_C:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_1]] : $*FakeOptional<rs_C>, #FakeOptional.Some!enumelt.1
 // CHECK-NEXT: [[RS_D:%[0-9]+]] = struct_element_addr [[RS_C]] : $*rs_C, #rs_C.d
 // CHECK-NEXT: struct_element_addr [[RS_D]] : $*rs_D, #rs_D.i
-// CHECK-NEXT: unchecked_addr_cast [[INPTR_2]] : $*FakeOptional<rs_F> to $*Builtin.NativeObject
+// CHECK-NEXT: [[INVALUE_2:%[0-9]+]] = load [[INPTR_2]] : $*FakeOptional<rs_F>
+// CHECK-NEXT: unchecked_ref_bit_cast [[INVALUE_2]] : $FakeOptional<rs_F> to $Builtin.NativeObject
 // CHECK-NEXT: [[RS_A_2:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_3]] : $*TwoStateEnum, #TwoStateEnum.State1!enumelt.1
 // CHECK-NEXT: [[RS_B_2:%[0-9]+]] = struct_element_addr [[RS_A_2]] : $*rs_A, #rs_A.b
 // CHECK-NEXT: [[RS_PTR_2:%[0-9]+]] = struct_element_addr [[RS_B_2]] : $*rs_B, #rs_B.ptr
-// CHECK-NEXT: unchecked_addr_cast [[INPTR_4]] : $*TwoStateEnum to $*Int
+// CHECK-NEXT: [[INVALUE_4:%[0-9]+]] = load [[INPTR_4]] : $*TwoStateEnum
+// CHECK-NEXT: unchecked_trivial_bit_cast [[INVALUE_4]] : $TwoStateEnum to $Int
 sil @reinterpretcast_simplification_unchecked_addr
   : $@thin (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum,
             @inout TwoStateEnum)

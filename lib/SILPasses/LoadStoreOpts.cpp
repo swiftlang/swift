@@ -262,11 +262,6 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   SILType InputTy = UADCI->getOperand().getType();
   SILType OutputTy = UADCI->getType();
 
-  // If OutputTy is not layout compatible with InputTy, there is nothing we can
-  // do here.
-  if(!OutputTy.isLayoutCompatibleWith(InputTy, Mod))
-    return SILValue();
-
   bool InputIsTrivial = InputTy.isTrivial(Mod);
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
@@ -274,11 +269,16 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   if (InputTy.hasArchetype() || OutputTy.hasArchetype())
     return SILValue();
 
+  // If we have a trivial input and a non-trivial output bail.
+  if (InputIsTrivial && !OutputIsTrivial) {
+    return SILValue();
+  }
+
   SILBuilder B(LI);
   SILValue CastValue;
 
   // If the output is trivial, we have a trivial bit cast.
-  if (InputIsTrivial || OutputIsTrivial) {
+  if (OutputIsTrivial) {
     CastValue =  B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
                                                  OutputTy.getObjectType());
   } else {

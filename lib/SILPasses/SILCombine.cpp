@@ -1389,19 +1389,17 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   SILType OutputTy = UADCI->getType();
 
   // If either type is address only, do not do anything here.
-  if (InputTy.isAddressOnly(Mod) ||
-      OutputTy.isAddressOnly(Mod))
+  if (InputTy.isAddressOnly(Mod) || OutputTy.isAddressOnly(Mod))
     return nullptr;
 
-  // If our UADCI does not have fully layout compatible types, we can't do
-  // anything here.
-  if (!OutputTy.isLayoutCompatibleWith(InputTy, Mod))
-    return nullptr;
-
-  // If our input is trivial and our output type is not, do not do anything.
   bool InputIsTrivial = InputTy.isTrivial(Mod);
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
-  bool IsTrivialCast = InputIsTrivial || OutputIsTrivial;
+
+  // If our input is trivial and our output type is not, do not do
+  // anything. This is to ensure that we do not change any types reference
+  // semantics from trivial -> reference counted.
+  if (InputIsTrivial && !OutputIsTrivial)
+    return nullptr;
 
   // For each user U of the unchecked_addr_cast...
   for (auto U : UADCI->getUses())
@@ -1421,7 +1419,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     // Insert a new load from our source and bitcast that as appropriate.
     LoadInst *NewLoad = Builder->createLoad(Loc, Op);
     SILInstruction *BitCast = nullptr;
-    if (IsTrivialCast)
+    if (OutputIsTrivial)
       BitCast = Builder->createUncheckedTrivialBitCast(Loc, NewLoad,
                                                        OutputTy.getObjectType());
     else

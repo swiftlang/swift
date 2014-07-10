@@ -263,10 +263,10 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
 // CHECK-NEXT: alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $A
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.RawPointer
 // CHECK: unchecked_addr_cast
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.Int32>
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_addr_cast
 sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
 bb0(%0 : $Optional<A>):
@@ -298,11 +298,11 @@ bb0(%0 : $Optional<A>):
 // CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: alloc_stack
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $B
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.RawPointer
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
 sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
@@ -349,15 +349,18 @@ bb0(%0 : $Agg1):
   return %5 : $Builtin.Int32
 }
 
+
+
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
 // CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
 // CHECK: bb0(
+
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.Int32
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $A
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.RawPointer
 // CHECK: unchecked_addr_cast
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.Int32>
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_addr_cast
 sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
 bb0(%0 : $*Optional<A>):
@@ -378,7 +381,7 @@ bb0(%0 : $*Optional<A>):
   %15 = load %14 : $*Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
-}
+ }
 
 // *NOTE* This does not handle raw pointer since raw pointer is layout
 // compatible with heap references, but does not have reference
@@ -386,11 +389,11 @@ bb0(%0 : $*Optional<A>):
 
 // CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
 // CHECK: bb0(
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.Int32
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.RawPointer
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.NativeObject
-// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.NativeObject>
 sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
