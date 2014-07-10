@@ -246,7 +246,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // Check if the next expected diagnostic should be in the same line.
     StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));
     AfterEnd = AfterEnd.substr(AfterEnd.find_first_not_of(" \t"));
-    if (AfterEnd[0] == '\\')
+    if (AfterEnd.startswith("\\"))
       PrevExpectedContinuationLine = Expected.LineNo;
     else
       PrevExpectedContinuationLine = 0;
