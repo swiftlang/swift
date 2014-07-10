@@ -72,6 +72,7 @@ enum class SyntaxStructureKind : uint8_t {
   Struct,
   Protocol,
   Enum,
+  Extension,
   FreeFunction,
   InstanceFunction,
   StaticFunction,

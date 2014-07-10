@@ -28,3 +28,22 @@ class MyCls : OtherClass {
   // CHECK: Parameter at [[@LINE+1]]:9 - [[@LINE+1]]:10, name at [[@LINE+1]]:9 - [[@LINE+1]]:10
   init (x: Int)
 }
+
+//CHECK: Struct at [[@LINE+1]]:1 - [[@LINE+4]]:2, name at [[@LINE+1]]:8 - [[@LINE+1]]:15
+struct MyStruc {
+    //CHECK: Property at [[@LINE+1]]:5 - [[@LINE+1]]:19, name at [[@LINE+1]]:9 - [[@LINE+1]]:14
+    var myVar: Int
+}
+
+//CHECK: Protocol at [[@LINE+1]]:1 - [[@LINE+4]]:2, name at [[@LINE+1]]:10 - [[@LINE+1]]:16
+protocol MyProt {
+    //CHECK: Func at [[@LINE+1]]:5 - [[@LINE+1]]:15, name at [[@LINE+1]]:10 - [[@LINE+1]]:15
+    func foo()
+}
+
+//CHECK: Extension at [[@LINE+1]]:1 - [[@LINE+5]]:2, name at [[@LINE+1]]:11 - [[@LINE+1]]:18
+extension MyStruc {
+    //CHECK: Func at [[@LINE+1]]:5 - [[@LINE+2]]:6, name at [[@LINE+1]]:10 - [[@LINE+1]]:15
+    func foo() {
+    }
+}

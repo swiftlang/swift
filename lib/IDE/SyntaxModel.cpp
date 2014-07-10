@@ -471,6 +471,24 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Attrs = NTD->getAttrs();
     pushStructureNode(SN, NTD);
 
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    SyntaxStructureNode SN;
+    SN.Dcl = D;
+    SN.Kind = SyntaxStructureKind::Extension;
+    SN.Range = charSourceRangeFromSourceRange(SM, ED->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ED->getBraces());
+    SourceRange NSR = ED->getExtendedTypeLoc().getSourceRange();
+    SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
+
+    for (const TypeLoc &TL : ED->getInherited()) {
+      CharSourceRange TR = charSourceRangeFromSourceRange(SM,
+                                                          TL.getSourceRange());
+      SN.InheritedTypeRanges.push_back(TR);
+    }
+
+    SN.Attrs = ED->getAttrs();
+    pushStructureNode(SN, ED);
+
   } else if (auto *PD = dyn_cast<ParamDecl>(D)) {
     SyntaxStructureNode SN;
     SN.Dcl = D;
@@ -572,9 +590,14 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
     if (DC->isTypeContext()) {
       popStructureNode();
     }
+
   } else if (isa<NominalTypeDecl>(D)) {
     popStructureNode();
+
+  } else if (isa<ExtensionDecl>(D)) {
+    popStructureNode();
   }
+
   return true;
 }
 

@@ -622,11 +622,14 @@ public:
     case swift::ide::SyntaxStructureKind::Struct:
       OS << "Struct ";
       break;
+    case swift::ide::SyntaxStructureKind::Protocol:
+      OS << "Protocol ";
+      break;
     case swift::ide::SyntaxStructureKind::Enum:
       OS << "Enum ";
       break;
-    case swift::ide::SyntaxStructureKind::Protocol:
-      OS << "Protocol ";
+    case swift::ide::SyntaxStructureKind::Extension:
+      OS << "Extension ";
       break;
     case swift::ide::SyntaxStructureKind::FreeFunction:
     case swift::ide::SyntaxStructureKind::InstanceFunction:
