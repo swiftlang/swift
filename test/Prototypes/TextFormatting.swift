@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: *
+// (See <rdar://problem/17619178>)
 
 // Text Formatting Prototype
 //

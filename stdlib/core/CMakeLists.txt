@@ -69,6 +69,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift.gyb
   Shims.swift
   StaticString.swift
+  Stride.swift
   String.swift
   StringBridge.swift
   StringBuffer.swift

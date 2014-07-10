@@ -244,7 +244,7 @@ func ~> <T: _BidirectionalIndex>(
 
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndex ------------------------------------------------===//
-public protocol _RandomAccessIndex : _BidirectionalIndex {
+public protocol _RandomAccessIndex : _BidirectionalIndex, Strideable {
   func distanceTo(Self) -> DistanceType
   func advancedBy(DistanceType) -> Self
 }
