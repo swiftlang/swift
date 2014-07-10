@@ -43,18 +43,54 @@ public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivatePro
 
 public class Base {
   @required public init() {}
+  // expected-note@+1 + {{overridden declaration is here}}
+  public func foo() {}
+  // expected-note@+1 + {{overridden declaration is here}}
+  public internal(set) var bar: Int = 0
+  // expected-note@+1 + {{overridden declaration is here}}
+  public subscript () -> () { return () }
 }
 
 public class PublicSub: Base {
   init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-3=public }}
+  override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
+    get { return 0 }
+    set {}
+  }
+  override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
 }
 
 internal class InternalSub: Base {
   private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-10=internal}}
+  private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
+  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
+    get { return 0 }
+    set {}
+  }
+  private override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as its enclosing type}} {{3-10=internal}}
 }
 
 internal class InternalSubGood: Base {
   init() {} // no-warning
+  override func foo() {}
+  override var bar: Int {
+    get { return 0 }
+    set {}
+  }
+  override subscript () -> () { return () }
+}
+
+internal class InternalSubPrivateSet: Base {
+  init() {}
+  private(set) override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-16=}}
+    get { return 0 }
+    set {}
+  }
+  private(set) override subscript () -> () { // okay; read-only in base class
+    get { return () }
+    set {}
+  }
 }
 
 

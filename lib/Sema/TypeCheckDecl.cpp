@@ -2063,51 +2063,57 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
   // Check if the decl has an explicit accessibility attribute.
   if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>()) {
     D->setAccessibility(AA->getAccess());
-    return;
-  }
 
-  // Special case for accessors, which inherit the access of their storage decl.
-  // A setter attribute can also override this.
-  if (auto fn = dyn_cast<FuncDecl>(D)) {
+  } else if (auto fn = dyn_cast<FuncDecl>(D)) {
+    // Special case for accessors, which inherit the access of their storage.
+    // decl. A setter attribute can also override this.
     if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
       const DeclAttributes &attrs = storage->getAttrs();
       if (auto accessAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
         fn->setAccessibility(accessAttr->getAccess());
+      } else if (storage->hasAccessibility()) {
+        fn->setAccessibility(storage->getAccessibility());
       } else {
         computeAccessibility(TC, storage);
-        fn->setAccessibility(storage->getAccessibility());
       }
-      return;
     }
   }
 
-  // If not, it inherits the default accessibility of its parent context.
-  DeclContext *DC = D->getDeclContext();
-  switch (DC->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::AbstractFunctionDecl:
-    D->setAccessibility(Accessibility::Private);
-    break;
-  case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
-    D->setAccessibility(Accessibility::Internal);
-    break;
-  case DeclContextKind::NominalTypeDecl: {
-    auto nominal = cast<NominalTypeDecl>(DC);
-    TC.validateDecl(nominal);
-    Accessibility access = nominal->getAccessibility();
-    if (!isa<ProtocolDecl>(nominal))
-      access = std::min(access, Accessibility::Internal);
-    D->setAccessibility(access);
-    break;
+  if (!D->hasAccessibility()) {
+    DeclContext *DC = D->getDeclContext();
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::AbstractFunctionDecl:
+      D->setAccessibility(Accessibility::Private);
+      break;
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+      D->setAccessibility(Accessibility::Internal);
+      break;
+    case DeclContextKind::NominalTypeDecl: {
+      auto nominal = cast<NominalTypeDecl>(DC);
+      TC.validateDecl(nominal);
+      Accessibility access = nominal->getAccessibility();
+      if (!isa<ProtocolDecl>(nominal))
+        access = std::min(access, Accessibility::Internal);
+      D->setAccessibility(access);
+      break;
+    }
+    case DeclContextKind::ExtensionDecl: {
+      auto extension = cast<ExtensionDecl>(DC);
+      computeDefaultAccessibility(TC, extension);
+      D->setAccessibility(extension->getDefaultAccessibility());
+    }
+    }
   }
-  case DeclContextKind::ExtensionDecl: {
-    auto extension = cast<ExtensionDecl>(DC);
-    computeDefaultAccessibility(TC, extension);
-    D->setAccessibility(extension->getDefaultAccessibility());
-  }
+
+  if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    if (auto getter = ASD->getGetter())
+      computeAccessibility(TC, getter);
+    if (auto setter = ASD->getSetter())
+      computeAccessibility(TC, setter);
   }
 }
 
@@ -4570,6 +4576,40 @@ public:
                                 matchDecl->getFullName());
         TC.fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
                                     matchDecl->getFullName());
+      }
+
+      // Check accessibility.
+      // FIXME: Copied from TypeCheckProtocol.cpp.
+      Accessibility requiredAccess =
+        std::min(classDecl->getAccessibility(), matchDecl->getAccessibility());
+      bool shouldDiagnose = false;
+      bool shouldDiagnoseSetter = false;
+      if (requiredAccess > Accessibility::Private &&
+          !isa<ConstructorDecl>(decl)) {
+        shouldDiagnose = (decl->getAccessibility() < requiredAccess);
+
+        if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
+          auto matchASD = cast<AbstractStorageDecl>(matchDecl);
+          if (matchASD->isSetterAccessibleFrom(classDecl)) {
+            auto ASD = cast<AbstractStorageDecl>(decl);
+            const DeclContext *accessDC = nullptr;
+            if (requiredAccess == Accessibility::Internal)
+              accessDC = classDecl->getParentModule();
+            shouldDiagnoseSetter = !ASD->isSetterAccessibleFrom(accessDC);
+          }
+        }
+      }
+      if (shouldDiagnose || shouldDiagnoseSetter) {
+        bool overriddenForcesAccess =
+          (requiredAccess == matchDecl->getAccessibility());
+        {
+          auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                  shouldDiagnoseSetter,
+                                  decl->getDescriptiveKind(),
+                                  overriddenForcesAccess);
+          fixItAccessibility(diag, decl, requiredAccess, shouldDiagnoseSetter);
+        }
+        TC.diagnose(matchDecl, diag::overridden_here);
       }
 
       // If this is an exact type match, we're successful!

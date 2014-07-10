@@ -688,7 +688,12 @@ NOTE(overridden_here_with_type,sema_tcd,none,
 ERROR(missing_override,sema_tcd,none,
       "overriding declaration requires an 'override' keyword", ())
 ERROR(override_unavailable,sema_tcd,none,
-"cannot override %0 which has been marked unavailable", (Identifier))
+      "cannot override %0 which has been marked unavailable", (Identifier))
+ERROR(override_not_accessible,sema_tcd,none,
+      "%select{|setter of }0overriding %1 must be as accessible as "
+      "%select{its enclosing type|the declaration it overrides}2",
+      (bool, DescriptiveDeclKind, bool))
+
 ERROR(method_does_not_override,sema_tcd,none,
       "method does not override any method from its superclass", ())
 ERROR(property_does_not_override,sema_tcd,none,

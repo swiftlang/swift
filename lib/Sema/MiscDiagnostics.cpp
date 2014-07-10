@@ -607,6 +607,10 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
     // replace the "(set)" part of a setter attribute.
     diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
 
+  } else if (auto var = dyn_cast<VarDecl>(VD)) {
+    if (auto PBD = var->getParentPattern())
+      diag.fixItInsert(PBD->getStartLoc(), fixItString);
+
   } else {
     diag.fixItInsert(VD->getStartLoc(), fixItString);
   }
