@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DRIVER_OPTIONS_H
-#define SWIFT_DRIVER_OPTIONS_H
+#ifndef SWIFT_OPTION_OPTIONS_H
+#define SWIFT_OPTION_OPTIONS_H
 
 #include <memory>
 
