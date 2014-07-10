@@ -91,11 +91,13 @@ func autoclosure(_: @auto_closure () -> ()) {}
 
 // CHECK-LABEL: sil @_TF17default_arguments25testCallWithMagicLiteralsFT_T_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
+// CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK-LABEL: sil shared @_TFF17default_arguments25testCallWithMagicLiteralsFT_T_U_FT_T_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK-LABEL: sil shared @_TFF17default_arguments25testCallWithMagicLiteralsFT_T_u_KT_T_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 func testCallWithMagicLiterals() {
+  testMagicLiterals()
   testMagicLiterals()
   closure { testMagicLiterals() }
   autoclosure(testMagicLiterals())

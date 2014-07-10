@@ -4184,7 +4184,7 @@ static StringRef
 getMagicFunctionString(SILGenFunction &gen) {
   assert(gen.MagicFunctionName
          && "asking for __FUNCTION__ but we don't have a function name?!");
-  {
+  if (gen.MagicFunctionString.empty()) {
     llvm::raw_string_ostream os(gen.MagicFunctionString);
     gen.MagicFunctionName.printPretty(os);
   }
