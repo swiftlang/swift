@@ -36,34 +36,6 @@ public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
   public var endIndex: T
 }
 
-public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
-  public typealias Element = T
-
-  @transparent public
-  init(_ bounds: Range<T>, stride: T.DistanceType) {
-    self._bounds = bounds
-    self._stride = stride
-  }
-
-  public mutating func next() -> Element? {
-    if !_bounds {
-      return .None
-    }
-    let ret = _bounds.startIndex
-    _bounds.startIndex = advance(_bounds.startIndex, _stride, _bounds.endIndex)
-    return ret
-  }
-
-  // Every Generator is also a single-pass Sequence
-  public typealias GeneratorType = StridedRangeGenerator
-  public func generate() -> GeneratorType {
-    return self
-  }
-
-  var _bounds: Range<T>
-  var _stride: T.DistanceType
-}
-
 public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
 
   @transparent public
@@ -105,10 +77,6 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
   public typealias GeneratorType = RangeGenerator<T>
   public func generate() -> RangeGenerator<T> {
     return GeneratorType(self)
-  }
-
-  public func by(stride: T.DistanceType) -> StridedRangeGenerator<T> {
-    return StridedRangeGenerator(self, stride: stride)
   }
 
   public var startIndex: T {

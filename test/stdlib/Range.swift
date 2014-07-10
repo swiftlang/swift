@@ -32,14 +32,6 @@ RangeTestCase.run()
 // CHECK: testing...
 println("testing...")
 
-var x: Range<Int> = 3..<10
-
-// CHECK-NEXT: 3579.
-for a in x.by(2) {
-  print(a)
-}
-println(".")
-
 for i in stride(from: 1.4, through: 3.4, by: 1) { println(i) }
 // CHECK-NEXT: 1.4
 // CHECK-NEXT: 2.4
