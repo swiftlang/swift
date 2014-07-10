@@ -21,15 +21,9 @@ func test_coercion(a: A, b: B) {
   y.foo()
 }
 
-// Ensure that we prefer coercions over casts.
-@objc class C {
-  @conversion func __conversion() -> D {
-    return D()
-  }
-}
+class C : B { }
 
-class D : C {
-}
+class D : C { }
 
 
 func prefer_coercion(inout c: C) {

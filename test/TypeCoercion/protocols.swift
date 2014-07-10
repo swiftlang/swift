@@ -170,13 +170,3 @@ func testREPLPrintable() {
   doREPLPrint(1)
   doREPLPrint("foo")
 }
-
-// rdar://16041990
-class CoercionTarget {}
-struct CoercesToClass {
-  func __conversion() -> CoercionTarget { return CoercionTarget() }
-}
-func testNoCoercionDowncast(v : AnyObject) {
-  let maybeClass = v as CoercionTarget
-  let maybeStruct = v as CoercesToClass // expected-error {{'AnyObject' is not convertible to 'CoercesToClass'}}
-}

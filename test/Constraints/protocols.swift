@@ -43,37 +43,6 @@ g(f1)
 g(f2) // expected-error{{'protocol<Barable, Fooable>' is not a subtype of 'Float'}}
 
 //===--------------------------------------------------------------------===//
-// User-defined conversions
-//===--------------------------------------------------------------------===//
-struct X { }
-
-protocol P {
-  @conversion func __conversion() -> Q
-}
-
-protocol Q { }
-
-func testUserConvert(p: P) {
-  var q : Q = p
-}
-
-func myPrintf(format: String, args: Any...) {}
-myPrintf("hello", i, f, 3.14159)
-
-// FIXME: Customize diagnostic
-Fooable() // expected-error{{'Fooable' is not constructible with '()'}}
-
-protocol P2 { }
-
-class Y : P2 { }
-
-class Z {
-  @conversion func __conversion () -> Y { return Y() }
-}
-
-var x: P2 = Z()
-
-//===--------------------------------------------------------------------===//
 // Dynamic self
 //===--------------------------------------------------------------------===//
 protocol Clonable {

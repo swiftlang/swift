@@ -34,10 +34,6 @@ public struct GenericCtor<U> {
   public init<T>(_ t : T) {}
 
   public func doSomething<T>(t: T) {}
-
-  @conversion public func __conversion() -> VoidPairTuple {
-    return ((), ())
-  }
 }
 
 // Protocols

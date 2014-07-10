@@ -81,12 +81,3 @@ i = co_f0_int_x1
 var co_f0_int_x2 = co.f0(5, t: x2)
 d = co_f0_int_x2
 
-// Overloading of conversion functions
-struct OverloadedConversion {
-  @conversion func __conversion<T : P1>() -> T { }
-  @conversion func __conversion<T : P2>() -> T { }
-}
-
-var ocvl = OverloadedConversion()
-x1 = ocvl
-x2 = ocvl

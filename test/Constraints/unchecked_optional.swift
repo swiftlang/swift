@@ -64,20 +64,6 @@ func test6(value : Int!) {
   let value2 : Int? = value
 }
 
-struct Test7a {}
-struct Test7b {
-  @conversion func __conversion() -> Test7a! { return .None }
-}
-var test7var: Test7a? = Test7b()
-
-struct Test8 {
-  @conversion func __conversion<T>() -> T! { return .None }
-}
-protocol Test8p {}
-var test8var: Test8p? {
-  return Test8()
-}
-
 class Test9a {}
 class Test9b : Test9a {}
 func test9_produceUnchecked() -> Test9b! { return Test9b() }

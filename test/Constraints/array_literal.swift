@@ -70,16 +70,10 @@ var b2 : [Double] = b
 
 var arrayOfStreams = [1..<2, 3..<4]
 
-struct MyDouble { }
-
-extension Double {
-  @conversion func __conversion() -> MyDouble { return MyDouble() }
-}
-
 struct MyArray : ArrayLiteralConvertible {
-  typealias Element = MyDouble
+  typealias Element = Double
 
-  static func convertFromArrayLiteral(elements: MyDouble...) -> MyArray {
+  static func convertFromArrayLiteral(elements: Double...) -> MyArray {
   }
 }
 

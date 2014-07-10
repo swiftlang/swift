@@ -44,8 +44,6 @@ p.second = 5.0
 
 var gc = GenericCtor<Int>()
 gc.doSomething()
-var funnyPair : VoidPairTuple = gc
-
 
 var wrappedTypeVar : ComputableWrapper<AnotherIntWrapper>.ComputableType
 wrappedTypeVar = intWrapper2

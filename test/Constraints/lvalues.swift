@@ -148,13 +148,8 @@ struct FooStruct {
   func instanceFunc0() {}
 }
 
-struct FooBarStruct {
-  @conversion func __conversion() -> FooStruct { }
-}
-
 func testFooStruct() {
   FooStruct.instanceFunc0(FooStruct())()
-  FooStruct.instanceFunc0(FooBarStruct())()
 }
 
 // Don't load from explicit lvalues.

@@ -145,14 +145,6 @@ variadics2(x: 1)
 variadics2(z: 1, 2, 3, y: 2) // expected-error{{missing argument for parameter 'x' in call}}
 variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argument 'z'}}
 
-// Variadics with conversions.
-struct X { 
-  @conversion func __conversion() -> Int { return 0 }
-}
-
-func variadics3(ints: Int...) { }
-variadics3(X(), X(), X())
-
 // -------------------------------------------
 // Missing arguments
 // -------------------------------------------
