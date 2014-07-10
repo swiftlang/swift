@@ -122,6 +122,11 @@ bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
                                                  SILFunction *Callee,
                                                  const ApplyInst *AI,
                                                  unsigned CalleeCount) {
+  /// Always inline transparent calls. This should have been done during
+  /// MandatoryInlining, but generics are not currenly handled.
+  if (AI->isTransparent())
+    return true;
+
   // To handle recursion and prevent massive code size expansion, we prevent
   // inlining the same callee many times into the caller. The recursion
   // detection logic in CallGraphAnalysis can't handle class_method in the
