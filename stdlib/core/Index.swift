@@ -250,13 +250,8 @@ public protocol _RandomAccessIndex : _BidirectionalIndex, Strideable {
 }
 
 public protocol RandomAccessIndex
-  : BidirectionalIndex, _RandomAccessIndex, Comparable {
+  : BidirectionalIndex, _RandomAccessIndex {
   /* typealias DistanceType : IntegerArithmetic*/
-}
-
-public
-func < <T: _RandomAccessIndex>(x: T, y: T) -> Bool {
-  return x.distanceTo(y) > 0
 }
 
 // advance and distance implementations

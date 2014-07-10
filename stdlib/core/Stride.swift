@@ -14,7 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol Strideable {
+/// Base protocol for Strideable; allows the definition of < to be
+/// inferred for Comparable conformance
+public protocol _Strideable {
   // FIXME: We'd like to name this type "DistanceType" but for
   // <rdar://problem/17619038>
   typealias Stride : SignedNumber
@@ -22,6 +24,14 @@ public protocol Strideable {
   func distanceTo(Self) -> Stride
   func advancedBy(Stride) -> Self
 }
+
+/// Compare two Strideables
+public func < <T: _Strideable>(x: T, y: T) -> Bool {
+  return x.distanceTo(y) > 0
+}
+
+/// A protocol for types that can be stride()d over.
+public protocol Strideable : Comparable, _Strideable {}
 
 public func + <T: Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(rhs)
