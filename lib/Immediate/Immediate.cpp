@@ -177,7 +177,8 @@ static bool loadSwiftRuntime(StringRef runtimeLibPath) {
   return loadRuntimeLib("libswift_stdlib_core.dylib", runtimeLibPath);
 }
 
-static bool tryLoadLibrary(LinkLibrary linkLib, StringRef runtimeLibPath,
+static bool tryLoadLibrary(LinkLibrary linkLib,
+                           SearchPathOptions searchPathOpts,
                            DiagnosticEngine &diags) {
   // If we have an absolute path, just try to load it now.
   llvm::SmallString<128> path = linkLib.getName();
@@ -193,21 +194,37 @@ static bool tryLoadLibrary(LinkLibrary linkLib, StringRef runtimeLibPath,
       llvm::sys::path::remove_filename(path);
       llvm::sys::path::append(path, stem.str());
       path += ".dylib";
+
+      // Let dlopen determine the best search paths.
+      success = dlopen(path.c_str(), 0);
+
+      // If that fails, try our runtime library path.
+      if (!success)
+        success = loadRuntimeLib(path, searchPathOpts.RuntimeLibraryPath);
       break;
     }
-    case LibraryKind::Framework:
+    case LibraryKind::Framework: {
       // If we have a framework, mangle the name to point to the framework
       // binary.
-      path += ".framework";
-      llvm::sys::path::append(path, linkLib.getName());
+      llvm::SmallString<64> frameworkPart{std::move(path)};
+      frameworkPart += ".framework";
+      llvm::sys::path::append(frameworkPart, linkLib.getName());
+
+      // Try user-provided framework search paths first; frameworks contain
+      // binaries as well as modules.
+      for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
+        path = frameworkDir;
+        llvm::sys::path::append(path, frameworkPart.str());
+        success = dlopen(path.c_str(), 0);
+        if (success)
+          break;
+      }
+
+      // If that fails, let dlopen search for system frameworks.
+      if (!success)
+        success = dlopen(frameworkPart.c_str(), 0);
       break;
     }
-
-    // Let dlopen determine the best search paths.
-    success = dlopen(path.c_str(), 0);
-    if (!success && linkLib.getKind() == LibraryKind::Library) {
-      // Try our runtime library path.
-      success = loadRuntimeLib(path, runtimeLibPath);
     }
   }
 
@@ -232,8 +249,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 
   // Perform autolinking.
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
-    if (!tryLoadLibrary(linkLib,
-                        CI.getASTContext().SearchPathOpts.RuntimeLibraryPath,
+    if (!tryLoadLibrary(linkLib, CI.getASTContext().SearchPathOpts,
                         CI.getDiags()))
       hadError = true;
   };
@@ -1071,8 +1087,7 @@ public:
     }
     std::for_each(CI.getLinkLibraries().begin(), CI.getLinkLibraries().end(),
                   [&](LinkLibrary linkLib) {
-      tryLoadLibrary(linkLib, Ctx.SearchPathOpts.RuntimeLibraryPath,
-                     CI.getDiags());
+      tryLoadLibrary(linkLib, Ctx.SearchPathOpts, CI.getDiags());
     });
 
     llvm::EngineBuilder builder(&Module);
