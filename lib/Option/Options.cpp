@@ -16,8 +16,7 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 
-using namespace swift::driver;
-using namespace swift::driver::options;
+using namespace swift::options;
 using namespace llvm::opt;
 
 #define PREFIX(NAME, VALUE) static const char *const NAME[] = VALUE;
@@ -42,6 +41,6 @@ public:
 
 }
 
-std::unique_ptr<OptTable> swift::driver::createDriverOptTable() {
+std::unique_ptr<OptTable> swift::createDriverOptTable() {
   return std::unique_ptr<OptTable>(new DriverOptTable());
 }

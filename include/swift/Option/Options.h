@@ -22,7 +22,6 @@ namespace opt {
 }
 
 namespace swift {
-namespace driver {
 namespace options {
   /// Flags specifically for Swift driver options.  Must not overlap with
   /// llvm::opt::DriverFlag.
@@ -43,7 +42,6 @@ namespace options {
 
   std::unique_ptr<llvm::opt::OptTable> createDriverOptTable();
 
-} // end namespace driver
 } // end namespace swift
 
 #endif

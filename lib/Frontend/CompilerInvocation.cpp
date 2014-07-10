@@ -25,7 +25,6 @@
 #include "llvm/Support/Path.h"
 
 using namespace swift;
-using namespace swift::driver;
 using namespace llvm::opt;
 
 swift::CompilerInvocation::CompilerInvocation() {
@@ -899,7 +898,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags) {
-  using namespace driver::options;
+  using namespace options;
 
   if (Args.empty())
     return false;
@@ -911,7 +910,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   unsigned MissingCount;
   ParsedArgs.reset(
       Table->ParseArgs(Args.begin(), Args.end(), MissingIndex, MissingCount,
-                       driver::options::FrontendOption));
+                       FrontendOption));
   if (MissingCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                    ParsedArgs->getArgString(MissingIndex), MissingCount);
