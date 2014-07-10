@@ -49,3 +49,55 @@ public func - <T: Strideable> (lhs: T, rhs: T) -> T.Stride {
   return rhs.distanceTo(lhs)
 }
 
+@assignment
+public func += <T: Strideable> (inout lhs: T, rhs: T.Stride) {
+  lhs = lhs.advancedBy(rhs)
+}
+
+@assignment
+public func -= <T: Strideable> (inout lhs: T, rhs: T.Stride) {
+  lhs = lhs.advancedBy(-rhs)
+}
+
+/// A Generator for StrideTo<T>
+public struct StrideToGenerator<T: Strideable> : Generator {
+  var current: T
+  let end: T
+  let stride: T.Stride
+
+  public mutating func next() -> T? {
+    if stride > 0 ? current >= end : current <= end {
+      return nil
+    }
+    let ret = current
+    current += stride
+    return ret
+  }
+}
+
+/// A Sequence of values formed by striding over a half-open interval
+/// FIXME: should really be a Collection, as it is multipass
+public struct StrideTo<T: Strideable> : Sequence {
+  public func generate() -> StrideToGenerator<T> {
+    return StrideToGenerator(current: start, end: end, stride: stride)
+  }
+
+  init(start: T, end: T, stride: T.Stride) {
+    _precondition(stride != 0, "stride size must not be zero")
+    // Unreachable endpoints are allowed; they just make for an
+    // already-empty Sequence.
+    self.start = start
+    self.end = end
+    self.stride = stride
+  }
+  
+  let start: T
+  let end: T
+  let stride: T.Stride
+}
+
+public func stride<
+  T: Strideable
+>(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
+  return StrideTo(start: start, end: end, stride: stride)
+}
