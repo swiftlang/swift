@@ -4289,9 +4289,7 @@ public:
     // - it's explicitly @objc or dynamic,
     // - it's a member of an ObjC-compatible class, or
     // - it's an accessor for an ObjC property.
-    Type ContextTy = FD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy) {
-      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+    if (FD->getDeclContext()->getDeclaredTypeInContext()) {
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(FD->getDeclContext());
       bool isMemberOfObjCProtocol =
