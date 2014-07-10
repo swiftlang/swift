@@ -63,3 +63,9 @@
 
 // RUN: %swift_driver -target armv7-apple-ios7 -### | FileCheck -check-prefix=TARGETCPU3 %s
 // TARGETCPU3: -target-cpu cortex-a8
+
+// RUN: %swift_driver -target i386-apple-ios7 -### | FileCheck -check-prefix=SIMULATOR_CPU %s
+// SIMULATOR_CPU: -target-cpu yonah
+
+// RUN: %swift_driver -target x86_64-apple-ios7 -### | FileCheck -check-prefix=SIMULATOR64_CPU %s
+// SIMULATOR64_CPU: -target-cpu core2

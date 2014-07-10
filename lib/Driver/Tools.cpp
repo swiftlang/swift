@@ -73,20 +73,49 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
   }
 }
 
-// Should this be done by the tool chain?
+// FIXME: This should use the logic in clang::driver::Clang::ConstructJob.
 static void configureDefaultCPU(const llvm::Triple &triple,
                                 ArgStringList &args) {
-  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
+  switch (triple.getArch()) {
+  case llvm::Triple::aarch64:
+  case llvm::Triple::aarch64_be:
+  case llvm::Triple::arm64:
+  case llvm::Triple::arm64_be:
+    if (!triple.isOSDarwin())
+      return;
     args.push_back("-target-cpu");
     args.push_back("cyclone");
     args.push_back("-target-feature");
     args.push_back("+neon");
-  } else if (triple.getArch() == llvm::Triple::arm) {
+    break;
+
+  case llvm::Triple::arm:
+  case llvm::Triple::armeb:
+  case llvm::Triple::thumb:
+  case llvm::Triple::thumbeb:
     if (auto CPUStr = clang::driver::getARMCPUForMArch(triple.getArchName(),
                                                        triple)) {
       args.push_back("-target-cpu");
       args.push_back(CPUStr);
     }
+    break;
+
+  case llvm::Triple::x86:
+  case llvm::Triple::x86_64:
+    if (triple.isOSDarwin()) {
+      args.push_back("-target-cpu");
+      if (triple.getArchName() == "x86_64h") {
+        args.push_back("core-avx2");
+        args.push_back("-target-feature");
+        args.push_back("-rdrnd,-aes,-pclmul,-rtm,-hle,-fsgsbase");
+      } else {
+        bool is64Bit = (triple.getArch() == llvm::Triple::x86_64);
+        args.push_back(is64Bit ? "core2" : "yonah");
+      }
+    }
+    break;
+  default:
+    break;
   }
 }
 
