@@ -112,8 +112,8 @@ private:
       if (auto FD = dyn_cast<FuncDecl>(VD))
         if (FD->isAccessor())
           continue;
-      if (VD->getAttrs().isOptional() != protocolMembersOptional) {
-        protocolMembersOptional = VD->getAttrs().isOptional();
+      if (VD->getAttrs().hasAttribute<OptionalAttr>() != protocolMembersOptional) {
+        protocolMembersOptional = VD->getAttrs().hasAttribute<OptionalAttr>();
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
       visit(VD);

@@ -558,7 +558,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
   while (valueCount--) {
     auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
-    assert(second || first->getAttrs().isOptional());
+    assert(second || first->getAttrs().hasAttribute<OptionalAttr>());
 
     unsigned substitutionCount = *rawIDIter++;
 
@@ -1885,14 +1885,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isOptional, isStatic, isLet;
+    bool isImplicit, isObjC, isStatic, isLet;
     uint8_t storageKind, rawAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isOptional, isStatic,
+                                       isObjC, isStatic,
                                        isLet, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        willSetID, didSetID, overriddenID,
@@ -1946,8 +1946,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       var->setImplicit();
-    if (isOptional)
-      var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
     if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
       var->setOverriddenDecl(overridden);
@@ -1994,7 +1992,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawStaticSpelling, rawAccessLevel;
     bool isAssignmentOrConversion;
     bool isObjC, isTransparent, isMutating, hasDynamicSelf;
-    bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -2008,7 +2005,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         isStatic, rawStaticSpelling,
                                         isAssignmentOrConversion,
                                         isObjC, isTransparent,
-                                        isMutating, hasDynamicSelf, isOptional,
+                                        isMutating, hasDynamicSelf,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
@@ -2109,8 +2106,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
-    if (isOptional)
-      fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);
@@ -2448,7 +2443,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::SUBSCRIPT_DECL: {
     DeclID contextID;
-    bool isImplicit, isObjC, isOptional;
+    bool isImplicit, isObjC;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
@@ -2456,8 +2451,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             isObjC, isOptional,
-                                             declTypeID, elemTypeID,
+                                             isObjC, declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              overriddenID, rawAccessLevel,
@@ -2498,8 +2492,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       subscript->setInterfaceType(interfaceType);
     if (isImplicit)
       subscript->setImplicit();
-    if (isOptional)
-      subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
       subscript->setOverriddenDecl(overridden);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));

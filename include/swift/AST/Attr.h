@@ -946,7 +946,6 @@ public:
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isUnmanaged() const { return has(AK_unowned_unsafe); }
-  bool isOptional() const { return has(AK_optional); }
 
   // FIXME: eventually take a platform argument.
   bool isUnavailable() const { return getUnavailable() != nullptr; }

@@ -1202,7 +1202,7 @@ namespace {
       
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
-        if (method->getAttrs().isOptional()) {
+        if (method->getAttrs().hasAttribute<OptionalAttr>()) {
           OptInstanceMethods.push_back(entry);
           if (isBuildingProtocol())
             OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
@@ -1213,7 +1213,7 @@ namespace {
             MethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
         }
       } else {
-        if (method->getAttrs().isOptional()) {
+        if (method->getAttrs().hasAttribute<OptionalAttr>()) {
           OptClassMethods.push_back(entry);
           if (isBuildingProtocol())
             OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
@@ -1231,7 +1231,7 @@ namespace {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, constructor);
-      if (constructor->getAttrs().isOptional())
+      if (constructor->getAttrs().hasAttribute<OptionalAttr>())
         OptInstanceMethods.push_back(entry);
       else
         InstanceMethods.push_back(entry);
@@ -1494,7 +1494,7 @@ namespace {
           return;
         
         SmallVectorImpl<llvm::Constant *> *methods;
-        if (var->getAttrs().isOptional()) {
+        if (var->getAttrs().hasAttribute<OptionalAttr>()) {
           if (var->isStatic())
             methods = &OptClassMethods;
           else
@@ -1689,13 +1689,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
       auto getter_setter = emitObjCSubscriptMethodDescriptors(IGM, subscript);
-      if (subscript->getAttrs().isOptional())
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         OptInstanceMethods.push_back(getter_setter.first);
       else
         InstanceMethods.push_back(getter_setter.first);
 
       if (getter_setter.second) {
-        if (subscript->getAttrs().isOptional())
+        if (subscript->getAttrs().hasAttribute<OptionalAttr>())
           OptInstanceMethods.push_back(getter_setter.second);
         else
           InstanceMethods.push_back(getter_setter.second);

@@ -627,7 +627,8 @@ namespace {
               (baseTy->is<ArchetypeType>() || baseTy->isAnyExistentialType());
 
       // If we are referring to an optional member of a protocol.
-      if (isArchetypeOrExistentialRef && member->getAttrs().isOptional()) {
+      if (isArchetypeOrExistentialRef &&
+          member->getAttrs().hasAttribute<OptionalAttr>()) {
         auto proto =tc.getProtocol(memberLoc, KnownProtocolKind::AnyObject);
         if (!proto)
           return nullptr;
@@ -681,7 +682,7 @@ namespace {
 
         Expr *ref;
 
-        if (member->getAttrs().isOptional()) {
+        if (member->getAttrs().hasAttribute<OptionalAttr>()) {
           base = tc.coerceToRValue(base);
           if (!base) return nullptr;
           ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
@@ -970,7 +971,7 @@ namespace {
 
       // Handle dynamic lookup.
       if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
-          subscript->getAttrs().isOptional()) {
+          subscript->getAttrs().hasAttribute<OptionalAttr>()) {
         // If we've found an optional method in a protocol, the base type is
         // AnyObject.
         if (selected.choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {

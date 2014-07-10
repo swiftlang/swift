@@ -107,51 +107,54 @@ DECL_ATTR(objc, ObjC,
 
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor, 4)
-                               
+
+SIMPLE_DECL_ATTR(optional, Optional,
+                 OnConstructor|OnFunc|OnVar|OnSubscript, 5)
+
 SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
-                 OnProtocol, 5)
+                 OnProtocol, 6)
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn,
-                 OnFunc, 6)
+                 OnFunc, 7)
 
 SIMPLE_DECL_ATTR(exported, Exported,
-                 OnImport, 7)
+                 OnImport, 8)
 
 SIMPLE_DECL_ATTR(assignment, Assignment,
-                 OnFunc, 8)
+                 OnFunc, 9)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
-                 OnVar, 9)
+                 OnVar, 10)
 
 SIMPLE_DECL_ATTR(IBAction, IBAction,
-                 OnFunc, 10)
+                 OnFunc, 11)
 
 SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
-                 OnClass, 11)
+                 OnClass, 12)
 
 SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
-                 OnVar, 12)
-
-SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
                  OnVar, 13)
 
-SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 14)
+SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
+                 OnVar, 14)
 
-SIMPLE_DECL_ATTR(lazy, Lazy, OnVar, 15)
+SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 15)
+
+SIMPLE_DECL_ATTR(lazy, Lazy, OnVar, 16)
 
 SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
-                 OnFunc, 16)
+                 OnFunc, 17)
 
 SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
-                 OnClass, 17)
+                 OnClass, 18)
 
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
-                 OnProtocol, 18)
+                 OnProtocol, 19)
 
-DECL_ATTR(inline, Inline, OnFunc, 19)
+DECL_ATTR(inline, Inline, OnFunc, 20)
 
 DECL_ATTR(semantics, Semantics,
-OnFunc | OnConstructor | OnDestructor | OnSubscript, 20)
+          OnFunc | OnConstructor | OnDestructor | OnSubscript, 21)
 
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
@@ -174,7 +177,6 @@ ATTR(infix)
 ATTR(mutating)
 ATTR(prefix)
 ATTR(postfix)
-ATTR(optional)
 ATTR(strong)
 ATTR(transparent)
 ATTR(unowned)

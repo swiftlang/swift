@@ -2363,7 +2363,8 @@ namespace {
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
           isa<ProtocolDecl>(dc))
-        result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+        result->getMutableAttrs().add(new (Impl.SwiftContext)
+                                      OptionalAttr(/*implicit*/false));
 
       // Mark this method @objc.
       addObjCAttribute(result, selector);
@@ -3216,7 +3217,8 @@ namespace {
 
       // Optional subscripts in protocols.
       if (optionalMethods && isa<ProtocolDecl>(dc))
-        subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+        subscript->getMutableAttrs().add(new (Impl.SwiftContext)
+                                         OptionalAttr(true));
 
       // Note that we've created this subscript.
       Impl.Subscripts[{getter, setter}] = subscript;
@@ -3307,7 +3309,7 @@ namespace {
             // For an optional requirement, record an empty witness:
             // we'll end up querying this at runtime.
             auto Attrs = func->getAttrs();
-            if (Attrs.isOptional()) {
+            if (Attrs.hasAttribute<OptionalAttr>()) {
               conformance->setWitness(valueReq, ConcreteDeclRef());
               continue;
             }
@@ -4362,8 +4364,10 @@ namespace {
         result->getMutableAttrs().add(
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       if (decl->getPropertyImplementation() == clang::ObjCPropertyDecl::Optional
-          && isa<ProtocolDecl>(dc))
-        result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+          && isa<ProtocolDecl>(dc) &&
+          !result->getMutableAttrs().hasAttribute<OptionalAttr>())
+        result->getMutableAttrs().add(new (Impl.SwiftContext)
+                                      OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
       if (overridden)
@@ -4661,8 +4665,9 @@ void ClangImporter::Implementation::importAttributes(
         // If we made a protocol requirement unavailable, mark it optional:
         // nobody should have to satisfy it.
         if (isa<ProtocolDecl>(MappedDecl->getDeclContext())) {
-          if (!MappedDecl->getAttrs().isOptional())
-            MappedDecl->getMutableAttrs().setAttr(AK_optional, SourceLoc());
+          if (!MappedDecl->getAttrs().hasAttribute<OptionalAttr>())
+            MappedDecl->getMutableAttrs().add(new (C)
+                                              OptionalAttr(/*implicit*/false));
         }
       }
     }

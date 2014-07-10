@@ -2045,7 +2045,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   SourceLoc IdLoc;
   ParserStatus Status;
   
-  if (Attributes.hasNonVirtualAttributes())
+  if (Attributes.hasNonVirtualAttributes() ||
+      Attributes.hasAttribute<OptionalAttr>())
     diagnose(Attributes.AtLoc, diag::typealias_attributes);
   
 

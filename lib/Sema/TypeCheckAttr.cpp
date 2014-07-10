@@ -50,6 +50,7 @@ public:
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(ObjC)
+  IGNORED_ATTR(Optional)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
   IGNORED_ATTR(Semantics)
@@ -413,6 +414,7 @@ public:
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(NSManaged) // checked early.
     UNINTERESTING_ATTR(ObjC)
+    UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Semantics)

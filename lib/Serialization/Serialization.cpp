@@ -1732,7 +1732,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_optional, AK_unowned, AK_unowned_unsafe, AK_weak, AK_transparent
+      AK_unowned, AK_unowned_unsafe, AK_weak, AK_transparent
     >(var);
     verifyAttrSerializable(var);
 
@@ -1768,7 +1768,6 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(DC),
                           var->isImplicit(),
                           var->isObjC(),
-                          var->getAttrs().isOptional(),
                           var->isStatic(),
                           var->isLet(),
                           uint8_t(storageKind),
@@ -1807,8 +1806,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_conversion, AK_infix,
-      AK_optional, AK_postfix, AK_prefix, AK_transparent,
+      AK_conversion, AK_infix, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
     verifyAttrSerializable(fn);
@@ -1834,7 +1832,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isTransparent(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->getAttrs().isOptional(),
                            fn->getBodyParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
@@ -1873,7 +1870,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
-    checkAllowedAttributes<AK_optional>(subscript);
+    checkAllowedAttributes<>(subscript);
     verifyAttrSerializable(subscript);
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
@@ -1890,7 +1887,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(DC),
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
-                                subscript->getAttrs().isOptional(),
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),

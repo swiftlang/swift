@@ -4715,6 +4715,7 @@ public:
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
+    UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Required)
@@ -6663,19 +6664,19 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   // Only protocol members can be @optional.
-  if (Attrs.isOptional()) {
+  if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {
-      TC.diagnose(Attrs.getLoc(AK_optional),
+      TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_protocol);
-      D->getMutableAttrs().clearAttribute(AK_optional);
+      D->getMutableAttrs().removeAttribute(OA);
     } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
-      TC.diagnose(Attrs.getLoc(AK_optional),
+      TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_objc_protocol);
-      D->getMutableAttrs().clearAttribute(AK_optional);
+      D->getMutableAttrs().removeAttribute(OA);
     } else if (isa<ConstructorDecl>(D)) {
-      TC.diagnose(Attrs.getLoc(AK_optional),
+      TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_initializer);
-      D->getMutableAttrs().clearAttribute(AK_optional);
+      D->getMutableAttrs().removeAttribute(OA);
     }
   }
 

@@ -342,7 +342,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         // correctly conforms to.  This is done so that we don't return
         // duplicate members.
         if (ShouldFindNonOptionalValueRequirements ||
-            VD->getAttrs().isOptional()) {
+            VD->getAttrs().hasAttribute<OptionalAttr>()) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }

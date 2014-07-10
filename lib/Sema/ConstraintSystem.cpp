@@ -1079,7 +1079,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // optional/dynamic, is settable, or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (subscript->getAttrs().isOptional())
+    if (subscript->getAttrs().hasAttribute<OptionalAttr>())
       elementTy = OptionalType::get(elementTy->getRValueType());
     else if (isDynamicResult)
       elementTy = ImplicitlyUnwrappedOptionalType::get(elementTy->getRValueType());
@@ -1183,7 +1183,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              isTypeReference,
                              choice.isSpecialized());
 
-    if (choice.getDecl()->getAttrs().isOptional() &&
+    if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
       // requirement in a protocol, strip off the lvalue-ness (FIXME:

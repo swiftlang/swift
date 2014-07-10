@@ -1182,7 +1182,7 @@ public:
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
     }
-    if (IsDynamicLookup || VD->getAttrs().isOptional()) {
+    if (IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>()) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.  Same applies to @optional members.
       VarType = OptionalType::get(VarType);
@@ -1394,7 +1394,7 @@ public:
     Builder.addTextChunk(Name);
     if (IsDynamicLookup)
       Builder.addDynamicLookupMethodCallTail();
-    else if (FD->getAttrs().isOptional())
+    else if (FD->getAttrs().hasAttribute<OptionalAttr>())
       Builder.addOptionalMethodCallTail();
 
     llvm::SmallString<32> TypeStr;

@@ -97,8 +97,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@postfix ";
   if (requiresStoredPropertyInits())
     Printer << "@requires_stored_property_inits ";
-  if (isOptional())
-    Printer << "@optional ";
 
   if (auto accessAttr = getAttribute<AccessibilityAttr>())
     Printer << accessAttr->getAttrName() << " ";
@@ -122,6 +120,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_ClassProtocol:
   case DAK_Exported:
   case DAK_Final:
+  case DAK_Optional:
   case DAK_NoReturn:
   case DAK_UnsafeNoObjCTaggedPointer:
   case DAK_NSCopying:
