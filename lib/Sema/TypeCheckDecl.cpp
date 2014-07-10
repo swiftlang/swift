@@ -6610,44 +6610,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  if (Attrs.isConversion()) {
-    // Only instance members with no non-defaulted parameters can be
-    // conversions.
-    FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!FD) {
-      TC.diagnose(Attrs.getLoc(AK_conversion), diag::conversion_not_function);
-      D->getMutableAttrs().clearAttribute(AK_conversion);
-    } else if (!FD->isInstanceMember()) {
-      TC.diagnose(Attrs.getLoc(AK_conversion),
-                  diag::conversion_not_instance_method, FD->getName());
-      D->getMutableAttrs().clearAttribute(AK_conversion);
-    } else if (!FD->getType()->is<ErrorType>()) {
-      AnyFunctionType *BoundMethodTy
-        = FD->getType()->castTo<AnyFunctionType>()->getResult()
-            ->castTo<AnyFunctionType>();
-
-      bool AcceptsEmptyParamList = false;
-      Type InputTy = BoundMethodTy->getInput();
-      if (const TupleType *Tuple = InputTy->getAs<TupleType>()) {
-        bool AllDefaulted = true;
-        for (auto Elt : Tuple->getFields()) {
-          if (!Elt.hasInit()) {
-            AllDefaulted = false;
-            break;
-          }
-        }
-
-        AcceptsEmptyParamList = AllDefaulted;
-      }
-
-      if (!AcceptsEmptyParamList) {
-        TC.diagnose(Attrs.getLoc(AK_conversion), diag::conversion_params,
-                    FD->getName());
-        D->getMutableAttrs().clearAttribute(AK_conversion);
-      }
-    }
-  }
-
   if (Attrs.isTransparent()) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     auto *ED = dyn_cast<ExtensionDecl>(D);

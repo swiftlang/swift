@@ -1990,7 +1990,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel;
-    bool isAssignmentOrConversion;
     bool isObjC, isTransparent, isMutating, hasDynamicSelf;
     unsigned numParamPatterns;
     TypeID signatureID;
@@ -2003,7 +2002,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling,
-                                        isAssignmentOrConversion,
                                         isObjC, isTransparent,
                                         isMutating, hasDynamicSelf,
                                         numParamPatterns, signatureID,
@@ -2098,10 +2096,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
-    if (isAssignmentOrConversion) {
-      assert(!fn->isOperator());
-      fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
-    }
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);

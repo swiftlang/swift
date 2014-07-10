@@ -2000,7 +2000,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
       // FIXME: Egregious hack to avoid our conversion operations becoming
       // @objc for bridged classes, which causes extraneous thunks.
-      if (FD->getAttrs().isConversion())
+      if (FD->getName() == Context.Id_Conversion)
         return false;
     }
 

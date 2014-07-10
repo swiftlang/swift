@@ -400,7 +400,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     
     // Only check the result type for conversion functions.
     if (auto func = dyn_cast<FuncDecl>(decl1)) {
-      if (func->getAttrs().isConversion())
+      if (func->getName() == tc.Context.Id_Conversion)
         checkKind = CheckResult;
     }
   } else {

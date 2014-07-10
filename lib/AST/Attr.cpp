@@ -94,8 +94,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (!Options.ExclusiveAttrList.empty())
     return;
 
-  if (isConversion())
-    Printer << "@conversion ";
   if (Options.PrintAttrTransparent && isTransparent())
     Printer << "@transparent ";
   if (isInfix())
