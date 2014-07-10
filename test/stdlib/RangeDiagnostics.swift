@@ -14,11 +14,10 @@
 func assertCollection<C: Collection>(_: C) {}
 assertCollection(0..<10)
 
-(10..<100)[0] // expected-error {{'Int' is not convertible to 'Range<Pos>'}}
+// These error messages are not great, especially the second one.  If
+// the test starts failing because the error message improves, update
+// the test.
 
-#if SWIFT_DISABLE_INT_RANGE_SLICE
-func assertSliceable<C: Sliceable>(_: C) {}
-assertSliceable(UInt(0)..<10)
+(10..<100)[0]           // expected-error {{could not find an overload for 'subscript' that accepts the supplied arguments}}
+(UInt(10)..<100)[0..<4] // expected-error {{'Range<Pos>' is not convertible to 'UInt'}}
 
-(UInt(10)..<100)[0..<4] // expected -error {{}}
-#endif

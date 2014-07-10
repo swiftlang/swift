@@ -64,7 +64,7 @@ public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
   var _stride: T.DistanceType
 }
 
-public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
+public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
 
   @transparent public
   init(start: T, end: T) {
@@ -88,10 +88,6 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
     return i
   }
 
-  public subscript(x: Range<T>) -> Range {
-    return Range(start: x.startIndex, end: x.endIndex)
-  }
-
   //===--------------------------------------------------------------------===//
   // Overloads for subscript that allow us to make subscripting fail
   // at compile time, outside a generic context, when T is an Integer
@@ -104,11 +100,6 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
     _fatalError("It shouldn't be possible to call this function'")
   }
   
-#if SWIFT_DISABLE_INT_RANGE_SLICE
-  public subscript(_: T._DisabledRangeSlice) -> Range {
-    _fatalError("It shouldn't be possible to call this function'")
-  }
-#endif
   //===--------------------------------------------------------------------===//
   
   public typealias GeneratorType = RangeGenerator<T>

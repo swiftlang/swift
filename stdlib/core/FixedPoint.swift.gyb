@@ -257,9 +257,6 @@ extension ${Self} : RandomAccessIndex {
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.
   typealias _DisabledRangeIndex = ${Self}
-#if SWIFT_DISABLE_INT_RANGE_SLICE
-  typealias _DisabledRangeSlice = Range<${Self}>
-#endif
   
   @transparent public
   func successor() -> ${Self} {
