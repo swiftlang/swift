@@ -58,16 +58,42 @@ strideTestCase.test("HalfOpen") {
       reduce(stride(from: R(start), to: R(end), by: stepSize), 0){ $0 + $1.x })
   }
   
-  check(from: 0, to: 14, by: 3, sum: 30)  // 0 + 3 + 6 + 9 + 12
-  check(from: 0, to: 15, by: 3, sum: 30)  // 0 + 3 + 6 + 9 + 12
-  check(from: 0, to: 16, by: 3, sum: 45)  // 0 + 3 + 6 + 9 + 12 + 15
+  check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
+  check(from: 1, to: 16, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
+  check(from: 1, to: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
   
   check(from: 1, to: -13, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
   check(from: 1, to: -14, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
-  check(from: 1, to: -15, by: -3, sum: -39)  // 1 + -2 + -5 + -8 + -11
+  check(from: 1, to: -15, by: -3, sum: -39)  // 1 + -2 + -5 + -8 + -11 + -14
   
   check(from: 4, to: 16, by: -3, sum: 0)
   check(from: 1, to: -16, by: 3, sum: 0)
+}
+
+strideTestCase.test("Closed") {
+  func check(from start: Int, through end: Int, by stepSize: Int, #sum: Int) {
+    // Work on Ints
+    expectEqual(
+      sum,
+      reduce(stride(from: start, through: end, by: stepSize), 0, +))
+
+    // Work on an arbitrary RandomAccessIndex
+    expectEqual(
+      sum,
+      reduce(
+        stride(from: R(start), through: R(end), by: stepSize), 0){ $0 + $1.x })
+  }
+  
+  check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
+  check(from: 1, through: 16, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
+  check(from: 1, through: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
+  
+  check(from: 1, through: -13, by: -3, sum: -25) // 1 + -2 + -5 + -8 + -11
+  check(from: 1, through: -14, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
+  check(from: 1, through: -15, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
+  
+  check(from: 4, through: 16, by: -3, sum: 0)
+  check(from: 1, through: -16, by: 3, sum: 0)
 }
 
 strideTestCase.run()

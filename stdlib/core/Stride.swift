@@ -101,3 +101,53 @@ public func stride<
 >(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
   return StrideTo(start: start, end: end, stride: stride)
 }
+
+/// A Generator for StrideThrough<T>
+public struct StrideThroughGenerator<T: Strideable> : Generator {
+  var current: T
+  let end: T
+  let stride: T.Stride
+  var done: Bool = false
+  
+  public mutating func next() -> T? {
+    if done {
+      return nil
+    }
+    if stride > 0 ? current >= end : current <= end {
+      if current == end {
+        done = true
+        return current
+      }
+      return nil
+    }
+    let ret = current
+    current += stride
+    return ret
+  }
+}
+
+/// A Sequence of values formed by striding over a closed interval
+/// FIXME: should really be a Collection, as it is multipass
+public struct StrideThrough<T: Strideable> : Sequence {
+  public func generate() -> StrideThroughGenerator<T> {
+    return StrideThroughGenerator(
+      current: start, end: end, stride: stride, done: false)
+  }
+
+  init(start: T, end: T, stride: T.Stride) {
+    _precondition(stride != 0, "stride size must not be zero")
+    self.start = start
+    self.end = end
+    self.stride = stride
+  }
+  
+  let start: T
+  let end: T
+  let stride: T.Stride
+}
+
+public func stride<
+  T: Strideable
+>(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {
+  return StrideThrough(start: start, end: end, stride: stride)
+}
