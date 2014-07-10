@@ -1260,6 +1260,28 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_BlockFunctionType1: @objc_block () -> ()
 
   @objc var var_BlockFunctionType1_: @objc_block () -> () // no-error
+
+  var var_ArrayType1: [AnyObject]
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType1: [AnyObject]
+
+  @objc var var_ArrayType1_: [AnyObject] // no-error
+
+  var var_ArrayType2: [@objc_block AnyObject -> AnyObject] // no-error
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@objc_block AnyObject -> AnyObject]
+
+  @objc var var_ArrayType2_: [@objc_block AnyObject -> AnyObject] // no-error
+
+  var var_ArrayType3: [PlainStruct]
+  // CHECK-LABEL: {{^}}  var var_ArrayType3: [PlainStruct]
+
+  @objc var var_ArrayType3_: [PlainStruct]
+  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+
+  var var_ArrayType4: [AnyObject -> AnyObject] // no-error
+  // CHECK-LABEL: {{^}}  var var_ArrayType4: [AnyObject -> AnyObject]
+
+  @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
+  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 }
 
 @objc

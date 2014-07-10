@@ -2219,6 +2219,18 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
                           &conformance))
     return nullptr;
 
+  // If the type is generic, check whether its generic arguments are also
+  // bridged to Objective-C.
+  if (auto bgt = type->getAs<BoundGenericType>()) {
+    for (auto arg : bgt->getGenericArgs()) {
+      if (arg->hasTypeVariable())
+        continue;
+
+      if (getBridgedToObjC(dc, arg).isNull())
+        return nullptr;
+    }
+  }
+
   return getWitnessType(type, bridgedProto, conformance,
                         Context.getIdentifier("ObjectiveCType"),
                         diag::broken_bridged_to_objc_protocol);

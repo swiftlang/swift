@@ -65,7 +65,7 @@ func arrayToNSArray() {
   nsa = [BridgedClass]()
   nsa = [OtherClass]()
   nsa = [BridgedStruct]()
-  nsa = [NotBridgedStruct]() // expected-error{{NotBridgedStruct' is not bridged to Objective-C}}
+  nsa = [NotBridgedStruct]() // expected-error{{'[(NotBridgedStruct)]' is not convertible to 'NSArray'}}
 }
 
 // NSArray -> Array
@@ -74,7 +74,7 @@ func nsArrayToArray(nsa: NSArray) {
   let arr2: [BridgedClass] = nsa // expected-error{{'BridgedClass' is not identical to 'AnyObject'}}
   let arr3: [OtherClass] = nsa  // expected-error{{'OtherClass' is not identical to 'AnyObject'}}
   let arr4: [BridgedStruct] = nsa  // expected-error{{'BridgedStruct' is not identical to 'AnyObject'}}
-  let arr5: [NotBridgedStruct] = nsa  // expected-error{{'NotBridgedStruct' is not identical to 'AnyObject'}}
+  let arr5: [NotBridgedStruct] = nsa  // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
 
   var arr6: Array = nsa // infers [AnyObject].
   arr6 = arr1
@@ -90,15 +90,15 @@ func dictionaryToNSDictionary() {
   nsd = [NSObject : BridgedClass]()
   nsd = [NSObject : OtherClass]()
   nsd = [NSObject : BridgedStruct]()
-  nsd = [NSObject : NotBridgedStruct]() // expected-error{{'NotBridgedStruct' is not bridged to Objective-C}}
+  nsd = [NSObject : NotBridgedStruct]() // expected-error{{'[NSObject : NotBridgedStruct]' is not convertible to 'NSDictionary'}}
 
-  nsd = [NSObject : BridgedClass?]() // expected-error{{'BridgedClass?' is not bridged to Objective-C}}
-  nsd = [NSObject : BridgedStruct?]()  // expected-error{{'BridgedStruct?' is not bridged to Objective-C}}
+  nsd = [NSObject : BridgedClass?]() // expected-error{{'[NSObject : BridgedClass?]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : BridgedStruct?]()  // expected-error{{'[NSObject : BridgedStruct?]' is not convertible to 'NSDictionary'}}
 
   nsd = [BridgedClass : AnyObject]()
   nsd = [OtherClass : AnyObject]()
   nsd = [BridgedStruct : AnyObject]()
-  nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{'NotBridgedStruct' is not bridged to Objective-C}}
+  nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{'[NotBridgedStruct : AnyObject]' is not convertible to 'NSDictionary'}}
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
