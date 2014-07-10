@@ -589,10 +589,7 @@ private:
   void finishFunctionType(const FunctionType *FT) {
     os << ")(";
     Type paramsTy = FT->getInput();
-    if (auto parenTy = dyn_cast<ParenType>(paramsTy.getPointer())) {
-      print(parenTy->getSinglyDesugaredType());
-    } else {
-      auto tupleTy = cast<TupleType>(paramsTy.getPointer());
+    if (auto tupleTy = dyn_cast<TupleType>(paramsTy.getPointer())) {
       if (tupleTy->getNumElements() == 0) {
         os << "void";
       } else {
@@ -600,6 +597,8 @@ private:
                    [this](Type ty) { print(ty); },
                    [this] { os << ", "; });
       }
+    } else {
+      print(paramsTy);
     }
     os << ")";
   }

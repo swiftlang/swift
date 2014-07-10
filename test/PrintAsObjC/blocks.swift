@@ -16,6 +16,9 @@ import ObjectiveC
 // CHECK-NEXT: - (void)blockReturnsBlock:(void (^ (^)(void))(void))input;
 // CHECK-NEXT: - (void)blockTakesAndReturnsBlock:(uint8_t (^ (^)(uint16_t (^)(int16_t)))(int8_t))input;
 // CHECK-NEXT: - (void)blockTakesTwoBlocksAndReturnsBlock:(uint8_t (^ (^)(uint16_t (^)(int16_t), uint32_t (^)(int32_t)))(int8_t))input;
+// CHECK-NEXT: - (void (^)(NSObject *))returnsBlockWithInput;
+// CHECK-NEXT: - (void (^)(NSObject *))returnsBlockWithParenthesizedInput;
+// CHECK-NEXT: - (void (^)(NSObject *, NSObject *))returnsBlockWithTwoInputs;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
@@ -33,4 +36,14 @@ import ObjectiveC
     ((Int16) -> (UInt16),
                  (Int32) -> (UInt32)) ->
                 ((Int8) -> (UInt8))) {}
+
+  func returnsBlockWithInput() -> (NSObject -> ())? {
+    return nil
+  }
+  func returnsBlockWithParenthesizedInput() -> ((NSObject) -> ())? {
+    return nil
+  }
+  func returnsBlockWithTwoInputs() -> ((NSObject, NSObject) -> ())? {
+    return nil
+  }
 }
