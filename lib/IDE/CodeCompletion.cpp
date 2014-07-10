@@ -1184,7 +1184,7 @@ public:
     }
     if (IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>()) {
       // Values of properties that were found on a AnyObject have
-      // Optional<T> type.  Same applies to @optional members.
+      // Optional<T> type.  Same applies to optional members.
       VarType = OptionalType::get(VarType);
     }
     addTypeAnnotation(Builder, VarType);

@@ -154,7 +154,9 @@ public:
     case 'n':
       return Text == "nonmutating";
     case 'o':
-      return Text == "override";
+      return Text == "optional" || Text == "override";
+    case 'r':
+      return Text == "required";
     case 's':
       return Text == "strong";
     case 'u':

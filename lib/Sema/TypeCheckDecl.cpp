@@ -6695,7 +6695,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
   }
 
-  // Only protocol members can be @optional.
+  // Only protocol members can be optional.
   if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {
       TC.diagnose(OA->getLocation(),

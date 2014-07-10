@@ -5,11 +5,11 @@ protocol B { func b() }
 @class_protocol protocol C { func c() }
 @objc @class_protocol protocol O { func o() }
 @objc @class_protocol protocol OPT { 
-  @optional func opt()
-  @optional class func static_opt()
+  optional func opt()
+  optional class func static_opt()
 
-  @optional var prop: O { get }
-  @optional subscript (x: O) -> O { get }
+  optional var prop: O { get }
+  optional subscript (x: O) -> O { get }
 }
 
 protocol AB : A, B { func ab() }

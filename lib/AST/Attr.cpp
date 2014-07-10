@@ -65,6 +65,7 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (NumAttrsSet == 0 && !DeclAttrs)
     return;
 
+  bool hadDeclModifier = false;
   for (auto DA : *this) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
@@ -79,6 +80,12 @@ void DeclAttributes::print(ASTPrinter &Printer,
                     Options.ExclusiveAttrList.end(),
                     DA->getKind()) == Options.ExclusiveAttrList.end())
         continue;
+    }
+    
+    // Process decl modifiers in a second pass, after the attributes.
+    if (DA->isDeclModifier()) {
+      hadDeclModifier = true;
+      continue;
     }
 
     DA->print(Printer);
@@ -103,6 +110,14 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (auto setterAccessAttr = getAttribute<SetterAccessibilityAttr>())
     Printer << setterAccessAttr->getAttrName() << " ";
 
+  // Process decl modifiers in a second pass, after the attributes.
+  if (hadDeclModifier) {
+    for (auto DA : *this) {
+      if (DA->isDeclModifier())
+        DA->print(Printer);
+    }
+  }
+  
   Optional<bool> MutatingAttr = getMutating();
   if (MutatingAttr)
     Printer << (MutatingAttr.getValue() ? "mutating " : "nonmutating ");
@@ -129,7 +144,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_Lazy:
   case DAK_LLDBDebuggerFunction:
   case DAK_Inline:
-    Printer << "@" << getAttrName();
+  case DAK_Dynamic:
+    if (!DeclAttribute::isDeclModifier(getKind()))
+      Printer << "@";
+    Printer << getAttrName();
     break;
 
   case DAK_Semantics:
@@ -160,10 +178,6 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     break;
   }
 
-  case DAK_Dynamic:
-    Printer << "dynamic";
-    break;
-      
   case DAK_Accessibility:
     Printer << getAttrName();
     break;
@@ -180,9 +194,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     return;
   case DAK_Required:
     if (isImplicit())
-      Printer << "/* @required(inferred) */";
+      Printer << "/* required(inferred) */";
     else
-      Printer << "@required";
+      Printer << "required";
     break;
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");

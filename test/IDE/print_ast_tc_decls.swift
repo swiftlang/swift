@@ -367,8 +367,8 @@ extension d0110_ReadWriteProperties {
 class d0120_TestClassBase {
 // PASS_COMMON-LABEL: {{^}}class d0120_TestClassBase {{{$}}
 
-  @required init() {}
-// PASS_COMMON-NEXT: {{^}}  @required init(){{$}}
+  required init() {}
+// PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
   @final func baseFunc1() {}
 // PASS_COMMON-NEXT: {{^}}  @final func baseFunc1(){{$}}
@@ -386,7 +386,7 @@ class d0121_TestClassDerived : d0120_TestClassBase {
 // PASS_COMMON-LABEL: {{^}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
 
   init() {}
-// PASS_COMMON-NEXT: {{^}}  /* @required(inferred) */ init(){{$}}
+// PASS_COMMON-NEXT: {{^}}  /* required(inferred) */ init(){{$}}
 
   @final override func baseFunc2() {}
 // PASS_COMMON-NEXT: {{^}}  @final override func baseFunc2(){{$}}
@@ -416,11 +416,11 @@ protocol d0130_TestProtocol {
 @objc protocol d0140_TestObjCProtocol {
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0140_TestObjCProtocol {{{$}}
 
-  @optional var property1: Int { get }
-// PASS_COMMON-NEXT: {{^}}  @objc @optional var property1: Int { get }{{$}}
+  optional var property1: Int { get }
+// PASS_COMMON-NEXT: {{^}}  @objc optional var property1: Int { get }{{$}}
 
-  @optional func protocolFunc1()
-// PASS_COMMON-NEXT: {{^}}  @objc @optional func protocolFunc1(){{$}}
+  optional func protocolFunc1()
+// PASS_COMMON-NEXT: {{^}}  @objc optional func protocolFunc1(){{$}}
 }
 
 @class_protocol protocol d0150_TestClassProtocol {}

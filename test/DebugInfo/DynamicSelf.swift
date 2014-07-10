@@ -1,7 +1,7 @@
 // RUN: %swift %s -emit-ir -g -o - | FileCheck %s
 class C {
   let n : Int
-  @required init (number i :Int) {
+  required init (number i :Int) {
     self.n = i
   }
 }

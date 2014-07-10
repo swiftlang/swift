@@ -325,9 +325,7 @@ protected:
   DeclAttribute *Next = nullptr;
 
   DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range,
-                bool Implicit) :
-    AttributeBase(AtLoc, Range)
-  {
+                bool Implicit) : AttributeBase(AtLoc, Range) {
     DeclAttrBits.Kind = static_cast<unsigned>(DK);
     DeclAttrBits.Implicit = Implicit;
     DeclAttrBits.Invalid = 0;
@@ -353,7 +351,11 @@ protected:
                 OnTypeAlias | OnType | OnStruct | OnEnum | OnClass |
                 OnProtocol | OnVar | OnSubscript | OnConstructor |
                 OnDestructor | OnImport,
-    AllowMultipleAttributes = 1 << 16
+    AllowMultipleAttributes = 1 << 16,
+
+    /// True if this is a decl modifier - i.e., that it should not be spelled
+    /// with an @.
+    DeclModifier = 1 << 17
   };
 
   static unsigned getOptions(DeclAttrKind DK);
@@ -472,6 +474,14 @@ public:
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
   }
+  
+  
+  bool isDeclModifier() const {
+    return getOptions() & DeclModifier;
+  }
+  static bool isDeclModifier(DeclAttrKind DK) {
+    return getOptions(DK) & DeclModifier;
+  }
 
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;
@@ -482,12 +492,12 @@ template<DeclAttrKind Kind>
 class SimpleDeclAttr : public DeclAttribute {
 public:
   SimpleDeclAttr(bool IsImplicit)
-      : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) {}
+    : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) {}
 
   SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
-      : DeclAttribute(Kind, AtLoc,
-                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
-                      /*Implicit=*/false) { }
+    : DeclAttribute(Kind, AtLoc,
+                    SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
+                    /*Implicit=*/false) { }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == Kind;

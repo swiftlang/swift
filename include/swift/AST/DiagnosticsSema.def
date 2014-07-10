@@ -392,12 +392,12 @@ ERROR(invalid_decl_attribute,sema_tcd,none,
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
 ERROR(optional_attribute_non_protocol,sema_tcd,none,
-      "'optional' attribute can only be applied to protocol members", ())
+      "'optional' can only be applied to protocol members", ())
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
-      "'optional' attribute can only be applied to members of an @objc protocol", 
+      "'optional' can only be applied to members of an @objc protocol", 
       ())
 ERROR(optional_attribute_initializer,sema_tcd,none,
-      "'optional' attribute cannot be applied to an initializer", ())
+      "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
       "protocol members can only be marked unavailable in an @objc protocol",
       ())
@@ -992,8 +992,8 @@ ERROR(nonclass_convenience_init,sema_tce,none,
       (Type))
 
 ERROR(dynamic_construct_class,sema_tce,none,
-      "constructing an object of class type %0 with a metatype value requires "
-      "an '@required' initializer", (Type))
+      "constructing an object of class type %0 with a metatype value must have "
+      "a 'required' initializer", (Type))
 NOTE(note_nonrequired_initializer,sema_tce,none,
       "selected non-required initializer declared here", ())
 NOTE(note_nonrequired_implicit_initializer,sema_tce,none,
@@ -1327,7 +1327,7 @@ ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
 
 // required
 ERROR(required_non_initializer,attribute_parsing,none,
-      "'required' attribute can only be applied to an initializer", ())
+      "'required' can only be applied to an initializer", ())
 ERROR(required_initializer_nonclass,attribute_parsing,none,
       "'required' initializer in non-class type %0", (Type))
 ERROR(required_initializer_in_extension,attribute_parsing,none,

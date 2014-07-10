@@ -4,18 +4,18 @@
 // Declaring optional requirements
 // -----------------------------------------------------------------------
 @class_protocol @objc protocol P1 {
-  @optional func method(x: Int)
+  optional func method(x: Int)
 
-  @optional var prop: Int { get }
+  optional var prop: Int { get }
 
-  @optional subscript (i: Int) -> Int { get }
+  optional subscript (i: Int) -> Int { get }
 }
 
 // -----------------------------------------------------------------------
 // Providing witnesses for optional requirements
 // -----------------------------------------------------------------------
 
-// One does not have provide a witness for an @optional requirement
+// One does not have provide a witness for an optional requirement
 class C1 : P1 { }
 
 // ... but it's okay to do so.
@@ -33,7 +33,7 @@ class C2 : P1 {
 }
 
 // -----------------------------------------------------------------------
-// Using @optional requirements
+// Using optional requirements
 // -----------------------------------------------------------------------
 
 // Optional method references in generics.
@@ -113,27 +113,27 @@ func optionalSubscriptExistential(t: P1) {
 }
 
 // -----------------------------------------------------------------------
-// Restrictions on the application of @optional
+// Restrictions on the application of optional
 // -----------------------------------------------------------------------
 
-// @optional cannot be used on non-protocol declarations
-@optional var optError: Int = 10 // expected-error{{'optional' attribute can only be applied to protocol members}}
+// optional cannot be used on non-protocol declarations
+optional var optError: Int = 10 // expected-error{{'optional' can only be applied to protocol members}}
 
-@optional struct optErrorStruct { // expected-error{{'optional' attribute can only be applied to protocol members}}
-  @optional var ivar: Int // expected-error{{'optional' attribute can only be applied to protocol members}}
-  @optional func foo() { } // expected-error{{'optional' attribute can only be applied to protocol members}}
+optional struct optErrorStruct { // expected-error{{'optional' can only be applied to protocol members}}
+  optional var ivar: Int // expected-error{{'optional' can only be applied to protocol members}}
+  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
 }
 
-@optional class optErrorClass { // expected-error{{'optional' attribute can only be applied to protocol members}}
-  @optional var ivar: Int = 0 // expected-error{{'optional' attribute can only be applied to protocol members}}
-  @optional func foo() { } // expected-error{{'optional' attribute can only be applied to protocol members}}
+optional class optErrorClass { // expected-error{{'optional' can only be applied to protocol members}}
+  optional var ivar: Int = 0 // expected-error{{'optional' can only be applied to protocol members}}
+  optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
 }
   
 protocol optErrorProtocol {
-  @optional func foo(x: Int) // expected-error{{'optional' attribute can only be applied to members of an @objc protocol}}
-  @optional typealias Assoc // expected-error{{invalid attributes specified for typealias}}
+  optional func foo(x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
+  optional typealias Assoc
 }
 
 @objc protocol optionalInitProto {
-  @optional init() // expected-error{{'optional' attribute cannot be applied to an initializer}}
+  optional init() // expected-error{{'optional' cannot be applied to an initializer}}
 }

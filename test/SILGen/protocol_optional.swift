@@ -1,11 +1,11 @@
 // RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
 
 @class_protocol @objc protocol P1 {
-  @optional func method(x: Int)
+  optional func method(x: Int)
 
-  @optional var prop: Int { get }
+  optional var prop: Int { get }
 
-  @optional subscript (i: Int) -> Int { get }
+  optional subscript (i: Int) -> Int { get }
 }
 
 // CHECK-LABEL: sil @{{.*}}optionalMethodGeneric{{.*}} : $@thin <T where T : P1> (@owned T) -> ()

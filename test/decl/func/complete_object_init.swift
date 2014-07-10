@@ -96,15 +96,15 @@ func testConstructB2(i: Int) {
 // Initializer inheritance can satisfy the requirement for an
 // @required initializer within a subclass.
 class Ab1 {
-  @required init() { }
+  required init() { }
 }
 
 class Ab2 : Ab1 {
   var s: String
 
-  // Subclasses can use this to satisfy the @required initializer
+  // Subclasses can use this to satisfy the required initializer
   // requirement.
-  @required convenience init() { // expected-note{{'required' initializer with type '()' not overridden}}
+  required convenience init() { // expected-note{{'required' initializer with type '()' not overridden}}
     self.init(string: "default")
   }
 

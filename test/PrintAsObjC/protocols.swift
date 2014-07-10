@@ -77,12 +77,12 @@ extension NSString : A, ZZZ {}
   func a()
   func b()
 
-  @optional func c()
-  @optional func d()
+  optional func c()
+  optional func d()
 
   func e()
 
-  @optional func f()
+  optional func f()
 }
 
 // NEGATIVE-NOT: @protocol PrivateProto
@@ -107,7 +107,7 @@ extension NSString : A, ZZZ {}
 @objc @class_protocol protocol Properties {
   var a: Int { get }
   var b: Properties? { get set }
-  @optional var c: String { get }
+  optional var c: String { get }
 }
 
 

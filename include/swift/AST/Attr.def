@@ -79,8 +79,10 @@ TYPE_ATTR(opened)
 //
 // - Attribute name.
 // - Class name without the 'Attr' suffix (ignored for
-// - Options for the attribute, including the declarations the
-//   attribute can appear, and whether duplicates are allowed.
+// - Options for the attribute, including:
+//    * the declarations the attribute can appear on
+//    * whether duplicates are allowed
+//    * whether the attribute is considered a decl modifier or not (no '@')
 // - Unique attribute identifier used for serialization.  This
 //   can never be changed.
 //
@@ -106,10 +108,10 @@ DECL_ATTR(objc, ObjC,
           OnConstructor | OnDestructor, 3)
 
 SIMPLE_DECL_ATTR(required, Required,
-                 OnConstructor, 4)
+                 OnConstructor|DeclModifier, 4)
 
 SIMPLE_DECL_ATTR(optional, Optional,
-                 OnConstructor|OnFunc|OnVar|OnSubscript, 5)
+                 OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
 SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
                  OnProtocol, 6)
@@ -156,8 +158,8 @@ DECL_ATTR(inline, Inline, OnFunc, 20)
 DECL_ATTR(semantics, Semantics,
           OnFunc | OnConstructor | OnDestructor | OnSubscript, 21)
 
-SIMPLE_DECL_ATTR(dynamic, Dynamic, OnFunc | OnVar | OnSubscript | OnConstructor,
-                 21)
+SIMPLE_DECL_ATTR(dynamic, Dynamic,
+                 OnFunc | OnVar | OnSubscript | OnConstructor | DeclModifier, 22)
 
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |

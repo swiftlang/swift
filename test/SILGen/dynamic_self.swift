@@ -9,7 +9,7 @@ protocol P {
 }
 
 class X : P, CP {
-  @required init(int i: Int) { }
+  required init(int i: Int) { }
 
   // CHECK-LABEL: sil @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned
   func f() -> Self { return self }
@@ -22,7 +22,7 @@ class X : P, CP {
 }
 
 class Y : X { 
-  @required init(int i: Int) { }
+  required init(int i: Int) { }
 }
 
 class GX<T> {
@@ -108,7 +108,7 @@ func testAnyObjectDispatch(o: AnyObject) {
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
 class ObjCInit {
-  @required @objc init() { }
+  @objc required init() { }
 }
 
 // CHECK: sil @_TF12dynamic_self12testObjCInit{{.*}} : $@thin (@thick ObjCInit.Type) -> ()

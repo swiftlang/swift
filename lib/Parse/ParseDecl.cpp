@@ -731,6 +731,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       .highlight(DuplicateAttribute->getRange());
   }
 
+    // If this is a decl modifier spelled with an @, emit an error and remove it
+  // with a fixit.
+  if (AtLoc.isValid() && DeclAttribute::isDeclModifier(DK))
+    diagnose(AtLoc, diag::cskeyword_not_attribute, AttrName).fixItRemove(AtLoc);
+  
   return false;
 }
 
@@ -1396,6 +1401,23 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         continue;
       }
         
+      if (Tok.isContextualKeyword("optional")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                              Tok.getText(), DAK_Optional);
+        continue;
+      }
+      if (Tok.isContextualKeyword("required")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                              Tok.getText(), DAK_Required);
+        continue;
+      }
+        
+      if (Tok.isContextualKeyword("dynamic")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Dynamic);
+        continue;
+      }
+        
       if (Tok.isContextualKeyword("mutating") ||
           Tok.isContextualKeyword("nonmutating")) {
         if (MutatingLoc.isValid()) {
@@ -1427,12 +1449,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
           ConvenienceLoc = Tok.getLoc();
         }
         consumeToken(tok::identifier);
-        continue;
-      }
-
-      if (Tok.isContextualKeyword("dynamic")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
-                              Tok.getText(), DAK_Dynamic);
         continue;
       }
         

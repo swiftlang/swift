@@ -117,7 +117,7 @@ public:
       /// desired.
       DynamicLookupMethodCallTail,
 
-      /// A placeholder for \c ! or \c ? in a call to an @optional method.
+      /// A placeholder for \c ! or \c ? in a call to an optional method.
       ///
       /// The default spelling is \c !, but clients may render it as \c ? if
       /// desired.

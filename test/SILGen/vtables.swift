@@ -15,7 +15,7 @@ class C : B {
   // zim inherited from B
   override func zang() {}
 
-  @required init(int i: Int) { }
+  required init(int i: Int) { }
 
   func flopsy() {}
   func mopsy() {}
@@ -49,7 +49,7 @@ class A {
 // CHECK: }
 
 class B : A {
-  @required init(int i: Int) { }
+  required init(int i: Int) { }
 
   override func foo() {}
   // bar inherited from A

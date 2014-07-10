@@ -3,7 +3,7 @@ public class Empty {}
 public class TwoInts {
   public var x, y : Int
   
-  @required public init(a : Int, b : Int) {
+  required public init(a : Int, b : Int) {
     x = a
     y = b
   }
@@ -78,9 +78,9 @@ public protocol PairLike {
 @class_protocol public protocol ClassProto {}
 
 @class_protocol @objc public protocol ObjCProtoWithOptional {
-  @optional func optionalMethod()
-  @optional var optionalVar: Int { get }
-  @optional subscript (i: Int) -> Int { get }
+  optional func optionalMethod()
+  optional var optionalVar: Int { get }
+  optional subscript (i: Int) -> Int { get }
 }
 
 

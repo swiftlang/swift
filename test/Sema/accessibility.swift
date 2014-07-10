@@ -42,7 +42,7 @@ public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivatePro
 
 
 public class Base {
-  @required public init() {}
+  required public init() {}
   // expected-note@+1 + {{overridden declaration is here}}
   public func foo() {}
   // expected-note@+1 + {{overridden declaration is here}}

@@ -156,7 +156,7 @@ private:
        << "@protocol " << PD->getName();
     printProtocols(PD->getProtocols());
     os << "\n";
-    assert(!protocolMembersOptional && "protocols start @required");
+    assert(!protocolMembersOptional && "protocols start required");
     printMembers(PD->getMembers());
     protocolMembersOptional = false;
     os << "@end\n";

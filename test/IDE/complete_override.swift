@@ -60,7 +60,7 @@ protocol ProtocolA {
   init(fromProtocolA: Int)
 
   func protoAFunc()
-  @optional func protoAFuncOptional()
+  optional func protoAFuncOptional()
 
   @noreturn
   func protoAFuncWithAttr()

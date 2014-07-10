@@ -135,11 +135,11 @@ func testB5(b5: B5) {
 
 // Class A8 conforms to P8 in an inheritable manner.
 class A8 : P8 {
-  @required init(int: Int) { }
+  required init(int: Int) { }
 }
 
 class B8 : A8 {
-  @required init(int: Int) { }
+  required init(int: Int) { }
 }
 
 func testB8(b8: B8) {

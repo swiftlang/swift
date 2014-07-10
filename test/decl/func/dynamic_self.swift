@@ -38,7 +38,7 @@ protocol P0 {
 // ----------------------------------------------------------------------------
 // The 'self' type of a Self method is based on Self
 class C1 {
-  @required init(int i: Int) {}
+  required init(int i: Int) {}
 
   // Instance methods have a self of type Self.
   func f(b: Bool) -> Self {

@@ -4,7 +4,7 @@
 // methods.  They are treated as if they
 // were marked optional
 @objc protocol Proto {
-  @optional @availability(*,unavailable) func bad()
+  @availability(*,unavailable) optional func bad()
   func good()
 }
 

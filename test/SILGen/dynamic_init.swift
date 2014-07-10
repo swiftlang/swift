@@ -1,7 +1,7 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
 class C {
-  @required init() { }
+  required init() { }
 }
 
 // CHECK-LABEL: sil @_TF12dynamic_init15testDynamicInit

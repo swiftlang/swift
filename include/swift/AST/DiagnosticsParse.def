@@ -190,6 +190,10 @@ ERROR(ownership_not_attribute,sema_tcd,none,
       "'@%0' is not an attribute, use the '%0' keyword instead",
       (StringRef))
 
+ERROR(cskeyword_not_attribute,sema_tcd,none,
+      "'%0' is a declaration modifier, not an attribute", (StringRef))
+
+
 ERROR(mutating_not_attribute,sema_tcd,none,
       "'mutating' is not an attribute, use the %select{|non}0mutating keyword",
      (unsigned))

@@ -112,7 +112,7 @@ namespace {
     /// Resolve a (non-type) witness via derivation.
     ResolveWitnessResult resolveWitnessViaDerivation(ValueDecl *requirement);
 
-    /// Resolve a (non-type) witness via default definition or @optional.
+    /// Resolve a (non-type) witness via default definition or optional.
     ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
 
     /// Attempt to resolve a type witness via member name lookup.
