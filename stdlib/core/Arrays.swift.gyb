@@ -88,7 +88,7 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
   }
 
   public
-  typealias _Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
+  typealias _Buffer = ${Self}Buffer<T>
 
   public
   init(_ buffer: _Buffer) {
