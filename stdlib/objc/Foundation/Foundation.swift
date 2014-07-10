@@ -744,9 +744,20 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
        _isBridgedVerbatimToObjectiveC(ValueType.self) {
       return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(d))
     }
-    // FIXME: this is incorrect.  Dictionary<T, U> where either T or U is a
-    // value type may never have a Cocoa representation.
-    return Dictionary(_cocoaDictionary: reinterpretCast(d))
+
+    // `Dictionary<KeyType, ValueType>` where either `KeyType` or `ValueType`
+    // is a value type may not be backed by an NSDictionary.
+    let count = d.count
+    var result = [KeyType : ValueType](minimumCapacity: count)
+    d.enumerateKeysAndObjectsUsingBlock {
+      (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
+       stop: UnsafePointer<ObjCBool>) in
+      let nativeKey = _bridgeFromObjectiveC(anyObjectKey, KeyType.self)
+      let nativeValue = _bridgeFromObjectiveC(anyObjectValue, ValueType.self)
+      // FIXME(performance): optimize using unsafeAddNew().
+      result[nativeKey] = nativeValue
+    }
+    return result
   }
 
   public static func bridgeFromObjectiveCConditional(

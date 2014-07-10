@@ -951,9 +951,9 @@ public enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   mutating func migrateDataToNativeStorage(
     cocoaStorage: _CocoaDictionaryStorage
   ) {
-    var minCapacity = NativeStorage.getMinCapacity(
+    let minCapacity = NativeStorage.getMinCapacity(
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
-    var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
+    let allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     _sanityCheck(allocated, "failed to allocate native dictionary storage")
   }
 
@@ -1699,6 +1699,10 @@ struct Dictionary<
   /// * `KeyType` and `ValueType` are bridged verbatim to Objective-C (i.e.,
   ///   are reference types).
   public init(_immutableCocoaDictionary: _SwiftNSDictionary) {
+    _sanityCheck(
+        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
+        _isBridgedVerbatimToObjectiveC(ValueType.self),
+        "Dictionary be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
     _variantStorage = .Cocoa(
         _CocoaDictionaryStorage(cocoaDictionary: _immutableCocoaDictionary))
   }

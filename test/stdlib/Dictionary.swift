@@ -1643,7 +1643,7 @@ func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionar
 
 func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
   var nsd = getAsEquatableNSDictionary(d)
-  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
+  return Dictionary.bridgeFromObjectiveC(nsd)
 }
 
 func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
@@ -1664,7 +1664,7 @@ func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
 
 func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getHugeBridgedVerbatimDictionaryHelper()
-  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
+  return Dictionary.bridgeFromObjectiveC(nsd)
 }
 
 /// A mock dictionary that stores its keys and values in parallel arrays, which
@@ -1720,7 +1720,7 @@ func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObje
 
 func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd: NSDictionary = ParallelArrayDictionary()
-  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
+  return Dictionary.bridgeFromObjectiveC(nsd)
 }
 
 func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {
@@ -1755,7 +1755,7 @@ test_BridgedFromObjC_Verbatim_DictionaryIsCopied()
 func test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied() {
   var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   // Find an existing key.
   if true {
@@ -1814,7 +1814,7 @@ test_BridgedFromObjC_Verbatim_IndexForKey()
 func test_BridgedFromObjC_Nonverbatim_IndexForKey() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   // Find an existing key.
   if true {
@@ -1870,7 +1870,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithIndex()
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var startIndex = d.startIndex
   var endIndex = d.endIndex
@@ -1916,7 +1916,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty()
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var startIndex = d.startIndex
   var endIndex = d.endIndex
@@ -1994,7 +1994,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithKey()
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithKey() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   // Read existing key-value pairs.
   var v = d[TestBridgedKeyTy(10)]
@@ -2102,7 +2102,7 @@ func test_BridgedFromObjC_Nonverbatim_UpdateValueForKey() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
 
     var oldValue =
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
@@ -2122,14 +2122,14 @@ func test_BridgedFromObjC_Nonverbatim_UpdateValueForKey() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
 
     var oldValue =
         d.updateValue(TestBridgedValueTy(2010), forKey: TestBridgedKeyTy(10))!
     assert(oldValue.value == 1010)
 
     var identity2: Word = reinterpretCast(d)
-    assert(identity1 != identity2)
+    assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 3)
 
@@ -2168,7 +2168,7 @@ test_BridgedFromObjC_Verbatim_RemoveAtIndex()
 func test_BridgedFromObjC_Nonverbatim_RemoveAtIndex() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   let foundIndex1 = d.indexForKey(TestBridgedKeyTy(10))!
   assert(d[foundIndex1].0 == TestBridgedKeyTy(10))
@@ -2176,7 +2176,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAtIndex() {
   assert(identity1 == reinterpretCast(d))
 
   d.removeAtIndex(foundIndex1)
-  assert(identity1 != reinterpretCast(d))
+  assert(identity1 == reinterpretCast(d))
   assert(isNativeDictionary(d))
   assert(d.count == 2)
   assert(!d.indexForKey(TestBridgedKeyTy(10)))
@@ -2254,17 +2254,17 @@ func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
 
     var deleted = d.removeValueForKey(TestBridgedKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d))
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
 
     deleted = d.removeValueForKey(TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2: Word = reinterpretCast(d)
-    assert(identity1 != identity2)
+    assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
 
@@ -2279,21 +2279,21 @@ func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
     var identity1: Word = reinterpretCast(d1)
 
     var d2 = d1
-    assert(isCocoaDictionary(d1))
-    assert(isCocoaDictionary(d2))
+    assert(isNativeDictionary(d1))
+    assert(isNativeDictionary(d2))
 
     var deleted = d2.removeValueForKey(TestBridgedKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 == reinterpretCast(d2))
-    assert(isCocoaDictionary(d1))
-    assert(isCocoaDictionary(d2))
+    assert(isNativeDictionary(d1))
+    assert(isNativeDictionary(d2))
 
     deleted = d2.removeValueForKey(TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2: Word = reinterpretCast(d2)
     assert(identity1 != identity2)
-    assert(isCocoaDictionary(d1))
+    assert(isNativeDictionary(d1))
     assert(isNativeDictionary(d2))
     assert(d2.count == 2)
 
@@ -2405,7 +2405,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d = getBridgedNonverbatimDictionary([:])
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
     assert(d.count == 0)
 
     d.removeAll()
@@ -2416,7 +2416,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2431,13 +2431,13 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
-    assert(isCocoaDictionary(d))
+    assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 != reinterpretCast(d))
+    assert(identity1 == reinterpretCast(d))
     assert(d._variantStorage.native.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(!d[TestBridgedKeyTy(10)])
@@ -2446,7 +2446,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d1)
-    assert(isCocoaDictionary(d1))
+    assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2466,7 +2466,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d1)
-    assert(isCocoaDictionary(d1))
+    assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2505,7 +2505,7 @@ test_BridgedFromObjC_Verbatim_Count()
 func test_BridgedFromObjC_Nonverbatim_Count() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   assert(d.count == 3)
   assert(identity1 == reinterpretCast(d))
@@ -2542,7 +2542,7 @@ test_BridgedFromObjC_Verbatim_Generate()
 func test_BridgedFromObjC_Nonverbatim_Generate() {
   var d = getBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
@@ -2587,7 +2587,7 @@ test_BridgedFromObjC_Verbatim_Generate_Empty()
 func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var gen = d.generate()
   // Can not write code below because of
@@ -2639,7 +2639,7 @@ test_BridgedFromObjC_Verbatim_Generate_Huge()
 func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
   var d = getHugeBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
@@ -2697,7 +2697,7 @@ autoreleasepool {
 func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
   var d = getParallelArrayBridgedNonverbatimDictionary()
   var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
+  assert(isNativeDictionary(d))
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
@@ -2756,11 +2756,11 @@ test_BridgedFromObjC_Verbatim_EqualityTest_Empty()
 func test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty() {
   var d1 = getBridgedNonverbatimEquatableDictionary([:])
   var identity1: Word = reinterpretCast(d1)
-  assert(isCocoaDictionary(d1))
+  assert(isNativeDictionary(d1))
 
   var d2 = getBridgedNonverbatimEquatableDictionary([:])
   var identity2: Word = reinterpretCast(d2)
-  assert(isCocoaDictionary(d2))
+  assert(isNativeDictionary(d2))
   assert(identity1 != identity2)
 
   assert(d1 == d2)
@@ -2769,8 +2769,7 @@ func test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty() {
 
   d2[TestBridgedKeyTy(10)] = TestBridgedEquatableValueTy(2010)
   assert(isNativeDictionary(d2))
-  assert(identity2 != reinterpretCast(d2))
-  identity2 = reinterpretCast(d2)
+  assert(identity2 == reinterpretCast(d2))
 
   assert(d1 != d2)
   assert(identity1 == reinterpretCast(d1))
