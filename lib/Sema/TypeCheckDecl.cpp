@@ -2859,6 +2859,8 @@ public:
         reason = ObjCReason::ExplicitlyIBOutlet;
       else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
         reason = ObjCReason::ExplicitlyNSManaged;
+      else if (VD->getAttrs().hasAttribute<DynamicAttr>())
+        reason = ObjCReason::ExplicitlyDynamic;
       else if (protocolContext && protocolContext->isObjC())
         reason = ObjCReason::MemberOfObjCProtocol;
 
@@ -3140,6 +3142,8 @@ public:
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (SD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
+      else if (SD->getAttrs().hasAttribute<DynamicAttr>())
+        reason = ObjCReason::ExplicitlyDynamic;
       else if (protocolContext && protocolContext->isObjC())
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
@@ -4281,9 +4285,13 @@ public:
 
     validateAttributes(TC, FD);
 
-    // A method is ObjC-compatible if it's explicitly @objc, a member of an
-    // ObjC-compatible class, or an accessor for an ObjC property.
-    if (FD->getDeclContext()->getDeclaredTypeInContext()) {
+    // A method is ObjC-compatible if:
+    // - it's explicitly @objc or dynamic,
+    // - it's a member of an ObjC-compatible class, or
+    // - it's an accessor for an ObjC property.
+    Type ContextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+    if (ContextTy) {
+      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
       ProtocolDecl *protocolContext =
           dyn_cast<ProtocolDecl>(FD->getDeclContext());
       bool isMemberOfObjCProtocol =
@@ -4291,6 +4299,8 @@ public:
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (FD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
+      else if (FD->getAttrs().hasAttribute<DynamicAttr>())
+        reason = ObjCReason::ExplicitlyDynamic;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
@@ -4705,6 +4715,7 @@ public:
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
@@ -5202,6 +5213,8 @@ public:
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (CD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
+      else if (CD->getAttrs().hasAttribute<DynamicAttr>())
+        reason = ObjCReason::ExplicitlyDynamic;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
@@ -6502,6 +6515,22 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           D->getMutableAttrs().removeAttribute(objcAttr);
         }
       }
+    }
+  }
+  
+  if (auto dynAttr = Attrs.getAttribute<DynamicAttr>()) {
+    // Only instance properties, methods,
+    // constructors, and subscripts of classes can be dynamic.
+    auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
+    if (!contextTy || !contextTy->getClassOrBoundGenericClass()) {
+      TC.diagnose(dynAttr->getLocation(), diag::dynamic_not_in_class);
+      const_cast<DynamicAttr *>(dynAttr)->setInvalid();
+    } else if (!isa<FuncDecl>(D)
+        && !isa<ConstructorDecl>(D)
+        && !isa<SubscriptDecl>(D)
+        && !isa<VarDecl>(D)) {
+      TC.diagnose(dynAttr->getLocation(), diag::invalid_dynamic_decl);
+      const_cast<DynamicAttr *>(dynAttr)->setInvalid();
     }
   }
 

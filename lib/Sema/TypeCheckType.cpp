@@ -1826,6 +1826,29 @@ static SourceRange getFunctionParamTypeSourceRange(const Pattern *P) {
   return {};
 }
 
+/// Return the %select discriminator used to complain about the correct
+/// attribute during @objc inference.
+static unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
+  enum {
+    DiagnoseAsAtObjC = 0,
+    DiagnoseAsIBOutlet = 1,
+    DiagnoseAsNSManaged = 2,
+    DiagnoseAsDynamic = 3,
+  };
+  switch (Reason) {
+    case ObjCReason::ExplicitlyIBOutlet:
+      return DiagnoseAsIBOutlet;
+    case ObjCReason::ExplicitlyNSManaged:
+      return DiagnoseAsNSManaged;
+    case ObjCReason::ExplicitlyDynamic:
+      return DiagnoseAsDynamic;
+    case ObjCReason::ExplicitlyObjC:
+    case ObjCReason::MemberOfObjCProtocol:
+    case ObjCReason::DontDiagnose:
+      return DiagnoseAsAtObjC;
+  }
+}
+
 static bool isParamRepresentableInObjC(TypeChecker &TC,
                                        const DeclContext *DC,
                                        const Pattern *P) {
@@ -1845,10 +1868,11 @@ static void diagnoseFunctionParamNotRepresentable(
     return;
 
   if (NumParams == 1) {
-    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type);
+    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type,
+                getObjCDiagnosticAttrKind(Reason));
   } else {
     TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
-                ParamIndex + 1);
+                ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
   if (Type ParamTy = getFunctionParamType(P)) {
     SourceRange SR = getFunctionParamTypeSourceRange(P);
@@ -1871,7 +1895,8 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     // Varargs are not representable in Objective-C.
     if (TP->hasVararg()) {
       if (Diagnose && Reason != ObjCReason::DontDiagnose) {
-        TC.diagnose(TP->getEllipsisLoc(), diag::objc_invalid_on_func_variadic);
+        TC.diagnose(TP->getEllipsisLoc(), diag::objc_invalid_on_func_variadic,
+                    getObjCDiagnosticAttrKind(Reason));
         describeObjCReason(TC, AFD, Reason);
       }
 
@@ -1952,7 +1977,8 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
   // objects.
   if (isForeignClassContext(AFD->getDeclContext())) {
     if (Diagnose) {
-      diagnose(AFD->getLoc(), diag::objc_invalid_on_foreign_class);
+      diagnose(AFD->getLoc(), diag::objc_invalid_on_foreign_class,
+               getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(*this, AFD, Reason);
     }
     return false;
@@ -1965,7 +1991,8 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
         ExpectedParamPatterns++;
       if (FD->getBodyParamPatterns().size() != ExpectedParamPatterns) {
         if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried);
+          diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
+                   getObjCDiagnosticAttrKind(Reason));
           describeObjCReason(*this, AFD, Reason);
         }
         return false;
@@ -2001,7 +2028,8 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     Type ResultType = FD->getResultType();
     if (!ResultType->isVoid() && !isRepresentableInObjC(FD, ResultType)) {
       if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_result_type);
+        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_result_type,
+                 getObjCDiagnosticAttrKind(Reason));
         SourceRange Range =
             FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
         diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
@@ -2038,7 +2066,8 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // objects.
   if (isForeignClassContext(VD->getDeclContext())) {
     if (Diagnose) {
-      diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class);
+      diagnose(VD->getLoc(), diag::objc_invalid_on_foreign_class,
+               getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(*this, VD, Reason);
     }
     return false;
@@ -2047,19 +2076,9 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!Diagnose || Result)
     return Result;
 
-  enum {
-    DiagnoseAsAtObjC = 0,
-    DiagnoseAsIBOutlet = 1,
-    DiagnoseAsNSManaged = 2
-  };
-
-  unsigned AttrKind = (Reason == ObjCReason::ExplicitlyIBOutlet)
-                          ? DiagnoseAsIBOutlet
-                          : (Reason == ObjCReason::ExplicitlyNSManaged)
-                            ? DiagnoseAsNSManaged
-                            : DiagnoseAsAtObjC;
   SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
-  diagnose(VD->getLoc(), diag::objc_invalid_on_var, AttrKind)
+  diagnose(VD->getLoc(), diag::objc_invalid_on_var,
+           getObjCDiagnosticAttrKind(Reason))
       .highlight(TypeRange);
   diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(), VD->getType(),
                                      TypeRange);
@@ -2078,7 +2097,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   // objects.
   if (isForeignClassContext(SD->getDeclContext())) {
     if (Diagnose) {
-      diagnose(SD->getLoc(), diag::objc_invalid_on_foreign_class);
+      diagnose(SD->getLoc(), diag::objc_invalid_on_foreign_class,
+               getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(*this, SD, Reason);
     }
     return false;
@@ -2102,7 +2122,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   // Make sure we know how to map the selector appropriately.
   if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
     SourceRange IndexRange = SD->getIndices()->getSourceRange();
-    diagnose(SD->getLoc(), diag::objc_invalid_subscript_key_type)
+    diagnose(SD->getLoc(), diag::objc_invalid_subscript_key_type,
+             getObjCDiagnosticAttrKind(Reason))
       .highlight(IndexRange);
     return false;
   }
@@ -2115,7 +2136,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     TypeRange = SD->getIndices()->getSourceRange();
   else
     TypeRange = SD->getElementTypeLoc().getSourceRange();
-  diagnose(SD->getLoc(), diag::objc_invalid_on_subscript)
+  diagnose(SD->getLoc(), diag::objc_invalid_on_subscript,
+           getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),

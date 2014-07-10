@@ -485,7 +485,8 @@ public:
       : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) {}
 
   SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
-      : DeclAttribute(Kind, AtLoc, SourceRange(AtLoc, NameLoc),
+      : DeclAttribute(Kind, AtLoc,
+                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
                       /*Implicit=*/false) { }
 
   static bool classof(const DeclAttribute *DA) {

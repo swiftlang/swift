@@ -160,6 +160,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     break;
   }
 
+  case DAK_Dynamic:
+    Printer << "dynamic";
+    break;
+      
   case DAK_Accessibility:
     Printer << getAttrName();
     break;

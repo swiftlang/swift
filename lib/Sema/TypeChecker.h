@@ -230,6 +230,7 @@ withoutContext(TypeResolutionOptions options) {
 /// Should only affect diagnostics.
 enum class ObjCReason {
   DontDiagnose,
+  ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
   ExplicitlyNSManaged,

@@ -147,6 +147,8 @@ public:
     switch (Text[0]) {
     case 'c':
       return Text == "convenience";
+    case 'd':
+      return Text == "dynamic";
     case 'm':
       return Text == "mutating";
     case 'n':

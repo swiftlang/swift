@@ -1430,6 +1430,12 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         continue;
       }
 
+      if (Tok.isContextualKeyword("dynamic")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Dynamic);
+        continue;
+      }
+        
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 

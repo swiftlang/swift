@@ -46,6 +46,7 @@ public:
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
+  IGNORED_ATTR(Dynamic)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
@@ -405,6 +406,7 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
