@@ -1,4 +1,5 @@
 // RUN: %swift -parse -verify %s
+// RUN: %swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs
 
 struct NotObjCAble {
   var c: Foo
@@ -23,6 +24,8 @@ class Foo {
   dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked dynamic because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
   dynamic deinit {} // expected-error{{only methods, initializers, properties, and subscripts may be dynamic}}
+
+  func notDynamic() {}
 }
 
 struct Bar {
@@ -35,3 +38,11 @@ struct Bar {
   dynamic func foo(x: Int) {} // expected-error{{only members of classes may be dynamic}}
 }
 
+// CHECK-LABEL: class InheritsDynamic : Foo {
+class InheritsDynamic: Foo {
+  // CHECK-LABLE: {{^}} dynamic override func foo(x: Int)
+  override func foo(x: Int) {}
+
+  // CHECK: {{^}} override func notDynamic()
+  override func notDynamic() {}
+}
