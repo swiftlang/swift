@@ -80,8 +80,32 @@ public protocol _Incrementable : Equatable {
   func successor() -> Self
 }
 
+//===----------------------------------------------------------------------===//
+// Dummy types that we can use when we /don't/ want to create an
+// ambiguity indexing/slicing Range<T> outside a generic context.  See the
+// implementation of Range for details.
+public struct _DisabledRangeIndex_ {
+  private init() {
+    _fatalError("Nobody should ever create one.")
+  }
+}
+
+public struct _DisabledRangeSlice_ {
+  private init() {
+    _fatalError("Nobody should ever create one.")
+  }
+}
+//===----------------------------------------------------------------------===//
+
 public protocol _ForwardIndex : _Incrementable {
   typealias DistanceType : _SignedInteger = Int
+
+  // See the implementation of Range for an explanation of these
+  // associated types.
+  typealias _DisabledRangeIndex = _DisabledRangeIndex_
+#if SWIFT_DISABLE_INT_RANGE_SLICE
+  typealias _DisabledRangeSlice = _DisabledRangeSlice_
+#endif
 }
 
 @prefix @assignment @transparent public

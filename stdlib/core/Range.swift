@@ -80,6 +80,10 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
     return !isEmpty
   }
 
+  public typealias IndexType = T
+  public typealias SliceType = Range<T>
+  public typealias _Element = T
+  
   public subscript(i: T) -> T {
     return i
   }
@@ -88,6 +92,25 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
     return Range(start: x.startIndex, end: x.endIndex)
   }
 
+  //===--------------------------------------------------------------------===//
+  // Overloads for subscript that allow us to make subscripting fail
+  // at compile time, outside a generic context, when T is an Integer
+  // type. The current language design gives us no way to force r[0]
+  // to work "as expected" (return the first element of the range) for
+  // an arbitrary Range<Int>, so instead we make it ambiguous.  Same
+  // goes for slicing.  The error message will be poor but at least it
+  // is a compile-time error.
+  public subscript(_: T._DisabledRangeIndex) -> T {
+    _fatalError("It shouldn't be possible to call this function'")
+  }
+  
+#if SWIFT_DISABLE_INT_RANGE_SLICE
+  public subscript(_: T._DisabledRangeSlice) -> Range {
+    _fatalError("It shouldn't be possible to call this function'")
+  }
+#endif
+  //===--------------------------------------------------------------------===//
+  
   public typealias GeneratorType = RangeGenerator<T>
   public func generate() -> RangeGenerator<T> {
     return GeneratorType(self)

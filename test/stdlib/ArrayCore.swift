@@ -76,7 +76,7 @@ struct MrMcRange : Collection {
   }
 
   subscript(i: Int) -> Tracked {
-    return Tracked(base[i])
+    return Tracked(i)
   }
   
   var base: Base
