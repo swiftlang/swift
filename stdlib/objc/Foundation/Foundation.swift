@@ -626,6 +626,18 @@ extension NSDictionary : DictionaryLiteralConvertible {
   }
 }
 
+extension Dictionary {
+  /// Private initializer used for bridging.
+  ///
+  /// The provided `NSDictionary` will be copied to ensure that the copy can
+  /// not be mutated by other code.
+  public init(_cocoaDictionary: _SwiftNSDictionary) {
+    let cfValue: CFDictionary = reinterpretCast(_cocoaDictionary)
+    let copy = CFDictionaryCreateCopy(nil, cfValue)
+    self = Dictionary(_immutableCocoaDictionary: reinterpretCast(copy))
+  }
+}
+
 /// The entry point for bridging `NSDictionary` to `Dictionary`.
 ///
 /// This is a forced downcast.  This operation should have O(1) complexity.
@@ -730,15 +742,11 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
     if _isBridgedVerbatimToObjectiveC(KeyType.self) &&
        _isBridgedVerbatimToObjectiveC(ValueType.self) {
-      let cfValue: CFDictionary = reinterpretCast(d)
-      let copy = CFDictionaryCreateCopy(nil, cfValue)
-      return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(copy))
+      return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(d))
     }
     // FIXME: this is incorrect.  Dictionary<T, U> where either T or U is a
     // value type may never have a Cocoa representation.
-    let cfValue: CFDictionary = reinterpretCast(d)
-    let copy = CFDictionaryCreateCopy(nil, cfValue)
-    return Dictionary(_cocoaDictionary: reinterpretCast(copy))
+    return Dictionary(_cocoaDictionary: reinterpretCast(d))
   }
 
   public static func bridgeFromObjectiveCConditional(

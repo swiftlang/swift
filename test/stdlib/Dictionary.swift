@@ -1643,7 +1643,7 @@ func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionar
 
 func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
   var nsd = getAsEquatableNSDictionary(d)
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
 }
 
 func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
@@ -1664,7 +1664,7 @@ func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
 
 func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getHugeBridgedVerbatimDictionaryHelper()
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
 }
 
 /// A mock dictionary that stores its keys and values in parallel arrays, which
@@ -1720,7 +1720,7 @@ func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObje
 
 func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd: NSDictionary = ParallelArrayDictionary()
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+  return Dictionary(_immutableCocoaDictionary: reinterpretCast(nsd))
 }
 
 func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {

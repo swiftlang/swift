@@ -1695,9 +1695,14 @@ struct Dictionary<
   }
 
   /// Private initializer used for bridging.
-  public init(_cocoaDictionary: _SwiftNSDictionary) {
-    _variantStorage =
-        .Cocoa(_CocoaDictionaryStorage(cocoaDictionary: _cocoaDictionary))
+  ///
+  /// Only use this initializer when both conditions are true:
+  /// * it is statically known that the given `NSDictionary` is immutable;
+  /// * `KeyType` and `ValueType` are bridged verbatim to Objective-C (i.e.,
+  ///   are reference types).
+  public init(_immutableCocoaDictionary: _SwiftNSDictionary) {
+    _variantStorage = .Cocoa(
+        _CocoaDictionaryStorage(cocoaDictionary: _immutableCocoaDictionary))
   }
 
   //
@@ -2260,10 +2265,13 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     // One way to solve this is to add a third, read-only, representation to
     // variant storage: like _NativeDictionaryStorageOwner, but it would
     // perform casts when accessing elements.
-    return Dictionary(_cocoaDictionary: reinterpretCast(nativeOwner))
+    //
+    // Note: it is safe to treat the storage as immutable here because
+    // Dictionary will not mutate storage with reference count greater than 1.
+    return Dictionary(_immutableCocoaDictionary: reinterpretCast(nativeOwner))
 
   case .Cocoa(let cocoaStorage):
-    return Dictionary(_cocoaDictionary: reinterpretCast(cocoaStorage))
+    return Dictionary(_immutableCocoaDictionary: reinterpretCast(cocoaStorage))
   }
 }
 
