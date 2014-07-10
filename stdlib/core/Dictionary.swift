@@ -216,7 +216,7 @@ protocol _DictionaryStorage {
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
 @transparent
-var _dictionaryDefaultMaxLoadFactorInverse: Double {
+public var _dictionaryDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
 
@@ -399,7 +399,7 @@ public struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   @transparent
-  static func getMinCapacity(
+  public static func getMinCapacity(
       requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
     // `requestedCount + 1` below ensures that we don't fill in the last hole
     return max(Int(Double(requestedCount) * maxLoadFactorInverse),
@@ -409,7 +409,7 @@ public struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   /// Storage should be uniquely referenced.
   /// The `key` should not be present in the dictionary.
   /// This function does *not* update `count`.
-  mutating func unsafeAddNew(#key: KeyType, value: ValueType) {
+  public mutating func unsafeAddNew(#key: KeyType, value: ValueType) {
     var (i, found) = _find(key, _bucket(key))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
@@ -877,7 +877,7 @@ public enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  var native: NativeStorage {
+  public var native: NativeStorage {
     switch self {
     case .Native(let owner):
       return owner.nativeStorage
