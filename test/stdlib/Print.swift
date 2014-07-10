@@ -560,13 +560,13 @@ func test_TuplePrinting() {
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
-  printedIs(arrayOfTuples1, "[(1, two, ►3◀︎, ►4◀︎, V1a18WithoutDescription (has 1 child))]")
+  printedIs(arrayOfTuples1, "[(1, two, ►3◀︎, ►4◀︎, _TtV1a18WithoutDescription)]")
 
   var arrayOfTuples2 =
       [ (1, "two", WithoutDescription(3)),
         (11, "twenty-two", WithoutDescription(33)),
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
-  printedIs(arrayOfTuples2, "[(1, two, V1a18WithoutDescription (has 1 child)), (11, twenty-two, V1a18WithoutDescription (has 1 child)), (111, two hundred twenty-two, V1a18WithoutDescription (has 1 child))]")
+  printedIs(arrayOfTuples2, "[(1, two, _TtV1a18WithoutDescription), (11, twenty-two, _TtV1a18WithoutDescription), (111, two hundred twenty-two, _TtV1a18WithoutDescription)]")
 
   println("test_TuplePrinting done")
 }
@@ -576,7 +576,7 @@ test_TuplePrinting()
 func test_ArbitraryStructPrinting() {
   var arrayOfArbitraryStructs =
       [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
-  printedIs(arrayOfArbitraryStructs, "[V1a18WithoutDescription (has 1 child), V1a18WithoutDescription (has 1 child), V1a18WithoutDescription (has 1 child)]")
+  printedIs(arrayOfArbitraryStructs, "[_TtV1a18WithoutDescription, _TtV1a18WithoutDescription, _TtV1a18WithoutDescription]")
 
   println("test_ArbitraryStructPrinting done")
 }
@@ -597,7 +597,7 @@ func test_StringInterpolation() {
   assertEquals("nan", "\(0 / 0.0)")
 
   assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
-  assertEquals("V1a18WithoutDescription (has 1 child)", "\(WithoutDescription(1))")
+  assertEquals("_TtV1a18WithoutDescription", "\(WithoutDescription(1))")
 
   println("test_StringInterpolation done")
 }
