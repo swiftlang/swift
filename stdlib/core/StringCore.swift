@@ -138,8 +138,8 @@ public struct _StringCore {
     self._baseAddress = baseAddress
     
     self._countAndFlags
-      = (UWord(elementShift) << UWord(sizeof(UWord.self) * 8 - 1))
-      | ((hasCocoaBuffer ? 1 : 0) << UWord(sizeof(UWord.self) * 8 - 2)) 
+      = (UWord(elementShift) << UWord(sizeof(UWord.self) &* 8 &- 1))
+      | ((hasCocoaBuffer ? 1 : 0) << UWord(sizeof(UWord.self) &* 8 &- 2)) 
       | UWord(count)
     
     self._owner = owner
@@ -184,7 +184,7 @@ public struct _StringCore {
   /// left shift amount to apply to an offset N so that when
   /// added to a UnsafePointer<RawByte>, it traverses N elements
   var elementShift: Int {
-    return Int(_countAndFlags >> UWord(sizeof(UWord.self) * 8 - 1))
+    return Int(_countAndFlags >> UWord(sizeof(UWord.self) &* 8 &- 1))
   }
   
   /// the number of bytes per element
