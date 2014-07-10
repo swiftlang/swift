@@ -140,7 +140,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       ApplyInst *AI = dyn_cast<ApplyInst>(I++);
       if (AI) {
         // If the call site is on a slow path, do not inline.
-        if (ColdBlocks.isCold(AI->getParent())) {
+        if (!AI->isTransparent() && ColdBlocks.isCold(AI->getParent())) {
           DEBUG(llvm::dbgs() << "    Pruning cold call site:" <<  *AI);
           continue;
         }
