@@ -47,6 +47,10 @@ namespace {
     InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
 
     bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA);
+
+  protected:
+    bool isProfitableToInline(SILFunction *Caller, SILFunction *Callee,
+                              const ApplyInst *AI, unsigned CalleeCount);
   };
 }
 
@@ -113,6 +117,63 @@ static bool transitivelyReferencesLessVisibleLinkage(const SILFunction &F,
   return false;
 }
 
+/// return true if inlining this call site is sane and profitable.
+bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
+                                                 SILFunction *Callee,
+                                                 const ApplyInst *AI,
+                                                 unsigned CalleeCount) {
+  // To handle recursion and prevent massive code size expansion, we prevent
+  // inlining the same callee many times into the caller. The recursion
+  // detection logic in CallGraphAnalysis can't handle class_method in the
+  // callee. To avoid inlining the recursion too many times, we stop at the
+  // threshold (currently set to 1024).
+  const unsigned CallsToCalleeThreshold = 1024;
+  if (CalleeCount > CallsToCalleeThreshold) {
+    DEBUG(llvm::dbgs() <<
+          "        FAIL! Skipping callees that are called too many times.\n");
+    return false;
+  }
+
+  // Prevent circular inlining.
+  if (Callee == Caller) {
+    DEBUG(llvm::dbgs() << "        FAIL! Skipping recursive calls.\n");
+    return false;
+  }
+
+  // If Callee has a less visible linkage than caller or references something
+  // with a less visible linkage than caller, don't inline Callee into caller.
+  if (transitivelyReferencesLessVisibleLinkage(*Callee,
+                                               Caller->getLinkage())) {
+    DEBUG(llvm::dbgs() << "        FAIL! Skipping less visible call.");
+    return false;
+  }
+
+  // Check if the function takes a closure.
+  bool HasClosure = false;
+  for (auto &Op : AI->getAllOperands()) {
+    if (isa<PartialApplyInst>(Op.get())) {
+      HasClosure = true;
+      break;
+    }
+  }
+  // If the function accepts a closure increase the threshold because
+  // inlining has the potential to eliminate the closure.
+  unsigned BoostFactor = HasClosure ? 2 : 1;
+
+  // Calculate the inlining cost of the callee.
+  unsigned CalleeCost = getFunctionCost(Callee, Caller,
+                                        InlineCostThreshold * BoostFactor);
+
+  unsigned Threshold = InlineCostThreshold * BoostFactor;
+  if (CalleeCost > Threshold) {
+    DEBUG(llvm::dbgs() << "        FAIL! Function too big to inline. "
+          "Skipping. CalleeCost: " << CalleeCost << ". Threshold: "
+          << Threshold << "\n");
+    return false;
+  }
+  return true;
+}
+
 /// \brief Attempt to inline all calls smaller than our threshold into F until.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
@@ -149,7 +210,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     }
   }
 
-  const unsigned CallsToCalleeThreshold = 1024;
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount; 
   for (auto AI : CallSites) {
@@ -176,55 +236,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     DEBUG(llvm::dbgs() << "        Found callee:" <<  Callee->getName()
           << ".\n");
 
-    // To handle recursion and prevent massive code size expansion, we prevent
-    // inlining the same callee many times into the caller. The recursion
-    // detection logic in CallGraphAnalysis can't handle class_method in the
-    // callee. To avoid inlining the recursion too many times, we stop at the
-    // threshold (currently set to 1024).
-    if (CalleeCount[Callee] > CallsToCalleeThreshold) {
-      DEBUG(llvm::dbgs() <<
-        "        FAIL! Skipping callees that are called too many times.\n");
+    if (!isProfitableToInline(Caller, Callee, AI, CalleeCount[Callee]))
       continue;
-    }
-
-    // Prevent circular inlining.
-    if (Callee == Caller) {
-      DEBUG(llvm::dbgs() << "        FAIL! Skipping recursive calls.\n");
-      continue;
-    }
-
-    // If Callee has a less visible linkage than caller or references something
-    // with a less visible linkage than caller, don't inline Callee into caller.
-    if (transitivelyReferencesLessVisibleLinkage(*Callee,
-                                                 Caller->getLinkage())) {
-      DEBUG(llvm::dbgs() << "        FAIL! Skipping less visible call.");
-      continue;
-    }
-
-    // Check if the function takes a closure.
-    bool HasClosure = false;
-    for (auto &Op : AI->getAllOperands()) {
-      if (isa<PartialApplyInst>(Op.get())) {
-        HasClosure = true;
-        break;
-      }
-    }
-
-    // If the function accepts a closure increase the threshold because
-    // inlining has the potential to eliminate the closure.
-    unsigned BoostFactor = HasClosure ? 2 : 1;
-
-    // Calculate the inlining cost of the callee.
-    unsigned CalleeCost = getFunctionCost(Callee, Caller,
-                                          InlineCostThreshold * BoostFactor);
-
-    unsigned Threshold = InlineCostThreshold * BoostFactor;
-    if (CalleeCost > Threshold) {
-      DEBUG(llvm::dbgs() << "        FAIL! Function too big to inline. "
-            "Skipping. CalleeCost: " << CalleeCost << ". Threshold: "
-            << Threshold << "\n");
-      continue;
-    }
 
     // Add the arguments from AI into a SILValue list.
     SmallVector<SILValue, 8> Args;
