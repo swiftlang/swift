@@ -10,48 +10,76 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper for a `BidirectionalIndex` that reverses its
+
+/// Return an `Array` containing the elements of `source` in reverse
+/// order.
+public func reverse<C:Collection where C.IndexType: BidirectionalIndex>(
+  source: C
+) -> [C.GeneratorType.Element] {
+  return lazy(source).reverse().array
+}
+
+
+% for traversal in ('Bidirectional', 'RandomAccess'):
+%   View = '%sReverseView' % traversal
+%   Self = 'Lazy%sCollection' % traversal
+%   Index = 'Reverse%sIndex' % traversal
+%   IndexProtocol = '%sIndex' % traversal
+
+/// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal
-public struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
+public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
   var _base: I
 
   init(_ _base: I) { self._base = _base }
 
-  public func successor() -> ReverseIndex {
-    return ReverseIndex(_base.predecessor())
+  public func successor() -> ${Index} {
+    return ${Index}(_base.predecessor())
   }
   
-  public func predecessor() -> ReverseIndex {
-    return ReverseIndex(_base.successor())
+  public func predecessor() -> ${Index} {
+    return ${Index}(_base.successor())
   }
+  
+  typealias DistanceType = I.DistanceType
+  
+%   if traversal == 'RandomAccess':
+  public func distanceTo(other: ${Index}) -> DistanceType {
+    return other._base.distanceTo(_base)
+  }
+  
+  public func advancedBy(amount: DistanceType) -> ${Index} {
+    return ${Index}(_base.advancedBy(-amount))
+  }
+%   end
 }
 
-public func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
+public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
   return lhs._base == rhs._base
 }
 
 /// The lazy `Collection` returned by `reverse(c)` where `c` is a
-/// `Collection`
-public struct ReverseView<
-  T: Collection where T.IndexType: BidirectionalIndex
+/// `Collection` with an `IndexType` conforming to `${IndexProtocol}`
+public struct ${View}<
+  T: Collection where T.IndexType: ${IndexProtocol}
 > : Collection {
-  public typealias IndexType = ReverseIndex<T.IndexType>
-  public typealias GeneratorType = IndexingGenerator<ReverseView>
+  public typealias IndexType = ${Index}<T.IndexType>
+  public typealias GeneratorType = IndexingGenerator<${View}>
 
   init(_ _base: T) {
     self._base = _base 
   }
 
-  public func generate() -> IndexingGenerator<ReverseView> {
+  public func generate() -> IndexingGenerator<${View}> {
     return IndexingGenerator(self)
   }
   
   public var startIndex: IndexType {
-    return ReverseIndex(_base.endIndex)
+    return ${Index}(_base.endIndex)
   }
   
   public var endIndex: IndexType {
-    return ReverseIndex(_base.startIndex)
+    return ${Index}(_base.startIndex)
   }
 
   public subscript(i: IndexType) -> T.GeneratorType.Element {
@@ -61,29 +89,14 @@ public struct ReverseView<
   var _base: T
 }
 
-/*
-/// Return a lazy Collection containing the elements `x` of `source` for
-/// which `includeElement(x)` is `true`
-public func reverse<
-  C: Collection where C.IndexType: BidirectionalIndex
->(source: C) -> ReverseView<C> {
-  return ReverseView(source)
-}
-*/
-
-% traversals = ('Bidirectional', 'RandomAccess')
-% for View, Self in [ 
-%   ('ReverseView', 'Lazy%sCollection' % t) for t in traversals
-% ]:
-
 extension ${Self} {
   /// Return a `${View}` over this `${Self}`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public
   func reverse() -> LazyBidirectionalCollection<${View}<S>> {
-    return LazyBidirectionalCollection<ReverseView<S>>(
-      ReverseView<S>(self._base)
+    return LazyBidirectionalCollection<${View}<S>>(
+      ${View}<S>(self._base)
     )
   }
 }
