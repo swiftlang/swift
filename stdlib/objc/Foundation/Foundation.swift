@@ -837,7 +837,7 @@ public class NSFastGenerator : Generator {
 }
 
 extension NSArray : Sequence {
-  @final public
+  final public
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -846,12 +846,12 @@ extension NSArray : Sequence {
 /*
 // FIXME: <rdar://problem/16951124> prevents this from being used
 extension NSArray : Swift.Collection {
-  @final
+  final
   var startIndex: Int {
     return 0
   }
   
-  @final
+  final
   var endIndex: Int {
     return count
   }

@@ -24,7 +24,7 @@ class Foo {
   }
 // CHECK: subscript (x: Int, y: Int) -> Int
 
-  @final var x : Int
+  final var x : Int
 // CHECK: var x: Int
 
   var y : Int {

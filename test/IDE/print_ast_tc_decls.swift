@@ -370,8 +370,8 @@ class d0120_TestClassBase {
   required init() {}
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
-  @final func baseFunc1() {}
-// PASS_COMMON-NEXT: {{^}}  @final func baseFunc1(){{$}}
+  final func baseFunc1() {}
+// PASS_COMMON-NEXT: {{^}}  final func baseFunc1(){{$}}
 
   func baseFunc2() {}
 // PASS_COMMON-NEXT: {{^}}  func baseFunc2(){{$}}
@@ -388,13 +388,13 @@ class d0121_TestClassDerived : d0120_TestClassBase {
   init() {}
 // PASS_COMMON-NEXT: {{^}}  /* required(inferred) */ init(){{$}}
 
-  @final override func baseFunc2() {}
-// PASS_COMMON-NEXT: {{^}}  @final override func baseFunc2(){{$}}
+  final override func baseFunc2() {}
+// PASS_COMMON-NEXT: {{^}}  final override func baseFunc2(){{$}}
 
-  @final override subscript(i: Int) -> Int {
+  final override subscript(i: Int) -> Int {
     return 0
   }
-// PASS_COMMON-NEXT: {{^}}  @final override subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  final override subscript (i: Int) -> Int { get }{{$}}
 }
 
 protocol d0130_TestProtocol {
@@ -621,7 +621,7 @@ class d0250_ExplodePattern {
   var (instanceVar5, instanceVar6) = (FooStruct(), FooStruct())
   var (instanceVar7, instanceVar8: FooStruct) = (FooStruct(), FooStruct())
   var (instanceVar9, instanceVar10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
-  @final var (instanceVar11, instanceVar12) = (FooStruct(), FooStruct())
+  final var (instanceVar11, instanceVar12) = (FooStruct(), FooStruct())
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar4: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar5: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar6: FooStruct{{$}}
@@ -629,8 +629,8 @@ class d0250_ExplodePattern {
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar8: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar9: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  var instanceVar10: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  @final var instanceVar11: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  @final var instanceVar12: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar11: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar12: FooStruct{{$}}
 
   let instanceLet1 = 0
   let instanceLet2 = 0.0
@@ -660,8 +660,8 @@ class d0260_ExplodePattern_TestClassBase {
   }
 // PASS_EXPLODE_PATTERN-NEXT: {{^}}  init(){{$}}
 
-  @final var baseProp1: Int
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @final var baseProp1: Int{{$}}
+  final var baseProp1: Int
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  final var baseProp1: Int{{$}}
 
   var baseProp2: Int {
     get {
@@ -675,13 +675,13 @@ class d0260_ExplodePattern_TestClassBase {
 class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {{{$}}
 
-  @final override var baseProp2: Int {
+  final override var baseProp2: Int {
     get {
       return 0
     }
     set {}
   }
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @final override var baseProp2: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  final override var baseProp2: Int{{$}}
 }
 
 //===---

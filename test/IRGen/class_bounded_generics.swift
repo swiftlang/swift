@@ -33,9 +33,9 @@ struct ClassProtocolFieldStruct {
 }
 
 class ClassGenericFieldClass<T:ClassBound> {
-  @final var x : Int = 0
-  @final var y : T
-  @final var z : Int = 0
+  final var x : Int = 0
+  final var y : T
+  final var z : Int = 0
 
   init(t: T) {
     y = t

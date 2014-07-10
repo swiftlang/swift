@@ -847,7 +847,7 @@ bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
     // thing as the getter/setter (i.e., it can't be overriden), then just do a
     // direct access.
     //
-    // This is true in structs and for @final properties.
+    // This is true in structs and for final properties.
     // TODO: What about static properties?
     if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
         var->getStorageKind() == VarDecl::Stored) {

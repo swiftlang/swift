@@ -817,7 +817,7 @@ func testClassPropertiesInProtocol() -> Int {
 class GenericClass<T> {
   var x: T
   var y: Int
-  @final let z: T
+  final let z: T
 
   init() { fatalError("scaffold") }
 }

@@ -467,7 +467,7 @@ namespace {
         break;
       }
       if (VD->getAttrs().hasAttribute<LazyAttr>())
-        OS << " @lazy";
+        OS << " lazy";
 
       if (FuncDecl *Get = VD->getGetter()) {
         OS << "\n";

@@ -11,9 +11,9 @@ extension Range {
 }
 
 struct LazyContainer {
-  @lazy var lazyVar = 42
+  lazy var lazyVar = 42
 }
 
 class LazyContainerClass {
-  @lazy var lazyVar = 42
+  lazy var lazyVar = 42
 }

@@ -1401,6 +1401,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         continue;
       }
         
+      // FIXME: This is ridiculous, this all needs to be sucked into the
+      // declparsing goop.
       if (Tok.isContextualKeyword("optional")) {
         parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
                               Tok.getText(), DAK_Optional);
@@ -1411,7 +1413,18 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                               Tok.getText(), DAK_Required);
         continue;
       }
+      if (Tok.isContextualKeyword("lazy")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                              Tok.getText(), DAK_Lazy);
+        continue;
+      }
+      if (Tok.isContextualKeyword("final")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+                              Tok.getText(), DAK_Final);
+        continue;
+      }
         
+     
       if (Tok.isContextualKeyword("dynamic")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
                               Tok.getText(), DAK_Dynamic);

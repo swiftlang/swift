@@ -240,7 +240,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
 
 /// An instance of this class has all dictionary data tail-allocated.  It is
 /// used as a `HeapBuffer` storage.
-@final class _NativeDictionaryStorageImpl<KeyType : Hashable, ValueType> :
+final class _NativeDictionaryStorageImpl<KeyType : Hashable, ValueType> :
     HeapBufferStorageBase {
 
   typealias Element = _DictionaryElement<KeyType, ValueType>
@@ -253,7 +253,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     buffer._value.destroy()
     buffer.elementStorage.destroy(body.capacity)
   }
-  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     let buffer = DictionaryHeapBuffer(
         reinterpretCast(self) as DictionaryHeapBuffer.Storage)
     return buffer._allocatedSizeAndAlignMask()
@@ -544,7 +544,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   }
 }
 
-@final @objc
+@objc final
 class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
     : _NativeDictionaryStorageKeyNSEnumeratorBase {
 
@@ -680,7 +680,7 @@ class _NativeDictionaryStorageOwnerBase
 /// is also a proper `NSDictionary` subclass, which is returned to Objective-C
 /// during bridging.  `DictionaryIndex` points directly to
 /// `_NativeDictionaryStorage`.
-@final public
+final public
 class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
     : _NativeDictionaryStorageOwnerBase {
 
@@ -1543,7 +1543,7 @@ struct _CocoaFastEnumerationStackBuf {
   }
 }
 
-@final
+final
 class _CocoaDictionaryGenerator : Generator {
   // Cocoa dictionary generator has to be a class, otherwise we can not
   // guarantee that the fast enumeration struct is pinned to a certain memory

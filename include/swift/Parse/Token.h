@@ -149,6 +149,10 @@ public:
       return Text == "convenience";
     case 'd':
       return Text == "dynamic";
+    case 'f':
+      return Text == "final";
+    case 'l':
+      return Text == "lazy";
     case 'm':
       return Text == "mutating";
     case 'n':

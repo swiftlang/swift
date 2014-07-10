@@ -995,7 +995,7 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (pbd->hasInit())
     return true;
 
-  // If it is an IBOutlet, is NSManaged, or is a @lazy variable, it is trivially
+  // If it is an IBOutlet, is NSManaged, or is a lazy variable, it is trivially
   // true.
   if (auto var = pbd->getSingleVar()) {
     if (var->getAttrs().hasAttribute<IBOutletAttr>() ||
@@ -1535,7 +1535,7 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
   // uniform and to be able to put the getter in a vtable).
   Get->getMutableAttrs().setAttr(AK_transparent, Loc);
 
-  // If the var is marked @final, then so is the getter.
+  // If the var is marked final, then so is the getter.
   if (VD->isFinal())
     Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 }
@@ -1679,7 +1679,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
 
-    // Make sure the didSet/willSet accessors are marked @final if in a class.
+    // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
       willSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
@@ -1706,7 +1706,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
 
-    // Make sure the didSet/willSet accessors are marked @final if in a class.
+    // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
       didSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
@@ -1774,7 +1774,7 @@ namespace {
 }
 
 
-/// Synthesize the getter for an @lazy property with the specified storage
+/// Synthesize the getter for an lazy property with the specified storage
 /// vardecl.
 static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                             TypeChecker &TC) {
@@ -1833,7 +1833,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
-  //   @lazy var (a,b) = foo()
+  //   lazy var (a,b) = foo()
   auto *InitValue = VD->getParentPattern()->getInit();
   bool wasChecked = VD->getParentPattern()->wasInitChecked();
   VD->getParentPattern()->setInit(nullptr, true);
@@ -1877,7 +1877,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
 }
 
 
-/// @lazy properties get a storage variable synthesized for them.
+/// lazy properties get a storage variable synthesized for them.
 static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getStorageKind() == AbstractStorageDecl::Computed &&
          "variable not validated yet");
@@ -2903,7 +2903,7 @@ public:
     if (VD->getAttrs().hasAttribute<NSManagedAttr>() && !VD->getGetter())
       convertNSManagedStoredVarToComputed(VD, TC);
 
-    // Synthesize accessors for @lazy, all checking already been performed.
+    // Synthesize accessors for lazy, all checking already been performed.
     if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
         !VD->getGetter()->hasBody())
       completeLazyVarImplementation(VD, TC);
@@ -2929,7 +2929,7 @@ public:
         !VD->getGetter()->getBody())
       synthesizeObservingAccessors(VD, TC);
 
-    // If this variable is marked @final and has a getter or setter, mark the
+    // If this variable is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (VD->isFinal()) {
       if (VD->getGetter() && !VD->getGetter()->isFinal())
@@ -3124,7 +3124,7 @@ public:
 
     validateAttributes(TC, SD);
 
-    // If this variable is marked @final and has a getter or setter, mark the
+    // If this variable is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (SD->isFinal()) {
       if (SD->getGetter() && !SD->getGetter()->isFinal())
@@ -3644,7 +3644,7 @@ public:
 
     TC.addImplicitDestructor(CD);
 
-    // Mark all members of @final classes as @final.
+    // Mark all members of final classes as final.
     if (CD->isFinal())
       for (Decl *Member : CD->getMembers())
         if (isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
@@ -5543,18 +5543,18 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
     }
 
-    // Synthesize accessors for @lazy.
+    // Synthesize accessors for lazy.
     if (!VD->getGetter() && VD->getAttrs().hasAttribute<LazyAttr>() &&
         !VD->isStatic() && !VD->isBeingTypeChecked()) {
       VD->setIsBeingTypeChecked();
 
       auto *getter = createGetterPrototype(VD, *this);
-      // If the var is marked @final, then so is the getter.
+      // If the var is marked final, then so is the getter.
       if (VD->isFinal()) {
         ASTContext &ctx = VD->getASTContext();
         getter->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
       }
-      // @lazy getters are mutating on an enclosing struct.
+      // lazy getters are mutating on an enclosing struct.
       getter->setMutating();
       getter->setAccessibility(VD->getAccessibility());
 
@@ -5644,7 +5644,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
       auto varType = tc.getTypeOfRValue(var);
 
-      // If var is a @lazy property, its value is provided for the underlying
+      // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
       // need to do this because the implicit constructor is added before all
       // the properties are type checked.  Perhaps init() synth should be moved

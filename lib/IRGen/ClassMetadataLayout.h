@@ -118,7 +118,7 @@ private:
     
     // Add entries for the methods.
     for (auto member : theClass->getMembers()) {
-      // If this is a non-overriding @final member, we don't need table entries.
+      // If this is a non-overriding final member, we don't need table entries.
       if (auto *VD = dyn_cast<ValueDecl>(member))
         if (VD->isFinal() && VD->getOverriddenDecl() == nullptr)
           continue;

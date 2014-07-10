@@ -38,6 +38,10 @@ Latest
 * Introduced the new BooleanLiteralConvertible protocol, which allows
   user-defined types to support Boolean literals. "true" and "false"
   are now Boolean constants and keywords.
+  
+* The "@final", "@lazy", "@required" and "@optional" attributes are now
+  considered to be declaration modifiers - they no longer require (or allow) an
+  @ sign.
 
 2014-07-03
 ----------

@@ -145,6 +145,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_LLDBDebuggerFunction:
   case DAK_Inline:
   case DAK_Dynamic:
+  case DAK_Accessibility:
     if (!DeclAttribute::isDeclModifier(getKind()))
       Printer << "@";
     Printer << getAttrName();
@@ -177,10 +178,6 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     }
     break;
   }
-
-  case DAK_Accessibility:
-    Printer << getAttrName();
-    break;
 
   case DAK_SetterAccessibility:
     Printer << getAttrName() << "(set)";

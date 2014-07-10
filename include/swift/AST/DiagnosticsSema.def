@@ -841,15 +841,15 @@ ERROR(override_final,sema_tcd,none,
       "%0 overrides a 'final' %0", (DescriptiveDeclKind))
 
 ERROR(member_cannot_be_final,sema_tcd,none,
-      "only classes and class members may be marked with the @final attribute",
+      "only classes and class members may be marked with 'final'",
       ())
 
 ERROR(final_not_allowed_here,sema_tcd,none,
-      "@final may only be applied to classes, properties, methods, and "
+      "final may only be applied to classes, properties, methods, and "
       "subscripts", ())
 
 ERROR(final_not_on_accessors,sema_tcd,none,
-      "@final cannot be applied to accessors, it must be put on the "
+      "final cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
 
 ERROR(override_noreturn_with_return,sema_tcd,none,
@@ -901,28 +901,28 @@ NOTE(attr_UIApplicationMain_script_here,sema_tcd,none,
      "top-level code defined in this source file",
      ())
 
-// lazy attribute
+// lazy 
 ERROR(lazy_not_on_let,sema_tcd,none,
-      "'lazy' attribute cannot be used on a let", ())
+      "'lazy' cannot be used on a let", ())
 ERROR(lazy_not_on_var,sema_tcd,none,
-      "'lazy' attribute may only be used on 'var' declarations", ())
+      "'lazy' may only be used on 'var' declarations", ())
 ERROR(lazy_not_on_computed,sema_tcd,none,
-      "'lazy' attribute may not be used on a computed property", ())
+      "'lazy' may not be used on a computed property", ())
 
 ERROR(lazy_on_already_lazy_global,sema_tcd,none,
-      "'lazy' attribute may not be used on an already-lazy global", ())
+      "'lazy' may not be used on an already-lazy global", ())
 ERROR(lazy_not_in_protocol,sema_tcd,none,
-      "'lazy' attribute isn't allowed on a protocol requirement", ())
+      "'lazy' isn't allowed on a protocol requirement", ())
 ERROR(lazy_requires_initializer,sema_tcd,none,
-      "@lazy properties must have an initializer", ())
+      "lazy properties must have an initializer", ())
 
 ERROR(lazy_requires_single_var,sema_tcd,none,
-      "'lazy' attribute cannot destructure an initializer", ())
+      "'lazy' cannot destructure an initializer", ())
 
 ERROR(lazy_must_be_property,sema_tcd,none,
-      "@lazy is only valid for members of a struct or class", ())
+      "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_observable,sema_tcd,none,
-      "@lazy properties may not have observers", ())
+      "lazy properties may not have observers", ())
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,sema_tcd,none,

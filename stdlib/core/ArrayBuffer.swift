@@ -19,7 +19,7 @@ import SwiftShims
 
 enum _ArrayCastKind { case Up, Down, DeferredDown }
 
-@final internal
+final internal
 class IndirectArrayBuffer {
   
   init<T>(

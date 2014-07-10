@@ -18,7 +18,7 @@ let emptyNSSwiftArray : _NSSwiftArray
   = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
 // The class that implements the storage for a ContiguousArray<T>
-@final internal class ContiguousArrayStorage<T> : _NSSwiftArray {
+final internal class ContiguousArrayStorage<T> : _NSSwiftArray {
   typealias Buffer = ContiguousArrayBuffer<T>
   
   deinit {
@@ -27,7 +27,7 @@ let emptyNSSwiftArray : _NSSwiftArray
     b._base._value.destroy()
   }
 
-  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._base._allocatedSizeAndAlignMask()
   }
 

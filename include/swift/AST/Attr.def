@@ -101,7 +101,7 @@ DECL_ATTR(availability, Availability,
           OnConstructor | OnDestructor | AllowMultipleAttributes, 1)
 
 SIMPLE_DECL_ATTR(final, Final,
-                 OnClass | OnFunc | OnVar | OnSubscript, 2)
+                 OnClass | OnFunc | OnVar | OnSubscript|DeclModifier, 2)
 
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
@@ -142,7 +142,7 @@ SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
 
 SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 15)
 
-SIMPLE_DECL_ATTR(lazy, Lazy, OnVar, 16)
+SIMPLE_DECL_ATTR(lazy, Lazy, OnVar|DeclModifier, 16)
 
 SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
                  OnFunc, 17)
@@ -163,10 +163,12 @@ SIMPLE_DECL_ATTR(dynamic, Dynamic,
 
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
-                  OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor,
+                  OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
+                  DeclModifier,
                   /* Not serialized */ 65535)
 
-VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript,
+VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript |
+                  DeclModifier,
                   /* Not serialized */ 65535)
 
 VIRTUAL_DECL_ATTR(override, Override,

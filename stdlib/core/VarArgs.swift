@@ -143,7 +143,7 @@ extension Double : CVarArg {
 
 #if !arch(x86_64)
 
-@final public
+final public
 class VaListBuilder {
   
   func append(arg: CVarArg) {
@@ -161,7 +161,7 @@ class VaListBuilder {
 
 #else
 
-@final public
+final public
 class VaListBuilder {
 
   struct Header {
@@ -211,7 +211,7 @@ class VaListBuilder {
   var gpRegistersUsed = 0
   var sseRegistersUsed = 0
 
-  @final  // Property must be final since it is used by Builtin.addressof.
+  final  // Property must be final since it is used by Builtin.addressof.
   var header = Header()
   var storage: [Word]
 }

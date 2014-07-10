@@ -1088,7 +1088,7 @@ public:
     }
     
   not_overridden:
-    // If this is a @final member and isn't overriding something, we don't need
+    // If this is a final member and isn't overriding something, we don't need
     // to add it to the vtable.
     if (member.getDecl()->isFinal())
       return;

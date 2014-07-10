@@ -2,10 +2,10 @@
 
 class TestClass {
 
-  @final
+  final
   var finalProperty : Int { return 42 }
 
-  @final
+  final
   func finalMethod() -> Int { return 12 }
 
 
@@ -13,7 +13,7 @@ class TestClass {
 }
 
 class TestDerived : TestClass {
-  @final
+  final
   override func baseMethod() {}
 }
 

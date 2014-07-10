@@ -262,7 +262,7 @@ void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
 }
 
 void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
-  // @lazy may only be used on properties.
+  // lazy may only be used on properties.
   auto *VD = dyn_cast<VarDecl>(D);
   if (!VD)
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_var);
@@ -272,7 +272,7 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (VD->isLet())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
 
-  // @lazy is not allowed on a protocol requirement.
+  // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
   if (isa<ProtocolDecl>(varDC))
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
@@ -281,14 +281,14 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (!VD->hasStorage() && VD->getGetter() && !VD->getGetter()->isImplicit())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
-  // @lazy is not allowed on a lazily initiailized global variable or on a
+  // lazy is not allowed on a lazily initiailized global variable or on a
   // static property (which is already lazily initialized).
   if (VD->isStatic() ||
       (varDC->isModuleScopeContext() &&
        !varDC->getParentSourceFile()->isScriptMode()))
     return diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
 
-  // @lazy must have an initializer, and the pattern binding must be a simple
+  // lazy must have an initializer, and the pattern binding must be a simple
   // one.
   auto *PBD = VD->getParentPattern();
   if (!PBD->getInit())
@@ -594,18 +594,18 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
 }
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
-  // @final on classes marks all members with @final.
+  // final on classes marks all members with final.
   if (isa<ClassDecl>(D))
     return;
 
-  // The @final attribute only makes sense in the context of a class
+  // 'final' only makes sense in the context of a class
   // declaration.  Reject it on global functions, structs, enums, etc.
   if (!D->getDeclContext()->isClassOrClassExtensionContext()) {
     TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }
 
-  // We currently only support @final on var/let, func and subscript
+  // We currently only support final on var/let, func and subscript
   // declarations.
   if (!isa<VarDecl>(D) && !isa<FuncDecl>(D) && !isa<SubscriptDecl>(D)) {
     TC.diagnose(attr->getLocation(), diag::final_not_allowed_here);

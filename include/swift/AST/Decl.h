@@ -1917,7 +1917,7 @@ public:
 
   void setIsObjC(bool Value);
 
-  /// Is this declaration marked with the @final attribute?
+  /// Is this declaration marked with 'final'?
   bool isFinal() const {
     return getAttrs().hasAttribute<FinalAttr>();
   }

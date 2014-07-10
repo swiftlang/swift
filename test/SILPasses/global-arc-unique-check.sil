@@ -6,7 +6,7 @@ import SwiftShims
 
 class MD5 {
   init()
-  @final var w: [UInt32]
+  final var w: [UInt32]
 }
 
 // CHECK-LABEL:sil @test_unique_check_arc : $@cc(method) @thin (@owned MD5) -> ()

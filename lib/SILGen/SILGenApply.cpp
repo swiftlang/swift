@@ -30,7 +30,7 @@ using namespace Lowering;
 /// Get the method dispatch mechanism for a method.
 MethodDispatch
 SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
-  // If this declaration is in a class but not marked @final, then it is
+  // If this declaration is in a class but not marked final, then it is
   // always dynamically dispatched. This includes (non-objc) extension methods.
   if ((isa<ClassDecl>(method->getDeclContext()) || method->isObjC()) &&
       !method->isFinal())
@@ -2866,7 +2866,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     break;
   }
 
-  // Dispatch in a struct/enum or to an @final method is always direct.
+  // Dispatch in a struct/enum or to an final method is always direct.
   if (!isClassDispatch || decl->isFinal())
     return Callee::forDirect(gen, constant, substAccessorType, loc);
 

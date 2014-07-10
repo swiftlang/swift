@@ -38,7 +38,7 @@ extension SomeObject {
 // <rdar://problem/16952186> Crash with @lazy in @objc class
 @objc
 class LazyPropertyCrash  {
-  @lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
+  lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
 }
 
 // <rdar://16909436>

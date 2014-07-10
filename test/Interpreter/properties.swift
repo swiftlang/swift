@@ -166,9 +166,9 @@ func lazyInitFunction() -> Int {
 
 class LazyPropertyClass {
   var id : Int
-  @lazy var lazyProperty = lazyInitFunction()
+  lazy var lazyProperty = lazyInitFunction()
 
-  @lazy var lazyProperty2 : Int = {
+  lazy var lazyProperty2 : Int = {
     println("other lazy property initialized")
     return 0
   }()
@@ -239,7 +239,7 @@ println("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
 
 // rdar://17192398 - Lazy optional types always nil
 class r17192398Failure {
-  @lazy var i : Int? = 42
+  lazy var i : Int? = 42
   func testLazy() {
     assert(i == 42)
   }
@@ -248,9 +248,9 @@ class r17192398Failure {
 let x = r17192398Failure()
 x.testLazy()
 
-// <rdar://problem/17226384> Setting an @lazy optional property to nil has a strange behavior (Swift)
+// <rdar://problem/17226384> Setting an lazy optional property to nil has a strange behavior (Swift)
 class r17226384Class {
-  @lazy var x : Int? = { println("propertyRun"); return 42 }()
+  lazy var x : Int? = { println("propertyRun"); return 42 }()
 }
 func test_r17226384() {
   var c = r17226384Class()

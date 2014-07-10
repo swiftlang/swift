@@ -748,17 +748,17 @@ class infer_instanceVar1 {
   var observingAccesorsVar1: Int {
   // CHECK: @objc var observingAccesorsVar1: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} @final willSet {}
+    // CHECK-NEXT: {{^}} final willSet {}
     didSet {}
-    // CHECK-NEXT: {{^}} @final didSet {}
+    // CHECK-NEXT: {{^}} final didSet {}
   }
 
   @objc var observingAccesorsVar1_: Int {
   // CHECK: {{^}} @objc var observingAccesorsVar1_: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} @final willSet {}
+    // CHECK-NEXT: {{^}} final willSet {}
     didSet {}
-    // CHECK-NEXT: {{^}} @final didSet {}
+    // CHECK-NEXT: {{^}} final didSet {}
   }
 
 

@@ -330,8 +330,8 @@ private class Private : A1 {}
     }
   }
   
-  // <rdar://problem/17165953> Swift: @lazy property reflects back into Objective-C with two properties, one for underlying storage
-  @lazy var cardPaths : [String] = []
+  // <rdar://problem/17165953> Swift: lazy property reflects back into Objective-C with two properties, one for underlying storage
+  lazy var cardPaths : [String] = []
 }
 
 // CHECK-LABEL: @interface Subscripts3

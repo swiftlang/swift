@@ -300,7 +300,7 @@ bb6(%18 : $Bool):                                 // Preds: bb4 bb5
 }
 
 class C {
-  @final var value: Int
+  final var value: Int
   init(v: Int)
 }
 
@@ -488,7 +488,7 @@ class Base {
 
 class Derived : Base {
   override func inner()
-  @final @inline(never) override func middle()
+  @inline(never) final override func middle()
 }
 
 class Final : Derived {
