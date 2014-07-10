@@ -117,7 +117,7 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
 }
 
 
-extern "C" double _swift_fmodf(float lhs, float rhs) {
+extern "C" float _swift_fmodf(float lhs, float rhs) {
     return fmodf(lhs, rhs);
 }
 
