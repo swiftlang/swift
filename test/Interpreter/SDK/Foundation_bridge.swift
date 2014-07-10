@@ -156,7 +156,17 @@ println("Hello: \(dict4[hello]!.description!)")
 // CHECK: World: 2
 println("World: \(dict4[world]!.description!)")
 
+// <rdar://problem/17035548> bridging array of blocks.
+class Foo: NSObject {
+    func foo() { println("Foo.foo()") }
+    @lazy var closures: [(@objc_block () -> Void)] = [self.foo]
+    func invoke() {
+        closures[0]()
+    }
+}
 
+// CHECK: Foo.foo()
+Foo().invoke()
 
 // CHECK: final
 println("final")

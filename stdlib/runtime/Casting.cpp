@@ -1590,6 +1590,7 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
   auto kind = T->getKind();
   return kind == MetadataKind::Class ||
          kind == MetadataKind::ObjCClassWrapper ||
+         kind == MetadataKind::Block ||
          (kind == MetadataKind::Existential &&
           static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
 }

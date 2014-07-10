@@ -2740,19 +2740,14 @@ bool Type::findIf(const std::function<bool(Type)> &pred) const {
 }
 
 TypeTraitResult TypeBase::canBeClass() {
+  // Any bridgeable object type can be a class.
+  if (isBridgeableObjectType())
+    return TypeTraitResult::Is;
+
   CanType self = getCanonicalType();
-  // Look through one level of metatype.
   if (auto m = dyn_cast<AnyMetatypeType>(self))
     self = m.getInstanceType();
-  
-  // Classes and class-constrained archetypes definitely are classes.
-  if (self->mayHaveSuperclass()) {
-    return TypeTraitResult::Is;
-  }
-  // Protocol types are a single class reference if all their protocols are ObjC.
-  if (self->isObjCExistentialType())
-    return TypeTraitResult::Is;
-  
+
   // Dependent types might be bound to classes.
   if (isa<SubstitutableType>(self))
     return TypeTraitResult::CanBe;
