@@ -16,6 +16,7 @@ class Foo {
   dynamic var nonObjcVar: NotObjCAble // expected-error{{property cannot be marked dynamic because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
   dynamic func foo(x: Int) {}
+  dynamic func bar(x: Int) {}
 
   dynamic func nonObjcFunc(x: NotObjCAble) {} // expected-error{{method cannot be marked dynamic because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
@@ -40,8 +41,10 @@ struct Bar {
 
 // CHECK-LABEL: class InheritsDynamic : Foo {
 class InheritsDynamic: Foo {
-  // CHECK-LABLE: {{^}} dynamic override func foo(x: Int)
+  // CHECK-LABEL: {{^}} dynamic override func foo(x: Int)
   override func foo(x: Int) {}
+  // CHECK-LABEL: {{^}} dynamic override func foo(x: Int)
+  dynamic override func bar(x: Int) {}
 
   // CHECK: {{^}} override func notDynamic()
   override func notDynamic() {}

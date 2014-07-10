@@ -4803,8 +4803,9 @@ public:
     }
             
     void visitDynamicAttr(DynamicAttr *attr) {
-      // Dynamic is inherited.
-      Override->getMutableAttrs().add(
+      if (!Override->getAttrs().hasAttribute<DynamicAttr>())
+        // Dynamic is inherited.
+        Override->getMutableAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
     }
   };
