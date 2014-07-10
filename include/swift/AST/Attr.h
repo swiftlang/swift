@@ -952,7 +952,6 @@ public:
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
-  bool isStrong() const { return has(AK_strong); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isUnmanaged() const { return has(AK_unowned_unsafe); }
@@ -978,7 +977,7 @@ public:
   }
 
   bool hasOwnership() const {
-    return isStrong() || isWeak() || isUnowned() || isUnmanaged();
+    return isWeak() || isUnowned() || isUnmanaged();
   }
   Ownership getOwnership() const {
     if (isWeak()) return Ownership::Weak;
@@ -988,7 +987,6 @@ public:
   }
 
   void clearOwnership() {
-    clearAttribute(AK_strong);
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
     clearAttribute(AK_unowned_unsafe);

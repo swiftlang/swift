@@ -161,8 +161,6 @@ public:
       return Text == "optional" || Text == "override";
     case 'r':
       return Text == "required";
-    case 's':
-      return Text == "strong";
     case 'u':
       return Text == "unowned";
     case 'w':

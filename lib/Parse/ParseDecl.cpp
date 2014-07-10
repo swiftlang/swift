@@ -882,14 +882,18 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     diagnose(Loc, diag::mutating_not_attribute, isInverted)
       .fixItReplace(AtLoc, isInverted ? "non" : "");
     break;
-  case AK_strong:
   case AK_weak:
   case AK_unowned:
   case AK_unowned_unsafe: {
-    const char *Kind = "strong";
-    if (attr == AK_weak) Kind = "weak";
-    if (attr == AK_unowned) Kind = "unowned";
-    if (attr == AK_unowned_unsafe) Kind = "unowned(unsafe)";
+    const char *Kind;
+    if (attr == AK_weak)
+      Kind = "weak";
+    else if (attr == AK_unowned)
+      Kind = "unowned";
+    else {
+      assert(attr == AK_unowned_unsafe);
+      Kind = "unowned(unsafe)";
+    }
     // Ownership are context-sensitive keywords, not attributes.
     diagnose(Loc, diag::ownership_not_attribute, Kind).fixItRemove(AtLoc);
     break;
@@ -1370,8 +1374,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       
       // Likewise, if this is a context sensitive keyword, parse it too.
       if (Tok.isContextualKeyword("weak") ||
-          Tok.isContextualKeyword("unowned") ||
-          Tok.isContextualKeyword("strong")) {
+          Tok.isContextualKeyword("unowned")) {
         AttrKind attr = AK_Count;
         bool isUnowned = Tok.getText() == "unowned";
 
@@ -1387,10 +1390,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         } else {
           if (isUnowned)
             attr = AK_unowned;
-          else if (Tok.getText() == "weak")
-            attr = AK_weak;
           else
-            attr = AK_strong;
+            attr = AK_weak;
           consumeToken(tok::identifier);
         }
         
