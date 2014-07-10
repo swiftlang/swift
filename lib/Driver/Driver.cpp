@@ -57,7 +57,7 @@ using namespace llvm::opt;
 
 Driver::Driver(StringRef DriverExecutable,
                DiagnosticEngine &Diags)
-  : Opts(createDriverOptTable()), Diags(Diags),
+  : Opts(createSwiftOptTable()), Diags(Diags),
     DriverExecutable(DriverExecutable),
     DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
   Name = llvm::sys::path::stem(DriverExecutable);

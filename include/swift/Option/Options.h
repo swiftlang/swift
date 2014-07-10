@@ -40,7 +40,7 @@ namespace options {
   };
 } //end namespace options
 
-  std::unique_ptr<llvm::opt::OptTable> createDriverOptTable();
+  std::unique_ptr<llvm::opt::OptTable> createSwiftOptTable();
 
 } // end namespace swift
 

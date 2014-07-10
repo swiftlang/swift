@@ -359,7 +359,7 @@ int frontend_main(ArrayRef<const char *>Args,
     unsigned ExcludedFlagsBitmask =
       Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
                                                         llvm::opt::HelpHidden;
-    std::unique_ptr<llvm::opt::OptTable> Options(createDriverOptTable());
+    std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask);

@@ -34,13 +34,13 @@ FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS },
 
 namespace {
 
-class DriverOptTable : public OptTable {
+class SwiftOptTable : public OptTable {
 public:
-  DriverOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)) {}
+  SwiftOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)) {}
 };
 
 }
 
-std::unique_ptr<OptTable> swift::createDriverOptTable() {
-  return std::unique_ptr<OptTable>(new DriverOptTable());
+std::unique_ptr<OptTable> swift::createSwiftOptTable() {
+  return std::unique_ptr<OptTable>(new SwiftOptTable());
 }

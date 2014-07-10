@@ -905,7 +905,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
 
   // Parse frontend command line options using Swift's option table.
   std::unique_ptr<llvm::opt::InputArgList> ParsedArgs;
-  std::unique_ptr<llvm::opt::OptTable> Table = createDriverOptTable();
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
   unsigned MissingIndex;
   unsigned MissingCount;
   ParsedArgs.reset(
