@@ -54,3 +54,12 @@
 
 // RUN: not %swift_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
 // FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
+
+// RUN: %swift_driver -target arm64-apple-ios7 -### | FileCheck -check-prefix=TARGETCPU1 %s
+// TARGETCPU1: -target-cpu cyclone
+
+// RUN: %swift_driver -target armv7s-apple-ios7 -### | FileCheck -check-prefix=TARGETCPU2 %s
+// TARGETCPU2: -target-cpu swift
+
+// RUN: %swift_driver -target armv7-apple-ios7 -### | FileCheck -check-prefix=TARGETCPU3 %s
+// TARGETCPU3: -target-cpu cortex-a8

@@ -21,6 +21,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
 #include "swift/Frontend/Frontend.h"
+#include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -80,6 +81,12 @@ static void configureDefaultCPU(const llvm::Triple &triple,
     args.push_back("cyclone");
     args.push_back("-target-feature");
     args.push_back("+neon");
+  } else if (triple.getArch() == llvm::Triple::arm) {
+    if (auto CPUStr = clang::driver::getARMCPUForMArch(triple.getArchName(),
+                                                       triple)) {
+      args.push_back("-target-cpu");
+      args.push_back(CPUStr);
+    }
   }
 }
 
