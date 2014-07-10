@@ -5,55 +5,9 @@ import StdlibUnittest
 var RangeTestCase = TestCase("Range")
 
 RangeTestCase.test("ReverseRange") {
-  if true {
-    let r = ReverseRange(range: 0..<0)
-    expectTrue(r.isEmpty)
-    expectEqual(0, r.bounds().0)
-    expectEqual(0, r.bounds().1)
-    checkSequence([], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(start: 0, pastEnd: 0)
-    expectTrue(r.isEmpty)
-    expectEqual(0, r.bounds().0)
-    expectEqual(0, r.bounds().1)
-    checkSequence([], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(range: 10..<10)
-    expectTrue(r.isEmpty)
-    expectEqual(10, r.bounds().0)
-    expectEqual(10, r.bounds().1)
-    checkSequence([], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(range: 0..<4)
-    expectFalse(r.isEmpty)
-    expectEqual(0, r.bounds().0)
-    expectEqual(4, r.bounds().1)
-    checkSequence([ 3, 2, 1, 0 ], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(start: 0, pastEnd: 4)
-    expectFalse(r.isEmpty)
-    expectEqual(0, r.bounds().0)
-    expectEqual(4, r.bounds().1)
-    checkSequence([ 3, 2, 1, 0 ], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(range: 10..<11)
-    expectFalse(r.isEmpty)
-    expectEqual(10, r.bounds().0)
-    expectEqual(11, r.bounds().1)
-    checkSequence([ 10 ], r, SourceLocStack().withCurrentLoc())
-  }
-  if true {
-    let r = ReverseRange(range: -11..<(-10))
-    expectFalse(r.isEmpty)
-    expectEqual(-11, r.bounds().0)
-    expectEqual(-10, r.bounds().1)
-    checkSequence([ -11 ], r, SourceLocStack().withCurrentLoc())
-  }
+  // We no longer have a ReverseRange, but we can still make sure that
+  // lazy reversal works correctly.
+  expectTrue(equal(lazy(0..<10).reverse(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]))
 }
 
 func isEquatable<E : Equatable>(e: E) {}

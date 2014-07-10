@@ -177,55 +177,6 @@ func ... <Pos : ForwardIndex> (
   return Range(start: minimum, end: maximum.successor())
 }
 
-public struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, 
-                                                              Sequence {
-  public typealias Element = T
-
-  @transparent public
-  init(start: T, pastEnd: T) {
-    self._bounds = (start,pastEnd)
-  }
-
-  public mutating func next() -> Element? {
-    if _bounds.0 == _bounds.1 { return .None }
-    _bounds.1 = _bounds.1.predecessor()
-    return _bounds.1
-  }
-
-  // Every Generator is also a single-pass Sequence
-  public typealias GeneratorType = ReverseRangeGenerator<T>
-  public func generate() -> GeneratorType {
-    return self
-  }
-
-  var _bounds: (T, T)
-}
-
-public struct ReverseRange<T: BidirectionalIndex> : Sequence {
-  public init(start: T, pastEnd: T) {
-    self._bounds = (start, pastEnd)
-  }
-
-  public init(range fwd: Range<T>) {
-    self._bounds = (fwd.startIndex, fwd.endIndex)
-  }
-
-  public var isEmpty: Bool {
-    return _bounds.0 == _bounds.1
-  }
-
-  public func bounds() -> (T, T) {
-    return _bounds
-  }
-
-  public typealias GeneratorType = ReverseRangeGenerator<T>
-  public func generate() -> GeneratorType {
-    return GeneratorType(start: _bounds.0, pastEnd: _bounds.1)
-  }
-
-  var _bounds: (T, T)
-}
-
 //
 // Pattern matching support for ranges
 //

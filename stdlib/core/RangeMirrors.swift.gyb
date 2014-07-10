@@ -10,21 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-%import gyb
-%TMirrorDecl = gyb.parseTemplate("../common/MirrorDecl.gyb")
-%TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
-%TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
-
-% for Type in [['Range','ForwardIndex','startIndex','endIndex'],
-%              # ['RandomAccessRange','RandomAccessIndex','startIndex','endIndex'],
-%              ['ReverseRange','BidirectionalIndex','_bounds.0','_bounds.1']]:
-%   Self = Type[0]
-%   Protocol = Type[1]
-%   StartIndex = Type[2]
-%   EndIndex = Type[3]
-%   MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
-%   MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
-%   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],genericConstraints={'T':Protocol},disposition='Struct')
+% import gyb
+%
+% common_args = dict(
+%   introspecteeType='Range',
+%   genericArgs=['T'],
+%   genericConstraints={'T':'ForwardIndex'},
+%   disposition='Struct')
+%
+% for x in ('Decl', 'Conformance', 'Boilerplate'):
+%   locals()['Mirror' + x] = gyb.executeTemplate(
+%     gyb.parseTemplate('../common/Mirror%s.gyb' % x), **common_args)
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}
@@ -32,17 +28,17 @@ ${MirrorDecl} {
 
   public subscript(i: Int) -> (String, Mirror) {
     switch i {
-    case 0: return ("startIndex",reflect(_value.${StartIndex}))
-    case 1: return ("endIndex",reflect(_value.${EndIndex}))
+    case 0: return ("startIndex",reflect(_value.startIndex))
+    case 1: return ("endIndex",reflect(_value.endIndex))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
   
   public var summary: String { 
-    return "${Self}(\(self[0].1.summary),\(self[1].1.summary))"
+    return "Range(\(self[0].1.summary),\(self[1].1.summary))"
   }
 
-  public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  public var quickLookObject: QuickLookObject? { return .Text(summary) }
 }
 
 ${MirrorConformance}

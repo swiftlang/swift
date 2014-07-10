@@ -17,7 +17,7 @@ println("testing...")
 // Reverse a random access Collection 
 let r = lazy(2..<8).map { $0 * 3 }.reverse()
 
-// CHECK-NEXT: [6, 9, 12, 15, 18, 21]
+// CHECK-NEXT: [21, 18, 15, 12, 9, 6]
 println(r.array)
 
 func assertRandomAccess<T: RandomAccessIndex>(x: T) {}
