@@ -15,9 +15,9 @@
 # Utility code for later in this template
 #
 
-# Bit counts for all floating point types. 
-# 80-bit floating point types are only permitted on x86 architectures. This
-# restriction is handled via #if's in the generated code.
+# // Bit counts for all floating point types. 
+# // 80-bit floating point types are only permitted on x86 architectures. This
+# // restriction is handled via #if's in the generated code.
 allFloatBits = [32, 64, 80]
 
 # Bit counts for all int types
