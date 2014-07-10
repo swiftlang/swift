@@ -64,19 +64,7 @@ public struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
   var _stride: T.DistanceType
 }
 
-% for IndexProtocol in ['ForwardIndex', 'RandomAccessIndex']:
-%   Self = 'RandomAccessRange' if IndexProtocol.startswith('R') else 'Range'
-
-public struct ${Self}<
-  T: ${IndexProtocol}
-> : LogicValue, Equatable, Sliceable {
-
-% if Self == 'RandomAccessRange':
-  @conversion public
-  func __conversion() -> Range<T> {
-    return Range(start: startIndex, end: endIndex)
-  }
-% end
+public struct Range<T: ForwardIndex> : LogicValue, Equatable, Sliceable {
 
   @transparent public
   init(start: T, end: T) {
@@ -96,8 +84,8 @@ public struct ${Self}<
     return i
   }
 
-  public subscript(x: Range<T>) -> ${Self} {
-    return ${Self}(start: x.startIndex, end: x.endIndex)
+  public subscript(x: Range<T>) -> Range {
+    return Range(start: x.startIndex, end: x.endIndex)
   }
 
   public typealias GeneratorType = RangeGenerator<T>
@@ -131,12 +119,10 @@ public struct ${Self}<
   var _endIndex: T
 }
 
-public func ==<T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
   return lhs._startIndex == rhs._startIndex &&
       lhs._endIndex == rhs._endIndex
 }
-
-% end
 
 public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
   return r.startIndex.distanceTo(r.endIndex)
@@ -166,24 +152,6 @@ func ... <Pos : ForwardIndex> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
   return Range(start: minimum, end: maximum.successor())
-}
-
-/// Forms a half-open range that contains `minimum`, but not
-/// `maximum`.
-@transparent public
-func ..< <Pos : RandomAccessIndex> (
-  minimum: Pos, maximum: Pos
-) -> RandomAccessRange<Pos> {
-  return RandomAccessRange(start: minimum, end: maximum)
-}
-
-
-/// Forms a closed range that contains both `minimum` and `maximum`.
-@transparent public
-func ... <Pos : RandomAccessIndex> (
-  minimum: Pos, maximum: Pos
-) -> RandomAccessRange<Pos> {
-  return RandomAccessRange(start: minimum, end: maximum.successor())
 }
 
 public struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, 

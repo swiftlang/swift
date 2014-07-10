@@ -62,7 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   REPL.swift
-  Range.swift.gyb
+  Range.swift
   RangeMirrors.swift.gyb
   Reflection.swift
   Repeat.swift

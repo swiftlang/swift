@@ -15,8 +15,8 @@
 %TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-% for Type in [['Range','ForwardIndex','startIndex','endIndex'],\
-%              ['RandomAccessRange','RandomAccessIndex','startIndex','endIndex'],\
+% for Type in [['Range','ForwardIndex','startIndex','endIndex'],
+%              # ['RandomAccessRange','RandomAccessIndex','startIndex','endIndex'],
 %              ['ReverseRange','BidirectionalIndex','_bounds.0','_bounds.1']]:
 %   Self = Type[0]
 %   Protocol = Type[1]
