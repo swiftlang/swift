@@ -20,10 +20,10 @@ import SwiftShims
 enum _ArrayCastKind { case Up, Down, DeferredDown }
 
 final internal
-class IndirectArrayBuffer {
+class _IndirectArrayBuffer {
   
   init<T>(
-    nativeBuffer: ContiguousArrayBuffer<T>,
+    nativeBuffer: _ContiguousArrayBuffer<T>,
     isMutable: Bool,
     needsElementTypeCheck: Bool
   ) {
@@ -41,7 +41,7 @@ class IndirectArrayBuffer {
   }
 
   init<Target>(
-    castFrom source: IndirectArrayBuffer,
+    castFrom source: _IndirectArrayBuffer,
     toElementType _: Target.Type
   ) {
     self.buffer = source.buffer
@@ -63,7 +63,7 @@ class IndirectArrayBuffer {
   
   // When this buffer has immutable storage and it is modified, the
   // storage is replaced with mutable storage.
-  func replaceStorage<T>(newBuffer: ContiguousArrayBuffer<T>) {
+  func replaceStorage<T>(newBuffer: _ContiguousArrayBuffer<T>) {
     self.buffer = newBuffer._storage
     self.isMutable = true
     self.isCocoa = false
@@ -75,10 +75,10 @@ class IndirectArrayBuffer {
   var isCocoa: Bool
   var needsElementTypeCheck: Bool
   
-  func getNativeBufferOf<T>(_: T.Type) -> ContiguousArrayBuffer<T> {
+  func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
-    return ContiguousArrayBuffer(
-      buffer ? reinterpretCast(buffer) as ContiguousArrayStorage<T> : nil)
+    return _ContiguousArrayBuffer(
+      buffer ? reinterpretCast(buffer) as _ContiguousArrayStorage<T> : nil)
   }
 
   func getCocoa() -> _CocoaArray {
@@ -87,10 +87,10 @@ class IndirectArrayBuffer {
   }
 }
 
-public struct ArrayBuffer<T> : ArrayBufferType {
+public struct _ArrayBuffer<T> : _ArrayBufferType {
   var storage: Builtin.NativeObject?
 
-  var indirect: IndirectArrayBuffer {
+  var indirect: _IndirectArrayBuffer {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     return Builtin.castFromNativeObject(storage!)
   }
@@ -102,8 +102,8 @@ public struct ArrayBuffer<T> : ArrayBufferType {
   init() {
     storage = !_isClassOrObjCExistential(T.self)
       ? nil : Builtin.castToNativeObject(
-      IndirectArrayBuffer(
-        nativeBuffer: ContiguousArrayBuffer<T>(),
+      _IndirectArrayBuffer(
+        nativeBuffer: _ContiguousArrayBuffer<T>(),
         isMutable: false,
         needsElementTypeCheck: false
       ))
@@ -112,29 +112,29 @@ public struct ArrayBuffer<T> : ArrayBufferType {
   public init(_ cocoa: _CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
-      IndirectArrayBuffer(
+      _IndirectArrayBuffer(
         cocoa: cocoa,
         // FIXME: it may be possible to avoid a deferred check if we can
         // verify that source is backed by a ContiguousArray<T>.
         needsElementTypeCheck: !(AnyObject.self is T.Type)))
   }
 
-  init(_ buffer: IndirectArrayBuffer) {
+  init(_ buffer: _IndirectArrayBuffer) {
     storage = Builtin.castToNativeObject(buffer)
   }
   
-  /// Returns an `ArrayBuffer<U>` containing the same elements.
+  /// Returns an `_ArrayBuffer<U>` containing the same elements.
   /// Requires: the elements actually have dynamic type `U`, and `U`
   /// is a class or `@objc` existential.
-  func castToBufferOf<U>(_: U.Type) -> ArrayBuffer<U> {
+  func castToBufferOf<U>(_: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    return ArrayBuffer<U>(
-      IndirectArrayBuffer(castFrom: self.indirect, toElementType: U.self))
+    return _ArrayBuffer<U>(
+      _IndirectArrayBuffer(castFrom: self.indirect, toElementType: U.self))
   }
 }
 
-extension ArrayBuffer {
+extension _ArrayBuffer {
   /// Adopt the storage of source
   public
   init(_ source: NativeBuffer) {
@@ -144,7 +144,7 @@ extension ArrayBuffer {
     }
     else {
       self.storage = Builtin.castToNativeObject(
-        IndirectArrayBuffer(
+        _IndirectArrayBuffer(
           nativeBuffer: source, isMutable: true, needsElementTypeCheck: false))
     }
   }
@@ -173,7 +173,7 @@ extension ArrayBuffer {
   }
 
   /// If this buffer is backed by a uniquely-referenced mutable
-  /// ContiguousArrayBuffer that can be grown in-place to allow the self
+  /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil
   public
@@ -192,9 +192,9 @@ extension ArrayBuffer {
     return Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer
   }
   
-  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
+  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
-  /// not match ours, if we are a SliceBuffer.
+  /// not match ours, if we are a _SliceBuffer.
   public
   func requestNativeBuffer() -> NativeBuffer? {
     let result = self._native
@@ -206,7 +206,7 @@ extension ArrayBuffer {
   /// the given collection.
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
-  /// ContiguousArrayBuffer
+  /// _ContiguousArrayBuffer
   public
   mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
@@ -269,10 +269,10 @@ extension ArrayBuffer {
     return result
   }
   
-  /// Return a SliceBuffer containing the given subRange of values
+  /// Return a _SliceBuffer containing the given subRange of values
   /// from this buffer.
   public
-  subscript(subRange: Range<Int>) -> SliceBuffer<T> {
+  subscript(subRange: Range<Int>) -> _SliceBuffer<T> {
     _typeCheck(subRange)
     
     if _fastPath(_isNative) {
@@ -287,20 +287,21 @@ extension ArrayBuffer {
     let cocoa = _CocoaArrayWrapper(nonNative!)
     let start = cocoa.contiguousStorage(subRange)
     if start != nil {
-      return SliceBuffer(owner: nonNative, start: UnsafePointer(start),
-                         count: subRangeCount, hasNativeBuffer: false)
+      return _SliceBuffer(owner: nonNative, start: UnsafePointer(start),
+          count: subRangeCount, hasNativeBuffer: false)
     }
     
     // No contiguous storage found; we must allocate
-    var result = ContiguousArrayBuffer<T>(count: subRangeCount, minimumCapacity: 0)
+    var result = _ContiguousArrayBuffer<T>(
+        count: subRangeCount, minimumCapacity: 0)
 
     // Tell Cocoa to copy the objects into our storage
     cocoa.buffer.getObjects(
       UnsafePointer(result.elementStorage),
       range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
     )
-    
-    return SliceBuffer(result)
+
+    return _SliceBuffer(result)
   }
 
   /// If the elements are stored contiguously, a pointer to the first
@@ -393,13 +394,13 @@ extension ArrayBuffer {
   }
 
   public
-  func generate() -> IndexingGenerator<ArrayBuffer> {
+  func generate() -> IndexingGenerator<_ArrayBuffer> {
     return IndexingGenerator(self)
   }
   
   //===--- private --------------------------------------------------------===//
-  typealias Storage = ContiguousArrayStorage<T>
-  typealias NativeBuffer = ContiguousArrayBuffer<T>
+  typealias Storage = _ContiguousArrayStorage<T>
+  typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
   func _invariantCheck() -> Bool {
     return true
@@ -419,7 +420,7 @@ extension ArrayBuffer {
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
       return NativeBuffer(
-        reinterpretCast(storage) as ContiguousArrayStorage<T>?)
+        reinterpretCast(storage) as _ContiguousArrayStorage<T>?)
     }
     else {
       let i = indirect

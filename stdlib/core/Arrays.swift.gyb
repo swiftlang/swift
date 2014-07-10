@@ -77,7 +77,7 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
 
   @inline(never)
   func _subscriptSetSlowPath(inout buffer: _Buffer, e: Element, index : Int) {
-    var newBuffer = ContiguousArrayBuffer<T>(
+    var newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     let target = buffer._uninitializedCopy(
       0..<index, target: newBuffer.elementStorage)
@@ -88,7 +88,7 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
   }
 
   public
-  typealias _Buffer = ${Self}Buffer<T>
+  typealias _Buffer = _${Self}Buffer<T>
 
   public
   init(_ buffer: _Buffer) {
@@ -177,7 +177,7 @@ extension ${Self} : ArrayType {
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
 
-      var newBuffer = ContiguousArrayBuffer<T>(
+      var newBuffer = _ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
       
       _buffer._uninitializedCopy(0..<count, target: newBuffer.elementStorage)
@@ -411,7 +411,7 @@ struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
 
 @inline(never)
 func _arrayOutOfPlaceReplace<
-  B: ArrayBufferType, C: Collection
+  B: _ArrayBufferType, C: Collection
     where C.GeneratorType.Element == B.Element, B.IndexType == Int
 >(
   inout source: B, subRange: Range<Int>, newValues: C, insertCount: Int
@@ -429,7 +429,7 @@ func _arrayOutOfPlaceReplace<
 }
 
 func _arrayNonSliceInPlaceReplace<
-  B: ArrayBufferType, C: Collection
+  B: _ArrayBufferType, C: Collection
   where C.GeneratorType.Element == B.Element, B.IndexType == Int
 >(inout target: B, subRange: Range<Int>, insertCount: Int, newValues: C) {
   let oldCount = target.count
@@ -497,7 +497,7 @@ func _arrayNonSliceInPlaceReplace<
 }
 
 func _arrayReplace<
-  B: ArrayBufferType, C: Collection
+  B: _ArrayBufferType, C: Collection
   where C.GeneratorType.Element == B.Element, B.IndexType == Int
   >(
   inout target: B, subRange: Range<Int>, newValues: C
@@ -590,7 +590,7 @@ func += <T>(inout lhs: ${Self}<T>, rhs: T) {
 % end
 
 //===--- generic helpers --------------------------------------------------===//
-/// Ensure there's a ContiguousArrayBuffer capable of storing
+/// Ensure there's a _ContiguousArrayBuffer capable of storing
 /// max(newCount, minimumCapacity) elements, with count set to
 /// newCount.
 ///
@@ -601,9 +601,9 @@ func += <T>(inout lhs: ${Self}<T>, rhs: T) {
 /// the buffer that satisfies the capacity request now has a count
 /// that does not match its number of initialized elements, and that
 /// needs to be corrected before the buffer can go back into circulation.
-func _createUniqueMutableBuffer<_Buffer: ArrayBufferType>(
+func _createUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
   inout source: _Buffer, newCount: Int, minimumCapacity: Int = 0)
--> ContiguousArrayBuffer<_Buffer.Element>? {
+-> _ContiguousArrayBuffer<_Buffer.Element>? {
 
   _sanityCheck(newCount >= 0)
   
@@ -617,9 +617,9 @@ func _createUniqueMutableBuffer<_Buffer: ArrayBufferType>(
   return _forceCreateUniqueMutableBuffer(&source, newCount, requiredCapacity)
 }
 
-func _forceCreateUniqueMutableBuffer<_Buffer: ArrayBufferType>(
+func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
   inout source: _Buffer, newCount: Int, requiredCapacity: Int
-) -> ContiguousArrayBuffer<_Buffer.Element> {
+) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
   _sanityCheck(requiredCapacity >= newCount)
   
@@ -628,7 +628,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: ArrayBufferType>(
     newCount > source.capacity
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
-  return ContiguousArrayBuffer(
+  return _ContiguousArrayBuffer(
     count: newCount, minimumCapacity: minimumCapacity)
 }
 
@@ -645,11 +645,11 @@ protocol _PointerFunction {
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
 func _arrayOutOfPlaceUpdate<
-  _Buffer: ArrayBufferType, Initializer: _PointerFunction
+  _Buffer: _ArrayBufferType, Initializer: _PointerFunction
     where Initializer.Element == _Buffer.Element
 >(
   inout source: _Buffer, 
-  inout dest: ContiguousArrayBuffer<_Buffer.Element>?,
+  inout dest: _ContiguousArrayBuffer<_Buffer.Element>?,
   headCount: Int, // Count of initial source elements to copy/move
   newCount: Int,  // Count of new elements to insert
   initializeNewElements: Initializer
@@ -672,7 +672,7 @@ func _arrayOutOfPlaceUpdate<
     let sourceStart = source.elementStorage
     let oldStart = sourceStart + headCount
     
-    // Destroy any items that may be lurking in a SliceBuffer before
+    // Destroy any items that may be lurking in a _SliceBuffer before
     // its real first element
     let backingStart = backing.elementStorage
     let sourceOffset = sourceStart - backingStart
@@ -689,7 +689,7 @@ func _arrayOutOfPlaceUpdate<
     // Move the tail items
     newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
     
-    // Destroy any items that may be lurking in a SliceBuffer after
+    // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element
     let backingEnd = backingStart + backing.count
     let sourceEnd = sourceStart + sourceCount
@@ -719,7 +719,7 @@ struct _InitializePointer<T> : _PointerFunction {
   var newValue: T
 }
 
-func _arrayAppend<_Buffer: ArrayBufferType>(
+func _arrayAppend<_Buffer: _ArrayBufferType>(
   inout buffer: _Buffer, newValue: _Buffer.Element
 ) {
   let oldCount = buffer.count
@@ -737,7 +737,7 @@ struct _IgnorePointer<T> : _PointerFunction {
   func call(_:UnsafePointer<T>) {}
 }
 
-func _arrayReserve<_Buffer: ArrayBufferType>(
+func _arrayReserve<_Buffer: _ArrayBufferType>(
   inout buffer: _Buffer, minimumCapacity: Int
 ) {
   let oldCount = buffer.count
@@ -749,10 +749,10 @@ func _arrayReserve<_Buffer: ArrayBufferType>(
 }
 
 public func _extractOrCopyToNativeArrayBuffer<
-  _Buffer: ArrayBufferType
+  _Buffer: _ArrayBufferType
     where _Buffer.GeneratorType.Element == _Buffer.Element
 >(source: _Buffer) 
-  -> ContiguousArrayBuffer<_Buffer.Element> 
+  -> _ContiguousArrayBuffer<_Buffer.Element> 
 {
   if let n = source.requestNativeBuffer() {
     return n
@@ -762,7 +762,7 @@ public func _extractOrCopyToNativeArrayBuffer<
 
 /// Append items from newItems to buffer
 func _arrayAppendSequence<
-  _Buffer: ArrayBufferType,
+  _Buffer: _ArrayBufferType,
   S: Sequence where S.GeneratorType.Element == _Buffer.Element
 >(
   inout buffer: _Buffer, newItems: S
@@ -908,14 +908,14 @@ public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
 ) -> Array<Base> {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
-  var buf = ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
+  var buf = _ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
   var p = buf._unsafeElementStorage
   for value in source {
     let bridged: AnyObject? = _bridgeToObjectiveC(value)
     _precondition(bridged, "array element cannot be bridged to Objective-C")
     p++.initialize(reinterpretCast(bridged!))
   }
-  return Array(ArrayBuffer(buf))
+  return Array(_ArrayBuffer(buf))
 }
 
 /// Try to convert the source array of objects to an array of values
@@ -946,7 +946,7 @@ public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
      ) -> Array<BridgesToDerived>? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
-  var buf = ContiguousArrayBuffer<BridgesToDerived>(count: source.count, 
+  var buf = _ContiguousArrayBuffer<BridgesToDerived>(count: source.count, 
                                                     minimumCapacity: 0)
   var p = buf._unsafeElementStorage
   
@@ -960,7 +960,7 @@ ElementwiseBridging:
       }
       p++.initialize(value!)
     }
-    return Array(ArrayBuffer(buf))
+    return Array(_ArrayBuffer(buf))
   }
   while false
   

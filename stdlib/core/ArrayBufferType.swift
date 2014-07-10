@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The underlying buffer for an ArrayType conforms to ArrayBufferType
-public protocol ArrayBufferType : MutableCollection {
+/// The underlying buffer for an ArrayType conforms to _ArrayBufferType
+public protocol _ArrayBufferType : MutableCollection {
   /// The type of elements stored in the buffer
   typealias Element
 
@@ -19,7 +19,7 @@ public protocol ArrayBufferType : MutableCollection {
   init()
 
   /// Adopt the storage of x
-  init(_ buffer: ContiguousArrayBuffer<Element>)
+  init(_ buffer: _ContiguousArrayBuffer<Element>)
   
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
@@ -36,42 +36,42 @@ public protocol ArrayBufferType : MutableCollection {
   subscript(index: Int) -> Element { get nonmutating set}
 
   /// If this buffer is backed by a uniquely-referenced mutable
-  /// ContiguousArrayBuffer that can be grown in-place to allow the self
+  /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil.  Note: the result's elementStorage may
-  /// not match ours, if we are a SliceBuffer.
+  /// not match ours, if we are a _SliceBuffer.
   ///
   /// Note: this function must remain mutating; otherwise the buffer
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
-    -> ContiguousArrayBuffer<Element>?
+    -> _ContiguousArrayBuffer<Element>?
 
   /// Returns true iff this buffer is backed by a uniquely-referenced mutable
-  /// ContiguousArrayBuffer.
+  /// _ContiguousArrayBuffer.
   ///
   /// Note: this function must remain mutating; otherwise the buffer
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
   mutating func isMutableAndUniquelyReferenced() -> Bool
 
-  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
+  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
-  /// not match ours, if we are a SliceBuffer.
-  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>?
+  /// not match ours, if we are a _SliceBuffer.
+  func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
   
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
-  /// ContiguousArrayBuffer
+  /// _ContiguousArrayBuffer
   mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
   
-  /// Return a SliceBuffer containing the given subRange of values
+  /// Return a _SliceBuffer containing the given subRange of values
   /// from this buffer.
-  subscript(subRange: Range<Int>) -> SliceBuffer<Element> {get}
+  subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {get}
 
   /// Call body(p), where p is a pointer to the underlying contiguous storage
   /// Requires: such contiguous storage exists or the buffer is empty

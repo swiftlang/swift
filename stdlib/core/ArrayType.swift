@@ -99,7 +99,7 @@ internal protocol ArrayType
   
   //===--- implementation detail  -----------------------------------------===//
 
-  typealias _Buffer : ArrayBufferType
+  typealias _Buffer : _ArrayBufferType
   init(_ buffer: _Buffer)
 }
 

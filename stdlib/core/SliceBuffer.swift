@@ -12,10 +12,10 @@
 
 /// Buffer type for Slice<T>
 public
-struct SliceBuffer<T> : ArrayBufferType {
+struct _SliceBuffer<T> : _ArrayBufferType {
   typealias Element = T
-  typealias NativeStorage = ContiguousArrayStorage<T>
-  typealias NativeBuffer = ContiguousArrayBuffer<T>
+  typealias NativeStorage = _ContiguousArrayStorage<T>
+  typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
   init(owner: AnyObject?, start: UnsafePointer<T>, count: Int, 
        hasNativeBuffer: Bool) {
@@ -66,7 +66,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   /// the given collection.
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
-  /// ContiguousArrayBuffer,
+  /// _ContiguousArrayBuffer,
   ///
   /// Requires: insertCount <= numericCast(countElements(newValues))
   ///
@@ -162,11 +162,11 @@ struct SliceBuffer<T> : ArrayBufferType {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
-  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
+  /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
-  /// not match ours, since we are a SliceBuffer.
+  /// not match ours, since we are a _SliceBuffer.
   public
-  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
+  func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer) {
       return  reinterpretCast(owner) as NativeBuffer
@@ -248,11 +248,11 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
 
   public
-  subscript (subRange: Range<Int>) -> SliceBuffer {
+  subscript (subRange: Range<Int>) -> _SliceBuffer {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)
-    return SliceBuffer(
+    return _SliceBuffer(
       owner: owner, start: start + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex, 
       hasNativeBuffer: _hasNativeBuffer)
@@ -270,7 +270,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
 
   public
-  func generate() -> IndexingGenerator<SliceBuffer> {
+  func generate() -> IndexingGenerator<_SliceBuffer> {
     return IndexingGenerator(self)
   }
 

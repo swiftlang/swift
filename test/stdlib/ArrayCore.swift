@@ -53,7 +53,7 @@ func == (x: Tracked, y: Tracked) -> Bool {
 // A wrapper around Range<Tracked> that allows us to detect when it is
 // being treated as a Collection rather than merely a Sequence, which
 // helps us to prove that an optimization is being used.  In
-// particular, when constructing a ContiguousArrayBuffer from a
+// particular, when constructing a _ContiguousArrayBuffer from a
 // Collection, the necessary storage should be pre-allocated.
 struct MrMcRange : Collection {
   typealias Base = Range<Int>
@@ -85,10 +85,10 @@ struct MrMcRange : Collection {
 //===--- struct MrMcArray<T> ----------------------------------------------===//
 // A faux ArrayType that allows us to detect that, rather than being
 // treated as an arbitrary Collection when converting to a
-// ContiguousArrayBuffer, it is first asked for its underlying
-// ContiguousArrayBuffer.
+// _ContiguousArrayBuffer, it is first asked for its underlying
+// _ContiguousArrayBuffer.
 struct MrMcArray<T> : Collection, _ArrayType {
-  typealias _Buffer = ContiguousArrayBuffer<T>
+  typealias _Buffer = _ContiguousArrayBuffer<T>
 
   init(_ buffer: _Buffer) {
     self._buffer = buffer

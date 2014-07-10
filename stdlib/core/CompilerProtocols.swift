@@ -72,7 +72,7 @@ public protocol Sequence : _Sequence_ {
 
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
-  ) -> ContiguousArrayBuffer<Self.GeneratorType.Element>
+  ) -> _ContiguousArrayBuffer<Self.GeneratorType.Element>
 }
 
 public struct _CopyToNativeArrayBuffer {}

@@ -554,11 +554,11 @@ extension NSArray : ArrayLiteralConvertible {
 public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
-    return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   }
 
   var anyObjectArr: [AnyObject]
-    = Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    = Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   return _arrayBridgeFromObjectiveC(anyObjectArr)
 }
 
@@ -590,11 +590,11 @@ extension Array : _ConditionallyBridgedToObjectiveC {
         "array element type is not bridged to Objective-C")
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
-      return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     }
 
     var anyObjectArr: [AnyObject]
-      = [AnyObject](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
@@ -602,7 +602,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
-      = [AnyObject](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
     if _isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }
