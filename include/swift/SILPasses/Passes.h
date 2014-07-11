@@ -92,6 +92,7 @@ namespace swift {
   SILTransform *createSILAADumper();
   SILTransform *createSILLinker();
   SILTransform *createLoopInfoPrinter();
+  SILTransform *createIVInfoPrinter();
   SILTransform *createSILCFGPrinter();
   SILTransform *createLoopRotatePass();
 } // end namespace swift

@@ -39,6 +39,7 @@ static void registerAnalysisPasses(SILPassManager &PM, SILModule *Mod) {
   PM.registerAnalysis(createAliasAnalysis(Mod));
   PM.registerAnalysis(createDominanceAnalysis(Mod));
   PM.registerAnalysis(createLoopInfoAnalysis(Mod, &PM));
+  PM.registerAnalysis(createInductionVariableAnalysis(Mod));
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module,

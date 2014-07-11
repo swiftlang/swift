@@ -77,6 +77,7 @@ enum class PassKind {
   ViewCFG,
   LoopRotate,
   LICM,
+  IVInfoPrinter,
 };
 
 enum class OptGroup {
@@ -253,6 +254,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::LICM,
                                    "licm",
                                    "Loop invariant code motion."),
+                        clEnumValN(PassKind::IVInfoPrinter,
+                                   "iv-info-printer",
+                                   "Display induction variable information."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -315,6 +319,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
   PM.registerAnalysis(createAliasAnalysis(Module));
   PM.registerAnalysis(createDominanceAnalysis(Module));
   PM.registerAnalysis(createLoopInfoAnalysis(Module, &PM));
+  PM.registerAnalysis(createInductionVariableAnalysis(Module));
 
   for (auto Pass : Passes) {
     switch (Pass) {
@@ -440,6 +445,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::LICM:
       PM.add(createLICMPass());
+      break;
+    case PassKind::IVInfoPrinter:
+      PM.add(createIVInfoPrinter());
       break;
     }
   }

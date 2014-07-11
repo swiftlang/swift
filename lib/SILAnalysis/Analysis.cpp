@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-analysis"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
@@ -52,4 +53,8 @@ SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createDominanceAnalysis(SILModule *M) {
   return new DominanceAnalysis(M);
+}
+
+SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {
+  return new IVAnalysis(M);
 }
