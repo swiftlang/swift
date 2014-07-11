@@ -30,6 +30,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -299,6 +300,40 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   }
   
   return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
+}
+
+SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
+                                              SILDeclRef constant,
+                                              SILConstantInfo constantInfo) {
+  // If the method is foreign, its foreign thunk will handle the dynamic
+  // dispatch for us.
+  if (constant.isForeignThunk()) {
+    if (!SGM.hasFunction(constant))
+      SGM.emitForeignThunk(constant);
+    return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
+  }
+  
+  // Otherwise, we need a dynamic dispatch thunk.
+  // FIXME: A real mangling. These thunks are always private and transparent,
+  // so hopefully not a huge deal...
+  llvm::SmallString<32> name;
+  constant.mangle(name);
+  name += "_dynamic";
+  
+  auto F = SGM.M.getOrCreateFunction(loc, name, SILLinkage::Private,
+                            constantInfo.getSILType().castTo<SILFunctionType>(),
+                            IsBare, IsTransparent);
+
+  if (F->empty()) {
+    // Emit the thunk if we haven't yet.
+    // Currently a dynamic thunk looks just like a foreign-to-native thunk around
+    // an ObjC method. This would change if we introduced a native
+    // runtime-hookable mechanism.
+    SILGenFunction subSGF(SGM, *F);
+    subSGF.emitForeignThunk(constant);
+  }
+  
+  return B.createFunctionRef(loc, F);
 }
 
 SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,

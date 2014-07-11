@@ -1411,6 +1411,12 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
       isExtension = isa<ExtensionDecl>(dc);
   }
 
+  // If the witness is dynamic, go through dynamic dispatch.
+  if (gen.getASTContext().LangOpts.EnableDynamic &&
+      witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+    return gen.emitDynamicMethodRef(loc, witness,
+                                    SGM.Types.getConstantInfo(witness));
+  
   // If we have a final method or a method from an extension that is not
   // objective c, emit a static reference.
   // A natively ObjC method witness referenced this way will end up going
@@ -1423,6 +1429,13 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
   return gen.B.createClassMethod(loc, selfParam.getValue(), witness,
                                  SGM.getConstantType(witness),
                                  /*volatile*/ false);
+}
+
+static bool isTransparent(SILValue v) {
+  if (auto fnRef = dyn_cast<FunctionRefInst>(v))
+    return fnRef->getFunction()->isTransparent();
+  
+  return false;
 }
 
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
@@ -1580,7 +1593,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                                 origParams, witnessSILTy, loc);
   SILValue witnessResultValue = B.createApply(
       loc, witnessFnRef, witnessSILTy,
-      witnessFTy->getInterfaceResult().getSILType(), witnessSubs, args);
+      witnessFTy->getInterfaceResult().getSILType(), witnessSubs, args,
+      isTransparent(witnessFnRef));
 
   // Reabstract the result value:
   // If the witness is generic, reabstract to the concrete witness signature.

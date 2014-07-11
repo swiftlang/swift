@@ -4,7 +4,7 @@
 import Foundation
 import gizmo
 
-class Foo {
+class Foo: Proto {
   // Not objc or dynamic, so only a vtable entry
   init(native: Int) {}
   func nativeMethod() {}
@@ -34,19 +34,98 @@ class Foo {
   }
 }
 
+protocol Proto {
+  func nativeMethod()
+  var nativeProp: Int { get set }
+  subscript(#native: Int) -> Int { get set }
+
+  func objcMethod()
+  var objcProp: Int { get set }
+  subscript(#objc: Int) -> Int { get set }
+
+  func dynamicMethod()
+  var dynamicProp: Int { get set }
+  subscript(#dynamic: Int) -> Int { get set }
+}
+
 // ObjC entry points for @objc and dynamic entry points
+
+// normal and @objc initializing ctors can be statically dispatched
+// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
+// CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT6nativeSi_S0_
+
+// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
+// CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT4objcSi_S0_
+
 // CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT4objcSi_S0_
 // CHECK-LABEL: sil @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
 // CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foog8objcPropSi
 // CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foos8objcPropSi
 // CHECK-LABEL: sil @_TToFC7dynamic3Foog9subscriptFT4objcSi_Si
 // CHECK-LABEL: sil @_TToFC7dynamic3Foos9subscriptFT4objcSi_Si
+
+// TODO: dynamic initializing ctor must be objc dispatched
+// CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
+// C/HECK:         class_method [volatile] XXX
+
 // CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK-LABEL: sil @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
 // CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foog11dynamicPropSi
 // CHECK-LABEL: sil [transparent] @_TToFC7dynamic3Foos11dynamicPropSi
 // CHECK-LABEL: sil @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
 // CHECK-LABEL: sil @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
+
+// Protocol witnesses use best appropriate dispatch
+
+// Native witnesses use vtable dispatch:
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_12nativeMethodUS1___fRQPS1_FT_T_
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeMethod!1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g10nativePropSi
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeProp!getter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s10nativePropSi
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeProp!setter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g9subscriptFT6nativeSi_Si
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s9subscriptFT6nativeSi_Si
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
+
+// @objc witnesses use vtable dispatch:
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_10objcMethodUS1___fRQPS1_FT_T_
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.objcMethod!1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g8objcPropSi
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!getter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s8objcPropSi
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!setter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g9subscriptFT4objcSi_Si
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s9subscriptFT4objcSi_Si
+// CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
+
+// Dynamic witnesses use objc dispatch:
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_13dynamicMethodUS1___fRQPS1_FT_T_
+// CHECK:         function_ref @_TFC7dynamic3Foo13dynamicMethodfS0_FT_T__dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foo13dynamicMethodfS0_FT_T__dynamic
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :
+
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g11dynamicPropSi
+// CHECK:         function_ref @_TFC7dynamic3Foog11dynamicPropSi_dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foog11dynamicPropSi_dynamic
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign :
+
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s11dynamicPropSi
+// CHECK:         function_ref @_TFC7dynamic3Foos11dynamicPropSi_dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foos11dynamicPropSi_dynamic
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign :
+
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g9subscriptFT7dynamicSi_Si
+// CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT7dynamicSi_Si_dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foog9subscriptFT7dynamicSi_Si_dynamic
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign :
+
+// CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s9subscriptFT7dynamicSi_Si
+// CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
 
 // CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
 func nativeMethodDispatch() {

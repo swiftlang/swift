@@ -173,7 +173,7 @@ public:
   
   /// Emits a thunk from a foreign function to the native Swift conventions.
   void emitForeignThunk(SILDeclRef thunk);
-  
+
   template<typename T>
   SILFunction *preEmitFunction(SILDeclRef constant, T *astNode,
                                SILLocation L);

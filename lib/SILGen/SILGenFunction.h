@@ -636,7 +636,14 @@ public:
   }
   SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                  SILConstantInfo constantInfo);
+  
+  /// Returns a reference to a function value that dynamically dispatches
+  /// the function in a runtime-modifiable way.
+  SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
+                                SILConstantInfo constantInfo);  
 
+  /// Returns a reference to a function value that dynamically invokes the 
+  
   /// Returns a reference to a constant in local context. This will return a
   /// closure object reference if the constant refers to a local func decl.
   /// In rvalue contexts, emitFunctionRef should be used instead, which retains
