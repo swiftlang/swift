@@ -17,17 +17,6 @@ import Foundation
 // Utilities.
 //===---
 
-class Canary {
-  var i: Int
-  init(i: Int) {
-    self.i = i
-    println("Canary.init(\(i))")
-  }
-  deinit {
-    println("Canary(\(i)).deinit")
-  }
-}
-
 var keyCount = 0
 var keySerial = 0
 
@@ -1299,13 +1288,22 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
     className.rangeOfString("NSCFDictionary").length > 0
 }
 
-var objcKeyCount = 0
-var objcKeySerial = 0
+var _objcKeyCount = 0
+var _objcKeySerial = 0
 
 class TestObjCKeyTy : NSObject, NSCopying, Printable {
+  class var objectCount: Int {
+    get {
+      return _objcKeyCount
+    }
+    set {
+      _objcKeyCount = newValue
+    }
+  }
+
   init(_ value: Int) {
-    ++objcKeyCount
-    serial = ++objcKeySerial
+    ++TestObjCKeyTy.objectCount
+    serial = ++_objcKeySerial
     self.value = value
     self._hashValue = value
   }
@@ -1317,7 +1315,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
 
   deinit {
     assert(serial > 0, "double destruction")
-    --objcKeyCount
+    --TestObjCKeyTy.objectCount
     serial = -serial
   }
 
@@ -1353,19 +1351,28 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
   var serial: Int
 }
 
-var objcValueCount = 0
-var objcValueSerial = 0
+var _objcValueCount = 0
+var _objcValueSerial = 0
 
 class TestObjCValueTy : NSObject, Printable {
+  class var objectCount: Int {
+    get {
+      return _objcValueCount
+    }
+    set {
+      _objcValueCount = newValue
+    }
+  }
+
   init(_ value: Int) {
-    ++objcValueCount
-    serial = ++objcValueSerial
+    ++TestObjCValueTy.objectCount
+    serial = ++_objcValueSerial
     self.value = value
   }
 
   deinit {
     assert(serial > 0, "double destruction")
-    --objcValueCount
+    --TestObjCValueTy.objectCount
     serial = -serial
   }
 
@@ -1415,8 +1422,18 @@ func == (lhs: TestObjCEquatableValueTy, rhs: TestObjCEquatableValueTy) -> Bool {
 
 var bridgedKeyCount = 0
 var bridgedKeySerial = 0
+var _bridgedKeyBridgeOperations = 0
 
 struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
+  static var bridgeOperations: Int {
+    get {
+      return _bridgedKeyBridgeOperations
+    }
+    set {
+      _bridgedKeyBridgeOperations = newValue
+    }
+  }
+
   init(_ value: Int) {
     ++bridgedKeyCount
     serial = ++bridgedKeySerial
@@ -1438,10 +1455,12 @@ struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
   }
 
   func bridgeToObjectiveC() -> TestObjCKeyTy {
+    TestBridgedKeyTy.bridgeOperations++
     return TestObjCKeyTy(value)
   }
 
   static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
+    TestBridgedKeyTy.bridgeOperations++
     return TestBridgedKeyTy(x.value)
   }
 
@@ -1456,8 +1475,18 @@ func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
 
 var bridgedValueCount = 0
 var bridgedValueSerial = 0
+var _bridgedValueBridgeOperations = 0
 
 struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
+  static var bridgeOperations: Int {
+    get {
+      return _bridgedValueBridgeOperations
+    }
+    set {
+      _bridgedValueBridgeOperations = newValue
+    }
+  }
+
   init(_ value: Int) {
     ++bridgedValueCount
     serial = ++bridgedValueSerial
@@ -1474,10 +1503,12 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   }
 
   func bridgeToObjectiveC() -> TestObjCValueTy {
+    TestBridgedValueTy.bridgeOperations++
     return TestObjCValueTy(value)
   }
 
   static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy {
+    TestBridgedValueTy.bridgeOperations++
     return TestBridgedValueTy(x.value)
   }
 
@@ -2606,8 +2637,8 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
 test_BridgedFromObjC_Nonverbatim_Generate_Empty()
 // CHECK: test_BridgedFromObjC_Nonverbatim_Generate_Empty done
 
-assert(objcKeyCount == 0, "key leak")
-assert(objcValueCount == 0, "value leak")
+assert(TestObjCKeyTy.objectCount == 0, "key leak")
+assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   var d = getHugeBridgedVerbatimDictionary()
@@ -2663,8 +2694,8 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
 test_BridgedFromObjC_Nonverbatim_Generate_Huge()
 // CHECK: test_BridgedFromObjC_Nonverbatim_Generate_Huge done
 
-assert(objcKeyCount == 0, "key leak")
-assert(objcValueCount == 0, "value leak")
+assert(TestObjCKeyTy.objectCount == 0, "key leak")
+assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   var d = getParallelArrayBridgedVerbatimDictionary()
@@ -2722,8 +2753,8 @@ autoreleasepool {
 }
 // CHECK: test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done
 
-assert(objcKeyCount == 0, "key leak")
-assert(objcValueCount == 0, "value leak")
+assert(TestObjCKeyTy.objectCount == 0, "key leak")
+assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_EqualityTest_Empty() {
   var d1 = getBridgedVerbatimEquatableDictionary([:])
@@ -3095,7 +3126,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary 
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
   let bridged = _convertDictionaryToNSDictionary(d)
-  assert(isCocoaNSDictionary(bridged))
+  assert(isNativeNSDictionary(bridged))
 
   return bridged
 }
@@ -3127,7 +3158,7 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   d[TestBridgedKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged = _convertDictionaryToNSDictionary(d)
-  assert(isCocoaNSDictionary(bridged))
+  assert(isNativeNSDictionary(bridged))
 
   return bridged
 }
@@ -3159,7 +3190,7 @@ func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
   d[TestObjCKeyTy(30)] = TestBridgedValueTy(1030)
 
   let bridged = _convertDictionaryToNSDictionary(d)
-  assert(isCocoaNSDictionary(bridged))
+  assert(isNativeNSDictionary(bridged))
 
   return bridged
 }
@@ -3859,6 +3890,153 @@ DictionaryDerivedAPIs.test("values") {
 
 DictionaryDerivedAPIs.run()
 // CHECK: {{^}}DictionaryDerivedAPIs: All tests passed
+
+var ObjCThunks = TestCase("ObjCThunks")
+
+class ObjCThunksHelper : NSObject {
+  @objc func acceptArrayBridgedVerbatim(array: [TestObjCValueTy]) {
+    expectEqual(10, array[0].value)
+    expectEqual(20, array[1].value)
+    expectEqual(30, array[2].value)
+  }
+
+  @objc func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
+    // Can not check elements because doing so would bridge them.
+    expectEqual(3, array.count)
+  }
+
+  @objc func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
+    return [ TestObjCValueTy(10), TestObjCValueTy(20),
+        TestObjCValueTy(30) ]
+  }
+
+  @objc func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
+    return [ TestBridgedValueTy(10), TestBridgedValueTy(20),
+        TestBridgedValueTy(30) ]
+  }
+
+  @objc func acceptDictionaryBridgedVerbatim(
+      d: [TestObjCKeyTy : TestObjCValueTy]) {
+    expectEqual(3, d.count)
+    expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
+    expectEqual(1020, d[TestObjCKeyTy(20)]!.value)
+    expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
+  }
+
+  @objc func acceptDictionaryBridgedNonverbatim(
+      d: [TestBridgedKeyTy : TestBridgedValueTy]) {
+    expectEqual(3, d.count)
+    // Can not check elements because doing so would bridge them.
+  }
+
+  @objc func returnDictionaryBridgedVerbatim() ->
+      [TestObjCKeyTy : TestObjCValueTy] {
+    return [
+        TestObjCKeyTy(10): TestObjCValueTy(1010),
+        TestObjCKeyTy(20): TestObjCValueTy(1020),
+        TestObjCKeyTy(30): TestObjCValueTy(1030),
+    ]
+  }
+
+  @objc func returnDictionaryBridgedNonverbatim() ->
+      [TestBridgedKeyTy : TestBridgedValueTy] {
+    return [
+        TestBridgedKeyTy(10): TestBridgedValueTy(1010),
+        TestBridgedKeyTy(20): TestBridgedValueTy(1020),
+        TestBridgedKeyTy(30): TestBridgedValueTy(1030),
+    ]
+  }
+}
+
+ObjCThunks.test("Array/Accept") {
+  var helper = ObjCThunksHelper()
+
+  if true {
+    helper.acceptArrayBridgedVerbatim(
+        [ TestObjCValueTy(10), TestObjCValueTy(20), TestObjCValueTy(30) ])
+  }
+  if true {
+    TestBridgedValueTy.bridgeOperations = 0
+    helper.acceptArrayBridgedNonverbatim(
+        [ TestBridgedValueTy(10), TestBridgedValueTy(20),
+          TestBridgedValueTy(30) ])
+    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+  }
+}
+
+ObjCThunks.test("Array/Return") {
+  var helper = ObjCThunksHelper()
+
+  if true {
+    let a = helper.returnArrayBridgedVerbatim()
+    expectEqual(10, a[0].value)
+    expectEqual(20, a[1].value)
+    expectEqual(30, a[2].value)
+  }
+  if true {
+    TestBridgedValueTy.bridgeOperations = 0
+    let a = helper.returnArrayBridgedNonverbatim()
+    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+
+    TestBridgedValueTy.bridgeOperations = 0
+    expectEqual(10, a[0].value)
+    expectEqual(20, a[1].value)
+    expectEqual(30, a[2].value)
+    expectEqual(0, TestBridgedValueTy.bridgeOperations) // FIXME: should be 3
+  }
+}
+
+ObjCThunks.test("Dictionary/Accept") {
+  var helper = ObjCThunksHelper()
+
+  if true {
+    helper.acceptDictionaryBridgedVerbatim(
+        [ TestObjCKeyTy(10): TestObjCValueTy(1010),
+          TestObjCKeyTy(20): TestObjCValueTy(1020),
+          TestObjCKeyTy(30): TestObjCValueTy(1030) ])
+  }
+  if true {
+    TestBridgedKeyTy.bridgeOperations = 0
+    TestBridgedValueTy.bridgeOperations = 0
+    helper.acceptDictionaryBridgedNonverbatim(
+        [ TestBridgedKeyTy(10): TestBridgedValueTy(1010),
+          TestBridgedKeyTy(20): TestBridgedValueTy(1020),
+          TestBridgedKeyTy(30): TestBridgedValueTy(1030) ])
+    expectEqual(9, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+  }
+}
+
+ObjCThunks.test("Dictionary/Return") {
+  var helper = ObjCThunksHelper()
+
+  if true {
+    let d = helper.returnDictionaryBridgedVerbatim()
+    expectEqual(3, d.count)
+    expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
+    expectEqual(1020, d[TestObjCKeyTy(20)]!.value)
+    expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
+  }
+  if true {
+    TestBridgedKeyTy.bridgeOperations = 0
+    TestBridgedValueTy.bridgeOperations = 0
+    let d = helper.returnDictionaryBridgedNonverbatim()
+    expectEqual(9, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+
+    TestBridgedKeyTy.bridgeOperations = 0
+    TestBridgedValueTy.bridgeOperations = 0
+    expectEqual(3, d.count)
+    expectEqual(1010, d[TestBridgedKeyTy(10)]!.value)
+    expectEqual(1020, d[TestBridgedKeyTy(20)]!.value)
+    expectEqual(1030, d[TestBridgedKeyTy(30)]!.value)
+    expectEqual(0, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 3
+    expectEqual(0, TestBridgedValueTy.bridgeOperations) // FIXME: should be 3
+  }
+}
+
+ObjCThunks.run()
+// CHECK: {{^}}ObjCThunks: All tests passed
 
 //===---
 // Misc tests.

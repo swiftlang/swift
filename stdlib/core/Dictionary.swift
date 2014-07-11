@@ -178,17 +178,26 @@
 //   to `NSDictionary` in `O(1)`, without memory allocation.
 //
 // * otherwise, `K` and/or `V` are unconditionally or conditionally bridged.
-//   In this case, `Dictionary<K, V>` is bridged to `NSDictionary` in `O(N)`
-//   by allocating a new `NSDictionary` that contains the bridged key-value
-//   pairs from the original `Dictionary`.
-//
-// Syntax for bridging
-// -------------------
-//
-// There are two implicit conversions:
-//
-// * `NSDictionary` converts to `Dictionary<NSObject, AnyObject>`,
-// * `Dictionary<K, V>` converts to `NSDictionary`.
+//   In this case, `Dictionary<K, V>` is bridged to `NSDictionary` in `O(1)`,
+//   without memory allocation.  Bridging is performed lazily on-demand when
+//   elements are accessed.  The bridged `NSDictionary` only retains a
+//   reference to native storage and it does not keep references to keys and
+//   values bridged on-demand.  This has a few implications:
+//   - Every time keys or values are accessed on the bridged `NSDictionary`,
+//     new objects are created.
+//   - Accessing the same element (key or value) multiple times will return
+//     objects with different reference identity.  (Although they should be
+//     semantically equivalent.)
+//   - Fast enumeration over the bridged `NSDictionary` has to autorelease the
+//     returned objects.  (The objects are returned via an enumeration buffer
+//     that contains unowned objects, and something should to keep them alive.
+//     There is no callback to the fast enumeration object when enumeration is
+//     terminated, so fast enumeration object can not own these objects.)
+//   - In other cases when an object is bridged to Objective-C and returned,
+//     bridged `NSDictionary` does not keep any references to it, but ARC (just
+//     as always) will ensure that this object is alive across the function
+//     return, so we don't need to autorelease it explcitly.  Absolutely no
+//     magic here.
 //
 
 /// This protocol is only used for compile-time checks that
@@ -552,11 +561,6 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
   typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
   init(_ nativeStorage: NativeStorage) {
-    _precondition(
-        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
-        _isBridgedVerbatimToObjectiveC(ValueType.self),
-        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
-
     nextIndex = nativeStorage.startIndex
     endIndex = nativeStorage.endIndex
     super.init(dummy: (0, ()))
@@ -575,9 +579,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
     }
     let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
     nextIndex = nextIndex.successor()
-    // Not using bridgeToObjectiveC() here because we know that KeyType is
-    // bridged verbatim.
-    return _reinterpretCastToAnyObject(nativeKey)
+    return _bridgeToObjectiveC(nativeKey)
   }
 }
 
@@ -696,7 +698,7 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
     super.init()
   }
 
-  public var nativeStorage: NativeStorage
+  var nativeStorage: NativeStorage
 
   //
   // Dictionary -> NSDictionary bridging.
@@ -707,13 +709,9 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
   }
 
   override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    _sanityCheck(
-        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
-        _isBridgedVerbatimToObjectiveC(ValueType.self),
-        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
-    let nativeKey = reinterpretCast(aKey) as KeyType
+    let nativeKey = _bridgeFromObjectiveC(aKey, KeyType.self)
     if let nativeValue = nativeStorage.maybeGet(nativeKey) {
-      return _reinterpretCastToAnyObject(nativeValue)
+      return _bridgeToObjectiveCUnconditional(nativeValue)
     }
     return nil
   }
@@ -732,11 +730,6 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
-    _sanityCheck(
-        _isBridgedVerbatimToObjectiveC(KeyType.self) &&
-        _isBridgedVerbatimToObjectiveC(ValueType.self),
-        "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
-
     var theState = state.memory
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
@@ -754,7 +747,11 @@ class _NativeDictionaryStorageOwner<KeyType : Hashable, ValueType>
         break
       }
       var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
-      let bridgedKey: AnyObject = _reinterpretCastToAnyObject(nativeKey)
+      let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(nativeKey)
+      // Autorelease the key to ensure that it is alive across function return.
+      // The only explicit reference to this object is stored in the buffer of
+      // unowned references, so something has to keep it alive.
+      _autorelease(bridgedKey)
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()

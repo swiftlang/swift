@@ -549,7 +549,7 @@ extension NSArray : ArrayLiteralConvertible {
 ///
 ///   func f([NSView]) {}
 ///
-/// to Objective-C code as a method that accepts an NSArray.  This operation
+/// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
 public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
@@ -567,7 +567,7 @@ public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
 ///
 ///   func f() -> [NSView] { return [] }
 ///
-/// to Objective-C code as a method that returns an NSArray.
+/// to Objective-C code as a method that returns an `NSArray`.
 public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return arr.bridgeToObjectiveC()
 }
@@ -638,21 +638,32 @@ extension Dictionary {
   }
 }
 
-/// The entry point for bridging `NSDictionary` to `Dictionary`.
+/// The entry point for bridging `NSDictionary` to `Dictionary` in bridge
+/// thunks.  Used, for example, to expose ::
 ///
-/// This is a forced downcast.  This operation should have O(1) complexity.
+///   func f([String : String]) {}
+///
+/// to Objective-C code as a method that accepts an `NSDictionary`.
+///
+/// This is a forced downcast.  This operation should have O(1) complexity
+/// when `KeyType` and `ValueType` are bridged verbatim.
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 public func _convertNSDictionaryToDictionary<
-    KeyType : NSObject, ValueType : AnyObject>(d: NSDictionary)
+    KeyType : Hashable, ValueType>(d: NSDictionary)
     -> [KeyType : ValueType] {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(KeyType.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(ValueType.self))
+  // Note: there should be *a good justification* for doing something else
+  // than just dispatching to `bridgeToObjectiveC`.
   return Dictionary.bridgeFromObjectiveC(d)
 }
 
-/// The entry point for bridging `Dictionary` to `NSDictionary`.
+/// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
+/// thunks.  Used, for example, to expose ::
+///
+///   func f() -> [String : String] {}
+///
+/// to Objective-C code as a method that returns an `NSDictionary`.
 ///
 /// This is a forced downcast.  This operation should have O(1) complexity.
 /// FIXME: right now it is O(n).
@@ -662,71 +673,9 @@ public func _convertNSDictionaryToDictionary<
 public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     d: [KeyType : ValueType]
 ) -> NSDictionary {
-  switch d._variantStorage {
-  case .Native(let nativeOwner):
-    _precondition(_isBridgedToObjectiveC(KeyType.self),
-        "KeyType is not bridged to Objective-C")
-    _precondition(_isBridgedToObjectiveC(ValueType.self),
-        "ValueType is not bridged to Objective-C")
-
-    let isKeyBridgedVerbatim = _isBridgedVerbatimToObjectiveC(KeyType.self)
-    let isValueBridgedVerbatim = _isBridgedVerbatimToObjectiveC(ValueType.self)
-
-    // If both `KeyType` and `ValueType` can be bridged verbatim, return the
-    // underlying storage.
-    if _fastPath(isKeyBridgedVerbatim && isValueBridgedVerbatim) {
-      let anNSSwiftDictionary: _NSSwiftDictionary = nativeOwner
-      return reinterpretCast(anNSSwiftDictionary)
-    }
-
-    // At least either one of `KeyType` or `ValueType` can not be bridged
-    // verbatim.  Bridge all the contents eagerly and create an `NSDictionary`.
-    let nativeStorage = nativeOwner.nativeStorage
-    let result = NSMutableDictionary(capacity: nativeStorage.count)
-    let endIndex = nativeStorage.endIndex
-    for var i = nativeStorage.startIndex; i != endIndex; ++i {
-      let (key, value) = nativeStorage.assertingGet(i)
-      var bridgedKey: AnyObject
-      if _fastPath(isKeyBridgedVerbatim) {
-        // Avoid calling the runtime.
-        bridgedKey = _reinterpretCastToAnyObject(key)
-      } else {
-        bridgedKey = _bridgeToObjectiveC(key)!
-      }
-      var bridgedValue: AnyObject
-      if _fastPath(isValueBridgedVerbatim) {
-        // Avoid calling the runtime.
-        bridgedValue = _reinterpretCastToAnyObject(value)
-      } else {
-        if let theBridgedValue: AnyObject = _bridgeToObjectiveC(value) {
-          bridgedValue = theBridgedValue
-        } else {
-          _preconditionFailure("Dictionary to NSDictionary bridging: value failed to bridge")
-        }
-      }
-
-      // NOTE: the just-bridged key is copied here.  It would be nice to avoid
-      // copying it, but it seems like there is no public APIs for this.  But
-      // since the key may potentially come from user code, it might be a good
-      // idea to copy it anyway.  In the case of bridging stdlib types, this is
-      // wasteful.
-      if let nsCopyingKey = bridgedKey as? NSCopying {
-        result[nsCopyingKey] = bridgedValue
-      } else {
-        // Note: on a different code path -- when KeyType bridges verbatim --
-        // we are not doing this check eagerly.  Instead, the message send will
-        // fail at runtime when NSMutableDictionary attempts to copy the key
-        // that does not conform to NSCopying.
-        _preconditionFailure("key bridged to an object that does not conform to NSCopying")
-      }
-    }
-    return reinterpretCast(result)
-
-  case .Cocoa(let cocoaStorage):
-    // The `Dictionary` is already backed by `NSDictionary` of some kind.  Just
-    // unwrap it.
-    return reinterpretCast(cocoaStorage.cocoaDictionary)
-  }
+  // Note: there should be *a good justification* for doing something else
+  // than just dispatching to `bridgeToObjectiveC`.
+  return d.bridgeToObjectiveC()
 }
 
 // Dictionary<KeyType, ValueType> is conditionally bridged to NSDictionary
@@ -736,7 +685,23 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   public func bridgeToObjectiveC() -> NSDictionary {
-    return _convertDictionaryToNSDictionary(self)
+    switch _variantStorage {
+    case .Native(let nativeOwner):
+      _precondition(_isBridgedToObjectiveC(KeyType.self),
+          "KeyType is not bridged to Objective-C")
+      _precondition(_isBridgedToObjectiveC(ValueType.self),
+          "ValueType is not bridged to Objective-C")
+
+      // The `Dictionary` is backed by native storage, which is also a proper
+      // `NSDictionary` subclass, that, if needed, performs bridging lazily.
+      let anNSSwiftDictionary: _NSSwiftDictionary = nativeOwner
+      return reinterpretCast(anNSSwiftDictionary)
+
+    case .Cocoa(let cocoaStorage):
+      // The `Dictionary` is already backed by `NSDictionary` of some kind.  Just
+      // unwrap it.
+      return reinterpretCast(cocoaStorage.cocoaDictionary)
+    }
   }
 
   public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {

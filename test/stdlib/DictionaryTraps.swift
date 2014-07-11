@@ -172,10 +172,11 @@ if arg == "BridgedKeyIsNotNSCopyable1" {
 }
 
 if arg == "BridgedKeyIsNotNSCopyable2" {
-  // This Dictionary is bridged in O(N).
+  // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): 10 ]
-  println("OK")
   var nsd: NSDictionary = d
+  println("OK")
+  nsd.mutableCopy()
 }
 
 if arg == "Downcast1" {
