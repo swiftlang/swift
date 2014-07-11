@@ -619,6 +619,7 @@ bb0(%0 : $FakeOptional):
 
 
 class C {}
+class D : C { }
 
 // CHECK-LABEL: sil @test1cse : $@thin (C) -> () {
 // CHECK: unchecked_ref_bit_cast
@@ -649,6 +650,24 @@ bb0(%0 : $C):
   %2 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
   %4 = function_ref @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
   %5 = apply %4(%1, %2) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+  %6 = tuple()
+  return %6 : $()
+}
+
+sil @helperCD : $@thin (C, C) -> Builtin.Word
+
+// CHECK-LABEL: sil @test3cse : $@thin (D) -> () {
+// CHECK: upcast
+// CHECK-NOT: upcast
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @test3cse : $@thin (D) -> () {
+bb0(%0 : $D):
+  %1 = upcast %0 : $D to $C
+  %2 = upcast %0 : $D to $C
+  %4 = function_ref @helperCD : $@thin (C, C) -> Builtin.Word
+  %5 = apply %4(%1, %2) : $@thin (C, C) -> Builtin.Word
   %6 = tuple()
   return %6 : $()
 }

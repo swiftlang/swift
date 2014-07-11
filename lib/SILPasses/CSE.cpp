@@ -84,6 +84,7 @@ struct SimpleValue {
     case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
     case ValueKind::RefToRawPointerInst:
+    case ValueKind::UpcastInst:
         return true;
     default:
         return false;
@@ -148,6 +149,10 @@ public:
 
   hash_code visitRefToRawPointerInst(RefToRawPointerInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitUpcastInst(UpcastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
 
   hash_code visitStringLiteralInst(StringLiteralInst *X) {
