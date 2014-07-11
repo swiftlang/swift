@@ -2939,7 +2939,6 @@ public:
         VD->getSetter()->getMutableAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
-
     TC.checkDeclAttributes(VD);
   }
 
@@ -4328,7 +4327,14 @@ public:
           validatePatternBindingDecl(TC, pat);
 
         isObjC = prop->isObjC() ||
-                 prop->getAttrs().hasAttribute<IBOutletAttr>();
+                 prop->getAttrs().hasAttribute<IBOutletAttr>() ||
+                 prop->getAttrs().hasAttribute<DynamicAttr>();
+        
+        // If the property is dynamic, propagate to this accessor.
+        if (prop->getAttrs().hasAttribute<DynamicAttr>()
+            && !FD->getAttrs().hasAttribute<DynamicAttr>())
+          FD->getMutableAttrs().add(
+                               new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
       if (isObjC &&
