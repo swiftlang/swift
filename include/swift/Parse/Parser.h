@@ -720,7 +720,7 @@ public:
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
 
-  ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel,
+  ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                                      SourceLoc PrefixLoc,

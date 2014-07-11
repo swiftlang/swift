@@ -1164,6 +1164,7 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_init:
   case tok::kw_internal:
   case tok::kw_let:
+  case tok::kw_operator:
   case tok::kw_private:
   case tok::kw_protocol:
   case tok::kw_public:
@@ -1365,13 +1366,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
     // Context sensitive keywords.
     case tok::identifier:
-      // If this is the start of an operator, parse it as such.
-      if (isStartOfOperatorDecl(Tok, peekToken())) {
-        DeclResult = parseDeclOperator(Flags.contains(PD_AllowTopLevel),
-                                       Attributes);
-        break;
-      }
-      
       // Likewise, if this is a context sensitive keyword, parse it too.
       if (Tok.isContextualKeyword("weak") ||
           Tok.isContextualKeyword("unowned")) {
@@ -1514,6 +1508,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       break;
     case tok::kw_deinit:
       DeclResult = parseDeclDeinit(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_operator:
+      DeclResult = parseDeclOperator(Flags, Attributes);
       Status = DeclResult;
       break;
     case tok::kw_protocol:
@@ -4000,11 +3998,9 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserResult<OperatorDecl> 
-Parser::parseDeclOperator(bool AllowTopLevel, DeclAttributes &Attributes) {
-  assert(Tok.isContextualKeyword("operator") &&
-         "no 'operator' at start of operator decl?!");
-
-  SourceLoc OperatorLoc = consumeToken(tok::identifier);
+Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+  SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
+  bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::operator_attributes);
@@ -4040,7 +4036,6 @@ Parser::parseDeclOperator(bool AllowTopLevel, DeclAttributes &Attributes) {
   }
   
   ParserResult<OperatorDecl> Result;
-  
   switch (*kind) {
   case DeclKind::PrefixOperator:
     Result = parseDeclPrefixOperator(OperatorLoc, KindLoc, Name, NameLoc);
