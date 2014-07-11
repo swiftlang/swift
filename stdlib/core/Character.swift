@@ -74,6 +74,8 @@ public enum Character :
       s.core.count != 0, "Can't form a Character from an empty String")
 
     var (count, initialUTF8) = s.core._encodeSomeUTF8(0)
+    // Notice that the result of sizeof() is a small non-zero number and can't
+    // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s.core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {

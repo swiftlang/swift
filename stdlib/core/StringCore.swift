@@ -136,7 +136,9 @@ public struct _StringCore {
   ) {
     _sanityCheck(elementShift == 0 || elementShift == 1)
     self._baseAddress = baseAddress
-    
+   
+    // Notice that the result of sizeof() is a small non-zero number and can't
+    // overflow when multiplied by 8.
     self._countAndFlags
       = (UWord(elementShift) << UWord(sizeof(UWord.self) &* 8 &- 1))
       | ((hasCocoaBuffer ? 1 : 0) << UWord(sizeof(UWord.self) &* 8 &- 2)) 
@@ -184,6 +186,8 @@ public struct _StringCore {
   /// left shift amount to apply to an offset N so that when
   /// added to a UnsafePointer<RawByte>, it traverses N elements
   var elementShift: Int {
+    // Notice that the result of sizeof() is a small non-zero number and can't
+    // overflow when multiplied by 8.
     return Int(_countAndFlags >> UWord(sizeof(UWord.self) &* 8 &- 1))
   }
   
