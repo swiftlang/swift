@@ -97,9 +97,9 @@ public struct HeapBuffer<Value, Element> : LogicValue, Equatable {
 
   static func _requiredAlignMask() -> Int {
     // We can't use max here because it can allocate an array.
-    let heapAlign = alignof(_HeapObject.self) - 1
-    let valueAlign = alignof(Value.self) - 1
-    let elementAlign = alignof(Element.self) - 1
+    let heapAlign = alignof(_HeapObject.self) &- 1
+    let valueAlign = alignof(Value.self) &- 1
+    let elementAlign = alignof(Element.self) &- 1
     return (heapAlign < valueAlign
             ? (valueAlign < elementAlign ? elementAlign : valueAlign)
             : (heapAlign < elementAlign ? elementAlign : heapAlign))

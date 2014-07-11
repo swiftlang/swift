@@ -95,7 +95,7 @@ extension String {
       
       public func successor() -> Index {
         let newBuffer0 = (_buffer >> 8) | (
-          0xFF << numericCast((sizeofValue(_buffer) - 1) * 8)
+          0xFF << numericCast((sizeofValue(_buffer) &- 1) &* 8)
         )
         if _fastPath(newBuffer0 != ~0) {
           return Index(_core, _coreIndex, newBuffer0)
