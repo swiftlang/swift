@@ -2071,7 +2071,7 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
 
 /// Return true if this stored property needs to be accessed with getters and
 /// setters for Objective-C.
-bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
+bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
   // We don't export generic methods or subclasses to IRGen yet.
   auto *DC = getDeclContext();
   if (DC->getDeclaredTypeInContext() &&
@@ -2080,7 +2080,7 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
     return false;
 
   if (auto override = getOverriddenDecl())
-    return override->usesObjCGetterAndSetter();
+    return override->hasObjCGetterAndSetter();
 
   if (!isObjC())
     return false;
@@ -2099,6 +2099,15 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
     }
   }
 
+  return true;
+}
+
+bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
+  if (!hasObjCGetterAndSetter())
+    return false;
+  if (getASTContext().LangOpts.EnableDynamic)
+    if (!getAttrs().hasAttribute<DynamicAttr>())
+      return false;
   return true;
 }
 

@@ -2966,7 +2966,7 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 decl->usesObjCGetterAndSetter());
+                 decl->requiresObjCGetterAndSetter());
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
@@ -2998,7 +2998,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 decl->usesObjCGetterAndSetter());
+                 decl->requiresObjCGetterAndSetter());
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,

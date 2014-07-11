@@ -979,7 +979,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // the @NSManagedAttr attribute is present.
   if (method->isGetterOrSetter()) {
     auto asd = method->getAccessorStorageDecl();
-    return asd->usesObjCGetterAndSetter() &&
+    return asd->hasObjCGetterAndSetter() &&
            !asd->getAttrs().hasAttribute<NSManagedAttr>();
   }
 
@@ -1000,13 +1000,24 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     if (fd->isGetterOrSetter())
       return requiresObjCDispatch(fd->getAccessorStorageDecl());
 
-    return fd->isObjC() || fd->getAttrs().hasAttribute<IBActionAttr>();
+    if (getASTContext().LangOpts.EnableDynamic)
+      return fd->getAttrs().hasAttribute<DynamicAttr>();
+    else
+      return fd->isObjC() || fd->getAttrs().hasAttribute<IBActionAttr>();
   }
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd))
-    return cd->isObjC();
+  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
+    if (getASTContext().LangOpts.EnableDynamic)
+      return cd->getAttrs().hasAttribute<DynamicAttr>();
+    else
+      return cd->isObjC();
+  }
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
-    return asd->usesObjCGetterAndSetter();
-  return vd->isObjC();
+    return asd->requiresObjCGetterAndSetter();
+  
+  if (getASTContext().LangOpts.EnableDynamic)
+    return vd->getAttrs().hasAttribute<DynamicAttr>();
+  else
+    return vd->isObjC();
 }
 
 bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
@@ -1238,7 +1249,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
     // FIXME: Default implementations in protocols.
-    if (asd->usesObjCGetterAndSetter() &&
+    if (asd->hasObjCGetterAndSetter() &&
         !isa<ProtocolDecl>(asd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(asd);
   }
@@ -1419,7 +1430,7 @@ public:
   }
   
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
-    if (vd->usesObjCGetterAndSetter())
+    if (vd->hasObjCGetterAndSetter())
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 };

@@ -3276,9 +3276,13 @@ public:
   /// only valid on a VarDecl with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
-  /// Return true if this storage needs to be accessed with getters and
-  /// setters for Objective-C.
-  bool usesObjCGetterAndSetter() const;
+  /// Return true if this storage can (but doesn't have to) be accessed with
+  /// Objective-C-compatible getters and setters.
+  bool hasObjCGetterAndSetter() const;
+
+  /// Return true if this storage *must* be accessed with Objective-C-compatible
+  /// getters and setters.
+  bool requiresObjCGetterAndSetter() const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
