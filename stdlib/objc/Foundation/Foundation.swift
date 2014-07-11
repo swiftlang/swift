@@ -712,21 +712,15 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 
     // `Dictionary<KeyType, ValueType>` where either `KeyType` or `ValueType`
     // is a value type may not be backed by an NSDictionary.
-    let count = d.count
-    let requiredCapacity =
-        _NativeDictionaryStorage<KeyType, ValueType>.getMinCapacity(
-            count, _dictionaryDefaultMaxLoadFactorInverse)
-    var result = [KeyType : ValueType](minimumCapacity: requiredCapacity)
-    var nativeStorage = result._variantStorage.native
+    var builder = _DictionaryBuilder<KeyType, ValueType>(count: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
       (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
        stop: UnsafePointer<ObjCBool>) in
-      nativeStorage.unsafeAddNew(
+      builder.add(
           key: _bridgeFromObjectiveC(anyObjectKey, KeyType.self),
           value: _bridgeFromObjectiveC(anyObjectValue, ValueType.self))
     }
-    nativeStorage.count = count
-    return result
+    return builder.take()
   }
 
   public static func bridgeFromObjectiveCConditional(

@@ -1661,8 +1661,7 @@ public struct DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
   }
 }
 
-public
-struct Dictionary<
+public struct Dictionary<
   KeyType : Hashable, ValueType
 > : Collection, DictionaryLiteralConvertible {
 
@@ -2042,6 +2041,42 @@ class _DictionaryMirror<Key : Hashable,Value> : Mirror {
 extension Dictionary : Reflectable {
   public func getMirror() -> Mirror {
     return _DictionaryMirror(self)
+  }
+}
+
+public struct _DictionaryBuilder<KeyType : Hashable, ValueType> {
+  var _result: [KeyType : ValueType]
+  var _nativeStorage: _NativeDictionaryStorage<KeyType, ValueType>
+  let _requestedCount: Int
+  var _actualCount: Int
+
+  public init(count: Int) {
+    let requiredCapacity =
+        _NativeDictionaryStorage<KeyType, ValueType>.getMinCapacity(
+            count, _dictionaryDefaultMaxLoadFactorInverse)
+    _result = [KeyType : ValueType](minimumCapacity: requiredCapacity)
+    _nativeStorage = _result._variantStorage.native
+    _requestedCount = count
+    _actualCount = 0
+  }
+
+  public mutating func add(#key: KeyType, value: ValueType) {
+    _nativeStorage.unsafeAddNew(key: key, value: value)
+    _actualCount++
+  }
+
+  public mutating func take() -> [KeyType : ValueType] {
+    _precondition(_actualCount >= 0,
+        "can not take the result twice")
+    _precondition(_actualCount == _requestedCount,
+        "the number of key-value pairs added does not match the promised count")
+
+    // Finish building the `Dictionary`.
+    _nativeStorage.count = _requestedCount
+
+    // Prevent taking the result twice.
+    _actualCount = -1
+    return _result
   }
 }
 
