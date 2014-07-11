@@ -30,8 +30,8 @@ func _putchar(value: Int32) -> Int32
 /// protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_conformsToProtocol")public
-func _stdlib_conformsToProtocol<SourceType, DestType>(
+@asmname("swift_stdlib_conformsToProtocol")
+public func _stdlib_conformsToProtocol<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> Bool
 
@@ -39,8 +39,10 @@ func _stdlib_conformsToProtocol<SourceType, DestType>(
 /// type.  Traps if the object does not conform to the protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1Unconditional")public
-func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
+@asmname("swift_stdlib_dynamicCastToExistential1Unconditional")
+public func _stdlib_dynamicCastToExistential1Unconditional<
+    SourceType, DestType
+>(
     value: SourceType, _: DestType.Type
 ) -> DestType
 
@@ -48,8 +50,8 @@ func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
 /// type.  Returns `.None` if the object does not conform to the protocol.
 ///
 /// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_dynamicCastToExistential1")public
-func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
+@asmname("swift_stdlib_dynamicCastToExistential1")
+public func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> DestType?
 
