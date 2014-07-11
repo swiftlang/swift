@@ -53,6 +53,12 @@ typedef long NSInteger;
 
 @property void (^block)(void);
 @property NSInteger count;
+
+@end
+
+@interface Guisemeau : Gizmo
+- (id)objectAtIndexedSubscript:(NSInteger)idx;
+- (void)setObject:(id)obj atIndexedSubscript:(NSInteger)idx;
 @end
 
 @interface NSString : NSObject

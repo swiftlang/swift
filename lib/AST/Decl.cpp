@@ -2105,6 +2105,9 @@ bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
 bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
   if (!hasObjCGetterAndSetter())
     return false;
+  // Imported accessors are foreign and only have objc entry points.
+  if (hasClangNode())
+    return true;
   if (getASTContext().LangOpts.EnableDynamic)
     if (!getAttrs().hasAttribute<DynamicAttr>())
       return false;

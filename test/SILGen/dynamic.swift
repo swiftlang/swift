@@ -2,6 +2,7 @@
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-dynamic %s -emit-silgen | FileCheck %s
 
 import Foundation
+import gizmo
 
 class Foo {
   // Not objc or dynamic, so only a vtable entry
@@ -93,6 +94,22 @@ func dynamicMethodDispatch() {
   let y = c[dynamic: 0]
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign
   c[dynamic: 0] = y
+}
+
+// CHECK-LABEL: sil @_TF7dynamic21foreignMethodDispatchFT_T_
+func foreignMethodDispatch() {
+  // CHECK: function_ref @_TFCSo9GuisemeauCfMS_FT_S_
+  let g = Guisemeau()
+  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.frob!1.foreign
+  g.frob()
+  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!getter.1.foreign
+  let x = g.count
+  // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!setter.1.foreign
+  g.count = x
+  // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!getter.1.foreign
+  let y = g[0]
+  // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!setter.1.foreign
+  g[0] = y
 }
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
