@@ -3043,6 +3043,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   }
   Identifier SimpleName;
   SourceLoc NameLoc = Tok.getLoc();
+  Token NonglobalTok = Tok;
   bool  NonglobalError = false;
 
   if (!(Flags & PD_AllowTopLevel) && 
@@ -3067,7 +3068,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   
   if (NonglobalError && !DCC.movedToTopLevel()) {
     // FIXME: Recovery here is awful.
-    diagnose(Tok, diag::func_decl_nonglobal_operator);
+    diagnose(NonglobalTok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
 

@@ -144,3 +144,9 @@ func test_14705150() {
 operator postfix! {} // expected-error{{cannot declare a custom postfix '!' operator}}
 @postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 @postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
+
+// Only allow operators at global scope:
+func operator_in_func_bad () {
+    @prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} \
+                                                                    // expected-error {{braced block of statements is an unused closure}}
+}
