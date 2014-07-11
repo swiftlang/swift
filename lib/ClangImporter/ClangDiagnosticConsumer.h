@@ -15,10 +15,11 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 
 namespace swift {
 
-class ClangDiagnosticConsumer : public clang::DiagnosticConsumer {
+class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
   using ImportTy =
     PointerUnion<const clang::IdentifierInfo *, const llvm::MemoryBuffer *>;
 
@@ -58,10 +59,12 @@ private:
   ClangImporter::Implementation &ImporterImpl;
   ImportTy CurrentImport;
   bool CurrentImportNotFound;
+  bool DumpToStderr;
 
 public:
-  ClangDiagnosticConsumer(ClangImporter::Implementation &Impl)
-    : ImporterImpl(Impl) {}
+  ClangDiagnosticConsumer(ClangImporter::Implementation &impl,
+                          clang::DiagnosticOptions &clangDiagOptions,
+                          bool dumpToStderr);
 
   LoadModuleRAII handleImport(ImportTy nameOrImportBuffer) {
     return LoadModuleRAII(*this, nameOrImportBuffer);

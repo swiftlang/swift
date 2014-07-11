@@ -20,6 +20,13 @@
 
 using namespace swift;
 
+ClangDiagnosticConsumer::ClangDiagnosticConsumer(
+    ClangImporter::Implementation &impl,
+    clang::DiagnosticOptions &clangDiagOptions,
+    bool dumpToStderr)
+  : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
+    ImporterImpl(impl), DumpToStderr(dumpToStderr) {}
+
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
     const clang::Diagnostic &clangDiag) {
@@ -60,7 +67,10 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   }
 
   // Satisfy the default implementation (bookkeeping).
-  DiagnosticConsumer::HandleDiagnostic(clangDiagLevel, clangDiag);
+  if (DumpToStderr)
+    TextDiagnosticPrinter::HandleDiagnostic(clangDiagLevel, clangDiag);
+  else
+    DiagnosticConsumer::HandleDiagnostic(clangDiagLevel, clangDiag);
 
   decltype(diag::error_from_clang) diagKind;
   switch (clangDiagLevel) {

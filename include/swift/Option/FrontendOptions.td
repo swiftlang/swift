@@ -115,6 +115,9 @@ def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
 def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
   HelpText<"Don't link SIL functions">;
 
+def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
+  HelpText<"Dump Clang diagnostics to stderr">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 

@@ -34,9 +34,13 @@ public:
   /// properties.
   bool InferImplicitProperties = false;
 
-  // If true, the audited APIs will be imported with the tighter types, not
-  // unwrapped optional.
+  /// If true, the audited APIs will be imported with the tighter types, not
+  /// unwrapped optional.
   bool ImportWithTighterObjCPointerTypes = false;
+
+  /// If true, Clang diagnostics will be dumped to stderr using Clang's
+  /// diagnostic printer as well as being passed to Swift's diagnostic engine.
+  bool DumpClangDiagnostics = false;
 };
 
 } // end namespace swift

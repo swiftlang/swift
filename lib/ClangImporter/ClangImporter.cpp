@@ -286,12 +286,16 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgs.push_back(argStr.c_str());
 
   // Create a new Clang compiler invocation.
-
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation =
-    new CompilerInvocation;
-  auto clangDiags = CompilerInstance::createDiagnostics(
-      &invocation->getDiagnosticOpts(),
-      new ClangDiagnosticConsumer(importer->Impl));
+  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation{
+    new CompilerInvocation
+  };
+  std::unique_ptr<ClangDiagnosticConsumer> diagClient{
+    new ClangDiagnosticConsumer(importer->Impl, invocation->getDiagnosticOpts(),
+                                importerOpts.DumpClangDiagnostics)
+  };
+  auto clangDiags =
+    CompilerInstance::createDiagnostics(&invocation->getDiagnosticOpts(),
+                                        diagClient.release());
 
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up

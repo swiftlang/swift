@@ -618,6 +618,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.ImportWithTighterObjCPointerTypes |=
     Args.hasArg(OPT_import_tighter_objc_types);
 
+  Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
+
   return false;
 }
 
