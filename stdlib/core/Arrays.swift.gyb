@@ -36,24 +36,18 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
   }
 
   public var endIndex: Int {
-    return _buffer.count
+    return _getCount()
   }
 
   public subscript(index: Int) -> Element {
     get {
-      _precondition(index < count, "${Self} index out of range")
-      _precondition(index >= 0, "Negative ${Self} index is out of range")
-      return _buffer[index]
+      _checkBounds(index)
+      return _getElement(index)
     }
     set {
-      _precondition(index < count, "${Self} index out of range")
-      _precondition(index >= 0, "Negative array index is out of range")
-      if _buffer.isMutableAndUniquelyReferenced() {
-        _buffer[index] = newValue
-      }
-      else {
-        _subscriptSetSlowPath(&_buffer, e: newValue, index: index)
-      }
+      _makeMutableAndUnique()
+      _checkBounds(index)
+      _setElement(index, newValue: newValue)
     }
   }
 
@@ -75,16 +69,45 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
 
   //===--- private --------------------------------------------------------===//
 
-  @inline(never)
-  func _subscriptSetSlowPath(inout buffer: _Buffer, e: Element, index : Int) {
+  @semantics("array.get_count")
+  func _getCount() -> Int {
+    return _buffer.count
+  }
+  @semantics("array.get_capacity")
+  func _getCapacity() -> Int {
+    return _buffer.capacity
+  }
+
+  func _copyBuffer(inout buffer: _Buffer) {
     var newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     let target = buffer._uninitializedCopy(
-      0..<index, target: newBuffer.elementStorage)
-    target.initialize(e)
-    buffer._uninitializedCopy(
-      (index + 1)..<buffer.count, target: target + 1)
+      0..<count, target: newBuffer.elementStorage)
     buffer = _Buffer(newBuffer)
+  }
+
+  @semantics("array.make_mutable")
+  mutating func _makeMutableAndUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _copyBuffer(&_buffer)
+    }
+  }
+
+  @semantics("array.check_bounds")
+  func _checkBounds(index: Int) {
+    _precondition(index < count, "${Self} index out of range")
+    _precondition(index >= 0, "Negative ${Self} index is out of range")
+  }
+
+  @semantics("array.get_element")
+  func _getElement(index: Int) -> Element {
+    return _buffer[index]
+  }
+  @semantics("array.set_element")
+  mutating func _setElement(
+    index: Int, newValue: Element
+  ) {
+    _buffer[index] = newValue
   }
 
   public
@@ -138,12 +161,12 @@ extension ${Self} : ArrayType {
   
   /// How many elements the ${Self} stores
   public var count: Int {
-    return _buffer.count
+    return _getCount()
   }
 
   /// How many elements the ${Self} can store without reallocation
   public var capacity: Int {
-    return _buffer.capacity
+    return _getCapacity()
   }
 
   /// true if and only if the ${Self} is empty
@@ -174,6 +197,7 @@ extension ${Self} : ArrayType {
   /// Ensure the array has enough mutable contiguous storage to store
   /// minimumCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
+  @semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
 
@@ -187,6 +211,7 @@ extension ${Self} : ArrayType {
   }
   
   /// Append newElement to the ${Self} in O(1) (amortized)
+  @semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     _arrayAppend(&_buffer, newElement)
   }
@@ -533,6 +558,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
 
 % for (Self, a_Self) in arrayTypes:
 extension ${Self} {
+  @semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: Collection where C.GeneratorType.Element == _Buffer.Element
   >(
