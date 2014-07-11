@@ -2978,7 +2978,11 @@ public:
           PBD->hasStorage() && !PBD->getPattern()->getType()->is<ErrorType>()) {
 
         // If we have a type-adjusting attribute, apply it now.
+        // Also record whether the pattern-binding is for a debugger variable.
+        bool isDebuggerVar = false;
         if (auto var = PBD->getSingleVar()) {
+          isDebuggerVar = var->isDebuggerVar();
+            
           if (var->getAttrs().hasOwnership())
             TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
         }
@@ -2990,7 +2994,7 @@ public:
             hasNSManaged = true;
         });
 
-        if (!hasNSManaged) {
+        if (!hasNSManaged && !isDebuggerVar) {
           auto type = PBD->getPattern()->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
             // If any of the default initialized values are immutable, then
