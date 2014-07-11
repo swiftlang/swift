@@ -44,6 +44,45 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
 namespace swift {
 
+enum IsZeroKind {
+  Zero,
+  NotZero,
+  Unknown
+};
+
+/// Check if the value \p Value is known to be zero, non-zero or unknown.
+static IsZeroKind isZeroValue(SILValue Value) {
+  // Inspect integer literals.
+  if (auto *L = dyn_cast<IntegerLiteralInst>(Value.getDef())) {
+    if (L->getValue().getZExtValue() == 0)
+      return IsZeroKind::Zero;
+    return IsZeroKind::NotZero;
+  }
+
+  // Inspect casts.
+  if (auto *AI = dyn_cast<ApplyInst>(Value.getDef())) {
+    auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+    if (!FR)
+      return IsZeroKind::Unknown;
+    switch (FR->getBuiltinInfo().ID) {
+      case BuiltinValueKind::IntToPtr:
+      case BuiltinValueKind::PtrToInt:
+      case BuiltinValueKind::ZExt:
+        return isZeroValue(AI->getArgument(0));
+
+      default:
+        return IsZeroKind::Unknown;
+    }
+  }
+
+  //Inspect allocations and pointer literals.
+  if (isa<StringLiteralInst>(Value.getDef()) ||
+      isa<SILGlobalAddrInst>(Value.getDef()))
+    return IsZeroKind::NotZero;
+
+  return IsZeroKind::Unknown;
+}
+
 /// This is the worklist management logic for SILCombine.
 class SILCombineWorklist {
   llvm::SmallVector<SILInstruction *, 256> Worklist;
@@ -286,6 +325,11 @@ public:
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
+
+  // Optimize the "cmp_eq_XXX" builtin. If \p NegateResult is true then negate
+  // the result bit.
+  SILInstruction *optimizeBuiltinCompareEq(ApplyInst *AI, bool NegateResult);
+
   SILInstruction *optimizeApplyOfPartialApply(ApplyInst *AI,
                                               PartialApplyInst *PAI);
   SILInstruction *optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
@@ -885,6 +929,26 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
   }
 }
 
+SILInstruction *SILCombiner::optimizeBuiltinCompareEq(ApplyInst *AI,
+                                                       bool NegateResult) {
+  IsZeroKind LHS = isZeroValue(AI->getArgument(0));
+  IsZeroKind RHS = isZeroValue(AI->getArgument(1));
+
+  // Can't handle unknown values.
+  if (LHS == IsZeroKind::Unknown || RHS == IsZeroKind::Unknown)
+    return nullptr;
+
+  // Can't handle non-zero ptr values.
+  if (LHS == IsZeroKind::NotZero && RHS == IsZeroKind::NotZero)
+    return nullptr;
+
+  // Set to true if both sides are zero. Set to false if only one side is zero.
+  bool Val = (LHS == RHS) ^ NegateResult;
+
+  return IntegerLiteralInst::create(AI->getLoc(), AI->getType(), APInt(1, Val),
+                                    *AI->getFunction());
+}
+
 SILInstruction *
 SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
                                                 ConvertFunctionInst *CFI) {
@@ -971,9 +1035,16 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
     return optimizeApplyOfPartialApply(AI, PAI);
 
-  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
     if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
       return optimizeBuiltinCanBeObjCClass(AI);
+
+    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::ICMP_EQ)
+      return optimizeBuiltinCompareEq(AI, /*Negate Eq result*/ false);
+
+    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::ICMP_NE)
+      return optimizeBuiltinCompareEq(AI, /*Negate Eq result*/ true);
+  }
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);

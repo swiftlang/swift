@@ -1495,3 +1495,38 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   %6 = tuple(%3 : $B, %5 : $Optional<Builtin.Word>)
   return %6 : $(B, Optional<Builtin.Word>)
 }
+
+
+//CHECK-LABEL: @remove_pointer_compare_to_zero
+//CHECK-NOT: apply
+//CHECK-NOT: cond_fail
+//CHECK: return
+sil @remove_pointer_compare_to_zero : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = string_literal utf16 "ss"
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %4 = apply %3(%2) : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %5 = builtin_function_ref "cmp_eq_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %6 = apply %5(%1, %4) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  cond_fail %6 : $Builtin.Int1
+  %8 = tuple ()
+  return %8 : $()
+}
+
+//CHECK-LABEL: @remove_pointer_compare_to_zero_NE
+//CHECK-NOT: apply
+//CHECK: cond_fail
+//CHECK: return
+sil @remove_pointer_compare_to_zero_NE : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = string_literal utf16 "ss"
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %4 = apply %3(%2) : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %5 = builtin_function_ref "cmp_ne_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %6 = apply %5(%1, %4) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  cond_fail %6 : $Builtin.Int1
+  %8 = tuple ()
+  return %8 : $()
+}
