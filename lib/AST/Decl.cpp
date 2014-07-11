@@ -1938,6 +1938,17 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
   Set->makeAccessor(this, AccessorKind::IsSetter);
 }
 
+void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
+  assert(GetSetInfo == nullptr && "Braces range has already been set");
+
+  auto &Context = getASTContext();
+  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
+  GetSetInfo = new (Mem) GetSetRecord();
+  GetSetInfo->Braces = BracesRange;
+  GetSetInfo->Get = nullptr;
+  GetSetInfo->Set = nullptr;
+}
+
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {

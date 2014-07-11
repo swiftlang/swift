@@ -2739,6 +2739,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     return PrimaryVar;
   }
 
+  // Otherwise this decl is invalid and the accessors have been rejected above.
+  // Make sure to at least record the braces range in the AST.
+  PrimaryVar->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
+
   return nullptr;
 }
 

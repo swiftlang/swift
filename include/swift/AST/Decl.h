@@ -3257,9 +3257,13 @@ public:
   /// This should only be used by the ClangImporter.
   void setComputedSetter(FuncDecl *Set);
 
+  /// \brief Specify the braces range without adding accessors.
+  ///
+  /// This is used to record the braces range if the accessors were rejected.
+  void setInvalidBracesRange(SourceRange BracesRange);
+
   SourceRange getBracesRange() const {
-    assert(GetSetInfo && "Not computed!");
-    return GetSetInfo->Braces;
+    return GetSetInfo ? GetSetInfo->Braces : SourceRange();
   }
 
   /// \brief Retrieve the getter used to access the value of this variable.
