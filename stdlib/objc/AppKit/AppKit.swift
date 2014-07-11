@@ -105,5 +105,6 @@ public extension NSGradient {
 // Fix the ARGV type of NSApplicationMain, which nonsensically takes
 // argv as a const char**.
 @asmname("NSApplicationMain")
-func NSApplicationMain(argc: Int32, argv: UnsafePointer<UnsafePointer<CChar>>)
+public func NSApplicationMain(argc: Int32,
+                              argv: UnsafePointer<UnsafePointer<CChar>>)
   -> Int32
