@@ -12,6 +12,7 @@
 // CHECK: @_TWvdvC13objc_subclass10SwiftGizmo1xSi = global i64 16, align 8
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* @_objc_empty_vtable, i64 ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to i64) }
 // CHECK: [[STRING_X:@.*]] = private unnamed_addr constant [2 x i8] c"x\00"
+// CHECK: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
 // CHECK: [[METHOD_TYPE_ENCODING1:@.*]] = private unnamed_addr constant [8 x i8] c"q16@0:8\00"
 // CHECK: [[METHOD_TYPE_ENCODING2:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8q16\00"
 // CHECK: [[GETTER_ENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
@@ -86,7 +87,7 @@
 // CHECK:   [1 x { i64*, i8*, i8*, i32, i32 }] [{ i64*, i8*, i8*, i32, i32 } {
 // CHECK:     i64* @_TWvdvC13objc_subclass10SwiftGizmo1xSi,
 // CHECK:     i8* getelementptr inbounds ([2 x i8]* [[STRING_X]], i64 0, i64 0),
-// CHECK:     i8* null,
+// CHECK:     i8* getelementptr inbounds ([1 x i8]* [[STRING_EMPTY]], i64 0, i64 0),
 // CHECK:     i32 3,
 // CHECK:     i32 8 }]
 // CHECK: }, section "__DATA, __objc_const", align 8

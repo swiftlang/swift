@@ -1433,7 +1433,7 @@ namespace {
       auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      auto typeEncode = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      auto typeEncode = IGM.getAddrOfGlobalString("");
 
       Size size;
       Alignment alignment;
