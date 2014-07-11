@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{'Int' is not convertible to 'UInt8'}}
+  return a + "a" // expected-error{{'Int' is not convertible to 'String'}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{'Int' is not convertible to 'UInt8'}}
+  return a() + "a" // expected-error{{'Int' is not convertible to 'String'}}
 }
 
 

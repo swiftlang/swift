@@ -3436,6 +3436,11 @@ public:
   /// such operations.
   bool isPrinting = false;
   
+  /// \brief If this type variable is an opened literal expression, keep track
+  /// of the associated literal conformance for optimization and diagnostic
+  /// purposes.
+  ProtocolDecl *literalConformanceProto = nullptr;
+  
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>

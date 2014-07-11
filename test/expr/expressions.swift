@@ -109,7 +109,7 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({  // expected-error{{'UInt8' is not a subtype of 'Int'}}
+  testfunc2({  // expected-error{{'((), Int)' is not a subtype of 'Int'}}
      $0 + 1})
 
   enum union1 {

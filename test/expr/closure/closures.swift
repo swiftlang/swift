@@ -12,7 +12,7 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error{{'UInt8' is not a subtype of 'Int'}}
+   { // expected-error{{'Double' is not a subtype of 'Int'}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}

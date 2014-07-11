@@ -152,6 +152,9 @@ namespace {
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
+      
+      tv->literalConformanceProto = protocol;
+      
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(CS.rootExpr));
@@ -862,85 +865,200 @@ namespace {
 
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
       
-      // Check to see if the type checker has any newly created functions with
-      // this name - if it does, they were created before the list of overloads
-      // was created, so we'll need to add a new disjunction constraint for the
-      // new set of overloads.
-      if (expr->IsGlobalDelayedOperatorApply) {
-        if (CS.TC.HasForcedExternalDecl &&
-            CS.TC.implicitlyDefinedFunctions.size()) {
-          
-          // This will only occur if the new bindings were added while solving
-          // the system, so disable the flag to prevent further unnecessary
-          // checks.
-          CS.TC.HasForcedExternalDecl = false;
-          
-          auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
-          auto declName = declRef->getDecls()[0]->getName();
-          SmallVector<OverloadChoice, 4> choices;
-          
-          for (auto implicitFn : CS.TC.implicitlyDefinedFunctions) {
-            if (implicitFn->getName() == declName) {
-              CS.TC.validateDecl(implicitFn, true);
-              choices.push_back(OverloadChoice(Type(),
-                                               implicitFn,
-                                               declRef->isSpecialized()));
-            }
-          }
-          
-          if (!choices.empty()) {
-            SmallVector<Constraint *, 4> constraints;
+      auto isBinaryExpr = isa<BinaryExpr>(expr);
+      
+      // If we're generating constraints for a binary operator application,
+      // there are two special situations to consider:
+      //  1. If the type checker has any newly created functions with the
+      //     operator's name. If it does, the overloads were created after the
+      //     associated overloaded id expression was created, and we'll need to
+      //     add a new disjunction constraint for the new set of overloads.
+      //  2. If any component argument expressions (nested or otherwise) are
+      //     literals, we can favor operator overloads whose argument types are
+      //     identical to the literal type, or whose return types are identical
+      //     to any contextual type associated with the application expression.
+      if (isBinaryExpr) {
+        
+        auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
             
-            auto fnType = expr->getFn()->getType().getPointer();
-            auto tyvarType = cast<TypeVariableType>(fnType);
-            auto &CG = CS.getConstraintGraph();
+        if (declRef) {
+        SmallVector<Constraint *, 4> constraints;
+        
+        auto fnType = expr->getFn()->getType().getPointer();
+        
+        if (auto tyvarType = dyn_cast<TypeVariableType>(fnType)) {
+          auto &CG = CS.getConstraintGraph();
+          
+          // This type variable is only currently associated with the function
+          // being applied, and the only constraint attached to it should
+          // be the disjunction constraint for the overload group.
+          CG.gatherConstraints(tyvarType, constraints);
+          
+          if (constraints.size()) {
             
-            // This type variable is only currently associated with the function
-            // being applied, and the only constraint attached to it should
-            // be the disjunction constraint for the overload group.
-            CG.gatherConstraints(tyvarType, constraints);
-            
-            if (constraints.size()) {
-              for (auto constraint : constraints) {
-                if (constraint->getKind() == ConstraintKind::Disjunction) {
-                  SmallVector<Constraint *, 4> newConstraints;
+            for (auto constraint : constraints) {
+              if (constraint->getKind() == ConstraintKind::Disjunction) {
+                SmallVector<Constraint *, 4> newConstraints;
+                SmallVector<Constraint *, 4> favoredConstraints;
+                
+                auto oldConstraints = constraint->getNestedConstraints();
+                auto csLoc = CS.getConstraintLocator(expr->getFn());
+                
+                // Only replace the disjunctive overload constraint.
+                if (oldConstraints[0]->getKind() !=
+                        ConstraintKind::BindOverload) {
+                  continue;
+                }
+                
+                auto argTy = expr->getArg()->getType().getPointer();
+                TypeBase *firstArgTy = nullptr;
+                
+                if (auto argTupleTy = dyn_cast<TupleType>(argTy)) {
+                  firstArgTy = argTupleTy->
+                               getFields()[1].
+                               getType().
+                               getPointer();
+                }
+                
+                // Copy over the existing bindings, dividing the constraints up
+                // into "favored" and non-favored lists, should one of the
+                // operands be a literal.
+                for (auto oldConstraint : oldConstraints) {
+                  auto overloadChoice = oldConstraint->getOverloadChoice();
                   
-                  auto oldConstraints = constraint->getNestedConstraints();
-                  auto csLoc = CS.getConstraintLocator(expr->getFn());
+                  auto overloadType = overloadChoice.getDecl()->getType();
                   
-                  // Only replace the disjunctive overload constraint.
-                  if (oldConstraints[0]->getKind() !=
-                          ConstraintKind::BindOverload) {
-                    continue;
+                  if (auto fnType = dyn_cast<AnyFunctionType>
+                                        (overloadType.getPointer())) {
+                    auto paramTy = fnType->getInput();
+                    auto resultTy = fnType->getResult();
+                    
+                    if (auto tupleType = dyn_cast<TupleType>
+                                            (paramTy.getPointer())) {
+                      auto firstParamType = tupleType->
+                                            getFields()[0].
+                                            getType().
+                                            getPointer();
+                      auto secondParamType = tupleType->
+                                             getFields()[1].
+                                             getType().
+                                             getPointer();
+                      
+                      if (auto tyvarArgType = dyn_cast<TypeVariableType>
+                                                  (firstArgTy)) {
+                        
+                        if (tyvarArgType->literalConformanceProto) {
+                          
+                          auto defaultType = CS.TC.
+                                             getDefaultType(
+                                               tyvarArgType->
+                                                   literalConformanceProto,
+                                               CS.DC);
+                          auto contextualType = CS.getContextualType(expr);
+                          
+                          if (secondParamType->
+                                  getNominalOrBoundGenericNominal() &&
+                              defaultType &&
+                              !resultTy->isVoid()) {
+                            if (defaultType->isEqual(resultTy) &&
+                                secondParamType->isEqual(resultTy) &&
+                                firstParamType->isEqual(secondParamType) &&
+                                (!contextualType ||
+                                    (*contextualType)->isEqual(resultTy))) {
+                              oldConstraint->setFavored();
+                              favoredConstraints.push_back(oldConstraint);
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                   
-                  // Copy over the existing bindings.
-                  for (auto oldConstraint : oldConstraints) {
-                    newConstraints.push_back(oldConstraint);
-                  }
+                  // FIXME: We can also further filter any available overloads
+                  // based upon conformance to literal protocols. Experiments
+                  // have shown that this doesn't provide much of an
+                  // improvement over favoring the default type when considering
+                  // literal types, but we may be able to use them to favor
+                  // constraints for non-literal types.
+                  newConstraints.push_back(oldConstraint);
+                }
+                
+                // Now add the new bindings as overloads.
+                // This will only occur if the new bindings were added while
+                // solving the system, so disable the flag to prevent further
+                // unnecessary checks.
+                if (expr->IsGlobalDelayedOperatorApply) {
+                  if(CS.TC.HasForcedExternalDecl &&
+                     CS.TC.implicitlyDefinedFunctions.size()) {
+                    
+                    CS.TC.HasForcedExternalDecl = false;
+                    
+                    auto declName = declRef->getDecls()[0]->getName();
+                    SmallVector<OverloadChoice, 4> choices;
+                    
+                    for (auto implicitFn : CS.TC.implicitlyDefinedFunctions) {
+                      if (implicitFn->getName() == declName) {
+                        CS.TC.validateDecl(implicitFn, true);
+                        choices.push_back(OverloadChoice(Type(),
+                                                         implicitFn,
+                                                         declRef->isSpecialized()));
+                      }
+                    }
                   
-                  // Now add the new bindings as overloads.
-                  for (auto choice : choices) {
-                    auto overload = Constraint::createBindOverload(CS,
-                                                                   tyvarType,
-                                                                   choice,
-                                                                   csLoc);
-                    newConstraints.push_back(overload);
+                    if (!choices.empty()) {
+                      for (auto choice : choices) {
+                        auto overload = Constraint::createBindOverload(CS,
+                                                                       tyvarType,
+                                                                       choice,
+                                                                       csLoc);
+                        newConstraints.push_back(overload);
+                      }
+                    }
                   }
+                }
 
-                  // Remove the original constraint from the inactive constraint
-                  // list and add the new one.
-                  CS.removeInactiveConstraint(constraint);
+                // Remove the original constraint from the inactive constraint
+                // list and add the new one.
+                CS.removeInactiveConstraint(constraint);
+                
+                if (favoredConstraints.size()) {
+                  auto favoredConstraintsDisjunction =
+                          Constraint::createDisjunction(CS,
+                                                        favoredConstraints,
+                                                        csLoc);
+                  favoredConstraintsDisjunction->setFavored();
+                  
+                  if (newConstraints.size()) {
+                    auto newConstraintsDisjunction =
+                            Constraint::createDisjunction(CS,
+                                                          newConstraints,
+                                                          csLoc);
+                    auto aggregateConstraints = {
+                                                  favoredConstraintsDisjunction,
+                                                  newConstraintsDisjunction
+                                                };
+                    CS.addConstraint(
+                        Constraint::createDisjunction(CS,
+                                                      aggregateConstraints,
+                                                      csLoc));
+                  } else {
+                    CS.addConstraint(
+                        Constraint::createDisjunction(CS,
+                                                      favoredConstraints,
+                                                      csLoc));
+                  }
+                } else {
                   CS.addConstraint(Constraint::createDisjunction(CS,
                                                                  newConstraints,
                                                                  csLoc));
-                  break;
                 }
+                break;
               }
             }
           }
         }
       }
+    }
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),

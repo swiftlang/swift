@@ -323,6 +323,11 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
+  
+  /// Whether or not this constraint is 'favored' in the sense that, if
+  /// successfully applied, it should be preferred over any other constraints
+  /// in its disjunction.
+  unsigned IsFavored : 1;
 
   /// The number of type variables referenced by this constraint.
   ///
@@ -447,6 +452,10 @@ public:
 
   /// Set whether this constraint is active or not.
   void setActive(bool active) { IsActive = active; }
+  
+  /// Mark or retrieve whether this constraint should be favored in the system.
+  void setFavored() { IsFavored = true; }
+  bool isFavored() const { return IsFavored; }
 
   /// Whether the solver should remember which choice was taken for
   /// this constraint.

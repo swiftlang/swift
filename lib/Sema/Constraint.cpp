@@ -29,7 +29,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        ConstraintLocator *locator, 
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(kind), HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), NumTypeVariables(typeVars.size()),
+    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Nested(constraints), Locator(locator)
 {
   assert(kind == ConstraintKind::Conjunction ||
@@ -41,7 +41,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), NumTypeVariables(typeVars.size()),
+    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Types { First, Second, Member }, Locator(locator)
 {
   switch (Kind) {
@@ -99,7 +99,7 @@ Constraint::Constraint(Type type, OverloadChoice choice,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(ConstraintKind::BindOverload),
     HasRestriction(false), HasFix(false), IsActive(false),
-    RememberChoice(false), NumTypeVariables(typeVars.size()),
+    RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Overload{type, choice}, Locator(locator)
 { 
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -111,7 +111,7 @@ Constraint::Constraint(ConstraintKind kind,
                        ArrayRef<TypeVariableType *> typeVars)
     : Kind(kind), Restriction(restriction),
       HasRestriction(true), HasFix(false), IsActive(false),
-      RememberChoice(false), NumTypeVariables(typeVars.size()),
+      RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
       Types{ first, second, Identifier() }, Locator(locator)
 {
   assert(!first.isNull());
@@ -124,7 +124,8 @@ Constraint::Constraint(ConstraintKind kind, Fix fix,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
     HasRestriction(false), HasFix(true),
-    IsActive(false), RememberChoice(false), NumTypeVariables(typeVars.size()),
+    IsActive(false), RememberChoice(false), IsFavored(false),
+    NumTypeVariables(typeVars.size()),
     Types{ first, second, Identifier() }, Locator(locator)
 {
   assert(!first.isNull());

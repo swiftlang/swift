@@ -1213,7 +1213,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 static bool shortCircuitDisjunctionAt(Constraint *constraint,
                                       Constraint *successfulConstraint) {
   // Anything without a fix is better than anything with a fix.
-  if (constraint->getFix() && !successfulConstraint->getFix())
+  if ((constraint->getFix() && !successfulConstraint->getFix()) ||
+      successfulConstraint->isFavored())
     return true;
 
   if (auto restriction = constraint->getRestriction()) {
@@ -1330,7 +1331,7 @@ bool ConstraintSystem::solveSimplified(
       }
 
       // If this solution is worse than the best solution we've seen so far,
-      // skipt it.
+      // skip it.
       if (worseThanBestSolution())
         return true;
 
