@@ -233,10 +233,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   Pattern *ParamPat = new (Context) NamedPattern(Arg);
   ParamPat = new (Context) TypedPattern(ParamPat,
                                         TypeLoc::withoutLoc(Arg->getType()));
-  if (TC.Context.LangOpts.StrictKeywordArguments) {
-    TuplePatternElt elt{ParamPat};
-    ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
-  }
+  TuplePatternElt elt{ParamPat};
+  ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   TC.typeCheckPattern(ParamPat, Arg->getDeclContext(), None);
 
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
@@ -248,9 +246,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
                                 discriminator, newTopLevel);
 
   Type ParamTy = ParamPat->getType();
-  if (TC.Context.LangOpts.StrictKeywordArguments) {
-    ParamTy = ParamTy->getRelabeledType(TC.Context, { Identifier() });
-  }
+  ParamTy = ParamTy->getRelabeledType(TC.Context, { Identifier() });
   Type FuncTy = FunctionType::get(ParamTy, TupleType::getEmpty(Context));
   CE->setType(FuncTy);
 
@@ -281,11 +277,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // If the caller didn't wrap the argument in parentheses or make it a tuple,
   // add the extra parentheses now.
   Expr *TheArg = E;
-  if (TC.Context.LangOpts.StrictKeywordArguments) {
-    Type Ty = ParenType::get(TC.Context, TheArg->getType());
-    TheArg = new (TC.Context) ParenExpr(SourceLoc(), TheArg, SourceLoc(), false,
-                                        Ty);
-  }
+  Type Ty = ParenType::get(TC.Context, TheArg->getType());
+  TheArg = new (TC.Context) ParenExpr(SourceLoc(), TheArg, SourceLoc(), false,
+                                      Ty);
 
   Expr *TheCall = new (Context) CallExpr(CE, TheArg, /*Implicit=*/true);
   if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))

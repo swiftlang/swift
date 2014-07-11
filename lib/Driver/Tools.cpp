@@ -207,8 +207,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   inputArgs.AddLastArg(arguments, options::OPT_implicit_objc_with,
                        options::OPT_no_implicit_objc_with);
-  inputArgs.AddLastArg(arguments, options::OPT_strict_keyword_arguments,
-                       options::OPT_no_strict_keyword_arguments);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

@@ -1316,9 +1316,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // to the fixed type.
   TypeVariableType *typeVar1;
   bool isArgumentTupleConversion
-          = getASTContext().LangOpts.StrictKeywordArguments &&
-            (kind == TypeMatchKind::ArgumentTupleConversion ||
-             kind == TypeMatchKind::OperatorArgumentTupleConversion);
+          = kind == TypeMatchKind::ArgumentTupleConversion ||
+            kind == TypeMatchKind::OperatorArgumentTupleConversion;
   type1 = getFixedTypeRecursive(type1, typeVar1,
                                 kind == TypeMatchKind::SameType,
                                 isArgumentTupleConversion);
@@ -1453,9 +1452,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // If this is an argument conversion, handle it directly. The rules are
   // different than for normal conversions.
-  if ((kind == TypeMatchKind::ArgumentTupleConversion ||
-       kind == TypeMatchKind::OperatorArgumentTupleConversion) &&
-      getASTContext().LangOpts.StrictKeywordArguments) {
+  if (kind == TypeMatchKind::ArgumentTupleConversion ||
+      kind == TypeMatchKind::OperatorArgumentTupleConversion) {
     if (concrete) {
       return ::matchCallArguments(*this, kind, type1, type2, locator);
     }

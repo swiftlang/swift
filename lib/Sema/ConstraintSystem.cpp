@@ -567,8 +567,7 @@ namespace {
         // If we didn't get something that structurally has the parentheses,
         // add them back.
         if (!isa<TupleType>(inputTy.getPointer()) &&
-            !isa<ParenType>(inputTy.getPointer()) &&
-            cs.getASTContext().LangOpts.StrictKeywordArguments) {
+            !isa<ParenType>(inputTy.getPointer())) {
           inputTy = ParenType::get(cs.getASTContext(), inputTy);
         }
 

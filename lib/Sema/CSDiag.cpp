@@ -203,15 +203,6 @@ void constraints::simplifyLocator(Expr *&anchor,
 
         anchor = applyExpr->getArg();
         path = path.slice(1);
-
-        // FIXME: Egregious hack. Strict-keyword-arguments shouldn't need it.
-        if (!anchor->getType()->getASTContext()
-              .LangOpts.StrictKeywordArguments) {
-          // Look through parentheses around the argument.
-          if (auto paren = dyn_cast<ParenExpr>(anchor))
-            anchor = paren->getSubExpr();
-        }
-
         continue;
       }
       break;

@@ -81,11 +81,6 @@ namespace swift {
     /// codegen.
     bool EnableDynamic = false;
     
-    /// Be strict about the use of keyword arguments.
-    /// FIXME: This is the default, and the option will eventually be
-    /// removed.
-    bool StrictKeywordArguments = true;
-    
     /// Should access control be respected?
     bool EnableAccessControl = true;
     

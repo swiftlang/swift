@@ -955,15 +955,9 @@ namespace {
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
       // Coerce the index argument.
-      if (cs.getASTContext().LangOpts.StrictKeywordArguments) {
-        index = coerceCallArguments(index, indexTy,
-                                    locator.withPathElement(
-                                      ConstraintLocator::SubscriptIndex));
-      } else {
-        index = coerceToType(index, indexTy,
-                             locator.withPathElement(
-                               ConstraintLocator::SubscriptIndex));
-      }
+      index = coerceCallArguments(index, indexTy,
+                                  locator.withPathElement(
+                                    ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -2066,10 +2060,7 @@ namespace {
 
     Expr *visitParenExpr(ParenExpr *expr) {
       auto &ctx = cs.getASTContext();
-      if (ctx.LangOpts.StrictKeywordArguments)
-        expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
-      else
-        expr->setType(expr->getSubExpr()->getType());
+      expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
       return expr;
     }
 
@@ -3025,10 +3016,7 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
 static Type rebuildParenType(ASTContext &ctx, Expr *expr, Type type) {
   if (auto paren = dyn_cast<ParenExpr>(expr)) {
     type = rebuildParenType(ctx, paren->getSubExpr(), type);
-    if (ctx.LangOpts.StrictKeywordArguments)
-      paren->setType(ParenType::get(ctx, type));
-    else
-      paren->setType(type);
+    paren->setType(ParenType::get(ctx, type));
     return paren->getType();
   }
 
@@ -4443,17 +4431,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
 
-    Expr *arg;
-    if (tc.Context.LangOpts.StrictKeywordArguments) {
-      arg = coerceCallArguments(origArg, fnType->getInput(),
-                                locator.withPathElement(
-                                  ConstraintLocator::ApplyArgument));
-    } else {
-      arg = coerceToType(origArg, fnType->getInput(),
-                         locator.withPathElement(
-                           ConstraintLocator::ApplyArgument));
-    }
-
+    Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
+                                    locator.withPathElement(
+                                      ConstraintLocator::ApplyArgument));
     if (!arg) {
       return nullptr;
     }

@@ -587,12 +587,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_implicit_objc_with);
   }
 
-  if (auto A = Args.getLastArg(OPT_strict_keyword_arguments,
-                               OPT_no_strict_keyword_arguments)) {
-    Opts.StrictKeywordArguments
-      = A->getOption().matches(OPT_strict_keyword_arguments);
-  }
-
   if (Opts.SplitPrepositions)
     Opts.addBuildConfigOption("OBJC_SELECTOR_SPLITTING");
 
