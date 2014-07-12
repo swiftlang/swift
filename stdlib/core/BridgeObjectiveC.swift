@@ -240,7 +240,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafePointer<T /* TODO : class */>
-  : Equatable, LogicValueType, NilLiteralConvertible, _PointerType {
+  : Equatable, BooleanType, NilLiteralConvertible, _PointerType {
   let value: Builtin.RawPointer
 
   @transparent

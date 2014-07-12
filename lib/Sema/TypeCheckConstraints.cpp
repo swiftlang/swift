@@ -1374,7 +1374,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       // Otherwise, the result must be a LogicValue.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::LogicValueType);
+                                            KnownProtocolKind::BooleanType);
       if (!logicValueProto) {
         return true;
       }

@@ -1154,7 +1154,7 @@ namespace index_block {
     ArrayBoundType = 1,
     SequenceType,
     // killed
-    LogicValueType = 4,
+    BooleanType = 4,
 
     ArrayLiteralConvertible,
     BooleanLiteralConvertible,

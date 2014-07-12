@@ -39,7 +39,7 @@
 PROTOCOL(ArrayBoundType)
 PROTOCOL(SequenceType)
 PROTOCOL(GeneratorType)
-PROTOCOL(LogicValueType)
+PROTOCOL(BooleanType)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(RawOptionSetType)

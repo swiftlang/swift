@@ -27,7 +27,7 @@
 /// to allocate and free memory appropriately.
 public struct ${Self}<T>
   : BidirectionalIndexType, Comparable, Hashable,
-    LogicValueType, NilLiteralConvertible, _PointerType {
+    BooleanType, NilLiteralConvertible, _PointerType {
 
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer

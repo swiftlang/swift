@@ -207,16 +207,16 @@ RuntimeBridging.test("isBridgedVerbatimToObjectiveC") {
 
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
-typealias P1 = LogicValueType
+typealias P1 = BooleanType
 protocol P2 {}
 
-struct StructConformsToP1 : LogicValueType, P2 {
+struct StructConformsToP1 : BooleanType, P2 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-struct Struct2ConformsToP1<T : LogicValueType> : LogicValueType, P2 {
+struct Struct2ConformsToP1<T : BooleanType> : BooleanType, P2 {
   init(_ value: T) {
     self.value = value
   }
@@ -228,13 +228,13 @@ struct Struct2ConformsToP1<T : LogicValueType> : LogicValueType, P2 {
 
 struct StructDoesNotConformToP1 : P2 {}
 
-class ClassConformsToP1 : LogicValueType, P2 {
+class ClassConformsToP1 : BooleanType, P2 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-class Class2ConformsToP1<T : LogicValueType> : LogicValueType, P2 {
+class Class2ConformsToP1<T : BooleanType> : BooleanType, P2 {
   init(_ value: T) {
     self.value = [ value ]
   }

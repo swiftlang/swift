@@ -40,7 +40,7 @@ public struct RangeGenerator<
 
 public struct Range<
   T: ForwardIndexType
-> : LogicValueType, Equatable, CollectionType {
+> : BooleanType, Equatable, CollectionType {
 
   @transparent public
   init(start: T, end: T) {

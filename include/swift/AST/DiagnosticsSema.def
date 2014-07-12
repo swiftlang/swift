@@ -1015,7 +1015,7 @@ ERROR(reference_non_inout,sema_tce,none,
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
-      "protocol 'LogicValueType' is broken", ())
+      "protocol 'BooleanType' is broken", ())
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 ERROR(binding_injected_optional,sema_tce,none,
       "operand of postfix '?' should have optional type; type is %0", (Type))

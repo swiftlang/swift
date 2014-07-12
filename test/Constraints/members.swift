@@ -38,7 +38,7 @@ var format : String
 format._splitFirstIf({ $0.isASCII() })
 
 // Archetypes
-func doGetLogicValue<T : LogicValueType>(t: T) {
+func doGetLogicValue<T : BooleanType>(t: T) {
   t.getLogicValue()
 }
 

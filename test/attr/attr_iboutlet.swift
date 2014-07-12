@@ -158,7 +158,7 @@ class NonObjC {}
   @IBOutlet var outlet4: AnyObject?
 
   func testStrong() {
-    if outlet3 {}      // expected-error {{type 'Infer' does not conform to protocol 'LogicValueType'}}
+    if outlet3 {}      // expected-error {{type 'Infer' does not conform to protocol 'BooleanType'}}
     if outlet4 {}
   }
 }

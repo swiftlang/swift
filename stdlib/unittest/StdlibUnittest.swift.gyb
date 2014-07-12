@@ -222,7 +222,7 @@ public func expectGE(
 
 %end
 
-public struct AssertionResult : Printable, LogicValueType {
+public struct AssertionResult : Printable, BooleanType {
   init(isPass: Bool) {
     self._isPass = isPass
   }

@@ -791,13 +791,13 @@ sil @print_a_number : $@thin (Int) -> ()
 //CHECK: return
 sil @remove_init_ex : $@thin (Int) -> () {
 bb0(%0 : $Int):
-  %1 = alloc_stack $LogicValueType
-  %2 = init_existential %1#1 : $*LogicValueType, $*Bool
+  %1 = alloc_stack $BooleanType
+  %2 = init_existential %1#1 : $*BooleanType, $*Bool
   %3 = integer_literal $Builtin.Int1, 1
   %4 = struct $Bool (%3 : $Builtin.Int1)
   store %4 to %2 : $*Bool
-  destroy_addr %1#1 : $*LogicValueType
-  dealloc_stack %1#0 : $*@local_storage LogicValueType
+  destroy_addr %1#1 : $*BooleanType
+  dealloc_stack %1#0 : $*@local_storage BooleanType
   %8 = tuple ()
   return %8 : $()
 }

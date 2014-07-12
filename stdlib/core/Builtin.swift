@@ -127,17 +127,17 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 // mandatory generic inlining.
 
 @transparent @semantics("branchhint") internal
-func _branchHint<C: LogicValueType>(actual: C, expected: Bool) -> Bool {
+func _branchHint<C: BooleanType>(actual: C, expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.getLogicValue().value, expected.value))
 }
 
 @transparent @semantics("fastpath") public
-func _fastPath<C: LogicValueType>(x: C) -> Bool {
+func _fastPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), true)
 }
 
 @transparent @semantics("slowpath") public
-func _slowPath<C: LogicValueType>(x: C) -> Bool {
+func _slowPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), false)
 }
 

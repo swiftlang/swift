@@ -3,7 +3,7 @@
 // The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.
 #if os(iOS) && (arch(arm64) || arch(x86_64))
-public struct ObjCBool : LogicValueType {
+public struct ObjCBool : BooleanType {
   private var value : Bool
 
   public init(_ value: Bool) {
@@ -18,7 +18,7 @@ public struct ObjCBool : LogicValueType {
 
 #else
 
-public struct ObjCBool : LogicValueType {
+public struct ObjCBool : BooleanType {
   private var value : UInt8
 
   public init(_ value: Bool) {

@@ -41,7 +41,7 @@ if (Process.arguments[1] == "debugTrapBool") {
   test_debugTrapBool()
 }
 
-struct Truthiness : LogicValueType {
+struct Truthiness : BooleanType {
   init(_ value: Bool) { self.value = value }
   func getLogicValue() -> Bool { return value }
 

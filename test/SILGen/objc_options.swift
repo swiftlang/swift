@@ -7,4 +7,4 @@ func foo(a: NSKeyValueObservingOptions) -> Bool {
   return a || true
 }
 
-// CHECK: sil_witness_table shared NSKeyValueObservingOptions: LogicValueType module Foundation
+// CHECK: sil_witness_table shared NSKeyValueObservingOptions: BooleanType module Foundation

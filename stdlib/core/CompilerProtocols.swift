@@ -25,11 +25,11 @@ public protocol ArrayBoundType {
 /// Protocol describing types that can be used as logical values within
 /// a condition.
 ///
-/// Types that conform to the `LogicValueType` protocol can be used as
+/// Types that conform to the `BooleanType` protocol can be used as
 /// condition in various control statements (`if`, `while`, C-style
 /// `for`) as well as other logical value contexts (e.g., `case`
 /// statement guards).
-public protocol LogicValueType {
+public protocol BooleanType {
   func getLogicValue() -> Bool
 }
 
@@ -158,7 +158,7 @@ public protocol _RawOptionSetType: RawRepresentable {
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSetType : _RawOptionSetType, LogicValueType, Equatable,
+public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
                                 NilLiteralConvertible {
   // A non-failable version of RawRepresentable.fromRaw.
   class func fromMask(raw: Raw) -> Self

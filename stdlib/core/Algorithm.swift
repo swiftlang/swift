@@ -430,7 +430,7 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   return r
 }
 
-public func split<Seq: Sliceable, R:LogicValueType>(
+public func split<Seq: Sliceable, R:BooleanType>(
   seq: Seq, 
   isSeparator: (Seq.Generator.Element)->R, 
   maxSplit: Int = Int.max,
@@ -638,7 +638,7 @@ public func lexicographicalCompare<
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
-  S: SequenceType, L: LogicValueType
+  S: SequenceType, L: BooleanType
 >(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
   for a in seq {
     if predicate(a) {

@@ -47,7 +47,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
 }
 
-public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValueType {
+public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the

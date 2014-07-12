@@ -37,15 +37,15 @@ extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
   }
 }
 
-extension Bool : LogicValueType {
+extension Bool : BooleanType {
   @transparent public func _getBuiltinLogicValue() -> Builtin.Int1 {
     return value
   }
 
   @transparent public func getLogicValue() -> Bool { return self }
 
-  // Bool can be constructed from LogicValueType
-  public init(_ v : LogicValueType) {
+  // Bool can be constructed from BooleanType
+  public init(_ v : BooleanType) {
     self = v.getLogicValue()
   }
 }

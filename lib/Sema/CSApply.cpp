@@ -5203,7 +5203,7 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::LogicValueType),
+                                 KnownProtocolKind::BooleanType),
                   tc.Context.Id_GetLogicValue,
                   tc.Context.Id_GetBuiltinLogicValue,
                   diag::condition_broken_proto,
@@ -5223,7 +5223,7 @@ Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = cs.getTypeChecker();
 
   auto proto = tc.getProtocol(
-    expr->getLoc(), KnownProtocolKind::LogicValueType);
+    expr->getLoc(), KnownProtocolKind::BooleanType);
 
   // Find the witness we need to use.
   Type type = expr->getType();

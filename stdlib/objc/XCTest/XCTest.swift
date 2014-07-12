@@ -107,12 +107,12 @@ func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ message: Stri
   // TODO: handle an exception for which we can't get a description
 }
 
-func XCTAssert(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+func XCTAssert(expression: @auto_closure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
-func XCTAssertTrue(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertTrue(expression: @auto_closure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
@@ -128,7 +128,7 @@ func XCTAssertTrue(expression: @auto_closure () -> LogicValueType, _ message: St
   // TODO: handle an exception for which we can't get a description
 }
 
-func XCTAssertFalse(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+func XCTAssertFalse(expression: @auto_closure () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
