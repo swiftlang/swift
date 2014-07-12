@@ -1530,3 +1530,27 @@ bb0(%0 : $Int):
   %8 = tuple ()
   return %8 : $()
 }
+
+
+//CHECK-LABEL: @remove_pointer_compare_to_zero_arith
+//CHECK-NOT: apply
+//CHECK-NOT: cond_fail
+//CHECK: return
+sil @remove_pointer_compare_to_zero_arith : $@thin (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %1 = string_literal utf16 "ss"
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Word, 4
+  %4 = integer_literal $Builtin.Int1, -1
+  %5 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %6 = apply %5(%0, %2, %4) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0
+  %8 = builtin_function_ref "inttoptr_Word" : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %9 = apply %8(%7) : $@thin (Builtin.Word) -> Builtin.RawPointer
+  %10 = builtin_function_ref "cmp_eq_RawPointer" : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  %11 = apply %10(%1, %9) : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Int1
+  cond_fail %11 : $Builtin.Int1
+  %13 = tuple ()
+  return %13 : $()
+}
+
