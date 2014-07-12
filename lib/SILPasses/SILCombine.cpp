@@ -121,6 +121,7 @@ static IsZeroKind isZeroValue(SILValue Value) {
 
   //Inspect allocations and pointer literals.
   if (isa<StringLiteralInst>(Value.getDef()) ||
+      isa<AllocationInst>(Value.getDef()) ||
       isa<SILGlobalAddrInst>(Value.getDef()))
     return IsZeroKind::NotZero;
 
