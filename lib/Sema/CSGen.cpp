@@ -153,7 +153,7 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       
-      tv->literalConformanceProto = protocol;
+      tv->getImpl().literalConformanceProto = protocol;
       
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
@@ -906,10 +906,10 @@ namespace {
                   continue;
                 }
                 
-                auto argTy = expr->getArg()->getType().getPointer();
+                auto argTy = expr->getArg()->getType();
                 TypeBase *firstArgTy = nullptr;
                 
-                if (auto argTupleTy = dyn_cast<TupleType>(argTy)) {
+                if (auto argTupleTy = argTy->getAs<TupleType>()) {
                   firstArgTy = argTupleTy->
                                getFields()[1].
                                getType().
@@ -924,32 +924,26 @@ namespace {
                   
                   auto overloadType = overloadChoice.getDecl()->getType();
                   
-                  if (auto fnType = dyn_cast<AnyFunctionType>
-                                        (overloadType.getPointer())) {
+                  if (auto fnType = overloadType->getAs<AnyFunctionType>()) {
                     auto paramTy = fnType->getInput();
                     auto resultTy = fnType->getResult();
                     
-                    if (auto tupleType = dyn_cast<TupleType>
-                                            (paramTy.getPointer())) {
+                    if (auto tupleType = paramTy->getAs<TupleType>()) {
                       auto firstParamType = tupleType->
                                             getFields()[0].
-                                            getType().
-                                            getPointer();
+                                            getType();
                       auto secondParamType = tupleType->
                                              getFields()[1].
-                                             getType().
-                                             getPointer();
+                                             getType();
                       
-                      if (auto tyvarArgType = dyn_cast<TypeVariableType>
-                                                  (firstArgTy)) {
+                      if (auto tyvarArgType =
+                              firstArgTy->getAs<TypeVariableType>()) {
                         
-                        if (tyvarArgType->literalConformanceProto) {
+                        if (auto proto =
+                                  tyvarArgType->
+                                  getImpl().literalConformanceProto) {
                           
-                          auto defaultType = CS.TC.
-                                             getDefaultType(
-                                               tyvarArgType->
-                                                   literalConformanceProto,
-                                               CS.DC);
+                          auto defaultType = CS.TC.getDefaultType(proto, CS.DC);
                           auto contextualType = CS.getContextualType(expr);
                           
                           if (secondParamType->
