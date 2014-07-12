@@ -3982,7 +3982,7 @@ ObjCThunks.test("Array/Return") {
     expectEqual(10, a[0].value)
     expectEqual(20, a[1].value)
     expectEqual(30, a[2].value)
-    expectEqual(0, TestBridgedValueTy.bridgeOperations) // FIXME: should be 3
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
   }
 }
 
@@ -4030,8 +4030,8 @@ ObjCThunks.test("Dictionary/Return") {
     expectEqual(1010, d[TestBridgedKeyTy(10)]!.value)
     expectEqual(1020, d[TestBridgedKeyTy(20)]!.value)
     expectEqual(1030, d[TestBridgedKeyTy(30)]!.value)
-    expectEqual(0, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 3
-    expectEqual(0, TestBridgedValueTy.bridgeOperations) // FIXME: should be 3
+    expectEqual(0, TestBridgedKeyTy.bridgeOperations)
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
   }
 }
 
