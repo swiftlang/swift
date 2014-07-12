@@ -14,65 +14,67 @@
 
 /// Protocol describing types that can be used as array bounds.
 ///
-/// Types that conform to the `ArrayBound` protocol can be used as array bounds
-/// by providing an operation (`getArrayBoundValue`) that produces an integral
-/// value.
-public protocol ArrayBound {
-  typealias ArrayBoundType
-  func getArrayBoundValue() -> ArrayBoundType
+/// Types that conform to the `ArrayBoundType` protocol can be used as
+/// array bounds by providing an operation (`getArrayBoundValue`) that
+/// produces an integral value.
+public protocol ArrayBoundType {
+  typealias ArrayBound
+  func getArrayBoundValue() -> ArrayBound
 }
 
 /// Protocol describing types that can be used as logical values within
 /// a condition.
 ///
-/// Types that conform to the `LogicValue` protocol can be used as
+/// Types that conform to the `LogicValueType` protocol can be used as
 /// condition in various control statements (`if`, `while`, C-style
 /// `for`) as well as other logical value contexts (e.g., `case`
 /// statement guards).
-public protocol LogicValue {
+public protocol LogicValueType {
   func getLogicValue() -> Bool
 }
 
-/// A `Generator` is a `Sequence` that is consumed when iterated.
+/// A `GeneratorType` is a `SequenceType` that is consumed when iterated.
 ///
-/// While it is safe to copy a `Generator`, only one copy should be advanced
+/// While it is safe to copy a `GeneratorType`, only one copy should be advanced
 /// with `next()`.
 ///
-/// If an algorithm requires two `Generator`\ s for the same `Sequence` to be
-/// advanced at the same time, and the specific `Sequence` type supports
-/// that, then those `Generator` objects should be obtained from `Sequence` by
-/// two distinct calls to `generate().  However in that case the algorithm
-/// should probably require `Collection`, since `Collection` implies
+/// If an algorithm requires two `GeneratorType`\ s for the same
+/// `SequenceType` to be advanced at the same time, and the specific
+/// `SequenceType` type supports that, then those `GeneratorType`
+/// objects should be obtained from `SequenceType` by two distinct
+/// calls to `generate().  However in that case the algorithm should
+/// probably require `CollectionType`, since `CollectionType` implies
 /// multi-pass.
-public protocol Generator /* : Sequence */ { 
+public protocol GeneratorType /* : SequenceType */ { 
   // FIXME: Refinement pending <rdar://problem/14396120>
   typealias Element
   mutating func next() -> Element?
 }
 
-/// The `for...in` loop operates on `Sequence`\ s.  It is unspecified whether
-/// `for...in` consumes the sequence on which it operates.
-public protocol _Sequence {
+/// The `for...in` loop operates on `SequenceType`\ s.  It is
+/// unspecified whether `for...in` consumes the sequence on which it
+/// operates.
+public protocol _SequenceType {
 }
 
-public protocol _Sequence_ : _Sequence {
-  typealias GeneratorType : Generator
-  func generate() -> GeneratorType
+public protocol _Sequence_Type : _SequenceType {
+  typealias Generator : GeneratorType
+  func generate() -> Generator
 }
 
-public protocol Sequence : _Sequence_ {
-  typealias GeneratorType : Generator
-  func generate() -> GeneratorType
+public protocol SequenceType : _Sequence_Type {
+  typealias Generator : GeneratorType
+  func generate() -> Generator
 
   func ~> (_:Self,_:(_UnderestimateCount,())) -> Int
 
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke the function
+  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
   func ~> <R>(_: Self, _: (_PreprocessingPass, ((Self)->R))) -> R?
 
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
-  ) -> _ContiguousArrayBuffer<Self.GeneratorType.Element>
+  ) -> _ContiguousArrayBuffer<Self.Generator.Element>
 }
 
 public struct _CopyToNativeArrayBuffer {}
@@ -93,14 +95,14 @@ internal func _underestimateCount<Args>(args: Args)
 
 // Default implementation of underestimateCount for Sequences.  Do not
 // use this operator directly; call underestimateCount(s) instead
-public func ~> <T: _Sequence>(s: T,_:(_UnderestimateCount, ())) -> Int {
+public func ~> <T: _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
   return 0
 }
 
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
 /// actually Collections, this will return countElements(x)
-public func underestimateCount<T: Sequence>(x: T) -> Int {
+public func underestimateCount<T: SequenceType>(x: T) -> Int {
   return x~>_underestimateCount()
 }
 
@@ -111,7 +113,7 @@ public struct _PreprocessingPass {}
 // Default implementation of `_preprocessingPass` for Sequences.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
 public func ~> <
-  T : _Sequence, R
+  T : _SequenceType, R
 >(s: T, _: (_PreprocessingPass, ( (T)->R ))) -> R? {
   return nil
 }
@@ -123,8 +125,10 @@ internal func _preprocessingPass<Args>(args: Args)
 }
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
-// pass a Generator through GeneratorSequence to give it "Sequence-ness"
-public struct GeneratorSequence<G: Generator> : Generator, Sequence {
+// pass a GeneratorType through GeneratorSequence to give it "SequenceType-ness"
+public struct GeneratorSequence<
+  G: GeneratorType
+> : GeneratorType, SequenceType {
   public init(_ base: G) {
     _base = base
   }
@@ -141,29 +145,29 @@ public struct GeneratorSequence<G: Generator> : Generator, Sequence {
 }
 
 public protocol RawRepresentable {
-  typealias RawType
-  class func fromRaw(raw: RawType) -> Self?
-  func toRaw() -> RawType
+  typealias Raw
+  class func fromRaw(raw: Raw) -> Self?
+  func toRaw() -> Raw
 }
 
 // Workaround for our lack of circular conformance checking. Allow == to be
-// defined on _RawOptionSet in order to satisfy the Equatable requirement of
-// RawOptionSet without a circularity our type-checker can't yet handle.
-public protocol _RawOptionSet: RawRepresentable {
-  typealias RawType : BitwiseOperations, Equatable
+// defined on _RawOptionSetType in order to satisfy the Equatable requirement of
+// RawOptionSetType without a circularity our type-checker can't yet handle.
+public protocol _RawOptionSetType: RawRepresentable {
+  typealias Raw : BitwiseOperationsType, Equatable
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSet : _RawOptionSet, LogicValue, Equatable,
+public protocol RawOptionSetType : _RawOptionSetType, LogicValueType, Equatable,
                                 NilLiteralConvertible {
   // A non-failable version of RawRepresentable.fromRaw.
-  class func fromMask(raw: RawType) -> Self
+  class func fromMask(raw: Raw) -> Self
 
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
   // implementations in protocols)
   // The Clang importer synthesizes these for imported NS_OPTIONS.
 
-  /* class func fromRaw(raw: RawType) -> Self? { return fromMask(raw) } */
+  /* class func fromRaw(raw: Raw) -> Self? { return fromMask(raw) } */
 
   /* func getLogicValue() -> Bool { return toRaw() != .allZeros() } */
 }

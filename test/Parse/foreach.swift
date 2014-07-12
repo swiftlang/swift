@@ -1,10 +1,10 @@
 // RUN: %swift %s -parse -verify
 
-struct IntRange<Int> : Sequence, Generator {
+struct IntRange<Int> : SequenceType, GeneratorType {
   typealias Element = (Int, Int)
   func next() -> (Int, Int)? {}
 
-  typealias GeneratorType = IntRange<Int>
+  typealias Generator = IntRange<Int>
   func generate() -> IntRange<Int> { return self }
 }
 

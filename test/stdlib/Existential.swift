@@ -6,7 +6,7 @@ func pipe<T>(input: SequenceOf<T>, output: SinkOf<T>) {
   }
 }
 
-struct Print<T : Printable> : Sink {
+struct Print<T : Printable> : SinkType {
   func put(x: T) {
     print(x)
     print("/")

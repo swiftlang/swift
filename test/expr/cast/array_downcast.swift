@@ -28,7 +28,7 @@ class A {
   var x = 0
 }
 
-struct B : _BridgedToObjectiveC {
+struct B : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return A.self
   }

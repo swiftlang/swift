@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
+public struct RangeGenerator<
+  T: ForwardIndexType
+> : GeneratorType, SequenceType {
   public typealias Element = T
 
   @transparent public
@@ -26,9 +28,9 @@ public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
     return startIndex++
   }
 
-  // Every Generator is also a single-pass Sequence
-  public typealias GeneratorType = RangeGenerator<T>
-  public func generate() -> GeneratorType {
+  // Every GeneratorType is also a single-pass SequenceType
+  public typealias Generator = RangeGenerator<T>
+  public func generate() -> Generator {
     return self
   }
 
@@ -36,7 +38,9 @@ public struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
   public var endIndex: T
 }
 
-public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
+public struct Range<
+  T: ForwardIndexType
+> : LogicValueType, Equatable, CollectionType {
 
   @transparent public
   init(start: T, end: T) {
@@ -52,8 +56,8 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
     return !isEmpty
   }
 
-  public typealias IndexType = T
-  public typealias SliceType = Range<T>
+  public typealias Index = T
+  public typealias Slice = Range<T>
   public typealias _Element = T
   
   public subscript(i: T) -> T {
@@ -62,7 +66,7 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
 
   //===--------------------------------------------------------------------===//
   // Overloads for subscript that allow us to make subscripting fail
-  // at compile time, outside a generic context, when T is an Integer
+  // at compile time, outside a generic context, when T is an IntegerType
   // type. The current language design gives us no way to force r[0]
   // to work "as expected" (return the first element of the range) for
   // an arbitrary Range<Int>, so instead we make it ambiguous.  Same
@@ -74,9 +78,9 @@ public struct Range<T: ForwardIndex> : LogicValue, Equatable, Collection {
   
   //===--------------------------------------------------------------------===//
   
-  public typealias GeneratorType = RangeGenerator<T>
+  public typealias Generator = RangeGenerator<T>
   public func generate() -> RangeGenerator<T> {
-    return GeneratorType(self)
+    return Generator(self)
   }
 
   public var startIndex: T {
@@ -106,7 +110,7 @@ public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
       lhs._endIndex == rhs._endIndex
 }
 
-public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
+public func count<I: RandomAccessIndexType>(r: Range<I>) -> I.Distance {
   return r.startIndex.distanceTo(r.endIndex)
 }
 
@@ -116,21 +120,21 @@ public func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
 @transparent
 @availability(
   *, unavailable, message="half-open range operator .. has been renamed to ..<")
-public func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
+public func .. <Pos : ForwardIndexType> (min: Pos, max: Pos) -> Range<Pos> {
   return Range(start: min, end: max)
 }
 
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @transparent public
-func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos) -> Range<Pos> {
+func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos) -> Range<Pos> {
   return Range(start: minimum, end: maximum)
 }
 
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
 @transparent public
-func ... <Pos : ForwardIndex> (
+func ... <Pos : ForwardIndexType> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
   return Range(start: minimum, end: maximum.successor())
@@ -149,7 +153,7 @@ func ... <Pos : ForwardIndex> (
 
 @infix public
 func ~= <
-  T: RandomAccessIndex where T.DistanceType : SignedInteger
+  T: RandomAccessIndexType where T.Distance : SignedIntegerType
 >(x: Range<T>, y: T) -> Bool {
   let a = x.startIndex.distanceTo(y) >= 0
   let b = y.distanceTo(x.endIndex) > 0

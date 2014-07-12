@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-enum Bewl : LogicValue {
+enum Bewl : LogicValueType {
   case False, True
 
   func getLogicValue() -> Bool {
@@ -25,11 +25,11 @@ func falsy() -> Bewl {
 
 func logicValueTests() {
   // Logic values should convert to bool.
-  struct X : LogicValue {
+  struct X : LogicValueType {
     func getLogicValue() -> Bool { return false }
   }
   var anX = X()
-  println("LogicValue Bool = \(Bool(anX))")   // CHECK: LogicValue Bool = false
+  println("LogicValueType Bool = \(Bool(anX))")   // CHECK: LogicValueType Bool = false
 
   println("\(!Bewl.True)") // CHECK: false
   println("\(!Bewl.False)") // CHECK: true

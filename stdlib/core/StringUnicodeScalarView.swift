@@ -11,19 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 public func ==(
-  lhs: String.UnicodeScalarView.IndexType,
-  rhs: String.UnicodeScalarView.IndexType
+  lhs: String.UnicodeScalarView.Index,
+  rhs: String.UnicodeScalarView.Index
 ) -> Bool {
   return lhs._position == rhs._position
 }
 
 extension String {
-  public struct UnicodeScalarView : Sliceable, Sequence {
+  public struct UnicodeScalarView : Sliceable, SequenceType {
     init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    struct _ScratchGenerator : Generator {
+    struct _ScratchGenerator : GeneratorType {
       var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {
@@ -38,20 +38,20 @@ extension String {
       }
     }
 
-    public struct IndexType : BidirectionalIndex {
+    public struct Index : BidirectionalIndexType {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core
       }
 
-      public func successor() -> IndexType {
+      public func successor() -> Index {
         var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()
         let (result, length) = decoder._decodeOne(&scratch)
-        return IndexType(_position + length, _core)
+        return Index(_position + length, _core)
       }
 
-      public func predecessor() -> IndexType {
+      public func predecessor() -> Index {
         var i = _position
         let codeUnit = _core[--i]
         if _slowPath((codeUnit >> 10) == 0b1101_11) {
@@ -59,32 +59,32 @@ extension String {
             --i
           }
         }
-        return IndexType(i, _core)
+        return Index(i, _core)
       }
 
       /// The end index that for this view.
-      internal var _viewStartIndex: IndexType {
-        return IndexType(_core.startIndex, _core)
+      internal var _viewStartIndex: Index {
+        return Index(_core.startIndex, _core)
       }
 
       /// The end index that for this view.
-      internal var _viewEndIndex: IndexType {
-        return IndexType(_core.endIndex, _core)
+      internal var _viewEndIndex: Index {
+        return Index(_core.endIndex, _core)
       }
 
       var _position: Int
       var _core: _StringCore
     }
 
-    public var startIndex: IndexType {
-      return IndexType(_core.startIndex, _core)
+    public var startIndex: Index {
+      return Index(_core.startIndex, _core)
     }
 
-    public var endIndex: IndexType {
-      return IndexType(_core.endIndex, _core)
+    public var endIndex: Index {
+      return Index(_core.endIndex, _core)
     }
 
-    public subscript(i: IndexType) -> UnicodeScalar {
+    public subscript(i: Index) -> UnicodeScalar {
       var scratch = _ScratchGenerator(_core, i._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
@@ -97,13 +97,13 @@ extension String {
       }
     }
 
-    public subscript(r: Range<IndexType>) -> UnicodeScalarView {
+    public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
         _core[r.startIndex._position..<r.endIndex._position])
     }
 
-    public struct GeneratorType : Generator {
-      init(_ _base: _StringCore.GeneratorType) {
+    public struct Generator : GeneratorType {
+      init(_ _base: _StringCore.Generator) {
         self._base = _base
       }
 
@@ -118,11 +118,11 @@ extension String {
         }
       }
       var _decoder: UTF16 = UTF16()
-      var _base: _StringCore.GeneratorType
+      var _base: _StringCore.Generator
     }
 
-    public func generate() -> GeneratorType {
-      return GeneratorType(_core.generate())
+    public func generate() -> Generator {
+      return Generator(_core.generate())
     }
 
     public func compare(other : UnicodeScalarView) -> Int {

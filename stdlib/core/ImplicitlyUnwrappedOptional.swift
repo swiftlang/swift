@@ -17,7 +17,7 @@
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
 /// library intrinsics below.
 public enum ImplicitlyUnwrappedOptional<T>
-  : LogicValue, Reflectable, NilLiteralConvertible {
+  : LogicValueType, Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
@@ -59,7 +59,7 @@ public enum ImplicitlyUnwrappedOptional<T>
     }
   }
 
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     // FIXME: This should probably use _OptionalMirror in both cases.
     if let value = self {
       return reflect(value)
@@ -107,7 +107,7 @@ func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None
 }
 
-extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
+extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveCType {
   public typealias ObjectiveCType = AnyObject
 
   public static func getObjectiveCType() -> Any.Type {

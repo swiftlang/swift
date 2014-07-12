@@ -1563,8 +1563,8 @@ struct _ConditionallyBridgedToObjectiveCWitnessTable {
 
 } // unnamed namespace
 
-extern "C" const ProtocolDescriptor _TMpSs20_BridgedToObjectiveC;
-extern "C" const ProtocolDescriptor _TMpSs33_ConditionallyBridgedToObjectiveC;
+extern "C" const ProtocolDescriptor _TMpSs24_BridgedToObjectiveCType;
+extern "C" const ProtocolDescriptor _TMpSs37_ConditionallyBridgedToObjectiveCType;
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
@@ -1573,14 +1573,14 @@ extern "C" const ProtocolDescriptor _TMpSs33_ConditionallyBridgedToObjectiveC;
 //===----------------------------------------------------------------------===//
 static const _BridgedToObjectiveCWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(T, &_TMpSs20_BridgedToObjectiveC, nullptr);
+  auto w = swift_conformsToProtocol(T, &_TMpSs24_BridgedToObjectiveCType, nullptr);
   return reinterpret_cast<const _BridgedToObjectiveCWitnessTable *>(w);
 }
 
 static const _ConditionallyBridgedToObjectiveCWitnessTable *
 findConditionalBridgeWitness(const Metadata *T) {
   auto w = swift_conformsToProtocol(
-      T, &_TMpSs33_ConditionallyBridgedToObjectiveC, nullptr);
+      T, &_TMpSs37_ConditionallyBridgedToObjectiveCType, nullptr);
 
   return reinterpret_cast<
       const _ConditionallyBridgedToObjectiveCWitnessTable *>(w);

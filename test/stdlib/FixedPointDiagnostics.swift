@@ -22,7 +22,7 @@ var u32 : UInt32 = u // expected-error {{'UInt' is not convertible to 'UInt32'}}
 var u16 : UInt16 = u // expected-error {{'UInt' is not convertible to 'UInt16'}}
 var u8  : UInt8  = u // expected-error {{'UInt' is not convertible to 'UInt8'}}
 
-func testOps<T : IntegerArithmetic>(x: T, y: T) -> T {
+func testOps<T : IntegerArithmeticType>(x: T, y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y

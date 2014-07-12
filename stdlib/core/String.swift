@@ -24,8 +24,8 @@ public struct String {
 
 extension String {
   public static func _fromWellFormedCodeUnitSequence<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.GeneratorType.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodecType, Input: CollectionType
+    where Input.Generator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String {
@@ -33,8 +33,8 @@ extension String {
   }
 
   public static func _fromCodeUnitSequence<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.GeneratorType.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodecType, Input: CollectionType
+    where Input.Generator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String? {
@@ -49,8 +49,8 @@ extension String {
   }
 
   public static func _fromCodeUnitSequenceWithRepair<
-    Encoding: UnicodeCodec, Input: Collection
-    where Input.GeneratorType.Element == Encoding.CodeUnit
+    Encoding: UnicodeCodecType, Input: CollectionType
+    where Input.Generator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool) {
@@ -147,7 +147,9 @@ extension String : DebugPrintable {
 extension String {
   /// Return the number of code units occupied by this string
   /// in the given encoding.
-  func _encodedLength<Encoding: UnicodeCodec>(encoding: Encoding.Type) -> Int {
+  func _encodedLength<
+    Encoding: UnicodeCodecType
+  >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     self._encode(
       encoding, output: SinkOf<Encoding.CodeUnit>({ _ in ++codeUnitCount;() }))
@@ -162,8 +164,8 @@ extension String {
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
   func _encode<
-    Encoding: UnicodeCodec,
-    Output: Sink
+    Encoding: UnicodeCodecType,
+    Output: SinkType
     where Encoding.CodeUnit == Output.Element
   >(encoding: Encoding.Type, output: Output)
   {
@@ -300,16 +302,16 @@ extension String {
   }
 }
 
-/// String is a Collection of Character
-extension String : Collection {
+/// String is a CollectionType of Character
+extension String : CollectionType {
   // An adapter over UnicodeScalarView that advances by whole Character
-  public struct Index : BidirectionalIndex, Reflectable {
-    public init(_ _base: UnicodeScalarView.IndexType) {
+  public struct Index : BidirectionalIndexType, Reflectable {
+    public init(_ _base: UnicodeScalarView.Index) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
 
-    init(_ _base: UnicodeScalarView.IndexType, _ _lengthUTF16: Int) {
+    init(_ _base: UnicodeScalarView.Index, _ _lengthUTF16: Int) {
       self._base = _base
       self._lengthUTF16 = _lengthUTF16
     }
@@ -324,11 +326,11 @@ extension String : Collection {
           "can not decrement startIndex")
       let predecessorLengthUTF16 =
           Index._measureExtendedGraphemeClusterBackward(_base)
-      return Index(UnicodeScalarView.IndexType(
+      return Index(UnicodeScalarView.Index(
           _utf16Index - predecessorLengthUTF16, _base._core))
     }
 
-    let _base: UnicodeScalarView.IndexType
+    let _base: UnicodeScalarView.Index
 
     /// The length of this extended grapheme cluster in UTF-16 code units.
     let _lengthUTF16: Int
@@ -340,15 +342,15 @@ extension String : Collection {
 
     /// The one past end index for this extended grapheme cluster in Unicode
     /// scalars.
-    var _endBase: UnicodeScalarView.IndexType {
-      return UnicodeScalarView.IndexType(
+    var _endBase: UnicodeScalarView.Index {
+      return UnicodeScalarView.Index(
           _utf16Index + _lengthUTF16, _base._core)
     }
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
     static func _measureExtendedGraphemeClusterForward(
-        var start: UnicodeScalarView.IndexType
+        var start: UnicodeScalarView.Index
     ) -> Int {
       let end = start._viewEndIndex
       if start == end {
@@ -386,7 +388,7 @@ extension String : Collection {
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
     static func _measureExtendedGraphemeClusterBackward(
-        end: UnicodeScalarView.IndexType
+        end: UnicodeScalarView.Index
     ) -> Int {
       var start = end._viewStartIndex
       if start == end {
@@ -421,7 +423,7 @@ extension String : Collection {
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
     
-    public func getMirror() -> Mirror {
+    public func getMirror() -> MirrorType {
       return _IndexMirror(self)
     }
   }
@@ -442,7 +444,7 @@ extension String : Collection {
     return IndexingGenerator(self)
   }
   
-  internal struct _IndexMirror : Mirror {
+  internal struct _IndexMirror : MirrorType {
     var _value: Index
 
     init(_ x: Index) {
@@ -459,8 +461,8 @@ extension String : Collection {
     
     public var count: Int { return 0 }
 
-    public subscript(i: Int) -> (String,Mirror) { 
-      _fatalError("Mirror access out of bounds")
+    public subscript(i: Int) -> (String,MirrorType) { 
+      _fatalError("MirrorType access out of bounds")
     }
 
     public var summary: String { return "\(_value._utf16Index)" }
@@ -483,7 +485,7 @@ extension String : Sliceable {
 // Algorithms
 extension String {
   public func join<
-      S : Sequence where S.GeneratorType.Element == String
+      S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String{
     return Swift.join(self, elements)
   }

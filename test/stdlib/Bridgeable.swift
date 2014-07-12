@@ -30,7 +30,7 @@ func testBridging<T>(x: T, name: String) {
 }
 
 //===----------------------------------------------------------------------===//
-struct BridgedValueType : _BridgedToObjectiveC {
+struct BridgedValueType : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return C.self
   }
@@ -62,7 +62,7 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T>
-  : _BridgedToObjectiveC, _ConditionallyBridgedToObjectiveC {
+  : _BridgedToObjectiveCType, _ConditionallyBridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return C.self
   }

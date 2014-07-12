@@ -12,7 +12,7 @@ protocol Comparable: Eq {
   func >(lhs: Self, rhs: Self) -> Bool
 }
 
-func find<R : Generator where R.Element : Eq>
+func find<R : GeneratorType where R.Element : Eq>
        (range : R, value : R.Element) -> R {
   var result = range
   var z = GeneratorSequence(range)
@@ -25,7 +25,7 @@ func find<R : Generator where R.Element : Eq>
   return result
 }
 
-func findIf<R : Generator>(range: R, predicate: (R.Element) -> Bool) -> R {
+func findIf<R : GeneratorType>(range: R, predicate: (R.Element) -> Bool) -> R {
   var result = range
   for x in GeneratorSequence(range) {
     if predicate(x) {
@@ -36,7 +36,7 @@ func findIf<R : Generator>(range: R, predicate: (R.Element) -> Bool) -> R {
   return result
 }
 
-func count<R : Generator where R.Element : Eq>
+func count<R : GeneratorType where R.Element : Eq>
        (range : R, value : R.Element) -> Int {
   var result = 0
   for x in GeneratorSequence(range) {
@@ -47,7 +47,9 @@ func count<R : Generator where R.Element : Eq>
   return result
 }
 
-func countIf<R : Generator>(range: R, predicate: (R.Element) -> Bool) -> Int {
+func countIf<
+  R : GeneratorType
+>(range: R, predicate: (R.Element) -> Bool) -> Int {
   var result = 0
   for x in GeneratorSequence(range) {
     if predicate(x) {
@@ -57,7 +59,7 @@ func countIf<R : Generator>(range: R, predicate: (R.Element) -> Bool) -> Int {
   return result
 }
 
-func equal<R1 : Generator, R2 : Generator where R1.Element : Eq,
+func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
                                            R1.Element == R2.Element>
        (var range1 : R1, var range2 : R2) -> Bool {
 
@@ -74,7 +76,7 @@ func equal<R1 : Generator, R2 : Generator where R1.Element : Eq,
   return !e1 == !e2
 }
 
-func equalIf<R1 : Generator, R2 : Generator>
+func equalIf<R1 : GeneratorType, R2 : GeneratorType>
        (var range1 : R1, var range2 : R2,
         predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
   var e1 = range1.next()
@@ -90,7 +92,7 @@ func equalIf<R1 : Generator, R2 : Generator>
   return !e1 == !e2
 }
 
-func mismatch<R1 : Generator, R2 : Generator where R1.Element : Eq,
+func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
                                               R1.Element == R2.Element>
        (var range1 : R1, var range2 : R2) -> (R1, R2) {
   var prev1 = range1, prev2 = range2
@@ -106,7 +108,7 @@ func mismatch<R1 : Generator, R2 : Generator where R1.Element : Eq,
   return (prev1, prev2)
 }
 
-func mismatchIf<R1 : Generator, R2 : Generator>
+func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
        (var range1 : R1, var range2 : R2,
         predicate : (R1.Element, R2.Element) -> Bool) -> (R1, R2) {
   var prev1 = range1, prev2 = range2
@@ -122,7 +124,7 @@ func mismatchIf<R1 : Generator, R2 : Generator>
   return (prev1, prev2)
 }
 
-func minElement<R : Generator where R.Element : Comparable>(var range: R)
+func minElement<R : GeneratorType where R.Element : Comparable>(var range: R)
        -> R.Element {
   var result = range.next()!
   for next in GeneratorSequence(range) {
@@ -133,7 +135,7 @@ func minElement<R : Generator where R.Element : Comparable>(var range: R)
   return result
 }
 
-func maxElement<R : Generator where R.Element : Comparable>(var range: R)
+func maxElement<R : GeneratorType where R.Element : Comparable>(var range: R)
        -> R.Element {
   var result = range.next()!
   for next in GeneratorSequence(range) {
@@ -144,7 +146,7 @@ func maxElement<R : Generator where R.Element : Comparable>(var range: R)
   return result
 }
 
-func minMaxElement<R : Generator where R.Element : Comparable>(var range: R)
+func minMaxElement<R : GeneratorType where R.Element : Comparable>(var range: R)
        -> (R.Element, R.Element) {
   var min = range.next()!, max = min
   for next in GeneratorSequence(range) {
@@ -154,7 +156,7 @@ func minMaxElement<R : Generator where R.Element : Comparable>(var range: R)
   return (min, max)
 }
 
-protocol RandomAccessStreamType : Generator {
+protocol RandomAccessStreamType : GeneratorType {
   func size() -> Int
   func getNth(n: Int) -> Element
   subscript (r : Range<Int>) -> Self { get }

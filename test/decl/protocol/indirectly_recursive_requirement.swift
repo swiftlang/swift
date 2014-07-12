@@ -4,30 +4,30 @@ protocol Incrementable  {
   func successor() -> Self
 }
 
-protocol _ForwardIndex  {
-  typealias DistanceType  = MyInt
+protocol _ForwardIndexType  {
+  typealias Distance  = MyInt
 }
 
-protocol ForwardIndex : _ForwardIndex {
+protocol ForwardIndexType : _ForwardIndexType {
 }
 
-protocol _BidirectionalIndex : _ForwardIndex {
+protocol _BidirectionalIndexType : _ForwardIndexType {
   func predecessor() -> Self
 }
 
-protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
+protocol BidirectionalIndexType : ForwardIndexType, _BidirectionalIndexType {
 }
 
-protocol _RandomAccessIndex : _BidirectionalIndex {
-  typealias DistanceType
+protocol _RandomAccessIndexType : _BidirectionalIndexType {
+  typealias Distance
 }
 
-protocol RandomAccessIndex : BidirectionalIndex, _RandomAccessIndex {
-}
+protocol RandomAccessIndexType 
+  : BidirectionalIndexType, _RandomAccessIndexType {}
 
-struct MyInt : RandomAccessIndex
+struct MyInt : RandomAccessIndexType
 {
-  typealias DistanceType = MyInt
+  typealias Distance = MyInt
 
   func predecessor() -> MyInt {
   	return self

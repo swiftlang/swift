@@ -17,9 +17,9 @@
 /// Base protocol for Strideable; allows the definition of < to be
 /// inferred for Comparable conformance
 public protocol _Strideable {
-  // FIXME: We'd like to name this type "DistanceType" but for
+  // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
-  typealias Stride : SignedNumber
+  typealias Stride : SignedNumberType
   
   func distanceTo(Self) -> Stride
   func advancedBy(Stride) -> Self
@@ -59,8 +59,8 @@ public func -= <T: Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(-rhs)
 }
 
-/// A Generator for StrideTo<T>
-public struct StrideToGenerator<T: Strideable> : Generator {
+/// A GeneratorType for StrideTo<T>
+public struct StrideToGenerator<T: Strideable> : GeneratorType {
   var current: T
   let end: T
   let stride: T.Stride
@@ -75,9 +75,9 @@ public struct StrideToGenerator<T: Strideable> : Generator {
   }
 }
 
-/// A Sequence of values formed by striding over a half-open interval
-/// FIXME: should really be a Collection, as it is multipass
-public struct StrideTo<T: Strideable> : Sequence {
+/// A SequenceType of values formed by striding over a half-open interval
+/// FIXME: should really be a CollectionType, as it is multipass
+public struct StrideTo<T: Strideable> : SequenceType {
   public func generate() -> StrideToGenerator<T> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -85,7 +85,7 @@ public struct StrideTo<T: Strideable> : Sequence {
   init(start: T, end: T, stride: T.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
-    // already-empty Sequence.
+    // already-empty SequenceType.
     self.start = start
     self.end = end
     self.stride = stride
@@ -102,8 +102,8 @@ public func stride<
   return StrideTo(start: start, end: end, stride: stride)
 }
 
-/// A Generator for StrideThrough<T>
-public struct StrideThroughGenerator<T: Strideable> : Generator {
+/// A GeneratorType for StrideThrough<T>
+public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
   var current: T
   let end: T
   let stride: T.Stride
@@ -126,9 +126,9 @@ public struct StrideThroughGenerator<T: Strideable> : Generator {
   }
 }
 
-/// A Sequence of values formed by striding over a closed interval
-/// FIXME: should really be a Collection, as it is multipass
-public struct StrideThrough<T: Strideable> : Sequence {
+/// A SequenceType of values formed by striding over a closed interval
+/// FIXME: should really be a CollectionType, as it is multipass
+public struct StrideThrough<T: Strideable> : SequenceType {
   public func generate() -> StrideThroughGenerator<T> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)

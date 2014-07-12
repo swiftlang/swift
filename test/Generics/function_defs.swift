@@ -124,13 +124,13 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
 // Subscripting
 //===----------------------------------------------------------------------===//
 protocol Subscriptable {
-  typealias IndexType
-  typealias ValueType
+  typealias Index
+  typealias Value
 
-  func getIndex() -> IndexType
-  func getValue() -> ValueType
+  func getIndex() -> Index
+  func getValue() -> Value
 
-  subscript (index : IndexType) -> ValueType { get set }
+  subscript (index : Index) -> Value { get set }
 }
 
 protocol IntSubscriptable {

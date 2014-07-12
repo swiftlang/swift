@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal struct IntEncoder : Sink {
+internal struct IntEncoder : SinkType {
   var asInt: UInt64 = 0
   var shift: UInt64 = 0
   mutating func put(x: UTF8.CodeUnit) {

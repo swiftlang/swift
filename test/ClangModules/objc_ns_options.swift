@@ -12,7 +12,7 @@ var withQuince: NSRuncingOptions = .EnableQuince
 // derive the namespaced name.
 var singleValue: NSSingleOptions = .Value
 
-// Check RawOptionSet conformance.
+// Check RawOptionSetType conformance.
 var minceAndQuince: NSRuncingOptions = .EnableMince & .EnableQuince
 var minceOrQuince: NSRuncingOptions = .EnableMince | .EnableQuince
 var noMince: NSRuncingOptions = ~NSRuncingOptions.EnableMince

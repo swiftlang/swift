@@ -62,9 +62,11 @@ struct formattedTestS<T : MyFormattedPrintable> {
   }
 }
 
-struct GenericReq<T : Generator, U : Generator where T.Element == U.Element> {}
+struct GenericReq<
+  T : GeneratorType, U : GeneratorType where T.Element == U.Element
+> {}
 
-func getFirst<R : Generator>(var r: R) -> R.Element {
+func getFirst<R : GeneratorType>(var r: R) -> R.Element {
   return r.next()!
 }
 
@@ -134,8 +136,8 @@ var d2 : Dictionary<String, Int>
 d1["hello"] = d2["world"]
 i = d2["blarg"]
 
-struct RangeOfPrintables<R : Sequence
-         where R.GeneratorType.Element : MyFormattedPrintable> {
+struct RangeOfPrintables<R : SequenceType
+         where R.Generator.Element : MyFormattedPrintable> {
   var r : R
 
   func format() -> String {
@@ -148,16 +150,16 @@ struct RangeOfPrintables<R : Sequence
 }
 
 struct Y {}
-struct SequenceY : Sequence, Generator {
-  typealias GeneratorType = SequenceY
+struct SequenceY : SequenceType, GeneratorType {
+  typealias Generator = SequenceY
   typealias Element = Y
 
   func next() -> Element? { return Y() }
-  func generate() -> GeneratorType { return self }
+  func generate() -> Generator { return self }
 }
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {
-  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
+  var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'SequenceType'}}
   var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' does not conform to protocol 'MyFormattedPrintable'}}
 }
 

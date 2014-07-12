@@ -26,7 +26,7 @@
 }%
 
 extension ${introspecteeType} : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _${introspecteeType}Mirror(self)
   }
 }

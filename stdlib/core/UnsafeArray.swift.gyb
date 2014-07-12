@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 /// Wrapper for a contiguous array of T.  UnsafeArray is both a
-/// Collection (which is multi-pass if you use indices or call
-/// generate() on it) and a Generator, which can only be assumed to be
+/// CollectionType (which is multi-pass if you use indices or call
+/// generate() on it) and a GeneratorType, which can only be assumed to be
 /// single-pass.  It's not clear how well this combination will work
 /// out, or whether all Collections should also be Streams; consider
 /// this an experiment.
 
-public struct UnsafeArrayGenerator<T>: Generator, Sequence {
+public struct UnsafeArrayGenerator<T>: GeneratorType, SequenceType {
   public mutating func next() -> T? {
     return position == end ? nil : (position++).memory
   }
@@ -30,7 +30,7 @@ public struct UnsafeArrayGenerator<T>: Generator, Sequence {
 }
 
 %for Mutable in ('Mutable', ''):
-public struct Unsafe${Mutable}Array<T> : ${Mutable}Collection {
+public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
 
   public var startIndex: Int {
     return 0

@@ -1151,10 +1151,10 @@ namespace index_block {
   /// The names should be kept in sync, but the values must \em not be
   /// renumbered or reordered without incrementing VERSION_MAJOR.
   enum KnownProtocolKind : uint8_t {
-    ArrayBound = 1,
-    Sequence,
+    ArrayBoundType = 1,
+    SequenceType,
     // killed
-    LogicValue = 4,
+    LogicValueType = 4,
 
     ArrayLiteralConvertible,
     BooleanLiteralConvertible,
@@ -1177,14 +1177,14 @@ namespace index_block {
 
     AnyObject,
     RawRepresentable,
-    Generator,
-    RawOptionSet,
+    GeneratorType,
+    RawOptionSetType,
     Equatable,
     Hashable,
     Comparable,
 
-    _BridgedToObjectiveC,
-    _ConditionallyBridgedToObjectiveC,
+    _BridgedToObjectiveCType,
+    _ConditionallyBridgedToObjectiveCType,
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<

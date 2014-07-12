@@ -29,7 +29,7 @@
 %     ('Array', 'an Array')
 % ]
 % for (Self, a_Self) in arrayTypes:
-public struct ${Self}<T> : MutableCollection, Sliceable {
+public struct ${Self}<T> : MutableCollectionType, Sliceable {
   public typealias Element = T
   public var startIndex: Int {
     return 0
@@ -55,8 +55,8 @@ public struct ${Self}<T> : MutableCollection, Sliceable {
     return IndexingGenerator(self)
   }
   
-  public typealias SliceType = Slice<T>
-  public subscript(subRange: Range<Int>) -> SliceType {
+  public typealias SubSlice = Slice<T>
+  public subscript(subRange: Range<Int>) -> SubSlice {
     get {
       return Slice(_buffer[subRange])
     }
@@ -129,7 +129,7 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 extension ${Self} {
-  public func _asCocoaArray() -> _CocoaArray {
+  public func _asCocoaArray() -> _CocoaArrayType {
     return _buffer._asCocoaArray()
   }
 }
@@ -141,7 +141,7 @@ extension ${Self} : ArrayType {
   }
 
   public init<
-    S: Sequence where S.GeneratorType.Element == _Buffer.Element
+    S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
     self = ${Self}(_Buffer(s~>_copyToNativeArrayBuffer()))
   }
@@ -218,8 +218,8 @@ extension ${Self} : ArrayType {
 
   /// Append elements from `sequence` to the Array
   public mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == T
+      S : SequenceType
+      where S.Generator.Element == T
   >(sequence: S) {
     // Calling a helper free function instead of writing the code inline
     // because of:
@@ -268,7 +268,7 @@ extension ${Self} : ArrayType {
   //===--- algorithms -----------------------------------------------------===//
 
   public func join<
-      S : Sequence where S.GeneratorType.Element == ${Self}<T>
+      S : SequenceType where S.Generator.Element == ${Self}<T>
   >(elements: S) -> ${Self}<T> {
     return Swift.join(self, elements)
   }
@@ -309,14 +309,14 @@ extension ${Self} : ArrayType {
 }
 
 func _${Self}Extend<
-    T, S : Sequence
-    where S.GeneratorType.Element == T
+    T, S : SequenceType
+    where S.Generator.Element == T
 >(inout a: ${Self}<T>, sequence: S) {
   a += sequence
 }
 
 extension ${Self} : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _ArrayTypeMirror(self)
   }
 }
@@ -419,8 +419,10 @@ extension Array {
   }
 }
 
-struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
-  func call(rawMemory: UnsafePointer<C.GeneratorType.Element>) {
+struct _InitializeMemoryFromCollection<
+  C: CollectionType
+> : _PointerFunctionType {
+  func call(rawMemory: UnsafePointer<C.Generator.Element>) {
     var p = rawMemory
     for x in newValues {
       p++.initialize(x)
@@ -436,8 +438,8 @@ struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
 
 @inline(never)
 func _arrayOutOfPlaceReplace<
-  B: _ArrayBufferType, C: Collection
-    where C.GeneratorType.Element == B.Element, B.IndexType == Int
+  B: _ArrayBufferType, C: CollectionType
+    where C.Generator.Element == B.Element, B.Index == Int
 >(
   inout source: B, subRange: Range<Int>, newValues: C, insertCount: Int
 ) {
@@ -454,8 +456,8 @@ func _arrayOutOfPlaceReplace<
 }
 
 func _arrayNonSliceInPlaceReplace<
-  B: _ArrayBufferType, C: Collection
-  where C.GeneratorType.Element == B.Element, B.IndexType == Int
+  B: _ArrayBufferType, C: CollectionType
+  where C.Generator.Element == B.Element, B.Index == Int
 >(inout target: B, subRange: Range<Int>, insertCount: Int, newValues: C) {
   let oldCount = target.count
   let eraseCount = countElements(subRange)
@@ -522,8 +524,8 @@ func _arrayNonSliceInPlaceReplace<
 }
 
 func _arrayReplace<
-  B: _ArrayBufferType, C: Collection
-  where C.GeneratorType.Element == B.Element, B.IndexType == Int
+  B: _ArrayBufferType, C: CollectionType
+  where C.Generator.Element == B.Element, B.Index == Int
   >(
   inout target: B, subRange: Range<Int>, newValues: C
 ) {
@@ -560,7 +562,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
 extension ${Self} {
   @semantics("array.mutate_unknown")
   public mutating func replaceRange<
-    C: Collection where C.GeneratorType.Element == _Buffer.Element
+    C: CollectionType where C.Generator.Element == _Buffer.Element
   >(
     subRange: Range<Int>, with newValues: C
   ) {
@@ -570,8 +572,8 @@ extension ${Self} {
 
 @assignment public
 func += <
-  T, S: Sequence
-where S.GeneratorType.Element == T
+  T, S: SequenceType
+where S.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
@@ -586,8 +588,8 @@ where S.GeneratorType.Element == T
 
 @assignment public
 func += <
-  T, C: Collection
-where C.GeneratorType.Element == T
+  T, C: CollectionType
+where C.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: C) {
   let rhsCount = numericCast(countElements(rhs)) as Int
   
@@ -658,7 +660,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
     count: newCount, minimumCapacity: minimumCapacity)
 }
 
-protocol _PointerFunction {
+protocol _PointerFunctionType {
   typealias Element
   func call(UnsafePointer<Element>)
 }
@@ -671,7 +673,7 @@ protocol _PointerFunction {
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
 func _arrayOutOfPlaceUpdate<
-  _Buffer: _ArrayBufferType, Initializer: _PointerFunction
+  _Buffer: _ArrayBufferType, Initializer: _PointerFunctionType
     where Initializer.Element == _Buffer.Element
 >(
   inout source: _Buffer, 
@@ -731,7 +733,7 @@ func _arrayOutOfPlaceUpdate<
   source = _Buffer(dest!)
 }
 
-struct _InitializePointer<T> : _PointerFunction {
+struct _InitializePointer<T> : _PointerFunctionType {
   func call(rawMemory: UnsafePointer<T>) {
     // FIXME: maybe we should move here instead of copying?
     rawMemory.initialize(newValue)
@@ -759,7 +761,7 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
   }
 }
 
-struct _IgnorePointer<T> : _PointerFunction {
+struct _IgnorePointer<T> : _PointerFunctionType {
   func call(_:UnsafePointer<T>) {}
 }
 
@@ -776,7 +778,7 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
 
 public func _extractOrCopyToNativeArrayBuffer<
   _Buffer: _ArrayBufferType
-    where _Buffer.GeneratorType.Element == _Buffer.Element
+    where _Buffer.Generator.Element == _Buffer.Element
 >(source: _Buffer) 
   -> _ContiguousArrayBuffer<_Buffer.Element> 
 {
@@ -789,7 +791,7 @@ public func _extractOrCopyToNativeArrayBuffer<
 /// Append items from newItems to buffer
 func _arrayAppendSequence<
   _Buffer: _ArrayBufferType,
-  S: Sequence where S.GeneratorType.Element == _Buffer.Element
+  S: SequenceType where S.Generator.Element == _Buffer.Element
 >(
   inout buffer: _Buffer, newItems: S
 ) {

@@ -14,7 +14,7 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's _CocoaArray.
+//  compatible API.  That's _CocoaArrayType.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,10 +24,10 @@ import SwiftShims
 /// (e.g. _SwiftNSRange is layout-compatible with NSRange in
 /// getObjects:range: below).  Array<T> is backed by one of these, and
 /// when T isBridgedToObjectiveC, it can be used directly as an
-/// NSArray.  It is safe to convert between NSArray and _CocoaArray via
+/// NSArray.  It is safe to convert between NSArray and _CocoaArrayType via
 /// reinterpretCast.
 @class_protocol @unsafe_no_objc_tagged_pointer @objc public
-protocol _CocoaArray {
+protocol _CocoaArrayType {
   func objectAtIndex(index: Int) -> AnyObject
   
   func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
@@ -37,15 +37,15 @@ protocol _CocoaArray {
          objects buffer: UnsafePointer<AnyObject>,
          count len: Int) -> Int
 
-  func copyWithZone(COpaquePointer) -> _CocoaArray
+  func copyWithZone(COpaquePointer) -> _CocoaArrayType
   
   var count: Int {get}
 }
 
-/// A wrapper around any _CocoaArray that gives it Collection
-/// conformance.  Why not make _CocoaArray conform directly?  It's a
+/// A wrapper around any _CocoaArrayType that gives it CollectionType
+/// conformance.  Why not make _CocoaArrayType conform directly?  It's a
 /// class, and I don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : Collection {
+internal struct _CocoaArrayWrapper : CollectionType {
   var startIndex: Int {
     return 0
   }
@@ -86,10 +86,10 @@ internal struct _CocoaArrayWrapper : Collection {
   }
 
   @transparent
-  init(_ buffer: _CocoaArray) {
+  init(_ buffer: _CocoaArrayType) {
     self.buffer = buffer
   }
 
-  var buffer: _CocoaArray
+  var buffer: _CocoaArrayType
 }
 

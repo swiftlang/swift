@@ -10,16 +10,16 @@ extension X {
   func getFloat() -> MyReal { return 3.14 }
 }
 
-struct GeneratorTypeGeneratorType<G : Generator> {
+struct GeneratorTypeGeneratorType<G : GeneratorType> {
   var index : Int
   var elements : G
 }
 
-struct GeneratorType<T : Sequence> {
+struct Generator<T : SequenceType> {
   var input : T
 
-  typealias GeneratorType = GeneratorTypeGeneratorType<T.GeneratorType>
-  func generate() -> GeneratorType {
-    return GeneratorType(index: 0, elements: input.generate())
+  typealias Generator = GeneratorTypeGeneratorType<T.Generator>
+  func generate() -> Generator {
+    return Generator(index: 0, elements: input.generate())
   }
 }

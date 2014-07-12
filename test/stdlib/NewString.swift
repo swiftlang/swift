@@ -230,7 +230,7 @@ let winter = "🏂☃❅❆❄︎⛄️❄️"
 let summer = "school's out!"
 
 func printHexSequence<
-  S:Sequence where S.GeneratorType.Element : Integer
+  S:SequenceType where S.Generator.Element : IntegerType
 >(s: S) {
   print("[")
   var prefix = ""

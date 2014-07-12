@@ -1278,7 +1278,8 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
     // Enums with raw types can derive their RawRepresentable conformance.
     if (protocol
-          == getASTContext().getProtocol(KnownProtocolKind::RawRepresentable))
+          == getASTContext().getProtocol(
+            KnownProtocolKind::RawRepresentable))
       return enumDecl->hasRawType();
     
     // Simple enums can derive Equatable and Hashable conformance.

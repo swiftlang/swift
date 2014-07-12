@@ -14,7 +14,7 @@ class ObjC : Root {
 
 class DerivesObjC : ObjC { }
 
-struct BridgedToObjC : Hashable, _BridgedToObjectiveC {
+struct BridgedToObjC : Hashable, _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return ObjC.self
   }

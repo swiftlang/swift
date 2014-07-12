@@ -55,7 +55,7 @@ func test_varname_binding() {
 }
 
 //===----------------------------------------------------------------------===//
-// ForwardIndex referencing of types.
+// ForwardIndexType referencing of types.
 //===----------------------------------------------------------------------===//
 
 // We don't allow namebinding to look forward past a var declaration in the
@@ -83,7 +83,7 @@ enum y {
 
 
 //===----------------------------------------------------------------------===//
-// ForwardIndex referencing of values.
+// ForwardIndexType referencing of values.
 //===----------------------------------------------------------------------===//
 
 func func2() {

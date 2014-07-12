@@ -26,9 +26,9 @@ extension String {
 
       public var count: Int { return distance(_value.startIndex,_value.endIndex) }
 
-      public subscript(i: Int) -> (String,Mirror) { 
+      public subscript(i: Int) -> (String,MirrorType) { 
         if i >= count {
-          _fatalError("Mirror access out of bounds")
+          _fatalError("MirrorType access out of bounds")
         }
         return ("[\(i)]",reflect(self[i]))
       }

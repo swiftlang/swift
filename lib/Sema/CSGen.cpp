@@ -1092,7 +1092,7 @@ namespace {
       Expr *condExpr = expr->getCondExpr();
       auto logicValue
         = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
-                                          KnownProtocolKind::LogicValue);
+                                          KnownProtocolKind::LogicValueType);
       if (!logicValue)
         return Type();
 

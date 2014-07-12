@@ -146,11 +146,11 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 }
 
 protocol SequenceViaStream {
-  typealias SequenceStreamTypeType : Generator // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
+  typealias SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
   func generate() -> SequenceStreamTypeType
 }
 
-struct IntGeneratorType : Generator /*, Sequence, ReplPrintable*/ {
+struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
   typealias Element = Int
   var min : Int
   var max : Int
@@ -163,7 +163,7 @@ struct IntGeneratorType : Generator /*, Sequence, ReplPrintable*/ {
     return prev
   }
 
-  typealias GeneratorType = IntGeneratorType
+  typealias Generator = IntGeneratorType
   func generate() -> IntGeneratorType {
     return self
   }
@@ -174,7 +174,7 @@ extension IntGeneratorType : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' does not conform to 'Generator'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' does not conform to 'GeneratorType'}}
   func generate() -> Int {}
 }
 
@@ -238,15 +238,15 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
+func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Need a more specific diagnostic here.
-  var x = e.generate() // expected-error{{'Sequence' does not have a member named 'generate'}}
+  var x = e.generate() // expected-error{{'SequenceType' does not have a member named 'generate'}}
   x.next()
   x.nonexistent()
 }
 
 protocol HasSequenceAndStream {
-  typealias R : Generator, Sequence
+  typealias R : GeneratorType, SequenceType
   func getR() -> R
 }
 

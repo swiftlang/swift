@@ -25,9 +25,9 @@ extension String {
 
     // This is to avoid printing "func generate() -> GeneratorOf<UInt16>"
     public typealias _GeneratorType = GeneratorOf<UInt16>
-    public typealias GeneratorType = _GeneratorType
+    public typealias Generator = _GeneratorType
 
-    public func generate() -> GeneratorType {
+    public func generate() -> Generator {
       var index = startIndex
       return GeneratorOf<UInt16> {
         if _fastPath(index != self.endIndex) {
@@ -37,7 +37,7 @@ extension String {
       }
     }
 
-    public subscript(i: Int) -> GeneratorType.Element {
+    public subscript(i: Int) -> Generator.Element {
       _precondition(i >= 0 && i < _length,
           "out-of-range access on a UTF16View")
 
@@ -50,8 +50,8 @@ extension String {
       }
 
       if (u >> 10) == 0b1101_10 {
-        // `u` is a high-surrogate.  Sequence is well-formed if it is followed
-        // by a low-surrogate.
+        // `u` is a high-surrogate.  SequenceType is well-formed if it
+        // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _core.count &&
                (_core[index + 1] >> 10) == 0b1101_11) {
@@ -60,8 +60,8 @@ extension String {
         return 0xfffd
       }
 
-      // `u` is a low-surrogate.  Sequence is well-formed if previous code unit
-      // is a high-surrogate.
+      // `u` is a low-surrogate.  SequenceType is well-formed if
+      // previous code unit is a high-surrogate.
       if _fastPath(index != 0 && (_core[index - 1] >> 10) == 0b1101_10) {
         return u
       }
@@ -85,7 +85,7 @@ extension String {
       self._core = _core
     }
     
-    public func getMirror() -> Mirror {
+    public func getMirror() -> MirrorType {
       return _UTF16ViewMirror(self)
     }
 

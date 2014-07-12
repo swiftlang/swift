@@ -876,20 +876,20 @@ bb0:
 }
 
 // Generic call to "branchHint" for use in specialized @slowPath
-sil public_external [transparent] [semantics "branchhint"] @_TFSs11_branchHintUSs10LogicValue__FTQ_Sb_Sb : $@thin <C where C : LogicValue> (@in C, Bool) -> Bool {
+sil public_external [transparent] [semantics "branchhint"] @_TFSs11_branchHintUSs14LogicValueType__FTQ_Sb_Sb : $@thin <C where C : LogicValueType> (@in C, Bool) -> Bool {
 bb0(%0 : $*C, %1 : $Bool):
-  %2 = witness_method $C, #LogicValue.getLogicValue!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : LogicValue> (@inout τ_0_0) -> Bool // user: %4
-  %3 = apply %2<C>(%0) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : LogicValue> (@inout τ_0_0) -> Bool
+  %2 = witness_method $C, #LogicValueType.getLogicValue!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : LogicValueType> (@inout τ_0_0) -> Bool // user: %4
+  %3 = apply %2<C>(%0) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : LogicValueType> (@inout τ_0_0) -> Bool
   return %3 : $Bool
 }
 
 // Specialized call to "slowPath" for use in @coldcall_caller
-sil shared [transparent] [semantics "slowpath"] @_TTSSbSbSs10LogicValue___TFSs9_slowPathUSs10LogicValue__FQ_Sb : $@thin (@in Bool) -> Bool {
+sil shared [transparent] [semantics "slowpath"] @_TTSSbSbSs14LogicValueType___TFSs9_slowPathUSs14LogicValueType__FQ_Sb : $@thin (@in Bool) -> Bool {
 bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
-  %5 = function_ref @_TFSs11_branchHintUSs10LogicValue__FTQ_Sb_Sb : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0, Bool) -> Bool
-  %6 = apply [transparent] %5<Bool>(%0, %4) : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0, Bool) -> Bool
+  %5 = function_ref @_TFSs11_branchHintUSs14LogicValueType__FTQ_Sb_Sb : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0, Bool) -> Bool
+  %6 = apply [transparent] %5<Bool>(%0, %4) : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0, Bool) -> Bool
   return %6 : $Bool
 }
 
@@ -908,7 +908,7 @@ bb0(%0 : $Int):
   %5 = apply %3(%4, %2) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
-  %8 = function_ref @_TTSSbSbSs10LogicValue___TFSs9_slowPathUSs10LogicValue__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9
+  %8 = function_ref @_TTSSbSbSs14LogicValueType___TFSs9_slowPathUSs14LogicValueType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9
   %9 = apply [transparent] %8(%1#1) : $@thin (@in Bool) -> Bool // user: %10
   %10 = struct_extract %9 : $Bool, #Bool.value    // user: %12
   dealloc_stack %1#0 : $*@local_storage Bool      // id: %11
@@ -930,7 +930,7 @@ bb0:
   return %t : $()
 }
 
-sil [transparent] [semantics "fastpath"] @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0) -> Bool
+sil [transparent] [semantics "fastpath"] @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0) -> Bool
 
 // fastpath.closedTest0 () -> ()
 // From <rdar://problem/17611447> _fastPath kills optimizer
@@ -945,12 +945,12 @@ sil [transparent] [semantics "fastpath"] @fastPathHelper : $@thin <τ_0_0 where 
 // CHECK-LABEL: bb2:
 sil @testNoInlineSlow : $@thin () -> () {
 bb0:
-  %f1 = function_ref @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0) -> Bool
+  %f1 = function_ref @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0) -> Bool
   %v9 = alloc_stack $Bool
   %v12 = integer_literal $Builtin.Int1, 0
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
-  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0) -> Bool
+  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0) -> Bool
   %v19 = struct_extract %v18 : $Bool, #Bool.value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21
@@ -974,12 +974,12 @@ bb2:
 // CHECK-LABEL: bb2:
 sil @testInlineSlowTransparent : $@thin () -> () {
 bb0:
-  %f1 = function_ref @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0) -> Bool
+  %f1 = function_ref @fastPathHelper : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0) -> Bool
   %v9 = alloc_stack $Bool
   %v12 = integer_literal $Builtin.Int1, 0
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
-  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : LogicValue> (@in τ_0_0) -> Bool
+  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : LogicValueType> (@in τ_0_0) -> Bool
   %v19 = struct_extract %v18 : $Bool, #Bool.value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21

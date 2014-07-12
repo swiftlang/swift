@@ -138,7 +138,7 @@ class TestObjCKeyTy : NSObject {
   var value: Int
 }
 
-struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveC {
+struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveCType {
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }

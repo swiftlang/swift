@@ -1015,7 +1015,7 @@ ERROR(reference_non_inout,sema_tce,none,
 NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
-      "protocol 'LogicValue' is broken", ())
+      "protocol 'LogicValueType' is broken", ())
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 ERROR(binding_injected_optional,sema_tce,none,
       "operand of postfix '?' should have optional type; type is %0", (Type))
@@ -1209,9 +1209,9 @@ ERROR(forced_downcast_should_be_conditional,sema_tcs,none,
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
-      "Sequence protocol definition is broken", ())
+      "SequenceType protocol definition is broken", ())
 ERROR(generator_protocol_broken,sema_tcs,none,
-      "Generator protocol definition is broken", ())
+      "GeneratorType protocol definition is broken", ())
 
 ERROR(label_shadowed,sema_tcs, none,
       "label %0 cannot be reused on an inner statement", (Identifier))

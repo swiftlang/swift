@@ -36,16 +36,16 @@ public func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
 public func selectorFunc1(#a: Int, b x: Int) {}
 
 public protocol Wrapped {
-  typealias ValueType : Equatable
+  typealias Value : Equatable
   
-  //var value : ValueType
-  func getValue() -> ValueType
+  //var value : Value
+  func getValue() -> Value
 }
 
 public func differentWrapped<
   T : Wrapped, U : Wrapped
   where
-  T.ValueType == U.ValueType
+  T.Value == U.Value
 >(#a: T, #b: U) -> Bool {
   return a.getValue() != b.getValue()
 }

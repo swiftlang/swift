@@ -33,8 +33,8 @@ func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 // NSDictionary bridging entry points
-internal func _convertDictionaryToNSDictionary<KeyType, ValueType>(
-    d: Dictionary<KeyType, ValueType>
+internal func _convertDictionaryToNSDictionary<Key, Value>(
+    d: Dictionary<Key, Value>
 ) -> NSDictionary {
   return NSDictionary()
 }
@@ -45,7 +45,7 @@ internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
   return Dictionary<K, V>()
 }
 
-extension String : _BridgedToObjectiveC {
+extension String : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
@@ -57,7 +57,7 @@ extension String : _BridgedToObjectiveC {
   }
 }
 
-extension Int : _BridgedToObjectiveC {
+extension Int : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
@@ -69,7 +69,7 @@ extension Int : _BridgedToObjectiveC {
   }
 }
 
-extension Array : _BridgedToObjectiveC {
+extension Array : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
@@ -81,7 +81,7 @@ extension Array : _BridgedToObjectiveC {
   }
 }
 
-extension Dictionary : _BridgedToObjectiveC {
+extension Dictionary : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
@@ -93,7 +93,7 @@ extension Dictionary : _BridgedToObjectiveC {
   }
 }
 
-extension CGFloat : _BridgedToObjectiveC {
+extension CGFloat : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
 
-struct F : ForwardIndex {
+struct F : ForwardIndexType {
   var x: Int
 
   init(_ x: Int) {
@@ -28,7 +28,7 @@ func ==(a: F, b: F) -> Bool {
   return a.x == b.x
 }
 
-struct B : BidirectionalIndex {
+struct B : BidirectionalIndexType {
   var x: Int
 
   init(_ x: Int) {
@@ -49,7 +49,7 @@ func ==(a: B, b: B) -> Bool {
   return a.x == b.x
 }
 
-struct R : RandomAccessIndex {
+struct R : RandomAccessIndexType {
   var x: Int
 
   init(_ x: Int) {

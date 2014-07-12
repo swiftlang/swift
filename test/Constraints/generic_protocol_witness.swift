@@ -56,8 +56,8 @@ func usesAGenericMethod<U : NeedsAGenericMethod>(x: U) {
   x.method(5)
 }
 
-struct L<T>: Sequence {} // expected-error {{type 'L<T>' does not conform to protocol '_Sequence_'}} expected-error {{type 'L<T>' does not conform to protocol 'Sequence'}}
+struct L<T>: SequenceType {} // expected-error {{type 'L<T>' does not conform to protocol '_Sequence_Type'}} expected-error {{type 'L<T>' does not conform to protocol 'SequenceType'}}
 
 func z(x: L<Int>) {
-  for xx in x {} // expected-error{{'L<Int>' does not have a member named 'GeneratorType'}}
+  for xx in x {} // expected-error{{'L<Int>' does not have a member named 'Generator'}}
 }

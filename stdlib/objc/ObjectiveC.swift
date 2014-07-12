@@ -22,7 +22,7 @@ import ObjectiveC
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
-public struct ObjCBool : LogicValue, BooleanLiteralConvertible {
+public struct ObjCBool : LogicValueType, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var value: Int8
@@ -60,7 +60,7 @@ public struct ObjCBool : LogicValue, BooleanLiteralConvertible {
 }
 
 extension ObjCBool : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return reflect(getLogicValue())
   }
 }
@@ -140,7 +140,7 @@ extension String {
 
 extension Selector : Reflectable {
   public
-  func getMirror() -> Mirror {
+  func getMirror() -> MirrorType {
     return reflect(String(_sel: self))
   }
 }

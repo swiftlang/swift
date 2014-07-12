@@ -34,7 +34,7 @@ func assert(
   }
 }
 @transparent public
-func assert<T : LogicValue>(
+func assert<T : LogicValueType>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -81,7 +81,7 @@ func _precondition(
   }
 }
 @transparent public
-func _precondition<T : LogicValue>(
+func _precondition<T : LogicValueType>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -147,7 +147,7 @@ func _debugPrecondition(
 }
 
 @transparent public
-func _debugPrecondition<T : LogicValue>(
+func _debugPrecondition<T : LogicValueType>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -188,7 +188,7 @@ func _sanityCheck(
 }
 
 @transparent public
-func _sanityCheck<T : LogicValue>(
+func _sanityCheck<T : LogicValueType>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {

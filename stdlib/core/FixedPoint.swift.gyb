@@ -66,50 +66,58 @@ def otherIntName(name, signed):
 public typealias IntMax = Int${maxBits}
 public typealias UIntMax = UInt${maxBits}
 
-public protocol _Integer
+public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
     Printable,
-    ArrayBound,
+    ArrayBoundType,
     Hashable,
-    IntegerArithmetic,
-    BitwiseOperations,
+    IntegerArithmeticType,
+    BitwiseOperationsType,
     _Incrementable
 {
 }
 
-public protocol Integer : _Integer, RandomAccessIndex {
+public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 }
 
-public protocol _SignedInteger : _Integer, SignedNumber {
+public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   func toIntMax() -> IntMax
   class func from(IntMax) -> Self
 }
 
-public protocol SignedInteger : _SignedInteger, Integer {
+public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 }
 
-public protocol _UnsignedInteger : _Integer {
+public protocol _UnsignedIntegerType : _IntegerType {
   func toUIntMax() -> UIntMax
   class func from(UIntMax) -> Self
 }
 
-public protocol UnsignedInteger : _UnsignedInteger, Integer {
+public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 }
 
-public func numericCast<T : _SignedInteger, U : _SignedInteger>(x: T) -> U {
+public func numericCast<
+  T : _SignedIntegerType, U : _SignedIntegerType
+>(x: T) -> U {
   return .from(x.toIntMax())
 }
 
-public func numericCast<T : _UnsignedInteger, U : _UnsignedInteger>(x: T) -> U {
+public func numericCast<
+  T : _UnsignedIntegerType, U : _UnsignedIntegerType
+>(x: T) -> U {
   return .from(x.toUIntMax())
 }
 
-public func numericCast<T : _SignedInteger, U : _UnsignedInteger>(x: T) -> U {
+public func numericCast<
+  T : _SignedIntegerType, U : _UnsignedIntegerType
+>(x: T) -> U {
   return .from(UIntMax(x.toIntMax()))
 }
 
-public func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
+public func numericCast<
+T : _UnsignedIntegerType, U : _SignedIntegerType
+>(x: T) -> U {
   return .from(IntMax(x.toUIntMax()))
 }
 
@@ -120,13 +128,15 @@ public func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
 %   OtherSelf = otherIntName(name, signed)
 %   ConstructIntType = 'Int' if Self != 'Int' else ''
 
-public struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
+public struct ${Self}
+   : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
   public var value: Builtin.${BuiltinName}
 
   @transparent public
   init() {
     var maxWidthZero: IntMax = 0
-    value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
+    value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(
+       maxWidthZero.value)
   }
 
   @transparent public
@@ -183,7 +193,7 @@ public struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'}
 %  end
   }
 
-  public typealias ArrayBoundType = ${Self}
+  public typealias ArrayBound = ${Self}
   public func getArrayBoundValue() -> ${Self} {
     return self
   }
@@ -254,8 +264,8 @@ extension ${Self} : Printable {
 }
 
 @transparent
-extension ${Self} : RandomAccessIndex {
-  // HACK: Disable indexing and slicing Ranges of Integer types
+extension ${Self} : RandomAccessIndexType {
+  // HACK: Disable indexing and slicing Ranges of IntegerType types
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.
   typealias _DisabledRangeIndex = ${Self}
@@ -270,12 +280,12 @@ extension ${Self} : RandomAccessIndex {
   }
   
   @transparent public
-  func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
+  func distanceTo(other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
   
   @transparent public
-  func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
+  func advancedBy(amount: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) + numericCast(amount))
   }
 
@@ -326,7 +336,7 @@ extension ${Self} : RandomAccessIndex {
 
 % if signed:
 @transparent
-extension ${Self} : SignedNumber {}
+extension ${Self} : SignedNumberType {}
 % end
 
 %# FIXME: checked conversions of Word types
@@ -452,7 +462,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 
 // bitwise operations
 @transparent
-extension ${Self} : BitwiseOperations {
+extension ${Self} : BitwiseOperationsType {
   public static var allZeros: ${Self} { return 0 }
 }
 

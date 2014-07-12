@@ -71,7 +71,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
 // This is a workaround for:
 // <rdar://problem/16883288> Property of type 'String!' does not satisfy
 // protocol requirement of type 'String'
-extension NSObject : _PrintableNSObject {}
+extension NSObject : _PrintableNSObjectType {}
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -111,7 +111,7 @@ extension NSString : StringLiteralConvertible {
 //===----------------------------------------------------------------------===//
 // New Strings
 //===----------------------------------------------------------------------===//
-extension NSString : _CocoaString {}
+extension NSString : _CocoaStringType {}
 
 /// Sets variables in Swift's core stdlib that allow it to
 /// bridge Cocoa strings properly.  Currently invoked by a HACK in
@@ -126,7 +126,7 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
   return COpaquePointer()
 }
 
-// When used as a _CocoaString, an NSString should be either
+// When used as a _CocoaStringType, an NSString should be either
 // immutable or uniquely-referenced, and not have a buffer of
 // contiguous UTF-16.  Ideally these distinctions would be captured in
 // the type system, so one would have to explicitly convert NSString
@@ -136,18 +136,18 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
 // (by way of allowing structs to conform).  Fortunately, correctness
 // doesn't depend on these preconditions but efficiency might,
 // because producing a _StringBuffer from an
-// NSString-as-_CocoaString is assumed to require allocation and
+// NSString-as-_CocoaStringType is assumed to require allocation and
 // buffer copying.
 //
 func _cocoaStringReadAllImpl(
-  source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>) {
+  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>) {
   let cfSelf: CFString = reinterpretCast(source)
   CFStringGetCharacters(
   cfSelf, CFRange(location: 0, length: CFStringGetLength(cfSelf)), destination)
 }
   
 func _cocoaStringToContiguousImpl(
-  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
+  source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   let cfSelf: CFString = reinterpretCast(source)
   _sanityCheck(!CFStringGetCharactersPtr(cfSelf),
@@ -166,7 +166,7 @@ func _cocoaStringToContiguousImpl(
   return buffer
 }
 
-func _cocoaStringLengthImpl(source: _CocoaString) -> Int {
+func _cocoaStringLengthImpl(source: _CocoaStringType) -> Int {
   // FIXME: Not ultra-fast, but reliable... but we're counting on an
   // early demise for this function anyhow
   return (source as NSString).length
@@ -372,7 +372,7 @@ extension String {
   }
 }
 
-extension String : _BridgedToObjectiveC {
+extension String : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
@@ -400,7 +400,7 @@ extension String : _BridgedToObjectiveC {
 // conversion to NSNumber is automatic (auto-boxing), while conversion
 // back to a specific numeric type requires a cast.
 // FIXME: Incomplete list of types.
-extension Int : _BridgedToObjectiveC {
+extension Int : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     value = number.integerValue.value
   }
@@ -418,7 +418,7 @@ extension Int : _BridgedToObjectiveC {
   }
 }
 
-extension UInt : _BridgedToObjectiveC {
+extension UInt : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     value = number.unsignedIntegerValue.value
   }
@@ -438,7 +438,7 @@ extension UInt : _BridgedToObjectiveC {
   }
 }
 
-extension Float : _BridgedToObjectiveC {
+extension Float : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     value = number.floatValue.value
   }
@@ -456,7 +456,7 @@ extension Float : _BridgedToObjectiveC {
   }
 }
 
-extension Double : _BridgedToObjectiveC {
+extension Double : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     value = number.doubleValue.value
   }
@@ -474,7 +474,7 @@ extension Double : _BridgedToObjectiveC {
   }
 }
 
-extension Bool: _BridgedToObjectiveC {
+extension Bool: _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     if number.boolValue { self = true }
     else { self = false }
@@ -494,7 +494,7 @@ extension Bool: _BridgedToObjectiveC {
 }
 
 // CGFloat bridging.
-extension CGFloat : _BridgedToObjectiveC {
+extension CGFloat : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
     self.native = CGFloat.NativeType(number)
   }
@@ -554,11 +554,11 @@ extension NSArray : ArrayLiteralConvertible {
 public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
   if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
-    return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
   }
 
   var anyObjectArr: [AnyObject]
-    = Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    = Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
   return _arrayBridgeFromObjectiveC(anyObjectArr)
 }
 
@@ -572,7 +572,7 @@ public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return arr.bridgeToObjectiveC()
 }
 
-extension Array : _ConditionallyBridgedToObjectiveC {
+extension Array : _ConditionallyBridgedToObjectiveCType {
   public static func isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
@@ -590,11 +590,11 @@ extension Array : _ConditionallyBridgedToObjectiveC {
         "array element type is not bridged to Objective-C")
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
-      return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
     }
 
     var anyObjectArr: [AnyObject]
-      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
@@ -602,7 +602,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
-      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
     if _isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }
@@ -631,7 +631,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _SwiftNSDictionary) {
+  public init(_cocoaDictionary: _SwiftNSDictionaryType) {
     let cfValue: CFDictionary = reinterpretCast(_cocoaDictionary)
     let copy = CFDictionaryCreateCopy(nil, cfValue)
     self = Dictionary(_immutableCocoaDictionary: reinterpretCast(copy))
@@ -646,13 +646,13 @@ extension Dictionary {
 /// to Objective-C code as a method that accepts an `NSDictionary`.
 ///
 /// This is a forced downcast.  This operation should have O(1) complexity
-/// when `KeyType` and `ValueType` are bridged verbatim.
+/// when `Key` and `Value` are bridged verbatim.
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 public func _convertNSDictionaryToDictionary<
-    KeyType : Hashable, ValueType>(d: NSDictionary)
-    -> [KeyType : ValueType] {
+    Key : Hashable, Value>(d: NSDictionary)
+    -> [Key : Value] {
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `bridgeToObjectiveC`.
   return Dictionary.bridgeFromObjectiveC(d)
@@ -670,16 +670,16 @@ public func _convertNSDictionaryToDictionary<
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
-public func _convertDictionaryToNSDictionary<KeyType, ValueType>(
-    d: [KeyType : ValueType]
+public func _convertDictionaryToNSDictionary<Key, Value>(
+    d: [Key : Value]
 ) -> NSDictionary {
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `bridgeToObjectiveC`.
   return d.bridgeToObjectiveC()
 }
 
-// Dictionary<KeyType, ValueType> is conditionally bridged to NSDictionary
-extension Dictionary : _ConditionallyBridgedToObjectiveC {
+// Dictionary<Key, Value> is conditionally bridged to NSDictionary
+extension Dictionary : _ConditionallyBridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
@@ -687,10 +687,10 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   public func bridgeToObjectiveC() -> NSDictionary {
     switch _variantStorage {
     case .Native(let nativeOwner):
-      _precondition(_isBridgedToObjectiveC(KeyType.self),
-          "KeyType is not bridged to Objective-C")
-      _precondition(_isBridgedToObjectiveC(ValueType.self),
-          "ValueType is not bridged to Objective-C")
+      _precondition(_isBridgedToObjectiveC(Key.self),
+          "Key is not bridged to Objective-C")
+      _precondition(_isBridgedToObjectiveC(Value.self),
+          "Value is not bridged to Objective-C")
 
       // The `Dictionary` is backed by native storage, which is also a proper
       // `NSDictionary` subclass, that, if needed, performs bridging lazily.
@@ -706,28 +706,28 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 
   public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
     if let nativeOwner =
-        d as AnyObject as? _NativeDictionaryStorageOwner<KeyType, ValueType> {
+        d as AnyObject as? _NativeDictionaryStorageOwner<Key, Value> {
       // If `NSDictionary` is actually native storage of `Dictionary` with key
       // and value types that the requested ones match exactly, then just
       // re-wrap the native storage.
-      return [KeyType : ValueType](_nativeStorageOwner: nativeOwner)
+      return [Key : Value](_nativeStorageOwner: nativeOwner)
     }
     // FIXME: what if `d` is native storage, but for different key/value type?
 
-    if _isBridgedVerbatimToObjectiveC(KeyType.self) &&
-       _isBridgedVerbatimToObjectiveC(ValueType.self) {
-      return [KeyType : ValueType](_cocoaDictionary: reinterpretCast(d))
+    if _isBridgedVerbatimToObjectiveC(Key.self) &&
+       _isBridgedVerbatimToObjectiveC(Value.self) {
+      return [Key : Value](_cocoaDictionary: reinterpretCast(d))
     }
 
-    // `Dictionary<KeyType, ValueType>` where either `KeyType` or `ValueType`
+    // `Dictionary<Key, Value>` where either `Key` or `Value`
     // is a value type may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<KeyType, ValueType>(count: d.count)
+    var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
       (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
        stop: UnsafePointer<ObjCBool>) in
       builder.add(
-          key: _bridgeFromObjectiveC(anyObjectKey, KeyType.self),
-          value: _bridgeFromObjectiveC(anyObjectValue, ValueType.self))
+          key: _bridgeFromObjectiveC(anyObjectKey, Key.self),
+          value: _bridgeFromObjectiveC(anyObjectValue, Value.self))
     }
     return builder.take()
   }
@@ -736,8 +736,8 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     x: NSDictionary
   ) -> Dictionary? {
     let anyDict = x as [NSObject : AnyObject]
-    if _isBridgedVerbatimToObjectiveC(KeyType.self) &&
-       _isBridgedVerbatimToObjectiveC(ValueType.self) {
+    if _isBridgedVerbatimToObjectiveC(Key.self) &&
+       _isBridgedVerbatimToObjectiveC(Value.self) {
       return Swift._dictionaryDownCastConditional(anyDict)
     }
 
@@ -745,8 +745,8 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   public static func isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(KeyType.self) &&
-           Swift._isBridgedToObjectiveC(ValueType.self)
+    return Swift._isBridgedToObjectiveC(Key.self) &&
+           Swift._isBridgedToObjectiveC(Value.self)
   }
 }
 
@@ -754,7 +754,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 // General objects
 //===----------------------------------------------------------------------===//
 
-extension NSObject : CVarArg {
+extension NSObject : CVarArgType {
   public func encode() -> [Word] {
     _autorelease(self)
     return _encodeBitsAsWords(self)
@@ -780,7 +780,7 @@ extension NSFastEnumerationState {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
-public class NSFastGenerator : Generator {
+public class NSFastGenerator : GeneratorType {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
   var n: Int
@@ -827,7 +827,7 @@ public class NSFastGenerator : Generator {
   }
 }
 
-extension NSArray : Sequence {
+extension NSArray : SequenceType {
   final public
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
@@ -836,7 +836,7 @@ extension NSArray : Sequence {
 
 /*
 // FIXME: <rdar://problem/16951124> prevents this from being used
-extension NSArray : Swift.Collection {
+extension NSArray : Swift.CollectionType {
   final
   var startIndex: Int {
     return 0
@@ -855,9 +855,9 @@ extension NSArray : Swift.Collection {
 
 // FIXME: This should not be necessary.  We
 // should get this from the extension on 'NSArray' above.
-extension NSMutableArray : Sequence {}
+extension NSMutableArray : SequenceType {}
 
-extension NSSet : Sequence {
+extension NSSet : SequenceType {
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -865,11 +865,11 @@ extension NSSet : Sequence {
 
 // FIXME: This should not be necessary.  We
 // should get this from the extension on 'NSSet' above.
-extension NSMutableSet : Sequence {}
+extension NSMutableSet : SequenceType {}
 
 // FIXME: A class because we can't pass a struct with class fields through an
 // [objc] interface without prematurely destroying the references.
-public class NSDictionaryGenerator : Generator {
+public class NSDictionaryGenerator : GeneratorType {
   var fastGenerator : NSFastGenerator
   var dictionary : NSDictionary {
     return fastGenerator.enumerable as NSDictionary
@@ -892,7 +892,7 @@ public class NSDictionaryGenerator : Generator {
   }
 }
 
-extension NSDictionary : Sequence {
+extension NSDictionary : SequenceType {
   public func generate() -> NSDictionaryGenerator {
     return NSDictionaryGenerator(self)
   }
@@ -900,7 +900,7 @@ extension NSDictionary : Sequence {
 
 // FIXME: This should not be necessary.  We
 // should get this from the extension on 'NSDictionary' above.
-extension NSMutableDictionary : Sequence {}
+extension NSMutableDictionary : SequenceType {}
 
 //===----------------------------------------------------------------------===//
 // Ranges
@@ -918,7 +918,7 @@ extension NSRange {
   }
 }
 
-extension NSRange : _BridgedToObjectiveC {
+extension NSRange : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSValue.self
   }
@@ -968,7 +968,7 @@ func NSLocalizedString(key: String,
 @asmname("swift_ObjCMirror_count") 
 func _getObjCCount(_MagicMirrorData) -> Int
 @asmname("swift_ObjCMirror_subscript") 
-func _getObjCChild(Int, _MagicMirrorData) -> (String, Mirror)
+func _getObjCChild(Int, _MagicMirrorData) -> (String, MirrorType)
 
 func _getObjCSummary(data: _MagicMirrorData) -> String {
   // FIXME: Trying to call debugDescription on AnyObject crashes.
@@ -977,7 +977,7 @@ func _getObjCSummary(data: _MagicMirrorData) -> String {
   return (data._loadValue() as NSObject).debugDescription
 }
 
-struct _ObjCMirror: Mirror {
+struct _ObjCMirror: MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.objcValue }
@@ -988,7 +988,7 @@ struct _ObjCMirror: Mirror {
   var count: Int {
     return _getObjCCount(data)
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getObjCChild(i, data)
   }
   var summary: String {
@@ -1000,7 +1000,7 @@ struct _ObjCMirror: Mirror {
   var disposition: MirrorDisposition { return .ObjCObject }
 }
 
-struct _ObjCSuperMirror: Mirror {
+struct _ObjCSuperMirror: MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.objcValue }
@@ -1013,7 +1013,7 @@ struct _ObjCSuperMirror: Mirror {
   var count: Int {
     return _getObjCCount(data)
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getObjCChild(i, data)
   }
   var summary: String {
@@ -1029,7 +1029,7 @@ struct _ObjCSuperMirror: Mirror {
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, args: CVarArg...) {
+public func NSLog(format: String, args: CVarArgType...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1062,7 +1062,7 @@ public typealias NSErrorPointer = AutoreleasingUnsafePointer<NSError?>
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArg...) {
+  convenience init(format predicateFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
     return self.init(format: predicateFormat, arguments: va_args)
   }
@@ -1071,7 +1071,7 @@ extension NSPredicate {
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
   public
-  convenience init(format expressionFormat: String, _ args: CVarArg...) {
+  convenience init(format expressionFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
     return self.init(format: expressionFormat, arguments: va_args)
   }
@@ -1079,7 +1079,7 @@ extension NSExpression {
 
 extension NSString {
   public
-  convenience init(format: NSString, _ args: CVarArg...) {
+  convenience init(format: NSString, _ args: CVarArgType...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -1087,7 +1087,9 @@ extension NSString {
   }
   
   public
-  convenience init(format: NSString, locale: NSLocale?, _ args: CVarArg...) {
+  convenience init(
+    format: NSString, locale: NSLocale?, _ args: CVarArgType...
+  ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -1096,7 +1098,7 @@ extension NSString {
 
   public
   class func localizedStringWithFormat(format: NSString,
-                                       _ args: CVarArg...) -> NSString {
+                                       _ args: CVarArgType...) -> NSString {
     return withVaList(args) {
       NSString(format: format, locale: NSLocale.currentLocale(),
                arguments: $0)
@@ -1104,7 +1106,7 @@ extension NSString {
   }
 
   public
-  func stringByAppendingFormat(format: NSString, _ args: CVarArg...)
+  func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
   -> NSString {
     return withVaList(args) {
       self.stringByAppendingString(NSString(format: format, arguments: $0))
@@ -1114,7 +1116,7 @@ extension NSString {
 
 extension NSMutableString {
   public
-  func appendFormat(format: NSString, _ args: CVarArg...) {
+  func appendFormat(format: NSString, _ args: CVarArgType...) {
     return withVaList(args) {
       self.appendString(NSString(format: format, arguments: $0))
     }

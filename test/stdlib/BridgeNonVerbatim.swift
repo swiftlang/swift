@@ -28,7 +28,7 @@ import ObjectiveC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ForwardIndex, Printable {
+class Tracked : ForwardIndexType, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -58,7 +58,7 @@ func == (x: Tracked, y: Tracked) -> Bool {
   return x.value == y.value
 }
 
-struct X : _BridgedToObjectiveC {
+struct X : _BridgedToObjectiveCType {
   init(_ value: Int) {
     self.value = value
   }

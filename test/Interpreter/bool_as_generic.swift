@@ -5,11 +5,11 @@
 operator prefix !! {}
 operator infix &&& {}
 
-@prefix func !!<T : LogicValue>(x: T) -> Bool {
+@prefix func !!<T : LogicValueType>(x: T) -> Bool {
   return x.getLogicValue()
 }
 
-func &&&(x: LogicValue, y: @auto_closure () -> LogicValue) -> Bool {
+func &&&(x: LogicValueType, y: @auto_closure () -> LogicValueType) -> Bool {
   return x.getLogicValue() ? y().getLogicValue() : false
 }
 

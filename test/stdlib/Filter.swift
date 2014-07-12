@@ -14,7 +14,7 @@
 // CHECK: testing...
 println("testing...")
 
-func printlnByGenerating<S: Sequence>(s: S) {
+func printlnByGenerating<S: SequenceType>(s: S) {
   print("<")
   var prefix = ""
   for x in s {
@@ -24,7 +24,7 @@ func printlnByGenerating<S: Sequence>(s: S) {
   println(">")
 }
 
-func printlnByIndexing<C: Collection>(c: C) {
+func printlnByIndexing<C: CollectionType>(c: C) {
   printlnByGenerating(
     PermutationGenerator(elements: c, indices: indices(c))
   )

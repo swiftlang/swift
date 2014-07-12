@@ -33,7 +33,7 @@ internal func replApplicationMain() {
 
 }
 
-struct _NSViewMirror : Mirror {
+struct _NSViewMirror : MirrorType {
   static var _views = NSMutableSet()
 
   var _v : NSView
@@ -48,7 +48,9 @@ struct _NSViewMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
+  subscript(_: Int) -> (String,MirrorType) {
+    _fatalError("MirrorType access out of bounds")
+  }
   
   var summary: String { get { return ""} }
   
@@ -86,7 +88,7 @@ struct _NSViewMirror : Mirror {
 }
 
 extension NSView : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _NSViewMirror(self)
   }
 }

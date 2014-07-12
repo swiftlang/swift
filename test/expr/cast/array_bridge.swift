@@ -4,7 +4,7 @@ class A {
   var x = 0
 }
 
-struct B : _BridgedToObjectiveC {
+struct B : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return A.self
   }
@@ -36,7 +36,7 @@ class E {
   var x = 0
 }
 
-struct F : _BridgedToObjectiveC {
+struct F : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return E.self
   }
@@ -58,7 +58,7 @@ class G {
   var x = 0
 }
 
-struct H : _ConditionallyBridgedToObjectiveC {
+struct H : _ConditionallyBridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return G.self
   }
@@ -82,7 +82,7 @@ var h: [H] = []
 g = h // should type check, but cause a failure at runtime
 
 
-struct I : _BridgedToObjectiveC {
+struct I : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return A.self
   }

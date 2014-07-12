@@ -1092,7 +1092,7 @@ namespace {
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveCType);
 
       // Find the conformance of the value type to _BridgedToObjectiveC.
       Type valueType = value->getType()->getRValueType();
@@ -1124,7 +1124,7 @@ namespace {
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveCType);
 
       // Find the conformance of the value type to _BridgedToObjectiveC.
       ProtocolConformance *conformance = nullptr;
@@ -1158,7 +1158,7 @@ namespace {
       // Find the _ConditionallyBridgedToObjectiveC protocol.
       auto conditionalBridgedProto
         = tc.Context.getProtocol(
-            KnownProtocolKind::_ConditionallyBridgedToObjectiveC);
+            KnownProtocolKind::_ConditionallyBridgedToObjectiveCType);
 
       // Check whether the value type conforms to
       // _ConditionallyBridgedToObjectiveC. If so, we have a specific
@@ -5203,7 +5203,7 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::LogicValue),
+                                 KnownProtocolKind::LogicValueType),
                   tc.Context.Id_GetLogicValue,
                   tc.Context.Id_GetBuiltinLogicValue,
                   diag::condition_broken_proto,
@@ -5222,7 +5222,8 @@ Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
   ExprRewriter rewriter(cs, *this);
   auto &tc = cs.getTypeChecker();
 
-  auto proto = tc.getProtocol(expr->getLoc(), KnownProtocolKind::LogicValue);
+  auto proto = tc.getProtocol(
+    expr->getLoc(), KnownProtocolKind::LogicValueType);
 
   // Find the witness we need to use.
   Type type = expr->getType();
@@ -5263,7 +5264,7 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
-                                 KnownProtocolKind::ArrayBound),
+                                 KnownProtocolKind::ArrayBoundType),
                   tc.Context.Id_GetArrayBoundValue,
                   tc.Context.Id_GetBuiltinArrayBoundValue,
                   diag::broken_array_bound_proto,

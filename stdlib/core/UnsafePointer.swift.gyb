@@ -25,8 +25,10 @@
 /// This type stores a pointer to an object of type T. It provides no
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
-public struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
-                            LogicValue, NilLiteralConvertible, _Pointer {
+public struct ${Self}<T>
+  : BidirectionalIndexType, Comparable, Hashable,
+    LogicValueType, NilLiteralConvertible, _PointerType {
+
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -180,15 +182,15 @@ public struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
 
   /// Copy the elements of `C` into raw memory.
   public func initializeFrom<
-    C: Collection where C._Element == T
+    C: CollectionType where C._Element == T
   >(
     source: C
   ) {
     var p = self
     for x in source {
       // FIXME: <rdar://problem/16951692> We should be able to use a
-      // C.GeneratorType.Element == T constraint here, because C._Element ==
-      // C.GeneratorType.Element in all cases, but doing so crashes the
+      // C.Generator.Element == T constraint here, because C._Element ==
+      // C.Generator.Element in all cases, but doing so crashes the
       // type-checker.
       p++.initialize(reinterpretCast(x))
     }
@@ -283,7 +285,7 @@ ${MirrorDecl} {
     return UInt64(Int(Builtin.ptrtoint_Word(_value.value)))
   }
 
-  public subscript(i: Int) -> (String, Mirror) {
+  public subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("pointerValue",reflect(_getPointerValue()))
     default: _preconditionFailure("cannot extract this child index")

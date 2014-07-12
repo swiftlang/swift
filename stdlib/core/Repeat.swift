@@ -1,4 +1,4 @@
-//===--- Repeat.swift - A Collection that repeats a value N times ---------===//
+//===--- Repeat.swift - A CollectionType that repeats a value N times -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,19 +9,19 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-public struct Repeat<T> : Collection {
-  public typealias IndexType = Int
+public struct Repeat<T> : CollectionType {
+  public typealias Index = Int
 
   public init(count: Int, repeatedValue: T) {
     self.count = count
     self.repeatedValue = repeatedValue
   }
   
-  public var startIndex: IndexType {
+  public var startIndex: Index {
     return 0
   }
   
-  public var endIndex: IndexType {
+  public var endIndex: Index {
     return count
   }
 

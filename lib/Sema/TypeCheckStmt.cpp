@@ -378,14 +378,14 @@ public:
 
     // Retrieve the 'Sequence' protocol.
     ProtocolDecl *sequenceProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::SequenceType);
     if (!sequenceProto) {
       return nullptr;
     }
 
     // Retrieve the 'Generator' protocol.
     ProtocolDecl *generatorProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Generator);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::GeneratorType);
     if (!generatorProto) {
       return nullptr;
     }
@@ -416,7 +416,7 @@ public:
 
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
                                       conformance,
-                                      TC.Context.Id_GeneratorType,
+                                      TC.Context.Id_Generator,
                                       diag::sequence_protocol_broken);
       
       Expr *getGenerator

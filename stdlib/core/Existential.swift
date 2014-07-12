@@ -17,12 +17,12 @@
 // This file contains "existentials" for the protocols defined in
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
-public struct GeneratorOf<T> : Generator, Sequence {
+public struct GeneratorOf<T> : GeneratorType, SequenceType {
   public init(_ next: ()->T?) {
     self._next = next
   }
   
-  public init<G: Generator where G.Element == T>(var _ self_: G) {
+  public init<G: GeneratorType where G.Element == T>(var _ self_: G) {
     self._next = { self_.next() }
   }
   
@@ -36,11 +36,11 @@ public struct GeneratorOf<T> : Generator, Sequence {
   let _next: ()->T?
 }
 
-public struct SequenceOf<T> : Sequence {
-  public init<G: Generator where G.Element == T>(_ generate: ()->G) {
+public struct SequenceOf<T> : SequenceType {
+  public init<G: GeneratorType where G.Element == T>(_ generate: ()->G) {
     _generate = { GeneratorOf(generate()) }
   }
-  public init<S: Sequence where S.GeneratorType.Element == T>(_ self_: S) {
+  public init<S: SequenceType where S.Generator.Element == T>(_ self_: S) {
     self = SequenceOf({ self_.generate() })
   }
 
@@ -51,7 +51,9 @@ public struct SequenceOf<T> : Sequence {
   let _generate: ()->GeneratorOf<T>
 }
 
-internal struct _CollectionOf<IndexType_ : ForwardIndex, T> : Collection {
+internal struct _CollectionOf<
+  IndexType_ : ForwardIndexType, T
+> : CollectionType {
   init(startIndex: IndexType_, endIndex: IndexType_,
       _ subscriptImpl: (IndexType_)->T) {
     self.startIndex = startIndex
@@ -81,12 +83,12 @@ internal struct _CollectionOf<IndexType_ : ForwardIndex, T> : Collection {
   let _subscriptImpl: (IndexType_)->T
 }
 
-public struct SinkOf<T> : Sink {
+public struct SinkOf<T> : SinkType {
   public init(_ put: (T)->()) {
     _put = put
   }
 
-  public init<S: Sink where S.Element == T>(var _ base: S) {
+  public init<S: SinkType where S.Element == T>(var _ base: S) {
     _put = { base.put($0) }
   }
   public func put(x: T) {

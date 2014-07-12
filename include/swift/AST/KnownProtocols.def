@@ -36,19 +36,19 @@
 #define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
 #endif
 
-PROTOCOL(ArrayBound)
-PROTOCOL(Sequence)
-PROTOCOL(Generator)
-PROTOCOL(LogicValue)
+PROTOCOL(ArrayBoundType)
+PROTOCOL(SequenceType)
+PROTOCOL(GeneratorType)
+PROTOCOL(LogicValueType)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
-PROTOCOL(RawOptionSet)
+PROTOCOL(RawOptionSetType)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 
-PROTOCOL(_BridgedToObjectiveC)
-PROTOCOL(_ConditionallyBridgedToObjectiveC)
+PROTOCOL(_BridgedToObjectiveCType)
+PROTOCOL(_ConditionallyBridgedToObjectiveCType)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible)

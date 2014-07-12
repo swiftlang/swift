@@ -76,14 +76,14 @@ extension _StringCore {
 }
 
 extension String {
-  public struct UTF8View : Collection, Reflectable {
+  public struct UTF8View : CollectionType, Reflectable {
     let _core: _StringCore
     
     init(_ _core: _StringCore) {
       self._core = _core
     }
 
-    public struct Index : ForwardIndex {
+    public struct Index : ForwardIndexType {
       init(_ _core: _StringCore, _ _coreIndex: Int, 
            _ _buffer: _StringCore.UTF8Chunk) {
         self._core = _core
@@ -133,7 +133,7 @@ extension String {
       return IndexingGenerator(self)
     }
     
-    public func getMirror() -> Mirror {
+    public func getMirror() -> MirrorType {
       return _UTF8ViewMirror(self)
     }
   }

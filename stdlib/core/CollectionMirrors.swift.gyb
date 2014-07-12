@@ -40,11 +40,11 @@ ${MirrorDecl} {
   
   public var count: Int { return ${Count} }
 
-  public subscript(i: Int) -> (String, Mirror) {
+  public subscript(i: Int) -> (String, MirrorType) {
     if i >= 0 && i < count {
       return ("${ElementName}",reflect(_value[advance(_value.startIndex,i)]))
     } else {
-      _fatalError("Mirror access out of bounds")
+      _fatalError("MirrorType access out of bounds")
     }
   }
 

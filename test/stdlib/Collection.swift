@@ -1,18 +1,18 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-struct X : Collection {
-  typealias Element = String.GeneratorType.Element
-  typealias IndexType = String.IndexType
+struct X : CollectionType {
+  typealias Element = String.Generator.Element
+  typealias Index = String.Index
   var msg: String
 
   init(_ msg: String) { self.msg = msg }
-  var startIndex: IndexType {
+  var startIndex: Index {
     return msg.startIndex
   }
-  var endIndex: IndexType {
+  var endIndex: Index {
     return msg.endIndex
   }
-  subscript(i: IndexType) -> Element { return msg[i] }
+  subscript(i: Index) -> Element { return msg[i] }
 
   func generate() -> IndexingGenerator<X> {
     return IndexingGenerator(self)
@@ -39,10 +39,10 @@ for a in PermutationGenerator(elements: foobar, indices: r) {
 println("")
 
 func isPalindrome0<
-  S: Collection 
-    where S.IndexType: BidirectionalIndex, S.GeneratorType.Element: Equatable
+  S: CollectionType 
+    where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
-  typealias IndexType = S.IndexType
+  typealias Index = S.Index
 
   var a = indices(seq)
   var i = indices(seq)
@@ -62,8 +62,8 @@ println(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
 println(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 
 func isPalindrome1<
-  S: Collection 
-  where S.IndexType: BidirectionalIndex, S.GeneratorType.Element: Equatable
+  S: CollectionType 
+  where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: indices(seq))
@@ -77,8 +77,8 @@ func isPalindrome1<
 }
 
 func isPalindrome1_5<
-  S: Collection 
-  where S.IndexType: BidirectionalIndex, S.GeneratorType.Element == S.GeneratorType.Element, S.GeneratorType.Element: Equatable
+  S: CollectionType 
+  where S.Index: BidirectionalIndexType, S.Generator.Element == S.Generator.Element, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
   var b = lazy(seq).reverse().generate()
@@ -101,10 +101,10 @@ println(isPalindrome1_5(X("FleetoMeRemoteelF")))
 println(isPalindrome1_5(X("FleetoMeReMoteelF")))
 
 // Finally, one that actually uses indexing to do half as much work.
-// BidirectionalIndex traversal finally pays off!
+// BidirectionalIndexType traversal finally pays off!
 func isPalindrome2<
-  S: Collection 
-    where S.IndexType: BidirectionalIndex, S.GeneratorType.Element: Equatable
+  S: CollectionType 
+    where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
   var b = seq.startIndex, e = seq.endIndex
@@ -133,10 +133,10 @@ println(isPalindrome2(X("ZerimarORamireZ")))
 println(isPalindrome2(X("Zerimar-O-ramireZ")))
 
 func isPalindrome4<
-  S: Collection 
-  where S.IndexType: BidirectionalIndex, S.GeneratorType.Element: Equatable
+  S: CollectionType 
+  where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
-  typealias IndexType = S.IndexType
+  typealias Index = S.Index
 
   var a = PermutationGenerator(elements: seq, indices: indices(seq))
   // FIXME: separate ri from the expression below pending
@@ -174,9 +174,9 @@ func testUnderestimateCount() {
   println("random access: \(underestimateCount(array))")
   // CHECK-NEXT: bidirectional: 5
   println("bidirectional: \(underestimateCount(dict))")
-  // CHECK-NEXT: Sequence only: 0
+  // CHECK-NEXT: SequenceType only: 0
   let s = SequenceOf(array)
-  println("Sequence only: \(underestimateCount(s))")
+  println("SequenceType only: \(underestimateCount(s))")
 }
 testUnderestimateCount()
 

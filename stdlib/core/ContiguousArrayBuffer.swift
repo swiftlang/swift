@@ -47,7 +47,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
 }
 
-public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValue {
+public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValueType {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
@@ -140,7 +140,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValue {
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
   public
-  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
@@ -241,7 +241,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValue {
   /// Precondition: T is bridged to Objective-C
   /// O(1) if T is bridged verbatim, O(N) otherwise
   public
-  func _asCocoaArray() -> _CocoaArray {
+  func _asCocoaArray() -> _CocoaArrayType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
         "Array element type is not bridged to ObjectiveC")
@@ -314,7 +314,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, LogicValue {
 
 /// Append the elements of rhs to lhs
 public func += <
-  T, C: Collection where C._Element == T
+  T, C: CollectionType where C._Element == T
 > (
   inout lhs: _ContiguousArrayBuffer<T>, rhs: C
 ) {
@@ -357,7 +357,7 @@ public func !== <T>(
   return lhs._base != rhs._base
 }
 
-extension _ContiguousArrayBuffer : Collection {
+extension _ContiguousArrayBuffer : CollectionType {
   public var startIndex: Int {
     return 0
   }
@@ -370,15 +370,15 @@ extension _ContiguousArrayBuffer : Collection {
 }
 
 public func ~> <
-  S: _Sequence_
+  S: _Sequence_Type
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<S.GeneratorType.Element>
+) -> _ContiguousArrayBuffer<S.Generator.Element>
 {
-  var result = _ContiguousArrayBuffer<S.GeneratorType.Element>()
+  var result = _ContiguousArrayBuffer<S.Generator.Element>()
 
   // Using GeneratorSequence here essentially promotes the sequence to
-  // a Sequence from _Sequence_ so we can iterate the elements
+  // a SequenceType from _Sequence_Type so we can iterate the elements
   for x in GeneratorSequence(source.generate()) {
     result += x
   }
@@ -386,24 +386,24 @@ public func ~> <
 }
 
 public func ~> <  
-  C: protocol<_Collection,_Sequence_>
+  C: protocol<_CollectionType,_Sequence_Type>
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
-) -> _ContiguousArrayBuffer<C.GeneratorType.Element>
+) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
 internal func _copyCollectionToNativeArrayBuffer<
-  C: protocol<_Collection,_Sequence_>
->(source: C) -> _ContiguousArrayBuffer<C.GeneratorType.Element>
+  C: protocol<_CollectionType,_Sequence_Type>
+>(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
   let count = countElements(source)
   if count == 0 {
     return _ContiguousArrayBuffer()
   }
   
-  var result = _ContiguousArrayBuffer<C.GeneratorType.Element>(
+  var result = _ContiguousArrayBuffer<C.Generator.Element>(
     count: numericCast(count),
     minimumCapacity: 0
   )
@@ -416,7 +416,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   return result
 }
 
-internal protocol _ArrayType : Collection {
+internal protocol _ArrayType : CollectionType {
   var count: Int {get}
 
   typealias _Buffer : _ArrayBufferType

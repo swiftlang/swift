@@ -1424,7 +1424,8 @@ var bridgedKeyCount = 0
 var bridgedKeySerial = 0
 var _bridgedKeyBridgeOperations = 0
 
-struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
+struct TestBridgedKeyTy 
+  : Equatable, Hashable, Printable, _BridgedToObjectiveCType {
   static var bridgeOperations: Int {
     get {
       return _bridgedKeyBridgeOperations
@@ -1477,7 +1478,7 @@ var bridgedValueCount = 0
 var bridgedValueSerial = 0
 var _bridgedValueBridgeOperations = 0
 
-struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
+struct TestBridgedValueTy : Printable, _BridgedToObjectiveCType {
   static var bridgeOperations: Int {
     get {
       return _bridgedValueBridgeOperations
@@ -1516,7 +1517,8 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   var serial: Int
 }
 
-struct TestBridgedEquatableValueTy : Equatable, Printable, _BridgedToObjectiveC {
+struct TestBridgedEquatableValueTy
+  : Equatable, Printable, _BridgedToObjectiveCType {
   init(_ value: Int) {
     ++bridgedValueCount
     serial = ++bridgedValueSerial
@@ -2558,7 +2560,7 @@ func test_BridgedFromObjC_Verbatim_Generate() {
     pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2581,7 +2583,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate() {
     pairs += (key.value, value.value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2603,7 +2605,7 @@ func test_BridgedFromObjC_Verbatim_Generate_Empty() {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(!gen.next())
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2625,7 +2627,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(!gen.next())
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2655,7 +2657,7 @@ func test_BridgedFromObjC_Verbatim_Generate_Huge() {
     expectedPairs += (i, 1000 + i)
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2682,7 +2684,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
     expectedPairs += (i, 1000 + i)
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2709,7 +2711,7 @@ func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2737,7 +2739,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the Generator protocol, but
+  // The following is not required by the GeneratorType protocol, but
   // it is a nice QoI.
   assert(!gen.next())
   assert(!gen.next())
@@ -2958,7 +2960,7 @@ test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries()
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
-// KeyType and ValueType are bridged verbatim.
+// Key and Value are bridged verbatim.
 //===---
 
 func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {

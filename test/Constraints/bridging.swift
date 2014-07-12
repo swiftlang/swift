@@ -11,7 +11,7 @@ class BridgedClass : NSObject, NSCopying {
 
 class BridgedClassSub : BridgedClass { }
 
-struct BridgedStruct : Hashable, _BridgedToObjectiveC {
+struct BridgedStruct : Hashable, _BridgedToObjectiveCType {
   var hashValue: Int { return 0 }
 
   static func getObjectiveCType() -> Any.Type {

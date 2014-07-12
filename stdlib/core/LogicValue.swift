@@ -9,10 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// LogicValue
+// LogicValueType
 //===----------------------------------------------------------------------===//
 
-@prefix public func !<T : LogicValue>(a: T) -> Bool {
+@prefix public func !<T : LogicValueType>(a: T) -> Bool {
   return !a.getLogicValue()
 }
 
@@ -28,11 +28,11 @@
 // [Implement overload resolution].
 
 @transparent public
-func &&(lhs: LogicValue, rhs: @auto_closure () -> LogicValue) -> Bool {
+func &&(lhs: LogicValueType, rhs: @auto_closure () -> LogicValueType) -> Bool {
   return lhs.getLogicValue() ? rhs().getLogicValue() : false
 }
 
 @transparent public
-func ||(lhs: LogicValue, rhs: @auto_closure () -> LogicValue) -> Bool {
+func ||(lhs: LogicValueType, rhs: @auto_closure () -> LogicValueType) -> Bool {
   return lhs.getLogicValue() ? true : rhs().getLogicValue()
 }

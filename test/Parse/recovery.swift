@@ -175,20 +175,20 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'LogicValue'}}
+  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'LogicValueType'}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }
 }
 
 func missingControllingExprInForEach() {
-  for in { // expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
+  for in { // expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
   }
 
-  for for in { // expected-error {{expected initialization in a 'for' statement}} expected-error {{expected pattern}} expected-error {{expected Sequence expression for for-each loop}}
+  for for in { // expected-error {{expected initialization in a 'for' statement}} expected-error {{expected pattern}} expected-error {{expected SequenceType expression for for-each loop}}
   }
 
-  for i in { // expected-error {{expected Sequence expression for for-each loop}}
+  for i in { // expected-error {{expected SequenceType expression for for-each loop}}
   }
 }
 

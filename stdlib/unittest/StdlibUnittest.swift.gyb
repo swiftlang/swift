@@ -143,7 +143,7 @@ public func expectOptionalEqual<T : Equatable>(
 %    ('<T : Equatable>', 'Slice<T>'),
 %    ('<T : Equatable>', 'Array<T>'),
 %    ('<T, U : Equatable>', 'Dictionary<T, U>'),
-%    ('<T : ForwardIndex>', 'T')]:
+%    ('<T : ForwardIndexType>', 'T')]:
 
 public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -222,7 +222,7 @@ public func expectGE(
 
 %end
 
-public struct AssertionResult : Printable, LogicValue {
+public struct AssertionResult : Printable, LogicValueType {
   init(isPass: Bool) {
     self._isPass = isPass
   }
@@ -367,11 +367,11 @@ public func asHex(a: [UInt32]) -> String {
 
 public
 func checkGenerator<
-    Element : Equatable, G : Generator
+    Element : Equatable, G : GeneratorType
     where G.Element == Element>(
     expected: [Element], generator: G, stackTrace: SourceLocStack) {
 
-  // Copying a `Generator` is allowed.
+  // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
   var actual: [Element] = []
   while let e = mutableGen.next() {
@@ -379,7 +379,7 @@ func checkGenerator<
   }
   expectEqual(expected, actual, stackTrace: stackTrace.withCurrentLoc())
 
-  // Having returned `.None` once, a `Generator` should not generate more
+  // Having returned `.None` once, a `GeneratorType` should not generate more
   // elements.
   for i in 0..<10 {
     expectEmpty(mutableGen.next(), stackTrace: stackTrace.withCurrentLoc())
@@ -388,8 +388,8 @@ func checkGenerator<
 
 public
 func checkSequence<
-    Element : Equatable, S : Sequence
-    where S.GeneratorType.Element == Element>(
+    Element : Equatable, S : SequenceType
+    where S.Generator.Element == Element>(
     expected: [Element], sequence: S, stackTrace: SourceLocStack) {
   checkGenerator(expected, sequence.generate(), stackTrace.withCurrentLoc())
   expectGE(expected.count, underestimateCount(sequence))
@@ -397,10 +397,10 @@ func checkSequence<
 
 public
 func checkCollection<
-    Element : Equatable, C : Collection
-    where C.GeneratorType.Element == Element>(
+    Element : Equatable, C : CollectionType
+    where C.Generator.Element == Element>(
     expected: [Element], collection: C, stackTrace: SourceLocStack) {
-  // A `Collection` is a multi-pass `Sequence`.
+  // A `CollectionType` is a multi-pass `SequenceType`.
   for i in 0..<3 {
     checkSequence(expected, collection, stackTrace.withCurrentLoc())
   }
@@ -430,11 +430,11 @@ func checkCollection<
 public
 func checkSliceableWithBidirectionalIndex<
     Element : Equatable, S : Sliceable
-    where S.GeneratorType.Element == Element,
-    S.SliceType.GeneratorType.Element == Element,
-    S.IndexType : BidirectionalIndex>(
+    where S.Generator.Element == Element,
+    S.SubSlice.Generator.Element == Element,
+    S.Index : BidirectionalIndexType>(
     expected: [Element], sliceable: S, stackTrace: SourceLocStack) {
-  // A `Sliceable` is a `Collection`.
+  // A `Sliceable` is a `CollectionType`.
   checkCollection(expected, sliceable, stackTrace.withCurrentLoc())
 
   var start = sliceable.startIndex

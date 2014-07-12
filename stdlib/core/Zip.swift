@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct ZipGenerator2<E0 : Generator, E1 : Generator> : Generator
-{
+public struct ZipGenerator2<
+  E0 : GeneratorType, E1 : GeneratorType
+> : GeneratorType {
   public typealias Element = (E0.Element,E1.Element)
 
   public init(_ e0: E0, _ e1: E1) {
@@ -29,18 +30,18 @@ public struct ZipGenerator2<E0 : Generator, E1 : Generator> : Generator
   var baseStreams : (E0,E1)
 }
 
-public struct Zip2<S0: Sequence, S1: Sequence> : Sequence
+public struct Zip2<S0: SequenceType, S1: SequenceType> : SequenceType
 {
-  public typealias Stream1 = S0.GeneratorType
-  public typealias Stream2 = S1.GeneratorType
-  public typealias GeneratorType = ZipGenerator2<Stream1, Stream2>
+  public typealias Stream1 = S0.Generator
+  public typealias Stream2 = S1.Generator
+  public typealias Generator = ZipGenerator2<Stream1, Stream2>
 
   public init(_ s0: S0, _ s1: S1) {
     sequences = (s0,s1)
   }
 
-  public func generate() -> GeneratorType {
-    return GeneratorType(
+  public func generate() -> Generator {
+    return Generator(
       sequences.0.generate(), 
       sequences.1.generate())
   }

@@ -48,7 +48,7 @@ public struct CGFloat {
   public var native: NativeType
 }
 
-@transparent extension CGFloat : FloatingPointNumber {
+@transparent extension CGFloat : FloatingPointNumberType {
   public typealias _BitsType = UInt
 
   public static func _fromBitPattern(bits: UInt) -> CGFloat {
@@ -197,7 +197,7 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   return lhs.native < rhs.native
 }
 
-@transparent extension CGFloat : RandomAccessIndex {
+@transparent extension CGFloat : RandomAccessIndexType {
   @transparent public
   func successor() -> CGFloat {
     return CGFloat(self.native + 1.0)
@@ -208,12 +208,12 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   }
   
   @transparent public
-  func distanceTo(other: CGFloat) -> CGFloat.DistanceType {
+  func distanceTo(other: CGFloat) -> CGFloat.Distance {
     return Int(other.native-self.native)
   }
   
   @transparent public
-  func advancedBy(amount: CGFloat.DistanceType) -> CGFloat {
+  func advancedBy(amount: CGFloat.Distance) -> CGFloat {
     return CGFloat(self.native + CGFloat(amount).native)
   }
 }

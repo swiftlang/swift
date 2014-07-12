@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // Check to make sure we are actually getting Optionals out of this
-// Generator
+// GeneratorType
 var w = (1..<2).generate()
 var maybe_one = w.next()
 
@@ -22,13 +22,13 @@ case .None:
 println("w.next() \(!w.next() ? is_ : is_not) None")
 // CHECK: w.next() is None
 
-// Test Sequence protocol
+// Test SequenceType protocol
 w = (1..<2).generate()
 for x in w { 
   println("x is \(x)") 
 }
 
-// Test round-trip Generator/Generator adaptation
+// Test round-trip GeneratorType/GeneratorType adaptation
 var x = (1..<7).generate()
 var y = x
 var z = ZipGenerator2(y, (1..<7).generate())

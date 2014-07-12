@@ -31,8 +31,8 @@ func bar() {
 
 
 // <rdar://problem/17251682>
-struct StructWithInheritedConformances: Sequence {
-  struct EmptyGenerator: Generator {
+struct StructWithInheritedConformances: SequenceType {
+  struct EmptyGenerator: GeneratorType {
     mutating func next() -> Int? {
       return nil
     }

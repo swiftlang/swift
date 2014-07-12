@@ -1,7 +1,7 @@
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
-// General Mutable, Collection, Value-Type Collections
+// General Mutable, CollectionType, Value-Type Collections
 // =================================================
 //
 // Basic copy-on-write (COW) requires a container's data to be copied
@@ -15,7 +15,7 @@
 // an open-addressing hash table) are not traversable with a fixed
 // size offset, so incrementing/decrementing indices requires looking
 // at the contents of the container.  The current interface for
-// incrementing/decrementing indices of an Collection is the usual ++i,
+// incrementing/decrementing indices of an CollectionType is the usual ++i,
 // --i. Therefore, for memory safety, the indices need to keep a
 // reference to the container's underlying data so that it can be
 // inspected.  But having multiple outstanding references to the
@@ -152,13 +152,13 @@ struct FixedSizedRefArrayOfOptional<T>
   }
 }
 
-struct DictionaryElement<KeyType: Hashable, ValueType> {
-  var key: KeyType
-  var value: ValueType
+struct DictionaryElement<Key: Hashable, Value> {
+  var key: Key
+  var value: Value
 }
 
-class DictionaryBufferOwner<KeyType: Hashable, ValueType> {
-  typealias Element = DictionaryElement<KeyType, ValueType>
+class DictionaryBufferOwner<Key: Hashable, Value> {
+  typealias Element = DictionaryElement<Key, Value>
   typealias Buffer = FixedSizedRefArrayOfOptional<Element>
 
   init(minimumCapacity: Int = 2) {
@@ -179,7 +179,7 @@ func == <Element>(lhs: DictionaryIndex<Element>, rhs: DictionaryIndex<Element>) 
   return lhs.offset == rhs.offset
 }
 
-struct DictionaryIndex<Element> : BidirectionalIndex {
+struct DictionaryIndex<Element> : BidirectionalIndexType {
   typealias Index = DictionaryIndex<Element>
 
   func predecessor() -> Index {
@@ -211,9 +211,9 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
   var offset: Int
 }
 
-struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
-  typealias _Self = Dictionary<KeyType, ValueType>
-  typealias BufferOwner = DictionaryBufferOwner<KeyType, ValueType>
+struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
+  typealias _Self = Dictionary<Key, Value>
+  typealias BufferOwner = DictionaryBufferOwner<Key, Value>
   typealias Buffer = BufferOwner.Buffer
   typealias Element = BufferOwner.Element
   typealias Index = DictionaryIndex<Element>
@@ -258,7 +258,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
     }
   }
 
-  subscript(key: KeyType) -> ValueType {
+  subscript(key: Key) -> Value {
     get {
       return self[find(key).0].value
     }
@@ -319,7 +319,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
     return false
   }
 
-  func _bucket(k: KeyType) -> Int {
+  func _bucket(k: Key) -> Int {
     return k.hashValue & _bucketMask
   }
 
@@ -331,7 +331,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
     return (bucket - 1) & _bucketMask
   }
 
-  func _find(k: KeyType, startBucket: Int) -> (Index,Bool) {
+  func _find(k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
 
     // The invariant guarantees there's always a hole, so we just loop
@@ -345,12 +345,12 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
     }
   }
 
-  func find(k: KeyType) -> (Index,Bool) {
+  func find(k: Key) -> (Index,Bool) {
     return _find(k, startBucket: _bucket(k))
   }
 
   mutating
-  func deleteKey(k: KeyType) -> Bool {
+  func deleteKey(k: Key) -> Bool {
     var start = _bucket(k)
     var (pos, found) = _find(k, startBucket: start)
 
@@ -415,7 +415,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
     return _owner.buffer
   }
 
-  // Satisfying Sequence
+  // Satisfying SequenceType
   func generate() -> IndexingGenerator<_Self> {
     return IndexingGenerator(self)
   }

@@ -34,7 +34,7 @@ struct Matte {
 // CHECK-LABEL: Matte:
 println("Matte:")
 // Build a String around an interpolation as a way of smoke-testing that
-// the internal Mirror implementation gets memory management right.
+// the internal MirrorType implementation gets memory management right.
 // CHECK-NEXT:    _TtV10Reflection5Matte
 // CHECK-NEXT:      s: 123
 dump(Matte("\(123)"))
@@ -76,7 +76,7 @@ dump(Complex<String>(real: "is this the real life?",
                      imag: "is it just fantasy?"))
 
 // A type that provides its own mirror.
-struct BrilliantMirror : Mirror {
+struct BrilliantMirror : MirrorType {
   let _value: Brilliant
 
   init (_ _value: Brilliant) {
@@ -99,7 +99,7 @@ struct BrilliantMirror : Mirror {
     return 3
   }
 
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0:
       return ("first", reflect(_value.first))
@@ -134,7 +134,7 @@ class Brilliant : Reflectable {
     self.second = snd
   }
 
-  func getMirror() -> Mirror {
+  func getMirror() -> MirrorType {
     return BrilliantMirror(self)
   }
 }
@@ -215,7 +215,7 @@ println("Brilliant subclass:")
 // CHECK-NEXT:  Brilliant(400, )
 dump(Irradiant())
 
-// Check that the primitive Mirror implementation produces appropriately
+// Check that the primitive MirrorType implementation produces appropriately
 // unique identifiers for class instances.
 
 // CHECK-LABEL: Object identity:

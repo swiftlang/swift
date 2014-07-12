@@ -6,7 +6,7 @@ func simpleIf(b: Bool) {
 }
 
 // Support for non-Bool logic values
-struct OtherLogicValue : LogicValue {
+struct OtherLogicValue : LogicValueType {
   func getLogicValue() -> Bool { return true }
 }
 
@@ -15,12 +15,12 @@ func otherIf(b : OtherLogicValue) {
 }
 
 // Support for arbitrary logic values in generics
-func doIf<T : LogicValue>(t: T) {
+func doIf<T : LogicValueType>(t: T) {
   if t { }
 }
 doIf(true)
 
-// Using LogicValue-ness to resolve overloading.
+// Using LogicValueType-ness to resolve overloading.
 func getValue() -> OtherLogicValue {}
 func getValue() -> Int {}
 

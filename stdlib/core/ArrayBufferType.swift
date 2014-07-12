@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to _ArrayBufferType
-public protocol _ArrayBufferType : MutableCollection {
+public protocol _ArrayBufferType : MutableCollectionType {
   /// The type of elements stored in the buffer
   typealias Element
 
@@ -30,7 +30,7 @@ public protocol _ArrayBufferType : MutableCollection {
   /// Convert to an NSArray.
   /// Precondition: isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func _asCocoaArray() -> _CocoaArray
+  func _asCocoaArray() -> _CocoaArrayType
 
   /// Get/set the index'th element
   subscript(index: Int) -> Element { get nonmutating set}
@@ -65,7 +65,7 @@ public protocol _ArrayBufferType : MutableCollection {
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
-  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
   

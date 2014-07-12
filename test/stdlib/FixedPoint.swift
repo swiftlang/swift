@@ -5,7 +5,7 @@ func assertEq<T1 : Equatable, T2 : Equatable>(a : (T1, T2), b : (T1, T2)) {
   assert(a.1 == b.1)
 }
 
-func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
+func testBitwiseOperationsImpl<T : UnsignedIntegerType>(_: T.Type) {
   var x = numericCast(0b11_1010_00) as T
   var y = numericCast(0b10_1100_10) as T
 

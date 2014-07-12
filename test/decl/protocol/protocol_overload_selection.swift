@@ -12,26 +12,26 @@ func f<C : P2> (elements: C) {
   var x: Int = elements.foo() // should not error
 }
 
-protocol _Collection  {
-  typealias IndexType
+protocol _CollectionType  {
+  typealias Index
 
   typealias _Element
-  subscript(i: IndexType) -> _Element {get}
+  subscript(i: Index) -> _Element {get}
 }
 
-protocol Collection : _Collection, Sequence {
-  subscript(i: IndexType) -> GeneratorType.Element {get}
+protocol CollectionType : _CollectionType, SequenceType {
+  subscript(i: Index) -> Generator.Element {get}
 }
 
-protocol MutableCollection : Collection {
-  subscript(i: IndexType) -> GeneratorType.Element {get set}
+protocol MutableCollectionType : CollectionType {
+  subscript(i: Index) -> Generator.Element {get set}
 }
 
 func insertionSort<
-C: MutableCollection 
+C: MutableCollectionType 
 >(
   inout elements: C,
-  i: C.IndexType
+  i: C.Index
 ) {
-  var x: C.GeneratorType.Element = elements[i] // should not error
+  var x: C.Generator.Element = elements[i] // should not error
 }

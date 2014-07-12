@@ -1199,7 +1199,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
+        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::SequenceType);
       if (!sequenceProto) {
         return true;
       }
@@ -1218,7 +1218,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       auto generatorType = cs.createTypeVariable(Locator, /*options=*/0);
       cs.addConstraint(Constraint::create(cs, ConstraintKind::TypeMember,
                                           expr->getType(), generatorType,
-                                          tc.Context.Id_GeneratorType,
+                                          tc.Context.Id_Generator,
                                           Locator));
 
       // Determine the element type of the generator.
@@ -1374,7 +1374,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       // Otherwise, the result must be a LogicValue.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::LogicValue);
+                                            KnownProtocolKind::LogicValueType);
       if (!logicValueProto) {
         return true;
       }
@@ -1462,7 +1462,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
       // The result must be an ArrayBound.
       auto &tc = cs.getTypeChecker();
       auto arrayBoundProto = tc.getProtocol(expr->getLoc(),
-                                            KnownProtocolKind::ArrayBound);
+                                            KnownProtocolKind::ArrayBoundType);
       if (!arrayBoundProto) {
         return true;
       }

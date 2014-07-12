@@ -17,7 +17,7 @@ public protocol Reflectable {
   // corresponding change to Reflection.cpp.
     
   /// Get the mirror that reflects this object.
-  func getMirror() -> Mirror
+  func getMirror() -> MirrorType
 }
 
 /// A unique identifier for a class instance. This can be used by reflection
@@ -148,7 +148,7 @@ public enum MirrorDisposition {
 }
 
 /// A protocol that provides a reflection interface to an underlying value.
-public protocol Mirror {
+public protocol MirrorType {
   /// Copy the value out as an Any.
   var value: Any { get }
 
@@ -166,7 +166,7 @@ public protocol Mirror {
   /// Get a mirror for one of this value's children.
   ///
   /// Returns a pair of the child's name and its mirror.
-  subscript(i: Int) -> (String, Mirror) { get }
+  subscript(i: Int) -> (String, MirrorType) { get }
 
   /// Get a string description of this value.
   var summary: String { get }
@@ -190,7 +190,7 @@ func _getSummary<T>(out: UnsafePointer<String>,
 /// Produce a mirror for any value. If the value's type conforms to Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
-@asmname("swift_reflectAny")public func reflect<T>(x: T) -> Mirror
+@asmname("swift_reflectAny")public func reflect<T>(x: T) -> MirrorType
 
 /// Unsafely produce a mirror for a value in memory whose lifetime is
 /// guaranteed by holding a strong reference to a heap object.
@@ -199,11 +199,11 @@ func _getSummary<T>(out: UnsafePointer<String>,
 @asmname("swift_unsafeReflectAny")func unsafeReflect<T>(
   owner: Builtin.NativeObject,
   ptr: UnsafePointer<T>
-) -> Mirror
+) -> MirrorType
 
 
 /// Dump an object's contents using its mirror to the specified output stream.
-public func dump<T, TargetStream : OutputStream>(
+public func dump<T, TargetStream : OutputStreamType>(
     x: T, name: String? = nil, indent: Int = 0,
     maxDepth: Int = .max, maxItems: Int = .max,
     inout targetStream: TargetStream
@@ -224,8 +224,8 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
 }
 
 /// Dump an object's contents using a mirror. User code should use dump().
-func _dumpWithMirror<TargetStream : OutputStream>(
-    mirror: Mirror, name: String?, indent: Int, maxDepth: Int,
+func _dumpWithMirror<TargetStream : OutputStreamType>(
+    mirror: MirrorType, name: String?, indent: Int, maxDepth: Int,
     inout maxItemCounter: Int,
     inout visitedItems: [ObjectIdentifier : Int],
     inout targetStream: TargetStream
@@ -279,11 +279,11 @@ func _dumpWithMirror<TargetStream : OutputStream>(
   }
 }
 
-// -- Mirror implementations for basic data types
+// -- MirrorType implementations for basic data types
 
 /// A mirror for a value that is represented as a simple value with no
 /// children.
-internal struct _LeafMirror<T>: Mirror {
+internal struct _LeafMirror<T>: MirrorType {
   let _value: T
   let summaryFunction: T -> String
   let quickLookFunction: T -> QuickLookObject?
@@ -299,13 +299,15 @@ internal struct _LeafMirror<T>: Mirror {
   var valueType: Any.Type { return value.dynamicType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, Mirror) { _preconditionFailure("no children") }
+  subscript(i: Int) -> (String, MirrorType) { 
+    _preconditionFailure("no children") 
+  }
   var summary: String { return summaryFunction(_value) }
   var quickLookObject: QuickLookObject? { return quickLookFunction(_value) }
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
-// -- Implementation details for the runtime's Mirror implementation
+// -- Implementation details for the runtime's MirrorType implementation
 
 @asmname("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
@@ -342,20 +344,22 @@ public struct _MagicMirrorData {
   }
 }
 
-struct _OpaqueMirror: Mirror {
+struct _OpaqueMirror: MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, Mirror) { _preconditionFailure("no children") }
+  subscript(i: Int) -> (String, MirrorType) { 
+    _preconditionFailure("no children")
+  }
   var summary: String { return data.summary }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
-internal struct _TupleMirror: Mirror {
+internal struct _TupleMirror: MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
@@ -364,7 +368,7 @@ internal struct _TupleMirror: Mirror {
   var count: Int {
     @asmname("swift_TupleMirror_count")get
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     @asmname("swift_TupleMirror_subscript")get
   }
   var summary: String { return "(\(count) elements)" }
@@ -372,7 +376,7 @@ internal struct _TupleMirror: Mirror {
   var disposition: MirrorDisposition { return .Tuple }
 }
 
-struct _StructMirror: Mirror {
+struct _StructMirror: MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
@@ -381,7 +385,7 @@ struct _StructMirror: Mirror {
   var count: Int {
     @asmname("swift_StructMirror_count")get
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     @asmname("swift_StructMirror_subscript")get
   }
 
@@ -395,12 +399,12 @@ struct _StructMirror: Mirror {
 @asmname("swift_ClassMirror_count")
 func _getClassCount(_MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")
-func _getClassChild(Int, _MagicMirrorData) -> (String, Mirror)
+func _getClassChild(Int, _MagicMirrorData) -> (String, MirrorType)
 
 @asmname("swift_ClassMirror_quickLookObject")public
 func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
 
-struct _ClassMirror: Mirror {
+struct _ClassMirror: MirrorType {
   let data: _MagicMirrorData
   
   var value: Any { return data.value }
@@ -411,7 +415,7 @@ struct _ClassMirror: Mirror {
   var count: Int {
     return _getClassCount(data)
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getClassChild(i, data)
   }
   var summary: String {
@@ -423,7 +427,7 @@ struct _ClassMirror: Mirror {
   var disposition: MirrorDisposition { return .Class }
 }
 
-struct _ClassSuperMirror: Mirror {
+struct _ClassSuperMirror: MirrorType {
   let data: _MagicMirrorData
   
   var value: Any { return data.value }
@@ -436,7 +440,7 @@ struct _ClassSuperMirror: Mirror {
   var count: Int {
     return _getClassCount(data)
   }
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     return _getClassChild(i, data)
   }
   var summary: String {

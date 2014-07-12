@@ -215,26 +215,26 @@ JoinTestCase.test("String") {
   expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
 }
 
-struct MockExtensibleCollection : ExtensibleCollection {
+struct MockExtensibleCollection : ExtensibleCollectionType {
   init() {}
   init(_ a: Array<Int>) {
     _storage = a
     _reservedCapacity = a.count
   }
 
-  func generate() -> Array<Int>.GeneratorType {
+  func generate() -> Array<Int>.Generator {
     return _storage.generate()
   }
 
-  var startIndex: Array<Int>.IndexType {
+  var startIndex: Array<Int>.Index {
     return _storage.startIndex
   }
 
-  var endIndex: Array<Int>.IndexType {
+  var endIndex: Array<Int>.Index {
     return _storage.endIndex
   }
 
-  subscript(i: Array<Int>.IndexType) -> Int {
+  subscript(i: Array<Int>.Index) -> Int {
     return _storage[i]
   }
 
@@ -244,8 +244,8 @@ struct MockExtensibleCollection : ExtensibleCollection {
   }
 
   mutating func extend<
-    S : Sequence
-    where S.GeneratorType.Element == Int
+    S : SequenceType
+    where S.Generator.Element == Int
   >(seq: S) {
     expectNotEmpty(_reservedCapacity)
     _storage += seq
@@ -285,24 +285,24 @@ JoinTestCase.test("ReservesCapacity") {
   }
 }
 
-struct MinimalCollection : Collection {
+struct MinimalCollection : CollectionType {
   init(_ a: Array<Int>) {
     _storage = a
   }
 
-  func generate() -> Array<Int>.GeneratorType {
+  func generate() -> Array<Int>.Generator {
     return _storage.generate()
   }
 
-  var startIndex: Array<Int>.IndexType {
+  var startIndex: Array<Int>.Index {
     return _storage.startIndex
   }
 
-  var endIndex: Array<Int>.IndexType {
+  var endIndex: Array<Int>.Index {
     return _storage.endIndex
   }
 
-  subscript(i: Array<Int>.IndexType) -> Int {
+  subscript(i: Array<Int>.Index) -> Int {
     return _storage[i]
   }
 
@@ -310,7 +310,7 @@ struct MinimalCollection : Collection {
 }
 
 JoinTestCase.test("OperatorPlus") {
-  // ExtensibleCollection + Sequence
+  // ExtensibleCollectionType + SequenceType
   if true {
     var ec: [Int] = []
     var s = SequenceOf([Int]())
@@ -336,7 +336,7 @@ JoinTestCase.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // Sequence + ExtensibleCollection
+  // SequenceType + ExtensibleCollectionType
   if true {
     var s = SequenceOf([Int]())
     var ec: [Int] = []
@@ -362,7 +362,7 @@ JoinTestCase.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // ExtensibleCollection + Collection
+  // ExtensibleCollectionType + CollectionType
   if true {
     var ec: [Int] = []
     var c = MinimalCollection([Int]())
@@ -388,7 +388,7 @@ JoinTestCase.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // ExtensibleCollection + same ExtensibleCollection
+  // ExtensibleCollectionType + same ExtensibleCollectionType
   if true {
     var ec1: [Int] = []
     var ec2: [Int] = []
@@ -414,7 +414,7 @@ JoinTestCase.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // ExtensibleCollection + other ExtensibleCollection
+  // ExtensibleCollectionType + other ExtensibleCollectionType
   if true {
     var ec1: [Int] = []
     var ec2 = MockExtensibleCollection([Int]())

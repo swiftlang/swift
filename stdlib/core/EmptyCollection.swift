@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct EmptyGenerator<T> : Generator, Sequence {
+public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   public func generate() -> EmptyGenerator {
     return self
   }
@@ -27,16 +27,16 @@ public struct EmptyGenerator<T> : Generator, Sequence {
   }
 }
 
-public struct EmptyCollection<T> : Collection {
-  public typealias IndexType = Int
+public struct EmptyCollection<T> : CollectionType {
+  public typealias Index = Int
 
   public init() {}
   
-  public var startIndex: IndexType {
+  public var startIndex: Index {
     return 0
   }
   
-  public var endIndex: IndexType {
+  public var endIndex: Index {
     return 0
   }
 
@@ -44,7 +44,7 @@ public struct EmptyCollection<T> : Collection {
     return EmptyGenerator()
   }
 
-  public subscript(i: IndexType) -> T {
+  public subscript(i: Index) -> T {
     _preconditionFailure("Index out of range")
   }
 }

@@ -31,7 +31,7 @@ enum <loc/>FooComparisonResult : <ref:Struct>Int</ref> {
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
-struct <loc/>FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
+struct <loc/>FooRuncingOptions : <ref:Protocol>RawOptionSetType</ref> {
   <decl:Constructor><loc/>init()</decl>
   <decl:Constructor><loc/>init(_ value: <ref:Struct>Int</ref>)</decl>
   <decl:Var>var <loc/>value: <ref:Struct>Int</ref></decl>

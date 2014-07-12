@@ -16,7 +16,7 @@ struct NotBridgedValueType {
   var a: ClassA = ClassA(value: 4242)
 }
 
-struct BridgedValueType : _ConditionallyBridgedToObjectiveC {
+struct BridgedValueType : _ConditionallyBridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
@@ -44,7 +44,7 @@ struct BridgedValueType : _ConditionallyBridgedToObjectiveC {
   var value: Int
 }
 
-struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveC {
+struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveCType {
   init(value: Int) {
     value0 = value
     value1 = value
@@ -93,7 +93,8 @@ struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveC {
 }
 
 
-struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
+struct ConditionallyBridgedValueType<T>
+  : _ConditionallyBridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
@@ -206,16 +207,16 @@ RuntimeBridging.test("isBridgedVerbatimToObjectiveC") {
 
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
-typealias P1 = LogicValue
+typealias P1 = LogicValueType
 protocol P2 {}
 
-struct StructConformsToP1 : LogicValue, P2 {
+struct StructConformsToP1 : LogicValueType, P2 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-struct Struct2ConformsToP1<T : LogicValue> : LogicValue, P2 {
+struct Struct2ConformsToP1<T : LogicValueType> : LogicValueType, P2 {
   init(_ value: T) {
     self.value = value
   }
@@ -227,13 +228,13 @@ struct Struct2ConformsToP1<T : LogicValue> : LogicValue, P2 {
 
 struct StructDoesNotConformToP1 : P2 {}
 
-class ClassConformsToP1 : LogicValue, P2 {
+class ClassConformsToP1 : LogicValueType, P2 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-class Class2ConformsToP1<T : LogicValue> : LogicValue, P2 {
+class Class2ConformsToP1<T : LogicValueType> : LogicValueType, P2 {
   init(_ value: T) {
     self.value = [ value ]
   }

@@ -7,7 +7,7 @@ class NSObject { }
 class BridgedClass : NSObject { 
 }
 
-struct BridgedStruct : _BridgedToObjectiveC {
+struct BridgedStruct : _BridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }

@@ -37,7 +37,7 @@ import typealias Swift.HeapBufferStorage
 import class Swift.HeapBufferStorage
 import typealias Swift.Bool
 import struct Swift.Bool
-import protocol Swift.Generator
+import protocol Swift.GeneratorType
 import var Swift.C_ARGC
 import func Swift.min
 

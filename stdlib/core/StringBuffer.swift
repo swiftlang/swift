@@ -74,8 +74,8 @@ public struct _StringBuffer {
   }
 
   static func fromCodeUnits<
-    Encoding : UnicodeCodec, Input : Collection // Sequence?
-    where Input.GeneratorType.Element == Encoding.CodeUnit
+    Encoding : UnicodeCodecType, Input : CollectionType // SequenceType?
+    where Input.Generator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0

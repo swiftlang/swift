@@ -42,7 +42,7 @@ var nextTrackedSerialNumber = 0
   func baz()
 }
 
-class Tracked : NSObject, ForwardIndex, Printable, Fooable {
+class Tracked : NSObject, ForwardIndexType, Printable, Fooable {
   func foo() { }
 
   init(_ value: Int) {
@@ -92,7 +92,7 @@ class BridgedObjC : Base, Printable, Barable {
   }
 }
 
-struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveC {
+struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
   static func getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
@@ -293,7 +293,7 @@ func testBridgedVerbatim() {
 testBridgedVerbatim()
 
 //===--- Explicitly Bridged -----------------------------------------------===//
-// BridgedSwift conforms to _BridgedToObjectiveC
+// BridgedSwift conforms to _BridgedToObjectiveCType
 //===----------------------------------------------------------------------===//
 func testExplicitlyBridged() {
   // CHECK-LABEL: testExplicitlyBridged()

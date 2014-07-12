@@ -1,10 +1,10 @@
 // RUN: %swift -module-name=Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-protocol LogicValue {
+protocol LogicValueType {
   func getLogicValue() -> Bool
 }
 
-struct Bool : LogicValue {
+struct Bool : LogicValueType {
   var value: Builtin.Int1
   func _getBuiltinLogicValue() -> Builtin.Int1 { return value }
   func getLogicValue() -> Bool { return self }

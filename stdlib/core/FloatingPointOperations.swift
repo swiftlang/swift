@@ -45,7 +45,7 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
   }
 }
 
-public protocol FloatingPointNumber : Strideable {
+public protocol FloatingPointNumberType : Strideable {
   typealias _BitsType
   class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType

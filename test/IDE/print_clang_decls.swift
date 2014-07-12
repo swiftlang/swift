@@ -68,7 +68,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION:      {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : RawOptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : RawOptionSetType {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
 // FOUNDATION-NEXT: {{^}}  init(_ value: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var value: UInt{{$}}

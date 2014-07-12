@@ -652,7 +652,7 @@ NSStringAPIs.test("init(format:_:...)") {
 
 NSStringAPIs.test("init(format:arguments:)") {
   let world: NSString = "world"
-  let args: [CVarArg] = [ world, 42 ]
+  let args: [CVarArgType] = [ world, 42 ]
   expectEqual("Hello, world!%42",
       String(format: "Hello, %@!%%%ld", arguments: args))
 }
@@ -667,7 +667,7 @@ NSStringAPIs.test("init(format:locale:_:...)") {
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
   let world: NSString = "world"
-  let args: [CVarArg] = [ world, 42 ]
+  let args: [CVarArgType] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",

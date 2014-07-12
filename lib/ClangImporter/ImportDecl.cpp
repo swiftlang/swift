@@ -1497,7 +1497,8 @@ namespace {
         
         // Add delayed protocol declarations to the enum declaration.
         DelayedProtocolDecl delayedProtocols[] = {
-          [&]() {return cxt.getProtocol(KnownProtocolKind::RawRepresentable);},
+          [&]() {return cxt.getProtocol(
+              KnownProtocolKind::RawRepresentable);},
           [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);},
           [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);}
         };
@@ -1556,7 +1557,7 @@ namespace {
 
         // Build a delayed RawOptionSet conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {
-          [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSet);}
+          [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSetType);}
         };
         structDecl->setDelayedProtocolDecls(
             Impl.SwiftContext.AllocateCopy(delayedProtocols));

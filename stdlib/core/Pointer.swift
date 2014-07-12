@@ -12,7 +12,7 @@
 
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafePointer, ConstUnsafePointer, and AutoreleasingUnsafePointer.
-protocol _Pointer {
+protocol _PointerType {
   /// The underlying raw pointer value.
   var value: Builtin.RawPointer { get }
 
@@ -23,8 +23,8 @@ protocol _Pointer {
 /// Derive a pointer argument from a convertible pointer type.
 @transparent
 func _convertPointerToPointerArgument<
-  FromPointer: _Pointer,
-  ToPointer: _Pointer
+  FromPointer: _PointerType,
+  ToPointer: _PointerType
 >(from: FromPointer) -> ToPointer {
   return ToPointer(from.value)
 }
@@ -32,7 +32,7 @@ func _convertPointerToPointerArgument<
 /// Derive a pointer argument from the address of an inout parameter.
 @transparent
 func _convertInOutToPointerArgument<
-  ToPointer: _Pointer
+  ToPointer: _PointerType
 >(from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
@@ -41,7 +41,7 @@ func _convertInOutToPointerArgument<
 @transparent
 func _convertMutableArrayToPointerArgument<
   FromElement,
-  ToPointer: _Pointer
+  ToPointer: _PointerType
 >(inout a: Array<FromElement>) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
@@ -57,7 +57,7 @@ func _convertMutableArrayToPointerArgument<
 @transparent
 func _convertConstArrayToPointerArgument<
   FromElement,
-  ToPointer: _Pointer
+  ToPointer: _PointerType
 >(arr: Array<FromElement>) -> (AnyObject?, ToPointer) {
   let (owner: AnyObject?, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
@@ -66,7 +66,7 @@ func _convertConstArrayToPointerArgument<
 /// Derive a UTF-8 pointer argument from a value string parameter.
 @transparent
 func _convertConstStringToUTF8PointerArgument<
-  ToPointer: _Pointer
+  ToPointer: _PointerType
 >(str: String) -> (AnyObject?, ToPointer) {
   // Convert the UTF-8 representation to a null-terminated array.
   var utf8 = Array(str.utf8)

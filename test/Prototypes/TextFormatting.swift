@@ -155,7 +155,7 @@ extension String : XPrintable {
 }
 
 /// \brief An integral type that can be printed
-protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
+protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumberType, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 

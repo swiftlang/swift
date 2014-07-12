@@ -106,10 +106,10 @@ struct S7b : P7 {
 }
 
 // <rdar://problem/14685674>
-struct zip<A: Generator, B: Generator> : Generator, Sequence {
+struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
      func next() -> (A.Element, B.Element)? { }
 
-     typealias GeneratorType = zip
+     typealias Generator = zip
      func generate() -> zip { }
      
 }

@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
+  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'SequenceType'}}
 }
 
-struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol '_Sequence_'}} expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
+struct BadContainer2 : SequenceType { // expected-error{{type 'BadContainer2' does not conform to protocol '_Sequence_Type'}} expected-error{{type 'BadContainer2' does not conform to protocol 'SequenceType'}}
   var generate : Int // expected-note{{candidate is not a function}} expected-note{{candidate is not a function}}
 }
 
@@ -16,7 +16,7 @@ func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
 }
 
-struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol '_Sequence_'}} expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}} 
+struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol '_Sequence_Type'}} expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}} 
   func generate() { } // expected-note{{candidate has non-matching type '() -> ()'}} expected-note{{candidate has non-matching type '() -> ()'}}
 }
 
@@ -28,8 +28,8 @@ struct BadGeneratorType1 {
   
 }
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol '_Sequence_'}} expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
-  typealias GeneratorType = BadGeneratorType1 // expected-note{{possibly intended match 'GeneratorType' does not conform to 'Generator'}} expected-note{{possibly intended match 'GeneratorType' does not conform to 'Generator'}}
+struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol '_Sequence_Type'}} expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
+  typealias Generator = BadGeneratorType1 // expected-note{{possibly intended match 'Generator' does not conform to 'GeneratorType'}} expected-note{{possibly intended match 'Generator' does not conform to 'GeneratorType'}}
   func generate() -> BadGeneratorType1 { }
 }
 
@@ -39,19 +39,19 @@ func bad_containers_4(bc: BadContainer4) {
 
 // Pattern type-checking
 
-struct GoodRange<Int> : Sequence, Generator {
+struct GoodRange<Int> : SequenceType, GeneratorType {
   typealias Element = Int
   func next() -> Int? {}
 
-  typealias GeneratorType = GoodRange<Int>
+  typealias Generator = GoodRange<Int>
   func generate() -> GoodRange<Int> { return self }
 }
 
-struct GoodTupleGeneratorType : Sequence, Generator {
+struct GoodTupleGeneratorType : SequenceType, GeneratorType {
   typealias Element = (Int, Float)
   func next() -> (Int, Float)? {}
 
-  typealias GeneratorType = GoodTupleGeneratorType
+  typealias Generator = GoodTupleGeneratorType
   func generate() -> GoodTupleGeneratorType {}
 }
 
@@ -96,11 +96,11 @@ struct X<T> {
   var value: T
 }
 
-struct Gen<T> : Generator {
+struct Gen<T> : GeneratorType {
   func next() -> T? { return nil }
 }
 
-struct Seq<T> : Sequence {
+struct Seq<T> : SequenceType {
   func generate() -> Gen<T> { return Gen() }
 }
 

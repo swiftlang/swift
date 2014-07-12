@@ -2,7 +2,7 @@
 
 @exported import ObjectiveC
 
-public struct ObjCBool : LogicValue {
+public struct ObjCBool : LogicValueType {
   var value : UInt8
 
   /// \brief Allow use in a Boolean context.

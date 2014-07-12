@@ -1,4 +1,4 @@
-//===--- IntegerArithmetic.swift.gyb -------------------------*- swift -*--===//
+//===--- IntegerArithmeticType.swift.gyb ---------------------*- swift -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,20 +11,20 @@
 //===----------------------------------------------------------------------===//
 %# Ignore the following admonition; it applies to the resulting .swift file only
 
-// Automatically Generated From IntegerArithmetic.swift.gyb.  Do Not
+// Automatically Generated From IntegerArithmeticType.swift.gyb.  Do Not
 // Edit Directly!
 
 % integerBinaryOps = [
 %    (x[:-1], x[-1]) for x in 
 %     'add+ subtract- multiply* divide/ remainder%'.split()]
 
-public protocol _IntegerArithmetic {
+public protocol _IntegerArithmeticType {
 % for name,_ in integerBinaryOps:
   class func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
 
-public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
+public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
 % for _,op in integerBinaryOps:
@@ -37,35 +37,35 @@ public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
 
 % for name,op in integerBinaryOps:
 @transparent public
-func ${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
+func ${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
 @transparent public
-func &${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
+func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
 
 @assignment @transparent public
-func ${op}= <T: _IntegerArithmetic>(inout lhs: T, rhs: T) {
+func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
 }
 % end
 
-//===--- SignedNumber -----------------------------------------------------===//
+//===--- SignedNumberType -------------------------------------------------===//
 // A numeric type that supports abs(x), +x and -x
 //===----------------------------------------------------------------------===//
 
 // Base protocol containing all the non-defaulted implentations.  This
-// protocol should be presented to users as part of SignedNumber.
-public protocol _SignedNumber : Comparable, IntegerLiteralConvertible {
-  // Subtraction is a requirement for SignedNumber
+// protocol should be presented to users as part of SignedNumberType.
+public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
+  // Subtraction is a requirement for SignedNumberType
   @infix func - (lhs: Self, rhs: Self) -> Self
 }
 
-// SignedNumber itself contains only operator requirements having
+// SignedNumberType itself contains only operator requirements having
 // default implementations on the base protocol.
-public protocol SignedNumber : _SignedNumber {
+public protocol SignedNumberType : _SignedNumberType {
   @prefix func - (x: Self) -> Self
 
   // Do not use this operator directly; call abs(x) instead
@@ -73,16 +73,16 @@ public protocol SignedNumber : _SignedNumber {
 }
 
 // Unary negation in terms of subtraction.  This is a default
-// implementation; models of SignedNumber can provide their own
+// implementation; models of SignedNumberType can provide their own
 // implementations.
 @prefix @transparent public
-func - <T : _SignedNumber>(x: T) -> T {
+func - <T : _SignedNumberType>(x: T) -> T {
   return 0 - x
 }
 
 // Unary +
 @prefix @transparent public
-func + <T: _SignedNumber>(x: T) -> T {
+func + <T: _SignedNumberType>(x: T) -> T {
   return x
 }
 
@@ -94,11 +94,11 @@ internal func _abs<Args>(args: Args) -> (_Abs, Args) {
 
 // Do not use this operator directly; call abs(x) instead
 @transparent public
-func ~> <T : _SignedNumber>(x:T,_:(_Abs, ())) -> T {
+func ~> <T : _SignedNumberType>(x:T,_:(_Abs, ())) -> T {
   return x < 0 ? -x : x
 }
 
-public protocol AbsoluteValuable : SignedNumber {
+public protocol AbsoluteValuable : SignedNumberType {
   class func abs(_:Self) -> Self
 }
 
@@ -108,10 +108,10 @@ func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
   return T.abs(x)
 }
 
-// Absolute value.  Concrete instances of SignedNumber can specialize
+// Absolute value.  Concrete instances of SignedNumberType can specialize
 // this function by conforming to AbsoluteValuable.
 @transparent public
-func abs<T : SignedNumber>(x: T) -> T {
+func abs<T : SignedNumberType>(x: T) -> T {
   return x~>_abs()
 }
 

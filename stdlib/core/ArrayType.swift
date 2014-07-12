@@ -12,7 +12,7 @@
 
 internal protocol ArrayType
   : _ArrayType,
-    ExtensibleCollection,
+    ExtensibleCollectionType,
     MutableSliceable,
     ArrayLiteralConvertible
 {
@@ -21,7 +21,7 @@ internal protocol ArrayType
   init()
 
   /// Construct an array of count elements, each initialized to repeatedValue
-  init(count: Int, repeatedValue: Self.GeneratorType.Element)
+  init(count: Int, repeatedValue: Self.Generator.Element)
   
   /// How many elements the Array stores
   var count: Int {get}
@@ -39,7 +39,7 @@ internal protocol ArrayType
   /// element. Otherwise, nil.
   var _elementStorageIfContiguous: UnsafePointer<Element> {get}
 
-  subscript(index: Int) -> Self.GeneratorType.Element {get set}
+  subscript(index: Int) -> Self.Generator.Element {get set}
   
   //===--- basic mutations ------------------------------------------------===//
 
@@ -49,35 +49,35 @@ internal protocol ArrayType
   mutating func reserveCapacity(minimumCapacity: Int)
   
   /// Append newElement to the Array in O(1) (amortized)
-  mutating func append(newElement: Self.GeneratorType.Element)
+  mutating func append(newElement: Self.Generator.Element)
 
   /// Operator form of append
   @assignment 
-  func += (inout lhs: Self, rhs: Self.GeneratorType.Element)
+  func += (inout lhs: Self, rhs: Self.Generator.Element)
 
   /// Append elements from `sequence` to the Array
   mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == Self.GeneratorType.Element
+      S : SequenceType
+      where S.Generator.Element == Self.Generator.Element
   >(sequence: S)
 
   /// Operator form of extend
   @assignment
   func += <
-    S: Sequence where S.GeneratorType.Element == Self.GeneratorType.Element
+    S: SequenceType where S.Generator.Element == Self.Generator.Element
   >(inout lhs: Self, rhs: S)
   
   /// Remove an element from the end of the Array in O(1).  Returns:
   /// the removed element. Requires: count > 0
-  mutating func removeLast() -> Self.GeneratorType.Element
+  mutating func removeLast() -> Self.Generator.Element
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
-  mutating func insert(newElement: Self.GeneratorType.Element, atIndex: Int)
+  mutating func insert(newElement: Self.Generator.Element, atIndex: Int)
 
   /// Remove the element at the given index.  Returns: the removed
   /// element.  Worst case complexity: O(N).  Requires: count > index
-  mutating func removeAtIndex(index: Int) -> Self.GeneratorType.Element
+  mutating func removeAtIndex(index: Int) -> Self.Generator.Element
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not change
@@ -86,14 +86,14 @@ internal protocol ArrayType
   //===--- algorithms -----------------------------------------------------===//
 
   func join<
-      S : Sequence where S.GeneratorType.Element == Self
+      S : SequenceType where S.Generator.Element == Self
   >(elements: S) -> Self
 
-  func reduce<U>(initial: U, combine: (U, Self.GeneratorType.Element) -> U) -> U
+  func reduce<U>(initial: U, combine: (U, Self.Generator.Element) -> U) -> U
 
   mutating func sort(
     isOrderedBefore: (
-      Self.GeneratorType.Element, Self.GeneratorType.Element
+      Self.Generator.Element, Self.Generator.Element
     ) -> Bool
   )
   
@@ -103,7 +103,7 @@ internal protocol ArrayType
   init(_ buffer: _Buffer)
 }
 
-internal struct _ArrayTypeMirror<T : ArrayType> : Mirror {
+internal struct _ArrayTypeMirror<T : ArrayType> : MirrorType {
   let _value : T
   
   init(_ v : T) { _value = v }
@@ -116,11 +116,11 @@ internal struct _ArrayTypeMirror<T : ArrayType> : Mirror {
 
   var count: Int { return _value.count }
 
-  subscript(i: Int) -> (String, Mirror) {
+  subscript(i: Int) -> (String, MirrorType) {
     if (i >= 0) && (i < count) {
       return ("[\(i)]",reflect(_value[i]))
     }
-    _fatalError("Mirror access out of bounds")
+    _fatalError("MirrorType access out of bounds")
   }
 
   var summary: String {

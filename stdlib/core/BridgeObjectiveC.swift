@@ -52,11 +52,11 @@ public func withUnsafePointers<A0, A1, A2, Result>(
 }
 
 /// A Swift Array or Dictionary of types conforming to
-/// _BridgedToObjectiveC can be passed to ObjectiveC as an NSArray or
+/// _BridgedToObjectiveCType can be passed to ObjectiveC as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling bridgeToObjectiveC
 /// on each elmeent of the source container.
-public protocol _BridgedToObjectiveC {
+public protocol _BridgedToObjectiveCType {
   typealias ObjectiveCType: AnyObject
 
   // Workaround: right now protocol witness tables don't include associated
@@ -78,7 +78,8 @@ public protocol _BridgedToObjectiveC {
 /// Whether a given type conforming to this protocol bridges to
 /// ObjectiveC is only knowable at runtime.  Array<T> is an example;
 /// it bridges to ObjectiveC iff T does.
-public protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
+public protocol
+_ConditionallyBridgedToObjectiveCType : _BridgedToObjectiveCType {
   class func isBridgedToObjectiveC() -> Bool
 
   /// Try to bridge from an Objective-C object of the bridged class
@@ -104,8 +105,8 @@ public protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
 ///
 /// - If `T` is a class type, it is alaways bridged verbatim, the function
 ///   returns `x`;
-/// - otherwise, `T` conforms to `_BridgedToObjectiveC`:
-///   + if `T` conforms to `_ConditionallyBridgedToObjectiveC` and
+/// - otherwise, `T` conforms to `_BridgedToObjectiveCType`:
+///   + if `T` conforms to `_ConditionallyBridgedToObjectiveCType` and
 ///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
 ///   + otherwise, returns the result of `x.bridgeToObjectiveC()`;
 /// - otherwise, the result is empty.
@@ -132,7 +133,7 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 /// - If `T` is a class type:
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveC`:
+/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`:
 ///   + if the dynamic type of `x` is not `T.getObjectiveCType()`
 ///     or a subclass of it, trap
 ///   + otherwise, returns the result of `T.bridgeFromObjectiveC(x)`;
@@ -150,8 +151,8 @@ public func _bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 /// - If `T` is a class type:
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveC`:
-///   + if `T` conforms to `_ConditionallyBridgedToObjectiveC` and
+/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`:
+///   + if `T` conforms to `_ConditionallyBridgedToObjectiveCType` and
 ///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
 ///   + otherwise, if the dynamic type of `x` is not `T.getObjectiveCType()`
 ///     or a subclass of it, the result is empty;
@@ -175,9 +176,10 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject,
 /// representation.
 ///
 /// - If `T` is a class type, returns `true`;
-/// - otherwise, `T` conforms to `_ConditionallyBridgedToObjectiveC`, returns
+/// - otherwise, `T` conforms to
+///   `_ConditionallyBridgedToObjectiveCType`, returns
 ///   `T.isBridgedToObjectiveC()`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveC`, returns `true`.
+/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`, returns `true`.
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
@@ -189,7 +191,7 @@ public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
 func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
 /// A type that's bridged "verbatim" does not conform to
-/// `_BridgedToObjectiveC`, and can have its bits reinterpreted as an
+/// `_BridgedToObjectiveCType`, and can have its bits reinterpreted as an
 /// `AnyObject`.  When this function returns true, the storage of an
 /// `Array<T>` can be `reinterpretCast` as an array of `AnyObject`.
 public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
@@ -238,7 +240,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafePointer<T /* TODO : class */>
-  : Equatable, LogicValue, NilLiteralConvertible, _Pointer {
+  : Equatable, LogicValueType, NilLiteralConvertible, _PointerType {
   let value: Builtin.RawPointer
 
   @transparent

@@ -17,41 +17,41 @@
 /// Effectively a proxy for NSString that doesn't mention it by
 /// name.  NSString's conformance to this protocol is declared in
 /// Foundation.
-@class_protocol @objc public protocol _CocoaString {}
+@class_protocol @objc public protocol _CocoaStringType {}
 
 /// Loading Foundation initializes these function variables
 /// with useful values
 
 /// Produces a `_StringBuffer` from a given subrange of a source
-/// `_CocoaString`, having the given minimum capacity.
+/// `_CocoaStringType`, having the given minimum capacity.
 public var _cocoaStringToContiguous: (
-  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
+  source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer = _cocoaStringToContiguousNotInitialized
 
 func _cocoaStringToContiguousNotInitialized(
-  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
+  source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _fatalError("_cocoaStringToContiguous not initialized")
 }
 
-/// Reads the entire contents of a _CocoaString into contiguous
+/// Reads the entire contents of a _CocoaStringType into contiguous
 /// storage of sufficient capacity.
 public var _cocoaStringReadAll: (
-  source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
+  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>
 ) -> Void = _cocoaStringReadAllNotInitialized
 
 func _cocoaStringReadAllNotInitialized(
-  source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
+  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>
 ) -> Void {
   _fatalError("_cocoaStringReadAll not initialized")
 }
 
 public var _cocoaStringLength: (
-  source: _CocoaString
+  source: _CocoaStringType
 ) -> Int = _cocoaStringLengthNotInitialized
 
 func _cocoaStringLengthNotInitialized(
-  source: _CocoaString
+  source: _CocoaStringType
 ) -> Int {
   _fatalError("_cocoaStringLength not initialized")
 }

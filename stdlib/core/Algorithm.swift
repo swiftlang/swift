@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 public func minElement<
-     R : Sequence
-       where R.GeneratorType.Element : Comparable>(range: R)
-  -> R.GeneratorType.Element {
+     R : SequenceType
+       where R.Generator.Element : Comparable>(range: R)
+  -> R.Generator.Element {
   var g = range.generate()
   var result = g.next()!  
   for e in GeneratorSequence(g) {
@@ -23,9 +23,9 @@ public func minElement<
 }
 
 public func maxElement<
-     R : Sequence
-       where R.GeneratorType.Element : Comparable>(range: R)
-  -> R.GeneratorType.Element {
+     R : SequenceType
+       where R.Generator.Element : Comparable>(range: R)
+  -> R.Generator.Element {
   var g = range.generate()
   var result = g.next()!
   for e in GeneratorSequence(g) {
@@ -37,8 +37,8 @@ public func maxElement<
 // Returns the first index where value appears in domain or nil if
 // domain doesn't contain the value. O(countElements(domain))
 public func find<
-  C: Collection where C.GeneratorType.Element : Equatable
->(domain: C, value: C.GeneratorType.Element) -> C.IndexType? {
+  C: CollectionType where C.Generator.Element : Equatable
+>(domain: C, value: C.Generator.Element) -> C.Index? {
   for i in indices(domain) {
     if domain[i] == value {
       return i
@@ -48,11 +48,11 @@ public func find<
 }
 
 func _insertionSort<
-  C: MutableCollection where C.IndexType: BidirectionalIndex
+  C: MutableCollectionType where C.Index: BidirectionalIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>,
-  inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
+  range: Range<C.Index>,
+  inout less: (C.Generator.Element, C.Generator.Element)->Bool
 ) {
   if range {
     let start = range.startIndex
@@ -65,13 +65,13 @@ func _insertionSort<
     // Continue until the sorted elements cover the whole sequence
     while (++sortedEnd != range.endIndex) {
       // get the first unsorted element
-      var x: C.GeneratorType.Element = elements[sortedEnd]
+      var x: C.Generator.Element = elements[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       do {
-        let predecessor: C.GeneratorType.Element = elements[i.predecessor()]
+        let predecessor: C.Generator.Element = elements[i.predecessor()]
         
         // if x doesn't belong before y, we've found its position
         if !less(x, predecessor) {
@@ -95,12 +95,12 @@ func _insertionSort<
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
 public func partition<
-  C: MutableCollection where C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>,
-  inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
-) -> C.IndexType {
+  range: Range<C.Index>,
+  inout less: (C.Generator.Element, C.Generator.Element)->Bool
+) -> C.Index {
 
   _precondition(
     range.startIndex != range.endIndex, "Can't partition an empty range")
@@ -139,22 +139,22 @@ public func partition<
 
 
 func _quickSort<
-  C: MutableCollection where C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>,
-  less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
+  range: Range<C.Index>,
+  less: (C.Generator.Element, C.Generator.Element)->Bool
 ) {
   var comp = less
   _quickSortImpl(&elements, range, &comp)
 }
 
 func _quickSortImpl<
-  C: MutableCollection where C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>,
-  inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
+  range: Range<C.Index>,
+  inout less: (C.Generator.Element, C.Generator.Element)->Bool
 ) {
 
   // Insertion sort is better at handling smaller regions.
@@ -165,7 +165,7 @@ func _quickSortImpl<
   }
 
    // Partition and sort.
-  let part_idx : C.IndexType = partition(&elements, range, &less)
+  let part_idx : C.Index = partition(&elements, range, &less)
   _quickSortImpl(&elements, range.startIndex..<part_idx, &less);
   _quickSortImpl(&elements, (part_idx.successor())..<range.endIndex, &less);
 }
@@ -177,17 +177,17 @@ struct Less<T: Comparable> {
 }
 
 public func sort<
-  C: MutableCollection where C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout collection: C,
-  predicate: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predicate: (C.Generator.Element, C.Generator.Element) -> Bool
 ) {
   _quickSort(&collection, indices(collection), predicate)
 }
 
 public func sort<
-  C: MutableCollection 
-    where C.IndexType: RandomAccessIndex, C.GeneratorType.Element: Comparable
+  C: MutableCollectionType 
+    where C.Index: RandomAccessIndexType, C.Generator.Element: Comparable
 >(
   inout collection: C
 ) {
@@ -212,10 +212,10 @@ public func sort<T : Comparable>(inout array: [T]) {
 }
 
 public func sorted<
-  C: MutableCollection where C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   source: C,
-  predicate: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+  predicate: (C.Generator.Element, C.Generator.Element) -> Bool
 ) -> C {
   var result = source
   sort(&result, predicate)
@@ -223,8 +223,8 @@ public func sorted<
 }
 
 public func sorted<
-  C: MutableCollection 
-    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+  C: MutableCollectionType 
+    where C.Generator.Element: Comparable, C.Index: RandomAccessIndexType
 >(source: C) -> C {
   var result = source
   sort(&result)
@@ -232,32 +232,32 @@ public func sorted<
 }
 
 public func sorted<
-  S: Sequence
+  S: SequenceType
 >(
   source: S,
-  predicate: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
-) -> [S.GeneratorType.Element] {
+  predicate: (S.Generator.Element, S.Generator.Element) -> Bool
+) -> [S.Generator.Element] {
   var result = Array(source)
   sort(&result, predicate)
   return result
 }
 
 public func sorted<
-  S: Sequence 
-    where S.GeneratorType.Element: Comparable
+  S: SequenceType 
+    where S.Generator.Element: Comparable
 >(
   source: S
-) -> [S.GeneratorType.Element] {
+) -> [S.Generator.Element] {
   var result = Array(source)
   sort(&result)
   return result
 }
 
 func _insertionSort<
-  C: MutableCollection where C.IndexType: RandomAccessIndex,
-  C.GeneratorType.Element: Comparable>(
+  C: MutableCollectionType where C.Index: RandomAccessIndexType,
+  C.Generator.Element: Comparable>(
   inout elements: C,
-  range: Range<C.IndexType>) {
+  range: Range<C.Index>) {
 
   if range {
     let start = range.startIndex
@@ -270,13 +270,13 @@ func _insertionSort<
     // Continue until the sorted elements cover the whole sequence
     while (++sortedEnd != range.endIndex) {
       // get the first unsorted element
-      var x: C.GeneratorType.Element = elements[sortedEnd]
+      var x: C.Generator.Element = elements[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       do {
-        let predecessor: C.GeneratorType.Element = elements[i.predecessor()]
+        let predecessor: C.Generator.Element = elements[i.predecessor()]
 
         // if x doesn't belong before y, we've found its position
         if !Less.compare(x, predecessor) {
@@ -300,11 +300,11 @@ func _insertionSort<
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
 public func partition<
-  C: MutableCollection where C.GeneratorType.Element: Comparable
-, C.IndexType: RandomAccessIndex
+  C: MutableCollectionType where C.Generator.Element: Comparable
+, C.Index: RandomAccessIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>) -> C.IndexType {
+  range: Range<C.Index>) -> C.Index {
 
   // Variables i and j point to the next element to be visited.
   var i = range.startIndex
@@ -339,19 +339,19 @@ public func partition<
 }
 
 func _quickSort<
-  C: MutableCollection
-    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+  C: MutableCollectionType
+    where C.Generator.Element: Comparable, C.Index: RandomAccessIndexType
 >(
   inout elements: C,
-  range: Range<C.IndexType>) {
+  range: Range<C.Index>) {
   _quickSortImpl(&elements, range)
 }
 
 func _quickSortImpl<
-  C: MutableCollection
-    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+  C: MutableCollectionType
+    where C.Generator.Element: Comparable, C.Index: RandomAccessIndexType
 >(
-  inout elements: C, range: Range<C.IndexType>
+  inout elements: C, range: Range<C.Index>
 ) {
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
@@ -360,7 +360,7 @@ func _quickSortImpl<
     return
   }
    // Partition and sort.
-  let part_idx : C.IndexType = partition(&elements, range)
+  let part_idx : C.Index = partition(&elements, range)
   _quickSortImpl(&elements, range.startIndex..<part_idx);
   _quickSortImpl(&elements, (part_idx.successor())..<range.endIndex);
 }
@@ -430,18 +430,18 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   return r
 }
 
-public func split<Seq: Sliceable, R:LogicValue>(
+public func split<Seq: Sliceable, R:LogicValueType>(
   seq: Seq, 
-  isSeparator: (Seq.GeneratorType.Element)->R, 
+  isSeparator: (Seq.Generator.Element)->R, 
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false
-  ) -> [Seq.SliceType] {
+  ) -> [Seq.SubSlice] {
 
-  var result = Array<Seq.SliceType>()
+  var result = Array<Seq.SubSlice>()
 
   // FIXME: could be simplified pending <rdar://problem/15032945>
   // (ternary operator not resolving some/none)
-  var startIndex: Optional<Seq.IndexType>
+  var startIndex: Optional<Seq.Index>
      = allowEmptySlices ? .Some(seq.startIndex) : .None
   var splits = 0
 
@@ -477,10 +477,10 @@ public func split<Seq: Sliceable, R:LogicValue>(
 
 /// Return true iff the the initial elements of `s` are equal to `prefix`.
 public func startsWith<
-  S0: Sequence, S1: Sequence
+  S0: SequenceType, S1: SequenceType
   where
-    S0.GeneratorType.Element == S1.GeneratorType.Element,
-    S0.GeneratorType.Element : Equatable
+    S0.Generator.Element == S1.Generator.Element,
+    S0.Generator.Element : Equatable
 >(s: S0, prefix: S1) -> Bool
 {
   var prefixGenerator = prefix.generate()
@@ -495,7 +495,9 @@ public func startsWith<
   return prefixGenerator.next() ? false : true
 }
 
-public struct EnumerateGenerator<Base: Generator> : Generator, Sequence {
+public struct EnumerateGenerator<
+  Base: GeneratorType
+> : GeneratorType, SequenceType {
   public typealias Element = (index: Int, element: Base.Element)
   var base: Base
   var count: Int
@@ -511,26 +513,26 @@ public struct EnumerateGenerator<Base: Generator> : Generator, Sequence {
     return .Some((index: count++, element: b!))
   }
 
-  // Every Generator is also a single-pass Sequence
-  public typealias GeneratorType = EnumerateGenerator<Base>
-  public func generate() -> GeneratorType {
+  // Every GeneratorType is also a single-pass SequenceType
+  public typealias Generator = EnumerateGenerator<Base>
+  public func generate() -> Generator {
     return self
   }
 }
 
-public func enumerate<Seq : Sequence>(
+public func enumerate<Seq : SequenceType>(
   seq: Seq
-) -> EnumerateGenerator<Seq.GeneratorType> {
+) -> EnumerateGenerator<Seq.Generator> {
   return EnumerateGenerator(seq.generate())
 }
 
 
 /// Return true iff `a1` and `a2` contain the same elements.
 public func equal<
-    S1 : Sequence, S2 : Sequence
+    S1 : SequenceType, S2 : SequenceType
   where
-    S1.GeneratorType.Element == S2.GeneratorType.Element,
-    S1.GeneratorType.Element : Equatable
+    S1.Generator.Element == S2.Generator.Element,
+    S1.Generator.Element : Equatable
 >(a1: S1, a2: S2) -> Bool
 {
   var g1 = a1.generate()
@@ -552,11 +554,11 @@ public func equal<
 /// Return true iff `a1` and `a2` contain the same elements, using
 /// `pred` as equality `==` comparison.
 public func equal<
-    S1 : Sequence, S2 : Sequence
+    S1 : SequenceType, S2 : SequenceType
   where
-    S1.GeneratorType.Element == S2.GeneratorType.Element
+    S1.Generator.Element == S2.Generator.Element
 >(a1: S1, a2: S2,
-  predicate: (S1.GeneratorType.Element, S1.GeneratorType.Element) -> Bool) -> Bool
+  predicate: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
 {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -577,10 +579,10 @@ public func equal<
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
 public func lexicographicalCompare<
-    S1 : Sequence, S2 : Sequence
+    S1 : SequenceType, S2 : SequenceType
   where 
-    S1.GeneratorType.Element == S2.GeneratorType.Element,
-    S1.GeneratorType.Element : Comparable>(
+    S1.Generator.Element == S2.Generator.Element,
+    S1.Generator.Element : Comparable>(
   a1: S1, a2: S2) -> Bool {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -606,12 +608,12 @@ public func lexicographicalCompare<
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `less` as the comparison between elements.
 public func lexicographicalCompare<
-    S1 : Sequence, S2 : Sequence
+    S1 : SequenceType, S2 : SequenceType
   where 
-    S1.GeneratorType.Element == S2.GeneratorType.Element
+    S1.Generator.Element == S2.Generator.Element
 >(
   a1: S1, a2: S2,
-  less: (S1.GeneratorType.Element,S1.GeneratorType.Element)->Bool
+  less: (S1.Generator.Element,S1.Generator.Element)->Bool
 ) -> Bool {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -636,8 +638,8 @@ public func lexicographicalCompare<
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
-  S: Sequence, L: LogicValue
->(seq: S, predicate: (S.GeneratorType.Element)->L) -> Bool {
+  S: SequenceType, L: LogicValueType
+>(seq: S, predicate: (S.Generator.Element)->L) -> Bool {
   for a in seq {
     if predicate(a) {
       return true
@@ -648,13 +650,13 @@ public func contains<
 
 /// Return `true` iff `x` is in `seq`.
 public func contains<
-  S: Sequence where S.GeneratorType.Element: Equatable
->(seq: S, x: S.GeneratorType.Element) -> Bool {
+  S: SequenceType where S.Generator.Element: Equatable
+>(seq: S, x: S.Generator.Element) -> Bool {
   return contains(seq, { $0 == x })
 }
 
-public func reduce<S: Sequence, U>(
-  sequence: S, initial: U, combine: (U, S.GeneratorType.Element)->U
+public func reduce<S: SequenceType, U>(
+  sequence: S, initial: U, combine: (U, S.Generator.Element)->U
 ) -> U {
   var result = initial
   for element in sequence {

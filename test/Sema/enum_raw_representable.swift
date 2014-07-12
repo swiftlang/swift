@@ -5,7 +5,7 @@ enum Foo : Int {
 }
 
 var raw1: Int = Foo.A.toRaw()
-var raw2: Foo.RawType = raw1
+var raw2: Foo.Raw = raw1
 var cooked1: Foo? = Foo.fromRaw(0)
 var cooked2: Foo? = Foo.fromRaw(22)
 
@@ -32,11 +32,11 @@ enum MembersReferenceRawType : Int {
   }
 }
 
-func serialize<T : RawRepresentable>(values: [T]) -> [T.RawType] {
+func serialize<T : RawRepresentable>(values: [T]) -> [T.Raw] {
   return values.map { $0.toRaw() }
 }
 
-func deserialize<T : RawRepresentable>(serialized: [T.RawType]) -> [T] {
+func deserialize<T : RawRepresentable>(serialized: [T.Raw]) -> [T] {
   return serialized.map { T.fromRaw($0)! }
 }
 
@@ -46,7 +46,7 @@ var doubles: [Double] = serialize([Bar.A, .B, .C])
 var foos: [Foo] = deserialize([1, 2, 3])
 var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
-// Infer RawType from witnesses.
+// Infer Raw from witnesses.
 enum Color : Int, RawRepresentable {
   case Red
   case Blue
@@ -60,4 +60,4 @@ enum Color : Int, RawRepresentable {
   }
 }
 
-var colorRaw: Color.RawType = 7.5
+var colorRaw: Color.Raw = 7.5

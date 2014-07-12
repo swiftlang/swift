@@ -15,29 +15,29 @@
 //===----------------------------------------------------------------------===//
 
 /// Models an object into into which we can stream text.
-public protocol OutputStream {
+public protocol OutputStreamType {
   mutating
   func write(string: String)
 }
 
-/// Models an object that can be written to an `OutputStream` in a single,
+/// Models an object that can be written to an `OutputStreamType` in a single,
 /// immediately obvious, way.
 ///
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
-  func writeTo<Target : OutputStream>(inout target: Target)
+  func writeTo<Target : OutputStreamType>(inout target: Target)
 }
 
 /// This protocol should be adopted by types that wish to customize their
 /// textual representation.  This textual representation is used when objects
-/// are written to an `OutputStream`.
+/// are written to an `OutputStreamType`.
 public protocol Printable {
   var description: String { get }
 }
 
 /// This protocol should be adopted by types that wish to customize their
 /// textual representation used for debugging purposes.  This textual
-/// representation is used when objects are written to an `OutputStream`.
+/// representation is used when objects are written to an `OutputStreamType`.
 public protocol DebugPrintable {
   var debugDescription: String { get }
 }
@@ -45,7 +45,7 @@ public protocol DebugPrintable {
 // This protocol is adopted only by NSObject.  This is a workaround for:
 // <rdar://problem/16883288> Property of type 'String!' does not satisfy
 // protocol requirement of type 'String'
-public protocol _PrintableNSObject {
+public protocol _PrintableNSObjectType {
   var description: String! { get }
   var debugDescription: String! { get }
 }
@@ -57,7 +57,7 @@ public protocol _PrintableNSObject {
 
 /// Do our best to print a value that can not be printed directly, using one of
 /// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
-func _adHocPrint<T, TargetStream : OutputStream>(
+func _adHocPrint<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
   var mirror = reflect(object)
@@ -93,7 +93,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-public func print<T, TargetStream : OutputStream>(
+public func print<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
   if let streamableObject =
@@ -115,7 +115,7 @@ public func print<T, TargetStream : OutputStream>(
   }
 
   if let anNSObject =
-      _stdlib_dynamicCastToExistential1(object, _PrintableNSObject.self) {
+      _stdlib_dynamicCastToExistential1(object, _PrintableNSObjectType.self) {
     anNSObject.description.writeTo(&target)
     return
   }
@@ -132,7 +132,7 @@ public func print<T, TargetStream : OutputStream>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-public func println<T, TargetStream : OutputStream>(
+public func println<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
   print(object, &target)
@@ -183,7 +183,7 @@ public func toString<T>(object: T) -> String {
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
-public func debugPrint<T, TargetStream : OutputStream>(
+public func debugPrint<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
   if let debugPrintableObject =
@@ -199,7 +199,7 @@ public func debugPrint<T, TargetStream : OutputStream>(
   }
 
   if let anNSObject =
-      _stdlib_dynamicCastToExistential1(object, _PrintableNSObject.self) {
+      _stdlib_dynamicCastToExistential1(object, _PrintableNSObjectType.self) {
     anNSObject.debugDescription.writeTo(&target)
     return
   }
@@ -213,7 +213,7 @@ public func debugPrint<T, TargetStream : OutputStream>(
   _adHocPrint(object, &target)
 }
 
-public func debugPrintln<T, TargetStream : OutputStream>(
+public func debugPrintln<T, TargetStream : OutputStreamType>(
     object: T, inout target: TargetStream
 ) {
   debugPrint(object, &target)
@@ -348,7 +348,7 @@ internal func _uint64ToString(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-internal struct _Stdout : OutputStream {
+internal struct _Stdout : OutputStreamType {
   mutating func write(string: String) {
     // FIXME: buffering?
     // It is important that we use stdio routines in order to correctly
@@ -359,7 +359,7 @@ internal struct _Stdout : OutputStream {
   }
 }
 
-extension String : OutputStream {
+extension String : OutputStreamType {
   public mutating
   func write(string: String) {
     self += string
@@ -371,19 +371,19 @@ extension String : OutputStream {
 //===----------------------------------------------------------------------===//
 
 extension String : Streamable {
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
-  public func writeTo<Target : OutputStream>(inout target: Target) {
+  public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(Character(self)))
   }
 }

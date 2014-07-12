@@ -23,7 +23,7 @@ func _XCTRegisterFailure(expected: Bool, condition: String, message: String, fil
 }
 
 /// Produce a failure description for the given assertion type.
-func _XCTFailureDescription(assertionType: _XCTAssertionType, formatIndex: UInt, expressionStrings: CVarArg...) -> String {
+func _XCTFailureDescription(assertionType: _XCTAssertionType, formatIndex: UInt, expressionStrings: CVarArgType...) -> String {
   // In order to avoid revlock/submission issues between XCTest and the Swift XCTest overlay,
   // we are using the convention with _XCTFailureFormat that (formatIndex >= 100) should be
   // treated just like (formatIndex - 100), but WITHOUT the expression strings. (Swift can't
@@ -107,12 +107,12 @@ func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ message: Stri
   // TODO: handle an exception for which we can't get a description
 }
 
-func XCTAssert(expression: @auto_closure () -> LogicValue, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+func XCTAssert(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
-func XCTAssertTrue(expression: @auto_closure () -> LogicValue, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertTrue(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
@@ -128,7 +128,7 @@ func XCTAssertTrue(expression: @auto_closure () -> LogicValue, _ message: String
   // TODO: handle an exception for which we can't get a description
 }
 
-func XCTAssertFalse(expression: @auto_closure () -> LogicValue, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+func XCTAssertFalse(expression: @auto_closure () -> LogicValueType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
   let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
@@ -196,7 +196,7 @@ func _XCTCheckEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Fl
     && (abs(value1 - value2) <= accuracy)
 }
 
-func XCTAssertEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertEqualWithAccuracy<T: FloatingPointNumberType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -242,7 +242,7 @@ func _XCTCheckNotEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy:
     || (abs(value1 - value2) > accuracy)
 }
 
-func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumberType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once

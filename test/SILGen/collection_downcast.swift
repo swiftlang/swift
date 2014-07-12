@@ -7,7 +7,7 @@ class BridgedObjC : NSObject { }
 
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
-struct BridgedSwift : Hashable, _BridgedToObjectiveC {
+struct BridgedSwift : Hashable, _BridgedToObjectiveCType {
   var hashValue: Int { return 0 }
 
   static func getObjectiveCType() -> Any.Type {

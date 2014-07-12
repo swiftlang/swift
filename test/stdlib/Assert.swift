@@ -5,7 +5,7 @@
 //
 // RUN: %target-run %t/a.out fatal 2>&1 | FileCheck %s -check-prefix=CHECK_FATAL
 // RUN: %target-run %t/a.out Bool 2>&1 | FileCheck %s -check-prefix=CHECK_BOOL
-// RUN: %target-run %t/a.out LogicValue 2>&1 | FileCheck %s -check-prefix=CHECK_LOGICVALUE
+// RUN: %target-run %t/a.out LogicValueType 2>&1 | FileCheck %s -check-prefix=CHECK_LOGICVALUE
 
 // REQUIRES: swift_stdlib_asserts
 
@@ -15,7 +15,7 @@ import Darwin
 // Utilities.
 //===---
 
-struct Truthiness : LogicValue {
+struct Truthiness : LogicValueType {
   init(_ value: Bool) { self.value = value }
   func getLogicValue() -> Bool { return value }
 
@@ -78,7 +78,7 @@ func test_securityCheckLogicValue() {
   // CHECK_LOGICVALUE-NEXT: CRASHED: SIG{{ILL|TRAP}}
 }
 
-if (Process.arguments[1] == "LogicValue") {
+if (Process.arguments[1] == "LogicValueType") {
   test_securityCheckLogicValue()
 }
 

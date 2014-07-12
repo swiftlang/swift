@@ -16,67 +16,69 @@ internal func _countElements<Args>(a: Args) -> (_CountElements, Args) {
 }
 // Default implementation of countElements for Collections
 // Do not use this operator directly; call countElements(x) instead
-public func ~> <T: _Collection>(x:T, _:(_CountElements,()))
-  -> T.IndexType.DistanceType
+public func ~> <T: _CollectionType>(x:T, _:(_CountElements,()))
+  -> T.Index.Distance
 {
   return distance(x.startIndex, x.endIndex)
 }
 
-/// Return the number of elements in x.  O(1) if T.IndexType is
-/// RandomAccessIndex; O(N) otherwise.
-public func countElements <T: _Collection>(x: T) -> T.IndexType.DistanceType {
+/// Return the number of elements in x.  O(1) if T.Index is
+/// RandomAccessIndexType; O(N) otherwise.
+public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
   return x~>_countElements()
 }
 
-public protocol _Collection : _Sequence {
-  typealias IndexType : ForwardIndex
+public protocol _CollectionType : _SequenceType {
+  typealias Index : ForwardIndexType
 
-  var startIndex: IndexType {get}
-  var endIndex: IndexType {get}
+  var startIndex: Index {get}
+  var endIndex: Index {get}
 
   // The declaration of Element and _subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
-  // need something other than a Collection.GeneratorType.Element that can
+  // need something other than a CollectionType.Generator.Element that can
   // be used as IndexingGenerator<T>'s Element.  Here we arrange for the
-  // Collection itself to have an Element type that's deducible from
+  // CollectionType itself to have an Element type that's deducible from
   // its subscript.  Ideally we'd like to constrain this
-  // Element to be the same as Collection.GeneratorType.Element (see
+  // Element to be the same as CollectionType.Generator.Element (see
   // below), but we have no way of expressing it today.
   typealias _Element
-  subscript(i: IndexType) -> _Element {get}
+  subscript(i: Index) -> _Element {get}
 }
 
-public protocol Collection : _Collection, Sequence {
-  subscript(i: IndexType) -> GeneratorType.Element {get}
+public protocol CollectionType : _CollectionType, SequenceType {
+  subscript(i: Index) -> Generator.Element {get}
   
   // Do not use this operator directly; call countElements(x) instead
-  func ~> (_:Self, _:(_CountElements, ())) -> IndexType.DistanceType
+  func ~> (_:Self, _:(_CountElements, ())) -> Index.Distance
 }
 
 // Default implementation of underestimateCount for Collections.  Do not
 // use this operator directly; call underestimateCount(s) instead
-public func ~> <T: _Collection>(x:T,_:(_UnderestimateCount,())) -> Int {
+public func ~> <T: _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_countElements())
 }
 
 // Default implementation of `preprocessingPass` for Collections.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
-public func ~> <T: _Collection, R>(
+public func ~> <T: _CollectionType, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
 ) -> R? {
   return args.1(s)
 }
 
 
-public protocol MutableCollection : Collection {
-  subscript(i: IndexType) -> GeneratorType.Element {get set}
+public protocol MutableCollectionType : CollectionType {
+  subscript(i: Index) -> Generator.Element {get set}
 }
 
-/// A stream type that could serve for a Collection given that
-/// it already had an IndexType.
-public struct IndexingGenerator<C: _Collection> : Generator, Sequence {
-  // Because of <rdar://problem/14396120> we've had to factor _Collection out
-  // of Collection to make it useful.
+/// A stream type that could serve for a CollectionType given that
+/// it already had an Index.
+public struct IndexingGenerator<
+  C: _CollectionType
+> : GeneratorType, SequenceType {
+  // Because of <rdar://problem/14396120> we've had to factor
+  // _CollectionType out of CollectionType to make it useful.
 
   public init(_ seq: C) {
     self._elements = seq
@@ -92,31 +94,31 @@ public struct IndexingGenerator<C: _Collection> : Generator, Sequence {
     ? .None : .Some(_elements[_position++])
   }
   var _elements: C
-  var _position: C.IndexType
+  var _position: C.Index
 }
 
 public func indices<
-    Seq : Collection>(seq: Seq) -> Range<Seq.IndexType> {
+    Seq : CollectionType>(seq: Seq) -> Range<Seq.Index> {
   return Range(start: seq.startIndex, end: seq.endIndex)
 }
 
 public struct PermutationGenerator<
-  C: Collection, Indices: Sequence
-  where C.IndexType == Indices.GeneratorType.Element
-> : Generator, Sequence {
+  C: CollectionType, Indices: SequenceType
+  where C.Index == Indices.Generator.Element
+> : GeneratorType, SequenceType {
   var seq : C
-  var indices : Indices.GeneratorType
+  var indices : Indices.Generator
 
-  public typealias Element = C.GeneratorType.Element
+  public typealias Element = C.Generator.Element
 
   public mutating func next() -> Element? {
     var result = indices.next()
     return result ? seq[result!] : .None
   }
 
-  // Every Generator is also a single-pass Sequence
-  public typealias GeneratorType = PermutationGenerator
-  public func generate() -> GeneratorType {
+  // Every GeneratorType is also a single-pass SequenceType
+  public typealias Generator = PermutationGenerator
+  public func generate() -> Generator {
     return self
   }
 
@@ -126,28 +128,28 @@ public struct PermutationGenerator<
   }
 }
 
-public protocol _Sliceable : Collection {}
+public protocol _Sliceable : CollectionType {}
 
 public protocol Sliceable : _Sliceable {
-  // FIXME: SliceType should also be Sliceable but we can't express
+  // FIXME: Slice should also be Sliceable but we can't express
   // that constraint (<rdar://problem/14375973> Include associated
   // type information in protocol witness tables) Instead we constrain
   // to _Sliceable; at least error messages will be more informative.
-  typealias SliceType: _Sliceable
-  subscript(_: Range<IndexType>) -> SliceType {get}
+  typealias SubSlice: _Sliceable
+  subscript(_: Range<Index>) -> SubSlice {get}
 }
 
-public protocol MutableSliceable : Sliceable, MutableCollection {
-  subscript(_: Range<IndexType>) -> SliceType {get set}
+public protocol MutableSliceable : Sliceable, MutableCollectionType {
+  subscript(_: Range<Index>) -> SubSlice {get set}
 }
 
-public func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SliceType {
+public func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SubSlice {
   return seq[seq.startIndex.successor()..<seq.endIndex]
 }
 
 public func dropLast<
   Seq: Sliceable 
-  where Seq.IndexType: BidirectionalIndex
->(seq: Seq) -> Seq.SliceType {
+  where Seq.Index: BidirectionalIndexType
+>(seq: Seq) -> Seq.SubSlice {
   return seq[seq.startIndex..<seq.endIndex.predecessor()]
 }

@@ -15,7 +15,7 @@
 % common_args = dict(
 %   introspecteeType='Range',
 %   genericArgs=['T'],
-%   genericConstraints={'T':'ForwardIndex'},
+%   genericConstraints={'T':'ForwardIndexType'},
 %   disposition='Struct')
 %
 % for x in ('Decl', 'Conformance', 'Boilerplate'):
@@ -26,7 +26,7 @@ ${MirrorDecl} {
   ${MirrorBoilerplate}
   public var count: Int { return 2 }
 
-  public subscript(i: Int) -> (String, Mirror) {
+  public subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("startIndex",reflect(_value.startIndex))
     case 1: return ("endIndex",reflect(_value.endIndex))

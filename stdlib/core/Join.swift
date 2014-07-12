@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _ExtensibleCollection : Collection {
+public protocol _ExtensibleCollectionType : CollectionType {
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
   /// This works as an optimization to avoid multiple reallocations of
   /// linear data structures like Array
-  mutating func reserveCapacity(n: IndexType.DistanceType)
+  mutating func reserveCapacity(n: Index.Distance)
 
   /*
   The 'extend' requirement should be an operator, but the compiler crashes:
@@ -25,18 +25,18 @@ public protocol _ExtensibleCollection : Collection {
   or SILGen
 
   @assignment func +=<
-    S : Sequence
-    where S.GeneratorType.Element == Self.GeneratorType.Element
+    S : SequenceType
+    where S.Generator.Element == Self.Generator.Element
   >(inout _: Self, _: S)
   */
 
   mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == Self.GeneratorType.Element
+      S : SequenceType
+      where S.Generator.Element == Self.Generator.Element
   >(_: S)
 }
 
-public protocol ExtensibleCollection : _ExtensibleCollection {
+public protocol ExtensibleCollectionType : _ExtensibleCollectionType {
 /*
   We could have these operators with default implementations, but the compiler
   crashes:
@@ -45,31 +45,31 @@ public protocol ExtensibleCollection : _ExtensibleCollection {
   or SILGen
 
   func +<
-    S : Sequence
-    where S.GeneratorType.Element == Self.GeneratorType.Element
+    S : SequenceType
+    where S.Generator.Element == Self.Generator.Element
   >(_: Self, _: S) -> Self
 
   func +<
-    S : Sequence
-    where S.GeneratorType.Element == Self.GeneratorType.Element
+    S : SequenceType
+    where S.Generator.Element == Self.Generator.Element
   >(_: S, _: Self) -> Self
 
   func +<
-    S : Collection
-    where S.GeneratorType.Element == Self.GeneratorType.Element
+    S : CollectionType
+    where S.Generator.Element == Self.Generator.Element
   >(_: Self, _: S) -> Self
 
   func +<
-    EC : ExtensibleCollection
-    where EC.GeneratorType.Element == Self.GeneratorType.Element
+    EC : ExtensibleCollectionType
+    where EC.Generator.Element == Self.Generator.Element
   >(_: Self, _: S) -> Self
 */
 }
 
 public func +<
-    C : _ExtensibleCollection,
-    S : Sequence
-    where S.GeneratorType.Element == C.GeneratorType.Element
+    C : _ExtensibleCollectionType,
+    S : SequenceType
+    where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.extend(rhs)
@@ -77,9 +77,9 @@ public func +<
 }
 
 public func +<
-    C : _ExtensibleCollection,
-    S : Sequence
-    where S.GeneratorType.Element == C.GeneratorType.Element
+    C : _ExtensibleCollectionType,
+    S : SequenceType
+    where S.Generator.Element == C.Generator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(
@@ -90,9 +90,9 @@ public func +<
 }
 
 public func +<
-    C : _ExtensibleCollection,
-    S : Collection
-    where S.GeneratorType.Element == C.GeneratorType.Element
+    C : _ExtensibleCollectionType,
+    S : CollectionType
+    where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
@@ -101,9 +101,9 @@ public func +<
 }
 
 public func +<
-    EC1 : _ExtensibleCollection,
-    EC2 : _ExtensibleCollection
-    where EC1.GeneratorType.Element == EC2.GeneratorType.Element
+    EC1 : _ExtensibleCollectionType,
+    EC2 : _ExtensibleCollectionType
+    where EC1.Generator.Element == EC2.Generator.Element
 >(var lhs: EC1, rhs: EC2) -> EC1 {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
@@ -111,15 +111,15 @@ public func +<
   return lhs
 }
 
-extension String : ExtensibleCollection {
+extension String : ExtensibleCollectionType {
   public mutating func reserveCapacity(n: Int) {
     // FIXME: implement.
     // <rdar://problem/16970908> Implement String.reserveCapacity
   }
 
   public mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == Character
+      S : SequenceType
+      where S.Generator.Element == Character
   >(seq: S) {
     for c in seq {
       self += c
@@ -136,7 +136,8 @@ extension String : ExtensibleCollection {
 ///
 ///   println(join(" ", [ "here", "be", "dragons" ]))
 public func join<
-    C : ExtensibleCollection, S : Sequence where S.GeneratorType.Element == C
+  C : ExtensibleCollectionType, S : SequenceType 
+  where S.Generator.Element == C
 >(
   separator: C, elements: S
 ) -> C {

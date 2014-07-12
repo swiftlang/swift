@@ -15,7 +15,7 @@ import StdlibUnittest
 
 var strideTestCase = TestCase("Strideable")
 
-struct R : RandomAccessIndex {
+struct R : RandomAccessIndexType {
   var x: Int
 
   init(_ x: Int) {
@@ -42,7 +42,7 @@ func ==(a: R, b: R) -> Bool {
 
 strideTestCase.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
-  // to RandomAccessIndex
+  // to RandomAccessIndexType
 }
 
 strideTestCase.test("HalfOpen") {
@@ -52,7 +52,7 @@ strideTestCase.test("HalfOpen") {
       sum,
       reduce(stride(from: start, to: end, by: stepSize), 0, +))
 
-    // Work on an arbitrary RandomAccessIndex
+    // Work on an arbitrary RandomAccessIndexType
     expectEqual(
       sum,
       reduce(stride(from: R(start), to: R(end), by: stepSize), 0){ $0 + $1.x })
@@ -77,7 +77,7 @@ strideTestCase.test("Closed") {
       sum,
       reduce(stride(from: start, through: end, by: stepSize), 0, +))
 
-    // Work on an arbitrary RandomAccessIndex
+    // Work on an arbitrary RandomAccessIndexType
     expectEqual(
       sum,
       reduce(

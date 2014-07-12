@@ -58,12 +58,12 @@ testSplit()
 // generic algorithms that work on Sequences, so need a lightweight
 // way to get Streams out of them.
 operator prefix ^ {}
-@prefix func ^ (x: [Int]) -> Array<Int>.GeneratorType
+@prefix func ^ (x: [Int]) -> Array<Int>.Generator
 { return x.generate() }
 
 // FIXME: This class is a temporary workaround for
 // <rdar://problem/13987068> (Vector enumerators can dangle)
-struct VecIntStream : Generator, Sequence {
+struct VecIntStream : GeneratorType, SequenceType {
   typealias Element = Int
 
   init(_ owner: [Int]) {
@@ -77,7 +77,7 @@ struct VecIntStream : Generator, Sequence {
     return self
   }
   var owner: [Int]
-  var value: Array<Int>.GeneratorType
+  var value: Array<Int>.Generator
 }
 
 operator prefix ^^ {}

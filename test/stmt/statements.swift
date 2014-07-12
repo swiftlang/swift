@@ -52,7 +52,7 @@ func funcdecl5(a: Int, y: Int) {
   }
 
   // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'LogicValue'}}
+  if x {}   // expected-error {{type 'Int' does not conform to protocol 'LogicValueType'}}
 
   if true {
     if (B) {
@@ -92,7 +92,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'LogicValue'}}
+  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'LogicValueType'}}
 }
 
 // test "builder" API style

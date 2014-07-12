@@ -46,3 +46,4 @@ public var valueType: Any.Type { return (_value as Any).dynamicType }
 public var objectIdentifier: ObjectIdentifier? { return .None }
 
 public var disposition: MirrorDisposition { return ${disposition} }
+

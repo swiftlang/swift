@@ -17,6 +17,6 @@ struct A2<T> : P {
   typealias Element = T
 }
 
-func toA<S: _Sequence, AT:P where AT.Element == S.GeneratorType.Element>(s: S) -> AT { // expected-error{{'GeneratorType' is not a member type of 'S'}}
+func toA<S: _SequenceType, AT:P where AT.Element == S.Generator.Element>(s: S) -> AT { // expected-error{{'Generator' is not a member type of 'S'}}
   return AT()
 }

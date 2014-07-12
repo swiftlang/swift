@@ -111,7 +111,7 @@ public protocol Comparable : _Comparable, Equatable {
   func >(lhs: Self, rhs: Self) -> Bool
 }
 
-public protocol BitwiseOperations {
+public protocol BitwiseOperationsType {
   func & (_: Self, _: Self) -> Self
   func |(_: Self, _: Self) -> Self
   func ^(_: Self, _: Self) -> Self
@@ -136,28 +136,28 @@ public protocol Hashable : Equatable {
   var hashValue: Int { get }
 }
 
-// The opposite of a Generator (like an Output Iterator)
-public protocol Sink {
+// The opposite of a GeneratorType (like an Output Iterator)
+public protocol SinkType {
   typealias Element
   mutating func put(x: Element)
 }
 
-public func == <T: _RawOptionSet>(a: T, b: T) -> Bool {
+public func == <T: _RawOptionSetType>(a: T, b: T) -> Bool {
   return a.toRaw() == b.toRaw()
 }
 
-/* FIXME: These should be default implementations of the BitwiseOperations
-   conformance for RawOptionSet. */
-public func & <T: RawOptionSet>(a: T, b: T) -> T {
+/* FIXME: These should be default implementations of the BitwiseOperationsType
+   conformance for RawOptionSetType. */
+public func & <T: RawOptionSetType>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() & b.toRaw())
 }
-public func | <T: RawOptionSet>(a: T, b: T) -> T {
+public func | <T: RawOptionSetType>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() | b.toRaw())
 }
-public func ^ <T: RawOptionSet>(a: T, b: T) -> T {
+public func ^ <T: RawOptionSetType>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() ^ b.toRaw())
 }
-@prefix public func ~ <T: RawOptionSet>(a: T) -> T {
+@prefix public func ~ <T: RawOptionSetType>(a: T) -> T {
   return T.fromMask(~a.toRaw())
 }
 

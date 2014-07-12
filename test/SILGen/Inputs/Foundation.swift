@@ -19,8 +19,8 @@ func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 // NSDictionary bridging entry points
-func _convertDictionaryToNSDictionary<KeyType, ValueType>(
-    d: Dictionary<KeyType, ValueType>
+func _convertDictionaryToNSDictionary<Key, Value>(
+    d: Dictionary<Key, Value>
 ) -> NSDictionary {
   return NSDictionary()
 }
@@ -31,7 +31,7 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
   return Dictionary<K, V>()
 }
 
-extension String : _BridgedToObjectiveC {
+extension String : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSString.self
   }
@@ -43,7 +43,7 @@ extension String : _BridgedToObjectiveC {
   }
 }
 
-extension Int : _BridgedToObjectiveC {
+extension Int : _BridgedToObjectiveCType {
   public static func getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
@@ -55,7 +55,7 @@ extension Int : _BridgedToObjectiveC {
   }
 }
 
-extension Array : _ConditionallyBridgedToObjectiveC {
+extension Array : _ConditionallyBridgedToObjectiveCType {
   public
   static func getObjectiveCType() -> Any.Type {
     return NSArray.self
@@ -76,7 +76,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 }
 
-extension Dictionary : _ConditionallyBridgedToObjectiveC {
+extension Dictionary : _ConditionallyBridgedToObjectiveCType {
   public
   static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self

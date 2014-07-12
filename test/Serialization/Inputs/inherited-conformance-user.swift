@@ -1,19 +1,19 @@
 import Base
 
-// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndex.
-public struct OneToAThousand : Collection {
+// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndexType.
+public struct OneToAThousand : CollectionType {
   public typealias Element = Int
-  public typealias IndexType = Counter<Int>
+  public typealias Index = Counter<Int>
 
-  public var startIndex: IndexType {
-    return IndexType(value: 1)
+  public var startIndex: Index {
+    return Index(value: 1)
   }
 
-  public var endIndex: IndexType {
-    return IndexType(value: 1001)
+  public var endIndex: Index {
+    return Index(value: 1001)
   }
 
-  public subscript(i: IndexType) -> Element {
+  public subscript(i: Index) -> Element {
     return i.value
   }
 

@@ -60,7 +60,7 @@ var i : Int, f : Float
 var p = pair(i, f)
 
 // Conformance constraints on static variables.
-func f1<S1 : Sequence>(s1: S1) {}
+func f1<S1 : SequenceType>(s1: S1) {}
 var x : Array<Int> = [1]
 f1(x)
 
@@ -121,8 +121,8 @@ rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
 func f1<
-  S: Collection 
-  where S.IndexType: BidirectionalIndex
+  S: CollectionType 
+  where S.Index: BidirectionalIndexType
 >(seq: S) {
   let x = lazy(indices(seq)).reverse()
   PermutationGenerator(elements: seq, indices: x)
@@ -130,8 +130,8 @@ func f1<
 }
 
 // <rdar://problem/16078944>
-func count16078944<C: Collection>(x: C) -> Int { return 0 }
+func count16078944<C: CollectionType>(x: C) -> Int { return 0 }
 
-func test16078944 <T: ForwardIndex>(lhs: T, args: T) -> Int {
+func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
     return count16078944(lhs..<args) // don't crash
 }

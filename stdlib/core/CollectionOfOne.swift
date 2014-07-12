@@ -1,4 +1,4 @@
-//===--- CollectionOfOne.swift - A Collection with one element ------------===//
+//===--- CollectionOfOne.swift - A CollectionType with one element --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct GeneratorOfOne<T> : Generator, Sequence {
+public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
   public init(_ elements: T?) {
     self.elements = elements
   }
@@ -27,18 +27,18 @@ public struct GeneratorOfOne<T> : Generator, Sequence {
   var elements: T?
 }
 
-public struct CollectionOfOne<T> : Collection {
-  public typealias IndexType = Bit
+public struct CollectionOfOne<T> : CollectionType {
+  public typealias Index = Bit
 
   public init(_ element: T) { 
     self.element = element 
   }
 
-  public var startIndex: IndexType {
+  public var startIndex: Index {
     return .zero
   }
   
-  public var endIndex: IndexType {
+  public var endIndex: Index {
     return .one
   }
 
@@ -46,7 +46,7 @@ public struct CollectionOfOne<T> : Collection {
     return GeneratorOfOne(element)
   }
 
-  public subscript(i: IndexType) -> T {
+  public subscript(i: Index) -> T {
     _precondition(i == .zero, "Index out of range")
     return element
   }

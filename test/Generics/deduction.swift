@@ -205,7 +205,9 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{type 'Float' does not conform to protocol 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : Generator where R.Element : IsBefore>(range : R) { }
+func rangeOfIsBefore<
+  R : GeneratorType where R.Element : IsBefore
+>(range : R) { }
 
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {

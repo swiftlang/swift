@@ -1,23 +1,23 @@
 // RUN: %swift -parse -verify %s
 
-struct S<A: Collection where A.IndexType == Int> : Collection {
-  typealias Element = A.GeneratorType.Element
-  typealias IndexType = A.IndexType
+struct S<A: CollectionType where A.Index == Int> : CollectionType {
+  typealias Element = A.Generator.Element
+  typealias Index = A.Index
   
-  init(base: A, baseRange: Range<IndexType>) {
+  init(base: A, baseRange: Range<Index>) {
     self.base = base
     self.baseRange = baseRange
   }
   
-  var startIndex: IndexType {
+  var startIndex: Index {
     return .from(0)
   }
   
-  var endIndex: IndexType {
+  var endIndex: Index {
     return Swift.count(baseRange)
   }
 
-  subscript(i: IndexType) -> Element {
+  subscript(i: Index) -> Element {
     return base[baseRange.startIndex + i]
   }
   
@@ -26,5 +26,5 @@ struct S<A: Collection where A.IndexType == Int> : Collection {
   }
   
   var base: A
-  var baseRange: Range<A.IndexType>
+  var baseRange: Range<A.Index>
 }

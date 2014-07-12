@@ -156,7 +156,7 @@ extension ${Self} : Printable {
 % if bits in allIntBits:
 // Not transparent because the compiler crashes in that case.
 //@transparent
-extension ${Self} : FloatingPointNumber {
+extension ${Self} : FloatingPointNumberType {
   public typealias _BitsType = UInt${bits}
 
   public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
@@ -264,7 +264,7 @@ extension ${Self} : FloatingPointNumber {
 }
 
 // Not @transparent because the function is too complex.
-extension ${Self} /* : FloatingPointNumber */ {
+extension ${Self} /* : FloatingPointNumberType */ {
   public var floatingPointClass: FloatingPointClassification {
     get {
       var biasedExponent = __getBiasedExponent()

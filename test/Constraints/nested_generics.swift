@@ -23,12 +23,12 @@ GInt.static_foo(GChar())
 GInt.static_bar(0)
 
 // <rdar://problem/12895793>
-struct AnyStream<T : Sequence> {
-  struct StreamRange<S : Generator> {
+struct AnyStream<T : SequenceType> {
+  struct StreamRange<S : GeneratorType> {
     var index : Int
     var elements : S
 
-    // Conform to the Generator protocol.
+    // Conform to the GeneratorType protocol.
     typealias Element = (Int, S.Element)
     mutating
     func next() -> Element? {
@@ -42,12 +42,12 @@ struct AnyStream<T : Sequence> {
   var input : T
 
   // Conform to the enumerable protocol.
-  typealias Elements = StreamRange<T.GeneratorType>
+  typealias Elements = StreamRange<T.Generator>
   func getElements() -> Elements {
     return Elements(index: 0, elements: input.generate())
   }
 }
 
-func enumerate<T : Sequence>(arg: T) -> AnyStream<T> {
+func enumerate<T : SequenceType>(arg: T) -> AnyStream<T> {
   return AnyStream<T>(input: arg)
 }

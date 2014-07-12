@@ -228,10 +228,10 @@ public struct _StringCore {
   }
 
   /// the Cocoa String buffer, if any, or .None.
-  public var cocoaBuffer: _CocoaString? {
+  public var cocoaBuffer: _CocoaStringType? {
     if hasCocoaBuffer {
       return _owner.map {
-        reinterpretCast($0) as _CocoaString
+        reinterpretCast($0) as _CocoaStringType
       }
     }
     return nil
@@ -281,8 +281,8 @@ public struct _StringCore {
 
   /// Write the string, in the given encoding, to output.
   func encode<
-    Encoding: UnicodeCodec,
-    Output: Sink
+    Encoding: UnicodeCodecType,
+    Output: SinkType
     where Encoding.CodeUnit == Output.Element
   >(encoding: Encoding.Type, output: Output) 
   {
@@ -467,7 +467,7 @@ public struct _StringCore {
   }
 }
 
-extension _StringCore : Collection {
+extension _StringCore : CollectionType {
   public
   var startIndex: Int {
     return 0

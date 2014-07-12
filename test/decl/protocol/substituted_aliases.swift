@@ -1,11 +1,11 @@
 // RUN: %swift -parse %s -verify
 
-struct Q<T: Collection> : Sequence {
-  func generate() -> T.GeneratorType {
+struct Q<T: CollectionType> : SequenceType {
+  func generate() -> T.Generator {
     return base.generate()
   }
   
-  func _adopt(newBuffer: Array<Q<T>.GeneratorType.Element>) {
+  func _adopt(newBuffer: Array<Q<T>.Generator.Element>) {
   }
   var base: T
 }

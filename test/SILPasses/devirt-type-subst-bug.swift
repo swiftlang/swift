@@ -1,9 +1,9 @@
 // RUN: %swift -O %s
 // We used to crash on this when trying to devirtualize a call to:
 //
-// %168 = witness_method $Array<String>, #Sequence."~>"!1 : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : Sequence, τ_0_0.GeneratorType : Generator> (@out Optional<τ_1_0>, @in τ_0_0, _PreprocessingPass, @owned @callee_owned (@out τ_1_0, @in τ_0_0) -> (), @thick τ_0_0.Type) -> ()
+// %168 = witness_method $Array<String>, #SequenceType."~>"!1 : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType> (@out Optional<τ_1_0>, @in τ_0_0, _PreprocessingPass, @owned @callee_owned (@out τ_1_0, @in τ_0_0) -> (), @thick τ_0_0.Type) -> ()
 // ...
-// %181 = apply %168<Array<String>, IndexingGenerator<Array<String>>, String, Int>(%166#1, %169#1, %180, %179, %167) : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : Sequence, τ_0_0.GeneratorType : Generator> (@out Optional<τ_1_0>, @in τ_0_0, _PreprocessingPass, @owned @callee_owned (@out τ_1_0, @in τ_0_0) -> (), @thick τ_0_0.Type) -> ()
+// %181 = apply %168<Array<String>, IndexingGenerator<Array<String>>, String, Int>(%166#1, %169#1, %180, %179, %167) : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType> (@out Optional<τ_1_0>, @in τ_0_0, _PreprocessingPass, @owned @callee_owned (@out τ_1_0, @in τ_0_0) -> (), @thick τ_0_0.Type) -> ()
 //
 // rdar://17399536
 

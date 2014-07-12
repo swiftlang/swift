@@ -21,7 +21,7 @@ var xSerial = 0
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-class X : ForwardIndex, Comparable, Printable, IntegerLiteralConvertible {
+class X : ForwardIndexType, Comparable, Printable, IntegerLiteralConvertible {
   init(_ value: Int) {
     ++xCount
     serial = ++xSerial
@@ -61,7 +61,7 @@ func < (x: X, y: X) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T: Sequence>(x: T) {
+func printSequence<T: SequenceType>(x: T) {
   print("[")
   var prefix = ""
   for a in x {
@@ -88,10 +88,10 @@ func checkReallocation<T : ArrayType>(
 }
 
 func checkEqual<
-    S1 : Sequence, S2 : Sequence
+    S1 : SequenceType, S2 : SequenceType
   where 
-    S1.GeneratorType.Element == S2.GeneratorType.Element,
-    S1.GeneratorType.Element : Equatable
+    S1.Generator.Element == S2.Generator.Element,
+    S1.Generator.Element : Equatable
 >(a1: S1, a2: S2, expected: Bool) {
   if equal(a1, a2) != expected {
     let un = expected ? "un" : ""
@@ -101,10 +101,10 @@ func checkEqual<
 
 func test<
   T: ArrayType
-where T.GeneratorType.Element == T._Buffer.Element,
+where T.Generator.Element == T._Buffer.Element,
           T._Buffer.Element == T.Element,
           T.Element == X,
-          T.IndexType == Int
+          T.Index == Int
 >(_: T.Type, label: String) {
   print("test: \(label)...")
 
@@ -210,7 +210,7 @@ func nsArrayOfStrings() -> Array<NSString> {
 
   return src.withUnsafePointerToElements {
     let ns =  NSArray(objects: UnsafePointer($0), count: src.count)
-    return Array(_ArrayBuffer(reinterpretCast(ns) as _CocoaArray))
+    return Array(_ArrayBuffer(reinterpretCast(ns) as _CocoaArrayType))
   }
 }
 
@@ -330,14 +330,14 @@ let testWidth = 11
 // gybbing and go back to using a generic function here
 func testReplace/*<
   A: ArrayType
-  where A.GeneratorType.Element == X, A.Buffer.Element == X, A.IndexType == Int
+  where A.Generator.Element == X, A.Buffer.Element == X, A.Index == Int
 >*/(make: ()->${A}<X>) {
 
   typealias A = ${A}<X>
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  var source = ContiguousArray<A.GeneratorType.Element>()
+  var source = ContiguousArray<A.Generator.Element>()
   for x in make() {
     source += x
   }

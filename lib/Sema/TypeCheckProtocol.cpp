@@ -2240,7 +2240,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
                                                   ValueDecl *Requirement) {
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
-  if (protocol == Context.getProtocol(KnownProtocolKind::RawRepresentable)) {
+  if (protocol == Context.getProtocol(
+        KnownProtocolKind::RawRepresentable)
+     ) {
     return DerivedConformance::deriveRawRepresentable(*this,
                                                       TypeDecl, Requirement);
   }

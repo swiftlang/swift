@@ -13,7 +13,7 @@
 //  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
-public enum Bit : Int, RandomAccessIndex, Reflectable {
+public enum Bit : Int, RandomAccessIndexType, Reflectable {
   case zero = 0, one = 1
 
   public func successor() -> Bit {
@@ -35,12 +35,12 @@ public enum Bit : Int, RandomAccessIndex, Reflectable {
   }
 
   public
-  func getMirror() -> Mirror {
+  func getMirror() -> MirrorType {
     return _BitMirror(self)
   }
 }
 
-struct _BitMirror: Mirror {
+struct _BitMirror: MirrorType {
   let _value: Bit
   
   init(_ v: Bit) {
@@ -55,8 +55,8 @@ struct _BitMirror: Mirror {
 
   var count: Int { return 0 }
 
-  subscript(i: Int) -> (String, Mirror) { 
-    _fatalError("Mirror access out of bounds")
+  subscript(i: Int) -> (String, MirrorType) { 
+    _fatalError("MirrorType access out of bounds")
   }
 
   var summary: String { 
@@ -79,7 +79,7 @@ public func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() < rhs.toRaw()
 }
 
-extension Bit : IntegerArithmetic {
+extension Bit : IntegerArithmeticType {
   static func _withOverflow(v: (Int, overflow: Bool)) -> (Bit, overflow: Bool) {
     return (Bit.fromRaw(v.0)!, v.overflow)
   }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %swift -verify -parse %s
 
-func assertCollection<C: Collection>(_: C) {}
+func assertCollection<C: CollectionType>(_: C) {}
 assertCollection(0..<10)
 
 // These error messages are not great, especially the second one.  If

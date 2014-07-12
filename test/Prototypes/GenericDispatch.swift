@@ -24,7 +24,7 @@ println("testing...")
 //===--- Think of this code as being "in the library" ---------------------===//
 //===----------------------------------------------------------------------===//
 
-//===--- F "base" protocol (like ForwardIndex) ----------------------------===//
+//===--- F "base" protocol (like ForwardIndexType) ------------------------===//
 
 // Protocols with default implementations are broken into two parts, a
 // base and a more-refined part.  From the user's point-of-view,
@@ -74,7 +74,7 @@ func distance<T: F>(x: T, y: T) -> Int {
   return x~>_distance(y)
 }
 
-//===--- R refined protocol (like RandomAccessIndex) ----------------------===//
+//===--- R refined protocol (like RandomAccessIndexType) ------------------===//
 protocol R_ : F_ {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)

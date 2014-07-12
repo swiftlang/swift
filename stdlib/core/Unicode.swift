@@ -31,7 +31,7 @@ enum UnicodeDecodingResult {
   }
 }
 
-public protocol UnicodeCodec {
+public protocol UnicodeCodecType {
   typealias CodeUnit
 
   init()
@@ -47,15 +47,15 @@ public protocol UnicodeCodec {
   /// Because of buffering, it is impossible to find the corresponing position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   mutating func decode<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult
 
   class func encode<
-    S : Sink where S.Element == CodeUnit
+    S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S)
 }
 
-public struct UTF8 : UnicodeCodec {
+public struct UTF8 : UnicodeCodecType {
 
   public typealias CodeUnit = UInt8
 
@@ -301,7 +301,7 @@ public struct UTF8 : UnicodeCodec {
   }
 
   public mutating func decode<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout next: G) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
     // generator.
@@ -412,7 +412,7 @@ public struct UTF8 : UnicodeCodec {
   }
 
   public static func encode<
-    S : Sink where S.Element == CodeUnit
+    S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -446,7 +446,7 @@ public struct UTF8 : UnicodeCodec {
   var _value =  UInt8()
 }
 
-public struct UTF16 : UnicodeCodec {
+public struct UTF16 : UnicodeCodecType {
   public typealias CodeUnit = UInt16
 
   public init() {}
@@ -462,7 +462,7 @@ public struct UTF16 : UnicodeCodec {
   var _lookaheadFlags: UInt8 = 0
 
   public mutating func decode<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .EmptyInput
@@ -540,7 +540,7 @@ public struct UTF16 : UnicodeCodec {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   mutating func _decodeOne<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
@@ -556,7 +556,7 @@ public struct UTF16 : UnicodeCodec {
   }
 
   public static func encode<
-      S : Sink where S.Element == CodeUnit
+      S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     var scalarValue: UInt32 = UInt32(input)
 
@@ -573,19 +573,19 @@ public struct UTF16 : UnicodeCodec {
   var _value = UInt16()
 }
 
-public struct UTF32 : UnicodeCodec {
+public struct UTF32 : UnicodeCodecType {
   public typealias CodeUnit = UInt32
 
   public init() {}
 
   public mutating func decode<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
-    G : Generator where G.Element == CodeUnit
+    G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
     if let x: UInt32 = input.next() {
       if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
@@ -598,17 +598,17 @@ public struct UTF32 : UnicodeCodec {
   }
 
   public static func encode<
-    S : Sink where S.Element == CodeUnit
+    S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
     output.put(UInt32(input))
   }
 }
 
 public func transcode<
-  Input : Generator,
-  Output : Sink,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec
+  Input : GeneratorType,
+  Output : SinkType,
+  InputEncoding : UnicodeCodecType,
+  OutputEncoding : UnicodeCodecType
   where InputEncoding.CodeUnit == Input.Element,
       OutputEncoding.CodeUnit == Output.Element>(
   inputEncoding: InputEncoding.Type, outputEncoding: OutputEncoding.Type,
@@ -645,10 +645,10 @@ public func transcode<
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
 internal func _transcodeSomeUTF16AsUTF8<
-  Input : Collection
-  where Input.GeneratorType.Element == UInt16>(
-  input: Input, startIndex: Input.IndexType
-) -> (Input.IndexType, _StringCore.UTF8Chunk) {
+  Input : CollectionType
+  where Input.Generator.Element == UInt16>(
+  input: Input, startIndex: Input.Index
+) -> (Input.Index, _StringCore.UTF8Chunk) {
   typealias UTF8Chunk = _StringCore.UTF8Chunk
 
   let endIndex = input.endIndex
@@ -659,7 +659,7 @@ internal func _transcodeSomeUTF16AsUTF8<
   while nextIndex != input.endIndex && utf8Count != utf8Max {
     let u = UInt(input[nextIndex])
     let shift = UTF8Chunk(utf8Count * 8)
-    var utf16Length: Input.IndexType.DistanceType = 1
+    var utf16Length: Input.Index.Distance = 1
 
     if _fastPath(u <= 0x7f) {
       result |= UTF8Chunk(u) << shift
@@ -734,12 +734,12 @@ internal func _transcodeSomeUTF16AsUTF8<
 }
 
 public
-protocol StringElement {
+protocol StringElementType {
   class func toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
   class func fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
-extension UTF16.CodeUnit : StringElement {
+extension UTF16.CodeUnit : StringElementType {
   public
   static func toUTF16CodeUnit(x: UTF16.CodeUnit) -> UTF16.CodeUnit {
     return x
@@ -750,7 +750,7 @@ extension UTF16.CodeUnit : StringElement {
   }
 }
 
-extension UTF8.CodeUnit : StringElement {
+extension UTF8.CodeUnit : StringElementType {
   public
   static func toUTF16CodeUnit(x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     return UTF16.CodeUnit(x)
@@ -776,7 +776,7 @@ extension UTF16 {
     return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
   }
 
-  public static func copy<T: StringElement, U: StringElement>(
+  public static func copy<T: StringElementType, U: StringElementType>(
     source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
   ) {
     if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
@@ -801,7 +801,7 @@ extension UTF16 {
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
   public static func measure<
-      Encoding : UnicodeCodec, Input : Generator
+      Encoding : UnicodeCodecType, Input : GeneratorType
       where Encoding.CodeUnit == Input.Element
   >(
     _: Encoding.Type, var input: Input, repairIllFormedSequences: Bool

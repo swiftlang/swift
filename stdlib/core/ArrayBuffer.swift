@@ -33,7 +33,7 @@ class _IndirectArrayBuffer {
     self.needsElementTypeCheck = needsElementTypeCheck
   }
     
-  init(cocoa: _CocoaArray, needsElementTypeCheck: Bool) {
+  init(cocoa: _CocoaArrayType, needsElementTypeCheck: Bool) {
     self.buffer = cocoa
     self.isMutable = false
     self.isCocoa = true
@@ -81,9 +81,9 @@ class _IndirectArrayBuffer {
       buffer ? reinterpretCast(buffer) as _ContiguousArrayStorage<T> : nil)
   }
 
-  func getCocoa() -> _CocoaArray {
+  func getCocoa() -> _CocoaArrayType {
     _sanityCheck(isCocoa)
-    return reinterpretCast(buffer!) as _CocoaArray
+    return reinterpretCast(buffer!) as _CocoaArrayType
   }
 }
 
@@ -109,7 +109,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
       ))
   }
 
-  public init(_ cocoa: _CocoaArray) {
+  public init(_ cocoa: _CocoaArrayType) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
       _IndirectArrayBuffer(
@@ -157,7 +157,7 @@ extension _ArrayBuffer {
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  public func _asCocoaArray() -> _CocoaArray {
+  public func _asCocoaArray() -> _CocoaArrayType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
@@ -208,7 +208,7 @@ extension _ArrayBuffer {
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
   public
-  mutating func replace<C: Collection where C.GeneratorType.Element == Element>(
+  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
@@ -382,7 +382,7 @@ extension _ArrayBuffer {
     return p != nil ? reinterpretCast(p) : reinterpretCast(owner)
   }
   
-  //===--- Collection conformance -----------------------------------------===//
+  //===--- CollectionType conformance -------------------------------------===//
   public
   var startIndex: Int {
     return 0
@@ -430,7 +430,7 @@ extension _ArrayBuffer {
     }
   }
 
-  var _nonNative: _CocoaArray? {
+  var _nonNative: _CocoaArrayType? {
     if !_isClassOrObjCExistential(T.self) {
       return nil
     }

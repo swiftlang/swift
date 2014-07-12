@@ -11,40 +11,40 @@
 //===----------------------------------------------------------------------===//
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%  whereClause = 'where S.IndexType : %sIndex' % traversal
+%  whereClause = 'where S.Index : %sIndexType' % traversal
 %  Self = 'Lazy%sCollection' % traversal
 
 /// Augments `S` with lazy versions of various collection algorithms.
 public
-struct ${Self}<S: Collection ${whereClause}> : Collection {
+struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
   public
   init(_ base: S) {
     self._base = base
   }
 
   public
-  func generate() -> S.GeneratorType {
+  func generate() -> S.Generator {
     return self._base.generate()
   }
 
   public
-  var startIndex: S.IndexType {
+  var startIndex: S.Index {
     return _base.startIndex
   }
   
   public
-  var endIndex: S.IndexType {
+  var endIndex: S.Index {
     return _base.endIndex
   }
 
   public
-  subscript(i: S.IndexType) -> S.GeneratorType.Element {
+  subscript(i: S.Index) -> S.Generator.Element {
     return _base[i]
   }
   
   /// an Array, created on-demand, containing the elements of this
-  /// lazy Collection.
-  public var array: [S.GeneratorType.Element] {
+  /// lazy CollectionType.
+  public var array: [S.Generator.Element] {
     return Array(_base)
   }
 
@@ -53,7 +53,7 @@ struct ${Self}<S: Collection ${whereClause}> : Collection {
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
 public
-func lazy<S: Collection ${whereClause}>(s: S) -> ${Self}<S> {
+func lazy<S: CollectionType ${whereClause}>(s: S) -> ${Self}<S> {
   return ${Self}(s)
 }
 

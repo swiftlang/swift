@@ -238,8 +238,8 @@ protocol P11 {
 }
 
 protocol P12 {
-  typealias IndexType : P1
-  func getIndex() -> IndexType // expected-note{{protocol requires function 'getIndex()' with type '() -> X12.IndexType'}}
+  typealias Index : P1
+  func getIndex() -> Index // expected-note{{protocol requires function 'getIndex()' with type '() -> X12.Index'}}
 }
 
 struct XIndexType : P11 { } // expected-error{{type 'XIndexType' does not conform to protocol 'P11'}}
@@ -248,4 +248,4 @@ struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P
   func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate has non-matching type '() -> XIndexType'}}
 }
 
-func ==(x: X12.IndexType, y: X12.IndexType) -> Bool { return true } // expected-error 2{{'IndexType' is not a member type of 'X12'}}
+func ==(x: X12.Index, y: X12.Index) -> Bool { return true } // expected-error 2{{'Index' is not a member type of 'X12'}}

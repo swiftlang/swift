@@ -19,7 +19,7 @@
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ForwardIndex, Printable {
+class Tracked : ForwardIndexType, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -51,11 +51,11 @@ func == (x: Tracked, y: Tracked) -> Bool {
 
 //===--- struct MrMcRange -------------------------------------------------===//
 // A wrapper around Range<Tracked> that allows us to detect when it is
-// being treated as a Collection rather than merely a Sequence, which
+// being treated as a CollectionType rather than merely a SequenceType, which
 // helps us to prove that an optimization is being used.  In
 // particular, when constructing a _ContiguousArrayBuffer from a
-// Collection, the necessary storage should be pre-allocated.
-struct MrMcRange : Collection {
+// CollectionType, the necessary storage should be pre-allocated.
+struct MrMcRange : CollectionType {
   typealias Base = Range<Int>
 
   init(_ base: Base) {
@@ -84,10 +84,10 @@ struct MrMcRange : Collection {
 
 //===--- struct MrMcArray<T> ----------------------------------------------===//
 // A faux ArrayType that allows us to detect that, rather than being
-// treated as an arbitrary Collection when converting to a
+// treated as an arbitrary CollectionType when converting to a
 // _ContiguousArrayBuffer, it is first asked for its underlying
 // _ContiguousArrayBuffer.
-struct MrMcArray<T> : Collection, _ArrayType {
+struct MrMcArray<T> : CollectionType, _ArrayType {
   typealias _Buffer = _ContiguousArrayBuffer<T>
 
   init(_ buffer: _Buffer) {
@@ -98,8 +98,8 @@ struct MrMcArray<T> : Collection, _ArrayType {
     return _buffer.count
   }
 
-  typealias GeneratorType = IndexingGenerator<MrMcArray>
-  func generate() -> GeneratorType {
+  typealias Generator = IndexingGenerator<MrMcArray>
+  func generate() -> Generator {
     return IndexingGenerator(self)
   }
   
@@ -118,7 +118,7 @@ struct MrMcArray<T> : Collection, _ArrayType {
   var _buffer: _Buffer
 }
 
-func printSequence<T: Sequence>(x: T) {
+func printSequence<T: SequenceType>(x: T) {
   print("<")
   var prefix = ""
   for a in x {

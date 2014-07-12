@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _NSSwiftArray supplies the implementation of the _CocoaArray API
+//  _NSSwiftArray supplies the implementation of the _CocoaArrayType API
 //  (and thus, NSArray the API) for our _ContiguousArrayStorage<T>.  We
 //  can't put this implementation directly on _ContiguousArrayStorage
 //  because generic classes can't override Objective-C selectors.
@@ -22,7 +22,7 @@ import SwiftShims
 // Base class of the heap buffer implementation backing the new Array
 // design.  
 @objc internal
-class _NSSwiftArray : HeapBufferStorageBase, _CocoaArray {
+class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
   func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
@@ -72,7 +72,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArray {
     }
   }
 
-  func copyWithZone(_: COpaquePointer) -> _CocoaArray {
+  func copyWithZone(_: COpaquePointer) -> _CocoaArrayType {
     return self
   }
 

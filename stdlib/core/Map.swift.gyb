@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map the elements of a Sequence ----*- swift -*-===//
+//===--- Map.swift - Lazily map over a SequenceType -----------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `Generator` used by `MapSequenceView` and `MapCollectionView`.
+/// The `GeneratorType` used by `MapSequenceView` and `MapCollectionView`.
 /// Produces each element by passing the output of the `Base`
-/// `Generator` through a transform function returning `T`
-public struct MapSequenceGenerator<Base: Generator, T>: Generator, Sequence {
+/// `GeneratorType` through a transform function returning `T`
+public struct MapSequenceGenerator<
+  Base: GeneratorType, T
+>: GeneratorType, SequenceType {
   public mutating func next() -> T? {
     let x = _base.next()
     if x {
@@ -32,59 +34,59 @@ public struct MapSequenceGenerator<Base: Generator, T>: Generator, Sequence {
 
 //===--- Sequences --------------------------------------------------------===//
 
-/// A `Sequence` whose elements consist of those in a `Base`
-/// `Sequence` passed through a transform function returning `T`.
+/// A `SequenceType` whose elements consist of those in a `Base`
+/// `SequenceType` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct MapSequenceView<Base: Sequence, T> : Sequence {
-  public func generate() -> MapSequenceGenerator<Base.GeneratorType,T> {
+public struct MapSequenceView<Base: SequenceType, T> : SequenceType {
+  public func generate() -> MapSequenceGenerator<Base.Generator,T> {
     return MapSequenceGenerator(
       _base: _base.generate(), _transform: _transform)
   }
   
   var _base: Base
-  var _transform: (Base.GeneratorType.Element)->T
+  var _transform: (Base.Generator.Element)->T
 }
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
-public func map<S:Sequence, T>(
-  source: S, transform: (S.GeneratorType.Element)->T
+public func map<S:SequenceType, T>(
+  source: S, transform: (S.Generator.Element)->T
 ) -> [T] {
   return lazy(source).map(transform).array
 }
 
 //===--- Collections ------------------------------------------------------===//
 
-/// A `Collection` whose elements consist of those in a `Base`
-/// `Collection` passed through a transform function returning `T`.
+/// A `CollectionType` whose elements consist of those in a `Base`
+/// `CollectionType` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct MapCollectionView<Base: Collection, T> : Collection {
-  public var startIndex: Base.IndexType {
+public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
+  public var startIndex: Base.Index {
     return _base.startIndex
   }
   
-  public var endIndex: Base.IndexType {
+  public var endIndex: Base.Index {
     return _base.endIndex
   }
 
-  public subscript(index: Base.IndexType) -> T {
+  public subscript(index: Base.Index) -> T {
     return _transform(_base[index])
   }
 
-  public func generate() -> MapSequenceView<Base, T>.GeneratorType {
+  public func generate() -> MapSequenceView<Base, T>.Generator {
     return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }
 
   var _base: Base
-  var _transform: (Base.GeneratorType.Element)->T
+  var _transform: (Base.Generator.Element)->T
 }
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
-public func map<C:Collection, T>(
-  source: C, transform: (C.GeneratorType.Element)->T
+public func map<C:CollectionType, T>(
+  source: C, transform: (C.Generator.Element)->T
 ) -> [T] {
   return lazy(source).map(transform).array
 }
@@ -102,7 +104,7 @@ extension ${Self} {
   /// calling `transform` function on a base element.
   public
   func map<U>(
-    transform: (S.GeneratorType.Element)->U
+    transform: (S.Generator.Element)->U
   ) -> ${Self}<${View}<S, U>> {
     return ${Self}<${View}<S, U>>(
       ${View}(_base: self._base, transform)

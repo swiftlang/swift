@@ -5,8 +5,8 @@
 import Foundation
 import Swift
 
-protocol TestableUnicodeCodec : UnicodeCodec {
-  typealias CodeUnit : Integer
+protocol TestableUnicodeCodec : UnicodeCodecType {
+  typealias CodeUnit : IntegerType
   class func encodingId() -> NSStringEncoding
   class func name() -> NSString
 }
@@ -96,16 +96,16 @@ func nsEncode<CodeUnit>(
 }
 
 // Convert the given numeric value to a hexidecimal string
-func hex<T : Integer>(x: T) -> String {
+func hex<T : IntegerType>(x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
 
 // Convert the given sequence of numeric values to a string
 // representing their hexidecimal values
 func hex<
-  S: Sequence
+  S: SequenceType
 where
-  S.GeneratorType.Element : Integer
+  S.Generator.Element : IntegerType
 >(x: S) -> String {
   var r = "["
   var prefix = ""
@@ -117,9 +117,9 @@ where
   return r
 }
 
-// A Sink that stores the elements written into an Array that can be
+// A SinkType that stores the elements written into an Array that can be
 // inspected later.
-class ArraySink<T: IntegerLiteralConvertible> : Sink {
+class ArraySink<T: IntegerLiteralConvertible> : SinkType {
   init(capacity: Int) {
     storage = Array(count: capacity, repeatedValue: 0)
   }
@@ -302,7 +302,7 @@ additionalUtf16Tests()
 
 import StdlibUnittest
 
-class EOFCountingGenerator<T> : Generator {
+class EOFCountingGenerator<T> : GeneratorType {
   var array: [T]
   var index: Int = 0
   var numTimesReturnedEOF: Int = 0
@@ -320,7 +320,7 @@ class EOFCountingGenerator<T> : Generator {
   }
 }
 
-func checkDecodeUTF<Codec : UnicodeCodec>(
+func checkDecodeUTF<Codec : UnicodeCodecType>(
     codec: Codec.Type, expectedHead: [UInt32],
     expectedRepairedTail: [UInt32], utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {

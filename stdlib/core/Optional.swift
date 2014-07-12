@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-public enum Optional<T>: LogicValue, Reflectable, NilLiteralConvertible {
+public enum Optional<T>: LogicValueType, Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
@@ -41,7 +41,7 @@ public enum Optional<T>: LogicValue, Reflectable, NilLiteralConvertible {
     }
   }
 
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _OptionalMirror(self)
   }
   
@@ -138,7 +138,7 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   return !rhs.getLogicValue()
 }
 
-internal struct _OptionalMirror<T> : Mirror {
+internal struct _OptionalMirror<T> : MirrorType {
   let _value : Optional<T>
 
   init(_ x : Optional<T>) {
@@ -153,7 +153,7 @@ internal struct _OptionalMirror<T> : Mirror {
 
   var count: Int { return _value ? 1 : 0 }
 
-  subscript(i: Int) -> (String, Mirror) { 
+  subscript(i: Int) -> (String, MirrorType) { 
     switch (_value,i) {
     case (.Some(let contents),0) : return ("Some",reflect(contents))
     default: _preconditionFailure("cannot extract this child index")

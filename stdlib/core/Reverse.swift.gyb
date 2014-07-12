@@ -13,9 +13,9 @@
 
 /// Return an `Array` containing the elements of `source` in reverse
 /// order.
-public func reverse<C:Collection where C.IndexType: BidirectionalIndex>(
+public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
   source: C
-) -> [C.GeneratorType.Element] {
+) -> [C.Generator.Element] {
   return lazy(source).reverse().array
 }
 
@@ -24,7 +24,7 @@ public func reverse<C:Collection where C.IndexType: BidirectionalIndex>(
 %   View = '%sReverseView' % traversal
 %   Self = 'Lazy%sCollection' % traversal
 %   Index = 'Reverse%sIndex' % traversal
-%   IndexProtocol = '%sIndex' % traversal
+%   IndexProtocol = '%sIndexType' % traversal
 
 /// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal
@@ -41,14 +41,14 @@ public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
     return ${Index}(_base.successor())
   }
   
-  typealias DistanceType = I.DistanceType
+  typealias Distance = I.Distance
   
 %   if traversal == 'RandomAccess':
-  public func distanceTo(other: ${Index}) -> DistanceType {
+  public func distanceTo(other: ${Index}) -> Distance {
     return other._base.distanceTo(_base)
   }
   
-  public func advancedBy(amount: DistanceType) -> ${Index} {
+  public func advancedBy(amount: Distance) -> ${Index} {
     return ${Index}(_base.advancedBy(-amount))
   }
 %   end
@@ -58,13 +58,13 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
   return lhs._base == rhs._base
 }
 
-/// The lazy `Collection` returned by `reverse(c)` where `c` is a
-/// `Collection` with an `IndexType` conforming to `${IndexProtocol}`
+/// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
+/// `CollectionType` with an `Index` conforming to `${IndexProtocol}`
 public struct ${View}<
-  T: Collection where T.IndexType: ${IndexProtocol}
-> : Collection {
-  public typealias IndexType = ${Index}<T.IndexType>
-  public typealias GeneratorType = IndexingGenerator<${View}>
+  T: CollectionType where T.Index: ${IndexProtocol}
+> : CollectionType {
+  public typealias Index = ${Index}<T.Index>
+  public typealias Generator = IndexingGenerator<${View}>
 
   init(_ _base: T) {
     self._base = _base 
@@ -74,15 +74,15 @@ public struct ${View}<
     return IndexingGenerator(self)
   }
   
-  public var startIndex: IndexType {
+  public var startIndex: Index {
     return ${Index}(_base.endIndex)
   }
   
-  public var endIndex: IndexType {
+  public var endIndex: Index {
     return ${Index}(_base.startIndex)
   }
 
-  public subscript(i: IndexType) -> T.GeneratorType.Element {
+  public subscript(i: Index) -> T.Generator.Element {
     return _base[i._base.predecessor()]
   }
   

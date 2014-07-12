@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `Generator` used by `FilterSequenceView` and
+/// The `GeneratorType` used by `FilterSequenceView` and
 /// `FilterCollectionView`
-public struct FilterGenerator<Base: Generator> : Generator, Sequence {
+public struct FilterGenerator<
+  Base: GeneratorType
+> : GeneratorType, SequenceType {
   public mutating func next() -> Base.Element? {
     var n: Base.Element?
     for/*ever*/;; {
@@ -31,19 +33,21 @@ public struct FilterGenerator<Base: Generator> : Generator, Sequence {
   var _include: (Base.Element)->Bool
 }
 
-/// The lazy `Sequence` returned by `filter(c)` where `c` is a
-/// `Sequence`
-public struct FilterSequenceView<Base: Sequence> : Sequence {
-  public func generate() -> FilterGenerator<Base.GeneratorType> {
+/// The lazy `SequenceType` returned by `filter(c)` where `c` is a
+/// `SequenceType`
+public struct FilterSequenceView<Base: SequenceType> : SequenceType {
+  public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
   var _base: Base
-  var _include: (Base.GeneratorType.Element)->Bool
+  var _include: (Base.Generator.Element)->Bool
 }
 
-/// The `IndexType` used for subscripting a `FilterCollectionView`
-public struct FilterCollectionViewIndex<Base: Collection> : ForwardIndex {
+/// The `Index` used for subscripting a `FilterCollectionView`
+public struct FilterCollectionViewIndex<
+  Base: CollectionType
+> : ForwardIndexType {
   public func successor() -> FilterCollectionViewIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {
@@ -55,43 +59,43 @@ public struct FilterCollectionViewIndex<Base: Collection> : ForwardIndex {
     return FilterCollectionViewIndex(
       _pos: _end, _end: _end, _base: _base, _include: _include)
   }
-  var _pos: Base.IndexType
-  var _end: Base.IndexType
+  var _pos: Base.Index
+  var _end: Base.Index
   var _base: Base
-  var _include: (Base.GeneratorType.Element)->Bool
+  var _include: (Base.Generator.Element)->Bool
 }
 
-public func == <Base: Collection>(
+public func == <Base: CollectionType>(
   lhs: FilterCollectionViewIndex<Base>,
   rhs: FilterCollectionViewIndex<Base>
 ) -> Bool {
   return lhs._pos == rhs._pos
 }
 
-/// A lazy `Collection` wrapper that includes the elements of an
+/// A lazy `CollectionType` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.  Not
 /// automatically returned by `filter(x)` for two reasons:
 ///
-/// * The O(1) guarantee of our `IndexType` would be iffy at best, since
+/// * The O(1) guarantee of our `Index` would be iffy at best, since
 ///   it advances an underlying `Index` until the predicate is
 ///   satisfied.  Be aware that a `FilterCollectionView` may not offer
 ///   the expected efficiency for this reason.
 ///
-/// * Constructing an `Array` from a `Collection` measures the length
+/// * Constructing an `Array` from a `CollectionType` measures the length
 ///   of the collection before traversing it to read the elements.
 ///   This causes the filter predicate to be called twice for each
 ///   element of the underlying collection, which is surprising.
-public struct FilterCollectionView<Base: Collection> : Collection {
+public struct FilterCollectionView<Base: CollectionType> : CollectionType {
 
-  public typealias IndexType = FilterCollectionViewIndex<Base>
+  public typealias Index = FilterCollectionViewIndex<Base>
 
   public
-  init(_ base: Base, includeElement: (Base.GeneratorType.Element)->Bool) {
+  init(_ base: Base, includeElement: (Base.Generator.Element)->Bool) {
     self._base = base
     self._include = includeElement
   }
 
-  public var startIndex: IndexType {
+  public var startIndex: Index {
     var first = _base.startIndex
     while first != _base.endIndex {
       if _include(_base[first]) {
@@ -103,40 +107,40 @@ public struct FilterCollectionView<Base: Collection> : Collection {
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
   
-  public var endIndex: IndexType {
+  public var endIndex: Index {
     return FilterCollectionViewIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
       _base: _base, _include: _include)
   }
 
-  public subscript(index: IndexType) -> Base.GeneratorType.Element {
+  public subscript(index: Index) -> Base.Generator.Element {
     return _base[index._pos]
   }
 
-  public func generate() -> FilterGenerator<Base.GeneratorType> {
+  public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
   var _base: Base
-  var _include: (Base.GeneratorType.Element)->Bool
+  var _include: (Base.Generator.Element)->Bool
 }
 
 /// Return an `Array` containing the elements of `source`,
 /// in order, that satisfy the predicate `includeElement`.
-public func filter<S:Sequence>(
-  source: S, includeElement: (S.GeneratorType.Element)->Bool
-) -> [S.GeneratorType.Element] {
+public func filter<S:SequenceType>(
+  source: S, includeElement: (S.Generator.Element)->Bool
+) -> [S.Generator.Element] {
   return lazy(source).filter(includeElement).array
 }
 
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')
 % for Self in ['LazySequence'] + [ 'Lazy%sCollection' % t for t in traversals ]:
 extension ${Self} {
-  /// Return a lazy Sequence containing the elements `x` of `source` for
+  /// Return a lazy SequenceType containing the elements `x` of `source` for
   /// which `includeElement(x)` is `true`
   public
   func filter(
-    includeElement: (S.GeneratorType.Element)->Bool
+    includeElement: (S.Generator.Element)->Bool
   ) -> LazySequence<FilterSequenceView<S>> {
     return LazySequence<FilterSequenceView<S>>(
       FilterSequenceView(_base: self._base, _include: includeElement))
@@ -149,10 +153,10 @@ extension ${Self} {
 // No overload for collections; see the comment on
 // FilterCollectionView for an explanation.
 
-/// Return a lazy Collection containing the elements `x` of `source` for
+/// Return a lazy CollectionType containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
-public func filter<C:Collection>(
-  source: C, includeElement: (C.GeneratorType.Element)->Bool
+public func filter<C:CollectionType>(
+  source: C, includeElement: (C.Generator.Element)->Bool
 ) -> FilterCollectionView<C> {
   return FilterCollectionView(_base: source, _include: includeElement)
 }

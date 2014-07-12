@@ -1,4 +1,4 @@
-//===--- Mirrors.swift.gyb - Common Mirror implementations -----*- swift -*-==//
+//===--- Mirrors.swift.gyb - Common MirrorType implementations -*- swift -*-==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,7 +26,7 @@
 
 % for Type in Types:
 extension ${Type[0]} : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _LeafMirror(self, { "\($0)" }, { .Some(${Type[1]}(${Type[2]})) })
   }
 }

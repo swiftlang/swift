@@ -124,7 +124,7 @@ public extension UIAlertView {
   }
 }
 
-struct _UIViewMirror : Mirror {
+struct _UIViewMirror : MirrorType {
   var _v : UIView
   
   init(_ v : UIView) {_v = v}
@@ -137,7 +137,9 @@ struct _UIViewMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { _fatalError("Mirror access out of bounds") } }
+  subscript(_: Int) -> (String,MirrorType) { 
+    _fatalError("MirrorType access out of bounds")
+  }
   
   var summary: String { get { return ""} }
   
@@ -175,7 +177,7 @@ struct _UIViewMirror : Mirror {
 }
 
 extension UIView : Reflectable {
-  public func getMirror() -> Mirror {
+  public func getMirror() -> MirrorType {
     return _UIViewMirror(self)
   }
 }

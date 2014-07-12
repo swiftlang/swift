@@ -71,7 +71,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// Requires: insertCount <= numericCast(countElements(newValues))
   ///
   public
-  mutating func replace<C: Collection where C.GeneratorType.Element == T>(
+  mutating func replace<C: CollectionType where C.Generator.Element == T>(
     #subRange: Range<Int>, with insertCount: Int, elementsOf newValues: C
   ) {
     _invariantCheck()
@@ -118,7 +118,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   //===--- Non-essential bits ---------------------------------------------===//
 
   public
-  func _asCocoaArray() -> _CocoaArray {
+  func _asCocoaArray() -> _CocoaArrayType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
@@ -258,7 +258,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       hasNativeBuffer: _hasNativeBuffer)
   }
 
-  //===--- Collection conformance -----------------------------------------===//
+  //===--- CollectionType conformance -------------------------------------===//
   public
   var startIndex: Int {
     return 0

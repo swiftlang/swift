@@ -33,15 +33,15 @@ println(">")
 //===--- Avoid creating gratutitously self-destructive sequences ----------===//
 
 // In a naive implementation, mapping over a non-self-destructive
-// Sequence having a reference-semantics Generator produces a
+// SequenceType having a reference-semantics GeneratorType produces a
 // self-destructive mapped view.  This is technically correct because
 // Sequences are allowed to be self-destructive, and theoretically
-// every multi-pass Sequence would be a Collection, but Sequences are
+// every multi-pass SequenceType would be a CollectionType, but Sequences are
 // much easier to build than Collections and it would be extremely
 // surprising for users if their mappings were not stable.
 
-// A Generator with reference semantics
-class Counter : Generator {
+// A GeneratorType with reference semantics
+class Counter : GeneratorType {
   func next() -> Int? {
     return n < end ? n++ : nil
   }
@@ -55,8 +55,8 @@ class Counter : Generator {
   var end: Int
 }
 
-// A Sequence with value semantics
-struct IntRange: Sequence {
+// A SequenceType with value semantics
+struct IntRange: SequenceType {
   func generate() -> Counter {
     return Counter(start, end)
   }

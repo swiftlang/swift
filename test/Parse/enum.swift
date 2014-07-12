@@ -111,7 +111,7 @@ enum Recovery4 {
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}}
 
-enum RawType : Int {
+enum Raw : Int {
   case Ankeny, Burnside
 }
 

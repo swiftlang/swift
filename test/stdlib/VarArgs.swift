@@ -10,7 +10,7 @@ import Swift
 @asmname("vprintf")
 func c_vprintf(format: ConstUnsafePointer<Int8>, args: CVaListPointer)
 
-func printf(format: String, arguments: CVarArg...) {
+func printf(format: String, arguments: CVarArgType...) {
   withVaList(arguments) {
     c_vprintf(format, $0)
   }
@@ -25,7 +25,7 @@ func test_varArgs0() {
 test_varArgs0()
 
 func test_varArgs1() {
-  var args = [CVarArg]()
+  var args = [CVarArgType]()
 
   var format = "dig it: "
   for i in 0..<12 {
