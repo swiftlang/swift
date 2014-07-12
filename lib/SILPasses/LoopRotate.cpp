@@ -42,6 +42,17 @@ static SILBasicBlock *splitIfCriticalEdge(SILBasicBlock *From,
   llvm_unreachable("Destination block not found");
 }
 
+static SILBasicBlock *getSingleOutsideLoopPredecessor(SILLoop *L,
+                                                      SILBasicBlock *BB) {
+  SmallVector<SILBasicBlock *, 8> Preds;
+  for (auto *Pred : BB->getPreds())
+    if (!L->contains(Pred))
+      Preds.push_back(Pred);
+  if (Preds.size() != 1)
+    return nullptr;
+  return Preds[0];
+}
+
 /// Check whether all operands are loop invariant.
 static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L,
                                      llvm::DenseSet<SILInstruction *> &Inv) {
@@ -258,9 +269,17 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // We need a preheader.
   auto *Preheader = L->getLoopPreheader();
   if (!Preheader) {
-    DEBUG(llvm::dbgs() << *L << " no preheader\n");
-    DEBUG(L->getHeader()->getParent()->dump());
-    return false;
+    // Try to create a preheader.
+    if (auto LoopPred = getSingleOutsideLoopPredecessor(L, Header))
+      if (isa<CondBranchInst>(LoopPred->getTerminator())) {
+        Preheader = splitIfCriticalEdge(LoopPred, Header, DT, LI);
+        assert(Preheader && "Must have a preheader now");
+      }
+    if (!Preheader) {
+      DEBUG(llvm::dbgs() << *L << " no preheader\n");
+      DEBUG(L->getHeader()->getParent()->dump());
+      return false;
+    }
   }
 
   // We need a single backedge and the latch must not exit the loop if it is
@@ -278,15 +297,6 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
     return false;
   }
 
-  DEBUG(llvm::dbgs() << " Rotating " << *L);
-
-  // Now that we know we can perform the rotation move the instructions that
-  // need moving.
-  for (auto *Inst : MoveToPreheader)
-    Inst->moveBefore(Preheader->getTerminator());
-
-  // We can rotate the loop.
-
   auto *NewHeader = LoopEntryBranch->getTrueBB();
   auto *Exit = LoopEntryBranch->getFalseBB();
   if (L->contains(Exit))
@@ -295,7 +305,18 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
          "Could not find loop header and exit block");
   bool IsHeaderExitDominated = DT->dominates(Header, Exit);
 
-  assert(NewHeader->getSinglePredecessor() || Header == Latch);
+  // We don't want to rotate such that we merge two headers of separate loops
+  // into one. This can be turned into an assert again once we have guaranteed
+  // preheader insertions.
+  if (!NewHeader->getSinglePredecessor() && Header != Latch)
+    return false;
+
+  // Now that we know we can perform the rotation - move the instructions that
+  // need moving.
+  for (auto *Inst : MoveToPreheader)
+    Inst->moveBefore(Preheader->getTerminator());
+
+  DEBUG(llvm::dbgs() << " Rotating " << *L);
 
   // Map the values for the duplicated header block. We are duplicating the
   // header instructions into the end of the preheader.

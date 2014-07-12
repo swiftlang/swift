@@ -96,3 +96,61 @@ bb3 (%23 : $Builtin.Word) :
   %24 = struct $Int (%23 : $Builtin.Word)
   return %24 : $Int
 }
+
+// Don't assert on this loop. bb2 is bb1 loop's new header after rotation but
+// also bb2 loop's header.
+
+// CHECK-LABEL: @testnested
+// CHECK: return
+sil @testnested : $@thin () -> () {
+bb0:
+  br bb1(undef : $Builtin.Word, undef : $Builtin.Word) // id: %0
+
+bb1(%1 : $Builtin.Word, %2 : $Builtin.Word):      // Preds: bb0 bb2
+  %3 = integer_literal $Builtin.Int1, 0           // user: %4
+  cond_br %3, bb2(%1 : $Builtin.Word, %2 : $Builtin.Word), bb10 // id: %4
+
+bb2(%5 : $Builtin.Word, %6 : $Builtin.Word):      // Preds: bb1 bb8
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  cond_br %7, bb3, bb1(%5 : $Builtin.Word, %6 : $Builtin.Word) // id: %8
+
+bb3:                                              // Preds: bb2
+  %9 = integer_literal $Builtin.Word, 0           // user: %11
+  %10 = integer_literal $Builtin.Word, 1          // users: %14, %23
+  br bb4(%9 : $Builtin.Word)                      // id: %11
+
+bb4(%12 : $Builtin.Word):                         // Preds: bb3 bb7
+  %13 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %14
+  %14 = apply %13(%12, %10) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %15
+  cond_br %14, bb5, bb9                           // id: %15
+
+bb5:                                              // Preds: bb4
+  %16 = enum $Optional<Int>, #Optional.None!enumelt // user: %17
+  br bb6(%12 : $Builtin.Word, %16 : $Optional<Int>) // id: %17
+
+bb6(%18 : $Builtin.Word, %19 : $Optional<Int>):   // Preds: bb5 bb9
+  switch_enum %19 : $Optional<Int>, case #Optional.Some!enumelt.1: bb7, case #Optional.None!enumelt: bb8 // id: %20
+
+bb7:                                              // Preds: bb6
+  %21 = unchecked_enum_data %19 : $Optional<Int>, #Optional.Some!enumelt.1
+  br bb4(%18 : $Builtin.Word)                     // id: %22
+
+bb8:                                              // Preds: bb6
+  br bb2(%18 : $Builtin.Word, %10 : $Builtin.Word) // id: %23
+
+bb9:                                              // Preds: bb4
+  %24 = struct $Int (%12 : $Builtin.Word)         // user: %32
+  %25 = integer_literal $Builtin.Word, 1          // user: %28
+  %26 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %28
+  %27 = integer_literal $Builtin.Int1, -1         // user: %28
+  %28 = apply %26(%12, %25, %27) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %29, %30
+  %29 = tuple_extract %28 : $(Builtin.Word, Builtin.Int1), 0 // user: %33
+  %30 = tuple_extract %28 : $(Builtin.Word, Builtin.Int1), 1 // user: %31
+  cond_fail %30 : $Builtin.Int1                   // id: %31
+  %32 = enum $Optional<Int>, #Optional.Some!enumelt.1, %24 : $Int // user: %33
+  br bb6(%29 : $Builtin.Word, %32 : $Optional<Int>) // id: %33
+
+bb10:                                             // Preds: bb1
+  %34 = tuple ()                                  // user: %35
+  return %34 : $()                                // id: %35
+}
