@@ -1212,9 +1212,15 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 /// solution when we encounter the given constraint.
 static bool shortCircuitDisjunctionAt(Constraint *constraint,
                                       Constraint *successfulConstraint) {
+  
+  // If the successfully applied constraint is favored, we'll consider that to
+  // be the "best".
+  if (successfulConstraint->isFavored()) {
+    return true;
+  }
+  
   // Anything without a fix is better than anything with a fix.
-  if ((constraint->getFix() && !successfulConstraint->getFix()) ||
-      successfulConstraint->isFavored())
+  if (constraint->getFix() && !successfulConstraint->getFix())
     return true;
 
   if (auto restriction = constraint->getRestriction()) {

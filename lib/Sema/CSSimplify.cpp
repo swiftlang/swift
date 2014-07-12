@@ -674,44 +674,8 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
       auto argTy = argTuple[argIdx].getType();
 
       
-      auto isOptionalConversion = false;
-      auto notTyVarMatch = false;
-      
       if (!haveOneNonUserConversion) {
-        notTyVarMatch = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
-                          isa<TypeVariableType>(paramTy->getDesugaredType()));
-        
-        // We'll bypass optional conversions because of the implicit conversions
-        // that take place - there will always be a ValueToOptional disjunctive
-        // choice.
-        if (notTyVarMatch) {
-          if(auto boundGenericType = paramTy->getAs<BoundGenericType>()) {
-            auto typeDecl = boundGenericType->getDecl();
-            isOptionalConversion =
-                typeDecl->classifyAsOptionalType() ==
-                    OTK_ImplicitlyUnwrappedOptional;
-          }
-        }
-        
-        haveOneNonUserConversion = (!notTyVarMatch && !paramIdx) ||
-                                   isOptionalConversion ||
-                                   haveOneNonUserConversion;
-      }
-      
-      // If at least one operator argument can be applied to without a user
-      // conversion, there's no need to check the others.
-      if (!haveOneNonUserConversion && notTyVarMatch) {
-        auto applyFlags = subflags |
-                          ConstraintSystem::TMF_ApplyingOperatorParameter;
-        auto nonConversionResult = cs.matchTypes(argTy,
-                                                 paramTy,
-                                                 subKind,
-                                                 applyFlags,
-                                                 loc);
-        if (nonConversionResult == ConstraintSystem::SolutionKind::Solved) {
-          haveOneNonUserConversion = true;
-          continue;
-        }
+        subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
       }
       
       switch (cs.matchTypes(argTy,paramTy,
@@ -725,10 +689,6 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
         break;
       }
     }
-  }
-  
-  if (!haveOneNonUserConversion) {
-    return ConstraintSystem::SolutionKind::Error;
   }
 
   return ConstraintSystem::SolutionKind::Solved;
@@ -1757,11 +1717,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // Bridging from an Objective-C class type to a value type.
     // Note that specifically require a class or class-constrained archetype
     // here, because archetypes cannot be bridged.
-    // FIXME: Banned for operator parameters, like user conversions are.
     if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
         type2->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        !(flags & TMF_ApplyingOperatorParameter) &&
         TC.getBridgedToObjC(DC, type2)) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
     }

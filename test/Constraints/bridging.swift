@@ -105,3 +105,13 @@ func dictionaryToNSDictionary() {
   nsd = [BridgedStruct() : bcOpt] // expected-error{{cannot convert the expression's type '()' to type 'BridgedStruct'}}
 }
 
+// In this case, we should not implicitly convert Dictionary to NSDictionary.
+struct NotEquatable {}
+func notEquatableError(d: Dictionary<Int, NotEquatable>) -> Bool {
+  // FIXME: Another awful diagnostic.
+  return d == d // expected-error{{'Dictionary<Int, NotEquatable>' is not convertible to 'BridgedStruct'}}
+}
+
+// NSString -> String
+var nss1 = "Some great text" as NSString
+var nss2: NSString = nss1 + ", Some more text"
