@@ -96,6 +96,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary *)a;
 // CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary *)a;
 // CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary *)a;
+// CHECK-NEXT: - (IBAction)actionMethod:(id)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -137,6 +138,8 @@ class NotObjC {}
   func testDictionaryBridging(a: [NSObject : AnyObject]) {}
   func testDictionaryBridging2(a: [NSNumber : Methods]) {}
   func testDictionaryBridging3(a: [String : String]) {}
+
+  @IBAction func actionMethod(_: AnyObject) {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -225,10 +228,15 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic) Properties * weakOther;
 // CHECK-NEXT: @property (nonatomic) Properties * unownedOther;
 // CHECK-NEXT: @property (nonatomic) Properties * unmanagedOther;
-// CHECK-NEXT: @property (nonatomic) id outlet;
+// CHECK-NEXT: @property (nonatomic) IBOutlet id outlet;
+// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * array;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary * dictionary;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollectionNonOptional;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionAnyObject;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionProto;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -256,14 +264,20 @@ private class Private : A1 {}
   unowned(unsafe) var unmanagedOther: Properties = .shared
 
   @IBOutlet weak var outlet: AnyObject!
+  @IBOutlet weak var typedOutlet: Properties!
 
   var string = "abc"
   var array: Array<AnyObject> = []
   var dictionary: Dictionary<String, String> = [:]
+
+  @IBOutlet var outletCollection: [Properties]!
+  @IBOutlet var outletCollectionNonOptional: [Properties] = []
+  @IBOutlet var outletCollectionAnyObject: [AnyObject]?
+  @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, getter=bees, setter=setBees:) NSArray * bees;
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray * bees;
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {

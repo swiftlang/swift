@@ -37,10 +37,6 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor;
 
   llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
-  Identifier autoreleasingUnsafePointerID;
-  Identifier unsafePointerID;
-  Identifier constUnsafePointerID;
-  Identifier unmanagedID;
 
   ASTContext &ctx;
   raw_ostream &os;
@@ -193,6 +189,9 @@ private:
     if (isa<ConstructorDecl>(AFD) ||
         (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
       os << "instancetype";
+    } else if (methodTy->getResult()->isVoid() &&
+               AFD->getAttrs().hasAttribute<IBActionAttr>()) {
+      os << "IBAction";
     } else {
       print(methodTy->getResult());
     }
@@ -250,6 +249,24 @@ private:
     printAbstractFunction(CD, false);
   }
 
+  bool maybePrintIBOutletCollection(Type ty) {
+    if (auto unwrapped = ty->getAnyOptionalObjectType())
+      ty = unwrapped;
+
+    auto genericTy = ty->getAs<BoundGenericStructType>();
+    if (!genericTy || genericTy->getDecl() != ctx.getArrayDecl())
+      return false;
+
+    assert(genericTy->getGenericArgs().size() == 1);
+
+    auto argTy = genericTy->getGenericArgs().front();
+    if (auto classDecl = argTy->getClassOrBoundGenericClass())
+      os << "IBOutletCollection(" << classDecl->getName() << ") ";
+    else
+      os << "IBOutletCollection(id) ";
+    return true;
+  }
+
   void visitVarDecl(VarDecl *VD) {
     assert(VD->getDeclContext()->isTypeContext() &&
            "cannot handle global variables right now");
@@ -278,7 +295,7 @@ private:
     // they provide documentation and improve the quality of warnings.
     // For now, just handle "copy", which we get warnings about.
     Type ty = VD->getType();
-    if (auto unwrappedTy = ty->getOptionalObjectType())
+    if (auto unwrappedTy = ty->getAnyOptionalObjectType())
       ty = unwrappedTy;
     if (auto nominal = ty->getStructOrBoundGenericStruct()) {
       if (nominal == ctx.getArrayDecl() ||
@@ -311,6 +328,10 @@ private:
     }
 
     os << ") ";
+    if (VD->getAttrs().hasAttribute<IBOutletAttr>()) {
+      if (!maybePrintIBOutletCollection(ty))
+        os << "IBOutlet ";
+    }
     print(ty, VD->getName().str());
     os << ";\n";
   }
@@ -451,17 +472,11 @@ private:
     }
 
     // Everything from here on is some kind of pointer type.
-    if (unsafePointerID.empty()) {
-      autoreleasingUnsafePointerID = ctx.getIdentifier("AutoreleasingUnsafePointer");
-      unsafePointerID = ctx.getIdentifier("UnsafePointer");
-      constUnsafePointerID = ctx.getIdentifier("ConstUnsafePointer");
-    }
-
     bool isConst;
-    if (SD->getName() == constUnsafePointerID) {
+    if (SD == ctx.getConstUnsafePointerDecl()) {
       isConst = true;
-    } else if (SD->getName() == autoreleasingUnsafePointerID ||
-               SD->getName() == unsafePointerID) {
+    } else if (SD == ctx.getAutoreleasingUnsafePointerDecl() ||
+               SD == ctx.getUnsafePointerDecl()) {
       isConst = false;
     } else {
       // Not a pointer.
