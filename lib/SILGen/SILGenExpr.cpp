@@ -2113,7 +2113,17 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
                                      ArrayRef<Substitution> subs) {
-  SILValue methodValue = emitGlobalFunctionRef(loc, methodConstant);
+  SILValue methodValue;
+  
+  // If the method is dynamic, access it through runtime-hookable virtual
+  // dispatch (viz. objc_msgSend for now).
+  if (getASTContext().LangOpts.EnableDynamic
+      && methodConstant.hasDecl()
+      && methodConstant.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+    methodValue = emitDynamicMethodRef(loc, methodConstant,
+                                     SGM.Types.getConstantInfo(methodConstant));
+  else
+    methodValue = emitGlobalFunctionRef(loc, methodConstant);
 
   SILType methodTy = methodValue.getType();
   

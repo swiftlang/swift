@@ -66,7 +66,9 @@ protocol Proto {
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
-// C/HECK:         class_method [volatile] XXX
+// CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
+// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
+// CHECK:         class_method [volatile] %1 : $Foo, #Foo.init!initializer.1.foreign :
 
 // CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK-LABEL: sil @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
