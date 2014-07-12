@@ -68,7 +68,7 @@ protocol Proto {
 // CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
 // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
 // CHECK-LABEL: sil private [transparent] @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
-// CHECK:         class_method [volatile] %1 : $Foo, #Foo.init!initializer.1.foreign :
+// CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
 // CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK-LABEL: sil @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
@@ -128,6 +128,101 @@ protocol Proto {
 // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
 // CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
+
+// Superclass dispatch
+class Subclass: Foo {
+  // Native and objc methods can directly reference super members
+  init(native: Int) {
+    super.init(native: native)
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8SubclassCfMS0_FT6nativeSi_S0_
+  // CHECK:         function_ref @_TFC7dynamic8SubclasscfMS0_FT6nativeSi_S0_
+
+  override func nativeMethod() {
+    super.nativeMethod()
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8Subclass12nativeMethodfS0_FT_T_
+  // CHECK:         function_ref @_TFC7dynamic3Foo12nativeMethodfS0_FT_T_
+
+  override var nativeProp: Int {
+    get { return super.nativeProp }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg10nativePropSi
+    // CHECK:         function_ref @_TFC7dynamic3Foog10nativePropSi
+    set { super.nativeProp = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss10nativePropSi
+    // CHECK:         function_ref @_TFC7dynamic3Foos10nativePropSi
+  }
+
+  override subscript(#native: Int) -> Int {
+    get { return super[native: native] }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT6nativeSi_Si
+    // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT6nativeSi_Si
+    set { super[native: native] = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT6nativeSi_Si
+    // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT6nativeSi_Si
+  }
+
+  init(objc: Int) {
+    super.init(objc: objc)
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT4objcSi_S0_
+  // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT4objcSi_S0_
+
+  override func objcMethod() {
+    super.objcMethod()
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8Subclass10objcMethodfS0_FT_T_
+  // CHECK:         function_ref @_TFC7dynamic3Foo10objcMethodfS0_FT_T_
+
+  override var objcProp: Int {
+    get { return super.objcProp }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg8objcPropSi
+    // CHECK:         function_ref @_TFC7dynamic3Foog8objcPropSi
+    set { super.objcProp = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss8objcPropSi
+    // CHECK:         function_ref @_TFC7dynamic3Foos8objcPropSi
+  }
+
+  override subscript(#objc: Int) -> Int {
+    get { return super[objc: objc] }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT4objcSi_Si
+    // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT4objcSi_Si
+    set { super[objc: objc] = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT4objcSi_Si
+    // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT4objcSi_Si
+  }
+
+  // Dynamic methods are super-dispatched by objc_msgSend
+  init(dynamic: Int) {
+    super.init(dynamic: dynamic)
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT7dynamicSi_S0_
+  // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.init!initializer.1.foreign :
+
+  override func dynamicMethod() {
+    super.dynamicMethod()
+  }
+  // CHECK-LABEL: sil @_TFC7dynamic8Subclass13dynamicMethodfS0_FT_T_
+  // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicMethod!1.foreign :
+
+  override var dynamicProp: Int {
+    get { return super.dynamicProp }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg11dynamicPropSi
+    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!getter.1.foreign :
+    set { super.dynamicProp = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss11dynamicPropSi
+    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!setter.1.foreign :
+  }
+
+  override subscript(#dynamic: Int) -> Int {
+    get { return super[dynamic: dynamic] }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclassg9subscriptFT7dynamicSi_Si
+    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!getter.1.foreign :
+    set { super[dynamic: dynamic] = newValue }
+    // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT7dynamicSi_Si
+    // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
+  }
+}
 
 // CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
 func nativeMethodDispatch() {
