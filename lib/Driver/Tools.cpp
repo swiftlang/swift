@@ -93,8 +93,7 @@ static void configureDefaultCPU(const llvm::Triple &triple,
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
   case llvm::Triple::thumbeb:
-    if (auto CPUStr = clang::driver::getARMCPUForMArch(triple.getArchName(),
-                                                       triple)) {
+    if (auto CPUStr = triple.getARMCPUForArch()) {
       args.push_back("-target-cpu");
       args.push_back(CPUStr);
     }
