@@ -24,6 +24,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include <algorithm>
 #include <tuple>
 
 namespace swift {
@@ -170,33 +171,22 @@ private:
     // Visit each unvisited operand, updating the lowest DFS number we've seen
     // reachable in User's SCC.
     for (auto *Opnd : Operands) {
-      bool VisitedOpnd = false;
       if (!Visited.count(Opnd)) {
         DFS(Opnd);
-        VisitedOpnd = true;
+        UserInfo.LowNum = std::min(UserInfo.LowNum, getDFSInfo(Opnd).LowNum);
+      } else if (onStack(Opnd)) {
+        UserInfo.LowNum = std::min(UserInfo.LowNum, getDFSInfo(Opnd).DFSNum);
       }
-
-      auto &OpndInfo = getDFSInfo(Opnd);
-
-      if (VisitedOpnd && OpndInfo.LowNum < UserInfo.LowNum)
-        UserInfo.LowNum = OpndInfo.LowNum;
-
-      if (OpndInfo.DFSNum < UserInfo.DFSNum &&
-          OpndInfo.DFSNum < UserInfo.LowNum &&
-          onStack(Opnd))
-        UserInfo.LowNum = OpndInfo.DFSNum;
     }
-
-    llvm::SmallVector<ValueBase *, 4> SCC;
 
     // If User is the head of its own SCC, pop that SCC off the DFS stack.
     if (UserInfo.DFSNum == UserInfo.LowNum) {
-      ValueBase *PoppedValue = nullptr;
+      llvm::SmallVector<ValueBase *, 4> SCC;
+      ValueBase *PoppedValue;
       do {
         PoppedValue = DFSStack.pop_back_val();
         SCC.push_back(PoppedValue);
       } while (PoppedValue != User);
-
 
       // FIXME: This should not be firing, but it is.
       //      assert((SCC.size() == 1 || isa<SILArgument>(SCC[SCC.size()-1])) &&
