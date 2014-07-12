@@ -4002,8 +4002,8 @@ ObjCThunks.test("Dictionary/Accept") {
         [ TestBridgedKeyTy(10): TestBridgedValueTy(1010),
           TestBridgedKeyTy(20): TestBridgedValueTy(1020),
           TestBridgedKeyTy(30): TestBridgedValueTy(1030) ])
-    expectEqual(9, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 0
-    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(0, TestBridgedKeyTy.bridgeOperations)
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
   }
 }
 
@@ -4021,8 +4021,8 @@ ObjCThunks.test("Dictionary/Return") {
     TestBridgedKeyTy.bridgeOperations = 0
     TestBridgedValueTy.bridgeOperations = 0
     let d = helper.returnDictionaryBridgedNonverbatim()
-    expectEqual(9, TestBridgedKeyTy.bridgeOperations) // FIXME: should be 0
-    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(0, TestBridgedKeyTy.bridgeOperations)
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
 
     TestBridgedKeyTy.bridgeOperations = 0
     TestBridgedValueTy.bridgeOperations = 0

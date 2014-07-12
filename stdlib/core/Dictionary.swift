@@ -1688,6 +1688,12 @@ public struct Dictionary<
         .Native(_NativeStorage.Owner(nativeStorage: _nativeStorage))
   }
 
+  /// Private initializer.
+  public init(
+      _nativeStorageOwner: _NativeDictionaryStorageOwner<KeyType, ValueType>) {
+    _variantStorage = .Native(_nativeStorageOwner)
+  }
+
   /// Private initializer used for bridging.
   ///
   /// Only use this initializer when both conditions are true:
