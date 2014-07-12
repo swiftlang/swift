@@ -27,6 +27,8 @@ class Foo {
   dynamic deinit {} // expected-error{{only methods, initializers, properties, and subscripts may be dynamic}}
 
   func notDynamic() {}
+
+  final dynamic func indecisive() {} // expected-error{{a declaration cannot be both 'final' and 'dynamic'}}
 }
 
 struct Bar {

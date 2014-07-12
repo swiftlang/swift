@@ -1487,6 +1487,9 @@ ERROR(dynamic_not_in_class,sema_dynamic,none,
 ERROR(invalid_dynamic_decl,sema_dynamic,none,
       "only methods, initializers, properties, and subscripts may be dynamic",
       ())
+ERROR(dynamic_with_final,sema_dynamic,none,
+      "a declaration cannot be both 'final' and 'dynamic'",
+      ())
 
 //------------------------------------------------------------------------------
 // @availability

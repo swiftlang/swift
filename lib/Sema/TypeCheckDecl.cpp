@@ -6546,6 +6546,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(dynAttr->getLocation(), diag::invalid_dynamic_decl);
       const_cast<DynamicAttr *>(dynAttr)->setInvalid();
     }
+    
+    // Members cannot be both dynamic and final.
+    if (D->getAttrs().hasAttribute<FinalAttr>()) {
+      TC.diagnose(dynAttr->getLocation(), diag::dynamic_with_final);
+    }
   }
 
   // Ownership attributes (weak, unowned(safe), unowned(unsafe)).
