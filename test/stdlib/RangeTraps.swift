@@ -20,7 +20,7 @@
 // RUN: %target-run %t/a.out_Debug OutOfRange 2>&1 | FileCheck %s
 // RUN: %target-run %t/a.out_Release HalfOpen 2>&1 | FileCheck %s
 // RUN: %target-run %t/a.out_Release Closed 2>&1 | FileCheck %s
-// RUN: %target-run %t/a.out_Debug OutOfRange 2>&1 | FileCheck %s
+// RUN: %target-run %t/a.out_Release OutOfRange 2>&1 | FileCheck %s
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
