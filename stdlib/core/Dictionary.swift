@@ -225,7 +225,7 @@ protocol _DictionaryStorageType {
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
 @transparent
-public var _dictionaryDefaultMaxLoadFactorInverse: Double {
+var _dictionaryDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
 
@@ -269,7 +269,7 @@ final class _NativeDictionaryStorageImpl<Key : Hashable, Value> :
   }
 }
 
-public struct _NativeDictionaryStorage<Key : Hashable, Value> :
+struct _NativeDictionaryStorage<Key : Hashable, Value> :
     _DictionaryStorageType, Printable {
 
   typealias Owner = _NativeDictionaryStorageOwner<Key, Value>
@@ -323,7 +323,7 @@ public struct _NativeDictionaryStorage<Key : Hashable, Value> :
     }
   }
 
-  @transparent public
+  @transparent
   var count: Int {
     get {
       return body.count
@@ -408,7 +408,7 @@ public struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   @transparent
-  public static func getMinCapacity(
+  static func getMinCapacity(
       requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
     // `requestedCount + 1` below ensures that we don't fill in the last hole
     return max(Int(Double(requestedCount) * maxLoadFactorInverse),
@@ -418,14 +418,13 @@ public struct _NativeDictionaryStorage<Key : Hashable, Value> :
   /// Storage should be uniquely referenced.
   /// The `key` should not be present in the dictionary.
   /// This function does *not* update `count`.
-  public mutating func unsafeAddNew(#key: Key, value: Value) {
+  mutating func unsafeAddNew(#key: Key, value: Value) {
     var (i, found) = _find(key, _bucket(key))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: key, value: value)
   }
 
-  public
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
@@ -444,13 +443,13 @@ public struct _NativeDictionaryStorage<Key : Hashable, Value> :
   // _DictionaryStorageType conformance
   //
 
-  public typealias Index = _NativeDictionaryIndex<Key, Value>
+  typealias Index = _NativeDictionaryIndex<Key, Value>
 
-  public var startIndex: Index {
+  var startIndex: Index {
     return Index(nativeStorage: self, offset: -1).successor()
   }
 
-  public var endIndex: Index {
+  var endIndex: Index {
     return Index(nativeStorage: self, offset: capacity)
   }
 
@@ -459,14 +458,14 @@ public struct _NativeDictionaryStorage<Key : Hashable, Value> :
     return found ? i : .None
   }
 
-  public func assertingGet(i: Index) -> (Key, Value) {
+  func assertingGet(i: Index) -> (Key, Value) {
     let e = self[i.offset]
     _precondition(
       e, "attempting to access Dictionary elements using an invalid Index")
     return (e!.key, e!.value)
   }
 
-  public func assertingGet(key: Key) -> Value {
+  func assertingGet(key: Key) -> Value {
     let e = self[_find(key, _bucket(key)).pos.offset]
     _precondition(e, "key not found in Dictionary")
     return e!.value
@@ -587,8 +586,8 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 /// Specifically, we can not have objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_NativeDictionaryStorageOwner`.
-@objc public
-class _NativeDictionaryStorageOwnerBase
+@objc
+public class _NativeDictionaryStorageOwnerBase
     : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverridesType {
 
   init() {}
@@ -626,8 +625,8 @@ class _NativeDictionaryStorageOwnerBase
   // `nativeStorage`.
   //
 
-  @objc public
-  init(
+  @objc
+  public init(
     objects: ConstUnsafePointer<AnyObject?>,
     forKeys: ConstUnsafePointer<Void>,
     count: Int
@@ -635,35 +634,35 @@ class _NativeDictionaryStorageOwnerBase
     _fatalError("don't call this designated initializer")
   }
 
-  @objc public
-  var count: Int {
+  @objc
+  public var count: Int {
     return bridgingCount.0
   }
 
-  @objc public
-  func objectForKey(aKey: AnyObject?) -> AnyObject? {
+  @objc
+  public func objectForKey(aKey: AnyObject?) -> AnyObject? {
     if let nonNullKey: AnyObject = aKey {
       return bridgingObjectForKey(nonNullKey, dummy: ())
     }
     return nil
   }
 
-  @objc public
-  func keyEnumerator() -> _SwiftNSEnumeratorType? {
+  @objc
+  public func keyEnumerator() -> _SwiftNSEnumeratorType? {
     return bridgingKeyEnumerator(())
   }
 
-  @objc public
-  func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+  @objc
+  public func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
   }
 
-  @objc public
-  func countByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int
+  @objc
+  public func countByEnumeratingWithState(
+      state: UnsafePointer<_SwiftNSFastEnumerationState>,
+      objects: UnsafePointer<AnyObject>, count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
         state, objects: objects, count: count, dummy: ())
@@ -682,8 +681,7 @@ class _NativeDictionaryStorageOwnerBase
 /// is also a proper `NSDictionary` subclass, which is returned to Objective-C
 /// during bridging.  `DictionaryIndex` points directly to
 /// `_NativeDictionaryStorage`.
-final public
-class _NativeDictionaryStorageOwner<Key : Hashable, Value>
+final public class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
@@ -762,8 +760,8 @@ class _NativeDictionaryStorageOwner<Key : Hashable, Value>
   }
 }
 
-public struct _CocoaDictionaryStorage : _DictionaryStorageType {
-  public var cocoaDictionary: _SwiftNSDictionaryType
+struct _CocoaDictionaryStorage : _DictionaryStorageType {
+  var cocoaDictionary: _SwiftNSDictionaryType
 
   typealias Index = _CocoaDictionaryIndex
 
@@ -840,15 +838,15 @@ public struct _CocoaDictionaryStorage : _DictionaryStorageType {
   }
 }
 
-public enum _VariantDictionaryStorage<Key : Hashable, Value> :
+enum _VariantDictionaryStorage<Key : Hashable, Value> :
     _DictionaryStorageType {
 
   typealias _NativeStorageElement = _DictionaryElement<Key, Value>
   typealias NativeStorage =
       _NativeDictionaryStorage<Key, Value>
-  public typealias NativeStorageOwner =
+  typealias NativeStorageOwner =
       _NativeDictionaryStorageOwner<Key, Value>
-  public typealias CocoaStorage = _CocoaDictionaryStorage
+  typealias CocoaStorage = _CocoaDictionaryStorage
   typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
 
   case Native(NativeStorageOwner)
@@ -874,7 +872,7 @@ public enum _VariantDictionaryStorage<Key : Hashable, Value> :
     }
   }
 
-  public var native: NativeStorage {
+  var native: NativeStorage {
     switch self {
     case .Native(let owner):
       return owner.nativeStorage
@@ -1283,7 +1281,6 @@ public enum _VariantDictionaryStorage<Key : Hashable, Value> :
   }
 }
 
-public
 struct _NativeDictionaryIndex<Key : Hashable, Value> :
     BidirectionalIndexType {
 
@@ -1298,7 +1295,6 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
     self.offset = offset
   }
 
-  public
   func predecessor() -> NativeIndex {
     var j = offset
     while --j > 0 {
@@ -1309,7 +1305,6 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
     return self
   }
 
-  public
   func successor() -> NativeIndex {
     var i = offset + 1
     // FIXME: Can't write the simple code pending
@@ -1326,7 +1321,6 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
   }
 }
 
-public
 func == <Key : Hashable, Value> (
   lhs: _NativeDictionaryIndex<Key, Value>,
   rhs: _NativeDictionaryIndex<Key, Value>
@@ -1399,8 +1393,8 @@ enum _DictionaryIndexRepresentation<Key : Hashable, Value> {
   case _Cocoa(_CocoaIndex)
 }
 
-public
-struct DictionaryIndex<Key : Hashable, Value> : BidirectionalIndexType {
+public struct DictionaryIndex<Key : Hashable, Value> :
+    BidirectionalIndexType {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -1666,13 +1660,12 @@ public struct Dictionary<
 > : CollectionType, DictionaryLiteralConvertible {
 
   typealias _Self = Dictionary<Key, Value>
-  public
   typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
   typealias _NativeStorage = _NativeDictionaryStorage<Key, Value>
   public typealias Element = (Key, Value)
   public typealias Index = DictionaryIndex<Key, Value>
 
-  public var _variantStorage: _VariantStorage
+  var _variantStorage: _VariantStorage
 
   /// Create a dictionary with at least the given number of
   /// elements worth of storage.  The actual capacity will be the
@@ -1762,8 +1755,7 @@ public struct Dictionary<
   ///
   /// Returns the value that was replaced, or `nil` if a new key-value pair
   /// was added.
-  public
-  mutating func updateValue(
+  public mutating func updateValue(
     value: Value, forKey key: Key
   ) -> Value? {
     return _variantStorage.updateValue(value, forKey: key)
@@ -2090,30 +2082,29 @@ public struct _DictionaryBuilder<Key : Hashable, Value> {
 
 import SwiftShims
 
-@objc public
-protocol _SwiftNSFastEnumerationType {
+@objc
+public protocol _SwiftNSFastEnumerationType {
   func countByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int
   ) -> Int
 }
 
-@objc public
-protocol _SwiftNSEnumeratorType {
+@objc
+public protocol _SwiftNSEnumeratorType {
   init()
   func nextObject() -> AnyObject?
 }
 
-public
-typealias _SwiftNSZone = COpaquePointer
+public typealias _SwiftNSZone = COpaquePointer
 
-@objc public
-protocol _SwiftNSCopyingType {
+@objc
+public protocol _SwiftNSCopyingType {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 }
 
-@objc public
-protocol _SwiftNSArrayRequiredOverridesType :
+@objc
+public protocol _SwiftNSArrayRequiredOverridesType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
   func objectAtIndex(index: Int) -> AnyObject
@@ -2131,13 +2122,13 @@ protocol _SwiftNSArrayRequiredOverridesType :
 }
 
 // FIXME: replace _CocoaArrayType with this.
-@unsafe_no_objc_tagged_pointer @objc public
-protocol _SwiftNSArrayType : _SwiftNSArrayRequiredOverridesType {
+@unsafe_no_objc_tagged_pointer @objc
+public protocol _SwiftNSArrayType : _SwiftNSArrayRequiredOverridesType {
   func indexOfObject(anObject: AnyObject) -> Int
 }
 
-@objc public
-protocol _SwiftNSDictionaryRequiredOverridesType :
+@objc
+public protocol _SwiftNSDictionaryRequiredOverridesType :
     _SwiftNSCopyingType, _SwiftNSFastEnumerationType {
 
   // The following methods should be overridden when implementing an
@@ -2162,8 +2153,9 @@ protocol _SwiftNSDictionaryRequiredOverridesType :
   ) -> Int
 }
 
-@unsafe_no_objc_tagged_pointer @objc public
-protocol _SwiftNSDictionaryType : _SwiftNSDictionaryRequiredOverridesType {
+@unsafe_no_objc_tagged_pointer @objc
+public protocol _SwiftNSDictionaryType :
+    _SwiftNSDictionaryRequiredOverridesType {
   func getObjects(objects: UnsafePointer<AnyObject>,
       andKeys keys: UnsafePointer<AnyObject>)
 }
@@ -2191,8 +2183,8 @@ func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
-@objc public
-class _NSSwiftDictionary {}
+@objc
+public class _NSSwiftDictionary {}
 
 /// This class is derived from `_NSSwiftEnumeratorBase` (through runtime magic),
 /// which is derived from `NSEnumerator`.
@@ -2201,6 +2193,30 @@ class _NSSwiftDictionary {}
 /// memory allocator.
 @objc
 class _NSSwiftEnumerator {}
+
+//===--- Bridging ---------------------------------------------------------===//
+
+extension Dictionary {
+  public func _bridgeToObjectiveCImpl()
+      -> _SwiftNSDictionaryRequiredOverridesType {
+    switch _variantStorage {
+    case .Native(let nativeOwner):
+      _precondition(_isBridgedToObjectiveC(Key.self),
+          "Key is not bridged to Objective-C")
+      _precondition(_isBridgedToObjectiveC(Value.self),
+          "Value is not bridged to Objective-C")
+
+      // The `Dictionary` is backed by native storage, which is also a proper
+      // `NSDictionary` subclass, that, if needed, performs bridging lazily.
+      return nativeOwner as _NativeDictionaryStorageOwnerBase
+
+    case .Cocoa(let cocoaStorage):
+      // The `Dictionary` is already backed by `NSDictionary` of some kind.  Just
+      // unwrap it.
+      return cocoaStorage.cocoaDictionary
+    }
+  }
+}
 
 //===--- Compiler conversion/casting entry points -------------------------===//
 

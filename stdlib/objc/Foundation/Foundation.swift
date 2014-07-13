@@ -685,23 +685,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
   }
 
   public func bridgeToObjectiveC() -> NSDictionary {
-    switch _variantStorage {
-    case .Native(let nativeOwner):
-      _precondition(_isBridgedToObjectiveC(Key.self),
-          "Key is not bridged to Objective-C")
-      _precondition(_isBridgedToObjectiveC(Value.self),
-          "Value is not bridged to Objective-C")
-
-      // The `Dictionary` is backed by native storage, which is also a proper
-      // `NSDictionary` subclass, that, if needed, performs bridging lazily.
-      let anNSSwiftDictionary: _NSSwiftDictionary = nativeOwner
-      return reinterpretCast(anNSSwiftDictionary)
-
-    case .Cocoa(let cocoaStorage):
-      // The `Dictionary` is already backed by `NSDictionary` of some kind.  Just
-      // unwrap it.
-      return reinterpretCast(cocoaStorage.cocoaDictionary)
-    }
+    return reinterpretCast(_bridgeToObjectiveCImpl())
   }
 
   public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
