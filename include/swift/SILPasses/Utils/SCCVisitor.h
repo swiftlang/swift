@@ -49,11 +49,6 @@ public:
 
     for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
       auto *BB = *Iter;
-
-      for (auto A : BB->getBBArgs())
-        if (!Visited.count(A))
-          DFS(A);
-
       for (auto &I : *BB)
         if (!Visited.count(&I))
           DFS(&I);
@@ -187,10 +182,6 @@ private:
         PoppedValue = DFSStack.pop_back_val();
         SCC.push_back(PoppedValue);
       } while (PoppedValue != User);
-
-      // FIXME: This should not be firing, but it is.
-      //      assert((SCC.size() == 1 || isa<SILArgument>(SCC[SCC.size()-1])) &&
-      //             "Expected the lowest numbered element in the SCC to be a BB arg!");
 
       asImpl().visit(SCC);
     }

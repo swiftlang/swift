@@ -79,3 +79,47 @@ bb3:
   cond_fail %20 : $Builtin.Int1
   br bb1(%19 : $Builtin.Word, %15 : $Builtin.Word)
 }
+
+// CHECK: Induction variables for function: copy_iv
+// CHECK: IV Header:   [[ARG:%.*]] = argument of bb1 : $Builtin.Word
+// CHECK: IV:   [[ADD:%.*]] = apply {{%.*}}([[ARG]], {{%.*}}, {{.*}}) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
+// CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Word
+
+sil @copy_iv : $@thin (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = struct_extract %0 : $Int, #Int.value
+  %3 = integer_literal $Builtin.Word, 2
+  br bb1(%3 : $Builtin.Word, %2 : $Builtin.Word)
+
+bb1(%5 : $Builtin.Word, %6 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_ne_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = struct_extract %1 : $Int, #Int.value
+  %9 = apply %7(%6, %8) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %9, bb2, bb4
+
+bb2:
+  %11 = integer_literal $Builtin.Word, 1
+  %12 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = apply %12(%6, %11, %13) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 0
+  %16 = tuple_extract %14 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %16 : $Builtin.Int1
+  %18 = builtin_function_ref "smul_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = apply %18(%15, %3, %13) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %20 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 0
+  %21 = tuple_extract %19 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %21 : $Builtin.Int1
+  %23 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %24 = apply %23(%5, %20) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %24, bb4, bb3
+
+bb3:
+  br bb1(%20 : $Builtin.Word, %15 : $Builtin.Word)
+
+bb4:
+  %27 = tuple ()
+  return %27 : $()
+}

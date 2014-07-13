@@ -18,29 +18,42 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
+static bool inSCC(ValueBase *Value, IVInfo::SCCType &SCC) {
+  return std::find(SCC.begin(), SCC.end(), Value) != SCC.end();
+}
+
 // For now, we'll consider only the simplest induction variables:
-// - The last element in the cycle must be a SILArgument.
-// - No other element in the cycle is a SILArgument, which guarantees
-//   that increments are unconditional (although they may come after)
-//   a loop exit.
+// - Exactly one element in the cycle must be a SILArgument.
 // - Only a single increment by a literal.
 //
 // In other words many valid things that could be considered induction
 // variables are disallowed at this point.
-bool IVInfo::isInductionSequence(llvm::SmallVectorImpl<ValueBase *> &SCC) {
-  if (!isa<SILArgument>(SCC[SCC.size()-1]))
+bool IVInfo::isInductionSequence(SCCType &SCC,
+                                 unsigned &ArgIndex) {
+  // Ignore SCCs of size 1 for now. Some of these are derived IVs
+  // like i+1 or i*4, which we will eventually want to handle.
+  if (SCC.size() == 1)
     return false;
 
   bool FoundApply = false;
-  for (unsigned long i = 0, e = SCC.size() - 2; i != e; ++i) {
-    if (isa<SILArgument>(SCC[i]))
-      return false;
+  bool FoundArgument = false;
+  for (unsigned long i = 0, e = SCC.size(); i != e; ++i) {
+    if (isa<SILArgument>(SCC[i])) {
+      if (FoundArgument)
+        return false;
+
+      FoundArgument = true;
+      ArgIndex = i;
+      continue;
+    }
 
     auto *I = cast<SILInstruction>(SCC[i]);
     switch (I->getKind()) {
     case ValueKind::ApplyInst: {
       if (FoundApply)
         return false;
+
+      FoundApply = true;
 
       auto *AI = cast<ApplyInst>(I);
       SILValue L, R;
@@ -54,33 +67,34 @@ bool IVInfo::isInductionSequence(llvm::SmallVectorImpl<ValueBase *> &SCC) {
       if (!match(R, m_IntegerLiteralInst()))
         return false;
 
-      FoundApply = true;
       break;
     }
 
-    case ValueKind::TupleExtractInst:
+    case ValueKind::TupleExtractInst: {
+      auto *TEI = cast<TupleExtractInst>(I);
+      if (!inSCC(TEI->getOperand().getDef(), SCC))
+        return false;
       break;
+    }
 
     default:
       return false;
     }
   }
 
-  return true;
+  return FoundApply && FoundArgument;
 }
 
 void IVInfo::visit(SCCType &SCC) {
   assert(SCC.size() && "SCCs should have an element!!");
 
-  // Ignore SCCs of size 1 for now. Some of these are derived IVs
-  // like i+1 or i*4, which we will eventually want to handle.
-  if (SCC.size() == 1)
+  unsigned ArgIndex;
+  if (!isInductionSequence(SCC, ArgIndex))
     return;
 
-  if (!isInductionSequence(SCC))
-    return;
-
-  auto Header = cast<SILArgument>(SCC[SCC.size() - 1]);
+  auto Header = cast<SILArgument>(SCC[ArgIndex]);
+  assert(isa<SILArgument>(Header) &&
+         "Expected head of IV sequence to be an argument!");
 
   for (auto V : SCC)
     InductionVariableMap[V] = Header;

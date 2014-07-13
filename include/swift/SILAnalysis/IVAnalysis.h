@@ -49,7 +49,7 @@ private:
   // Map from an element of an induction sequence to the header.
   llvm::DenseMap<const ValueBase *, SILArgument *> InductionVariableMap;
 
-  bool isInductionSequence(SCCType &);
+  bool isInductionSequence(SCCType &SCC, unsigned &ArgIndex);
   void visit(SCCType &SCC);
 };
 
