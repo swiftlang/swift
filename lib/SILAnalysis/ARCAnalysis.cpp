@@ -224,7 +224,24 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedRefBitCastInst:
     return true;
+
+  // If we have a trivial bit cast between trivial types, it is not something
+  // that can use ref count ops in a way we care about. We do need to be careful
+  // with uses with ref count inputs. In such a case, we assume conservatively
+  // that the bit cast could use it.
+  //
+  // The reason why this is different from the ref bitcast is b/c the use of a
+  // ref bit cast is still a ref typed value implying that our ARC dataflow will
+  // properly handle its users. A conversion of a reference count value to a
+  // trivial value though could be used as a trivial value in ways that ARC
+  // dataflow will not understand implying we need to treat it as a use to be
+  // safe.
+  case ValueKind::UncheckedTrivialBitCastInst: {
+    SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
+    return Op.getType().isTrivial(Inst->getModule());
+  }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will
   // catch that via the dataflow.
