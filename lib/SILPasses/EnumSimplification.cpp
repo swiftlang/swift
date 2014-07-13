@@ -73,6 +73,9 @@ class BBEnumTagDataflowState
   llvm::DenseMap<SILValue, EnumCase> EnumToEnumCaseMap;
 
 public:
+  using PreallocatedMap = PreallocatedMap<SILBasicBlock *,
+                                          BBEnumTagDataflowState>;
+
   BBEnumTagDataflowState() : BB(nullptr), ValueToCaseMap() {}
   BBEnumTagDataflowState(const BBEnumTagDataflowState &Other)
       : BB(const_cast<SILBasicBlock *>(Other.BB.getPtrOrNull())),
@@ -116,8 +119,7 @@ public:
   bool visitReleaseValueInst(ReleaseValueInst *RVI);
   bool process();
   void
-  mergePredecessorStates(PreallocatedMap<SILBasicBlock *,
-                                         BBEnumTagDataflowState> &BBToStateMap);
+  mergePredecessorStates(PreallocatedMap &BBToStateMap);
   bool
   moveReleasesUpCFGIfCasesCovered();
   void handlePredSwitchEnum(TermInst *TI);
@@ -167,8 +169,9 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
                    "the switch_enum.");
 }
 
-void BBEnumTagDataflowState::mergePredecessorStates(
-    PreallocatedMap<SILBasicBlock *, BBEnumTagDataflowState> &BBToStateMap) {
+void
+BBEnumTagDataflowState::
+mergePredecessorStates(PreallocatedMap &BBToStateMap) {
 
   // If we have no precessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
@@ -184,8 +187,12 @@ void BBEnumTagDataflowState::mergePredecessorStates(
 
   // Initialize our state with our first predecessor...
   SILBasicBlock *BB = *PI;
-  BBEnumTagDataflowState &FirstPredState = BBToStateMap[BB];
-  FirstPredState.init(BB);
+  auto Iter = BBToStateMap.find(BB);
+  if (Iter == BBToStateMap.end()) {
+    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
+    return;
+  }
+  BBEnumTagDataflowState &FirstPredState = Iter->second;
   ++PI;
   ValueToCaseMap = FirstPredState.ValueToCaseMap;
 
@@ -338,10 +345,18 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
     if (!RVI)
       break;
 
+    // Grab the operand of the release value inst.
     SILValue Op = RVI->getOperand();
-    auto &EnumCase = EnumToEnumCaseMap[Op];
 
-    // If we don't have an enum decl for each predecessor, bail...
+    // Lookup the [(BB, EnumTag)] list for this operand.
+    auto R = EnumToEnumCaseMap.find(Op);
+    // If we don't have one, skip this release value inst.
+    if (R == EnumToEnumCaseMap.end())
+      continue;
+
+    auto &EnumCase = R->second;
+    // If we don't have an enum tag for each predecessor of this BB, bail since
+    // we do not know how to handle that BB.
     if (EnumCase.size() != NumPreds)
       continue;
 
@@ -379,8 +394,8 @@ static bool processFunction(SILFunction &F) {
   auto SortFn = [](const PairTy &P1,
                    const PairTy &P2) { return P1.first < P2.first; };
 
-  PreallocatedMap<SILBasicBlock *, BBEnumTagDataflowState> BBToStateMap(
-      PostOrder.size(), SortFn);
+  BBEnumTagDataflowState::PreallocatedMap BBToStateMap(PostOrder.size(),
+                                                       SortFn);
 
 #ifndef NDEBUG
   llvm::DenseMap<SILBasicBlock *, unsigned> BBToRPOTNumMap;
@@ -410,9 +425,14 @@ static bool processFunction(SILFunction &F) {
     });
 
     // Now that we have made sure that our predecessors all have initialized
-    // states, grab the state for this BB. If we don't have a state for this BB,
-    // this creates the state.
-    BBEnumTagDataflowState &State = BBToStateMap[BB];
+    // states, grab the state for this BB.
+    auto Iter = BBToStateMap.find(BB);
+    if (Iter == BBToStateMap.end()) {
+      assert(0 && "Found a BB in the post order without a state!\n");
+      return Changed;
+    }
+    BBEnumTagDataflowState &State = Iter->second;
+
     DEBUG(llvm::dbgs() << "    State Addr: " << &State << "\n");
 
     // Then merge in our predecessor states. We relook up our the states for our
