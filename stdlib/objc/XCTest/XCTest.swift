@@ -196,7 +196,7 @@ func _XCTCheckEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Fl
     && (abs(value1 - value2) <= accuracy)
 }
 
-func XCTAssertEqualWithAccuracy<T: FloatingPointNumberType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -242,7 +242,7 @@ func _XCTCheckNotEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy:
     || (abs(value1 - value2) > accuracy)
 }
 
-func XCTAssertNotEqualWithAccuracy<T: FloatingPointNumberType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @auto_closure () -> T, expression2: @auto_closure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once

@@ -48,7 +48,7 @@ public struct CGFloat {
   public var native: NativeType
 }
 
-@transparent extension CGFloat : FloatingPointNumberType {
+@transparent extension CGFloat : FloatingPointType {
   public typealias _BitsType = UInt
 
   public static func _fromBitPattern(bits: UInt) -> CGFloat {
