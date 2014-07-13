@@ -136,6 +136,25 @@ func ... <Pos : ForwardIndexType> (
   return Range(start: minimum, end: maximum.successor())
 }
 
+//===--- Prefer Ranges to Intervals, when there's an option ---------------===//
+
+/// Forms a half-open range that contains `minimum`, but not
+/// `maximum`.
+@transparent public
+func ..< <Pos : ForwardIndexType where Pos: Comparable> (
+  minimum: Pos, maximum: Pos
+) -> Range<Pos> {
+  return Range(start: minimum, end: maximum)
+}
+
+/// Forms a closed range that contains both `minimum` and `maximum`.
+@transparent public
+func ... <Pos : ForwardIndexType where Pos: Comparable> (
+  minimum: Pos, maximum: Pos
+) -> Range<Pos> {
+  return Range(start: minimum, end: maximum.successor())
+}
+
 //
 // Pattern matching support for ranges
 //

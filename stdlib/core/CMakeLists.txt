@@ -48,6 +48,7 @@ set(SWIFTLIB_ESSENTIAL
   Index.swift
   IntegerArithmetic.swift.gyb
   Join.swift
+  Interval.swift.gyb
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift

@@ -173,9 +173,17 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-public func toString<T>(object: T) -> String {
+/// Returns the result of `debugPrint`\ 'ing `x` into a `String`
+public func toString<T>(x: T) -> String {
   var result = ""
-  print(object, &result)
+  print(x, &result)
+  return result
+}
+
+/// Returns the result of `debugPrint`\ 'ing `x` into a `String`
+public func toDebugString<T>(x: T) -> String {
+  var result = ""
+  debugPrint(x, &result)
   return result
 }
 
