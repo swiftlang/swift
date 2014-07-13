@@ -151,7 +151,9 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
 ///
 /// The main case that this handles here are builtins that via read none imply
 /// that they can not read globals and at the same time do not take any
-/// non-trivial types via the arguments.
+/// non-trivial types via the arguments. The reason why we care about taking
+/// non-trivial types as arguments is that we want to be careful in the face of
+/// intrinsics that may be equivalent to bitcast and inttoptr operations.
 static bool canApplyOfBuiltinUseNonTrivialValues(ApplyInst *AI,
                                                  BuiltinFunctionRefInst *BFRI) {
   SILModule &Mod = AI->getModule();
@@ -228,6 +230,9 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   // catch that via the dataflow.
   case ValueKind::StructExtractInst:
   case ValueKind::TupleExtractInst:
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::RefElementAddrInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::IndexAddrInst:
