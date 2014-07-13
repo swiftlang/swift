@@ -22,6 +22,15 @@ RangeTestCase.test("Range/Equatable") {
   expectTrue(r1 != r2)
 }
 
+RangeTestCase.test("Printing") {
+  expectEqual("0..<10", toString(0..<10))
+  expectEqual("Range(0..<10)", toDebugString(Range(0..<10)))
+  
+  // No separate representation for closed Ranges yet
+  expectEqual("10..<42", toString(10...41)) 
+  expectEqual("Range(10..<42)", toDebugString(Range(10...41)))
+}
+
 RangeTestCase.run()
 // CHECK: {{^}}Range: All tests passed
 

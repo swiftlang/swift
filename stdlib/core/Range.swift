@@ -40,8 +40,16 @@ public struct RangeGenerator<
 
 public struct Range<
   T: ForwardIndexType
-> : Equatable, CollectionType {
+> : Equatable, CollectionType, Printable, DebugPrintable {
 
+  /// Construct a copy of `x`
+  public init(_ x: Range) {
+    // This initializer exists only so that we can have a
+    // debugDescription that actually constructs the right type when
+    // evaluated
+    self = x
+  }
+  
   @transparent public
   init(start: T, end: T) {
     _startIndex = start
@@ -96,6 +104,17 @@ public struct Range<
       _endIndex = newValue
     }
   }
+
+  /// The `Range`\ 's printed representation
+  public var description: String {
+    return "\(startIndex)..<\(endIndex)"
+  }
+  
+  /// The `Range`\ 's verbose printed representation
+  public var debugDescription: String {
+    return "Range(\(startIndex)..<\(endIndex))"
+  }
+  
   
   var _startIndex: T
   var _endIndex: T
