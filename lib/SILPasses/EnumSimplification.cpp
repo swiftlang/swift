@@ -137,7 +137,7 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
   // enum we switch on to that value. This is important so we can determine
   // covering switches for enums that have cases without payload.
 
-  // Next check if we are the target of a default switch_eum case. If we are,
+  // Next check if we are the target of a default switch_enum case. If we are,
   // no interesting information can be extracted, so bail...
   if (S->hasDefault() && S->getDefaultBB() == getBB())
     return;
@@ -146,14 +146,19 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
   // enum...
   for (unsigned i = 0, e = S->getNumCases(); i != e; ++i) {
     auto P = S->getCase(i);
-    // If we don't match our BB, skip this interation.
+
+    // If this case of the switch is not matched up with this BB, skip the
+    // case...
     if (P.second != getBB())
       continue;
-    // Ok, we have a matching BB. If we don't have a case (which can happen if
-    // we have a default statement), return, there is nothing more we can do.
+
+    // Ok, we found the case for our BB. If we don't have an enum tag (which can
+    // happen if we have a default statement), return. There is nothing more we
+    // can do.
     if (!P.first)
       return;
-    // Ok, we have a matching BB and a matching case. Set the state and
+
+    // Ok, we have a matching BB and a matching enum tag. Set the state and
     // return.
     ValueToCaseMap[S->getOperand()] = P.first;
     return;
@@ -164,6 +169,7 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
 
 void BBEnumTagDataflowState::mergePredecessorStates(
     PreallocatedMap<SILBasicBlock *, BBEnumTagDataflowState> &BBToStateMap) {
+
   // If we have no precessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
     DEBUG(llvm::dbgs() << "            No Preds.\n");
@@ -171,7 +177,6 @@ void BBEnumTagDataflowState::mergePredecessorStates(
   }
 
   auto PI = getBB()->pred_begin(), PE = getBB()->pred_end();
-
   if (*PI == getBB()) {
     DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
     return;
