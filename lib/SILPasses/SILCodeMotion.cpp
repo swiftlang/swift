@@ -300,12 +300,10 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
   // not move it.
   SILBasicBlock::iterator II = I;
-  ++II;
-  for (; &*II != S; ++II) {
-    if (canDecrementRefCount(&*II, Ptr, AA)) {
-      return false;
-    }
-  }
+  if (valueHasARCDecrementsInInstructionRange(Ptr, std::next(II),
+                                              SILBasicBlock::iterator(S),
+                                              AA))
+    return false;
 
   SILBuilder Builder(S);
 
