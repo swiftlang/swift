@@ -12,6 +12,18 @@ enum Either {
   case Second(Builtin.Int64)
 }
 
+enum ThreeCaseEnum {
+  case A
+  case B
+  case C
+}
+
+class C {}
+enum FakeOptionalClass {
+  case None
+  case Some(C)
+}
+
 // CHECK-LABEL: sil @test1 : $@thin (FakeOptional) -> () {
 // CHECK: bb0
 // CHECK-NEXT: retain_value
@@ -326,12 +338,6 @@ bb3:
   return %9999 : $()
 }
 
-enum ThreeCaseEnum {
-  case A
-  case B
-  case C
-}
-
 // CHECK-LABEL: sil @test15 : $@thin (Either, ThreeCaseEnum) -> () {
 // CHECK: bb1:
 // CHECK: release_value
@@ -357,6 +363,42 @@ bb3:
   br bb4
 
 bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @unknown : $@thin () -> ()
+
+// CHECK-LABEL: sil @test16 : $@thin (FakeOptionalClass) -> () {
+// CHECK: bb1:
+// CHECK-NOT: release_value
+// CHECK: bb2:
+// CHECK: unchecked_enum_data
+// CHECK: release_value
+// CHECK: bb3
+// CHECK: release_value
+sil @test16 : $@thin (FakeOptionalClass) -> () {
+bb0(%0 : $FakeOptionalClass):
+  switch_enum %0 : $FakeOptionalClass,
+    case #FakeOptionalClass.None!enumelt: bb1,
+    case #FakeOptionalClass.Some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %1 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %1(%2, %3, %4) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  release_value %0 : $FakeOptionalClass
+  %9998 = function_ref @unknown : $@thin () -> ()
+  apply %9998() : $@thin () -> ()
+  release_value %0 : $FakeOptionalClass
   %9999 = tuple()
   return %9999 : $()
 }

@@ -14,6 +14,8 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/PreallocatedMap.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -60,6 +62,7 @@ namespace {
 class BBEnumTagDataflowState
     : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
   NullablePtr<SILBasicBlock> BB;
+  NullablePtr<AliasAnalysis> AA;
 
   using ValueToCaseSmallBlotMapVectorTy =
     BlotMapVector<SILValue, EnumElementDecl *,
@@ -68,24 +71,27 @@ class BBEnumTagDataflowState
                                               EnumElementDecl *>, 4>>;
   ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
 
-  using EnumCase = llvm::SmallVector<std::pair<SILBasicBlock *,
-                                               EnumElementDecl *>, 2>;
-  llvm::DenseMap<SILValue, EnumCase> EnumToEnumCaseMap;
+  using EnumBBCaseList = llvm::SmallVector<std::pair<SILBasicBlock *,
+                                                     EnumElementDecl *>, 2>;
+  llvm::DenseMap<SILValue, EnumBBCaseList> EnumToEnumBBCaseListMap;
 
 public:
   using PreallocatedMap = PreallocatedMap<SILBasicBlock *,
                                           BBEnumTagDataflowState>;
 
-  BBEnumTagDataflowState() : BB(nullptr), ValueToCaseMap() {}
+  BBEnumTagDataflowState() = default;
   BBEnumTagDataflowState(const BBEnumTagDataflowState &Other)
       : BB(const_cast<SILBasicBlock *>(Other.BB.getPtrOrNull())),
+        AA(const_cast<AliasAnalysis *>(Other.AA.getPtrOrNull())),
         ValueToCaseMap() {}
   ~BBEnumTagDataflowState() = default;
 
-  bool init(SILBasicBlock *NewBB) {
-    if (BB.isNonNull())
-      return false;
+  bool init(SILBasicBlock *NewBB,
+            AliasAnalysis *NewAA) {
+    assert(NewBB && "NewBB should not be null");
+    assert(NewAA && "NewAA should not be null");
     BB = NewBB;
+    AA = NewAA;
     return true;
   }
 
@@ -200,7 +206,7 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
   // into it.
   if (FirstPredState.getBB()->getSingleSuccessor()) {
     for (auto P : ValueToCaseMap.getItems())
-      EnumToEnumCaseMap[P.first].push_back({BB, P.second});
+      EnumToEnumBBCaseListMap[P.first].push_back({BB, P.second});
   }
 
   // If we only have one predecessor...
@@ -235,7 +241,6 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
     }
 
     BBEnumTagDataflowState &PredState = OtherIter->second;
-    PredState.init(*PI);
     ++PI;
 
     // Then for each (SILValue, Enum Tag) that we are tracking...
@@ -254,12 +259,12 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
         // Check if out predecessor has any other successors. If that is true we
         // clear all the state since we can not hoist safely.
         if (!PredState.getBB()->getSingleSuccessor()) {
-          EnumToEnumCaseMap.clear();
+          EnumToEnumBBCaseListMap.clear();
         } else {
           // Otherwise, add this case to our predecessor case list. We will unique
           // this after we have finished processing all predecessors.
           auto Case = std::make_pair(PredState.getBB(), OtherValue->second);
-          EnumToEnumCaseMap[OtherValue->first].push_back(Case);
+          EnumToEnumBBCaseListMap[OtherValue->first].push_back(Case);
         }
 
         // And the states match, the enum state propagates to this BB.
@@ -269,7 +274,7 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
         // If we fail to find any state, we can not cover the switch along every
         // BB path... Clear all predecessor cases that we are tracking so we
         // don't attempt to perform that optimization.
-        EnumToEnumCaseMap.clear();
+        EnumToEnumBBCaseListMap.clear();
       }
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
@@ -336,32 +341,45 @@ bool
 BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
   bool Changed = false;
   unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
+
   for (auto II = getBB()->begin(), IE = getBB()->end(); II != IE;) {
     auto *RVI = dyn_cast<ReleaseValueInst>(&*II);
     ++II;
 
-    // For now we stop whenever we see a non-release pointer. We can extend this
-    // later to use can use from ARCAnalysis.
+    // If this instruction is not a release, skip it...
     if (!RVI)
-      break;
+      continue;
 
     // Grab the operand of the release value inst.
     SILValue Op = RVI->getOperand();
 
     // Lookup the [(BB, EnumTag)] list for this operand.
-    auto R = EnumToEnumCaseMap.find(Op);
+    auto R = EnumToEnumBBCaseListMap.find(Op);
     // If we don't have one, skip this release value inst.
-    if (R == EnumToEnumCaseMap.end())
+    if (R == EnumToEnumBBCaseListMap.end())
       continue;
 
-    auto &EnumCase = R->second;
+    auto &EnumBBCaseList = R->second;
     // If we don't have an enum tag for each predecessor of this BB, bail since
     // we do not know how to handle that BB.
-    if (EnumCase.size() != NumPreds)
+    if (EnumBBCaseList.size() != NumPreds)
+      continue;
+
+    // Finally ensure that we have no users of this operand preceding the
+    // release_value in this BB. If we have users like that we can not hoist the
+    // release past them unless we know that there is an additional set of
+    // releases that together post-dominate this release. If we can not do this,
+    // skip this release.
+    //
+    // TODO: We need information from the ARC optimizer to prove that property
+    // if we are going to use it.
+    if (arc::valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
+                                               SILBasicBlock::iterator(RVI),
+                                               AA.get()))
       continue;
 
     // Otherwise perform the transformation.
-    for (auto P : EnumCase) {
+    for (auto P : EnumBBCaseList) {
       // If we don't have an argument for this case, there is nothing to
       // do... continue...
       if (!P.second->hasArgumentType())
@@ -379,12 +397,14 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
     ++NumReleasesMovedIntoSwitches;
     Changed = true;
   }
+
   return Changed;
 }
 
-static bool processFunction(SILFunction &F) {
+static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
 
-  DEBUG(llvm::dbgs() << "**** Enum Simplification: " << F.getName() << " ****\n");
+  DEBUG(llvm::dbgs() << "**** Enum Simplification: " << F.getName()
+                     << " ****\n");
 
   bool Changed = false;
   std::vector<SILBasicBlock *> PostOrder;
@@ -403,9 +423,10 @@ static bool processFunction(SILFunction &F) {
 #endif
 
   for (int i = PostOrder.size() - 1; i >= 0; --i) {
+    DEBUG(llvm::dbgs() << "i: " << i << "\n");
     SILBasicBlock *BB = PostOrder[i];
     BBToStateMap[i].first = BB;
-    BBToStateMap[i].second.init(BB);
+    BBToStateMap[i].second.init(BB, AA);
 #ifndef NDEBUG
     BBToRPOTNumMap[BB] = RPOTId++;
 #endif
@@ -461,7 +482,9 @@ namespace {
 class EnumSimplification : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    if (processFunction(*getFunction()))
+    auto *AA = getAnalysis<AliasAnalysis>();
+
+    if (processFunction(*getFunction(), AA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
