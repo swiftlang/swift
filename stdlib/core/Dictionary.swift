@@ -587,7 +587,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 /// limitation is gone, this class can be folded into
 /// `_NativeDictionaryStorageOwner`.
 @objc
-public class _NativeDictionaryStorageOwnerBase
+class _NativeDictionaryStorageOwnerBase
     : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverridesType {
 
   init() {}
@@ -681,7 +681,7 @@ public class _NativeDictionaryStorageOwnerBase
 /// is also a proper `NSDictionary` subclass, which is returned to Objective-C
 /// during bridging.  `DictionaryIndex` points directly to
 /// `_NativeDictionaryStorage`.
-final public class _NativeDictionaryStorageOwner<Key : Hashable, Value>
+final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
@@ -1682,7 +1682,7 @@ public struct Dictionary<
   }
 
   /// Private initializer.
-  public init(
+  init(
       _nativeStorageOwner: _NativeDictionaryStorageOwner<Key, Value>) {
     _variantStorage = .Native(_nativeStorageOwner)
   }
@@ -2215,6 +2215,20 @@ extension Dictionary {
       // unwrap it.
       return cocoaStorage.cocoaDictionary
     }
+  }
+
+  public static func _bridgeFromObjectiveCAdoptingNativeStorage(
+      d: AnyObject
+  ) -> [Key : Value]? {
+    if let nativeOwner =
+        d as AnyObject as? _NativeDictionaryStorageOwner<Key, Value> {
+      // If `NSDictionary` is actually native storage of `Dictionary` with key
+      // and value types that the requested ones match exactly, then just
+      // re-wrap the native storage.
+      return [Key : Value](_nativeStorageOwner: nativeOwner)
+    }
+    // FIXME: what if `d` is native storage, but for different key/value type?
+    return .None
   }
 }
 

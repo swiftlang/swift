@@ -689,22 +689,18 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
   }
 
   public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
-    if let nativeOwner =
-        d as AnyObject as? _NativeDictionaryStorageOwner<Key, Value> {
-      // If `NSDictionary` is actually native storage of `Dictionary` with key
-      // and value types that the requested ones match exactly, then just
-      // re-wrap the native storage.
-      return [Key : Value](_nativeStorageOwner: nativeOwner)
+    if let result = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
+        d as AnyObject) {
+      return result
     }
-    // FIXME: what if `d` is native storage, but for different key/value type?
 
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
       return [Key : Value](_cocoaDictionary: reinterpretCast(d))
     }
 
-    // `Dictionary<Key, Value>` where either `Key` or `Value`
-    // is a value type may not be backed by an NSDictionary.
+    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
+    // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
       (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
