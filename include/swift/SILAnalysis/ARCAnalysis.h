@@ -14,6 +14,7 @@
 #define SWIFT_SILANALYSIS_ARCANALYSIS_H
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -36,6 +37,21 @@ bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,
 /// \returns True if the user \p User can use the pointer \p Ptr in a manner
 /// that requires \p Ptr to be alive before Inst.
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
+
+/// Return true if \p Op has arc uses in the instruction range [Start, End). We
+/// assume that Start and End are both in the same basic block.
+bool valueHasARCUsesInInstructionRange(SILValue Op,
+                                       SILBasicBlock::iterator Start,
+                                       SILBasicBlock::iterator End,
+                                       AliasAnalysis *AA);
+
+/// Return true if \p Op has instructions in the instruction range [Start, End)
+/// which may decrement it. We assume that Start and End are both in the same
+/// basic block.
+bool valueHasARCDecrementsInInstructionRange(SILValue Op,
+                                             SILBasicBlock::iterator Start,
+                                             SILBasicBlock::iterator End,
+                                             AliasAnalysis *AA);
 
 /// A set of matching reference count increments, decrements, increment
 /// insertion pts, and decrement insertion pts.

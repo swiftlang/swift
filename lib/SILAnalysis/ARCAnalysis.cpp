@@ -22,6 +22,7 @@
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+using namespace swift::arc;
 
 //===----------------------------------------------------------------------===//
 //                             Decrement Analysis
@@ -32,7 +33,7 @@ static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
      .Case("swift_keepAlive", true)
      .Case("_swift_isUniquelyReferenced", true)
      .Default(false);
-} 
+}
 
 static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
                                       AliasAnalysis *AA) {
@@ -248,4 +249,66 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
 
   // Otherwise, assume that Inst can use Target.
   return true;
+}
+
+
+//===----------------------------------------------------------------------===//
+// Utility Methods for determining use, decrement of values in a contiguous
+// instruction range in one BB.
+//===----------------------------------------------------------------------===//
+
+/// Return true if \p Op has arc uses in the instruction range [Start, End). We
+/// assume that Start and End are both in the same basic block.
+bool swift::arc::
+valueHasARCUsesInInstructionRange(SILValue Op,
+                                  SILBasicBlock::iterator Start,
+                                  SILBasicBlock::iterator End,
+                                  AliasAnalysis *AA) {
+  assert(Start->getParent() == End->getParent() &&
+         "Start and End should be in the same basic block");
+
+  // If Start == End, then we have an empty range, return false.
+  if (Start == End)
+    return false;
+
+  // Otherwise, until Start != End.
+  while (Start != End) {
+    // Check if Start can use Op in an ARC relevant way. If so, return true.
+    if (canUseValue(&*Start, Op, AA))
+      return true;
+
+    // Otherwise, increment our iterator.
+    ++Start;
+  }
+
+  // If all such instructions can not use Op, return false.
+  return false;
+}
+
+/// Return true if \p Op has instructions in the instruction range (Start, End]
+/// which may decrement it. We assume that Start and End are both in the same
+/// basic block.
+bool swift::arc::
+valueHasARCDecrementsInInstructionRange(SILValue Op,
+                                        SILBasicBlock::iterator Start,
+                                        SILBasicBlock::iterator End,
+                                        AliasAnalysis *AA) {
+  assert(Start->getParent() == End->getParent() &&
+         "Start and End should be in the same basic block");
+
+  // If Start == End, then we have an empty range, return false.
+  if (Start == End)
+    return false;
+
+  // Otherwise, until Start != End.
+  while (Start != End) {
+    // Check if Start can decrement Op's ref count. If so, return true.
+    if (canDecrementRefCount(&*Start, Op, AA))
+      return true;
+    // Otherwise, increment our iterator.
+    ++Start;
+  }
+
+  // If all such instructions can not decrement Op, return false.
+  return false;
 }
