@@ -136,45 +136,27 @@ func ... <Pos : ForwardIndexType> (
   return Range(start: minimum, end: maximum.successor())
 }
 
-//===--- Prefer Ranges to Intervals, when there's an option ---------------===//
+//===--- Prefer Ranges to Intervals, and add checking ---------------------===//
 
-/// Forms a half-open range that contains `minimum`, but not
-/// `maximum`.
+/// Forms a half-open range that contains `start`, but not
+/// `end`.  Requires: `start <= end`
 @transparent public
 func ..< <Pos : ForwardIndexType where Pos: Comparable> (
-  minimum: Pos, maximum: Pos
+  start: Pos, end: Pos
 ) -> Range<Pos> {
-  return Range(start: minimum, end: maximum)
+  _precondition(start <= end, "Can't form Range with end < start")
+  return Range(start: start, end: end)
 }
 
-/// Forms a closed range that contains both `minimum` and `maximum`.
+/// Forms a closed range that contains both `start` and `end`.
+/// Requres: `start <= end`
 @transparent public
 func ... <Pos : ForwardIndexType where Pos: Comparable> (
-  minimum: Pos, maximum: Pos
+  start: Pos, end: Pos
 ) -> Range<Pos> {
-  return Range(start: minimum, end: maximum.successor())
+  _precondition(start <= end, "Can't form Range with end < start")
+  return Range(start: start, end: end.successor())
 }
-
-//
-// Pattern matching support for ranges
-//
-// Ranges can be used to match values contained within the range, e.g.:
-// switch x {
-// case 0...10:
-//   println("single digit")
-// case _:
-//   println("too big")
-// }
-
-@infix public
-func ~= <
-  T: RandomAccessIndexType where T.Distance : SignedIntegerType
->(x: Range<T>, y: T) -> Bool {
-  let a = x.startIndex.distanceTo(y) >= 0
-  let b = y.distanceTo(x.endIndex) > 0
-  return a && b
-}
-
 
 extension Range {
   /// Return an array containing the results of calling

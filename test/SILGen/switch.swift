@@ -308,7 +308,6 @@ func test9() {
 // CHECK-LABEL: sil  @_TF6switch6test10FT_T_
 func test10() {
   switch (foo(), bar()) {
-  // CHECK:   function_ref @_TFSsoi3zzzUSs10ComparableSs16ForwardIndexType_USs18_SignedIntegerType__Ss33_BuiltinIntegerLiteralConvertible___FTQ_Q__GVSs5RangeQ__
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch3barFT_Si
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
