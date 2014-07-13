@@ -76,8 +76,7 @@ public typealias CBool = Bool
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-public struct COpaquePointer : Equatable, Hashable, BooleanType,
-                                NilLiteralConvertible {
+public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var value : Builtin.RawPointer
   
   public init() {
@@ -99,11 +98,6 @@ public struct COpaquePointer : Equatable, Hashable, BooleanType,
     return self == COpaquePointer.null()
   }
   
-  @transparent public
-  func getLogicValue() -> Bool {
-    return !_isNull
-  }
-
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
@@ -128,8 +122,7 @@ extension COpaquePointer {
   }
 }
 
-public struct CFunctionPointer<T> : Equatable, Hashable, BooleanType,
-                                     NilLiteralConvertible {
+public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   var value: COpaquePointer
 
   public init() {
@@ -142,11 +135,6 @@ public struct CFunctionPointer<T> : Equatable, Hashable, BooleanType,
 
   public static func null() -> CFunctionPointer {
     return CFunctionPointer()
-  }
-
-  @transparent public
-  func getLogicValue() -> Bool {
-    return value.getLogicValue()
   }
 
   public var hashValue: Int {

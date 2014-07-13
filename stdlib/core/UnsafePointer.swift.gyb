@@ -27,7 +27,7 @@
 /// to allocate and free memory appropriately.
 public struct ${Self}<T>
   : BidirectionalIndexType, Comparable, Hashable,
-    BooleanType, NilLiteralConvertible, _PointerType {
+    NilLiteralConvertible, _PointerType {
 
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
@@ -213,11 +213,6 @@ public struct ${Self}<T>
     return self == ${Self}.null()
   }
 
-  @transparent public
-  func getLogicValue() -> Bool {
-    return !_isNull
-  }
-
   public subscript (i : Int) -> T {
     @transparent
     get {
@@ -236,7 +231,7 @@ public struct ${Self}<T>
   /// the pointee
   public
   func _setIfNonNil(body: () -> T) {
-    if self {
+    if self != nil {
       memory = body()
     }
   }
@@ -248,7 +243,7 @@ public struct ${Self}<T>
   func _withBridgeObject<U: AnyObject, R>(
     inout buffer: U?, body: (AutoreleasingUnsafePointer<U?>)->R
   ) -> R {
-    return self ? body(&buffer) : body(nil)
+    return self != nil ? body(&buffer) : body(nil)
   }
 
   /// Return the result of invoking body.  If self was converted from
@@ -258,7 +253,7 @@ public struct ${Self}<T>
   func _withBridgeValue<U, R>(
     inout buffer: U, body: (UnsafePointer<U>)->R
   ) -> R {
-    return self ? body(&buffer) : body(nil)
+    return self != nil ? body(&buffer) : body(nil)
   }
 % end
 

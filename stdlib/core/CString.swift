@@ -59,7 +59,7 @@ extension String {
 /// with possibly-transient lifetime, create a nul-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
 public func _persistCString(s: ConstUnsafePointer<CChar>) -> [CChar]? {
-  if !s {
+  if s == nil {
     return .None
   }
   var length = _strlen(s)

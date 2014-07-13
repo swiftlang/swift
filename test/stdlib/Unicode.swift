@@ -2346,8 +2346,8 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
           ptr, backingStorage.count, kCFAllocatorNull)
       expectFalse(CFStringGetCStringPtr(cfstring,
-          CFStringBuiltInEncodings.ASCII.toRaw()).getLogicValue())
-      expectTrue(CFStringGetCharactersPtr(cfstring).getLogicValue())
+          CFStringBuiltInEncodings.ASCII.toRaw()) != nil)
+      expectTrue(CFStringGetCharactersPtr(cfstring) != nil)
       checkUTF8View(expected, String(cfstring), test.loc.withCurrentLoc())
       return ()
     }
@@ -2375,18 +2375,23 @@ func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
   // because Swift bridging may copy the string to ensure that it is not
   // mutated.
   let cfstring: CFString = reinterpretCast(nss)
-  assert(!CFStringGetCStringPtr(cfstring,
-      CFStringBuiltInEncodings.ASCII.toRaw()))
-  assert(!CFStringGetCStringPtr(cfstring,
-      CFStringBuiltInEncodings.UTF8.toRaw()))
-  assert(!CFStringGetCharactersPtr(cfstring))
+  assert(
+    CFStringGetCStringPtr(
+      cfstring, CFStringBuiltInEncodings.ASCII.toRaw()) == nil)
+  assert(
+    CFStringGetCStringPtr(
+      cfstring, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
+  
+  assert(CFStringGetCharactersPtr(cfstring) == nil)
 
   let copy = CFStringCreateCopy(nil, cfstring)
-  assert(!CFStringGetCStringPtr(copy,
-      CFStringBuiltInEncodings.ASCII.toRaw()))
-  assert(!CFStringGetCStringPtr(copy,
-      CFStringBuiltInEncodings.UTF8.toRaw()))
-  assert(!CFStringGetCharactersPtr(copy))
+  assert(
+    CFStringGetCStringPtr(
+      copy, CFStringBuiltInEncodings.ASCII.toRaw()) == nil)
+  assert(
+    CFStringGetCStringPtr(
+      copy, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
+  assert(CFStringGetCharactersPtr(copy) == nil)
 }
 
 StringCookedViews.test("UTF8ForNonContiguousUTF16") {
@@ -2427,11 +2432,13 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     // encoding itself, instead of dispatching to CF.
     // GetCStringPtr fails because our un-copied bytes aren't zero-terminated.
     // GetCharactersPtr fails because our un-copied bytes aren't UTF-16.
-    assert(!CFStringGetCStringPtr(cfstring,
-        CFStringBuiltInEncodings.ASCII.toRaw()))
-    assert(!CFStringGetCStringPtr(cfstring,
-        CFStringBuiltInEncodings.UTF8.toRaw()))
-    assert(!CFStringGetCharactersPtr(cfstring))
+    assert(
+      CFStringGetCStringPtr(
+        cfstring, CFStringBuiltInEncodings.ASCII.toRaw()) == nil)
+    assert(
+      CFStringGetCStringPtr(
+        cfstring, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
+    assert(CFStringGetCharactersPtr(cfstring) == nil)
 
     checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
     _fixLifetime(bytes)
@@ -2448,11 +2455,13 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     // or UTF-16, in which case one of the fast paths will succeed.
     // This test operates only when CF creates a tagged pointer string object.
     if (object_getClassName(cfstring) == "NSTaggedPointerString") {
-      assert(!CFStringGetCStringPtr(cfstring,
-          CFStringBuiltInEncodings.ASCII.toRaw()))
-      assert(!CFStringGetCStringPtr(cfstring,
-          CFStringBuiltInEncodings.UTF8.toRaw()))
-      assert(!CFStringGetCharactersPtr(cfstring))
+      assert(
+        CFStringGetCStringPtr(
+          cfstring, CFStringBuiltInEncodings.ASCII.toRaw()) == nil)
+      assert(
+        CFStringGetCStringPtr(
+          cfstring, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
+      assert(CFStringGetCharactersPtr(cfstring) == nil)
 
       checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
     }

@@ -168,8 +168,6 @@ public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
   // The Clang importer synthesizes these for imported NS_OPTIONS.
 
   /* class func fromRaw(raw: Raw) -> Self? { return fromMask(raw) } */
-
-  /* func getLogicValue() -> Bool { return toRaw() != .allZeros() } */
 }
 
 /// Conforming to this protocol allows a type to be usable with the 'nil'
