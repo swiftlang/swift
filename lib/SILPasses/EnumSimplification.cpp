@@ -68,9 +68,9 @@ class BBEnumTagDataflowState
                                               EnumElementDecl *>, 4>>;
   ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
 
-  using PredCase = llvm::SmallVector<std::pair<SILBasicBlock *,
+  using EnumCase = llvm::SmallVector<std::pair<SILBasicBlock *,
                                                EnumElementDecl *>, 2>;
-  llvm::DenseMap<SILValue, PredCase> EnumToPredCaseMap;
+  llvm::DenseMap<SILValue, EnumCase> EnumToEnumCaseMap;
 
 public:
   BBEnumTagDataflowState() : BB(nullptr), ValueToCaseMap() {}
@@ -188,7 +188,7 @@ void BBEnumTagDataflowState::mergePredecessorStates(
   // into it.
   if (FirstPredState.getBB()->getSingleSuccessor()) {
     for (auto P : ValueToCaseMap.getItems())
-      EnumToPredCaseMap[P.first].push_back({BB, P.second});
+      EnumToEnumCaseMap[P.first].push_back({BB, P.second});
   }
 
   // If we only have one predecessor...
@@ -242,12 +242,12 @@ void BBEnumTagDataflowState::mergePredecessorStates(
         // Check if out predecessor has any other successors. If that is true we
         // clear all the state since we can not hoist safely.
         if (!PredState.getBB()->getSingleSuccessor()) {
-          EnumToPredCaseMap.clear();
+          EnumToEnumCaseMap.clear();
         } else {
           // Otherwise, add this case to our predecessor case list. We will unique
           // this after we have finished processing all predecessors.
           auto Case = std::make_pair(PredState.getBB(), OtherValue->second);
-          EnumToPredCaseMap[OtherValue->first].push_back(Case);
+          EnumToEnumCaseMap[OtherValue->first].push_back(Case);
         }
 
         // And the states match, the enum state propagates to this BB.
@@ -257,7 +257,7 @@ void BBEnumTagDataflowState::mergePredecessorStates(
         // If we fail to find any state, we can not cover the switch along every
         // BB path... Clear all predecessor cases that we are tracking so we
         // don't attempt to perform that optimization.
-        EnumToPredCaseMap.clear();
+        EnumToEnumCaseMap.clear();
       }
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
@@ -334,14 +334,14 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
       break;
 
     SILValue Op = RVI->getOperand();
-    auto &PredCase = EnumToPredCaseMap[Op];
+    auto &EnumCase = EnumToEnumCaseMap[Op];
 
     // If we don't have an enum decl for each predecessor, bail...
-    if (PredCase.size() != NumPreds)
+    if (EnumCase.size() != NumPreds)
       continue;
 
     // Otherwise perform the transformation.
-    for (auto P : PredCase) {
+    for (auto P : EnumCase) {
       // If we don't have an argument for this case, there is nothing to
       // do... continue...
       if (!P.second->hasArgumentType())
