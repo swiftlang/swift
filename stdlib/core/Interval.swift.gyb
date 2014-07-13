@@ -76,7 +76,7 @@ public struct ${Self}<T: Comparable>
     return "\(start)${rangeOperator}\(end)"
   }
   
-  /// The `Interval`\ "s verbose printed representation
+  /// The `Interval`\ 's verbose printed representation
   public var debugDescription: String {
     return "${Self}(\(start)${rangeOperator}\(end))"
   }
