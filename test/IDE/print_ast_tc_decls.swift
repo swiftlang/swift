@@ -423,11 +423,11 @@ protocol d0130_TestProtocol {
 // PASS_COMMON-NEXT: {{^}}  @objc optional func protocolFunc1(){{$}}
 }
 
-@class_protocol protocol d0150_TestClassProtocol {}
-// PASS_COMMON-LABEL: {{^}}@class_protocol protocol d0150_TestClassProtocol {{{$}}
+protocol d0150_TestClassProtocol : class {}
+// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : class {{{$}}
 
-@objc @class_protocol protocol d0151_TestClassProtocol {}
-// PASS_COMMON-LABEL: {{^}}@class_protocol @objc protocol d0151_TestClassProtocol {{{$}}
+@objc protocol d0151_TestClassProtocol {}
+// PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}
 
 
 @noreturn @asmname("exit") func d0160_testNoReturn()

@@ -320,7 +320,7 @@ println("Fooable double:")
 fooable = 2.5
 dump(fooable)
 
-@class_protocol protocol Barrable {}
+protocol Barrable : class {}
 extension Best: Barrable {}
 
 // CHECK-LABEL: Barrable class:

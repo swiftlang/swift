@@ -297,7 +297,7 @@ class TopLevelClass {
   var ERROR_Property: Int
 }
 
-@class_protocol @objc protocol TopLevelObjcProtocol {
+@objc protocol TopLevelObjcProtocol {
   func topLevelObjcProtocol_InstanceFunc1()
   class func topLevelObjcProtocol_ClassFunc1()
   subscript (i: TopLevelObjcClass) -> Int { get set }

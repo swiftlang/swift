@@ -1,6 +1,6 @@
 // RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
 
-@class_protocol @objc protocol P1 {
+@objc protocol P1 {
   optional func method(x: Int)
 
   optional var prop: Int { get }

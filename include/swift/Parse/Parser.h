@@ -385,7 +385,15 @@ public:
     consumeToken(K);
     return true;
   }
-  
+
+  /// \brief If the current token is the specified kind, consume it and
+  /// return true.  Otherwise, return false without consuming it.
+  bool consumeIf(tok K, SourceLoc &consumedLoc) {
+    if (Tok.isNot(K)) return false;
+    consumedLoc = consumeToken(K);
+    return true;
+  }
+
   bool consumeIfNotAtStartOfLine(tok K) {
     if (Tok.isAtStartOfLine()) return false;
     return consumeIf(K);
@@ -660,7 +668,8 @@ public:
   
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
-  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
+  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
+                                SourceLoc *classRequirementLoc);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,

@@ -1,4 +1,4 @@
-@class_protocol @objc public protocol ObjCProto {
+@objc public protocol ObjCProto {
   func doSomething()
 }
 

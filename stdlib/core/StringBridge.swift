@@ -17,7 +17,7 @@
 /// Effectively a proxy for NSString that doesn't mention it by
 /// name.  NSString's conformance to this protocol is declared in
 /// Foundation.
-@class_protocol @objc public protocol _CocoaStringType {}
+@objc public protocol _CocoaStringType {}
 
 /// Loading Foundation initializes these function variables
 /// with useful values

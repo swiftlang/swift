@@ -26,7 +26,7 @@ import SwiftShims
 /// when T isBridgedToObjectiveC, it can be used directly as an
 /// NSArray.  It is safe to convert between NSArray and _CocoaArrayType via
 /// reinterpretCast.
-@class_protocol @unsafe_no_objc_tagged_pointer @objc public
+@unsafe_no_objc_tagged_pointer @objc public
 protocol _CocoaArrayType {
   func objectAtIndex(index: Int) -> AnyObject
   

@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 // Test the use of 'as' for type coercion (which requires no checking).
-@class_protocol @objc protocol P1 {
+@objc protocol P1 {
   func foo()
 }
 

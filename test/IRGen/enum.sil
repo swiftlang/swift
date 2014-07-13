@@ -1065,8 +1065,8 @@ end:
   return undef : $()
 }
 
-@class_protocol protocol PC {}
-@objc @class_protocol protocol PO {}
+protocol PC : class {}
+@objc protocol PO {}
 
 enum SinglePayloadClassProtocol {
   case x(PC)

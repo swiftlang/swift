@@ -95,11 +95,11 @@ typealias ZForwardAlias = ZForwardAliasClass;
 @objc class ZForwardClass3 {}
 @objc class ZForwardClass4 {}
 
-@class_protocol @objc protocol ZForwardProtocol1 {}
-@class_protocol @objc protocol ZForwardProtocol2 {}
-@class_protocol @objc protocol ZForwardProtocol3 {}
-@class_protocol @objc protocol ZForwardProtocol4 {}
-@class_protocol @objc protocol ZForwardProtocol5 {}
-@class_protocol @objc protocol ZForwardProtocol6 {}
-@class_protocol @objc protocol ZForwardProtocol7 {}
-@class_protocol @objc protocol ZForwardProtocol8 {}
+@objc protocol ZForwardProtocol1 {}
+@objc protocol ZForwardProtocol2 {}
+@objc protocol ZForwardProtocol3 {}
+@objc protocol ZForwardProtocol4 {}
+@objc protocol ZForwardProtocol5 {}
+@objc protocol ZForwardProtocol6 {}
+@objc protocol ZForwardProtocol7 {}
+@objc protocol ZForwardProtocol8 {}

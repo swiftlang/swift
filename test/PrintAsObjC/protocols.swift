@@ -12,11 +12,11 @@ import Foundation
 
 // CHECK-LABEL: @protocol A{{$}}
 // CHECK-NEXT: @end
-@objc @class_protocol protocol A {}
+@objc protocol A {}
 
 // CHECK-LABEL: @protocol B <A>
 // CHECK-NEXT: @end
-@objc @class_protocol protocol B : A {}
+@objc protocol B : A {}
 
 
 // CHECK-LABEL: @protocol Methods{{$}}
@@ -28,7 +28,7 @@ import Foundation
 // CHECK-NEXT: - (void)testComposition:(id <A, ZZZ>)x meta:(Class <A, ZZZ>)xClass;
 // CHECK-NEXT: - (void)testOptional:(id <A>)opt meta:(Class <A>)m;
 // CHECK-NEXT: @end
-@objc @class_protocol protocol Methods {
+@objc protocol Methods {
   func test()
   class func test2()
 
@@ -52,7 +52,7 @@ class MyObject : NSObject, NSCoding {
 }
 
 // NEGATIVE-NOT: NotObjC
-@class_protocol protocol NotObjC {}
+protocol NotObjC : class {}
 
 
 // CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
@@ -73,7 +73,7 @@ extension NSString : A, ZZZ {}
 // CHECK-NEXT: @optional
 // CHECK-NEXT: - (void)f;
 // CHECK-NEXT: @end
-@objc @class_protocol protocol Optional {
+@objc protocol Optional {
   func a()
   func b()
 
@@ -104,7 +104,7 @@ extension NSString : A, ZZZ {}
 // CHECK-NEXT: @optional
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * c;
 // CHECK-NEXT: @end
-@objc @class_protocol protocol Properties {
+@objc protocol Properties {
   var a: Int { get }
   var b: Properties? { get set }
   optional var c: String { get }
@@ -116,8 +116,8 @@ extension NSString : A, ZZZ {}
 // CHECK: SWIFT_PROTOCOL
 // CHECK-NEXT: @protocol ReversedOrder1 <ReversedOrder2>
 // CHECK-NEXT: @end
-@objc @class_protocol protocol ReversedOrder1 : ReversedOrder2 {}
-@objc @class_protocol protocol ReversedOrder2 {}
+@objc protocol ReversedOrder1 : ReversedOrder2 {}
+@objc protocol ReversedOrder2 {}
 
 
 // CHECK-LABEL: @interface RootClass1{{$}}
@@ -134,4 +134,4 @@ extension NSString : A, ZZZ {}
 @objc class Subclass : RootClass1, ZZZ {}
 
 // Deliberately at the end of the file.
-@objc @class_protocol protocol ZZZ {}
+@objc protocol ZZZ {}

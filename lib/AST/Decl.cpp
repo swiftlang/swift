@@ -1819,8 +1819,7 @@ bool ProtocolDecl::requiresClassSlow() {
   // Ensure that the result can not change in future.
   assert(isProtocolsValid());
 
-  if (getAttrs().hasAttribute<ClassProtocolAttr>() ||
-      getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
+  if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
     return true;
   }

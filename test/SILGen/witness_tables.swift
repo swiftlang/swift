@@ -31,7 +31,7 @@ protocol AnyProtocol {
   @infix func <~>(x: Self, y: Self)
 }
 
-@class_protocol protocol ClassProtocol {
+protocol ClassProtocol : class {
   typealias AssocType
   typealias AssocWithReqt: AssocReqt
 
@@ -45,7 +45,7 @@ protocol AnyProtocol {
   @infix func <~>(x: Self, y: Self)
 }
 
-@objc @class_protocol protocol ObjCProtocol {
+@objc protocol ObjCProtocol {
   func method(#x: ObjCClass)
   class func staticMethod(#y: ObjCClass)
 }
@@ -328,7 +328,7 @@ protocol InheritedProtocol2 : AnyProtocol {
   func inheritedMethod()
 }
 
-@class_protocol protocol InheritedClassProtocol : AnyProtocol {
+protocol InheritedClassProtocol : class, AnyProtocol {
   func inheritedMethod()
 }
 

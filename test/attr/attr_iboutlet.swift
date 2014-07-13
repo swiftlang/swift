@@ -39,8 +39,8 @@ enum E { }
 protocol P1 { }
 protocol P2 { }
 
-@class_protocol protocol CP1 { }
-@class_protocol protocol CP2 { }
+protocol CP1 : class { }
+protocol CP2 : class { }
 
 @objc protocol OP1 { }
 @objc protocol OP2 { }

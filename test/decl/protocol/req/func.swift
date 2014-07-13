@@ -128,7 +128,7 @@ struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4
 @prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching type '(X4z) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
 
 // Objective-C protocol
-@class_protocol @objc protocol P5 {
+@objc protocol P5 {
   func f2(x: Int, withInt a: Int) // expected-note{{requirement 'f2(_:withInt:)' declared here}}
   func f2(x: Int, withOtherInt a: Int) // expected-note{{protocol requires function 'f2(_:withOtherInt:)' with type '(Int, withOtherInt: Int) -> ()'}}
 }

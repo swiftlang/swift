@@ -3,7 +3,7 @@
 
 import Swift
 
-@class_protocol protocol ClassProto { }
+protocol ClassProto : class { }
 
 // CHECK-LABEL: sil @_TF8builtins3foo
 func foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
@@ -245,8 +245,8 @@ func condfail(i: Builtin.Int1) {
 
 struct S {}
 @objc class O {}
-@objc @class_protocol protocol OP1 {}
-@objc @class_protocol protocol OP2 {}
+@objc protocol OP1 {}
+@objc protocol OP2 {}
 protocol P {}
 
 // CHECK-LABEL: sil @_TF8builtins10canBeClass

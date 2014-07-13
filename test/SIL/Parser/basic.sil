@@ -290,7 +290,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   %11 = return %7 : $()
 }
 
-@class_protocol protocol ClassBound {
+protocol ClassBound : class {
   func classBoundMethod()
 }
 
@@ -726,7 +726,7 @@ bb0(%t : $*P):
   return %1 : $()
 }
 
-@class_protocol protocol ClassP {}
+protocol ClassP : class {}
 
 sil @test_downcast_existential_ref : $@thin <U : ClassP> (ClassP) -> () {
 bb0(%t : $ClassP):
@@ -1084,7 +1084,7 @@ entry(%0 : $*@block_storage Int):
   return undef : $()
 }
 
-@class_protocol protocol SomeClassProtocol {}
+protocol SomeClassProtocol : class {}
 
 // CHECK-LABEL: sil @metatype_to_object
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject

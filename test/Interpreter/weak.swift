@@ -2,7 +2,7 @@
 
 import ObjectiveC
 
-@class_protocol protocol Protocol {
+protocol Protocol : class {
   func noop()
 }
 
@@ -126,7 +126,7 @@ testProtocol()
 
 
 
-@class_protocol protocol P { }
+protocol P : class { }
 
 func test_rdar15293354() {
   weak var x : P? = .None

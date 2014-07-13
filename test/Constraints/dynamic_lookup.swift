@@ -79,11 +79,11 @@ class Z : Y {
   func generic4<T>(x : T) { }
 }
 
-@class_protocol @objc protocol P {
+@objc protocol P {
   func wibble()
 }
 
-@class_protocol @objc protocol P2 {
+@objc protocol P2 {
   func wonka()
   var protoProp : Int { get }
   class func staticWibble()

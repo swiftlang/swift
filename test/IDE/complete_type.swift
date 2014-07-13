@@ -701,10 +701,10 @@ struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8^#
 //===--- Test that we can complete types in the class inheritance clause.
 //===---
 
-class TypeInClassInheritance1 : #^TYPE_IN_CLASS_INHERITANCE_1^#
-
-class TypeInClassInheritance2 : #^TYPE_IN_CLASS_INHERITANCE_2^# {
+class TypeInClassInheritance1 : #^TYPE_IN_CLASS_INHERITANCE_1^# {
 }
+
+class TypeInClassInheritance2 : #^TYPE_IN_CLASS_INHERITANCE_2^#
 
 //===---
 //===--- Test that we can complete types in the enum inheritance clause.

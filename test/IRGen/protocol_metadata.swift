@@ -2,9 +2,9 @@
 
 protocol A { func a() }
 protocol B { func b() }
-@class_protocol protocol C { func c() }
-@objc @class_protocol protocol O { func o() }
-@objc @class_protocol protocol OPT { 
+protocol C : class { func c() }
+@objc protocol O { func o() }
+@objc protocol OPT { 
   optional func opt()
   optional class func static_opt()
 

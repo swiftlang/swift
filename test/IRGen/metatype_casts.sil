@@ -49,7 +49,7 @@ entry(%m : $@objc_metatype SomeClass.Type):
   return %o : $AnyObject
 }
 
-@class_protocol protocol SomeClassProtocol {}
+protocol SomeClassProtocol : class {}
 
 // CHECK-LABEL: define %objc_object* @existential_metatype_object_conversion(%objc_class*) {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*

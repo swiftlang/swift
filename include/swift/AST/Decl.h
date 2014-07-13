@@ -447,7 +447,7 @@ class alignas(8) Decl {
     /// Whether the \c RequiresClass bit is valid.
     unsigned RequiresClassValid : 1;
 
-    /// Whether this is a [class_bounded] protocol.
+    /// Whether this is a class-bounded protocol.
     unsigned RequiresClass : 1;
 
     /// Whether the \c ExistentialConformsToSelf bit is valid.
@@ -3036,6 +3036,13 @@ public:
       return ProtocolDeclBits.RequiresClass;
 
     return requiresClassSlow();
+  }
+
+  /// Specify that this protocol is class-bounded, e.g., because it was
+  /// annotated with the 'class' keyword.
+  void setRequiresClass() {
+    ProtocolDeclBits.RequiresClassValid = true;
+    ProtocolDeclBits.RequiresClass = true;
   }
 
   /// Determine whether an existential value conforming to just this protocol

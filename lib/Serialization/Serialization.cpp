@@ -1719,6 +1719,8 @@ void Serializer::writeDecl(const Decl *D) {
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
+                               const_cast<ProtocolDecl *>(proto)
+                                 ->requiresClass(),
                                proto->isObjC(),
                                rawAccessLevel,
                                protocols);

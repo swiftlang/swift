@@ -12,36 +12,6 @@ enum binary {
 func f5(inout x: binary) {}
 
 //===---
-//===--- @class_protocol attribute
-//===---
-
-@class_protocol // expected-error {{'class_protocol' attribute can only be applied to protocols}}
-class NotProtocol {}
-func fou(x: @class_protocol Int) {} // expected-error {{attribute can only be applied to declarations, not types}}
-
-// @class_protocol protocols can be @objc
-@objc @class_protocol
-protocol ObjC1 {}
-@class_protocol @objc
-protocol ObjC2 {}
-
-@class_protocol // expected-note {{attribute already specified here}}
-@class_protocol // expected-error {{duplicate attribute}}
-protocol ClassProtocolDuplicate {}
-
-@!class_protocol // expected-error {{attribute may not be inverted}}
-protocol ClassProtocolInverted {}
-
-@objc
-protocol ObjCButNotClass {}
-
-@class_protocol @objc
-protocol ClassProtocolBase {}
-
-@objc
-protocol ClassProtocolEx : ClassProtocolBase {}
-
-//===---
 //===--- IB attributes
 //===---
 
@@ -145,8 +115,7 @@ func zim(x: UnicodeScalar) {}
 @thin  // expected-error {{attribute can only be applied to types, not declarations}}
 func testThinDecl() -> () {}
 
-@class_protocol
-protocol Class {}
+protocol Class : class {}
 protocol NonClass {}
 
 @objc

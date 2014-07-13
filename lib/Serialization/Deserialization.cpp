@@ -2142,13 +2142,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC;
+    bool isImplicit, isClassBounded, isObjC;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, isObjC, rawAccessLevel,
-                                            protocolIDs);
+                                            isImplicit, isClassBounded, isObjC,
+                                            rawAccessLevel, protocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2158,6 +2158,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         getIdentifier(nameID), { });
     declOrOffset = proto;
 
+    if (isClassBounded)
+      proto->setRequiresClass();
+    
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       proto->setAccessibility(*accessLevel);
     } else {

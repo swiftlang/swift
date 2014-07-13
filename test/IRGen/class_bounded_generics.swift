@@ -1,18 +1,18 @@
 // RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
-@class_protocol protocol ClassBound {
+protocol ClassBound : class {
   func classBoundMethod()
 }
-@class_protocol protocol ClassBound2 {
+protocol ClassBound2 : class {
   func classBoundMethod2()
 }
-@class_protocol protocol ClassBoundBinary : ClassBound {
+protocol ClassBoundBinary : class, ClassBound {
   func classBoundBinaryMethod(x: Self)
 }
-@class_protocol @objc protocol ObjCClassBound {
+@objc protocol ObjCClassBound {
   func objCClassBoundMethod()
 }
-@class_protocol @objc protocol ObjCClassBound2 {
+@objc protocol ObjCClassBound2 {
   func objCClassBoundMethod2()
 }
 protocol NotClassBound {

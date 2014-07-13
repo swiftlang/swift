@@ -4,9 +4,9 @@
 import gadget
 import Foundation
 
-@class_protocol @objc protocol P1 {}
-@class_protocol @objc protocol P2 {}
-@class_protocol @objc protocol Work {
+@objc protocol P1 {}
+@objc protocol P2 {}
+@objc protocol Work {
   func doStuff(x: Int64)
 }
 

@@ -326,8 +326,8 @@ func testOnce(p: Builtin.RawPointer, f: () -> ()) {
 class C {}
 struct S {}
 @objc class O {}
-@objc @class_protocol protocol OP1 {}
-@objc @class_protocol protocol OP2 {}
+@objc protocol OP1 {}
+@objc protocol OP2 {}
 protocol P {}
 
 // CHECK-LABEL: define void @_TF8builtins10canBeClass

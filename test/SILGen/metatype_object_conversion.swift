@@ -5,7 +5,7 @@ import Foundation
 
 class C {}
 
-@class_protocol protocol CP {}
+protocol CP : class {}
 
 @objc protocol OP {}
 

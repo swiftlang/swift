@@ -22,7 +22,7 @@ func anyToIntOrZero(x: protocol<>) -> Int {
   return 0
 }
 
-@class_protocol protocol Class {}
+protocol Class : class {}
 
 class C : Class {
 

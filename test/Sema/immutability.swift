@@ -206,8 +206,7 @@ func test_arguments(a : Int, var b : Int, let c : Int) {
 }
 
 
-@class_protocol
-protocol ClassBoundProtocolMutating {
+protocol ClassBoundProtocolMutating : class {
   mutating       // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
   func f()
 }

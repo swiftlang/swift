@@ -292,12 +292,13 @@ private:
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
                       Type superclass = {},
+                      bool explicitClass = false,
                       bool PrintAsProtocolComposition = false);
 
   template <typename DeclWithSuperclass>
   void printInheritedWithSuperclass(DeclWithSuperclass *decl);
 
-  void printInherited(const TypeDecl *decl);
+  void printInherited(const TypeDecl *decl, bool explicitClass = false);
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
   void printInherited(const GenericTypeParamDecl *D);
@@ -660,8 +661,9 @@ void PrintAST::printInherited(const Decl *decl,
                               ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
                               Type superclass,
+                              bool explicitClass,
                               bool PrintAsProtocolComposition) {
-  if (inherited.empty() && superclass.isNull()) {
+  if (inherited.empty() && superclass.isNull() && !explicitClass) {
     if (protos.empty())
       return;
     // If only conforms to AnyObject protocol, nothing to print.
@@ -675,7 +677,10 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedColon = false;
     bool PrintedInherited = false;
 
-    if (superclass) {
+    if (explicitClass) {
+      Printer << " : class";
+      PrintedInherited = true;
+    } else if (superclass) {
       bool ShouldPrintSuper = true;
       if (auto NTD = superclass->getAnyNominal()) {
         ShouldPrintSuper = shouldPrint(NTD);
@@ -736,6 +741,9 @@ void PrintAST::printInherited(const Decl *decl,
 
     Printer << " : ";
 
+    if (explicitClass)
+      Printer << " class, ";
+
     interleave(TypesToPrint, [&](TypeLoc TL) {
       printTypeLoc(TL);
     }, [&]() {
@@ -750,8 +758,9 @@ void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
                  decl->getSuperclass());
 }
 
-void PrintAST::printInherited(const TypeDecl *decl) {
-  printInherited(decl, decl->getInherited(), decl->getProtocols());
+void PrintAST::printInherited(const TypeDecl *decl, bool explicitClass) {
+  printInherited(decl, decl->getInherited(), decl->getProtocols(), nullptr,
+                 explicitClass);
 }
 
 void PrintAST::printInherited(const EnumDecl *D) {
@@ -764,7 +773,7 @@ void PrintAST::printInherited(const ExtensionDecl *decl) {
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {
   printInherited(D, D->getInherited(), D->getProtocols(), D->getSuperclass(),
-                 true);
+                 false, true);
 }
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
@@ -946,7 +955,23 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     Printer << "protocol ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
-  printInherited(decl);
+
+  // Figure out whether we need an explicit 'class' in the inheritance.
+  bool explicitClass = false;
+  if (decl->requiresClass() && !decl->isObjC()) {
+    bool inheritsRequiresClass = false;
+    for (auto proto : decl->getProtocols()) {
+      if (proto->requiresClass()) {
+        inheritsRequiresClass = true;
+        break;
+      }
+    }
+
+    if (!inheritsRequiresClass)
+      explicitClass = true;
+  }
+
+  printInherited(decl, explicitClass);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }

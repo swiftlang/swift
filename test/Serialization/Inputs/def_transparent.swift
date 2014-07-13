@@ -86,7 +86,7 @@ public protocol P {
   func f() -> Self
 }
 
-@class_protocol public protocol CP {
+public protocol CP : class {
   func f() -> Self
 }
 

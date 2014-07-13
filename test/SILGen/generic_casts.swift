@@ -1,6 +1,6 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-@class_protocol protocol ClassBound {}
+protocol ClassBound : class {}
 protocol NotClassBound {}
 
 class C : ClassBound, NotClassBound {}

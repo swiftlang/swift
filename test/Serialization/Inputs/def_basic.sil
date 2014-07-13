@@ -268,7 +268,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   %11 = return %7 : $()
 }
 
-@class_protocol protocol ClassBound {
+protocol ClassBound : class {
   func classBoundMethod()
 }
 
@@ -664,7 +664,7 @@ bb0:
   return %11 : $()
 }
 
-@class_protocol protocol ClassP {}
+protocol ClassP : class {}
 
 enum MaybePair {
   case Neither
@@ -922,7 +922,7 @@ entry(%0 : $Int):
   return %b : $@cc(cdecl) @objc_block () -> ()
 }
 
-@class_protocol protocol SomeClassProtocol {}
+protocol SomeClassProtocol : class {}
 
 // CHECK-LABEL: sil public_external @metatype_to_object
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject

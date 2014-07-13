@@ -75,9 +75,9 @@ public protocol PairLike {
   func getSecond() -> SecondType
 }
 
-@class_protocol public protocol ClassProto {}
+public protocol ClassProto : class {}
 
-@class_protocol @objc public protocol ObjCProtoWithOptional {
+@objc public protocol ObjCProtoWithOptional {
   optional func optionalMethod()
   optional var optionalVar: Int { get }
   optional subscript (i: Int) -> Int { get }

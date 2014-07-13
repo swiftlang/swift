@@ -54,7 +54,7 @@ func protocol_generic_method(#x: Existentiable) -> Loadable {
 // CHECK:         apply [[METHOD]]<Loadable>({{%.*}}, {{%.*}}) : $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout Self) -> ()
 // CHECK:       }
 
-@class_protocol @objc protocol ObjCAble {
+@objc protocol ObjCAble {
   func foo()
 }
 
@@ -66,7 +66,7 @@ func protocol_objc_method(#x: ObjCAble) {
 
 struct Loadable {}
 protocol AddrOnly {}
-@class_protocol protocol Classes {}
+protocol Classes : class {}
 
 protocol X {
   mutating
@@ -88,7 +88,7 @@ protocol WithAssocType {
   func useAssocType(#x: AssocType) -> Self
 }
 
-@class_protocol protocol ClassBounded {
+protocol ClassBounded : class {
   func selfTypes(#x: Self) -> Self
 }
 

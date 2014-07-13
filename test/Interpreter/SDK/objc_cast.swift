@@ -2,7 +2,7 @@
 
 import Foundation
 
-@objc @class_protocol protocol SwiftObjCProto {}
+@objc protocol SwiftObjCProto {}
 
 class SwiftSuperPort : NSPort { }
 

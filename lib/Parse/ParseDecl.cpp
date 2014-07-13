@@ -1742,13 +1742,55 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///
 /// \verbatim
 ///   inheritance:
-///      ':' type-identifier (',' type-identifier)*
+///      ':' inherited (',' inherited)*
+///
+///   inherited:
+///     'class'
+///     type-identifier
 /// \endverbatim
-ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
+ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
+                                      SourceLoc *classRequirementLoc) {
   consumeToken(tok::colon);
 
+  // Clear out the class requirement location.
+  if (classRequirementLoc)
+    *classRequirementLoc = SourceLoc();
+
   ParserStatus Status;
+  SourceLoc prevComma;
   do {
+    // Parse the 'class' keyword for a class requirement.
+    if (Tok.is(tok::kw_class)) {
+      // If we aren't allowed to have a class requirement here, complain.
+      auto classLoc = consumeToken();
+      if (!classRequirementLoc) {
+        SourceLoc endLoc = Tok.is(tok::comma) ? Tok.getLoc() : classLoc;
+        diagnose(classLoc, diag::invalid_class_requirement)
+          .fixItRemove(SourceRange(classLoc, endLoc));
+        continue;
+      }
+
+      // If we already saw a class requirement, complain.
+      if (classRequirementLoc->isValid()) {
+        diagnose(classLoc, diag::redundant_class_requirement)
+          .highlight(*classRequirementLoc)
+          .fixItRemove(SourceRange(prevComma, classLoc));
+        continue;
+      }
+
+      // If the class requirement was not the first requirement, complain.
+      if (!Inherited.empty()) {
+        SourceLoc properLoc = Inherited[0].getSourceRange().Start;
+        diagnose(classLoc, diag::late_class_requirement)
+          .fixItInsert(properLoc, "class, ")
+          .fixItRemove(SourceRange(prevComma, classLoc));
+      }
+
+      // Record the location of the 'class' keyword.
+      *classRequirementLoc = classLoc;
+      continue;
+    }
+
     // Parse the inherited type (which must be a protocol).
     ParserResult<TypeRepr> Ty = parseTypeIdentifier();
     Status |= Ty;
@@ -1758,7 +1800,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
       Inherited.push_back(Ty.get());
 
     // Check for a ',', which indicates that there are more protocols coming.
-  } while (consumeIf(tok::comma));
+  } while (consumeIf(tok::comma, prevComma));
 
   return Status;
 }
@@ -1881,7 +1923,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
 
   ExtensionDecl *ED
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
@@ -2093,9 +2135,10 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
   // Parse optional inheritance clause.
+  // FIXME: Allow class requirements here.
   SmallVector<TypeLoc, 2> Inherited;
   if (isAssociatedType && Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
 
   ParserResult<TypeRepr> UnderlyingTy;
   if (WantDefinition || Tok.is(tok::equal)) {
@@ -3271,7 +3314,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, UD);
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     UD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -3527,7 +3570,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, SD);
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -3606,7 +3649,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, CD);
     SmallVector<TypeLoc, 2> Inherited;
-    Status |= parseInheritance(Inherited);
+    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     CD->setInherited(Context.AllocateCopy(Inherited));
   }
 
@@ -3678,14 +3721,50 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
-  if (Tok.is(tok::colon))
-    Status |= parseInheritance(InheritedProtocols);
+  SourceLoc classRequirementLoc;
+  SourceLoc colonLoc;
+  if (Tok.is(tok::colon)) {
+    colonLoc = Tok.getLoc();
+    Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
+  }
 
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
                                  Context.AllocateCopy(InheritedProtocols));
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
+
+  // If there was a 'class' requirement, mark this as a class-bounded protocol.
+  if (classRequirementLoc.isValid())
+    Proto->setRequiresClass();
+
+  // If the "class_protocol" attribute was provided, replace it with a 'class'
+  // requirement.
+  if (auto classProto = Attributes.getAttribute<ClassProtocolAttr>()) {
+    StringRef addString;
+    SourceLoc insertLoc;
+    if (InheritedProtocols.empty()) {
+      insertLoc = Lexer::getLocForEndOfToken(SourceMgr, NameLoc);
+      addString = " : class";
+    } else {
+      insertLoc = InheritedProtocols[0].getSourceRange().Start;
+      addString = "class, ";
+    }
+
+    // Remove @class_protocol and the character following it.
+    SourceLoc removeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                                        classProto->Range.End)
+      .getAdvancedLoc(1);
+    diagnose(classProto->AtLoc, diag::class_protocol_removed)
+      .fixItRemoveChars(classProto->AtLoc, removeEndLoc)
+      .fixItInsert(insertLoc, addString);
+
+    // Act as if we saw a 'class' requirement.
+    Proto->setRequiresClass();
+
+    // Drop the attribute.
+    Attributes.removeAttribute(classProto);
+  }
 
   if (Attributes.shouldSaveInAST())
     Proto->getMutableAttrs() = Attributes;

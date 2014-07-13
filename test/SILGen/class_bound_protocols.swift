@@ -6,11 +6,11 @@
 protocol NotClassBound {
   func notClassBoundMethod()
 }
-@class_protocol protocol ClassBound {
+protocol ClassBound : class {
   func classBoundMethod()
 }
 
-@class_protocol protocol ClassBound2 {
+protocol ClassBound2 : class {
   func classBound2Method()
 }
 

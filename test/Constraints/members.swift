@@ -134,7 +134,7 @@ func existential(p: P) {
   var barFull : () = p.bar(0)
 }
 
-@class_protocol protocol ClassP {
+protocol ClassP : class {
   func bas(x: Int)
 }
 

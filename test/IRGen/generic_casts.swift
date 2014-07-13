@@ -54,14 +54,14 @@ func anyToInt(x: protocol<>) -> Int {
   return x as Int
 }
 
-@class_protocol @objc protocol ObjCProto1 {
+@objc protocol ObjCProto1 {
   class func forClass()
   class func forInstance()
 
   var prop: NSObject { get }
 }
 
-@class_protocol @objc protocol ObjCProto2 : ObjCProto1 {}
+@objc protocol ObjCProto2 : ObjCProto1 {}
 
 @objc class ObjCClass {}
 

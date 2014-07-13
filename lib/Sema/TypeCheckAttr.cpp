@@ -566,7 +566,8 @@ void AttributeChecker::visitAssignmentAttr(AssignmentAttr *attr) {
 }
 
 void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
-  // Only protocols can have the @class_protocol attribute.
+  // FIXME: The @class_protocol attribute is dead. Retain this code so that we
+  // diagnose uses of @class_protocol for non-protocols.
   if (!isa<ProtocolDecl>(D)) {
     TC.diagnose(attr->getLocation(),
                 diag::class_protocol_not_protocol);
@@ -585,7 +586,6 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
   }
   
   if (!proto->requiresClass()
-      && !proto->getAttrs().hasAttribute<ClassProtocolAttr>()
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);

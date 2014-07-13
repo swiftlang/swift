@@ -4,7 +4,7 @@ class C {}
 struct S {}
 
 protocol NonClassProto {}
-@class_protocol protocol ClassConstrainedProto {}
+protocol ClassConstrainedProto : class {}
 
 func takesAnyObject(x: AnyObject) {} // expected-note{{}} // expected-note{{}} // expected-note{{}}
 

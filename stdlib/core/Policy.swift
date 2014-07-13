@@ -54,8 +54,7 @@ public typealias MaxBuiltinFloatType = Builtin.FPIEEE64
 //===----------------------------------------------------------------------===//
 
 public typealias Any = protocol<>
-@class_protocol @objc
-public protocol AnyObject {}
+@objc public protocol AnyObject {}
 
 public typealias AnyClass = AnyObject.Type
 

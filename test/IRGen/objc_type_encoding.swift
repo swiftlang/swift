@@ -4,9 +4,9 @@
 import ObjectiveC
 import gizmo
 
-@class_protocol @objc protocol P1 {}
-@class_protocol @objc protocol P2 {}
-@class_protocol @objc protocol P3 {}
+@objc protocol P1 {}
+@objc protocol P2 {}
+@objc protocol P3 {}
 
 @objc class Methods {
   @objc func testSizedUnsignedTypes(a: UInt8, b: UInt16, c: UInt32, d: UInt64) {}
@@ -97,7 +97,7 @@ func testArchetype(work: P3) {
 @objc class MyCustomObject {
 }
 
-@objc @class_protocol protocol MyProtocol {
+@objc protocol MyProtocol {
 	func myMethod2(arg : protocol<NSRuncing, NSFunging>)
         func readWithAuthorization(authData : Gizmo, reply : (NSView, NSSpoon) -> Void)
         func doSomething(context: MyCustomObject)

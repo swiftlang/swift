@@ -7,7 +7,7 @@ protocol P {
   func g() -> Self
 }
 
-@class_protocol protocol CP {
+protocol CP : class {
   func f() -> Self
   func g() -> Self
 }

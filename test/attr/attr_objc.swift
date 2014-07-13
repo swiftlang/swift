@@ -9,17 +9,13 @@ protocol PlainProtocol {} // expected-note {{protocol 'PlainProtocol' declared h
 
 @objc class Class_ObjC1 {}
 
-@class_protocol
-protocol Protocol_Class1 {} // expected-note {{protocol 'Protocol_Class1' declared here}}
+protocol Protocol_Class1 : class {} // expected-note {{protocol 'Protocol_Class1' declared here}}
 
-@class_protocol
-protocol Protocol_Class2 {}
+protocol Protocol_Class2 : class {}
 
-@class_protocol @objc
-protocol Protocol_ObjC1 {}
+@objc protocol Protocol_ObjC1 {}
 
-@objc
-protocol Protocol_ObjC2 {}
+@objc protocol Protocol_ObjC2 {}
 
 
 
@@ -207,13 +203,11 @@ protocol subject_protocol1 {
   func subject_instanceFunc()
 }
 
-@objc @class_protocol
-protocol subject_protocol2 {} // no-error
-// CHECK-LABEL: @class_protocol @objc protocol subject_protocol2 {
+@objc protocol subject_protocol2 {} // no-error
+// CHECK-LABEL: @objc protocol subject_protocol2 {
 
-@class_protocol @objc
-protocol subject_protocol3 {} // no-error
-// CHECK-LABEL: @objc @class_protocol protocol subject_protocol3 {
+@objc protocol subject_protocol3 {} // no-error
+// CHECK-LABEL: @objc protocol subject_protocol3 {
 
 @objc
 protocol subject_protocol4 : PlainProtocol {} // expected-error {{@objc protocol 'subject_protocol4' cannot refine non-@objc protocol 'PlainProtocol'}}
@@ -235,7 +229,7 @@ protocol subject_containerProtocol1 {
   class func subject_staticFunc()
 }
 
-@objc @class_protocol
+@objc
 protocol subject_containerObjCProtocol1 {
   func func_Curried1()()
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
@@ -266,7 +260,7 @@ protocol subject_containerObjCProtocol1 {
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
 
-@objc @class_protocol
+@objc
 protocol subject_containerObjCProtocol2 {
   init(a: Int)
   @objc init(a: Double)
@@ -1354,9 +1348,9 @@ class infer_instanceVar3 : Class_ObjC1 {
 }
 
 
-@objc @class_protocol
+@objc
 protocol infer_instanceVar4 {
-// CHECK-LABEL: @class_protocol @objc protocol infer_instanceVar4 {
+// CHECK-LABEL: @objc protocol infer_instanceVar4 {
 
   var v1: Int { get }
 // CHECK-LABEL: @objc var v1: Int { get }
@@ -1399,9 +1393,9 @@ class infer_subscript1 {
 }
 
 
-@class_protocol @objc
+@objc
 protocol infer_throughConformanceProto1 {
-// CHECK-LABEL: @objc @class_protocol protocol infer_throughConformanceProto1 {
+// CHECK-LABEL: @objc protocol infer_throughConformanceProto1 {
 
   func funcObjC1()
   var varObjC1: Int { get }
@@ -1426,9 +1420,9 @@ class infer_throughConformance1 : infer_throughConformanceProto1 {
   // CHECK: @objc deinit  {
 }
 
-@class_protocol @objc
+@objc
 private protocol infer_throughConformanceProto2 {
-  // CHECK-LABEL: @objc @class_protocol private protocol infer_throughConformanceProto2 {
+  // CHECK-LABEL: @objc private protocol infer_throughConformanceProto2 {
 
   func funcObjC1()
   var varObjC1: Int { get }

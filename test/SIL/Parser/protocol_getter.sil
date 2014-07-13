@@ -3,8 +3,7 @@
 // Verify that SILParser correctly handles protocol_method on a getter.
 import Swift
 
-@class_protocol
-protocol TestP {
+protocol TestP : class {
   var count: Int {get}
 }
 

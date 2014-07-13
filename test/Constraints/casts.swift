@@ -138,9 +138,9 @@ func conditional_cast(b: B) -> D? {
   return b as? D
 }
 
-@objc @class_protocol protocol ObjCProto1 {}
-@objc @class_protocol protocol ObjCProto2 {}
-@class_protocol protocol NonObjCProto {}
+@objc protocol ObjCProto1 {}
+@objc protocol ObjCProto2 {}
+protocol NonObjCProto : class {}
 
 @objc class ObjCClass {}
 class NonObjCClass {}

@@ -15,7 +15,7 @@ class X {
   }
 }
 
-@class_protocol @objc protocol P {
+@objc protocol P {
   func g()
 }
 

@@ -57,7 +57,7 @@ func call_existential_methods(var x: P, var y: S) {
   x.generic_method(y)
 }
 
-@class_protocol @objc protocol ObjC {
+@objc protocol ObjC {
   func method()
 }
 

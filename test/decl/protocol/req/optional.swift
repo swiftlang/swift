@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------
 // Declaring optional requirements
 // -----------------------------------------------------------------------
-@class_protocol @objc protocol P1 {
+@objc protocol P1 {
   optional func method(x: Int)
 
   optional var prop: Int { get }

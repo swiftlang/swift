@@ -4,7 +4,7 @@ protocol P {
   func f() -> Self
 }
 
-@class_protocol protocol CP {
+protocol CP : class {
   func f() -> Self
 }
 

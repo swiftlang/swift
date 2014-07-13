@@ -20,7 +20,7 @@ enum Foo {
   case B
 }
 
-@class_protocol @objc protocol ClassExistential {}
+@objc protocol ClassExistential {}
 
 // CHECK-LABEL: %O11enum_32_bit3Bar = type <{ [4 x i8] }>
 enum Bar {

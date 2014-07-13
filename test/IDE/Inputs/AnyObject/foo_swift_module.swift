@@ -20,7 +20,7 @@ class Foo_TopLevelClass {
   @objc var foo_TopLevelClass_ObjcProperty1: Int = 0
 }
 
-@class_protocol @objc protocol Foo_TopLevelObjcProtocol {
+@objc protocol Foo_TopLevelObjcProtocol {
   func foo_TopLevelObjcProtocol_InstanceFunc1()
   class func foo_TopLevelObjcProtocol_ClassFunc1()
   subscript(i: Foo_TopLevelObjcProtocol) -> Int { get set }

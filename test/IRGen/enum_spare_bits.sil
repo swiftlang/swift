@@ -19,7 +19,7 @@ enum ObjCClass {
 // can't use spare bits—NSObject is an ObjC-defined class
 // CHECK: %O15enum_spare_bits9ObjCClass = type <{ [8 x i8], [1 x i8] }>
 
-@objc @class_protocol @unsafe_no_objc_tagged_pointer
+@objc @unsafe_no_objc_tagged_pointer
 protocol NoTaggedPointers {}
 
 enum Existential {
