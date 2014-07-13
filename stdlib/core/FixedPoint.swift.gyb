@@ -231,6 +231,8 @@ public struct ${Self}
   static var max: ${Self} { return ${max} }
   @transparent public
   static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
+  @transparent
+  public static var _sizeInBits: ${Self} { return ${bits} }
 }
 
 extension ${Self} : Hashable {
@@ -239,9 +241,7 @@ extension ${Self} : Hashable {
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
 % elif bits > wordBits:
     var result: Int = 0
-    // Notice that the result of sizeof() is a small number and can't
-    // overflow when multiplied by 8.
-    for var i = 0; i < (sizeofValue(self) &* 8); i += sizeof(Int.self) &* 8 {
+    for var i = 0; i < ${bits}; i += Int._sizeInBits {
       result ^= Int(self >> ${Self}(i)) & ~0
     }
     return result

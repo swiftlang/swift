@@ -29,7 +29,6 @@ public enum Character :
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
   // remaining bit is used to discriminate between small and large
-  // representations.  In the small representation, the unused bytes 
   // representations.  In the small representation, the unused bytes
   // are filled with 0xFF.
   //
