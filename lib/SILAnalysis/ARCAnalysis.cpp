@@ -147,6 +147,40 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
 
+/// Returns true if a builtin apply can not use reference counted values.
+///
+/// The main case that this handles here are builtins that via read none imply
+/// that they can not read globals and at the same time do not take any
+/// non-trivial types via the arguments.
+static bool canApplyOfBuiltinUseNonTrivialValues(ApplyInst *AI,
+                                                 BuiltinFunctionRefInst *BFRI) {
+  SILModule &Mod = AI->getModule();
+
+  auto &II = BFRI->getIntrinsicInfo();
+  if (II.ID != llvm::Intrinsic::not_intrinsic) {
+    if (II.hasAttribute(llvm::Attribute::ReadNone)) {
+      for (auto &Op : AI->getArgumentOperands()) {
+        if (!Op.get().getType().isTrivial(Mod)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  auto &BI = BFRI->getBuiltinInfo();
+  if (BI.isReadNone()) {
+    for (auto &Op : AI->getArgumentOperands()) {
+      if (!Op.get().getType().isTrivial(Mod)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 /// Returns true if Inst is a function that we know never uses ref count values.
 static bool canInstUseRefCountValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
@@ -210,6 +244,16 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   // Only uses non reference counted values.
   case ValueKind::CondFailInst:
     return true;
+
+  case ValueKind::ApplyInst: {
+    auto *AI = cast<ApplyInst>(Inst);
+
+    // Certain builtin function refs we know can never use non-trivial values.
+    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+      return canApplyOfBuiltinUseNonTrivialValues(AI, BFRI);
+
+    return false;
+  }
 
   default:
     return false;
