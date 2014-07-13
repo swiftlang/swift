@@ -37,26 +37,48 @@ STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 //                                Code Motion
 //===----------------------------------------------------------------------===//
 
+/// Creates an increment on \p Ptr at insertion point \p InsertPt that creates a
+/// strong_retain if \p Ptr has reference semantics itself or a retain_value if
+/// \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
+  // Set up the builder we use to insert at our insertion point.
   SILBuilder B(InsertPt);
 
   // TODO: What is the correct SILLocation to use here? If the InsertPt is a
   // terminator, then we will have the wrong location type and hit an assertion.
+  auto Loc = SILFileLocation(SourceLoc());
+
+  // If Ptr has reference semantics itself, create the strong_retain and
+  // return.
   if (Ptr.getType().hasReferenceSemantics())
-    return B.createStrongRetain(SILFileLocation(SourceLoc()), Ptr);
-  return B.createRetainValue(SILFileLocation(SourceLoc()), Ptr);
+    return B.createStrongRetain(Loc, Ptr);
+
+  // Otherwise, create the retain_value.
+  return B.createRetainValue(Loc, Ptr);
 }
 
+/// Creates a decrement on \p Ptr at insertion point \p InsertPt that creates a
+/// strong_release if \p Ptr has reference semantics itself or a release_value
+/// if \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
+  // Setup the builder we will use to insert at our insertion point.
   SILBuilder B(InsertPt);
 
   // TODO: What is the correct SILLocation to use here? If the InsertPt is a
   // terminator, then we will have the wrong location type and hit an assertion.
+  auto Loc = SILFileLocation(SourceLoc());
+
+  // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr.getType().hasReferenceSemantics())
-    return B.createStrongRelease(SILFileLocation(SourceLoc()), Ptr);
-  return B.createReleaseValue(SILFileLocation(SourceLoc()), Ptr);
+    return B.createStrongRelease(Loc, Ptr);
+
+  // Otherwise create a release value.
+  return B.createReleaseValue(Loc, Ptr);
 }
 
+/// This routine takes in the ARCMatchingSet \p MatchSEt and inserts new
+/// increments, decrements at the insertion points and adds the old increment,
+/// decrements to the delete list \p DelList.
 static bool
 optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
                                   SmallVectorImpl<SILInstruction *> &DelList) {
@@ -112,6 +134,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
     ++NumRefCountOpsRemoved;
   }
 
+  // Return if we made any changes.
   return Changed;
 }
 
@@ -119,6 +142,9 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
+/// A quick predicate used to see if F has any interesting reference count
+/// instructions in it before we attempt to create a reverse post order (which
+/// can be expensive).
 static bool functionHasInterestingInstructions(SILFunction &F) {
   for (auto &BB : F)
     for (auto &II : BB)
@@ -147,7 +173,9 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
-  // Construct our context once.
+  // Construct our context once. A context contains the RPOT as well as maps
+  // that contain state for each BB in F. This is a major place where the
+  // optimizer allocates memory in one large chunk.
   auto *Ctx =  createARCMatchingSetComputationContext(F, AA);
 
   // If Ctx is null, we failed to initialize and can not do anything so just
@@ -175,6 +203,8 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
       }
     );
 
+    // Now that it is safe to do so and avoid iterator invalidation, delete all
+    // instructions from the delete list.
     while (!InstructionsToDelete.empty()) {
       InstructionsToDelete.pop_back_val()->eraseFromParent();
     }
@@ -184,12 +214,17 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
     if (!ShouldRunAgain)
       break;
 
+    // Otherwise, perform another iteration.
     DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
   }
+
+  // Now that we have finished our computation, destroy the matching set
+  // computation context.
   destroyARCMatchingSetComputationContext(Ctx);
 
   DEBUG(llvm::dbgs() << "\n");
 
+  // Return true if we moved or deleted any instructions.
   return Changed;
 }
 
