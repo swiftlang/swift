@@ -54,11 +54,6 @@ public:
   bool isSorted() const { return IsSorted; }
 
   PairTy &operator[](size_t Index) { return Array[Index]; }
-  ValueTy &operator[](KeyTy &Key) {
-    auto P = find(Key);
-    assert(P != end() && "Unknown key!");
-    return P->second;
-  }
   unsigned size() const { return Array.size(); }
 
   using iterator = typename ArrayTy::iterator;
@@ -72,6 +67,10 @@ public:
   Range<const_iterator> getRange() const { return Array.getRange(); }
 
   iterator find(KeyTy &Key) {
+    assert(IsSorted && "PreallocatedMap should be sorted before calling this");
+    if (!IsSorted)
+      return Array.end();
+
     std::pair<KeyTy, ValueTy> Pair;
     Pair.first = Key;
     return std::lower_bound(Array.begin(), Array.end(), Pair, SortFun); 

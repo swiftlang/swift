@@ -473,7 +473,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
     DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
-    ARCBBState &BBState = TopDownBBStates[BB];
+    ARCBBState &BBState = TopDownBBStates.find(BB)->second;
     BBState.init(BB);
 
     DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
@@ -655,7 +655,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
     DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
-    ARCBBState &BBState = BottomUpBBStates[BB];
+    ARCBBState &BBState = BottomUpBBStates.find(BB)->second;
     BBState.init(BB);
 
     DEBUG(llvm::dbgs() << "Merging Successors!\n");
