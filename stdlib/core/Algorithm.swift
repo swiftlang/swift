@@ -54,7 +54,7 @@ func _insertionSort<
   range: Range<C.Index>,
   inout less: (C.Generator.Element, C.Generator.Element)->Bool
 ) {
-  if range {
+  if !range.isEmpty {
     let start = range.startIndex
 
     // Keep track of the end of the initial sequence of sorted
@@ -259,7 +259,7 @@ func _insertionSort<
   inout elements: C,
   range: Range<C.Index>) {
 
-  if range {
+  if !range.isEmpty {
     let start = range.startIndex
 
     // Keep track of the end of the initial sequence of sorted

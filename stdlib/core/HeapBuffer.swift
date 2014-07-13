@@ -82,7 +82,7 @@ public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
   return _swift_isUniquelyReferenced(reinterpretCast(x))
 }
 
-public struct HeapBuffer<Value, Element> : BooleanType, Equatable {
+public struct HeapBuffer<Value, Element> : Equatable {
   public typealias Storage = HeapBufferStorage<Value, Element>
   let storage: Storage?
   
@@ -171,8 +171,7 @@ public struct HeapBuffer<Value, Element> : BooleanType, Equatable {
     }
   }
 
-  public
-  func getLogicValue() -> Bool {
+  public var hasStorage: Bool {
     return storage.getLogicValue()
   }
 

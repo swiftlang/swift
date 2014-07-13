@@ -40,7 +40,7 @@ public struct RangeGenerator<
 
 public struct Range<
   T: ForwardIndexType
-> : BooleanType, Equatable, CollectionType {
+> : Equatable, CollectionType {
 
   @transparent public
   init(start: T, end: T) {
@@ -50,10 +50,6 @@ public struct Range<
 
   public var isEmpty : Bool {
     return startIndex == endIndex
-  }
-
-  public func getLogicValue() -> Bool {
-    return !isEmpty
   }
 
   public typealias Index = T

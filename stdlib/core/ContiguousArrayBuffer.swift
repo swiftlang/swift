@@ -47,7 +47,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
 }
 
-public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
+public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
@@ -72,14 +72,14 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
     _base = reinterpretCast(storage)
   }
   
-  public func getLogicValue() -> Bool {
-    return _base.getLogicValue()
+  public var hasStorage: Bool {
+    return _base.hasStorage
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var elementStorage: UnsafePointer<T> {
-    return _base ? _base.elementStorage : nil
+    return _base.hasStorage ? _base.elementStorage : nil
   }
 
   /// A pointer to the first element, assuming that the elements are stored
@@ -94,7 +94,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
   }
 
   public mutating func take() -> _ContiguousArrayBuffer {
-    if !_base {
+    if !_base.hasStorage {
       return _ContiguousArrayBuffer()
     }
     _sanityCheck(_base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
@@ -170,7 +170,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
   /// How many elements the buffer stores
   public var count: Int {
     get {
-      return _base ? _base.value.count : 0
+      return _base.hasStorage ? _base.value.count : 0
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
@@ -179,9 +179,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      _sanityCheck(_base || newValue == 0)
+      _sanityCheck(_base.hasStorage || newValue == 0)
       
-      if _base {
+      if _base.hasStorage {
         _base.value.count = newValue
       }
     }
@@ -189,7 +189,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType, BooleanType {
 
   /// How many elements the buffer can store without reallocation
   public var capacity: Int {
-    return _base ? _base.value.capacity : 0
+    return _base.hasStorage ? _base.value.capacity : 0
   }
 
   /// Copy the given subRange of this buffer into uninitialized memory
@@ -330,7 +330,7 @@ public func += <
       count: newCount, 
       minimumCapacity: _growArrayCapacity(lhs.capacity))
     
-    if lhs._base {
+    if lhs._base.hasStorage {
       newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
                                                count: oldCount)
       lhs._base.value.count = 0

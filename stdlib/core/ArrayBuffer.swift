@@ -198,7 +198,7 @@ extension _ArrayBuffer {
   public
   func requestNativeBuffer() -> NativeBuffer? {
     let result = self._native
-    if result { return result }
+    if result.hasStorage { return result }
     return nil
   }
 
@@ -226,7 +226,7 @@ extension _ArrayBuffer {
             "NSArray element failed to match the Swift Array Element type")
         }
       }
-      else if (subRange) {
+      else if !subRange.isEmpty {
         let ns = _nonNative!
         // Could be sped up, e.g. by using
         // enumerateObjectsAtIndexes:options:usingBlock:
