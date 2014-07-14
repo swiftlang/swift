@@ -147,6 +147,10 @@ postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot
 postfix operator! {}  // expected-error {{cannot declare a custom postfix '!' operator}}
 prefix operator & {}  // expected-error {{cannot declare a custom prefix '&' operator}}
 
+// <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names
+postfix operator > {}  // expected-error {{cannot declare a custom postfix '>' operator}}
+prefix operator < {}  // expected-error {{cannot declare a custom prefix '<' operator}}
+
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&' operator}}

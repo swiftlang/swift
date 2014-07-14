@@ -639,9 +639,11 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 /// Return true if this is a builtin operator that cannot be defined in user
 /// code.
 static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
-  return ((isa<PrefixAttr>(attr)  && name == "&") ||   // prefix &
-          (isa<PostfixAttr>(attr) && name == "!") ||   // postfix !
-          (isa<PostfixAttr>(attr) && name == "?"));    // postfix ?
+  return ((isa<PrefixAttr>(attr)  && name == "&") ||   // lvalue to inout
+          (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
+          (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
+          (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
+          (isa<PrefixAttr>(attr) && name == "<"));     // generic argument list
 }
 
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
