@@ -268,13 +268,16 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // We need a preheader.
   auto *Preheader = L->getLoopPreheader();
+  bool ChangedCFG = false;
   if (!Preheader) {
     // Try to create a preheader.
     if (auto LoopPred = getSingleOutsideLoopPredecessor(L, Header))
       if (isa<CondBranchInst>(LoopPred->getTerminator())) {
         Preheader = splitIfCriticalEdge(LoopPred, Header, DT, LI);
+        ChangedCFG = true;
         assert(Preheader && "Must have a preheader now");
       }
+
     if (!Preheader) {
       DEBUG(llvm::dbgs() << *L << " no preheader\n");
       DEBUG(L->getHeader()->getParent()->dump());
@@ -287,14 +290,14 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   auto *Latch = L->getLoopLatch();
   if (!Latch) {
     DEBUG(llvm::dbgs() << *L << " no single latch\n");
-    return false;
+    return ChangedCFG;
   }
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> MoveToPreheader;
   if (!canDuplicateOrMoveToPreheader(L, Preheader, Header, MoveToPreheader)) {
     DEBUG(llvm::dbgs() << *L << " instructions in header preventing rotating\n");
-    return false;
+    return ChangedCFG;
   }
 
   auto *NewHeader = LoopEntryBranch->getTrueBB();
@@ -309,7 +312,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
   if (!NewHeader->getSinglePredecessor() && Header != Latch)
-    return false;
+    return ChangedCFG;
 
   // Now that we know we can perform the rotation - move the instructions that
   // need moving.
@@ -428,9 +431,15 @@ class LoopRotation : public SILFunctionTransform {
     }
 
     if (Changed) {
-      // TODO: Verify: We have updated the DominanceInfo and SILLoopInfo. It
-      // should be safe not to invalidate the CFG.
+      // We preserve loop info and the dominator tree.
+      auto PreservedDT = DA->preserveDomAnalysis(F);
+      auto PreservedLI = LA->preserveAnalysis(F);
+
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::CFG);
+
+      // Update domtree and loop info.
+      DA->updateAnalysis(F, std::move(PreservedDT));
+      LA->updateAnalysis(F, std::move(PreservedLI));
     }
   }
 };

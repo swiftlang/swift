@@ -87,6 +87,46 @@ class SILInstruction;
         }
       }
     }
+
+    /// Update the dominance information with the passed analysis info.
+    /// Takes ownership of the analysis info.
+    void updateAnalysis(SILFunction *F,
+                        std::unique_ptr<DominanceInfo> Info) {
+      if (DomInfo.count(F)) {
+        assert(DomInfo[F] != Info.get());
+        delete DomInfo[F];
+      }
+      DomInfo[F] = Info.release();
+    }
+
+    /// Update the post dominance information with the passed analysis info.
+    /// Takes ownership of the analysis info.
+    void updateAnalysis(SILFunction *F,
+                        std::unique_ptr<PostDominanceInfo> Info) {
+      if (PostDomInfo.count(F)) {
+        assert(PostDomInfo[F] != Info.get());
+        delete PostDomInfo[F];
+      }
+      PostDomInfo[F] = Info.release();
+    }
+
+    /// Release ownership of the dominance information for the function. The
+    /// returned unique_ptr takes ownership of the object.
+    std::unique_ptr<DominanceInfo> preserveDomAnalysis(SILFunction *F) {
+      assert(DomInfo.count(F));
+      std::unique_ptr<DominanceInfo> Info(DomInfo[F]);
+      DomInfo.erase(F);
+      return Info;
+    }
+
+    /// Release ownership of the post-dominance information for the function.
+    /// The returned unique_ptr takes ownership of the object.
+    std::unique_ptr<PostDominanceInfo> preservePostDomAnalysis(SILFunction *F) {
+      assert(PostDomInfo.count(F));
+      std::unique_ptr<PostDominanceInfo> Info(PostDomInfo[F]);
+      PostDomInfo.erase(F);
+      return Info;
+    }
   };
 } // end namespace swift
 
