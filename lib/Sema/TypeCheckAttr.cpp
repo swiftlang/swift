@@ -225,28 +225,20 @@ void AttributeEarlyChecker::
 visitUIApplicationMainAttr(UIApplicationMainAttr *A) {
   // @UIApplicationMain can only be applied to classes.
   auto CD = dyn_cast<ClassDecl>(D);
-  
   if (!CD)
     return diagnoseAndRemoveAttr(A, diag::attr_UIApplicationMain_not_class);
 }
 
 void AttributeEarlyChecker::
-visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {
+visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr) {
   // Only function declarations can be can have this attribute,
   // and it is only legal when debugger support is on.
   auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute, attr)
-      .fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
-  else if (!D->getASTContext().LangOpts.DebuggerSupport)
-  {
-      TC.diagnose(attr->getLocation(), diag::attr_for_debugger_support_only);
-      attr->setInvalid();
-      return;
-  }
+  if (!FD)
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+
+  if (!D->getASTContext().LangOpts.DebuggerSupport)
+    return diagnoseAndRemoveAttr(attr, diag::attr_for_debugger_support_only);
 }
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
