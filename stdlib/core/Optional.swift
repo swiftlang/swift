@@ -133,7 +133,7 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
     return _OptionalNilComparisonType()
   }
 }
-@transparent @infix public
+@transparent public
 func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   return !rhs.getLogicValue()
 }

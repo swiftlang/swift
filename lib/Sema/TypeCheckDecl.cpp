@@ -3979,12 +3979,6 @@ public:
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
         op = SF.lookupPrefixOperator(operatorName, FD->getLoc());
       } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-        // Postfix '!' is reserved.
-        if (operatorName.str().equals("!")) {
-          TC.diagnose(FD->getLoc(), diag::custom_operator_postfix_exclaim);
-          return;
-        }
-
         op = SF.lookupPostfixOperator(operatorName,FD->getLoc());
       } else {
         auto prefixOp = SF.lookupPrefixOperator(operatorName, FD->getLoc());
@@ -4000,9 +3994,9 @@ public:
             SourceLoc insertionLoc = FD->getLoc();
 
             TC.diagnose(prefixOp, diag::unary_operator_declaration_here,false)
-              .fixItInsert(insertionLoc, "@prefix ");
+              .fixItInsert(insertionLoc, "prefix ");
             TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
-              .fixItInsert(insertionLoc, "@postfix ");
+              .fixItInsert(insertionLoc, "postfix ");
           } else {
             // FIXME: Introduce a Fix-It that adds the operator declaration?
           }
@@ -4020,11 +4014,11 @@ public:
         const char *insertionText;
         auto &C = FD->getASTContext();
         if (postfixOp) {
-          insertionText = "@postfix ";
+          insertionText = "postfix ";
           op = postfixOp;
           FD->getMutableAttrs().add(new (C) PostfixAttr(/*implicit*/false));
         } else {
-          insertionText = "@prefix ";
+          insertionText = "prefix ";
           op = prefixOp;
           FD->getMutableAttrs().add(new (C) PrefixAttr(/*implicit*/false));
         }

@@ -2323,19 +2323,19 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     }
     return;
   case Node::Kind::Weak:
-    Printer << "@weak ";
+    Printer << "weak ";
     print(pointer->getChild(0));
     return;
   case Node::Kind::Unowned:
-    Printer << "@unowned ";
+    Printer << "unowned ";
     print(pointer->getChild(0));
     return;
   case Node::Kind::Unmanaged:
-    Printer << "@unowned(unsafe) ";
+    Printer << "unowned(unsafe) ";
     print(pointer->getChild(0));
     return;
   case Node::Kind::InOut:
-    Printer << "@inout ";
+    Printer << "inout ";
     print(pointer->getChild(0));
     return;
   case Node::Kind::NonObjCAttribute:
@@ -2370,13 +2370,13 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     Printer << pointer->getIndex();
     return;
   case Node::Kind::InfixOperator:
-    Printer << pointer->getText() << " @infix";
+    Printer << pointer->getText() << " infix";
     return;
   case Node::Kind::PrefixOperator:
-    Printer << pointer->getText() << " @prefix";
+    Printer << pointer->getText() << " prefix";
     return;
   case Node::Kind::PostfixOperator:
-    Printer << pointer->getText() << " @postfix";
+    Printer << pointer->getText() << " postfix";
     return;
   case Node::Kind::DependentProtocolWitnessTableGenerator:
     Printer << "dependent protocol witness table generator for ";

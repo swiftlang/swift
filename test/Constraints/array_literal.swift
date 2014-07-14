@@ -33,7 +33,7 @@ class Dict<K,V> : ArrayLiteralConvertible {
 
 operator infix => {}
 
-@infix func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
+func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
 
 func useIntList(l: IntList) {}
 func useDoubleList(l: DoubleList) {}

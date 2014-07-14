@@ -12,7 +12,7 @@
 
 import def_operator
 
-@prefix func ~~~(x: Int) -> (Int, Int, Int) {
+prefix func ~~~(x: Int) -> (Int, Int, Int) {
   return (x, x, x)
 }
 
@@ -20,7 +20,7 @@ var triple = (~~~42)
 println("(\(triple.0), \(triple.1), \(triple.2))")
 // OUTPUT: (42, 42, 42)
 
-@postfix func ^^(x: Int) -> Int {
+postfix func ^^(x: Int) -> Int {
   return x ^ x
 }
 

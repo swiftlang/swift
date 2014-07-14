@@ -53,10 +53,10 @@ operator prefix % {}
 
 protocol P2 {
   typealias Assoc2
-  @prefix func %(target: Self) -> Assoc2
+  prefix func %(target: Self) -> Assoc2
 }
 
-@prefix func % <P:P1>(target: P) -> P.Assoc1 {
+prefix func % <P:P1>(target: P) -> P.Assoc1 {
 }
 
 extension S1 : P2 {
@@ -96,10 +96,10 @@ protocol P6 {
 
 protocol P7 : P6 {
   typealias Assoc : P6
-  @infix func ~> (x: Self, _: S7a) -> Assoc
+  func ~> (x: Self, _: S7a) -> Assoc
 }
 
-@infix func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }
+func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }
 
 struct S7b : P7 {
   func foo<Target: P5>(inout target: Target) {}

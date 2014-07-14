@@ -219,32 +219,32 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
 }
 
 // CGFloat unary operators
-@transparent @prefix public
+@transparent public prefix
 func + (x: CGFloat) -> CGFloat { return x }
 
-@transparent @prefix public
+@transparent public prefix
 func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
 
-@transparent @prefix @assignment public
-func ++ (inout x: CGFloat) -> CGFloat { 
+@transparent @assignment public
+prefix func ++ (inout x: CGFloat) -> CGFloat {
   x.native += 1.0
   return x
 }
 
-@transparent @prefix @assignment public
-func -- (inout x: CGFloat) -> CGFloat { 
+@transparent @assignment public
+prefix func -- (inout x: CGFloat) -> CGFloat { 
   x.native -= 1.0
   return x
 }
 
-@transparent @postfix @assignment public
+@transparent @assignment postfix public
 func ++ (inout x: CGFloat) -> CGFloat { 
   let tmp = x
   x.native += 1.0
   return tmp 
 }
 
-@transparent @postfix @assignment public
+@transparent @assignment postfix public
 func -- (inout x: CGFloat) -> CGFloat { 
   let tmp = x
   x.native -= 1.0

@@ -17,7 +17,7 @@ func -(a: Interval, b: Interval) -> Interval {
   return Interval(a.lo - b.hi, a.hi - b.lo)
 }
 
-@prefix func -(a: Interval) -> Interval {
+prefix func -(a: Interval) -> Interval {
   return Interval(-a.hi, -a.lo)
 }
 

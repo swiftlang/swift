@@ -423,8 +423,8 @@ func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 %end
 
 // Bitwise negate
-@transparent @prefix public
-func ~(rhs: ${Self}) -> ${Self} {
+@transparent public
+prefix func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
 }

@@ -100,13 +100,13 @@ public protocol _ForwardIndexType : _Incrementable {
   typealias _DisabledRangeIndex = _DisabledRangeIndex_
 }
 
-@prefix @assignment @transparent public
+@assignment @transparent prefix public
 func ++ <T : _Incrementable> (inout x: T) -> T {
   x = x.successor()
   return x
 }
 
-@postfix @assignment @transparent public
+@assignment @transparent postfix public
 func ++ <T : _Incrementable> (inout x: T) -> T {
   var ret = x
   x = x.successor()
@@ -192,15 +192,15 @@ public protocol _BidirectionalIndexType : _ForwardIndexType {
 public protocol BidirectionalIndexType 
   : ForwardIndexType, _BidirectionalIndexType {}
 
-@prefix @assignment @transparent public
-func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
+@assignment @transparent public
+prefix func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
   x = x.predecessor()
   return x
 }
 
 
-@postfix @assignment @transparent public
-func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
+@assignment @transparent public
+postfix func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
   var ret = x
   x = x.predecessor()
   return ret

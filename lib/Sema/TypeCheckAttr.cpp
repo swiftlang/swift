@@ -654,9 +654,12 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     return;
   }
 
-  // The unary prefix operator '&' is reserved and cannot be overloaded.
-  if (isa<PrefixAttr>(attr) && FD->getName().str() == "&") {
-    TC.diagnose(D->getStartLoc(), diag::custom_operator_addressof);
+  // Reject attempts to define builtin operators.
+  if ((isa<PrefixAttr>(attr) && FD->getName().str() == "&") ||   // prefix &
+      (isa<PostfixAttr>(attr) && FD->getName().str() == "!") ||  // postfix !
+      (isa<PostfixAttr>(attr) && FD->getName().str() == "?")) {  // postfix ?
+    TC.diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
+                attr->getAttrName(), FD->getName().str());
     attr->setInvalid();
     return;
   }

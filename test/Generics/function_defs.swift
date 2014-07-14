@@ -175,7 +175,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
 // Operators
 //===----------------------------------------------------------------------===//
 protocol Ordered {
-  @infix func <(lhs: Self, rhs: Self) -> Bool
+  func <(lhs: Self, rhs: Self) -> Bool
 }
 
 func testOrdered<T : Ordered>(x: T, y: Int) {

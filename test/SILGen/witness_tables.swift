@@ -28,7 +28,7 @@ protocol AnyProtocol {
 
   class func staticMethod(#x: Self)
 
-  @infix func <~>(x: Self, y: Self)
+  func <~>(x: Self, y: Self)
 }
 
 protocol ClassProtocol : class {
@@ -42,7 +42,7 @@ protocol ClassProtocol : class {
 
   class func staticMethod(#x: Self)
 
-  @infix func <~>(x: Self, y: Self)
+  func <~>(x: Self, y: Self)
 }
 
 @objc protocol ObjCProtocol {

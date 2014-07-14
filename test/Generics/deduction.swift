@@ -262,15 +262,15 @@ operator postfix <*> {}
 
 protocol MetaFunction {
   typealias Result
-  @postfix func <*> (_: Self) -> Result?
+  postfix func <*> (_: Self) -> Result?
 }
 
 protocol Bool_ {}
 struct False : Bool_ {}
 struct True : Bool_ {}
 
-@postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .None }
-@postfix func <*> (_: Test<True>) -> String? { return .None }
+postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .None }
+postfix func <*> (_: Test<True>) -> String? { return .None }
 
 class Test<C: Bool_> : MetaFunction {} // picks first <*>
 typealias Inty = Test<True>.Result 

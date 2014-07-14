@@ -55,10 +55,10 @@ public protocol _CyclicAssociatedType {
 }
 
 public protocol CyclicAssociatedType : _CyclicAssociatedType {
-  @prefix func ~~~(_: Self.Type)
+  prefix func ~~~(_: Self.Type)
 }
 
-@prefix public func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
+prefix public func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
 
 public struct CyclicImpl : CyclicAssociatedType {
   public typealias Assoc = CyclicImpl

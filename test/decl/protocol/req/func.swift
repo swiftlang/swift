@@ -87,7 +87,7 @@ operator prefix ~~ {}
 
 protocol P3 {
   typealias Assoc : P1
-  @prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X3z -> Assoc'}}
+  prefix func ~~(_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X3z -> Assoc'}}
 }
 
 // Global operator match
@@ -95,7 +95,7 @@ struct X3a : P3 {
   typealias Assoc = X1a
 }
 
-@prefix func ~~(_: X3a) -> X1a {} // expected-note{{candidate has non-matching type '(X3a) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X3a) -> X1a {} // expected-note{{candidate has non-matching type '(X3a) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
 
 // FIXME: Add example with overloaded prefix/postfix
 
@@ -104,13 +104,13 @@ struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3
   typealias Assoc = X1a
 }
 
-@postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
+postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
 
 // Protocol with postfix unary function
 operator postfix ~~ {}
 protocol P4 {
   typealias Assoc : P1
-  @postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X4z -> Assoc'}}
+  postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X4z -> Assoc'}}
 }
 
 // Global operator match
@@ -118,14 +118,14 @@ struct X4a : P4 {
   typealias Assoc = X1a
 }
 
-@postfix func ~~(_: X4a) -> X1a {} // expected-note{{candidate has non-matching type '(X4a) -> X1a'}} expected-note{{candidate is postfix, not prefix as required}}
+postfix func ~~(_: X4a) -> X1a {} // expected-note{{candidate has non-matching type '(X4a) -> X1a'}} expected-note{{candidate is postfix, not prefix as required}}
 
 // Prefix/postfix mismatch.
 struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4'}}
   typealias Assoc = X1a
 }
 
-@prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching type '(X4z) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching type '(X4z) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
 
 // Objective-C protocol
 @objc protocol P5 {
@@ -207,17 +207,17 @@ protocol P8 {
   func foo()
 }
 
-@prefix func %%% <T : P8>(x: T) -> T { }
+prefix func %%% <T : P8>(x: T) -> T { }
 
 protocol P9 : P8 {
-  @prefix func %%% (x: Self) -> Self
+  prefix func %%% (x: Self) -> Self
 }
 
 struct X9 : P9 {
   func foo() {}
 }
 
-@prefix func %%%(x: X9) -> X9 { }
+prefix func %%%(x: X9) -> X9 { }
 
 protocol P10 {
   typealias Assoc

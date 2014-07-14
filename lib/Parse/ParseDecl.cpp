@@ -1411,14 +1411,27 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                               Tok.getText(), DAK_Final);
         continue;
       }
-        
-     
       if (Tok.isContextualKeyword("dynamic")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
                               Tok.getText(), DAK_Dynamic);
         continue;
       }
-        
+      if (Tok.isContextualKeyword("prefix")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Prefix);
+        continue;
+      }
+      if (Tok.isContextualKeyword("postfix")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Postfix);
+        continue;
+      }
+      if (Tok.isContextualKeyword("infix")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Infix);
+        continue;
+      }
+
       if (Tok.isContextualKeyword("mutating") ||
           Tok.isContextualKeyword("nonmutating")) {
         if (MutatingLoc.isValid()) {
@@ -4101,11 +4114,6 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
-
-  // Postfix operator '!' is reserved.
-  if (*kind == DeclKind::PostfixOperator &&Name.str().equals("!")) {
-    diagnose(NameLoc, diag::custom_operator_postfix_exclaim);
-  }
 
   if (!Tok.is(tok::l_brace)) {
     diagnose(Tok, diag::expected_lbrace_after_operator);

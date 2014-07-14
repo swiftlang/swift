@@ -2061,7 +2061,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
           fn->getMutableAttrs().add(new (ctx) PrefixAttr(/*implicit*/false));
         else if (isa<PostfixOperatorDecl>(op))
           fn->getMutableAttrs().add(new (ctx) PostfixAttr(/*implicit*/false));
-        // Note that an explicit @infix is not required.
+        // Note that an explicit 'infix' is not required.
       }
       // Otherwise, unknown associated decl kind.
     }

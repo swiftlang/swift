@@ -4,7 +4,7 @@ import imported_enums
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
-@infix func ~= (x: (Int,Int,Int), y: (Int,Int,Int)) -> Bool {
+func ~= (x: (Int,Int,Int), y: (Int,Int,Int)) -> Bool {
   return true
 }
 
@@ -255,8 +255,8 @@ var t = (1, 2, 3)
 
 operator prefix +++ {}
 operator infix +++ {}
-@prefix func +++(x: (Int,Int,Int)) -> (Int,Int,Int) { return x }
-@infix func +++(x: (Int,Int,Int), y: (Int,Int,Int)) -> (Int,Int,Int) {
+prefix func +++(x: (Int,Int,Int)) -> (Int,Int,Int) { return x }
+func +++(x: (Int,Int,Int), y: (Int,Int,Int)) -> (Int,Int,Int) {
   return (x.0+y.0, x.1+y.1, x.2+y.2)
 }
 

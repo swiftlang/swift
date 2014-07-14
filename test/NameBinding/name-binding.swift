@@ -98,8 +98,6 @@ func func3() {
 // Overloading
 //===----------------------------------------------------------------------===//
 
-@infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
-
 struct a_struct { var x : Int }
 
 operator infix *** {
@@ -176,8 +174,8 @@ operator postfix +++ {}
 operator prefix ++ {}
 operator postfix ++ {}
 
-@assignment @prefix func +++(inout a: Int) { a += 2 }
-@assignment @postfix func +++(inout a: Int) { a += 2 }
+@assignment prefix func +++(inout a: Int) { a += 2 }
+@assignment postfix func +++(inout a: Int) { a += 2 }
 
 var test = 0
 +++test

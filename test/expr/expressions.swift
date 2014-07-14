@@ -183,7 +183,7 @@ func foo3(a: Int = 2, b: Int = 3) {}
 
 operator prefix ^^ {}
 
-@prefix func ^^(a: Int) -> Int {
+prefix func ^^(a: Int) -> Int {
   return a + 1
 }
 
@@ -586,7 +586,7 @@ func magic_literals() {
 
 
 operator infix +-+= {}
-@assignment @infix func +-+= (inout x: Int, y: Int) -> Int { return 0}
+@assignment func +-+= (inout x: Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
   var i = 0

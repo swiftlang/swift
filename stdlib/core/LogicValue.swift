@@ -12,7 +12,7 @@
 // BooleanType
 //===----------------------------------------------------------------------===//
 
-@prefix public func !<T : BooleanType>(a: T) -> Bool {
+public prefix func !<T : BooleanType>(a: T) -> Bool {
   return !a.getLogicValue()
 }
 

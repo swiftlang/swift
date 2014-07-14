@@ -161,9 +161,9 @@ DECL_ATTR(semantics, Semantics,
 SIMPLE_DECL_ATTR(dynamic, Dynamic,
                  OnFunc | OnVar | OnSubscript | OnConstructor | DeclModifier, 22)
 
-SIMPLE_DECL_ATTR(infix, Infix, OnFunc, 23)
-SIMPLE_DECL_ATTR(prefix, Prefix, OnFunc, 24)
-SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc, 25)
+SIMPLE_DECL_ATTR(infix  , Infix  , OnFunc | DeclModifier, 23)
+SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | DeclModifier, 24)
+SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | DeclModifier, 25)
 
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |

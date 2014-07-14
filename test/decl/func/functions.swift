@@ -1,10 +1,5 @@
 // RUN: %swift %s -verify
 
-// FIXME: Ban prefix & when checking operator decl.
-operator prefix & {}
-
-@prefix func & (x: Int) {} // expected-error {{cannot declare a custom unary '&' operator}}
-
 operator infix ==== {}
 operator infix <<<< {}
 operator infix <><> {}

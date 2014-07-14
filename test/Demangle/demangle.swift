@@ -40,7 +40,7 @@
 ; CHECK: _TtP3foo3bar_ ---> foo.bar
 ; CHECK: _TtP3foo3barS_3bas_ ---> protocol<foo.bar, foo.bas>
 ; CHECK: _TtTP3foo3barS_3bas_PS1__PS1_S_3zimS0___ ---> (protocol<foo.bar, foo.bas>, foo.bas, protocol<foo.bas, foo.zim, foo.bar>)
-; CHECK: _TtRSi ---> @inout Swift.Int
+; CHECK: _TtRSi ---> inout Swift.Int
 ; CHECK: _TtTSiSu_ ---> (Swift.Int, Swift.UInt)
 ; CHECK: _TttSiSu_ ---> (Swift.Int, Swift.UInt...)
 ; CHECK: _TtT3fooSi3barSu_ ---> (foo : Swift.Int, bar : Swift.UInt)
@@ -67,8 +67,8 @@
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
 ; CHECK: _TToFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> @objc foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
 ; CHECK: _TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> foo.bar.bas (foo.bar)(zim : foo.zim) -> ()
-; CHECK: _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ @infix (foo.bar, foo.bas) -> foo.zim
-; CHECK: _TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ @postfix (foo.bar, foo.bas) -> foo.zim
+; CHECK: _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix (foo.bar, foo.bas) -> foo.zim
+; CHECK: _TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ postfix (foo.bar, foo.bas) -> foo.zim
 ; CHECK: _TFC3foo3barCfMS0_FT_S0_ ---> foo.bar.__allocating_init (foo.bar.Type)() -> foo.bar
 ; CHECK: _TFC3foo3barcfMS0_FT_S0_ ---> foo.bar.init (foo.bar.Type)() -> foo.bar
 ; CHECK: _TFC3foo3barD ---> foo.bar.__deallocating_deinit
@@ -134,10 +134,10 @@
 ; CHECK: _TWvi ---> _TWvi
 ; CHECK: _TWvx ---> _TWvx
 ; CHECK: _TtVCC4main3Foo4Ding3Str ---> main.Foo.Ding.Str
-; CHECK: _TFVCC6nested6AClass12AnotherClass7AStruct9aFunctionfRS2_FT1aSi_S2_ ---> nested.AClass.AnotherClass.AStruct.aFunction (@inout nested.AClass.AnotherClass.AStruct)(a : Swift.Int) -> nested.AClass.AnotherClass.AStruct
+; CHECK: _TFVCC6nested6AClass12AnotherClass7AStruct9aFunctionfRS2_FT1aSi_S2_ ---> nested.AClass.AnotherClass.AStruct.aFunction (inout nested.AClass.AnotherClass.AStruct)(a : Swift.Int) -> nested.AClass.AnotherClass.AStruct
 ; CHECK: _TF3foo3barU3foo8Barrable__FQ_QQ_3Bar ---> foo.bar <A : foo.Barrable>(A) -> A.Bar
-; CHECK: _TtXwC10attributes10SwiftClass ---> @weak attributes.SwiftClass
-; CHECK: _TtXoC10attributes10SwiftClass ---> @unowned attributes.SwiftClass
+; CHECK: _TtXwC10attributes10SwiftClass ---> weak attributes.SwiftClass
+; CHECK: _TtXoC10attributes10SwiftClass ---> unowned attributes.SwiftClass
 ; CHECK: _TtERR ---> <ERROR TYPE>
 ; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> [sugar.MyClass]?
 ; CHECK: _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
@@ -153,7 +153,7 @@
 ; CHECK: _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : [Swift.String]).(variable initialization expression).(closure #1)
 ; CHECK: _TFCSo1AE ---> ObjectiveC.A.__ivar_destroyer
 ; CHECK: _TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
-; CHECK: _TTWC13call_protocol1CS_1PFS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (@inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P
+; CHECK: _TTWC13call_protocol1CS_1PFS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P
 ; CHECK: _TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> dynamic_self.X.f (Self)() -> Self
 ; CHECK: _TTSSi___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?
 ; CHECK: _TTSSiSiSs3Foo_Sf___TFSqCU__fMGSqQ__FT_GSqQ__ ---> specialization <Swift.Int with Swift.Int : Swift.Foo, Swift.Float> of Swift.Optional.init <A>(A?.Type)() -> A?
@@ -173,4 +173,4 @@
 ; CHECK: _TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> mangling.他们为什么不说中文 () -> ()
 ; CHECK: _TF8manglingX27ihqwctvzcJBfGFJdrssDxIboAybFT_T_ ---> mangling.他們爲什麽不說中文 () -> ()
 ; CHECK: _TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> mangling.Pročprostěnemluvíčesky () -> ()
-; CHECK: _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» @infix (Swift.Int, Swift.Int) -> Swift.Int
+; CHECK: _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix (Swift.Int, Swift.Int) -> Swift.Int

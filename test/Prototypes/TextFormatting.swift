@@ -79,7 +79,7 @@ struct __PrintedFormat {}
 func format() -> __PrintedFormat {
   return __PrintedFormat()
 }
-@infix func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation {
+func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation {
   return x.debugFormat()
 }
 
@@ -101,7 +101,7 @@ protocol XPrintable: XDebugPrintable {
   /// type, e.g. a nested struct of your type.  If you're lazy, you
   /// can conform to XStreamable directly and just implement its
   /// write() func.
-  @infix func ~> (x: Self, _: __PrintedFormat) -> PrintRepresentation
+  func ~> (x: Self, _: __PrintedFormat) -> PrintRepresentation
 }
 
 
@@ -254,11 +254,11 @@ struct RadixFormat<T: XPrintableInteger> : XStreamable {
   var args: _formatArgs
 }
 
-@infix func ~> <T:XPrintableInteger> (x: T, _: __PrintedFormat) -> RadixFormat<T> {
+func ~> <T:XPrintableInteger> (x: T, _: __PrintedFormat) -> RadixFormat<T> {
   return RadixFormat(value: x, args: format())
 }
 
-@infix func ~> <T:XPrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
+func ~> <T:XPrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
   return RadixFormat(value: x, args: args)
 }
 

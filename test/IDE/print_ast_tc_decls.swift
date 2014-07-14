@@ -988,10 +988,10 @@ operator postfix <*> {}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 protocol d2600_ProtocolWithOperator1 {
-  @postfix func <*>(_: Int)
+  postfix func <*>(_: Int)
 }
 // PASS_2500: {{^}}protocol d2600_ProtocolWithOperator1 {{{$}}
-// PASS_2500-NEXT: {{^}}  @postfix func <*>(_: Int){{$}}
+// PASS_2500-NEXT: {{^}}  postfix func <*>(_: Int){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}

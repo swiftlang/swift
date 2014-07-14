@@ -29,8 +29,8 @@ var y : Y
 
 @assignment func +=(inout lhs: X, rhs : X) {}
 @assignment func +=(inout lhs: Double, rhs : Double) {}
-@assignment @prefix func ++(inout rhs: X) {}
-@assignment @postfix func ++(inout lhs: X) {}
+@assignment prefix func ++(inout rhs: X) {}
+@assignment postfix func ++(inout lhs: X) {}
 
 f0(&i)
 f1(&i)

@@ -2,7 +2,7 @@
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
-@infix func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
+func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
   return true
 }
 

@@ -32,17 +32,17 @@ operator postfix +- {}
 operator infix +- {}
 
 // CHECK-LABEL: sil  @_TF8manglingop2psU__FQ_T_
-@prefix func +- <T>(a: T) {}
+prefix func +- <T>(a: T) {}
 // CHECK-LABEL: sil  @_TF8manglingoP2psU__FQ_T_
-@postfix func +- <T>(a: T) {}
+postfix func +- <T>(a: T) {}
 
 // CHECK-LABEL: sil  @_TF8manglingoi2psU__FTQ_Q__T_
 func +- <T>(a: T, b: T) {}
 
 // CHECK-LABEL: sil  @_TF8manglingop2psU__FT1aQ_1bQ__T_
-@prefix func +- <T>(_: (a: T, b: T)) {}
+prefix func +- <T>(_: (a: T, b: T)) {}
 // CHECK-LABEL: sil  @_TF8manglingoP2psU__FT1aQ_1bQ__T_
-@postfix func +- <T>(_: (a: T, b: T)) {}
+postfix func +- <T>(_: (a: T, b: T)) {}
 
 operator infix «+» {}
 

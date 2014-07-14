@@ -64,13 +64,13 @@ extension Bool : Printable {
 //===----------------------------------------------------------------------===//
 
 // Unary bitwise complement.
-@prefix @transparent public
+@transparent prefix public
 func ~(a: Bool) -> Bool {
   return a ^ true
 }
 
 // Unary logical complement.
-@prefix @transparent public
+@transparent prefix public
 func !(a: Bool) -> Bool {
   return ~a
 }

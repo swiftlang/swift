@@ -50,8 +50,8 @@ struct LOOKBang {
   func exclaim() {}
 }
 
-@postfix func *!* (x: LOOK) -> LOOKBang {}
-@prefix func *!* (x: LOOKBang) {}
+postfix func *!* (x: LOOK) -> LOOKBang {}
+prefix func *!* (x: LOOKBang) {}
 
 func test2() {
   *!*LOOK()*!*
@@ -65,8 +65,8 @@ operator prefix ^ {}
 operator infix ^ {}
 operator postfix ^ {}
 
-@postfix func ^ (x: God) -> TheDevil {}
-@prefix func ^ (x: TheDevil) -> God {}
+postfix func ^ (x: God) -> TheDevil {}
+prefix func ^ (x: TheDevil) -> God {}
 
 func ^ (x: TheDevil, y: God) -> Man {} // expected-note 2{{in initialization of parameter 'x'}}
 
@@ -76,7 +76,7 @@ var _ : Man = TheDevil() ^ God()
 var _ : Man = God()^ ^ ^TheDevil()
 var _ = God()^TheDevil() // expected-error{{'God' is not convertible to 'TheDevil'}}
 
-@postfix func ^ (x: Man) -> () -> God {
+postfix func ^ (x: Man) -> () -> God {
   return { return God() }
 }
 
@@ -86,4 +86,4 @@ func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 
 operator prefix ⚽️ {}
 
-@prefix func ⚽️(x: Man) { }
+prefix func ⚽️(x: Man) { }

@@ -279,10 +279,6 @@ ERROR(extra_argument_positional,sema_tcc,none,
 // Type Check Declarations
 //------------------------------------------------------------------------------
 
-ERROR(operator_not_func,sema_tcd,none,
-      "operators must be declared with 'func'", ())
-ERROR(custom_operator_addressof,sema_tcd,none,
-      "cannot declare a custom unary '&' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(enum_element_not_materializable,sema_tcd,none,
@@ -292,6 +288,11 @@ ERROR(missing_initializer_def,decl_parsing,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
+ERROR(operator_not_func,sema_tcd,none,
+      "operators must be declared with 'func'", ())
+ERROR(redefining_builtin_operator,sema_tcd,none,
+     "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
+
 ERROR(invalid_infix_input,sema_tcd,none,
       "function with 'infix' specified must take a two element tuple as input",
      ())

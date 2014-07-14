@@ -58,7 +58,7 @@ testSplit()
 // generic algorithms that work on Sequences, so need a lightweight
 // way to get Streams out of them.
 operator prefix ^ {}
-@prefix func ^ (x: [Int]) -> Array<Int>.Generator
+prefix func ^ (x: [Int]) -> Array<Int>.Generator
 { return x.generate() }
 
 // FIXME: This class is a temporary workaround for
@@ -81,7 +81,7 @@ struct VecIntStream : GeneratorType, SequenceType {
 }
 
 operator prefix ^^ {}
-@prefix func ^^ (x: [Int]) -> VecIntStream
+prefix func ^^ (x: [Int]) -> VecIntStream
 { 
   var result = Array<Int>()
   

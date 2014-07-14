@@ -151,6 +151,8 @@ public:
       return Text == "dynamic";
     case 'f':
       return Text == "final";
+    case 'i':
+      return Text == "infix";
     case 'l':
       return Text == "lazy";
     case 'm':
@@ -159,6 +161,8 @@ public:
       return Text == "nonmutating";
     case 'o':
       return Text == "optional" || Text == "override";
+    case 'p':
+      return Text == "prefix" || Text == "postfix";
     case 'r':
       return Text == "required";
     case 'u':

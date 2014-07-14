@@ -5,13 +5,13 @@ protocol P : CollectionType {
 }
 operator postfix ~>> {}
 
-@postfix func ~>> <_Self: SequenceType, A: P where _Self.Generator.Element == A.Generator.Element>(_:_Self) -> A {
+postfix func ~>> <_Self: SequenceType, A: P where _Self.Generator.Element == A.Generator.Element>(_:_Self) -> A {
   return A()
 }
 
 protocol _ExtendedSequence : SequenceType {
   //typealias Generator = RangeGenerator<T>
-  @postfix func ~>> <A: P where Self.Generator.Element == A.Generator.Element>(s: Self) -> A
+  postfix func ~>> <A: P where Self.Generator.Element == A.Generator.Element>(s: Self) -> A
 }
 
 extension Range : _ExtendedSequence {

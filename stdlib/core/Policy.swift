@@ -114,7 +114,7 @@ public protocol BitwiseOperationsType {
   func & (_: Self, _: Self) -> Self
   func |(_: Self, _: Self) -> Self
   func ^(_: Self, _: Self) -> Self
-  @prefix func ~(_: Self) -> Self
+  prefix func ~(_: Self) -> Self
 
   /// The identity value for "|" and "^", and the fixed point for "&".
   ///
@@ -156,7 +156,7 @@ public func | <T: RawOptionSetType>(a: T, b: T) -> T {
 public func ^ <T: RawOptionSetType>(a: T, b: T) -> T {
   return T.fromMask(a.toRaw() ^ b.toRaw())
 }
-@prefix public func ~ <T: RawOptionSetType>(a: T) -> T {
+public prefix func ~ <T: RawOptionSetType>(a: T) -> T {
   return T.fromMask(~a.toRaw())
 }
 
@@ -165,7 +165,7 @@ public func ^ <T: RawOptionSetType>(a: T, b: T) -> T {
 //===----------------------------------------------------------------------===//
 
 // Equatable types can be matched in patterns by value equality.
-@transparent @infix public
+@transparent public
 func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b
 }

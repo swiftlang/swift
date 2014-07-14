@@ -18,6 +18,9 @@ operator infix ++++ {
   associativity left
 }
 
+infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
+
+
 func ++++(lhs: X, rhs: X) -> X {}
 func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
@@ -34,10 +37,10 @@ operator prefix ~~ {}
 operator postfix ~~ {}
 operator infix ~~ {}
 
-@postfix func foo(x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
-@postfix func ~~(x: Int) -> Float { return Float(x) }
-@postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument}}
-@prefix func ~~(x: Float) {}
+postfix func foo(x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
+postfix func ~~(x: Int) -> Float { return Float(x) }
+postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument}}
+prefix func ~~(x: Float) {}
 func test_postfix(x: Int) {
   ~~x~~
 }
@@ -45,16 +48,16 @@ func test_postfix(x: Int) {
 operator prefix ~~~ {} // expected-note 2{{prefix operator found here}}
 
 // Unary operators require a prefix or postfix attribute
-func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' attribute}}{{1-1=@prefix }}
+func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' attribute}}{{1-1=prefix }}
 
 protocol P {
-  func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' attribute}}{{3-3=@prefix }}
+  func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' attribute}}{{3-3=prefix }}
 }
 
-@prefix func +// this should be a comment, not an operator
+prefix func +// this should be a comment, not an operator
 (arg: Int) -> Int { return arg }
 
-@prefix func -/* this also should be a comment, not an operator */
+prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
 func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}}
@@ -67,7 +70,7 @@ func errors() {
 
 operator prefix ... {}
 
-@prefix func ... (arg: Int) -> Int { return arg }
+prefix func ... (arg: Int) -> Int { return arg }
 func resyncParser() {}
 
 // Operator decl refs (<op>)
@@ -80,13 +83,13 @@ operator postfix -+- {}
 
 operator infix +-+= {}
 
-@infix func +-+ (x: Int, y: Int) -> Int {}
-@prefix func +-+ (x: Int) -> Int {}
+infix func +-+ (x: Int, y: Int) -> Int {}
+prefix func +-+ (x: Int) -> Int {}
 
-@assignment @prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
-@assignment @postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
+@assignment prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
+@assignment postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
 
-@assignment @infix func +-+= (inout x: Int, y: Int) -> Int {}
+@assignment infix func +-+= (inout x: Int, y: Int) -> Int {}
 
 var n = 0
 
@@ -136,17 +139,21 @@ func test_14705150() {
               // expected-error {{type annotation missing in pattern}}
 }
 
-@prefix @postfix func ++(x: Int) {} // expected-error {{attribute 'prefix' cannot be combined with this attribute}}
-@postfix @prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot be combined with this attribute}}
+prefix postfix func ++(x: Int) {} // expected-error {{attribute 'prefix' cannot be combined with this attribute}}
+postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot be combined with this attribute}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language.
-operator postfix! {} // expected-error{{cannot declare a custom postfix '!' operator}}
-@postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
-@postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
+// FIXME: Ban these on operator decls.
+operator postfix! {}
+operator prefix & {}
+
+postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
+postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
+prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&' operator}}
 
 // Only allow operators at global scope:
 func operator_in_func_bad () {
-    @prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} \
+    prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} \
                                                                     // expected-error {{braced block of statements is an unused closure}}
 }

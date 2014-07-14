@@ -5,7 +5,7 @@
 operator prefix !! {}
 operator infix &&& {}
 
-@prefix func !!<T : BooleanType>(x: T) -> Bool {
+prefix func !!<T : BooleanType>(x: T) -> Bool {
   return x.getLogicValue()
 }
 

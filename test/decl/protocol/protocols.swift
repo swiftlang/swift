@@ -326,12 +326,12 @@ operator prefix <> {}
 operator postfix <> {}
 
 protocol IndexValue {
-  @prefix func <> (max: Self) -> Int
-  @postfix func <> (min: Self) -> Int
+  prefix func <> (max: Self) -> Int
+  postfix func <> (min: Self) -> Int
 }
 
-@prefix func <> (max: Int) -> Int  { return 0 }
-@postfix func <> (min: Int) -> Int  { return 0 }
+prefix func <> (max: Int) -> Int  { return 0 }
+postfix func <> (min: Int) -> Int  { return 0 }
 
 extension Int : IndexValue {}
 
