@@ -732,15 +732,12 @@ public:
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                                     SourceLoc PrefixLoc,
                                                      Identifier Name,
                                                      SourceLoc NameLoc);
   ParserResult<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                                      SourceLoc PostfixLoc,
                                                       Identifier Name,
                                                       SourceLoc NameLoc);
   ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                                    SourceLoc InfixLoc,
                                                     Identifier Name,
                                                     SourceLoc NameLoc);
 

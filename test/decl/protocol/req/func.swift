@@ -83,7 +83,7 @@ struct X2z : P2 { // expected-error{{type 'X2z' does not conform to protocol 'P2
 }
 
 // Protocol with prefix unary function
-operator prefix ~~ {}
+prefix operator ~~ {}
 
 protocol P3 {
   typealias Assoc : P1
@@ -107,7 +107,7 @@ struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3
 postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
 
 // Protocol with postfix unary function
-operator postfix ~~ {}
+postfix operator ~~ {}
 protocol P4 {
   typealias Assoc : P1
   postfix func ~~ (_: Self) -> Assoc // expected-note{{protocol requires function '~~' with type 'X4z -> Assoc'}}
@@ -169,7 +169,7 @@ func f(args: T1) {
 
 f(T0(1, "Hi"))
 
-operator infix ~>> { precedence 255 }
+infix operator ~>> { precedence 255 }
 
 func ~>> (x: Int, args: T0) { println("T0") }
 func ~>> (x: Int, args: T1) { println("T1") }
@@ -201,7 +201,7 @@ protocol P7 {
 struct X7 : P7 { }
 
 // Selecting the most specialized witness.
-operator prefix %%% {}
+prefix operator %%% {}
 
 protocol P8 {
   func foo()

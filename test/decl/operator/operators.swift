@@ -1,7 +1,7 @@
 // RUN: %swift %s -verify
 
-operator infix %%% {}
-operator infix %%%% {}
+infix operator %%% {}
+infix operator %%%% {}
 
 func %%%() {} // expected-error {{operators must have one or two arguments}}
 func %%%%(a: Int, b: Int, c: Int) {} // expected-error {{operators must have one or two arguments}}
@@ -13,7 +13,7 @@ func +(lhs: X, rhs: X) -> X {} // okay
 
 func +++(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}
 
-operator infix ++++ {
+infix operator ++++ {
   precedence 195
   associativity left
 }
@@ -33,9 +33,9 @@ func test() {
   useInt(x = y)  // expected-error{{'()' is not convertible to 'Int'}}
 }
 
-operator prefix ~~ {}
-operator postfix ~~ {}
-operator infix ~~ {}
+prefix operator ~~ {}
+postfix operator ~~ {}
+infix operator ~~ {}
 
 postfix func foo(x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
 postfix func ~~(x: Int) -> Float { return Float(x) }
@@ -45,7 +45,7 @@ func test_postfix(x: Int) {
   ~~x~~
 }
 
-operator prefix ~~~ {} // expected-note 2{{prefix operator found here}}
+prefix operator ~~~ {} // expected-note 2{{prefix operator found here}}
 
 // Unary operators require a prefix or postfix attribute
 func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' attribute}}{{1-1=prefix }}
@@ -68,20 +68,20 @@ func errors() {
   */+    // expected-error {{unexpected end of block comment}}
 }
 
-operator prefix ... {}
+prefix operator ... {}
 
 prefix func ... (arg: Int) -> Int { return arg }
 func resyncParser() {}
 
 // Operator decl refs (<op>)
 
-operator infix +-+ {}
-operator prefix +-+ {}
+infix operator +-+ {}
+prefix operator +-+ {}
 
-operator prefix -+- {}
-operator postfix -+- {}
+prefix operator -+- {}
+postfix operator -+- {}
 
-operator infix +-+= {}
+infix operator +-+= {}
 
 infix func +-+ (x: Int, y: Int) -> Int {}
 prefix func +-+ (x: Int) -> Int {}
@@ -121,8 +121,8 @@ var f6_s : f6_S
 var junk = f6_s[+]
 
 // Unicode operator names
-operator infix ☃ {}
-operator infix ☃⃠ {} // Operators can contain (but not start with) combining characters
+infix operator ☃ {}
+infix operator ☃⃠ {} // Operators can contain (but not start with) combining characters
 
 func ☃(x: Int, y: Int) -> Bool { return x == y }
 func ☃⃠(x: Int, y: Int) -> Bool { return x != y }
@@ -145,8 +145,8 @@ postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot
 // Don't allow one to define a postfix '!'; it's built into the
 // language.
 // FIXME: Ban these on operator decls.
-operator postfix! {}
-operator prefix & {}
+postfix operator! {}
+prefix operator & {}
 
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}

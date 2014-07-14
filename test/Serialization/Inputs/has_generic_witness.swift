@@ -48,7 +48,7 @@ public struct BasStruct : Bassable {
 }
 
 
-operator prefix ~~~ {}
+prefix operator ~~~ {}
 
 public protocol _CyclicAssociatedType {
   typealias Assoc = CyclicImpl

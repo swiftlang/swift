@@ -815,7 +815,7 @@ ERROR(broken_int_hashable_conformance,sema_tcd,none,
 ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,
       "Int type is broken: does not conform to IntegerLiteralConvertible", ())
 ERROR(broken_equatable_eq_operator,sema_tcd,none,
-      "Equatable protocol is broken: no operator infix declaration for '=='", ())
+      "Equatable protocol is broken: no infix operator declaration for '=='", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,sema_tcd,none,

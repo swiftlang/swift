@@ -27,9 +27,9 @@ func r13757744(#x: Int...) {}
 // <rdar://problem/13757750> Prefix, postfix, and infix operators need
 // distinct manglings.
 
-operator prefix +- {}
-operator postfix +- {}
-operator infix +- {}
+prefix operator +- {}
+postfix operator +- {}
+infix operator +- {}
 
 // CHECK-LABEL: sil  @_TF8manglingop2psU__FQ_T_
 prefix func +- <T>(a: T) {}
@@ -44,7 +44,7 @@ prefix func +- <T>(_: (a: T, b: T)) {}
 // CHECK-LABEL: sil  @_TF8manglingoP2psU__FT1aQ_1bQ__T_
 postfix func +- <T>(_: (a: T, b: T)) {}
 
-operator infix «+» {}
+infix operator «+» {}
 
 // CHECK-LABEL: sil  @_TF8manglingXoi7p_qcaDcFTSiSi_Si
 func «+»(a: Int, b: Int) -> Int { return a + b }

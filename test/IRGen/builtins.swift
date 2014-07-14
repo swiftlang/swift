@@ -9,64 +9,64 @@ import Swift
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
 
-operator infix * {
+infix operator * {
   associativity left
   precedence 200
 }
-operator infix / {
+infix operator / {
   associativity left
   precedence 200
 }
-operator infix % {
+infix operator % {
   associativity left
   precedence 200
 }
 
-operator infix + {
+infix operator + {
   associativity left
   precedence 190
 }
-operator infix - {
+infix operator - {
   associativity left
   precedence 190
 }
 
-operator infix << {
+infix operator << {
   associativity none
   precedence 180
 }
-operator infix >> {
+infix operator >> {
   associativity none
   precedence 180
 }
 
-operator infix ... {
+infix operator ... {
   associativity none
   precedence 175
 }
 
-operator infix < {
+infix operator < {
   associativity none
   precedence 170
 }
-operator infix <= {
+infix operator <= {
   associativity none
   precedence 170
 }
-operator infix > {
+infix operator > {
   associativity none
   precedence 170
 }
-operator infix >= {
+infix operator >= {
   associativity none
   precedence 170
 }
 
-operator infix == {
+infix operator == {
   associativity none
   precedence 160
 }
-operator infix != {
+infix operator != {
   associativity none
   precedence 160
 }

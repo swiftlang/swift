@@ -636,8 +636,31 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   }
 }
 
+/// Return true if this is a builtin operator that cannot be defined in user
+/// code.
+static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
+  return ((isa<PrefixAttr>(attr)  && name == "&") ||   // prefix &
+          (isa<PostfixAttr>(attr) && name == "!") ||   // postfix !
+          (isa<PostfixAttr>(attr) && name == "?"));    // postfix ?
+}
+
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
-  // Operators may only be defined as functions.
+  // Check out the operator attributes.  They may be attached to an operator
+  // declaration or a function.
+  if (auto *OD = dyn_cast<OperatorDecl>(D)) {
+    // Reject attempts to define builtin operators.
+    if (isBuiltinOperator(OD->getName().str(), attr)) {
+      TC.diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
+                  attr->getAttrName(), OD->getName().str());
+      attr->setInvalid();
+      return;
+    }
+
+    // Otherwise, the attribute is always ok on an operator.
+    return;
+  }
+
+  // Operators implementations may only be defined as functions.
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD) {
     TC.diagnose(D->getLoc(), diag::operator_not_func);
@@ -655,9 +678,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
   }
 
   // Reject attempts to define builtin operators.
-  if ((isa<PrefixAttr>(attr) && FD->getName().str() == "&") ||   // prefix &
-      (isa<PostfixAttr>(attr) && FD->getName().str() == "!") ||  // postfix !
-      (isa<PostfixAttr>(attr) && FD->getName().str() == "?")) {  // postfix ?
+  if (isBuiltinOperator(FD->getName().str(), attr)) {
     TC.diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
                 attr->getAttrName(), FD->getName().str());
     attr->setInvalid();

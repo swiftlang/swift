@@ -9,7 +9,7 @@ func get_truth(input: Int) -> Int {
 
 
 // Since this is an autoclosure test, don't use &&, which is transparent.
-operator infix &&&&& {
+infix operator &&&&& {
   associativity left
   precedence 120
 }

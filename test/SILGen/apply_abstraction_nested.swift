@@ -1,5 +1,5 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
-operator infix ~> { precedence 255 associativity left }
+infix operator ~> { precedence 255 associativity left }
 
 protocol P { }
 

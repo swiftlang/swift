@@ -2,7 +2,7 @@
 
 // FIXME: This should be a SIL test, but we can't parse generic types yet.
 
-operator infix ~> { precedence 255 }
+infix operator ~> { precedence 255 }
 
 func ~> <Target, Args, Result> (
   target: Target,

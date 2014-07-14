@@ -1,75 +1,76 @@
 // RUN: %swift -parse -verify %s
 
-operator prefix +++ {}
-operator postfix +++ {}
-operator infix +++ {}
-operator infix +++= {
+prefix operator +++ {}
+postfix operator +++ {}
+infix operator +++ {}
+infix operator +++= {
   associativity right
 }
-operator infix *** {
+infix operator *** {
   precedence 123
 }
-operator infix --- {
+infix operator --- {
   precedence 123
   associativity left
 }
-operator infix >>> {
+infix operator >>> {
   precedence 123
   associativity right
 }
-operator infix &&& {
+infix operator &&& {
   associativity none
   precedence 123
 }
 
 
-operator prefix // expected-error {{expected operator name after fixity in 'operator' declaration}}
+prefix operator // expected-error {{expected operator name in operator declaration}}
 
-operator prefix %%+ // expected-error {{expected '{' after operator name in 'operator' declaration}}
+;
+prefix operator %%+ // expected-error {{expected '{' after operator name in 'operator' declaration}}
 
-operator prefix %%/ {
+prefix operator %%/ {
   + // expected-error {{expected operator attribute identifier in 'operator' declaration body}}
 }
 
 
-operator prefix %%% {
+prefix operator %%% {
   associativity none // expected-error{{'associativity' is not a valid prefix operator attribute}}
 }
-operator postfix %%% {
+postfix operator %%% {
   associativity none // expected-error{{'associativity' is not a valid postfix operator attribute}}
 }
 
-operator infix !!! {
+infix operator !!! {
   associativity none
   associativity left // expected-error{{'associativity' for infix operator declared multiple times}}
 }
 
-operator infix ^^^ {
+infix operator ^^^ {
   precedence 22 
   precedence 44 // expected-error{{'precedence' for infix operator declared multiple times}}
 }
 
-operator infix === {
+infix operator === {
   associativity free // expected-error{{'free' is not a valid infix operator associativity}}
 }
 
-operator infix !== {
+infix operator !== {
   associativity 123 // expected-error{{expected identifier after 'associativity' in 'operator' declaration body}}
 }
 
-operator infix !!= {
+infix operator !!= {
   precedence blah // expected-error{{expected integer literal after 'precedence' in 'operator' declaration body}}
 }
 
-operator infix !<> {
+infix operator !<> {
   runcibility 12 // expected-error{{'runcibility' is not a valid infix operator attribute}}
 }
 
 class Foo {
-  operator infix ||| {} // expected-error{{'operator' may only be declared at file scope}}
+  infix operator ||| {} // expected-error{{'operator' may only be declared at file scope}}
 }
 
 
 // rdar://14690497
-operator infix ~> { precedence 99999 }   // expected-error {{'precedence' must be in the range of 0 to 255}}
+infix operator ~> { precedence 99999 }   // expected-error {{'precedence' must be in the range of 0 to 255}}
 

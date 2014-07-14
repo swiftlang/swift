@@ -13,7 +13,7 @@ func g() {
 
 // Verify we don't crash on this.
 // rdar://15595118
-operator infix ~> { precedence 255 }
+infix operator ~> { precedence 255 }
 protocol Target {}
 func ~> <Target1>(inout x: Int, f: (inout _: Int, _: Target)->Target) -> (Target)->Target {
   return { f(&x, $0) }

@@ -982,9 +982,9 @@ enum d2400_EnumDeclWithValues2 : Double {
 //===--- Custom operator printing.
 //===---
 
-operator postfix <*> {}
+postfix operator <*> {}
 
-// PASS_2500-LABEL: {{^}}operator postfix <*> {{{$}}
+// PASS_2500-LABEL: {{^}}postfix operator <*> {{{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 protocol d2600_ProtocolWithOperator1 {
@@ -995,7 +995,7 @@ protocol d2600_ProtocolWithOperator1 {
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
-operator infix %%% {}
+infix operator %%% {}
 @assignment func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }

@@ -75,7 +75,7 @@ func basictest() {
 }
 
 // Infix operators and attribute lists.
-operator infix %% {
+infix operator %% {
   associativity left
   precedence 2
 }
@@ -181,7 +181,7 @@ func foo1(a: Int, b: Int) -> Int {}
 func foo2(a: Int) -> (b: Int) -> Int {}
 func foo3(a: Int = 2, b: Int = 3) {}
 
-operator prefix ^^ {}
+prefix operator ^^ {}
 
 prefix func ^^(a: Int) -> Int {
   return a + 1
@@ -585,7 +585,7 @@ func magic_literals() {
 //===----------------------------------------------------------------------===//
 
 
-operator infix +-+= {}
+infix operator +-+= {}
 @assignment func +-+= (inout x: Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {

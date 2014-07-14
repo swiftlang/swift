@@ -4477,20 +4477,18 @@ public:
 /// Declares the behavior of an infix operator. For example:
 ///
 /// \code
-/// operator infix /+/ {
+/// infix operator /+/ {
 ///   associativity left
 ///   precedence 123
 /// }
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
-  SourceLoc InfixLoc,
-    AssociativityLoc, AssociativityValueLoc,
+  SourceLoc AssociativityLoc, AssociativityValueLoc,
     PrecedenceLoc, PrecedenceValueLoc;
 
 public:
   InfixOperatorDecl(DeclContext *DC,
                     SourceLoc OperatorLoc,
-                    SourceLoc InfixLoc,
                     Identifier Name,
                     SourceLoc NameLoc,
                     SourceLoc LBraceLoc,
@@ -4506,7 +4504,6 @@ public:
                    NameLoc,
                    LBraceLoc,
                    RBraceLoc),
-      InfixLoc(InfixLoc),
       AssociativityLoc(AssociativityLoc),
       AssociativityValueLoc(AssociativityValueLoc),
       PrecedenceLoc(PrecedenceLoc),
@@ -4520,7 +4517,6 @@ public:
     }
   }
   
-  SourceLoc getInfixLoc() const { return InfixLoc; }
   SourceLoc getAssociativityLoc() const { return AssociativityLoc; }
   SourceLoc getAssociativityValueLoc() const { return AssociativityValueLoc; }
   SourceLoc getPrecedenceLoc() const { return PrecedenceLoc; }
@@ -4554,28 +4550,16 @@ public:
 /// Declares the behavior of a prefix operator. For example:
 ///
 /// \code
-/// operator prefix /+/ {}
+/// prefix operator /+/ {}
 /// \endcode
 class PrefixOperatorDecl : public OperatorDecl {
-  SourceLoc PrefixLoc;
 public:
-  PrefixOperatorDecl(DeclContext *DC,
-                     SourceLoc OperatorLoc,
-                     SourceLoc PrefixLoc,
-                     Identifier Name,
-                     SourceLoc NameLoc,
-                     SourceLoc LBraceLoc,
+  PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                     SourceLoc NameLoc, SourceLoc LBraceLoc,
                      SourceLoc RBraceLoc)
     : OperatorDecl(DeclKind::PrefixOperator, DC,
-                   OperatorLoc,
-                   Name,
-                   NameLoc,
-                   LBraceLoc,
-                   RBraceLoc),
-      PrefixLoc(PrefixLoc) {}
-  
-  SourceLoc getPrefixLoc() const { return PrefixLoc; }
-  
+                   OperatorLoc, Name, NameLoc, LBraceLoc, RBraceLoc) {}
+
   /// True if this decl's attributes conflict with those declared by another
   /// PrefixOperatorDecl.
   bool conflictsWith(PrefixOperatorDecl *other) {
@@ -4590,28 +4574,16 @@ public:
 /// Declares the behavior of a postfix operator. For example:
 ///
 /// \code
-/// operator postfix /+/ {}
+/// postfix operator /+/ {}
 /// \endcode
 class PostfixOperatorDecl : public OperatorDecl {
-  SourceLoc PostfixLoc;
 public:
-  PostfixOperatorDecl(DeclContext *DC,
-                     SourceLoc OperatorLoc,
-                     SourceLoc PostfixLoc,
-                     Identifier Name,
-                     SourceLoc NameLoc,
-                     SourceLoc LBraceLoc,
+  PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                     SourceLoc NameLoc, SourceLoc LBraceLoc,
                      SourceLoc RBraceLoc)
-    : OperatorDecl(DeclKind::PostfixOperator, DC,
-                   OperatorLoc,
-                   Name,
-                   NameLoc,
-                   LBraceLoc,
-                   RBraceLoc),
-      PostfixLoc(PostfixLoc) {}
+    : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name,
+                   NameLoc, LBraceLoc, RBraceLoc) {}
   
-  SourceLoc getPostfixLoc() const { return PostfixLoc; }
-
   /// True if this decl's attributes conflict with those declared by another
   /// PostfixOperatorDecl.
   bool conflictsWith(PostfixOperatorDecl *other) {

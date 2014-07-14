@@ -1329,7 +1329,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
-  Printer << "operator infix ";
+  Printer << "infix operator ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";
@@ -1363,7 +1363,7 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
-  Printer << "operator prefix ";
+  Printer << "prefix operator ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";
@@ -1372,7 +1372,7 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
-  Printer << "operator postfix ";
+  Printer << "postfix operator ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";

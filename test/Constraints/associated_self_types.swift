@@ -3,7 +3,7 @@
 protocol P : CollectionType {
   init()
 }
-operator postfix ~>> {}
+postfix operator ~>> {}
 
 postfix func ~>> <_Self: SequenceType, A: P where _Self.Generator.Element == A.Generator.Element>(_:_Self) -> A {
   return A()

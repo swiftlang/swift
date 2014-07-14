@@ -1,7 +1,7 @@
 // RUN: %swift %s -verify
 
 // Assignment operators
-operator infix +- {
+infix operator +- {
   precedence 90
   associativity left
 }

@@ -1,6 +1,6 @@
 // Part of operators.swift multi-file test.
 
-operator infix ~~ {
+infix operator ~~ {
   associativity none
   precedence 200
 }

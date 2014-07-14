@@ -100,7 +100,7 @@ func func3() {
 
 struct a_struct { var x : Int }
 
-operator infix *** {
+infix operator *** {
   associativity left
   precedence 97
 }
@@ -168,11 +168,11 @@ var qualifiedvalue : Int = themodule.importedtype
 var qualifiedtype : themodule.x_ty = 5
 
 
-operator prefix +++ {}
-operator postfix +++ {}
+prefix operator +++ {}
+postfix operator +++ {}
 
-operator prefix ++ {}
-operator postfix ++ {}
+prefix operator ++ {}
+postfix operator ++ {}
 
 @assignment prefix func +++(inout a: Int) { a += 2 }
 @assignment postfix func +++(inout a: Int) { a += 2 }

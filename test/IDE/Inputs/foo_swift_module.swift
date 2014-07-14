@@ -1,4 +1,4 @@
-operator infix %%% {
+infix operator %%% {
   associativity left
   precedence 200
 }

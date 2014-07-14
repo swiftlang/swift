@@ -2,8 +2,8 @@
 // <rdar://problem/13986638> Missing Bool metadata when Bool is used as a generic
 // parameter or existential value
 
-operator prefix !! {}
-operator infix &&& {}
+prefix operator !! {}
+infix operator &&& {}
 
 prefix func !!<T : BooleanType>(x: T) -> Bool {
   return x.getLogicValue()

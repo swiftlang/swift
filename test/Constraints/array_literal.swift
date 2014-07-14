@@ -31,7 +31,7 @@ class Dict<K,V> : ArrayLiteralConvertible {
   class func convertFromArrayLiteral(elements: (K,V)...) -> Dict<K,V> {}
 }
 
-operator infix => {}
+infix operator => {}
 
 func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
 

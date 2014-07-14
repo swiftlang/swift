@@ -2,17 +2,17 @@
 
 // This disables importing the stdlib intentionally.
 
-operator infix == {
+infix operator == {
   associativity left
   precedence 110
 }
 
-operator infix & {
+infix operator & {
   associativity left
   precedence 150
 }
 
-operator infix => {
+infix operator => {
   associativity right
   precedence 100
 }
@@ -42,8 +42,8 @@ func test1() {
   Man() == Five() => TheDevil() == Six() => God() == Seven()
 }
 
-operator postfix *!* {}
-operator prefix *!* {}
+postfix operator *!* {}
+prefix operator *!* {}
 
 struct LOOK {}
 struct LOOKBang {
@@ -61,9 +61,9 @@ func test2() {
 LOOK()*!*.exclaim()
 
 
-operator prefix ^ {}
-operator infix ^ {}
-operator postfix ^ {}
+prefix operator ^ {}
+infix operator ^ {}
+postfix operator ^ {}
 
 postfix func ^ (x: God) -> TheDevil {}
 prefix func ^ (x: TheDevil) -> God {}
@@ -84,6 +84,6 @@ var _ : God = Man()^() // expected-error{{'Man' is not convertible to 'TheDevil'
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 
-operator prefix ⚽️ {}
+prefix operator ⚽️ {}
 
 prefix func ⚽️(x: Man) { }

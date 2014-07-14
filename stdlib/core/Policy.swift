@@ -175,76 +175,76 @@ func ~= <T : Equatable> (a: T, b: T) -> Bool {
 //===----------------------------------------------------------------------===//
 
 // Standard postfix operators.
-operator postfix ++ {}
-operator postfix -- {}
+postfix operator ++ {}
+postfix operator -- {}
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
 //
-// operator postfix ! {}
+// postfix operator ! {}
 
 // Standard prefix operators.
-operator prefix ++ {}
-operator prefix -- {}
-operator prefix ! {}
-operator prefix ~ {}
-operator prefix + {}
-operator prefix - {}
+prefix operator ++ {}
+prefix operator -- {}
+prefix operator ! {}
+prefix operator ~ {}
+prefix operator + {}
+prefix operator - {}
 
 // Standard infix operators.
 
 // "Exponentiative"
 
-operator infix << { associativity none precedence 160 }
-operator infix >> { associativity none precedence 160 }
+infix operator << { associativity none precedence 160 }
+infix operator >> { associativity none precedence 160 }
 
 // "Multiplicative"
 
-operator infix   * { associativity left precedence 150 }
-operator infix  &* { associativity left precedence 150 }
-operator infix   / { associativity left precedence 150 }
-operator infix  &/ { associativity left precedence 150 }
-operator infix   % { associativity left precedence 150 }
-operator infix  &% { associativity left precedence 150 }
-operator infix   & { associativity left precedence 150 }
+infix operator   * { associativity left precedence 150 }
+infix operator  &* { associativity left precedence 150 }
+infix operator   / { associativity left precedence 150 }
+infix operator  &/ { associativity left precedence 150 }
+infix operator   % { associativity left precedence 150 }
+infix operator  &% { associativity left precedence 150 }
+infix operator   & { associativity left precedence 150 }
 
 // "Additive"
 
-operator infix   + { associativity left precedence 140 }
-operator infix  &+ { associativity left precedence 140 }
-operator infix   - { associativity left precedence 140 }
-operator infix  &- { associativity left precedence 140 }
-operator infix   | { associativity left precedence 140 }
-operator infix   ^ { associativity left precedence 140 }
+infix operator   + { associativity left precedence 140 }
+infix operator  &+ { associativity left precedence 140 }
+infix operator   - { associativity left precedence 140 }
+infix operator  &- { associativity left precedence 140 }
+infix operator   | { associativity left precedence 140 }
+infix operator   ^ { associativity left precedence 140 }
 
 // FIXME: is this the right precedence level for "..." ?
-operator infix  ... { associativity none precedence 135 }
-operator infix  ..< { associativity none precedence 135 }
+infix operator  ... { associativity none precedence 135 }
+infix operator  ..< { associativity none precedence 135 }
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
-// operator infix as { associativity none precedence 132 }
+// infix operator as { associativity none precedence 132 }
 
 // "Comparative"
 
-operator infix  <  { associativity none precedence 130 }
-operator infix  <= { associativity none precedence 130 }
-operator infix  >  { associativity none precedence 130 }
-operator infix  >= { associativity none precedence 130 }
-operator infix  == { associativity none precedence 130 }
-operator infix  != { associativity none precedence 130 }
-operator infix === { associativity none precedence 130 }
-operator infix !== { associativity none precedence 130 }
+infix operator  <  { associativity none precedence 130 }
+infix operator  <= { associativity none precedence 130 }
+infix operator  >  { associativity none precedence 130 }
+infix operator  >= { associativity none precedence 130 }
+infix operator  == { associativity none precedence 130 }
+infix operator  != { associativity none precedence 130 }
+infix operator === { associativity none precedence 130 }
+infix operator !== { associativity none precedence 130 }
 // FIXME: ~= will be built into the compiler.
-operator infix  ~= { associativity none precedence 130 }
+infix operator  ~= { associativity none precedence 130 }
 
 // "Conjunctive"
 
-operator infix && { associativity left precedence 120 }
+infix operator && { associativity left precedence 120 }
 
 // "Disjunctive"
 
-operator infix || { associativity left precedence 110 }
+infix operator || { associativity left precedence 110 }
 
 
 // User-defined ternary operators are not supported. The ? : operator is
@@ -253,20 +253,20 @@ operator infix || { associativity left precedence 110 }
 
 // User-defined assignment operators are not supported. The = operator is
 // hardcoded as if it had the following attributes:
-// operator infix = { associativity right precedence 90 }
+// infix operator = { associativity right precedence 90 }
 
 // Compound
 
-operator infix  *= { associativity right precedence 90 }
-operator infix  /= { associativity right precedence 90 }
-operator infix  %= { associativity right precedence 90 }
-operator infix  += { associativity right precedence 90 }
-operator infix  -= { associativity right precedence 90 }
-operator infix <<= { associativity right precedence 90 }
-operator infix >>= { associativity right precedence 90 }
-operator infix  &= { associativity right precedence 90 }
-operator infix  ^= { associativity right precedence 90 }
-operator infix  |= { associativity right precedence 90 }
+infix operator  *= { associativity right precedence 90 }
+infix operator  /= { associativity right precedence 90 }
+infix operator  %= { associativity right precedence 90 }
+infix operator  += { associativity right precedence 90 }
+infix operator  -= { associativity right precedence 90 }
+infix operator <<= { associativity right precedence 90 }
+infix operator >>= { associativity right precedence 90 }
+infix operator  &= { associativity right precedence 90 }
+infix operator  ^= { associativity right precedence 90 }
+infix operator  |= { associativity right precedence 90 }
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure
@@ -274,4 +274,4 @@ operator infix  |= { associativity right precedence 90 }
 // test/Prototypes/GenericDispatch.swift for a fully documented
 // example of how this operator is used, and how its use can be hidden
 // from users.
-operator infix ~> { associativity left precedence 255 }
+infix operator ~> { associativity left precedence 255 }

@@ -1,8 +1,8 @@
 // RUN: %swift %s -verify
 
-operator infix ==== {}
-operator infix <<<< {}
-operator infix <><> {}
+infix operator ==== {}
+infix operator <<<< {}
+infix operator <><> {}
 
 // <rdar://problem/13782566>
 // Check that func op<T>() parses without a space between the name and the

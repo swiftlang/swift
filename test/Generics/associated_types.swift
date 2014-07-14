@@ -49,7 +49,7 @@ struct S1 : P1 {
   func foo() -> X {}
 }
 
-operator prefix % {}
+prefix operator % {}
 
 protocol P2 {
   typealias Assoc2
@@ -84,7 +84,7 @@ struct S4<T> : P3, P4 {
 takeP4(S4<Int>())
 
 // <rdar://problem/14680393>
-operator infix ~> { precedence 255 }
+infix operator ~> { precedence 255 }
 
 protocol P5 { }
 

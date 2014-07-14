@@ -1,5 +1,5 @@
 
-operator infix %%% {
+infix operator %%% {
 }
 
 func %%%(lhs: Int, rhs: Int) -> Int

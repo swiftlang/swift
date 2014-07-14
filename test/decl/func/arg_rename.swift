@@ -54,7 +54,7 @@ class X {
 }
 
 // Operators never have keyword arguments.
-operator infix +++ { }
+infix operator +++ { }
 func +++(#lhs: Int, // expected-error{{operator cannot have keyword arguments}}{{10-11=}}
          rhs x: Int) -> Int { // expected-error{{operator cannot have keyword arguments}}{{10-14=}}
   return lhs + x 

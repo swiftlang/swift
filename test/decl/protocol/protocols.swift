@@ -322,8 +322,8 @@ protocol Eq {
 extension Int : Eq { }
 
 // Matching prefix/postfix.
-operator prefix <> {}
-operator postfix <> {}
+prefix operator <> {}
+postfix operator <> {}
 
 protocol IndexValue {
   prefix func <> (max: Self) -> Int

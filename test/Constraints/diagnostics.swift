@@ -75,7 +75,7 @@ i.wobble() // expected-error{{Int' does not have a member named 'wobble'}}
 // Does not conform to protocol.
 // FIXME: f5(i)
 
-operator infix **** {
+infix operator **** {
   associativity left
   precedence 200
 }
@@ -83,7 +83,7 @@ operator infix **** {
 func ****(_: Int, _: String) { } // expected-note{{in initialization of parameter '_'}}
 i **** i // expected-error{{'Int' is not convertible to 'String'}}
 
-operator infix ***~ {
+infix operator ***~ {
   associativity left
   precedence 200
 }

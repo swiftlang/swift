@@ -102,12 +102,12 @@ func call_curried(x: Int, y: Int) -> Int {
   // CHECK: = apply
   // CHECK: return
 
-operator infix &&& {
+infix operator &&& {
   associativity left
   precedence 120
 }
 
-operator infix ||| {
+infix operator ||| {
   associativity left
   precedence 110
 }

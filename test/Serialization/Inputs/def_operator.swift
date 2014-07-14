@@ -1,17 +1,17 @@
-operator prefix ~~~ {}
-operator postfix ^^ {}
+prefix operator ~~~ {}
+postfix operator ^^ {}
 
-operator infix *- {
+infix operator *- {
   associativity left
   precedence 50
 }
 
-operator infix -* {
+infix operator -* {
   associativity right
   precedence 40
 }
 
-operator infix *-* {
+infix operator *-* {
   associativity none
   precedence 10
 }

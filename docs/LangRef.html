@@ -1517,7 +1517,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     // Not valid Swift code
-    operator infix = {
+    infix operator = {
       precedence 90
       associativity right
     }
@@ -1561,7 +1561,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     // Not valid Swift code
-    operator infix ?...: {
+    infix operator ?...: {
       precedence 100
       associativity right
     }
@@ -1598,7 +1598,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     // Not valid Swift code
-    operator infix as {
+    infix operator as {
       precedence 95
       associativity none
     }

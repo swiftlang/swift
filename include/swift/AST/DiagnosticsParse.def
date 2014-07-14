@@ -352,11 +352,19 @@ ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
 ERROR(destructor_params,decl_parsing,none,
       "deinitializer does not have a parameter clause", ())
 
+
+// FIXME: Remove this.
+ERROR(operator_fixity_moved,decl_parsing,PointsToFirstBadToken,
+      "%0 moved to before the 'operator' declaration", (StringRef))
+
+
 // Operator
 ERROR(operator_decl_inner_scope,decl_parsing,none,
       "'operator' may only be declared at file scope", ())
 ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
-      "expected operator name after fixity in 'operator' declaration", ())
+      "expected operator name in operator declaration", ())
+ERROR(operator_decl_no_fixity,decl_parsing,none,
+      "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,
       "expected '{' after operator name in 'operator' declaration", ())
 ERROR(expected_operator_attribute,decl_parsing,none,

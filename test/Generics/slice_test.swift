@@ -2,17 +2,17 @@
 
 import Swift
 
-operator infix < {
+infix operator < {
   associativity none
   precedence 170
 }
 
-operator infix == {
+infix operator == {
   associativity none
   precedence 160
 }
 
-operator infix != {
+infix operator != {
   associativity none
   precedence 160
 }

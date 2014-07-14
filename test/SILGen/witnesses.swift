@@ -1,6 +1,6 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-operator infix <~> {}
+infix operator <~> {}
 
 func archetype_method<T: X>(var #x: T, var #y: T) -> T {
   return x.selfTypes(x: y)

@@ -7,7 +7,7 @@ struct Arg {}
 
 @objc class ObjCClass {}
 
-operator infix <~> {}
+infix operator <~> {}
 
 protocol AssocReqt {
   func requiredMethod()

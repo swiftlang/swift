@@ -3,8 +3,8 @@ public struct SpecialInt {
   public init() {}
 }
 
-operator prefix +++ {}
-operator postfix +++ {}
+prefix operator +++ {}
+postfix operator +++ {}
 
 prefix public func +++(inout base: SpecialInt) {
   base.value += 2

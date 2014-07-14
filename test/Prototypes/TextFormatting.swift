@@ -8,7 +8,7 @@
 
 // FIXME: Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.
-operator infix ~> { precedence 255 }
+infix operator ~> { precedence 255 }
 
 /// \brief A thing into which we can stream text
 protocol XOutputStream {

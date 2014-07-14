@@ -2207,7 +2207,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID);
     declOrOffset = new (ctx) PrefixOperatorDecl(getDeclContext(contextID),
-                                                SourceLoc(), SourceLoc(),
+                                                SourceLoc(),
                                                 getIdentifier(nameID),
                                                 SourceLoc(), SourceLoc(),
                                                 SourceLoc());
@@ -2220,7 +2220,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID);
     declOrOffset = new (ctx) PostfixOperatorDecl(getDeclContext(contextID),
-                                                 SourceLoc(), SourceLoc(),
+                                                 SourceLoc(),
                                                  getIdentifier(nameID),
                                                  SourceLoc(), SourceLoc(),
                                                  SourceLoc());
@@ -2245,7 +2245,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     InfixData infixData(precedence, associativity.getValue());
 
     declOrOffset = new (ctx) InfixOperatorDecl(getDeclContext(contextID),
-                                               SourceLoc(), SourceLoc(),
+                                               SourceLoc(), 
                                                getIdentifier(nameID),
                                                SourceLoc(), SourceLoc(),
                                                SourceLoc(), SourceLoc(),
