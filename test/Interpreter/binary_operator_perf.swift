@@ -128,3 +128,13 @@ println(test2)
 
 println("\(1.0/1.0) \(1.0/1.0) \(1.0/1.0)")
 // CHECK: 1.0 1.0 1.0
+
+var yo = "yo"
+var yoyo = yo + yo + yo + yo + yo + yo + yo + yo
+println(yoyo)
+// CHECK: yoyoyoyoyoyoyoyo
+
+var i1 = 1
+var ia = i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1
+println(ia)
+// CHECK: 10

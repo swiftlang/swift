@@ -67,7 +67,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error{{'Int' is not convertible to 'UInt8'}}
+    sum = sum + f  // expected-error{{'Int' is not convertible to 'Float'}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }

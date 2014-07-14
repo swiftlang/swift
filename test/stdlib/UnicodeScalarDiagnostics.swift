@@ -14,10 +14,10 @@ func test_UnicodeScalarDoesNotImplementArithmetic(us: UnicodeScalar, i: Int) {
   let b3 = us * us // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
   let b4 = us / us // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
 
-  let c1 = us + i // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
-  let c2 = us - i // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
-  let c3 = us * i // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
-  let c4 = us / i // expected-error {{'UnicodeScalar' is not convertible to 'UInt8'}}
+  let c1 = us + i // expected-error {{'UnicodeScalar' is not convertible to 'Int'}}
+  let c2 = us - i // expected-error {{'UnicodeScalar' is not convertible to 'Int'}}
+  let c3 = us * i // expected-error {{'UnicodeScalar' is not convertible to 'Int'}}
+  let c4 = us / i // expected-error {{'UnicodeScalar' is not convertible to 'Int'}}
 
   let d1 = i + us // expected-error {{'Int' is not convertible to 'UInt8'}}
   let d2 = i - us // expected-error {{'Int' is not convertible to 'UInt8'}}

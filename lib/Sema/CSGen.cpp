@@ -922,54 +922,60 @@ namespace {
                 for (auto oldConstraint : oldConstraints) {
                   auto overloadChoice = oldConstraint->getOverloadChoice();
                   
-                  auto overloadType = overloadChoice.getDecl()->getType();
+                  auto overloadTy = overloadChoice.getDecl()->getType();
                   
-                  if (auto fnType = overloadType->getAs<AnyFunctionType>()) {
-                    auto paramTy = fnType->getInput();
-                    auto resultTy = fnType->getResult();
+                  if (auto fnTy = overloadTy->getAs<AnyFunctionType>()) {
+                    auto paramTy = fnTy->getInput();
+                    auto resultTy = fnTy->getResult();
                     
-                    if (auto tupleType = paramTy->getAs<TupleType>()) {
-                      auto firstParamType = tupleType->
+                    if (auto tupleTy = paramTy->getAs<TupleType>()) {
+                      auto firstParamTy = tupleTy->
                                             getFields()[0].
                                             getType();
-                      auto secondParamType = tupleType->
+                      auto secondParamTy = tupleTy->
                                              getFields()[1].
                                              getType();
                       
-                      if (auto tyvarArgType =
+                      bool conformsToDefaultType = false;
+                      bool isExactParamTypeMatch =
+                              !firstParamTy.isNull() &&
+                              firstArgTy &&
+                              firstParamTy->isEqual(firstArgTy);
+                      
+                      if (auto tyvarArgTy =
                               firstArgTy->getAs<TypeVariableType>()) {
                         
                         if (auto proto =
-                                  tyvarArgType->
+                                  tyvarArgTy->
                                   getImpl().literalConformanceProto) {
                           
-                          auto defaultType = CS.TC.getDefaultType(proto, CS.DC);
-                          auto contextualType = CS.getContextualType(expr);
+                          auto defaultTy = CS.TC.getDefaultType(proto, CS.DC);
                           
-                          if (secondParamType->
-                                  getNominalOrBoundGenericNominal() &&
-                              defaultType &&
-                              !resultTy->isVoid()) {
-                            if (defaultType->isEqual(resultTy) &&
-                                secondParamType->isEqual(resultTy) &&
-                                firstParamType->isEqual(secondParamType) &&
-                                (!contextualType ||
-                                    (*contextualType)->isEqual(resultTy))) {
-                              oldConstraint->setFavored();
-                              favoredConstraints.push_back(oldConstraint);
-                            }
-                          }
+                          conformsToDefaultType =
+                              resultTy &&
+                              !defaultTy.isNull() &&
+                              defaultTy->isEqual(resultTy);
+                        }
+                      }
+ 
+                      auto contextualTy = CS.getContextualType(expr);
+                      
+                      if (secondParamTy->
+                              getNominalOrBoundGenericNominal() &&
+                          !resultTy->isVoid()) {
+                        if ((conformsToDefaultType ||
+                             isExactParamTypeMatch) &&
+                            secondParamTy->isEqual(resultTy) &&
+                            firstParamTy->isEqual(secondParamTy) &&
+                            (!contextualTy ||
+                                (*contextualTy)->isEqual(resultTy))) {
+                          oldConstraint->setFavored();
+                          favoredConstraints.push_back(oldConstraint);
                         }
                       }
                     }
                   }
                   
-                  // FIXME: We can also further filter any available overloads
-                  // based upon conformance to literal protocols. Experiments
-                  // have shown that this doesn't provide much of an
-                  // improvement over favoring the default type when considering
-                  // literal types, but we may be able to use them to favor
-                  // constraints for non-literal types.
                   newConstraints.push_back(oldConstraint);
                 }
                 
