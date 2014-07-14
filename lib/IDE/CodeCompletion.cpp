@@ -1933,7 +1933,9 @@ public:
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     Module *M = CurrDeclContext->getParentModule();
-    M->lookupVisibleDecls({}, *this, NLKind::QualifiedLookup);
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
+                                                  TypeResolver.get());
+    M->lookupVisibleDecls({}, FilteringConsumer, NLKind::QualifiedLookup);
   }
 
   void getVisibleDeclsOfModule(const Module *TheModule,
@@ -1947,38 +1949,10 @@ public:
       LookupAccessPath.push_back(
           std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
     }
-    TheModule->lookupVisibleDecls(LookupAccessPath, *this,
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
+                                                  TypeResolver.get());
+    TheModule->lookupVisibleDecls(LookupAccessPath, FilteringConsumer,
                                   NLKind::QualifiedLookup);
-  }
-
-  void getModuleImportCompletions(StringRef ModuleName,
-                                  const std::vector<std::string> &AccessPath,
-                                  bool ResultsHaveLeadingDot) {
-    Kind = LookupKind::ImportFromModule;
-    NeedLeadingDot = ResultsHaveLeadingDot;
-
-    auto ModulePath =
-        std::make_pair(Ctx.getIdentifier(ModuleName), SourceLoc());
-    Module *M = Ctx.getModule(llvm::makeArrayRef(ModulePath));
-    if (!M)
-      return;
-
-    llvm::SmallVector<std::pair<Identifier, SourceLoc>, 1> LookupAccessPath;
-    for (auto Piece : AccessPath) {
-      LookupAccessPath.push_back(
-          std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
-    }
-
-    using namespace swift::namelookup;
-    SmallVector<ValueDecl *, 1> Decls;
-    lookupVisibleDeclsInModule(M, LookupAccessPath, Decls,
-                               NLKind::QualifiedLookup,
-                               ResolutionKind::Exact,
-                               TypeResolver.get());
-
-    for (auto *VD : Decls) {
-      foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
   }
 };
 

@@ -305,7 +305,22 @@ public:
     results.push_back(VD);
   }
 };
-  
+
+/// A consumer that filters out decls that are not accessible from a given
+/// DeclContext.
+class AccessFilteringDeclConsumer final : public VisibleDeclConsumer {
+  const DeclContext *DC;
+  VisibleDeclConsumer &ChainedConsumer;
+  LazyResolver *TypeResolver;
+public:
+  AccessFilteringDeclConsumer(const DeclContext *DC,
+                              VisibleDeclConsumer &consumer,
+                              LazyResolver *typeResolver)
+    : DC(DC), ChainedConsumer(consumer), TypeResolver(typeResolver) {}
+
+  void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
+};
+
 /// \brief Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///

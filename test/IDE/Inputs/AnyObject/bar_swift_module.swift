@@ -1,17 +1,17 @@
 // Import this class in the test.
-@objc class Bar_ImportedObjcClass {
-  func bar_ImportedObjcClass_InstanceFunc1() {}
-  class func bar_ImportedObjcClass_ClassFunc1() {}
-  subscript(i: Bar_ImportedObjcClass) -> Int {
+@objc public class Bar_ImportedObjcClass {
+  public func bar_ImportedObjcClass_InstanceFunc1() {}
+  public class func bar_ImportedObjcClass_ClassFunc1() {}
+  public subscript(i: Bar_ImportedObjcClass) -> Int {
     get {
       return 0
     }
   }
-  var bar_ImportedObjcClass_Property1: Int = 0
+  public var bar_ImportedObjcClass_Property1: Int = 0
 }
 
 // Don't import this class in the test.
-@objc class Bar_NonImportedObjcClass {
-  func ERROR() {}
+@objc public class Bar_NonImportedObjcClass {
+  public func ERROR() {}
 }
 

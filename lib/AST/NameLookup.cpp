@@ -29,6 +29,17 @@ using namespace swift;
 
 void DebuggerClient::anchor() {}
 
+void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
+                                            DeclVisibilityKind reason) {
+  if (TypeResolver)
+    TypeResolver->resolveDeclSignature(D);
+  if (D->isInvalid() && !D->hasAccessibility())
+    return;
+  if (D->isAccessibleFrom(DC))
+    ChainedConsumer.foundDecl(D, reason);
+}
+
+
 template <typename Fn>
 static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
   DeclContext *moduleScope = DC->getModuleScopeContext();

@@ -98,13 +98,27 @@ public:
 };
 } // unnamed namespace
 
-static bool isTypeDeclVisibleInLookupMode(LookupState LS) {
+static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
   // Nested type declarations can be accessed only with unqualified lookup or
   // on metatypes.
   return !LS.isQualified() || LS.isOnMetatype();
 }
 
-static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
+static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
+                                      const DeclContext *FromContext,
+                                      LazyResolver *TypeResolver) {
+  if (TypeResolver)
+    TypeResolver->resolveDeclSignature(Member);
+
+  // Check accessibility when relevant.
+  if (!Member->getDeclContext()->isLocalContext() &&
+      !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member)) {
+    if (Member->isInvalid() && !Member->hasAccessibility())
+      return false;
+    if (!Member->isAccessibleFrom(FromContext))
+      return false;
+  }
+
   if (auto *FD = dyn_cast<FuncDecl>(Member)) {
     // Can not call static functions on non-metatypes.
     if (!LS.isOnMetatype() && FD->isStatic())
@@ -140,14 +154,14 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     }
   }
   if (isa<TypeDecl>(Member))
-    return isTypeDeclVisibleInLookupMode(LS);
+    return areTypeDeclsVisibleInLookupMode(LS);
 
   return true;
 }
 
-static void DoGlobalExtensionLookup(Type BaseType,
+static void doGlobalExtensionLookup(Type BaseType,
                                     SmallVectorImpl<ValueDecl *> &FoundDecls,
-                                    const Module *CurModule,
+                                    const DeclContext *CurrDC,
                                     LookupState LS,
                                     DeclVisibilityKind Reason,
                                     LazyResolver *TypeResolver) {
@@ -157,13 +171,13 @@ static void DoGlobalExtensionLookup(Type BaseType,
   for (auto extension : nominal->getExtensions()) {
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
-        if (isDeclVisibleInLookupMode(VD, LS))
+        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
           FoundDecls.push_back(VD);
     }
   }
 
   // Handle shadowing.
-  removeShadowedDecls(FoundDecls, CurModule, TypeResolver);
+  removeShadowedDecls(FoundDecls, CurrDC->getParentModule(), TypeResolver);
 }
 
 /// \brief Enumerate immediate members of the type \c BaseType and its
@@ -194,17 +208,17 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     // are visible.
     if (D->getGenericParams())
       for (auto Param : *D->getGenericParams())
-        if (isDeclVisibleInLookupMode(Param, LS))
+        if (isDeclVisibleInLookupMode(Param, LS, CurrDC, TypeResolver))
           FoundDecls.push_back(Param);
   }
 
   for (Decl *Member : D->getMembers()) {
     if (auto *VD = dyn_cast<ValueDecl>(Member))
-      if (isDeclVisibleInLookupMode(VD, LS))
+      if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
         FoundDecls.push_back(VD);
   }
-  DoGlobalExtensionLookup(BaseType, FoundDecls,
-                          CurrDC->getParentModule(), LS, Reason, TypeResolver);
+  doGlobalExtensionLookup(BaseType, FoundDecls, CurrDC, LS, Reason,
+                          TypeResolver);
 
   // Report the declarations we found to the consumer.
   for (auto *VD : FoundDecls)
@@ -213,18 +227,24 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
 
 /// Enumerate AnyObject declarations as seen from context \c CurrDC.
 static void doDynamicLookup(VisibleDeclConsumer &Consumer,
-                            const DeclContext *CurrDC, LookupState LS) {
+                            const DeclContext *CurrDC,
+                            LookupState LS,
+                            LazyResolver *TypeResolver) {
   class DynamicLookupConsumer : public VisibleDeclConsumer {
     VisibleDeclConsumer &ChainedConsumer;
     LookupState LS;
+    const DeclContext *CurrDC;
+    LazyResolver *TypeResolver;
     llvm::DenseSet<std::pair<Identifier, CanType>> FunctionsReported;
     llvm::DenseSet<CanType> SubscriptsReported;
     llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
 
   public:
     explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,
-                                   LookupState LS)
-        : ChainedConsumer(ChainedConsumer), LS(LS) {}
+                                   LookupState LS, const DeclContext *CurrDC,
+                                   LazyResolver *TypeResolver)
+        : ChainedConsumer(ChainedConsumer), LS(LS), CurrDC(CurrDC),
+          TypeResolver(TypeResolver) {}
 
     void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
       // If the declaration has an override, name lookup will also have found
@@ -264,12 +284,12 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         llvm_unreachable("unhandled decl kind");
       }
 
-      if (isDeclVisibleInLookupMode(D, LS))
+      if (isDeclVisibleInLookupMode(D, LS, CurrDC, TypeResolver))
         ChainedConsumer.foundDecl(D, DeclVisibilityKind::DynamicLookup);
     }
   };
 
-  DynamicLookupConsumer ConsumerWrapper(Consumer, LS);
+  DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC, TypeResolver);
 
   CurrDC->getParentSourceFile()->forAllVisibleModules(
       [&](Module::ImportedModule Import) {
@@ -298,7 +318,8 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
 
 static void lookupDeclsFromProtocolsBeingConformedTo(
     Type BaseTy, VisibleDeclConsumer &Consumer, LookupState LS,
-    DeclVisibilityKind Reason, VisitedSet &Visited) {
+    const DeclContext *FromContext, DeclVisibilityKind Reason,
+    LazyResolver *TypeResolver, VisitedSet &Visited) {
   NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
   if (!CurrNominal)
     return;
@@ -319,7 +340,11 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   while (!Worklist.empty()) {
     auto Proto = Worklist.pop_back_val();
     if (!Visited.insert(Proto))
-      return;
+      continue;
+    if (TypeResolver)
+      TypeResolver->resolveDeclSignature(Proto);
+    if (!Proto->isAccessibleFrom(FromContext))
+      continue;
 
     bool ShouldFindNonOptionalValueRequirements =
         !ProtocolsWithConformances.count(Proto);
@@ -332,7 +357,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
     for (auto Member : Proto->getMembers()) {
       if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-        if (isTypeDeclVisibleInLookupMode(LS)) {
+        if (areTypeDeclsVisibleInLookupMode(LS)) {
           Consumer.foundDecl(ATD, ReasonForThisProtocol);
         }
         continue;
@@ -379,7 +404,10 @@ static void lookupVisibleMemberDeclsImpl(
   // Lookup module references, as on some_module.some_member.  These are
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(), Consumer,
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer,
+                                                  TypeResolver);
+    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(),
+                                        FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
   }
@@ -388,7 +416,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       // Handle AnyObject in a special way.
-      doDynamicLookup(Consumer, CurrDC, LS);
+      doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
       return;
     }
     if (!Visited.insert(PT->getDecl()))
@@ -432,8 +460,8 @@ static void lookupVisibleMemberDeclsImpl(
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, Consumer, CurrDC, LS, Reason, TypeResolver);
-    lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, Reason,
-                                             Visited);
+    lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
+                                             Reason, TypeResolver, Visited);
     // If we have a class type, look into its superclass.
     ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
