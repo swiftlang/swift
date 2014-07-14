@@ -106,6 +106,14 @@ namespace swift {
     /// Mark functions complete at the end of the optimization pipeline if they
     /// haven't changed.
     void setComplete();
+
+    /// Reset the state of this analysis.
+    void reset() {
+      CompleteFuncs.clear();
+      PendingFuncs.clear();
+      IsModulePending = false;
+      HasChanged = false;
+    }
   };
 
   /// The Call Graph Analysis provides information about the call graph.

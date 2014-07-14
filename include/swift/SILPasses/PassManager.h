@@ -101,6 +101,10 @@ namespace swift {
         AP->invalidate(F, K);
     }
 
+    /// \brief Reset the state of the pass manager and remove all transformation
+    /// owned by the pass manager. Anaysis passes will be kept.
+    void resetAndRemoveTransformations();
+
     /// D'tor.
     ~SILPassManager();
 

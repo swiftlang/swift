@@ -83,8 +83,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 }
 
 /// Perform semantic annotation/loop base optimizations.
-void ConstructHighLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
-  registerAnalysisPasses(PM, &Mod);
+void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
   // Get rid of int->enum->uncheck_enum_data.
   PM.add(createSILCombine());
   PM.add(createLoopRotatePass());
@@ -94,8 +93,7 @@ void ConstructHighLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
   PM.add(createSimplifyCFG());
 }
 
-void ConstructLowLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
-  registerAnalysisPasses(PM, &Mod);
+void AddLowLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
   PM.add(createLICMPass());
   PM.add(createDCE());
   PM.add(createCSE());
@@ -103,10 +101,9 @@ void ConstructLowLevelLoopOptPassManager(SILPassManager &PM, SILModule &Mod) {
   PM.add(createSimplifyCFG());
 }
 
-void ConstructSSAPassManager(SILPassManager &PM, SILModule &Module,
-                             bool useEarlyInliner) {
+void AddSSAPasses(SILPassManager &PM, SILModule &Module,
+                  bool useEarlyInliner) {
 
-  registerAnalysisPasses(PM, &Module);
   PM.add(createSimplifyCFG());
   PM.add(createAllocBoxToStack());
   PM.add(createLowerAggregate());
@@ -150,62 +147,64 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     return;
   }
 
+  SILPassManager PM(&Module, Options);
+  registerAnalysisPasses(PM, &Module);
+
   // Start by specializing generics and by cloning functions from stdlib.
-  SILPassManager GenericsPM(&Module, Options);
-  registerAnalysisPasses(GenericsPM, &Module);
-  GenericsPM.add(createSILLinker());
-  GenericsPM.add(createGenericSpecializer());
-  GenericsPM.run();
+  PM.add(createSILLinker());
+  PM.add(createGenericSpecializer());
+  PM.run();
+  PM.resetAndRemoveTransformations();
 
-  // Run two iteration of the high-level SSA pass mananger.
-  SILPassManager HighLevelSILPM(&Module, Options);
-  ConstructSSAPassManager(HighLevelSILPM, Module, true);
-  HighLevelSILPM.runOneIteration();
-  HighLevelSILPM.runOneIteration();
+  // Run two iterations of the high-level SSA passes.
+  AddSSAPasses(PM, Module, true);
+  PM.runOneIteration();
+  PM.runOneIteration();
+#if 1
+  PM.resetAndRemoveTransformations();
+#else
 
-#if 0
+  // Run the high-level loop optimization passes.
   // TODO: figure out what is really needed here to simplify the enums I still
   // see sticking around without this iteration.
-  HighLevelSILPM.runOneIteration();
-  // TODO: this should run as part of the last iteration of the previous
-  // pass manager so that we can reuse analysis info.
-  SILPassManager LoopPM(&Module, Options);
-  ConstructHighLevelLoopOptPassManager(LoopPM, Module);
-  LoopPM.runOneIteration();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
+  AddHighLevelLoopOptPasses(PM, Module);
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
 #endif
 
 
-  // Run two iteration of the low-level SSA pass mananger.
-  SILPassManager LowLevelSILPM(&Module, Options);
-  ConstructSSAPassManager(LowLevelSILPM, Module, false);
-  LowLevelSILPM.runOneIteration();
-  LowLevelSILPM.runOneIteration();
+  // Run two iterations of the low-level SSA passes.
+  AddSSAPasses(PM, Module, false);
+  PM.runOneIteration();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
 
   // Perform lowering optimizations.
-  SILPassManager LoweringPM(&Module, Options);
-  registerAnalysisPasses(LoweringPM, &Module);
-  LoweringPM.add(createDeadFunctionElimination());
-  LoweringPM.add(createDeadObjectElimination());
+  PM.add(createDeadFunctionElimination());
+  PM.add(createDeadObjectElimination());
 
   // Hoist globals out of loops.
-  LoweringPM.add(createGlobalOpt());
+  PM.add(createGlobalOpt());
 
   // Insert inline caches for virtual calls.
-  LoweringPM.add(createDevirtualization());
-  LoweringPM.add(createInlineCaches());
-  LoweringPM.run();
+  PM.add(createDevirtualization());
+  PM.add(createInlineCaches());
+  PM.run();
+  PM.resetAndRemoveTransformations();
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches.
-  LowLevelSILPM.invalidateAnalysis(SILAnalysis::InvalidationKind::All);
-  LowLevelSILPM.runOneIteration();
+  AddSSAPasses(PM, Module, false);
+  PM.runOneIteration();
 
 #if 0
-  SILPassManager LowLevelLoopPM(&Module, Options);
+  PM.resetAndRemoveTransformations();
   // TODO: this should run as part of the last iteration of the previous
   // pass manager so that we can reuse analysis info.
-  ConstructLowLevelLoopOptPassManager(LowLevelLoopPM, Module);
-  LowLevelLoopPM.runOneIteration();
+  AddLowLevelLoopOptPasses(PM, Module);
+  PM.runOneIteration();
 #endif
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.
