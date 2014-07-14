@@ -56,6 +56,14 @@ RangeTestCase.test("Printing") {
   expectEqual("Range(X(10)..<X(42))", toDebugString(Range(X(10)...X(41))))
 }
 
+RangeTestCase.test("Pattern matching") {
+  let x = 0..<20
+  // FIXME: These don't work yet: <rdar://problem/17668465> 
+  // expectTrue(x ~= 10)
+  // expectFalse(x ~= 20)
+  // expectFalse(x ~= -1)
+}
+
 RangeTestCase.run()
 // CHECK: {{^}}Range: All tests passed
 
