@@ -857,8 +857,9 @@ macro(add_swift_library_single target name)
   # Set compile and link flags for the non-static target. 
   # Do these LAST.
 
-  # FIXME: Should check whether this is a target library.
-  if (SWIFT_BUILD_STDLIB AND SWIFTLIB_SINGLE_INSTALL)
+  # FIXME: Should check whether this is a target library. It has nothing to
+  # do with installation.
+  if (SWIFT_BUILD_STATIC AND SWIFTLIB_SINGLE_INSTALL)
     set(target_static "${target}-static")
     add_library( ${target_static} STATIC
       ${SWIFTLIB_SINGLE_SOURCES}
