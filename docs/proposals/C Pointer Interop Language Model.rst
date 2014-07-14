@@ -169,8 +169,20 @@ You can call it as any of::
   zang(q)
   zang(&x)
   zang(&y)
-  zang([1.0, 2.0, 3.0])
-  zang([1, 2, 3])
+  let doubles = [1.0, 2.0, 3.0]
+  let ints = [1, 2, 3]
+  zang(doubles)
+  zang(ints)
+
+A type checker limitation prevents array literals from being passed directly
+to ``ConstUnsafePointer<Void>`` arguments without type annotation. As a
+workaround, you can bind the array literal to a constant, as above, or 
+specify the array type with ``as``::
+
+  zang([1.0, 2.0, 3.0] as [Double])
+  zang([1, 2, 3] as [Int])
+
+This limitation is tracked as <rdar://problem/17444930>.
 
 Strings
 =======
@@ -180,9 +192,9 @@ Swift ``String`` values and string literals:
 
 - ``CChar``, ``CSignedChar``, and ``CUnsignedChar``, which interoperate with
   ``String`` as a UTF-8 code unit array;
-- ``CShort``, ``CUnsignedShort``, and ``CChar16``, which interoperate with
+- (not implemented yet) ``CShort``, ``CUnsignedShort``, and ``CChar16``, which interoperate with
   ``String`` as a UTF-16 code unit array; and
-- ``CInt``, ``CUnsignedInt``, ``CWideChar``, and ``CChar32``, which interoperate
+- (not implemented yet) ``CInt``, ``CUnsignedInt``, ``CWideChar``, and ``CChar32``, which interoperate
   with ``String`` as a UTF-32 code unit array.
 
 A ``ConstUnsafePointer`` parameter with any of the above element types may take
