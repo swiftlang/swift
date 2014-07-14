@@ -234,7 +234,8 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
 /// We rotated a loop if it has the following properties.
 ///
 /// * It has an exiting header with a conditional branch.
-/// * It has a preheader.
+/// * It has a preheader (the function will try to create one for critical edges
+///   from cond_br).
 ///
 /// We will rotate at most up to the basic block passed as an argument.
 /// We will not rotate a loop where the header is equal to the latch except is
