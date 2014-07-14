@@ -586,7 +586,7 @@ func magic_literals() {
 
 
 infix operator +-+= {}
-@assignment func +-+= (inout x: Int, y: Int) -> Int { return 0}
+func +-+= (inout x: Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
   var i = 0

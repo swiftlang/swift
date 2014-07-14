@@ -49,12 +49,10 @@ public func - <T: Strideable> (lhs: T, rhs: T) -> T.Stride {
   return rhs.distanceTo(lhs)
 }
 
-@assignment
 public func += <T: Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(rhs)
 }
 
-@assignment
 public func -= <T: Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(-rhs)
 }

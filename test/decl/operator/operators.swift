@@ -86,10 +86,10 @@ infix operator +-+= {}
 infix func +-+ (x: Int, y: Int) -> Int {}
 prefix func +-+ (x: Int) -> Int {}
 
-@assignment prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
-@assignment postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
+prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
+postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
 
-@assignment infix func +-+= (inout x: Int, y: Int) -> Int {}
+infix func +-+= (inout x: Int, y: Int) -> Int {}
 
 var n = 0
 

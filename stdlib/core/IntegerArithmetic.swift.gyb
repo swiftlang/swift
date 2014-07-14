@@ -46,7 +46,7 @@ func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
 
-@assignment @transparent public
+@transparent public
 func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
 }

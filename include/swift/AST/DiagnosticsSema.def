@@ -1321,6 +1321,10 @@ ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
       "'requires_stored_property_inits' attribute can only be applied to a "
       "class", ())
 
+ERROR(assignment_attribute_removed, decl_parsing,none,
+      "@assignment attribute has been removed", ())
+
+
 // required
 ERROR(required_non_initializer,attribute_parsing,none,
       "'required' can only be applied to an initializer", ())

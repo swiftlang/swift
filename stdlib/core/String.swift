@@ -269,7 +269,7 @@ public func +(lhs: Character, rhs: Character) -> String {
 
 
 // String append
-@assignment public func += (inout lhs: String, rhs: String) {
+public func += (inout lhs: String, rhs: String) {
   if (lhs.isEmpty) {
     lhs = rhs
   }
@@ -278,7 +278,7 @@ public func +(lhs: Character, rhs: Character) -> String {
   }
 }
 
-@assignment public func += (inout lhs: String, rhs: Character) {
+public func += (inout lhs: String, rhs: Character) {
   lhs += String(rhs)
 }
 

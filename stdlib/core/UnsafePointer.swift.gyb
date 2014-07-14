@@ -334,12 +334,12 @@ func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
     / Int(Builtin.strideof(T.self))
 }
 
-@transparent @assignment public
+@transparent public
 func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
-@transparent @assignment public
+@transparent public
 func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
 }

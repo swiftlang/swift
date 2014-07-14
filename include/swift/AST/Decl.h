@@ -1875,7 +1875,7 @@ public:
   
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or @assignment operator.
+  /// `&` or 'inout' operator.
   bool isSettable(DeclContext *UseDC) const;
   
   /// isInstanceMember - Determine whether this value is an instance member

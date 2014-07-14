@@ -225,26 +225,26 @@ func + (x: CGFloat) -> CGFloat { return x }
 @transparent public prefix
 func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
 
-@transparent @assignment public
+@transparent public
 prefix func ++ (inout x: CGFloat) -> CGFloat {
   x.native += 1.0
   return x
 }
 
-@transparent @assignment public
+@transparent public
 prefix func -- (inout x: CGFloat) -> CGFloat { 
   x.native -= 1.0
   return x
 }
 
-@transparent @assignment postfix public
+@transparent postfix public
 func ++ (inout x: CGFloat) -> CGFloat { 
   let tmp = x
   x.native += 1.0
   return tmp 
 }
 
-@transparent @assignment postfix public
+@transparent postfix public
 func -- (inout x: CGFloat) -> CGFloat { 
   let tmp = x
   x.native -= 1.0
@@ -278,27 +278,27 @@ func %(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
 }
 
 // CGFloat assignment operators.
-@transparent @assignment public
+@transparent public
 func +=(inout lhs: CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native + rhs.native
 }
 
-@transparent @assignment public
+@transparent public
 func -=(inout lhs: CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native - rhs.native
 }
 
-@transparent @assignment public
+@transparent public
 func *=(inout lhs: CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native * rhs.native
 }
 
-@transparent @assignment public
+@transparent public
 func /=(inout lhs: CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native / rhs.native
 }
 
-@transparent @assignment public
+@transparent public
 func %=(inout lhs: CGFloat, rhs: CGFloat) {
   lhs.native = lhs.native % rhs.native
 }

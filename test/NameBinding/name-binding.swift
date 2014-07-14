@@ -174,8 +174,8 @@ postfix operator +++ {}
 prefix operator ++ {}
 postfix operator ++ {}
 
-@assignment prefix func +++(inout a: Int) { a += 2 }
-@assignment postfix func +++(inout a: Int) { a += 2 }
+prefix func +++(inout a: Int) { a += 2 }
+postfix func +++(inout a: Int) { a += 2 }
 
 var test = 0
 +++test

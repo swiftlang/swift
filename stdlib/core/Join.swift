@@ -24,7 +24,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   <rdar://problem/16566712> Dependent type should have been substituted by Sema
   or SILGen
 
-  @assignment func +=<
+  func +=<
     S : SequenceType
     where S.Generator.Element == Self.Generator.Element
   >(inout _: Self, _: S)

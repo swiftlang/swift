@@ -996,10 +996,10 @@ protocol d2600_ProtocolWithOperator1 {
 
 struct d2601_TestAssignment {}
 infix operator %%% {}
-@assignment func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
+func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}@assignment func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500-LABEL: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 //===---
 //===--- Printing of deduced associated types.

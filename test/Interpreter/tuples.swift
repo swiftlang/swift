@@ -14,7 +14,7 @@ func <->(a: Interval, b: Interval) -> Interval {
   return (a.lo - b.hi, a.hi - b.lo)
 }
 
-@assignment func <+>=(inout a: Interval, b: Interval) {
+func <+>=(inout a: Interval, b: Interval) {
   a.lo += b.lo
   a.hi += b.hi
 }

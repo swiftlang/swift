@@ -570,7 +570,7 @@ extension ${Self} {
   }
 }
 
-@assignment public
+public
 func += <
   T, S: SequenceType
 where S.Generator.Element == T
@@ -586,7 +586,7 @@ where S.Generator.Element == T
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
-@assignment public
+public
 func += <
   T, C: CollectionType
 where C.Generator.Element == T
@@ -611,8 +611,7 @@ where C.Generator.Element == T
   lhs._buffer.count = newCount
 }
 
-@assignment public
-func += <T>(inout lhs: ${Self}<T>, rhs: T) {
+public func += <T>(inout lhs: ${Self}<T>, rhs: T) {
   _arrayAppend(&lhs._buffer, rhs)
 }
 % end

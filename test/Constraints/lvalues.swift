@@ -27,10 +27,10 @@ var f : Float
 var x : X
 var y : Y
 
-@assignment func +=(inout lhs: X, rhs : X) {}
-@assignment func +=(inout lhs: Double, rhs : Double) {}
-@assignment prefix func ++(inout rhs: X) {}
-@assignment postfix func ++(inout lhs: X) {}
+func +=(inout lhs: X, rhs : X) {}
+func +=(inout lhs: Double, rhs : Double) {}
+prefix func ++(inout rhs: X) {}
+postfix func ++(inout lhs: X) {}
 
 f0(&i)
 f1(&i)

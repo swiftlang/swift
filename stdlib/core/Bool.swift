@@ -103,19 +103,19 @@ extension Bool : Equatable, Hashable {
 }
 
 // Compound assignment (with bitwise and)
-@assignment @transparent public
+@transparent public
 func &= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs & rhs
 }
 
 // Compound assignment (with bitwise or)
-@assignment @transparent public
+@transparent public
 func |= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs | rhs
 }
 
 // Compound assignment (with bitwise xor)
-@assignment @transparent public
+@transparent public
 func ^= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs ^ rhs
 }

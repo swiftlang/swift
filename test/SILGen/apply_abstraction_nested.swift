@@ -6,7 +6,6 @@ protocol P { }
 func bar<T:P>(inout _: T)() {}
 func baz<T:P>(inout _: T)(_:Int) {}
 
-@assignment
 func ~> <T: P, Args, Result>(
   inout x: T,
   m: (inout x: T)->((Args)->Result)

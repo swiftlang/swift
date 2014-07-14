@@ -468,7 +468,7 @@ extension ${Self} : BitwiseOperationsType {
 
 // Compound assignments
 % for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
-@transparent @assignment public
+@transparent public
 func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }

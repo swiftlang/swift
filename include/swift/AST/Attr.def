@@ -122,8 +122,8 @@ SIMPLE_DECL_ATTR(noreturn, NoReturn,
 SIMPLE_DECL_ATTR(exported, Exported,
                  OnImport, 8)
 
-SIMPLE_DECL_ATTR(assignment, Assignment,
-                 OnFunc, 9)
+// FIXME: Remove this.
+SIMPLE_DECL_ATTR(assignment, Assignment, OnFunc, 9)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
                  OnVar, 10)

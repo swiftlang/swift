@@ -52,7 +52,6 @@ internal protocol ArrayType
   mutating func append(newElement: Self.Generator.Element)
 
   /// Operator form of append
-  @assignment 
   func += (inout lhs: Self, rhs: Self.Generator.Element)
 
   /// Append elements from `sequence` to the Array
@@ -62,7 +61,6 @@ internal protocol ArrayType
   >(sequence: S)
 
   /// Operator form of extend
-  @assignment
   func += <
     S: SequenceType where S.Generator.Element == Self.Generator.Element
   >(inout lhs: Self, rhs: S)
