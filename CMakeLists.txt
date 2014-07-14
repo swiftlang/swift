@@ -414,9 +414,11 @@ function(compile_swift_files)
     if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
       set(arch_subdir "/32")
     endif()
-
+    
     set(SWIFTFILE_LIBRARY_SUBDIR "${SWIFTLIB_SUBDIR}${arch_subdir}")
   endif()
+
+  file(MAKE_DIRECTORY "${SWIFTFILE_LIBRARY_SUBDIR}")
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -445,6 +447,7 @@ function(compile_swift_files)
 
     set(objfile
       "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${objfile}")
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
   endif()
 
   if(SWIFTFILE_IS_MAIN)
@@ -568,6 +571,8 @@ function(handle_swift_sources sourcesvar externalvar name)
         ${SWIFTSOURCES_SDK} ${SWIFTSOURCES_ARCHITECTURE})
       set(objsubdir "/${SWIFTSOURCES_LIBRARY_SUBDIR}")
     endif()
+
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
     set(swift_obj 
         "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
