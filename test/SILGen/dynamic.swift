@@ -32,6 +32,8 @@ class Foo: Proto {
     get { return dynamic }
     set {}
   }
+
+  func overriddenByDynamic() {}
 }
 
 protocol Proto {
@@ -222,6 +224,8 @@ class Subclass: Foo {
     // CHECK-LABEL: sil @_TFC7dynamic8Subclasss9subscriptFT7dynamicSi_Si
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
   }
+
+  dynamic override func overriddenByDynamic() {}
 }
 
 // CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
@@ -298,7 +302,18 @@ func foreignMethodDispatch() {
 // CHECK-LABEL:   #Foo.objcMethod!1:         _TFC7dynamic3Foo10objcMethodfS0_FT_T_      // dynamic.Foo.objcMethod (dynamic.Foo)() -> ()
 // CHECK-LABEL:   #Foo.subscript!getter.1:   _TFC7dynamic3Foog9subscriptFT4objcSi_Si      // dynamic.Foo.subscript.getter (objc : Swift.Int) -> Swift.Int
 // CHECK-LABEL:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT4objcSi_Si      // dynamic.Foo.subscript.setter (objc : Swift.Int) -> Swift.Int
+// CHECK-NOT:     dynamic.Foo.init (dynamic.Foo.Type)(dynamic : Swift.Int) -> dynamic.Foo
+// CHECK-NOT:     dynamic.Foo.dynamicMethod
+// CHECK-NOT:     dynamic.Foo.subscript.getter (dynamic : Swift.Int) -> Swift.Int
+// CHECK-NOT:     dynamic.Foo.subscript.setter (dynamic : Swift.Int) -> Swift.Int
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TFC7dynamic3Foo19overriddenByDynamicfS0_FT_T_
 // CHECK-LABEL:   #Foo.nativeProp!getter.1:  _TFC7dynamic3Foog10nativePropSi     // dynamic.Foo.nativeProp.getter : Swift.Int
 // CHECK-LABEL:   #Foo.nativeProp!setter.1:  _TFC7dynamic3Foos10nativePropSi     // dynamic.Foo.nativeProp.setter : Swift.Int
 // CHECK-LABEL:   #Foo.objcProp!getter.1:    _TFC7dynamic3Foog8objcPropSi  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-LABEL:   #Foo.objcProp!setter.1:    _TFC7dynamic3Foos8objcPropSi  // dynamic.Foo.objcProp.setter : Swift.Int
+// CHECK-NOT:     dynamic.Foo.dynamicProp.getter
+// CHECK-NOT:     dynamic.Foo.dynamicProp.setter
+
+// Vtable uses a dynamic thunk for dynamic overrides
+// CHECK-LABEL: sil_vtable Subclass {
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TFC7dynamic8Subclass19overriddenByDynamicfS0_FT_T__dynamic

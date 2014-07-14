@@ -105,6 +105,10 @@ public:
   /// Get the function for a SILDeclRef.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
+  
+  /// Get the dynamic dispatch thunk for a SILDeclRef.
+  SILFunction *getDynamicThunk(SILDeclRef constant,
+                               SILConstantInfo constantInfo);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);

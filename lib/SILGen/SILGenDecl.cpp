@@ -1060,14 +1060,26 @@ public:
   
   // Add an entry to the vtable.
   void addEntry(SILDeclRef member) {
+    /// Get the function to reference from the vtable.
+    auto getVtableEntryFn = [&]() -> SILFunction* {
+      // If the member is dynamic, reference its dynamic dispatch thunk so that
+      // it will be redispatched, funneling the method call through the runtime
+      // hook point.
+      if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+        return SGM.getDynamicThunk(member, SGM.Types.getConstantInfo(member));
+      return SGM.getFunction(member, NotForDefinition);
+    };
+    
     // Try to find an overridden entry.
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
     if (auto overridden = member.getOverridden()) {
-      // If we overrode an ObjC decl, or this is an accessor for a
-      // property that overrides an ObjC decl, or if it is an
+      // If we overrode a foreign decl, a dynamic method, this is an
+      // accessor for a property that overrides an ObjC decl, or if it is an
       // @NSManaged property, then it won't be in the vtable.
       if (overridden.getDecl()->hasClangNode())
+        goto not_overridden;
+      if (overridden.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
         goto not_overridden;
       if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
         if (auto *asd = ovFD->getAccessorStorageDecl()) {
@@ -1090,7 +1102,7 @@ public:
           // Replace the overridden member.
           if (entry.first == ref) {
             // The entry is keyed by the least derived method.
-            entry = {ref, SGM.getFunction(member, NotForDefinition)};
+            entry = {ref, getVtableEntryFn()};
             return;
           }
         } while ((ref = ref.getOverridden()));
@@ -1103,6 +1115,11 @@ public:
     // to add it to the vtable.
     if (member.getDecl()->isFinal())
       return;
+    // If this is dynamic and isn't overriding a non-dynamic method, it'll
+    // always be accessed by objc_msgSend, so we don't need to add it to the
+    // vtable.
+    if (member.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+      return;
     
     // @NSManaged property getters/setters don't have vtable entries, because
     // they are only accessible via the @objc entry points.
@@ -1114,7 +1131,7 @@ public:
     }
 
     // Otherwise, introduce a new vtable entry.
-    vtableEntries.emplace_back(member, SGM.getFunction(member, NotForDefinition));
+    vtableEntries.emplace_back(member, getVtableEntryFn());
   }
   
   // Default for members that don't require vtable entries.

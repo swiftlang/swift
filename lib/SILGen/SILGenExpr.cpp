@@ -302,6 +302,30 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
 }
 
+SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
+                                           SILConstantInfo constantInfo) {
+  // FIXME: A real mangling. These thunks are always private and transparent,
+  // so hopefully not a huge deal...
+  llvm::SmallString<32> name;
+  constant.mangle(name);
+  name += "_dynamic";
+  
+  auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Private,
+                            constantInfo.getSILType().castTo<SILFunctionType>(),
+                            IsBare, IsTransparent);
+
+  if (F->empty()) {
+    // Emit the thunk if we haven't yet.
+    // Currently a dynamic thunk looks just like a foreign-to-native thunk around
+    // an ObjC method. This would change if we introduced a native
+    // runtime-hookable mechanism.
+    SILGenFunction SGF(*this, *F);
+    SGF.emitForeignThunk(constant);
+  }
+
+  return F;
+}
+
 SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
                                               SILDeclRef constant,
                                               SILConstantInfo constantInfo) {
@@ -314,24 +338,7 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
   }
   
   // Otherwise, we need a dynamic dispatch thunk.
-  // FIXME: A real mangling. These thunks are always private and transparent,
-  // so hopefully not a huge deal...
-  llvm::SmallString<32> name;
-  constant.mangle(name);
-  name += "_dynamic";
-  
-  auto F = SGM.M.getOrCreateFunction(loc, name, SILLinkage::Private,
-                            constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent);
-
-  if (F->empty()) {
-    // Emit the thunk if we haven't yet.
-    // Currently a dynamic thunk looks just like a foreign-to-native thunk around
-    // an ObjC method. This would change if we introduced a native
-    // runtime-hookable mechanism.
-    SILGenFunction subSGF(SGM, *F);
-    subSGF.emitForeignThunk(constant);
-  }
+  SILFunction *F = SGM.getDynamicThunk(constant, constantInfo);
   
   return B.createFunctionRef(loc, F);
 }
