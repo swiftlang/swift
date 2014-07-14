@@ -87,6 +87,6 @@
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
-// APPKIT-NEXT: var subviews: [AnyObject]!
+// APPKIT-NEXT: var subviews: [AnyObject]
 // APPKIT:      extension NSView {
 // APPKIT-NEXT:   var nextKeyView: NSView?

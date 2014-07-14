@@ -288,6 +288,12 @@ INSTANCE_METHOD(NSView, (1, "addSubview"), OptionalTypeAdjustment(0))
 INSTANCE_METHOD(NSView, (3, "addSubview", "positioned", "relativeTo"),
                 OptionalTypeAdjustment(4, OTK_None, OTK_None, OTK_None,
                                           OTK_Optional));
+INSTANCE_METHOD(NSView,
+                (1, "viewWillMoveToSuperview"),
+                OptionalTypeAdjustment(2, OTK_None, OTK_Optional))
+INSTANCE_METHOD(NSView,
+                (1, "viewWillMoveToWindow"),
+                OptionalTypeAdjustment(2, OTK_None, OTK_Optional))
 INSTANCE_METHOD(NSView, (2, "convertPoint", "fromView"),
                 OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional))
 INSTANCE_METHOD(NSView, (2, "convertPoint", "toView"),
@@ -350,6 +356,7 @@ INSTANCE_METHOD(NSView,
 
 OBJC_PROPERTY(NSView, window, OTK_Optional)
 OBJC_PROPERTY(NSView, superview, OTK_Optional)
+OBJC_PROPERTY(NSView, subviews, OTK_None)
 OBJC_PROPERTY(NSView, opaqueAncestor, OTK_Optional)
 OBJC_PROPERTY(NSView, makeBackingLayer, OTK_None)
 OBJC_PROPERTY(NSView, trackingAreas, OTK_None)
