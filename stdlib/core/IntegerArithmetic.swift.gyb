@@ -60,13 +60,13 @@ func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 // protocol should be presented to users as part of SignedNumberType.
 public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
   // Subtraction is a requirement for SignedNumberType
-  @infix func - (lhs: Self, rhs: Self) -> Self
+  infix func - (lhs: Self, rhs: Self) -> Self
 }
 
 // SignedNumberType itself contains only operator requirements having
 // default implementations on the base protocol.
 public protocol SignedNumberType : _SignedNumberType {
-  @prefix func - (x: Self) -> Self
+  prefix func - (x: Self) -> Self
 
   // Do not use this operator directly; call abs(x) instead
   func ~> (_:Self,_:(_Abs, ())) -> Self
@@ -75,14 +75,14 @@ public protocol SignedNumberType : _SignedNumberType {
 // Unary negation in terms of subtraction.  This is a default
 // implementation; models of SignedNumberType can provide their own
 // implementations.
-@prefix @transparent public
-func - <T : _SignedNumberType>(x: T) -> T {
+@transparent public
+prefix func - <T : _SignedNumberType>(x: T) -> T {
   return 0 - x
 }
 
 // Unary +
-@prefix @transparent public
-func + <T: _SignedNumberType>(x: T) -> T {
+@transparent public
+prefix func + <T: _SignedNumberType>(x: T) -> T {
   return x
 }
 
