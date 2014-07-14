@@ -15,6 +15,7 @@
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/PreallocatedMap.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILInstruction.h"
@@ -401,20 +402,23 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
   return Changed;
 }
 
-static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
+static bool processFunction(SILFunction &F, AliasAnalysis *AA,
+                            PostOrderAnalysis *POTA) {
 
   DEBUG(llvm::dbgs() << "**** Enum Simplification: " << F.getName()
                      << " ****\n");
 
   bool Changed = false;
-  std::vector<SILBasicBlock *> PostOrder;
-  std::copy(po_begin(&F), po_end(&F), std::back_inserter(PostOrder));
+
+  auto ReversePostOrder = POTA->getReversePostOrder(&F);
+  int PostOrderSize = std::distance(ReversePostOrder.begin(),
+                                    ReversePostOrder.end());
 
   using PairTy = std::pair<SILBasicBlock *, BBEnumTagDataflowState>;
   auto SortFn = [](const PairTy &P1,
                    const PairTy &P2) { return P1.first < P2.first; };
 
-  BBEnumTagDataflowState::PreallocatedMap BBToStateMap(PostOrder.size(),
+  BBEnumTagDataflowState::PreallocatedMap BBToStateMap(PostOrderSize,
                                                        SortFn);
 
 #ifndef NDEBUG
@@ -422,19 +426,18 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   unsigned RPOTId = 0;
 #endif
 
-  for (int i = PostOrder.size() - 1; i >= 0; --i) {
-    DEBUG(llvm::dbgs() << "i: " << i << "\n");
-    SILBasicBlock *BB = PostOrder[i];
+  unsigned i = 0;
+  for (SILBasicBlock *BB : ReversePostOrder) {
     BBToStateMap[i].first = BB;
     BBToStateMap[i].second.init(BB, AA);
 #ifndef NDEBUG
     BBToRPOTNumMap[BB] = RPOTId++;
 #endif
+    i++;
   }
   BBToStateMap.sort();
 
-  for (auto BI = PostOrder.rbegin(), BE = PostOrder.rend(); BI != BE; ++BI) {
-    SILBasicBlock *BB = *BI;
+  for (SILBasicBlock *BB : ReversePostOrder) {
     DEBUG(llvm::dbgs() << "Visiting BB#" << BBToRPOTNumMap[BB] << "\n");
 
     // We do this here to avoid issues with inserting, finding into BBToStateMap
@@ -483,8 +486,9 @@ class EnumSimplification : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     auto *AA = getAnalysis<AliasAnalysis>();
+    auto *POTA = getAnalysis<PostOrderAnalysis>();
 
-    if (processFunction(*getFunction(), AA))
+    if (processFunction(*getFunction(), AA, POTA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
