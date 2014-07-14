@@ -56,6 +56,11 @@ public:
   IGNORED_ATTR(Required)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+
+  IGNORED_ATTR(Infix)
+  IGNORED_ATTR(Postfix)
+  IGNORED_ATTR(Prefix)
+
 #undef IGNORED_ATTR
 
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
@@ -216,7 +221,8 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
 
 }
 
-void AttributeEarlyChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *A) {
+void AttributeEarlyChecker::
+visitUIApplicationMainAttr(UIApplicationMainAttr *A) {
   // @UIApplicationMain can only be applied to classes.
   auto CD = dyn_cast<ClassDecl>(D);
   
@@ -224,7 +230,8 @@ void AttributeEarlyChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *A)
     return diagnoseAndRemoveAttr(A, diag::attr_UIApplicationMain_not_class);
 }
 
-void AttributeEarlyChecker::visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {
+void AttributeEarlyChecker::
+visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {
   // Only function declarations can be can have this attribute,
   // and it is only legal when debugger support is on.
   auto *FD = dyn_cast<FuncDecl>(D);
@@ -401,27 +408,31 @@ public:
   /// below.
   void visitDeclAttribute(DeclAttribute *A) = delete;
 
-#define UNINTERESTING_ATTR(CLASS)                                              \
+#define IGNORED_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
-    UNINTERESTING_ATTR(Accessibility)
-    UNINTERESTING_ATTR(Asmname)
-    UNINTERESTING_ATTR(Dynamic)
-    UNINTERESTING_ATTR(Exported)
-    UNINTERESTING_ATTR(IBDesignable)
-    UNINTERESTING_ATTR(IBInspectable)
-    UNINTERESTING_ATTR(IBOutlet) // checked early.
-    UNINTERESTING_ATTR(Inline)
-    UNINTERESTING_ATTR(Lazy)      // checked early.
-    UNINTERESTING_ATTR(LLDBDebuggerFunction)
-    UNINTERESTING_ATTR(NSManaged) // checked early.
-    UNINTERESTING_ATTR(ObjC)
-    UNINTERESTING_ATTR(Optional)
-    UNINTERESTING_ATTR(Override)
-    UNINTERESTING_ATTR(RawDocComment)
-    UNINTERESTING_ATTR(Semantics)
+    IGNORED_ATTR(Accessibility)
+    IGNORED_ATTR(Asmname)
+    IGNORED_ATTR(Dynamic)
+    IGNORED_ATTR(Exported)
+    IGNORED_ATTR(IBDesignable)
+    IGNORED_ATTR(IBInspectable)
+    IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(Inline)
+    IGNORED_ATTR(Lazy)      // checked early.
+    IGNORED_ATTR(LLDBDebuggerFunction)
+    IGNORED_ATTR(NSManaged) // checked early.
+    IGNORED_ATTR(ObjC)
+    IGNORED_ATTR(Optional)
+    IGNORED_ATTR(Override)
+    IGNORED_ATTR(RawDocComment)
+    IGNORED_ATTR(Semantics)
 
-#undef UNINTERESTING_ATTR
+    IGNORED_ATTR(Infix)
+    IGNORED_ATTR(Postfix)
+    IGNORED_ATTR(Prefix)
+
+#undef IGNORED_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the

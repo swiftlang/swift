@@ -254,19 +254,21 @@ static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
     return true;
 
   switch (refKind) {
-      // An ordinary reference doesn't ignore anything.
-    case DeclRefKind::Ordinary:
-      return true;
+  // An ordinary reference doesn't ignore anything.
+  case DeclRefKind::Ordinary:
+    return true;
 
-      // A binary-operator reference only honors FuncDecls with a certain type.
-    case DeclRefKind::BinaryOperator:
-      return (getNumArgs(value) == 2);
+  // A binary-operator reference only honors FuncDecls with a certain type.
+  case DeclRefKind::BinaryOperator:
+    return (getNumArgs(value) == 2);
 
-    case DeclRefKind::PrefixOperator:
-      return (!value->getAttrs().isPostfix() && getNumArgs(value) == 1);
+  case DeclRefKind::PrefixOperator:
+    return (!value->getAttrs().hasAttribute<PostfixAttr>() &&
+            getNumArgs(value) == 1);
 
-    case DeclRefKind::PostfixOperator:
-      return (value->getAttrs().isPostfix() && getNumArgs(value) == 1);
+  case DeclRefKind::PostfixOperator:
+    return (value->getAttrs().hasAttribute<PostfixAttr>() &&
+            getNumArgs(value) == 1);
   }
   llvm_unreachable("bad declaration reference kind");
 }

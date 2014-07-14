@@ -48,6 +48,12 @@ enum class Associativity {
   Right
 };
 
+/// The kind of unary operator, if any.
+enum class UnaryOperatorKind : uint8_t {
+  None,
+  Prefix,
+  Postfix
+};
 
 /// Access control levels.
 // These are used in diagnostics, so please do not reorder existing values.
@@ -948,10 +954,16 @@ public:
     }
   }
 
+  /// If this attribute set has a prefix/postfix attribute on it, return this.
+  UnaryOperatorKind getUnaryOperatorKind() const {
+    if (hasAttribute<PrefixAttr>())
+      return UnaryOperatorKind::Prefix;
+    if (hasAttribute<PostfixAttr>())
+      return UnaryOperatorKind::Postfix;
+    return UnaryOperatorKind::None;
+  }
+
   bool isTransparent() const { return has(AK_transparent); }
-  bool isPrefix() const { return has(AK_prefix); }
-  bool isPostfix() const { return has(AK_postfix); }
-  bool isInfix() const { return has(AK_infix); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isUnmanaged() const { return has(AK_unowned_unsafe); }

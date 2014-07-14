@@ -236,7 +236,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
                            TypeLoc::withoutLoc(boolTy),
                            &enumDecl->getModuleContext()->getDerivedFileUnit());
   eqDecl->setImplicit();
-  eqDecl->getMutableAttrs().setAttr(AttrKind::AK_infix, SourceLoc());
+  eqDecl->getMutableAttrs().add(new (C) InfixAttr(/*implicit*/false));
   auto op = C.getStdlibModule()->lookupInfixOperator(C.Id_EqualsOperator);
   if (!op) {
     tc.diagnose(enumDecl->getLoc(),

@@ -1104,11 +1104,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     // Unary operators also include prefix/postfix.
     if (auto func = dyn_cast<FuncDecl>(this)) {
       if (func->isUnaryOperator()) {
-        signature.UnaryOperator 
-          = func->getAttrs().isPrefix()
-               ? UnaryOperatorKind::Prefix
-               : func->getAttrs().isPostfix() ? UnaryOperatorKind::Postfix
-                                              : UnaryOperatorKind::None;
+        signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
       }
     }
   } else if (isa<SubscriptDecl>(this)) {

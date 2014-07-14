@@ -3976,9 +3976,9 @@ public:
     auto operatorName = FD->getFullName().getBaseName();
     SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
-      if (FD->getAttrs().isPrefix()) {
+      if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
         op = SF.lookupPrefixOperator(operatorName, FD->getLoc());
-      } else if (FD->getAttrs().isPostfix()) {
+      } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
         // Postfix '!' is reserved.
         if (operatorName.str().equals("!")) {
           TC.diagnose(FD->getLoc(), diag::custom_operator_postfix_exclaim);
@@ -4018,14 +4018,15 @@ public:
         // Fix the AST and determine the insertion text.
         SourceLoc insertionLoc = FD->getFuncLoc();
         const char *insertionText;
+        auto &C = FD->getASTContext();
         if (postfixOp) {
           insertionText = "@postfix ";
           op = postfixOp;
-          FD->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
+          FD->getMutableAttrs().add(new (C) PostfixAttr(/*implicit*/false));
         } else {
           insertionText = "@prefix ";
           op = prefixOp;
-          FD->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
+          FD->getMutableAttrs().add(new (C) PrefixAttr(/*implicit*/false));
         }
 
         // Emit diagnostic with the Fix-It.
@@ -4741,6 +4742,10 @@ public:
     UNINTERESTING_ATTR(SetterAccessibility)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
+
+    UNINTERESTING_ATTR(Prefix)
+    UNINTERESTING_ATTR(Postfix)
+    UNINTERESTING_ATTR(Infix)
 
 #undef UNINTERESTING_ATTR
 
@@ -6419,8 +6424,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     // The unary prefix operator '&' is reserved and cannot be overloaded.
-    if (FDOrNull->isUnaryOperator() && FDOrNull->getName().str() == "&"
-        && !Attrs.isPostfix()) {
+    if (FDOrNull->isUnaryOperator() && FDOrNull->getName().str() == "&" &&
+        !Attrs.hasAttribute<PostfixAttr>()) {
       TC.diagnose(D->getStartLoc(), diag::custom_operator_addressof);
       return;
     }
@@ -6573,7 +6578,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.checkOwnershipAttr(var, Attrs.getOwnership());
   }
 
-  if (Attrs.isInfix()) {
+  if (Attrs.hasAttribute<InfixAttr>()) {
     // Only operator functions can be infix.
     if (!isOperator) {
       TC.diagnose(D->getStartLoc(), diag::infix_not_an_operator);
@@ -6589,37 +6594,37 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  if (Attrs.isPostfix()) {
+  if (auto *PA = Attrs.getAttribute<PostfixAttr>()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(Attrs.getLoc(AK_postfix), diag::postfix_not_an_operator);
-      D->getMutableAttrs().clearAttribute(AK_postfix);
+      TC.diagnose(PA->getLocation(), diag::postfix_not_an_operator);
+      D->getMutableAttrs().removeAttribute(PA);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(Attrs.getLoc(AK_postfix), diag::invalid_postfix_input);
-      D->getMutableAttrs().clearAttribute(AK_postfix);
+      TC.diagnose(PA->getLocation(), diag::invalid_postfix_input);
+      D->getMutableAttrs().removeAttribute(PA);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
   }
 
-  if (Attrs.isPrefix()) {
+  if (auto *PA = Attrs.getAttribute<PrefixAttr>()) {
     // Only operator functions can be postfix.
     if (!isOperator) {
-      TC.diagnose(Attrs.getLoc(AK_prefix), diag::prefix_not_an_operator);
-      D->getMutableAttrs().clearAttribute(AK_prefix);
+      TC.diagnose(PA->getLocation(), diag::prefix_not_an_operator);
+      D->getMutableAttrs().removeAttribute(PA);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }
 
     // Only unary operators can be postfix.
     if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(Attrs.getLoc(AK_prefix), diag::invalid_prefix_input);
-      D->getMutableAttrs().clearAttribute(AK_prefix);
+      TC.diagnose(PA->getLocation(), diag::invalid_prefix_input);
+      D->getMutableAttrs().removeAttribute(PA);
       // FIXME: Set the 'isError' bit on the decl.
       return;
     }

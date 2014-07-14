@@ -396,11 +396,12 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
 static OperatorFixity getDeclFixity(ValueDecl *decl) {
   if (!decl->getName().isOperator())
     return OperatorFixity::NotOperator;
-  if (decl->getAttrs().isPostfix())
-    return OperatorFixity::Postfix;
-  if (decl->getAttrs().isPrefix())
-    return OperatorFixity::Prefix;
-  return OperatorFixity::Infix;
+
+  switch (decl->getAttrs().getUnaryOperatorKind()) {
+  case UnaryOperatorKind::Prefix: return OperatorFixity::Prefix;
+  case UnaryOperatorKind::Postfix: return OperatorFixity::Postfix;
+  case UnaryOperatorKind::None: return OperatorFixity::Infix;
+  }
 }
 
 void Mangler::mangleDeclName(ValueDecl *decl) {

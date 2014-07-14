@@ -333,6 +333,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   if (InversionLoc.isValid())
     diagnose(InversionLoc, diag::invalid_attribute_inversion);
 
+  if ((DK == DAK_Prefix || DK == DAK_Postfix) && !DiscardAttribute &&
+      Attributes.getUnaryOperatorKind() != UnaryOperatorKind::None) {
+    diagnose(Loc, diag::cannot_combine_attribute,
+             DK == DAK_Prefix ? "postfix" : "prefix");
+    DiscardAttribute = true;
+  }
+
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
@@ -863,21 +870,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Handle any attribute-specific processing logic.
   switch (attr) {
   default: break;
-  case AK_prefix:
-    if (Attributes.isPostfix()) {
-      diagnose(Loc, diag::cannot_combine_attribute, "postfix");
-      Attributes.clearAttribute(attr);
-    }
-    break;
-    
-  case AK_postfix:
-    if (Attributes.isPrefix()) {
-      diagnose(Loc, diag::cannot_combine_attribute, "prefix");
-      Attributes.clearAttribute(attr);
-    }
-    break;
-      
-      
+
   case AK_mutating:
     diagnose(Loc, diag::mutating_not_attribute, isInverted)
       .fixItReplace(AtLoc, isInverted ? "non" : "");

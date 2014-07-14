@@ -96,10 +96,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
 
   if (Options.PrintAttrTransparent && isTransparent())
     Printer << "@transparent ";
-  if (isInfix())
-    Printer << "@infix ";
-  if (isPostfix())
-    Printer << "@postfix ";
   if (requiresStoredPropertyInits())
     Printer << "@requires_stored_property_inits ";
 
@@ -144,6 +140,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_Inline:
   case DAK_Dynamic:
   case DAK_Accessibility:
+  case DAK_Prefix:
+  case DAK_Postfix:
+  case DAK_Infix:
     if (!DeclAttribute::isDeclModifier(getKind()))
       Printer << "@";
     Printer << getAttrName();

@@ -1808,8 +1808,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_infix, AK_postfix, AK_prefix, AK_transparent,
-      AK_mutating
+      AK_transparent, AK_mutating
     >(fn);
     verifyAttrSerializable(fn);
 

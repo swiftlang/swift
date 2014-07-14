@@ -487,12 +487,14 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // If we require a prefix operator and the witness is not a prefix operator,
     // these don't match.
-    if (reqAttrs.isPrefix() && !witnessAttrs.isPrefix())
+    if (reqAttrs.hasAttribute<PrefixAttr>() &&
+        !witnessAttrs.hasAttribute<PrefixAttr>())
       return RequirementMatch(witness, MatchKind::PrefixNonPrefixConflict);
 
     // If we require a postfix operator and the witness is not a postfix
     // operator, these don't match.
-    if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
+    if (reqAttrs.hasAttribute<PostfixAttr>() &&
+        !witnessAttrs.hasAttribute<PostfixAttr>())
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
     // Check that the mutating bit is ok.
@@ -856,13 +858,15 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::PrefixNonPrefixConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
-                false, match.Witness->getAttrs().isPostfix()? 2 : 0);
+                false,
+                match.Witness->getAttrs().hasAttribute<PostfixAttr>() ? 2 : 0);
     break;
 
   case MatchKind::PostfixNonPostfixConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
-                true, match.Witness->getAttrs().isPrefix() ? 1 : 0);
+                true,
+                match.Witness->getAttrs().hasAttribute<PrefixAttr>() ? 1 : 0);
     break;
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
