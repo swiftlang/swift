@@ -883,9 +883,6 @@ macro(add_swift_library_single target name)
       ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
-    # Add dependencies
-    add_dependencies(${target_static} ${target})
-
     set_output_directory(${target_static}
       ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
