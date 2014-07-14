@@ -733,13 +733,16 @@ public:
                                                DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                                      Identifier Name,
-                                                     SourceLoc NameLoc);
+                                                     SourceLoc NameLoc,
+                                                     DeclAttributes &Attrs);
   ParserResult<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
                                                       Identifier Name,
-                                                      SourceLoc NameLoc);
+                                                      SourceLoc NameLoc,
+                                                      DeclAttributes &Attrs);
   ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
                                                     Identifier Name,
-                                                    SourceLoc NameLoc);
+                                                    SourceLoc NameLoc,
+                                                    DeclAttributes &Attrs);
 
   //===--------------------------------------------------------------------===//
   // SIL Parsing.

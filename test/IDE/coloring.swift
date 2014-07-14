@@ -234,11 +234,11 @@ class MySubClass : MyCls {
     convenience init(a: Int) {}
 }
 
-// CHECK: infix <kw>operator</kw> ~~ {
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> ~~ {
 infix operator ~~ {}
-// CHECK: prefix <kw>operator</kw> *~~ {
+// CHECK: <attr-builtin>prefix</attr-builtin> <kw>operator</kw> *~~ {
 prefix operator *~~ {}
-// CHECK: postfix <kw>operator</kw> ~~* {
+// CHECK: <attr-builtin>postfix</attr-builtin> <kw>operator</kw> ~~* {
 postfix operator ~~* {}
 
 // FIXME: blah.

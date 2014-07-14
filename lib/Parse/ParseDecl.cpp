@@ -4133,13 +4133,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   ParserResult<OperatorDecl> Result;
   if (Attributes.hasAttribute<PrefixAttr>())
-    Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc);
+    Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc, Attributes);
   else if (Attributes.hasAttribute<PostfixAttr>())
-    Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc);
+    Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc, Attributes);
   else {
     if (!Attributes.hasAttribute<InfixAttr>())
       diagnose(OperatorLoc, diag::operator_decl_no_fixity);
-    Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc);
+    Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes);
   }
 
   if (Tok.is(tok::r_brace))
@@ -4155,7 +4155,7 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
 ParserResult<OperatorDecl>
 Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
-                                SourceLoc NameLoc) {
+                                SourceLoc NameLoc, DeclAttributes &Attributes) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
   
   while (!Tok.is(tok::r_brace)) {
@@ -4170,14 +4170,17 @@ Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
   
   SourceLoc RBraceLoc = Tok.getLoc();
 
-  return makeParserResult(
-      new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
-                                       Name, NameLoc, LBraceLoc, RBraceLoc));
+  auto *Res =
+    new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
+                                     Name, NameLoc, LBraceLoc, RBraceLoc);
+  Res->getMutableAttrs() = Attributes;
+  return makeParserResult(Res);
 }
 
 ParserResult<OperatorDecl>
 Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                 Identifier Name, SourceLoc NameLoc) {
+                                 Identifier Name, SourceLoc NameLoc,
+                                 DeclAttributes &Attributes) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
   
   while (!Tok.is(tok::r_brace)) {
@@ -4192,14 +4195,16 @@ Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
   
   SourceLoc RBraceLoc = Tok.getLoc();
   
-  return makeParserResult(
-      new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
-                                        Name, NameLoc, LBraceLoc, RBraceLoc));
+  auto Res =
+    new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                      Name, NameLoc, LBraceLoc, RBraceLoc);
+  Res->getMutableAttrs() = Attributes;
+  return makeParserResult(Res);
 }
 
 ParserResult<OperatorDecl>
 Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
-                               SourceLoc NameLoc) {
+                               SourceLoc NameLoc, DeclAttributes &Attributes) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
 
   // Initialize InfixData with default attributes:
@@ -4274,8 +4279,11 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
   
   SourceLoc RBraceLoc = Tok.getLoc();
   
-  return makeParserResult(new (Context) InfixOperatorDecl(
-      CurDeclContext, OperatorLoc, Name, NameLoc, LBraceLoc,
-      AssociativityLoc, AssociativityValueLoc, PrecedenceLoc,
-      PrecedenceValueLoc, RBraceLoc, InfixData(precedence, associativity)));
+  auto Res = new (Context)
+    InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, LBraceLoc,
+                      AssociativityLoc, AssociativityValueLoc,
+                      PrecedenceLoc, PrecedenceValueLoc, RBraceLoc,
+                      InfixData(precedence, associativity));
+  Res->getMutableAttrs() = Attributes;
+  return makeParserResult(Res);
 }

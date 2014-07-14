@@ -144,9 +144,8 @@ postfix prefix func ++(x: Int) {} // expected-error {{attribute 'postfix' cannot
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language.
-// FIXME: Ban these on operator decls.
-postfix operator! {}
-prefix operator & {}
+postfix operator! {}  // expected-error {{cannot declare a custom postfix '!' operator}}
+prefix operator & {}  // expected-error {{cannot declare a custom prefix '&' operator}}
 
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}

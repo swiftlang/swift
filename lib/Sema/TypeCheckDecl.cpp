@@ -2836,6 +2836,11 @@ public:
     TC.checkDeclAttributes(ID);
   }
 
+  void visitOperatorDecl(OperatorDecl *OD) {
+    TC.checkDeclAttributesEarly(OD);
+    TC.checkDeclAttributes(OD);
+  }
+
   void visitBoundVariable(VarDecl *VD) {
     if (!VD->getType()->isMaterializable()) {
       TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
