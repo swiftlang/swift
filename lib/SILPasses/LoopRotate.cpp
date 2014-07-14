@@ -307,7 +307,6 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
     std::swap(NewHeader, Exit);
   assert(L->contains(NewHeader) && !L->contains(Exit) &&
          "Could not find loop header and exit block");
-  bool IsHeaderExitDominated = DT->dominates(Header, Exit);
 
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
@@ -364,7 +363,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   updateDomTree(DT, Preheader, Latch, Header);
 
   assert(DT->getNode(NewHeader)->getIDom() == DT->getNode(Preheader));
-  assert(!IsHeaderExitDominated ||
+  assert(!DT->dominates(Header, Exit) ||
          DT->getNode(Exit)->getIDom() == DT->getNode(Preheader));
   assert(DT->getNode(Header)->getIDom() == DT->getNode(Latch) ||
          ((Header == Latch) &&
