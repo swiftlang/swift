@@ -124,16 +124,41 @@ IntervalTestCase.test("start/end") {
   expectEqual(0.1, (0.0...0.1).end)
 }
 
+// Something to test with that distinguishes debugDescription from description
+struct X<T: Comparable> : Comparable, Printable, DebugPrintable {
+  init(_ a: T) {
+    self.a = a
+  }
+
+  var description: String {
+    return toString(a)
+  }
+
+  var debugDescription: String {
+    return "X(\(toDebugString(a)))"
+  }
+  
+  var a: T
+}
+
+func < <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
+  return lhs.a < rhs.a
+}
+
+func == <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
+  return lhs.a == rhs.a
+}
+
 IntervalTestCase.test("Printable/DebugPrintable") {
-  expectEqual("0.0..<0.1", toString(0.0..<0.1))
-  expectEqual("0.0...0.1", toString(0.0...0.1))
+  expectEqual("0.0..<0.1", toString(X(0.0)..<X(0.1)))
+  expectEqual("0.0...0.1", toString(X(0.0)...X(0.1)))
   
   expectEqual(
-    "HalfOpenInterval(0.0..<0.1)",
-    toDebugString(HalfOpenInterval(0.0..<0.1)))
+    "HalfOpenInterval(X(0.0)..<X(0.1))",
+    toDebugString(HalfOpenInterval(X(0.0)..<X(0.1))))
   expectEqual(
-    "ClosedInterval(0.0...0.1)",
-    toDebugString(ClosedInterval(0.0...0.1)))
+    "ClosedInterval(X(0.0)...X(0.1))",
+    toDebugString(ClosedInterval(X(0.0)...X(0.1))))
 }
 
 IntervalTestCase.test("rdar12016900") {

@@ -78,7 +78,7 @@ public struct ${Self}<T: Comparable>
   
   /// The `Interval`\ 's verbose printed representation
   public var debugDescription: String {
-    return "${Self}(\(start)${rangeOperator}\(end))"
+    return "${Self}(\(toDebugString(start))${rangeOperator}\(toDebugString(end)))"
   }
   
   /// Returns `true` iff the `Interval` contains `x`

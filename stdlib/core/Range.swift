@@ -112,7 +112,7 @@ public struct Range<
   
   /// The `Range`\ 's verbose printed representation
   public var debugDescription: String {
-    return "Range(\(startIndex)..<\(endIndex))"
+    return "Range(\(toDebugString(startIndex))..<\(toDebugString(endIndex)))"
   }
   
   

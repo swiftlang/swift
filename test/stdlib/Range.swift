@@ -22,13 +22,38 @@ RangeTestCase.test("Range/Equatable") {
   expectTrue(r1 != r2)
 }
 
+// Something to test with that distinguishes debugDescription from description
+struct X<T: ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
+  init(_ a: T) {
+    self.a = a
+  }
+
+  func successor() -> X {
+    return X(a.successor())
+  }
+
+  var description: String {
+    return toString(a)
+  }
+
+  var debugDescription: String {
+    return "X(\(toDebugString(a)))"
+  }
+  
+  var a: T
+}
+
+func == <T: ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
+  return lhs.a == rhs.a
+}
+
 RangeTestCase.test("Printing") {
-  expectEqual("0..<10", toString(0..<10))
-  expectEqual("Range(0..<10)", toDebugString(Range(0..<10)))
+  expectEqual("0..<10", toString(X(0)..<X(10)))
+  expectEqual("Range(X(0)..<X(10))", toDebugString(Range(X(0)..<X(10))))
   
   // No separate representation for closed Ranges yet
-  expectEqual("10..<42", toString(10...41)) 
-  expectEqual("Range(10..<42)", toDebugString(Range(10...41)))
+  expectEqual("10..<42", toString(X(10)...X(41))) 
+  expectEqual("Range(X(10)..<X(42))", toDebugString(Range(X(10)...X(41))))
 }
 
 RangeTestCase.run()
