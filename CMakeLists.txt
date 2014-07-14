@@ -481,7 +481,7 @@ function(compile_swift_files)
   endif()
   
   add_custom_command(
-    OUTPUT ${objfile} ${module_file}
+    OUTPUT ${objfile} ${module_file} ${module_doc_file}
     ${create_module_dir}
     COMMAND "${line_directive_tool}" ${source_files} -- 
       "${swift_compiler_path}" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
@@ -519,8 +519,8 @@ endfunction(compute_library_subdir)
 # list of externally-build sources.
 #
 # Usage:
-#   handle_swift_sources(sourcesvar externalvar target)
-function(handle_swift_sources sourcesvar externalvar target name)
+#   handle_swift_sources(sourcesvar externalvar)
+function(handle_swift_sources sourcesvar externalvar name)
   parse_arguments(SWIFTSOURCES  
     "DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE"
@@ -638,6 +638,36 @@ function(handle_gyb_sources ptr_size sourcesvar)
   set(${sourcesvar} "${de_gybbed_sources}" PARENT_SCOPE)
 endfunction()
 
+# Add a universal binary target created from the output of the given
+# set of targets by running 'lipo'.
+#
+# Usage:
+#   add_swift_lipo_target(
+#     target              # The name of the target to create
+#     output              # The file to be created by this target
+#     source_targets...   # The source targets whose outputs will be
+#                         # lipo'd into the output.
+#   )
+function(add_swift_lipo_target target output)
+  set(source_targets ${ARGN})
+
+  # Gather the source binaries.
+  set(source_binaries)
+  foreach(source_target ${source_targets})
+    get_property(source_binary TARGET ${source_target} PROPERTY LOCATION)
+    list(APPEND source_binaries "${source_binary}")
+  endforeach()
+
+  # Use lipo to create the final binary.
+  add_custom_target(${target} ALL
+    COMMAND ${LIPO}
+    "-create"
+    "-output"
+    ${output}
+    ${source_binaries}
+    DEPENDS ${source_targets})
+endfunction()
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -708,7 +738,7 @@ macro(add_swift_library_single target name)
   endif()
   
   handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
-    SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${target} ${name}
+    SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
     DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS}
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
@@ -736,29 +766,12 @@ macro(add_swift_library_single target name)
       )
   endif()
 
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${target} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
-
   # Add Swift source files to the project.
   source_group("Swift Sources" FILES ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
   # ...and for now, mark them as HEADER_FILE_ONLY, so that Xcode doesn't try
   # to build them itself.
   set_source_files_properties(${SWIFTLIB_SINGLE_EXTERNAL_SOURCES} PROPERTIES
     HEADER_FILE_ONLY true)
-
-  set(link_flags "${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
-  target_link_libraries(${target} ${SWIFTLIB_SINGLE_DEPENDS})
-  
-  # Link against system frameworks.
-  foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
-    target_link_libraries(${target} "-framework ${FRAMEWORK}")
-  endforeach()
-
-  llvm_config( ${target} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
-  if (NOT NO_LLVM_COMMON_LIBS)
-    target_link_libraries( ${target} ${LLVM_COMMON_LIBS} )
-  endif()
 
   if(SWIFTLIB_SINGLE_INSTALL)
     # Install runtime libraries to lib/swift instead of lib. This works around
@@ -866,7 +879,8 @@ macro(add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
-    add_dependencies(${target_static} ${name})
+    # Add dependencies
+    add_dependencies(${target_static} ${target})
 
     set_output_directory(${target_static}
       ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
@@ -893,17 +907,53 @@ macro(add_swift_library_single target name)
     set_target_properties(${target_static} PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
-
-    set_target_properties(${target_static} PROPERTIES 
-      COMPILE_FLAGS "${compile_flags}"
-      LINK_FLAGS "${link_flags}")
+  else()
+    unset(target_static)
   endif()
 
-  # Do not add code here.
+  # Handle linking and dependencies.
+  target_link_libraries(${target} ${SWIFTLIB_SINGLE_DEPENDS})
+  if (target_static AND SWIFTLIB_SINGLE_DEPENDS)
+    set(depends)
+    foreach (dep ${SWIFTLIB_SINGLE_DEPENDS})
+      list(APPEND depends "${dep}-static")
+    endforeach()
+    add_dependencies(${target_static} ${depends})
+  endif()
 
+  if( LLVM_COMMON_DEPENDS )
+    add_dependencies( ${target} ${LLVM_COMMON_DEPENDS} )
+    if (target_static)
+      add_dependencies( ${target_static} ${LLVM_COMMON_DEPENDS} )
+    endif()
+  endif( LLVM_COMMON_DEPENDS )
+
+  # Link against system frameworks.
+  foreach(FRAMEWORK ${SWIFTLIB_SINGLE_FRAMEWORK_DEPENDS})
+    target_link_libraries(${target} "-framework ${FRAMEWORK}")
+    if (target_static)
+      target_link_libraries(${target_static} "-framework ${FRAMEWORK}")
+    endif()
+  endforeach()
+
+  llvm_config( ${target} ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS} )
+  if (NOT NO_LLVM_COMMON_LIBS)
+    target_link_libraries( ${target} ${LLVM_COMMON_LIBS} )
+    if (target_static AND LLVM_COMMON_LIBS)
+      add_dependencies( ${target_static} ${LLVM_COMMON_LIBS} )
+    endif()
+  endif()
+
+  # Set compilation and link flags.
   set_target_properties(${target} PROPERTIES 
     COMPILE_FLAGS "${compile_flags}"
-    LINK_FLAGS "${link_flags}")
+    LINK_FLAGS "${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+
+  if (target_static)
+    set_target_properties(${target_static} PROPERTIES 
+      COMPILE_FLAGS "${compile_flags}"
+      LINK_FLAGS "${link_flags} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+  endif()
 
   # Do not add code here.
 endmacro(add_swift_library_single)
@@ -1063,6 +1113,15 @@ macro(add_swift_library name)
               "${DEP}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
           endforeach()
 
+          if (SWIFT_BUILD_STATIC AND SWIFTLIB_INSTALL)
+            # Add dependencies on the (not-yet-created) custom lipo
+            # target.
+            foreach(DEP ${SWIFTLIB_DEPENDS})
+              add_dependencies("${VARIANT_NAME}-static" 
+                "${DEP}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-static")
+            endforeach()
+          endif()
+
           # Note this thin library.
           list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
         endif()
@@ -1070,12 +1129,6 @@ macro(add_swift_library name)
 
       # Find the library targets created for this SDK.
       if (THIN_INPUT_TARGETS)
-        set(THIN_INPUT_LIBRARIES)
-        foreach(TARGET ${THIN_INPUT_TARGETS})
-          get_property(TARGET_FILE TARGET ${TARGET} PROPERTY LOCATION)
-          list(APPEND THIN_INPUT_LIBRARIES "${TARGET_FILE}")
-        endforeach()
-        
         # Determine the name of the universal library.
         if (SHARED_LIBRARY)
           set(UNIVERSAL_LIBRARY_NAME 
@@ -1084,15 +1137,25 @@ macro(add_swift_library name)
           set(UNIVERSAL_LIBRARY_NAME 
             "${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         endif()
-          
-        # Use lipo to create the final binary.      
-        add_custom_target("${name}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}" ALL
-          COMMAND ${LIPO} 
-          "-create"
-          "-output" 
+
+        add_swift_lipo_target(
+          "${name}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
           ${UNIVERSAL_LIBRARY_NAME}
-          ${THIN_INPUT_LIBRARIES}
-          DEPENDS ${THIN_INPUT_TARGETS})
+          ${THIN_INPUT_TARGETS})
+
+        # If we built static variants of the library, create a lipo
+        # target for them.
+        if (SWIFT_BUILD_STATIC AND SWIFTLIB_INSTALL)
+          set(THIN_INPUT_TARGETS_STATIC)
+          foreach(TARGET ${THIN_INPUT_TARGETS})
+            list(APPEND THIN_INPUT_TARGETS_STATIC "${TARGET}-static")
+          endforeach()
+
+          add_swift_lipo_target(
+            "${name}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-static"
+            "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}"
+            ${THIN_INPUT_TARGETS_STATIC})
+        endif()
       endif()
     endforeach(SDK)      
   else()
