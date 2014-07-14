@@ -297,7 +297,7 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   if (!ExtractPath)
     return SILValue();
 
-  assert(ExtractPath.getType() == UADCI->getType().getObjectType() &&
+  assert(ExtractPath.getType() == LI->getType().getObjectType() &&
          "Must have same types here.");
 
   return ExtractPath;
