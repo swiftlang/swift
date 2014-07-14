@@ -1370,7 +1370,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
                   ios-simulator ios "i386;x86_64" NO)
   endif()
 
-  message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
+  if (SWIFT_SDKS)
+    message(STATUS "Swift building for SDKs: ${SWIFT_SDKS}")
+  endif()
 
   if (NOT SWIFT_SDKS)
     # Add deployment target to C/C++ compiler and linker flags.
