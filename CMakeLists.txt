@@ -469,7 +469,7 @@ function(compile_swift_files)
   set(stdlib_dep)
   # Make sure that standard library does not depend on itself.
   if(NOT SWIFTFILE_IS_STDLIB_CORE)
-    set(stdlib_dep swift_stdlib_core)
+    set(stdlib_dep swiftCore)
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
@@ -552,7 +552,7 @@ function(handle_swift_sources sourcesvar externalvar name)
 
   if(swift_sources)
     # Special-case hack to create swift.o for the swift_stdlib_* targets
-    if(name STREQUAL swift_stdlib_core)
+    if(name STREQUAL swiftCore)
       set(swift_obj_base "Swift")
     else()
       # Otherwise, get the name from the first swift input file.  Also

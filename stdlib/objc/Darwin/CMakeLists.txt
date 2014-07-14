@@ -4,4 +4,4 @@ add_swift_library(swiftDarwin INSTALL TARGET_LIBRARY
   Darwin.swift
   Misc.mm
   tgmath.swift.gyb
-  DEPENDS swift_stdlib_core)
+  DEPENDS swiftCore)

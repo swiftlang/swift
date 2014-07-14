@@ -6,6 +6,6 @@ add_swift_unittest(SwiftRuntimeTests
 find_library(FOUNDATION_LIBRARY Foundation)
 
 target_link_libraries(SwiftRuntimeTests
-  swift_stdlib_core
+  swiftCore
   ${FOUNDATION_LIBRARY}
   )

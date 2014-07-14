@@ -4,4 +4,4 @@ add_swift_library(swiftDispatch
   Dispatch.swift
   Dispatch.mm
   INSTALL TARGET_LIBRARY
-  DEPENDS swift_stdlib_core swiftObjectiveC)
+  DEPENDS swiftCore swiftObjectiveC)

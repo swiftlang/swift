@@ -174,7 +174,7 @@ static bool loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
 }
 
 static bool loadSwiftRuntime(StringRef runtimeLibPath) {
-  return loadRuntimeLib("libswift_stdlib_core.dylib", runtimeLibPath);
+  return loadRuntimeLib("libswiftCore.dylib", runtimeLibPath);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,

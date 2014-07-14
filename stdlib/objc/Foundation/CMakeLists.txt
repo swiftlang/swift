@@ -6,5 +6,5 @@ add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
   ExtraStringAPIs.swift
   Misc.mm
   NSStringAPI.swift
-  DEPENDS swift_stdlib_core swiftObjectiveC swiftCoreGraphics swiftDispatch
+  DEPENDS swiftCore swiftObjectiveC swiftCoreGraphics swiftDispatch
   FRAMEWORK_DEPENDS Foundation)

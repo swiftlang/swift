@@ -7,7 +7,7 @@ set(SHARED_LIBRARY ON)
 
 add_swift_library(swiftObjectiveC INSTALL TARGET_LIBRARY
   ObjectiveC.swift
-  DEPENDS swift_stdlib_core swiftDarwin)
+  DEPENDS swiftCore swiftDarwin)
 
 
 add_subdirectory(Darwin)

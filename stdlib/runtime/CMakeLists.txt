@@ -24,7 +24,7 @@ if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND SWIFT_RUNTIME_COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 
-add_swift_library(swift_runtime 
+add_swift_library(swiftRuntime 
   Casting.cpp
   FastEntryPoints.s
   HeapObject.cpp
@@ -48,7 +48,7 @@ list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
 find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
 
 if (CRASHREPORTERCLIENT)
-  target_link_libraries(swift_runtime "-lCrashReporterClient")
-  set_target_properties(swift_runtime 
+  target_link_libraries(swiftRuntime "-lCrashReporterClient")
+  set_target_properties(swiftRuntime 
     PROPERTIES COMPILE_FLAGS "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()

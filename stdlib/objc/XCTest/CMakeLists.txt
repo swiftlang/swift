@@ -30,7 +30,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework XCTest")
 
 add_swift_library(swiftXCTest INSTALL
   ${SWIFTXCTEST_SOURCES}
-  DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation)
+  DEPENDS swiftCore swiftObjectiveC swiftFoundation)
 
 target_link_libraries(swiftXCTest
   "-F${XCTEST_FRAMEWORK_LOCATION}"

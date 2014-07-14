@@ -1,4 +1,4 @@
-// RUN: %swift %s -module-name Swift -g -sil-serialize-all -module-link-name swift_stdlib_core -O2 -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %sil-opt -verify -module-name="Swift" | FileCheck %s
+// RUN: %swift %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O2 -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %sil-opt -verify -module-name="Swift" | FileCheck %s
 
 // CHECK: import Builtin
 // CHECK: import Swift

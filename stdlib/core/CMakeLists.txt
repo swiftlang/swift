@@ -108,13 +108,13 @@ set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
  add_swift_library(swift_stdlib_essential IS_STDLIB_CORE
    ${SWIFTLIB_ESSENTIAL}
-   DEPENDS swift_runtime)
+   DEPENDS swiftRuntime)
 endif()
 
 set(SHARED_LIBRARY ON)
-add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE TARGET_LIBRARY
+add_swift_library(swiftCore INSTALL IS_STDLIB_CORE TARGET_LIBRARY
   ${SWIFTLIB_SOURCES}
-  DEPENDS swift_runtime
+  DEPENDS swiftRuntime
   # The copy_shim_headers target dependency is required to let the
   # Makefile build know that there's a rule to produce the shims
   # directory, but is not sufficient to cause Swift.o to be rebuilt
@@ -124,4 +124,4 @@ add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE TARGET_LIBRARY
     copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
   LINK_FLAGS "-all_load -Xlinker -reexport-lobjc"
   )
-add_dependencies(swift_stdlib_core swift)
+add_dependencies(swiftCore swift)
