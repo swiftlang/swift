@@ -874,9 +874,13 @@ macro(add_swift_library_single target name)
   # do with installation.
   if (SWIFT_BUILD_STATIC AND SWIFTLIB_SINGLE_INSTALL)
     set(target_static "${target}-static")
+
+    # Note: the dummy.c source file provides no definitions. However,
+    # it forces Xcode to properly link the static library.
     add_library( ${target_static} STATIC
       ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
+      ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
     # Add dependencies
