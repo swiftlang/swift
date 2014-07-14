@@ -6402,34 +6402,8 @@ ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   return ctor;
 }
 
-static bool isDeclOfOperator(const Decl *D) {
-  if (const ValueDecl *ValD = dyn_cast<ValueDecl>(D))
-    return ValD->isOperator();
-  return false;
-}
-
 static void validateAttributes(TypeChecker &TC, Decl *D) {
   const DeclAttributes &Attrs = D->getAttrs();
-  auto *FDOrNull = dyn_cast<FuncDecl>(D);
-
-  // Determine if VD is an operator declaration.
-  bool isOperator = isDeclOfOperator(D);
-
-  // Operators must be declared with 'func', not 'var'.
-  if (isOperator) {
-    if (!FDOrNull) {
-      TC.diagnose(D->getLoc(), diag::operator_not_func);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-
-    // The unary prefix operator '&' is reserved and cannot be overloaded.
-    if (FDOrNull->isUnaryOperator() && FDOrNull->getName().str() == "&" &&
-        !Attrs.hasAttribute<PostfixAttr>()) {
-      TC.diagnose(D->getStartLoc(), diag::custom_operator_addressof);
-      return;
-    }
-  }
 
   auto isInClassOrProtocolContext = [](Decl *vd) {
    Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
@@ -6447,7 +6421,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       /* ok */
     } else if (isa<FuncDecl>(D) && isInClassOrProtocolContext(D)) {
       auto func = cast<FuncDecl>(D);
-      if (isOperator)
+      if (func->isOperator())
         error = diag::invalid_objc_decl;
       else if (func->isGetterOrSetter()) {
         auto storage = func->getAccessorStorageDecl();
@@ -6576,58 +6550,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     TC.checkOwnershipAttr(var, Attrs.getOwnership());
-  }
-
-  if (Attrs.hasAttribute<InfixAttr>()) {
-    // Only operator functions can be infix.
-    if (!isOperator) {
-      TC.diagnose(D->getStartLoc(), diag::infix_not_an_operator);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-
-    // Only binary operators can be infix.
-    if (!FDOrNull || !FDOrNull->isBinaryOperator()) {
-      TC.diagnose(Attrs.AtLoc, diag::invalid_infix_input);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-  }
-
-  if (auto *PA = Attrs.getAttribute<PostfixAttr>()) {
-    // Only operator functions can be postfix.
-    if (!isOperator) {
-      TC.diagnose(PA->getLocation(), diag::postfix_not_an_operator);
-      D->getMutableAttrs().removeAttribute(PA);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-
-    // Only unary operators can be postfix.
-    if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(PA->getLocation(), diag::invalid_postfix_input);
-      D->getMutableAttrs().removeAttribute(PA);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-  }
-
-  if (auto *PA = Attrs.getAttribute<PrefixAttr>()) {
-    // Only operator functions can be postfix.
-    if (!isOperator) {
-      TC.diagnose(PA->getLocation(), diag::prefix_not_an_operator);
-      D->getMutableAttrs().removeAttribute(PA);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
-
-    // Only unary operators can be postfix.
-    if (!FDOrNull || !FDOrNull->isUnaryOperator()) {
-      TC.diagnose(PA->getLocation(), diag::invalid_prefix_input);
-      D->getMutableAttrs().removeAttribute(PA);
-      // FIXME: Set the 'isError' bit on the decl.
-      return;
-    }
   }
 
   if (Attrs.isTransparent()) {

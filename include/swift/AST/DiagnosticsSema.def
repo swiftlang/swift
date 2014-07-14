@@ -293,18 +293,13 @@ ERROR(missing_initializer_def,decl_parsing,PointsToFirstBadToken,
 
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
-  "function with 'infix' specified must take a two element tuple as input",
+      "function with 'infix' specified must take a two element tuple as input",
      ())
-ERROR(infix_not_an_operator,sema_tcd,none,
-      "only operator functions may be declared with an infix attribute", ())
-ERROR(postfix_not_an_operator,sema_tcd,none,
-      "only operator functions can be declared 'postfix'", ())
-ERROR(invalid_postfix_input,sema_tcd,none,
-      "only unary operators can be declared 'postfix'", ())
-ERROR(prefix_not_an_operator,sema_tcd,none,
-      "only operator functions can be declared 'prefix'", ())
-ERROR(invalid_prefix_input,sema_tcd,none,
-      "only unary operators can be declared 'prefix'", ())
+ERROR(attribute_requires_operator_identifier,sema_tcd,none,
+      "'%0' requires a function with an operator identifier", (StringRef))
+ERROR(attribute_requires_single_argument,sema_tcd,none,
+      "'%0' requires a function with one argument", (StringRef))
+
 ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial inout argument", ())
 ERROR(inout_cant_be_variadic,sema_tce,none,

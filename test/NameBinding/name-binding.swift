@@ -98,7 +98,7 @@ func func3() {
 // Overloading
 //===----------------------------------------------------------------------===//
 
-@infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{only operator functions may be declared with an infix attribute}}
+@infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
 
 struct a_struct { var x : Int }
 

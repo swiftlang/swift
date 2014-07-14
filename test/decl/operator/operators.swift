@@ -34,9 +34,9 @@ operator prefix ~~ {}
 operator postfix ~~ {}
 operator infix ~~ {}
 
-@postfix func foo(x: Int) {} // expected-error {{only operator functions can be declared 'postfix'}}
+@postfix func foo(x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
 @postfix func ~~(x: Int) -> Float { return Float(x) }
-@postfix func ~~(x: Int, y: Int) {} // expected-error {{only unary operators can be declared 'postfix'}}
+@postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument}}
 @prefix func ~~(x: Float) {}
 func test_postfix(x: Int) {
   ~~x~~

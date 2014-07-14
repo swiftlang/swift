@@ -427,11 +427,6 @@ public:
     IGNORED_ATTR(Override)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(Semantics)
-
-    IGNORED_ATTR(Infix)
-    IGNORED_ATTR(Postfix)
-    IGNORED_ATTR(Prefix)
-
 #undef IGNORED_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
@@ -449,8 +444,15 @@ public:
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
+
+  void checkOperatorAttribute(DeclAttribute *attr);
+
+  void visitInfixAttr(InfixAttr *attr) { checkOperatorAttribute(attr); }
+  void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
+  void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 };
 } // end anonymous namespace
+
 
 static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
                                             const Pattern *argPattern) {
@@ -633,6 +635,50 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     }
   }
 }
+
+void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
+  // Operators may only be defined as functions.
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD) {
+    TC.diagnose(D->getLoc(), diag::operator_not_func);
+    attr->setInvalid();
+    return;
+  }
+
+  // Only functions with an operator identifier can be declared with as an
+  // operator.
+  if (!FD->getName().isOperator()) {
+    TC.diagnose(D->getStartLoc(), diag::attribute_requires_operator_identifier,
+                attr->getAttrName());
+    attr->setInvalid();
+    return;
+  }
+
+  // The unary prefix operator '&' is reserved and cannot be overloaded.
+  if (isa<PrefixAttr>(attr) && FD->getName().str() == "&") {
+    TC.diagnose(D->getStartLoc(), diag::custom_operator_addressof);
+    attr->setInvalid();
+    return;
+  }
+
+  // Infix operator must be binary.
+  if (isa<InfixAttr>(attr)) {
+    if (!FD->isBinaryOperator()) {
+      TC.diagnose(attr->getLocation(), diag::invalid_infix_input);
+      attr->setInvalid();
+      return;
+    }
+  } else {
+    // Otherwise, must be unary.
+    if (!FD->isUnaryOperator()) {
+      TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,
+                  attr->getAttrName());
+      attr->setInvalid();
+      return;
+    }
+  }
+}
+
 
 void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // The @NSCopying attribute is only allowed on stored properties.
