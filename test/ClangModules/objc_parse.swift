@@ -50,6 +50,11 @@ func instanceMethods(b: B) {
 
 }
 
+func testNSArrayMethods(a: NSArray, b: B) {
+  a.makeObjectsPerformSelector("isEqual") // expected-error {{'performSelector' methods are unavailable}}
+  a.makeObjectsPerformSelector("isEqual", withObject:b) // expected-error {{'performSelector' methods are unavailable}}
+}
+
 // Class method invocation
 func classMethods(b: B, other: NSObject) {
   var i = B.classMethod()

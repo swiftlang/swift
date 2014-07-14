@@ -32,7 +32,8 @@ NS_SWIFT_UNAVAILABLE void NSSwiftUnavailableFunction();
 @property NSDictionary *dictProperty;
 
 + (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)count;
-
+- (void)makeObjectsPerformSelector:(SEL)aSelector;
+- (void)makeObjectsPerformSelector:(SEL)aSelector withObject:(id)anObject;
 @end
 
 @interface NSCoder : NSObject

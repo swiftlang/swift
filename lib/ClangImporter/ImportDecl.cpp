@@ -4648,7 +4648,8 @@ void ClangImporter::Implementation::importAttributes(
   if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
     // Ban uses of 'performSelector'.
     auto sel = MD->getSelector();
-    if (sel.getNameForSlot(0).startswith("performSelector")) {
+    if (sel.getNameForSlot(0).startswith("performSelector") ||
+        sel.getNameForSlot(0).startswith("makeObjectsPerformSelector")) {
       auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
                     "'performSelector' methods are unavailable");
       MappedDecl->getMutableAttrs().add(attr);
