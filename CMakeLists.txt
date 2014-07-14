@@ -195,6 +195,10 @@ option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 option(SWIFT_SPLIT_OBJC_SELECTORS 
        "Split Objective-C selectors when building the standard library" NO)
 
+option(SWIFT_BUILD_STATIC 
+       "Build static variants of the Swift runtime and SDK overlays"
+       ${ENABLE_SWIFT_STATIC_RUNTIME})
+
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
@@ -764,12 +768,6 @@ macro(add_swift_library_single target name)
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
 
-    if (target_static)
-      set_target_properties(${target_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
-    endif()
-
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
       # Hack to deal with the fact that ${SWIFTLIB_DIR} contains the build-time
@@ -783,26 +781,11 @@ macro(add_swift_library_single target name)
       set_target_properties(${target} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-
-      # Do the same for static libraries.
-      if (name_static)  
-        string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
-          ${SWIFTSTATICLIB_DIR})
-        set_target_properties(${target_static} PROPERTIES
-          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
-          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
-      endif()
     endforeach()
 
     install(TARGETS ${target}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR})
-
-    if (target_static)
-      install(TARGETS ${target_static}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR})
-    endif()
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
@@ -874,20 +857,41 @@ macro(add_swift_library_single target name)
   # Set compile and link flags for the non-static target. 
   # Do these LAST.
 
-  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_SINGLE_INSTALL)
-    set(target_static "${target}_static")
+  # FIXME: Should check whether this is a target library.
+  if (SWIFT_BUILD_STDLIB AND SWIFTLIB_SINGLE_INSTALL)
+    set(target_static "${target}-static")
     add_library( ${target_static} STATIC
       ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
-    add_dependencies(${target_static} ${name})
-    set_output_directory(${target_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-    if (SWIFT_SDKS)
-      # FIXME: Deal with library variants here
-      set(compile_flags
-        "${compile_flags} ${SWIFT_GLOBAL_DEPLOYMENT_TARGET_FLAGS}")
-    endif()
+    add_dependencies(${target_static} ${name})
+
+    set_output_directory(${target_static}
+      ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+      string(TOUPPER ${config} config_upper)
+      # Hack to deal with the fact that ${SWIFTLIB_DIR} contains the build-time
+      # variable $(CONFIGURATION). Note that this fix is Xcode-specific.
+      # You might think you could just replace ${CMAKE_CFG_INTDIR} here, but
+      # that can actually have other things mangled into it besides just the
+      # configuration. This at least doesn't pretend to do the right thing
+      # outside of Xcode.
+      string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
+        ${SWIFTSTATICLIB_DIR})
+      set_target_properties(${target_static} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
+    endforeach()
+    
+    install(TARGETS ${target_static}
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SINGLE_SUBDIR})
+
+    set_target_properties(${target_static} PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} )
 
     set_target_properties(${target_static} PROPERTIES 
       COMPILE_FLAGS "${compile_flags}"
