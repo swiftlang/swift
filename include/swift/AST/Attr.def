@@ -168,11 +168,10 @@ SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 VIRTUAL_DECL_ATTR(accessibility, Accessibility, AllowMultipleAttributes |
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
                   OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
-                  DeclModifier,
+                  OnTypeAlias,
                   /* Not serialized */ 65535)
 
-VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript |
-                  DeclModifier,
+VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility, OnVar | OnSubscript,
                   /* Not serialized */ 65535)
 
 VIRTUAL_DECL_ATTR(override, Override,

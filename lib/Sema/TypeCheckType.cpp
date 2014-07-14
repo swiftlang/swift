@@ -812,39 +812,53 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   return type;
 }
 
-static bool diagnoseAvailability(DeclContext *DC, Type ty,
-                                 IdentTypeRepr *IdType,
-                                 SourceLoc Loc,
-                                 TypeChecker &TC) {
-  CanType canTy = ty.getCanonicalTypeOrNull();
-  if (canTy.isNull())
-    return false;
-  auto D = canTy.getAnyNominal();
-  if (!D)
-    return false;
-  for (auto Attr : D->getAttrs()) {
-    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
-      // FIXME: unify this checking with declarations.
-      if (AvAttr->hasPlatform())
-        continue;
-      if (AvAttr->IsUnvailable) {
-        if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-          StringRef Message = AvAttr->Message;
-          if (Message.empty()) {
-            TC.diagnose(Loc, diag::availability_decl_unavailable,
-                        CI->getIdentifier())
-              .highlight(SourceRange(Loc, Loc));
-          }
-          else {
-            TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                        CI->getIdentifier(), Message)
-            .highlight(SourceRange(Loc, Loc));
-          }
-          return true;
+static bool checkTypeDeclAvailability(Decl *TypeDecl,
+                                      IdentTypeRepr *IdType,
+                                      SourceLoc Loc,
+                                      TypeChecker &TC) {
+  for (auto Attr : TypeDecl->getAttrs()) {
+    auto AvAttr = dyn_cast<AvailabilityAttr>(Attr);
+    if (!AvAttr) continue;
+
+    // FIXME: unify this checking with declarations.
+    if (AvAttr->hasPlatform())
+      continue;
+
+    if (AvAttr->IsUnvailable) {
+      if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+        StringRef Message = AvAttr->Message;
+        if (Message.empty()) {
+          TC.diagnose(Loc, diag::availability_decl_unavailable,
+                      CI->getIdentifier())
+          .highlight(SourceRange(Loc, Loc));
         }
+        else {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                      CI->getIdentifier(), Message)
+          .highlight(SourceRange(Loc, Loc));
+        }
+        return true;
       }
     }
   }
+
+  return false;
+}
+
+
+static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
+                                 TypeChecker &TC) {
+  if (auto *NAT = dyn_cast<NameAliasType>(ty.getPointer())) {
+    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, TC))
+      return true;
+  }
+
+  CanType canTy = ty.getCanonicalTypeOrNull();
+  if (canTy.isNull())
+    return false;
+  if (auto NTD = canTy.getAnyNominal())
+    return checkTypeDeclAvailability(NTD, IdType, Loc, TC);
+
   return false;
 }
 
@@ -873,8 +887,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   }
 
   // Check the availability of the type.
-  if (diagnoseAvailability(DC, result.get<Type>(), IdType,
-      Components.back()->getIdLoc(), *this)) {
+  if (diagnoseAvailability(result.get<Type>(), IdType,
+                           Components.back()->getIdLoc(), *this)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;

@@ -19,3 +19,9 @@ func availabilityInvalidInversion() {}
 // Handle unknown platform.
 @availability(HAL9000, unavailable) // expected-error {{unknown platform 'HAL9000'}}
 func availabilityUnknownPlatform() {}
+
+// <rdar://problem/17669805> Availability can't appear on a typealias
+@availability(*, unavailable, message="oh no you dont")
+typealias int = Int
+
+var x : int // expected-error {{'int' is unavailable: oh no you dont}}
