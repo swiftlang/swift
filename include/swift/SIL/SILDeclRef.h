@@ -195,7 +195,11 @@ struct SILDeclRef {
   FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
 
   /// Produce a mangled form of this constant.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer) const;
+  ///
+  /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
+  /// prefix.
+  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
+                         StringRef prefix = {}) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

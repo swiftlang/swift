@@ -68,8 +68,8 @@ protocol Proto {
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
-// CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3FoocfMS0_FT7dynamicSi_S0__dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
 // CHECK-LABEL: sil @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
@@ -107,28 +107,28 @@ protocol Proto {
 
 // Dynamic witnesses use objc dispatch:
 // CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_13dynamicMethodUS1___fRQPS1_FT_T_
-// CHECK:         function_ref @_TFC7dynamic3Foo13dynamicMethodfS0_FT_T__dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foo13dynamicMethodfS0_FT_T__dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3Foo13dynamicMethodfS0_FT_T_
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foo13dynamicMethodfS0_FT_T_
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :
 
 // CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g11dynamicPropSi
-// CHECK:         function_ref @_TFC7dynamic3Foog11dynamicPropSi_dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foog11dynamicPropSi_dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3Foog11dynamicPropSi
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foog11dynamicPropSi
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign :
 
 // CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s11dynamicPropSi
-// CHECK:         function_ref @_TFC7dynamic3Foos11dynamicPropSi_dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foos11dynamicPropSi_dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3Foos11dynamicPropSi
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foos11dynamicPropSi
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign :
 
 // CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_g9subscriptFT7dynamicSi_Si
-// CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT7dynamicSi_Si_dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foog9subscriptFT7dynamicSi_Si_dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3Foog9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foog9subscriptFT7dynamicSi_Si
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign :
 
 // CHECK-LABEL: sil @_TTWC7dynamic3FooS_5ProtoFS1_s9subscriptFT7dynamicSi_Si
-// CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
-// CHECK-LABEL: sil private [transparent] @_TFC7dynamic3Foos9subscriptFT7dynamicSi_Si_dynamic
+// CHECK:         function_ref @_TTDFC7dynamic3Foos9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foos9subscriptFT7dynamicSi_Si
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
 
 // Superclass dispatch
@@ -316,4 +316,4 @@ func foreignMethodDispatch() {
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TFC7dynamic8Subclass19overriddenByDynamicfS0_FT_T__dynamic
+// CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TTDFC7dynamic8Subclass19overriddenByDynamicfS0_FT_T_

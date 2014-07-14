@@ -273,6 +273,9 @@ public:
     } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTO") {
       Mangled.advanceOffset(4);
       appendNode(Node::Kind::NonObjCAttribute);
+    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTD") {
+      Mangled.advanceOffset(4);
+      appendNode(Node::Kind::DynamicAttribute);
     } else {
       Mangled.advanceOffset(2);
     }
@@ -1946,6 +1949,7 @@ private:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
     case Node::Kind::Directness:
+    case Node::Kind::DynamicAttribute:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::FieldOffset:
     case Node::Kind::Function:
@@ -2343,6 +2347,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
+    return;
+  case Node::Kind::DynamicAttribute:
+    Printer << "dynamic ";
     return;
   case Node::Kind::SpecializedAttribute:
     Printer << "specialization <";

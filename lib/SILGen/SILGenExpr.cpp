@@ -304,13 +304,11 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
-  // FIXME: A real mangling. These thunks are always private and transparent,
-  // so hopefully not a huge deal...
+  // Mangle the constant with a _TTD header.
   llvm::SmallString<32> name;
-  constant.mangle(name);
-  name += "_dynamic";
+  constant.mangle(name, "_TTD");
   
-  auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Private,
+  auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
                             IsBare, IsTransparent);
 

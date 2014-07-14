@@ -255,7 +255,8 @@ bool SILDeclRef::isForeignThunk() const {
   return false;
 }
 
-static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
+static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
+                           StringRef prefix) {
   using namespace Mangle;
   Mangler mangler(buffer);
 
@@ -264,10 +265,15 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   //   mangled-name ::= '_TTo' global   // ObjC interop thunk
   //   mangled-name ::= '_TTO' global   // Foreign function thunk
   StringRef introducer = "_T";
-  if (c.isForeign)
+  if (!prefix.empty()) {
+    introducer = prefix;
+  } else if (c.isForeign) {
+    assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTo";
-  else if (c.isForeignThunk())
+  } else if (c.isForeignThunk()) {
+    assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTO";
+  }
   
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
@@ -371,9 +377,10 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   llvm_unreachable("bad entity kind!");
 }
 
-StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer) const {
+StringRef SILDeclRef::mangle(SmallVectorImpl<char> &buffer,
+                             StringRef prefix) const {
   assert(buffer.empty());
   llvm::raw_svector_ostream stream(buffer);
-  mangleConstant(*this, stream);
+  mangleConstant(*this, stream, prefix);
   return stream.str();
 }
