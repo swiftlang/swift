@@ -18,6 +18,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -142,19 +143,8 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-/// A quick predicate used to see if F has any interesting reference count
-/// instructions in it before we attempt to create a reverse post order (which
-/// can be expensive).
-static bool functionHasInterestingInstructions(SILFunction &F) {
-  for (auto &BB : F)
-    for (auto &II : BB)
-      if (isa<StrongRetainInst>(II) || isa<StrongReleaseInst>(II) ||
-          isa<RetainValueInst>(II) || isa<ReleaseValueInst>(II))
-        return true;
-  return false;
-}
-
-static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
+static bool processFunction(SILFunction &F, AliasAnalysis *AA,
+                            PostOrderAnalysis *POTA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -164,19 +154,13 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
 
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
-  if (!functionHasInterestingInstructions(F)) {
-    DEBUG(llvm::dbgs() << "    Function does not have any ref count "
-          "instructions we handle... bailing...\n");
-    return false;
-  }
-
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
   // Construct our context once. A context contains the RPOT as well as maps
   // that contain state for each BB in F. This is a major place where the
   // optimizer allocates memory in one large chunk.
-  auto *Ctx =  createARCMatchingSetComputationContext(F, AA);
+  auto *Ctx =  createARCMatchingSetComputationContext(F, AA, POTA);
 
   // If Ctx is null, we failed to initialize and can not do anything so just
   // return false.
@@ -237,7 +221,8 @@ class GlobalARCOpts : public SILFunctionTransform {
       return;
 
     auto *AA = getAnalysis<AliasAnalysis>();
-    if (processFunction(*getFunction(), AA))
+    auto *POTA = getAnalysis<PostOrderAnalysis>();
+    if (processFunction(*getFunction(), AA, POTA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

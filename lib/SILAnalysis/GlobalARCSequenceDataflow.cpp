@@ -468,9 +468,9 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
   DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
 
   // For each BB in our reverse post order...
-  for (auto *BB : reversed(PostOrder)) {
+  for (auto *BB : POTA->getReversePostOrder(&F)) {
 
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
     ARCBBState &BBState = TopDownBBStates.find(BB)->second;
@@ -650,9 +650,9 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
   DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
 
   // For each BB in our post order...
-  for (auto *BB : PostOrder) {
+  for (auto *BB : POTA->getPostOrder(&F)) {
 
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
     ARCBBState &BBState = BottomUpBBStates.find(BB)->second;
@@ -673,33 +673,26 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
 //===----------------------------------------------------------------------===//
 
 void swift::arc::ARCSequenceDataflowEvaluator::init() {
-  assert((F.empty() || PostOrder.empty()) &&
-         "This should only be called if we have not initialized our post "
-         "order.");
-
   // Initialize the post order data structure.
 #ifndef NDEBUG
   unsigned Count = 0;
-  unsigned MaxSize = F.size();
-#endif
-  for (auto PI = po_begin(&F), PE = po_end(&F); PI != PE; ++PI) {
-    PostOrder.push_back(*PI);
-#ifndef NDEBUG
-    BBToPostOrderID[*PI] = MaxSize - Count++ - 1;
-#endif
+  for (auto &BB : F) {
+    BBToBBID[&BB] = Count++;      
   }
+#endif
 
   // Then iterate through it in reverse to perform the post order, looking for
   // backedges.
   llvm::DenseSet<SILBasicBlock *> VisitedSet;
-  for (int i = PostOrder.size() - 1; i >= 0; --i) {
-    SILBasicBlock *BB = PostOrder[i];
+  unsigned i = 0;
+  for (SILBasicBlock *BB : POTA->getReversePostOrder(&F)) {
     VisitedSet.insert(BB);
 
     BottomUpBBStates[i].first = BB;
     BottomUpBBStates[i].second.init(BB);
     TopDownBBStates[i].first = BB;
     TopDownBBStates[i].second.init(BB);
+    ++i;
 
     for (auto &Succ : BB->getSuccs())
       if (SILBasicBlock *SuccBB = Succ.getBB())
@@ -712,9 +705,6 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
 }
 
 bool swift::arc::ARCSequenceDataflowEvaluator::run() {
-  assert((F.empty() || PostOrder.size()) &&
-         "F must be empty or PostOrder must be initialized with a post order.");
-
   bool NestingDetected = processBottomUp();
   NestingDetected |= processTopDown();
 

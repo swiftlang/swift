@@ -15,6 +15,10 @@
 
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -46,7 +50,13 @@ class PostOrderAnalysis : public SILAnalysis {
       return *this;
     }
 
-    void recompute(SILFunction *F);
+    void recompute(SILFunction *F) {
+      assert(IsInvalidated && "Should only call this if the POT info is "
+             "invalidated for this function.");
+      PostOrder.clear();
+      std::copy(po_begin(F), po_end(F), std::back_inserter(PostOrder));
+      IsInvalidated = false;
+    }
   };
 
   llvm::DenseMap<SILFunction *, FunctionPOTInfo> FunctionToPOTMap;
@@ -72,6 +82,13 @@ public:
     if (POTInfo.IsInvalidated)
       POTInfo.recompute(F);
     return reversed(POTInfo.PostOrder);
+  }
+
+  // Return the size of the post order for \p F.
+  unsigned size(SILFunction *F) const {
+    auto R = const_cast<PostOrderAnalysis *>(this)->getPostOrder(F);
+    // This is cheap since we know that we are using vector iterators.
+    return std::distance(R.begin(), R.end());
   }
 
   static bool classof(const SILAnalysis *S) {

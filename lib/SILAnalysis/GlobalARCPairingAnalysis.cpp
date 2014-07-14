@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "swift/SILAnalysis/ARCAnalysis.h"
-#include "swift/Basic/BlotMapVector.h"
 #include "ReferenceCountState.h"
 #include "GlobalARCSequenceDataflow.h"
+#include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
@@ -22,6 +22,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -346,9 +347,9 @@ struct ARCMatchingSetComputationContext {
   ARCSequenceDataflowEvaluator Evaluator;
 
   ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                   unsigned Size)
+                                   PostOrderAnalysis *POTA)
     : DecToIncStateMap(), IncToDecStateMap(),
-      Evaluator(F, AA, Size, DecToIncStateMap, IncToDecStateMap) {}
+      Evaluator(F, AA, POTA, DecToIncStateMap, IncToDecStateMap) {}
 };
 
 } // end namespace arc
@@ -356,7 +357,8 @@ struct ARCMatchingSetComputationContext {
 
 ARCMatchingSetComputationContext *
 swift::arc::
-createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) {
+createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
+                                       PostOrderAnalysis *POTA) {
   unsigned Size = F.size();
 
   // We do not handle CFGs with more than INT_MAX BBs. Fail gracefully.
@@ -365,7 +367,7 @@ createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) {
 
   // We pass in size to avoid expensively recomputing size over and over
   // again. Currently F has to do a walk to perform that computation.
-  auto *C = new ARCMatchingSetComputationContext(F, AA, Size);
+  auto *C = new ARCMatchingSetComputationContext(F, AA, POTA);
   C->Evaluator.init();
   return C;
 }

@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ReferenceCountState.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/PreallocatedMap.h"
-#include "ReferenceCountState.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 
 namespace swift {
 
@@ -151,22 +152,20 @@ class ARCSequenceDataflowEvaluator {
   /// The alias analysis that we are using for alias queries.
   AliasAnalysis *AA;
 
+  /// The post order analysis we are using for computing post orders, reverse
+  /// post orders.
+  PostOrderAnalysis *POTA;
+
   /// The map from dataflow terminating decrements -> increment dataflow state.
   BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
 
   /// The map from dataflow terminating increment -> decrement dataflow state.
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
-  /// An array containing a post order of F. We only compute this once in the
-  /// lifetime of this class. We use this fields reverse iterator to perform
-  /// reverse post order traversals.
-  std::vector<SILBasicBlock *> PostOrder;
-
 #ifndef NDEBUG
-  /// A map from SIL Basic Blocks to their index in the post order. This is just
-  /// to make it easier to debug the optimizer by enabling log print outs of the
-  /// BB# in the traversal.
-  llvm::DenseMap<SILBasicBlock *, unsigned> BBToPostOrderID;
+  /// A map from a SIL Basic Block to its id in the BB list. This matches what
+  /// is printed out in SIL files.
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBID;
 #endif
 
   /// A map mapping the head to a tail of a backedge. We only compute this once
@@ -185,21 +184,21 @@ class ARCSequenceDataflowEvaluator {
 
 public:
   ARCSequenceDataflowEvaluator(
-      SILFunction &F, AliasAnalysis *AA, unsigned NumBB,
+      SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
-      : F(F), AA(AA), DecToIncStateMap(DecToIncStateMap),
-        IncToDecStateMap(IncToDecStateMap), PostOrder(),
+      : F(F), AA(AA), POTA(POTA), DecToIncStateMap(DecToIncStateMap),
+        IncToDecStateMap(IncToDecStateMap),
 #ifndef NDEBUG
-        BBToPostOrderID(),
+        BBToBBID(),
 #endif
         BackedgeMap(),
-        BottomUpBBStates(NumBB,
+        BottomUpBBStates(POTA->size(&F),
                          [](const BBToARCStateMapTy::PairTy &P1,
                             const BBToARCStateMapTy::PairTy &P2) {
                            return P1.first < P2.first;
                          }),
-        TopDownBBStates(NumBB,
+        TopDownBBStates(POTA->size(&F),
                         [](const BBToARCStateMapTy::PairTy &P1,
                            const BBToARCStateMapTy::PairTy &P2) {
                           return P1.first < P2.first;

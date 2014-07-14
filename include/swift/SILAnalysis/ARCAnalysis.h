@@ -23,6 +23,7 @@ namespace swift {
 class SILValue;
 class SILInstruction;
 class AliasAnalysis;
+class PostOrderAnalysis;
 class SILFunction;
 
 } // end namespace swift
@@ -78,7 +79,8 @@ struct ARCMatchingSetComputationContext;
 /// Create an opaque arc mutation set computation context for SILFunction F
 /// using AliasAnalysis AA.
 ARCMatchingSetComputationContext *
-createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA);
+createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
+                                       PostOrderAnalysis *POTA);
 
 /// Destroy the context.
 void
