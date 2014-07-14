@@ -14,6 +14,7 @@
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
@@ -57,4 +58,8 @@ SILAnalysis *swift::createDominanceAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {
   return new IVAnalysis(M);
+}
+
+SILAnalysis *swift::createPostOrderAnalysis(SILModule *M) {
+  return new PostOrderAnalysis(M);
 }

@@ -320,6 +320,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
   PM.registerAnalysis(createDominanceAnalysis(Module));
   PM.registerAnalysis(createLoopInfoAnalysis(Module, &PM));
   PM.registerAnalysis(createInductionVariableAnalysis(Module));
+  PM.registerAnalysis(createPostOrderAnalysis(Module));
 
   for (auto Pass : Passes) {
     switch (Pass) {

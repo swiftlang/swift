@@ -8,5 +8,6 @@ add_swift_library(swiftSILAnalysis
   GlobalARCSequenceDataflow.cpp
   SILLoopInfo.cpp
   IVAnalysis.cpp
+  PostOrderAnalysis.cpp
   DEPENDS swiftSILPassesUtils)
 
