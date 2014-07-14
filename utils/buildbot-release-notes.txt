@@ -43,6 +43,12 @@ Latest
   considered to be declaration modifiers - they no longer require (or allow) an
   @ sign.
 
+* The "@prefix", "@infix", and "@postfix" attributes have been changed to 
+  declaration modifiers, so they are no longer spelled with an @ sign.  Operator 
+  declarations have been rearranged from "operator prefix +" to 
+  "prefix operator +" for consistency.
+
+
 2014-07-03
 ----------
 
