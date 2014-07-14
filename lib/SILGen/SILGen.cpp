@@ -119,9 +119,9 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
 
     if (!trustInputTypes) {
-      if (funcInfo->getInterfaceParameters().size() != inputTypes.size()
-          || !std::equal(funcInfo->getInterfaceParameterSILTypes().begin(),
-                         funcInfo->getInterfaceParameterSILTypes().end(),
+      if (funcInfo->getParameters().size() != inputTypes.size()
+          || !std::equal(funcInfo->getParameterSILTypes().begin(),
+                         funcInfo->getParameterSILTypes().end(),
                          inputTypes.begin())) {
         SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                      moduleName, functionName);
@@ -130,7 +130,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     if (outputType &&
-        funcInfo->getInterfaceResult().getSILType() != *outputType) {
+        funcInfo->getResult().getSILType() != *outputType) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");

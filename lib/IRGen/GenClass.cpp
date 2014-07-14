@@ -625,9 +625,9 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
 
   // Check that it returns two size_t's and takes no other arguments.
   auto fnType = silFn->getLoweredFunctionType();
-  if (fnType->getInterfaceParameters().size() != 1)
+  if (fnType->getParameters().size() != 1)
     return false;
-  if (fnType->getInterfaceResult().getConvention() != ResultConvention::Unowned)
+  if (fnType->getResult().getConvention() != ResultConvention::Unowned)
     return false;
   llvm::Function *llvmFn =
     IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);
@@ -641,7 +641,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
     return false;
 
   // Retain 'self' if necessary.
-  if (fnType->getInterfaceParameters()[0].isConsumed()) {
+  if (fnType->getParameters()[0].isConsumed()) {
     IGF.emitRetainCall(selfValue);
   }
 

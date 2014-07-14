@@ -158,14 +158,14 @@ public:
   void requireSameFunctionComponents(CanSILFunctionType type1,
                                      CanSILFunctionType type2,
                                      const Twine &what) {
-    require(type1->getInterfaceResult() == type2->getInterfaceResult(),
+    require(type1->getResult() == type2->getResult(),
             "result types of " + what + " do not match");
-    require(type1->getInterfaceParameters().size() ==
-            type2->getInterfaceParameters().size(),
+    require(type1->getParameters().size() ==
+            type2->getParameters().size(),
             "inputs of " + what + " do not match in count");
-    for (auto i : indices(type1->getInterfaceParameters())) {
-      require(type1->getInterfaceParameters()[i] ==
-              type2->getInterfaceParameters()[i],
+    for (auto i : indices(type1->getParameters())) {
+      require(type1->getParameters()[i] ==
+              type2->getParameters()[i],
               "input " + Twine(i) + " of " + what + " do not match");
     }
   }
@@ -406,7 +406,7 @@ public:
             "callee of apply with substitutions must be polymorphic");
 
     // Apply the substitutions.
-    return fnTy->substInterfaceGenericArgs(F.getModule(), M, subs);
+    return fnTy->substGenericArgs(F.getModule(), M, subs);
   }
 
   void checkApplyInst(ApplyInst *AI) {
@@ -440,14 +440,14 @@ public:
 
     // Check that the arguments and result match.
     require(AI->getArguments().size() ==
-            substTy->getInterfaceParameters().size(),
+            substTy->getParameters().size(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
       requireSameType(AI->getArguments()[i].getType(),
-                      substTy->getInterfaceParameters()[i].getSILType(),
+                      substTy->getParameters()[i].getSILType(),
                       "operand of 'apply' doesn't match function input type");
     }
-    require(AI->getType() == substTy->getInterfaceResult().getSILType(),
+    require(AI->getType() == substTy->getResult().getSILType(),
             "type of apply instruction doesn't match function result type");
   }
 
@@ -485,27 +485,27 @@ public:
     // The arguments must match the suffix of the original function's input
     // types.
     require(PAI->getArguments().size() +
-              resultInfo->getInterfaceParameters().size()
-              == substTy->getInterfaceParameters().size(),
+              resultInfo->getParameters().size()
+              == substTy->getParameters().size(),
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
 
     unsigned offset =
-      substTy->getInterfaceParameters().size() - PAI->getArguments().size();
+      substTy->getParameters().size() - PAI->getArguments().size();
 
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i].getType()
-                == substTy->getInterfaceParameters()[i + offset].getSILType(),
+                == substTy->getParameters()[i + offset].getSILType(),
               "applied argument types do not match suffix of function type's "
               "inputs");
     }
 
     // The arguments to the result function type must match the prefix of the
     // original function's input types.
-    for (unsigned i = 0, size = resultInfo->getInterfaceParameters().size();
+    for (unsigned i = 0, size = resultInfo->getParameters().size();
          i < size; ++i) {
-      require(resultInfo->getInterfaceParameters()[i] ==
-              substTy->getInterfaceParameters()[i],
+      require(resultInfo->getParameters()[i] ==
+              substTy->getParameters()[i],
               "inputs to result function type do not match unapplied inputs "
               "of original function");
     }
@@ -513,16 +513,16 @@ public:
     // The "returns inner pointer" convention doesn't survive through a partial
     // application, since the thunk takes responsibility for lifetime-extending
     // 'self'.
-    auto expectedResult = substTy->getInterfaceResult();
+    auto expectedResult = substTy->getResult();
     if (expectedResult.getConvention() == ResultConvention::UnownedInnerPointer)
     {
       expectedResult = SILResultInfo(expectedResult.getType(),
                                      ResultConvention::Unowned);
-      require(resultInfo->getInterfaceResult() == expectedResult,
+      require(resultInfo->getResult() == expectedResult,
               "result type of result function type for partially applied "
               "@unowned_inner_pointer function should have @unowned convention");
     } else {
-      require(resultInfo->getInterfaceResult() == expectedResult,
+      require(resultInfo->getResult() == expectedResult,
               "result type of result function type does not match original "
               "function");
     }
@@ -1011,7 +1011,7 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    return ft->getInterfaceParameters().back().getSILType();
+    return ft->getParameters().back().getSILType();
   }
   CanType getMethodSelfInstanceType(CanSILFunctionType ft) {
     auto selfTy = getMethodSelfType(ft);
@@ -1154,13 +1154,13 @@ public:
     auto methodTy = F.getModule().Types.getConstantType(method)
       .castTo<SILFunctionType>();
     
-    auto params = methodTy->getInterfaceParameters();
+    auto params = methodTy->getParameters();
     SmallVector<SILParameterInfo, 4>
       dynParams(params.begin(), params.end() - 1);
     dynParams.push_back(SILParameterInfo(selfType.getSwiftType(),
                                              params.back().getConvention()));
     
-    auto dynResult = methodTy->getInterfaceResult();
+    auto dynResult = methodTy->getResult();
     // If the method returns Self, substitute AnyObject for the result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelf()) {
@@ -1734,7 +1734,7 @@ public:
 
     CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType
-      = F.mapTypeIntoContext(ti->getInterfaceResult().getSILType());
+      = F.mapTypeIntoContext(ti->getResult().getSILType());
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -1749,7 +1749,7 @@ public:
 
     CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType
-      = F.mapTypeIntoContext(ti->getInterfaceResult().getSILType());
+      = F.mapTypeIntoContext(ti->getResult().getSILType());
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -1984,9 +1984,9 @@ public:
             "invoke function operand must be a thin function");
     require(invokeTy->getAbstractCC() == AbstractCC::C,
             "invoke function operand must be a cdecl function");
-    require(invokeTy->getInterfaceParameters().size() >= 1,
+    require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
-    auto storageParam = invokeTy->getInterfaceParameters()[0];
+    auto storageParam = invokeTy->getParameters()[0];
     require(storageParam.getConvention() == ParameterConvention::Indirect_Inout,
             "invoke function must take block storage as @inout parameter");
     require(storageParam.getType() == storageTy,
@@ -1999,14 +1999,14 @@ public:
             "result must be a cdecl block function");
     require(blockTy->getRepresentation() == FunctionType::Representation::Block,
             "result must be a cdecl block function");
-    require(blockTy->getInterfaceResult() == invokeTy->getInterfaceResult(),
+    require(blockTy->getResult() == invokeTy->getResult(),
             "result must have same return type as invoke function");
     
-    require(blockTy->getInterfaceParameters().size() + 1
-              == invokeTy->getInterfaceParameters().size(),
+    require(blockTy->getParameters().size() + 1
+              == invokeTy->getParameters().size(),
           "result must match all parameters of invoke function but the first");
-    auto blockParams = blockTy->getInterfaceParameters();
-    auto invokeBlockParams = invokeTy->getInterfaceParameters().slice(1);
+    auto blockParams = blockTy->getParameters();
+    auto invokeBlockParams = invokeTy->getParameters().slice(1);
     for (unsigned i : indices(blockParams)) {
       require(blockParams[i] == invokeBlockParams[i],
           "result must match all parameters of invoke function but the first");
@@ -2062,15 +2062,15 @@ public:
           llvm::dbgs() << "Input types for SIL function type ";
           ti->print(llvm::dbgs());
           llvm::dbgs() << ":\n";
-          for (auto input : ti->getInterfaceParameters())
+          for (auto input : ti->getParameters())
             input.getSILType().dump(););
 
-    require(entry->bbarg_size() == ti->getInterfaceParameters().size(),
+    require(entry->bbarg_size() == ti->getParameters().size(),
             "entry point has wrong number of arguments");
 
 
     require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
-                      ti->getInterfaceParameterSILTypes().begin(),
+                      ti->getParameterSILTypes().begin(),
                       [&](SILArgument *bbarg, SILType ty) {
                         return bbarg->getType() == F.mapTypeIntoContext(ty);
                       }),

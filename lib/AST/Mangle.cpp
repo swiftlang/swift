@@ -894,15 +894,15 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       mangleType(param.getType(), ResilienceExpansion::Minimal, 0);
     };
 
-    for (auto param : fn->getInterfaceParametersWithoutIndirectResult()) {
+    for (auto param : fn->getParametersWithoutIndirectResult()) {
       mangleParameter(param);
     }
     Buffer << '_';
 
     if (fn->hasIndirectResult()) {
-      mangleParameter(fn->getIndirectInterfaceResult());
+      mangleParameter(fn->getIndirectResult());
     } else {
-      auto result = fn->getInterfaceResult();
+      auto result = fn->getResult();
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), ResilienceExpansion::Minimal, 0);
     }

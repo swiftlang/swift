@@ -405,7 +405,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
            && "generic global variable accessors not yet implemented");
     SILValue addr = gen.B.createApply(loc, accessor, accessor.getType(),
                               accessor.getType().castTo<SILFunctionType>()
-                                      ->getInterfaceResult().getSILType(),
+                                      ->getResult().getSILType(),
                               {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an address.
     addr = gen.B.createPointerToAddress(loc, addr,
@@ -586,7 +586,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   if (declRef.isSpecialized()) {
     // Substitute the function type.
     auto origFnType = result.getType().castTo<SILFunctionType>();
-    auto substFnType = origFnType->substInterfaceGenericArgs(
+    auto substFnType = origFnType->substGenericArgs(
                                                     SGM.M, SGM.SwiftModule,
                                                     declRef.getSubstitutions());
     auto closureType = adjustFunctionType(substFnType,
@@ -1093,14 +1093,14 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   auto fn = gen.emitLoad(loc, capture, funcTL, SGFContext(), IsNotTake);
   
   // Collect the block arguments, which may have nonstandard conventions.
-  assert(blockTy->getInterfaceParameters().size()
-         == funcTy->getInterfaceParameters().size()
+  assert(blockTy->getParameters().size()
+         == funcTy->getParameters().size()
          && "block and function types don't match");
   
   SmallVector<ManagedValue, 4> args;
-  for (unsigned i : indices(funcTy->getInterfaceParameters())) {
-    auto &funcParam = funcTy->getInterfaceParameters()[i];
-    auto &param = blockTy->getInterfaceParameters()[i];
+  for (unsigned i : indices(funcTy->getParameters())) {
+    auto &funcParam = funcTy->getParameters()[i];
+    auto &param = blockTy->getParameters()[i];
     SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
     
     ManagedValue mv;
@@ -1130,19 +1130,19 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   assert(!funcTy->hasIndirectResult()
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, fn, args,
-                         funcTy->getSILInterfaceResult().getSwiftRValueType());
+                         funcTy->getSILResult().getSwiftRValueType());
   
   // Bridge the result back to ObjC.
   result = gen.emitNativeToBridgedValue(loc, result, AbstractCC::C,
                         result.getType().getSwiftRValueType(),
                         result.getType().getSwiftRValueType(),
-                        blockTy->getSILInterfaceResult().getSwiftRValueType());
+                        blockTy->getSILResult().getSwiftRValueType());
   
   auto resultVal = result.forward(gen);
   scope.pop();
   
   // Handle the result convention.
-  switch (blockTy->getInterfaceResult().getConvention()) {
+  switch (blockTy->getResult().getConvention()) {
   case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
     assert(gen.getTypeLowering(resultVal.getType()).isTrivial()
@@ -1172,8 +1172,8 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
   SmallVector<SILParameterInfo, 4> params;
   params.push_back(
               SILParameterInfo(storageTy, ParameterConvention::Indirect_Inout));
-  std::copy(blockTy->getInterfaceParameters().begin(),
-            blockTy->getInterfaceParameters().end(),
+  std::copy(blockTy->getParameters().begin(),
+            blockTy->getParameters().end(),
             std::back_inserter(params));
   
   auto invokeTy =
@@ -1183,7 +1183,7 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                        .withRepresentation(FunctionType::Representation::Thin),
                      ParameterConvention::Direct_Unowned,
                      params,
-                     blockTy->getInterfaceResult(),
+                     blockTy->getResult(),
                      gen.getASTContext());
   
   // Create the invoke function. Borrow the mangling scheme from reabstraction
@@ -1224,15 +1224,15 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   // Collect the native arguments, which should all be +1.
   Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
   
-  assert(blockTy->getInterfaceParameters().size()
-           == funcTy->getInterfaceParameters().size()
+  assert(blockTy->getParameters().size()
+           == funcTy->getParameters().size()
          && "block and function types don't match");
   
   SmallVector<ManagedValue, 4> args;
   SILBasicBlock *entry = gen.F.begin();
-  for (unsigned i : indices(funcTy->getInterfaceParameters())) {
-    auto &param = funcTy->getInterfaceParameters()[i];
-    auto &blockParam = blockTy->getInterfaceParameters()[i];
+  for (unsigned i : indices(funcTy->getParameters())) {
+    auto &param = funcTy->getParameters()[i];
+    auto &blockParam = blockTy->getParameters()[i];
     
     auto &tl = gen.getTypeLowering(param.getSILType());
     assert((tl.isTrivial()
@@ -1256,13 +1256,13 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   assert(!funcTy->hasIndirectResult()
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
-                         funcTy->getSILInterfaceResult().getSwiftRValueType(),
+                         funcTy->getSILResult().getSwiftRValueType(),
                          /*transparent*/ false,
                          /*override CC*/ AbstractCC::C);
   
   // Return the result at +1.
-  auto &resultTL = gen.getTypeLowering(funcTy->getSILInterfaceResult());
-  auto convention = funcTy->getInterfaceResult().getConvention();
+  auto &resultTL = gen.getTypeLowering(funcTy->getSILResult());
+  auto convention = funcTy->getResult().getConvention();
   assert((resultTL.isTrivial()
            ? convention == ResultConvention::Unowned
            : convention == ResultConvention::Owned)
@@ -2136,7 +2136,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
     // Specialize the generic method.
     methodTy = getLoweredLoadableType(
                     methodTy.castTo<SILFunctionType>()
-                      ->substInterfaceGenericArgs(SGM.M, SGM.SwiftModule, subs));
+                      ->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
   
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
@@ -2278,7 +2278,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
       auto resultType = field.getType()->getCanonicalType();
       
       auto fnType = fnRef.getType().castTo<SILFunctionType>();
-      auto substFnType = fnType->substInterfaceGenericArgs(SGF.SGM.M,
+      auto substFnType = fnType->substGenericArgs(SGF.SGM.M,
                                    SGF.SGM.M.getSwiftModule(),
                                    E->getDefaultArgsOwner().getSubstitutions());
       auto origResultType = AbstractionPattern(
@@ -2467,7 +2467,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       auto resultType = outerFields[i].getType()->getCanonicalType();
       
       auto fnType = fnRef.getType().castTo<SILFunctionType>();
-      auto substFnType = fnType->substInterfaceGenericArgs(SGF.SGM.M,
+      auto substFnType = fnType->substGenericArgs(SGF.SGM.M,
                                    SGF.SGM.M.getSwiftModule(),
                                    defaultArgOwner.getSubstitutions());
       auto origResultType = AbstractionPattern(
@@ -2551,7 +2551,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   bool wasSpecialized = false;
   if (pft->isPolymorphic() && !forwardSubs.empty()) {
-    auto specialized = pft->substInterfaceGenericArgs(F.getModule(),
+    auto specialized = pft->substGenericArgs(F.getModule(),
                                                 F.getModule().getSwiftModule(),
                                                 forwardSubs);
     functionTy = SILType::getPrimitiveObjectType(specialized);
@@ -2824,7 +2824,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   auto argcGetterFn = SGM.getFunction(argcRef, NotForDefinition);
   auto argcGetter = B.createFunctionRef(mainClass, argcGetterFn);
   SILValue argc = B.createApply(mainClass, argcGetter, argcGetter->getType(),
-              argcGetter->getFunctionType()->getInterfaceResult().getSILType(),
+              argcGetter->getFunctionType()->getResult().getSILType(),
               {}, {});
   argc = B.createPointerToAddress(mainClass, argc,
      SILType::getPrimitiveAddressType(argcDecl->getType()->getCanonicalType()));
@@ -2835,7 +2835,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   auto argvGetterFn = SGM.getFunction(argvRef, NotForDefinition);
   auto argvGetter = B.createFunctionRef(mainClass, argvGetterFn);
   SILValue argv = B.createApply(mainClass, argvGetter, argvGetter->getType(),
-              argvGetter->getFunctionType()->getInterfaceResult().getSILType(),
+              argvGetter->getFunctionType()->getResult().getSILType(),
               {}, {});
   argv = B.createPointerToAddress(mainClass, argv,
      SILType::getPrimitiveAddressType(argvDecl->getType()->getCanonicalType()));
@@ -4034,7 +4034,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
-         ->getInterfaceResult().getSILType();
+         ->getResult().getSILType();
   resultTy = F.mapTypeIntoContext(resultTy);
   auto toTy = toFn.getType();
   
@@ -4044,7 +4044,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     auto toFnTy = toFn.getType().castTo<SILFunctionType>();
     subs = buildForwardingSubstitutions(gp);
     toTy = getLoweredLoadableType(
-              toFnTy->substInterfaceGenericArgs(SGM.M, SGM.SwiftModule, subs));
+              toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
   
   // Partially apply the next uncurry level and return the result closure.
@@ -4130,7 +4130,7 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
       auto arg = args[i];
       auto mv = emitManagedRValueWithCleanup(arg);
       
-      auto origArg = originalFnTy->getInterfaceParameters()[i].getSILType();
+      auto origArg = originalFnTy->getParameters()[i].getSILType();
       
       managedArgs.push_back(emitNativeToBridgedValue(fd, mv, AbstractCC::C,
                                                  mv.getSwiftType(),
@@ -4211,7 +4211,7 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
   auto resultTy = builtinOnceSILTy.castTo<SILFunctionType>()
-                                            ->getInterfaceResult().getSILType();
+                                            ->getResult().getSILType();
 
   B.createApply(global, builtinOnce, builtinOnceSILTy, resultTy,
                 {}, onceArgs);
@@ -4608,7 +4608,7 @@ static ManagedValue emitBridgeArrayToNSArray(SILGenFunction &gen,
     = arr.getType().getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   auto substFnType
-    = arrToNSArrFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+    = arrToNSArrFn.getType().substGenericArgs(gen.SGM.M, subs);
   SILValue nsarr = gen.B.createApply(loc, arrToNSArrFn,
                                      substFnType,
                                      gen.SGM.getLoweredType(
@@ -4629,7 +4629,7 @@ static ManagedValue emitBridgeNSArrayToArray(SILGenFunction &gen,
   auto arrTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   auto substFnType
-    = nsarrToArrFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+    = nsarrToArrFn.getType().substGenericArgs(gen.SGM.M, subs);
 
   SILValue arr = gen.B.createApply(loc, nsarrToArrFn,
                                    substFnType,
@@ -4651,7 +4651,7 @@ static ManagedValue emitBridgeDictionaryToNSDictionary(SILGenFunction &gen,
     = dict.getType().getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = dictTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   auto substFnType
-    = dictToNSDictFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+    = dictToNSDictFn.getType().substGenericArgs(gen.SGM.M, subs);
   SILValue nsdict = gen.B.createApply(loc, dictToNSDictFn,
                                       substFnType,
                                       gen.SGM.getLoweredType(
@@ -4672,7 +4672,7 @@ static ManagedValue emitBridgeNSDictionaryToDictionary(SILGenFunction &gen,
   auto dictTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
   auto subs = dictTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   auto substFnType
-    = nsdictToDictFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+    = nsdictToDictFn.getType().substGenericArgs(gen.SGM.M, subs);
 
   SILValue dict = gen.B.createApply(loc, nsdictToDictFn,
                                     substFnType,

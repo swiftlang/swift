@@ -331,7 +331,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       // Make sure that NewF's subst type matches the expected type.
       auto Subs = Bucket[0]->getSubstitutions();
       auto FTy =
-        F->getLoweredFunctionType()->substInterfaceGenericArgs(*M,
+        F->getLoweredFunctionType()->substGenericArgs(*M,
                                                                M->getSwiftModule(),
                                                                Subs);
       assert(FTy == NewF->getLoweredFunctionType() &&

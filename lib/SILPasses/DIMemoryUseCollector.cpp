@@ -596,7 +596,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       auto FTI = Apply->getSubstCalleeType();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
-      auto ParamConvention = FTI->getInterfaceParameters()[ArgumentNumber]
+      auto ParamConvention = FTI->getParameters()[ArgumentNumber]
         .getConvention();
 
       switch (ParamConvention) {

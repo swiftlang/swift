@@ -651,13 +651,13 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   GenericContextScope Scope(IGM, FnTy->getGenericSignature());
 
   // The function return type is the first element in the list.
-  createParameterType(Parameters, FnTy->getSemanticInterfaceResultSILType(),
+  createParameterType(Parameters, FnTy->getSemanticResultSILType(),
                       DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto Param : FnTy->getInterfaceParameters())
+  for (auto Param : FnTy->getParameters())
     createParameterType(Parameters, Param.getSILType(), DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);

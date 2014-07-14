@@ -165,7 +165,7 @@ public:
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   SILType getFunctionInterfaceResultType() const {
-    return castTo<SILFunctionType>()->getSemanticInterfaceResultSILType();
+    return castTo<SILFunctionType>()->getSemanticResultSILType();
   }
 
   /// Returns true if this function type has an indirect argument.
@@ -357,7 +357,7 @@ public:
   /// generic args with the appropriate item from the substitution.
   ///
   /// Only call this with function types!
-  SILType substInterfaceGenericArgs(SILModule &M,
+  SILType substGenericArgs(SILModule &M,
                                     ArrayRef<Substitution> Subs) const;
 
   SILType subst(SILModule &silModule, Module *astModule,
@@ -452,10 +452,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   return OS;
 }
 
-inline SILType SILFunctionType::getSILInterfaceParameter(unsigned i) const {
-  return getInterfaceParameters()[i].getSILType();
-}
-
 inline SILType SILParameterInfo::getSILType() const {
   if (isIndirect()) {
     return SILType::getPrimitiveAddressType(getType());
@@ -469,17 +465,17 @@ SILFunctionType::getParameterSILType(const SILParameterInfo &param) {
   return param.getSILType();
 }
 
-inline SILType SILFunctionType::getSILInterfaceResult() const {
-  return getInterfaceResult().getSILType();
+inline SILType SILFunctionType::getSILResult() const {
+  return getResult().getSILType();
 }
 
 inline SILType SILResultInfo::getSILType() const {
   return SILType::getPrimitiveObjectType(getType());
 }
 
-inline SILType SILFunctionType::getSemanticInterfaceResultSILType() const {
-  return (hasIndirectResult() ? getIndirectInterfaceResult().getSILType()
-                              : getInterfaceResult().getSILType());
+inline SILType SILFunctionType::getSemanticResultSILType() const {
+  return (hasIndirectResult() ? getIndirectResult().getSILType()
+                              : getResult().getSILType());
 }  
   
 inline SILType SILBlockStorageType::getCaptureAddressType() const {

@@ -351,12 +351,12 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   
   // Convert the return and parameter types.
   auto resultType = Converter.convert(IGM,
-                type->getSemanticInterfaceResultSILType().getSwiftRValueType());
+                type->getSemanticResultSILType().getSwiftRValueType());
   if (resultType.isNull())
     return clang::CanQualType();
   
   SmallVector<clang::QualType, 4> paramTypes;
-  for (auto paramTy : type->getInterfaceParametersWithoutIndirectResult()) {
+  for (auto paramTy : type->getParametersWithoutIndirectResult()) {
     // Blocks should only take direct +0 parameters.
     switch (paramTy.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:

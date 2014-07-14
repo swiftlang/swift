@@ -702,7 +702,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Do we need to lifetime-extend self?
   bool lifetimeExtendsSelf;
-  switch (origMethodType->getInterfaceResult().getConvention()) {
+  switch (origMethodType->getResult().getConvention()) {
   case ResultConvention::UnownedInnerPointer:
     lifetimeExtendsSelf = true;
     break;
@@ -716,7 +716,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Do we need to retain self before calling, and/or release it after?
   bool retainsSelf;
-  switch (origMethodType->getInterfaceParameters().back().getConvention()) {
+  switch (origMethodType->getParameters().back().getConvention()) {
   case ParameterConvention::Direct_Unowned:
     retainsSelf = false;
     break;
@@ -745,7 +745,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Save off the forwarded indirect return address if we have one.
   llvm::Value *indirectReturn = nullptr;
-  SILType appliedResultTy = origMethodType->getSemanticInterfaceResultSILType();
+  SILType appliedResultTy = origMethodType->getSemanticResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
   if (appliedResultTI.getSchema(ResilienceExpansion::Minimal)
         .requiresIndirectResult(IGM)) {
@@ -785,7 +785,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     emission.emitToExplosion(result);
     cleanup();
     auto &callee = emission.getCallee();
-    auto resultType = callee.getOrigFunctionType()->getSILInterfaceResult();
+    auto resultType = callee.getOrigFunctionType()->getSILResult();
     subIGF.emitScalarReturn(resultType, result);
   }
   
@@ -1229,12 +1229,12 @@ irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
 llvm::Constant *
 irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                     CanSILFunctionType invokeTy) {
-  CanType resultType = invokeTy->getInterfaceResult().getType();
+  CanType resultType = invokeTy->getResult().getType();
   SmallVector<CanType, 4> paramTypes;
   
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.
-  for (auto param : invokeTy->getInterfaceParameters().slice(1)) {
+  for (auto param : invokeTy->getParameters().slice(1)) {
     assert(!param.isIndirect()
            && "indirect C arguments not supported");
     paramTypes.push_back(param.getType());

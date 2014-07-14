@@ -234,13 +234,13 @@ SILFunction *FunctionSignatureOptCloner::initCloned(
   const ASTContext &Ctx = M.getASTContext();
 
   SmallVector<SILParameterInfo, 4> InterfaceParams;
-  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getInterfaceParameters();
+  ArrayRef<SILParameterInfo> ParameterInfo = OldFTy->getParameters();
   for (unsigned i = 0, e = ParameterInfo.size(); i != e; ++i) {
     if (Args[i].IsDead)
       continue;
     InterfaceParams.push_back(ParameterInfo[i]);
   }
-  SILResultInfo InterfaceResult = OldFTy->getInterfaceResult();
+  SILResultInfo InterfaceResult = OldFTy->getResult();
   CanSILFunctionType NewFTy = SILFunctionType::get(
       OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
       OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);

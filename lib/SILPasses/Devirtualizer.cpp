@@ -143,7 +143,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   SILModule &M = F->getModule();
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
   CanSILFunctionType SubstCalleeType =
-    GenCalleeType->substInterfaceGenericArgs(M, M.getSwiftModule(),
+    GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
                                              AI->getSubstitutions());
 
 
@@ -151,7 +151,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   // "this" pointer type is a super class of the CMI's operand, insert an
   // upcast.
   auto paramTypes =
-    SubstCalleeType->getInterfaceParameterSILTypesWithoutIndirectResult();
+    SubstCalleeType->getParameterSILTypesWithoutIndirectResult();
 
   // We should always have a this pointer. Assert on debug builds, return
   // nullptr on release builds.
@@ -184,7 +184,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   // indirect return types and contravariant arguments.
   llvm::SmallVector<SILValue, 8> NewArgs;
   auto Args = AI->getArguments();
-  auto allParamTypes = SubstCalleeType->getInterfaceParameterSILTypes();
+  auto allParamTypes = SubstCalleeType->getParameterSILTypes();
 
   // For each old argument Op...
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
@@ -221,7 +221,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   // tuple should be ok.
   SILType ReturnType = AI->getType();
   if (!SubstCalleeType->hasIndirectResult()) {
-    ReturnType = SubstCalleeType->getSILInterfaceResult();
+    ReturnType = SubstCalleeType->getSILResult();
   }
 
   SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
@@ -433,7 +433,7 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   NewSelfSub.Replacement = Ty;
 
   CanSILFunctionType OrigType = AI->getOrigCalleeType();
-  CanSILFunctionType SubstCalleeType = OrigType->substInterfaceGenericArgs(
+  CanSILFunctionType SubstCalleeType = OrigType->substGenericArgs(
       AI->getModule(), AI->getModule().getSwiftModule(),
       ArrayRef<Substitution>(NewSelfSub));
 
@@ -480,13 +480,13 @@ processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
     return false;
 
   CanSILFunctionType SubstCalleeType =
-    GenCalleeType->substInterfaceGenericArgs(M, M.getSwiftModule(),
+    GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
                                              Subs);
 
   std::copy(Subs.begin(), Subs.end(), SubstList.begin());
   HasSubstList = true;
   SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
-  ResultSILType = SubstCalleeType->getSILInterfaceResult();
+  ResultSILType = SubstCalleeType->getSILResult();
 
   return processNormalProtocolConformance();
 }
@@ -613,11 +613,11 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   }
 
   // Create a new non-virtual ApplyInst.
-  SILType SubstFnTy = FRI->getType().substInterfaceGenericArgs(F->getModule(),
+  SILType SubstFnTy = FRI->getType().substGenericArgs(F->getModule(),
                                                                Subs);
   ApplyInst *SAI = ApplyInst::create(
       AI->getLoc(), FRI, SubstFnTy,
-      SubstFnTy.castTo<SILFunctionType>()->getInterfaceResult().getSILType(),
+      SubstFnTy.castTo<SILFunctionType>()->getResult().getSILType(),
       Subs, Args, false, *F);
   AI->getParent()->getInstList().insert(AI, SAI);
   AI->replaceAllUsesWith(SAI);

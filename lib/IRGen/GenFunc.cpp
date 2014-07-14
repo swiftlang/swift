@@ -903,7 +903,7 @@ namespace {
 }
 
 llvm::Type *SignatureExpansion::addIndirectResult() {
-  auto resultType = FnType->getInterfaceResult().getSILType();
+  auto resultType = FnType->getResult().getSILType();
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   addPointerParameter(resultTI.getStorageType());
   addIndirectReturnAttributes(IGM, Attrs);
@@ -913,7 +913,7 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
 llvm::Type *SignatureExpansion::expandResult() {
   // Handle the direct result type, checking for supposedly scalar
   // result types that we actually want to return indirectly.
-  auto resultType = FnType->getInterfaceResult().getSILType();
+  auto resultType = FnType->getResult().getSILType();
 
   // Fast-path the empty tuple type.
   if (auto tuple = resultType.getAs<TupleType>())
@@ -943,11 +943,11 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
          FnType->getAbstractCC() == AbstractCC::C);
 
   // Convert the SIL result type to a Clang type.
-  auto resultTy = FnType->getInterfaceResult().getSILType();
+  auto resultTy = FnType->getResult().getSILType();
   auto clangResultTy = IGM.getClangType(resultTy);
 
   // Now convert the parameters to Clang types.
-  auto params = FnType->getInterfaceParameters();
+  auto params = FnType->getParameters();
   unsigned paramOffset = 0;
 
   SmallVector<clang::CanQualType,4> paramTys;
@@ -1103,7 +1103,7 @@ void SignatureExpansion::expandParameters() {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod: {
-    auto params = FnType->getInterfaceParameters();
+    auto params = FnType->getParameters();
 
     for (auto param : params) {
       expand(param);
@@ -1292,8 +1292,8 @@ static void emitCastBuiltin(IRGenFunction &IGF, CanSILFunctionType substFnType,
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getInterfaceResult().getConvention() == ResultConvention::Unowned);
-  SILType destType = substFnType->getInterfaceResult().getSILType();
+  assert(substFnType->getResult().getConvention() == ResultConvention::Unowned);
+  SILType destType = substFnType->getResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
   result.add(output);
@@ -1307,9 +1307,9 @@ static void emitCastOrBitCastBuiltin(IRGenFunction &IGF,
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getInterfaceResult().getConvention() ==
+  assert(substFnType->getResult().getConvention() ==
            ResultConvention::Unowned);
-  SILType destType = substFnType->getInterfaceResult().getSILType();
+  SILType destType = substFnType->getResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output;
   switch (BV) {
@@ -1869,7 +1869,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // Get the natural IR type in the body of the function that makes
   // the call. This may be different than the IR type returned by the
   // call itself due to ABI type coercion.
-  auto resultType = getCallee().getOrigFunctionType()->getSILInterfaceResult();
+  auto resultType = getCallee().getOrigFunctionType()->getSILResult();
   auto &resultTI = IGF.IGM.getTypeInfo(resultType);
   auto schema = resultTI.getSchema(out.getKind());
   auto *bodyType = schema.getScalarResultType(IGF.IGM);
@@ -1989,11 +1989,11 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
 
   CanType origResultType, substResultType;
   if (origFnType->hasIndirectResult()) {
-    origResultType = origFnType->getIndirectInterfaceResult().getType();
-    substResultType = substFnType->getIndirectInterfaceResult().getType();
+    origResultType = origFnType->getIndirectResult().getType();
+    substResultType = substFnType->getIndirectResult().getType();
   } else {
-    origResultType = origFnType->getInterfaceResult().getType();
-    substResultType = substFnType->getInterfaceResult().getType();
+    origResultType = origFnType->getResult().getType();
+    substResultType = substFnType->getResult().getType();
   }
 
   // Figure out how the substituted result differs from the original.
@@ -2036,7 +2036,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
   assert(LastArgWritten <= 1);
 
   CanType substResultType =
-    getCallee().getSubstFunctionType()->getSemanticInterfaceResultSILType()
+    getCallee().getSubstFunctionType()->getSemanticResultSILType()
                .getSwiftRValueType();
 
   auto &substResultTI =
@@ -2060,7 +2060,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
   }
 
   CanType origResultType =
-    getCallee().getOrigFunctionType()->getInterfaceResult().getType();
+    getCallee().getOrigFunctionType()->getResult().getType();
   if (origResultType->isDependentType())
     origResultType = IGF.IGM.getContextArchetypes()
       .substDependentType(origResultType)
@@ -2179,10 +2179,10 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
                                       CanSILFunctionType fnType) {
   if (fnType->hasIndirectResult()) {
     return IGM.getStoragePointerType(
-                             fnType->getIndirectInterfaceResult().getSILType());
+                             fnType->getIndirectResult().getSILType());
   }
 
-  auto resultTy = fnType->getInterfaceResult().getSILType();
+  auto resultTy = fnType->getResult().getSILType();
   auto clangTy = IGM.getClangType(resultTy);
   assert(clangTy && "Unexpected failure in Clang type generation!");
 
@@ -2227,7 +2227,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     paramTys.push_back(clangTy);
   }
 
-  const auto &resultInfo = callee.getSubstFunctionType()->getInterfaceResult();
+  const auto &resultInfo = callee.getSubstFunctionType()->getResult();
   auto clangResultTy = IGF.IGM.getClangType(resultInfo.getSILType());
 
   // Generate function info for this set of arguments.
@@ -2325,7 +2325,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 void CallEmission::addArg(Explosion &arg) {
   SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
 
-  auto origParams = getCallee().getOrigFunctionType()->getInterfaceParameters();
+  auto origParams = getCallee().getOrigFunctionType()->getParameters();
 
   // Convert arguments to a representation appropriate to the calling
   // convention.
@@ -2603,14 +2603,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     GenericContextScope scope(IGM, origType->getGenericSignature());
     
     // Forward the indirect return value, if we have one.
-    auto &resultTI = IGM.getTypeInfo(outType->getInterfaceResult().getSILType());
+    auto &resultTI = IGM.getTypeInfo(outType->getResult().getSILType());
     if (resultTI.getSchema(explosionLevel).requiresIndirectResult(IGM))
       params.add(origParams.claimNext());
     
     // Reemit the parameters as unsubstituted.
-    for (unsigned i = 0; i < outType->getInterfaceParameters().size(); ++i) {
-      emitApplyArgument(subIGF, origType->getInterfaceParameters()[i],
-                        outType->getInterfaceParameters()[i],
+    for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
+      emitApplyArgument(subIGF, origType->getParameters()[i],
+                        outType->getParameters()[i],
                         subs, origParams, params);
     }
   }
@@ -2636,7 +2636,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     Address data = layout.emitCastTo(subIGF, rawData);
 
     // Perform the loads.
-    unsigned origParamI = outType->getInterfaceParameters().size();
+    unsigned origParamI = outType->getParameters().size();
     for (unsigned i : indices(layout.getElements())) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
@@ -2662,10 +2662,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
       
       // Reemit the capture params as unsubstituted.
-      if (origParamI < origType->getInterfaceParameters().size()) {
+      if (origParamI < origType->getParameters().size()) {
         emitApplyArgument(subIGF,
-                          origType->getInterfaceParameters()[origParamI],
-                          substType->getInterfaceParameters()[origParamI], subs, param, params);
+                          origType->getParameters()[origParamI],
+                          substType->getParameters()[origParamI], subs, param, params);
         ++origParamI;
       } else {
         params.add(param.claimAll());

@@ -299,9 +299,9 @@ class InOutDeshadowing : public SILFunctionTransform {
     // them.
     SILFunctionType *FTI = F.getLoweredFunctionType();
 
-    for (unsigned arg = 0, e = FTI->getInterfaceParameters().size();
+    for (unsigned arg = 0, e = FTI->getParameters().size();
          arg != e; ++arg) {
-      if (!FTI->getInterfaceParameters()[arg].isIndirectInOut()) continue;
+      if (!FTI->getParameters()[arg].isIndirectInOut()) continue;
 
       DEBUG(llvm::dbgs()<< "  " << F.getName() << ": argument #"<< arg << "\n");
 

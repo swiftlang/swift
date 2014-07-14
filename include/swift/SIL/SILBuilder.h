@@ -207,7 +207,7 @@ public:
     auto FnTy = Fn.getType();
     return createApply(Loc, Fn, FnTy,
                        FnTy.castTo<SILFunctionType>()
-                         ->getInterfaceResult()
+                         ->getResult()
                          .getSILType(),
                        ArrayRef<Substitution>(), Args, Transparent);
   }

@@ -97,7 +97,7 @@ bool SILType::isAddressOnly(SILModule &M) const {
   return M.getTypeLowering(*this).isAddressOnly();
 }
 
-SILType SILType::substInterfaceGenericArgs(SILModule &M,
+SILType SILType::substGenericArgs(SILModule &M,
                                            ArrayRef<Substitution> Subs) const {
   SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
   if (Subs.empty()) {
@@ -108,7 +108,7 @@ SILType SILType::substInterfaceGenericArgs(SILModule &M,
   assert(fnTy->isPolymorphic() && "Can only subst interface generic args on "
          "polymorphic function types.");
   CanSILFunctionType canFnTy =
-    fnTy->substInterfaceGenericArgs(M, M.getSwiftModule(), Subs);
+    fnTy->substGenericArgs(M, M.getSwiftModule(), Subs);
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 

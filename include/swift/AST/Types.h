@@ -2395,7 +2395,7 @@ private:
   SILResultInfo InterfaceResult;
 
   /// TODO: Retire in favor of InterfaceParameters.
-  MutableArrayRef<SILParameterInfo> getMutableInterfaceParameters() {
+  MutableArrayRef<SILParameterInfo> getMutableParameters() {
     auto ptr = reinterpret_cast<SILParameterInfo*>(this + 1);
     unsigned n = SILFunctionTypeBits.NumParameters;
     return MutableArrayRef<SILParameterInfo>(ptr, n);
@@ -2420,8 +2420,7 @@ public:
                                 const ASTContext &ctx);
 
   // in SILType.h
-  SILType getSILInterfaceResult() const;
-  SILType getSILInterfaceParameter(unsigned i) const;
+  SILType getSILResult() const;
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -2432,46 +2431,46 @@ public:
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
   }
 
-  SILResultInfo getInterfaceResult() const {
+  SILResultInfo getResult() const {
     return InterfaceResult;
   }
   
-  ArrayRef<SILParameterInfo> getInterfaceParameters() const {
-    return const_cast<SILFunctionType*>(this)->getMutableInterfaceParameters();
+  ArrayRef<SILParameterInfo> getParameters() const {
+    return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
 
   bool hasIndirectResult() const {
-    return !getInterfaceParameters().empty()
-      && getInterfaceParameters()[0].isIndirectResult();
+    return !getParameters().empty()
+      && getParameters()[0].isIndirectResult();
   }
-  SILParameterInfo getIndirectInterfaceResult() const {
+  SILParameterInfo getIndirectResult() const {
     assert(hasIndirectResult());
-    return getInterfaceParameters()[0];
+    return getParameters()[0];
   }
 
   /// Returns the SILType of the semantic result of this function: the
   /// indirect result type, if there is one, otherwise the direct result.
   ///
   /// In SILType.h.
-  SILType getSemanticInterfaceResultSILType() const;
+  SILType getSemanticResultSILType() const;
 
   /// Get the parameters, ignoring any indirect-result parameter.
   ArrayRef<SILParameterInfo>
-  getInterfaceParametersWithoutIndirectResult() const  {
-    auto params = getInterfaceParameters();
+  getParametersWithoutIndirectResult() const  {
+    auto params = getParameters();
     if (hasIndirectResult()) params = params.slice(1);
       return params;
   }
 
   using ParameterSILTypeArrayRef
     = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
-  ParameterSILTypeArrayRef getInterfaceParameterSILTypes() const {
-    return ParameterSILTypeArrayRef(getInterfaceParameters());
+  ParameterSILTypeArrayRef getParameterSILTypes() const {
+    return ParameterSILTypeArrayRef(getParameters());
   }
   
   ParameterSILTypeArrayRef
-  getInterfaceParameterSILTypesWithoutIndirectResult() const {
-    return ParameterSILTypeArrayRef(getInterfaceParametersWithoutIndirectResult());
+  getParameterSILTypesWithoutIndirectResult() const {
+    return ParameterSILTypeArrayRef(getParametersWithoutIndirectResult());
   }
 
   bool isPolymorphic() const { return GenericSig != nullptr; }
@@ -2493,13 +2492,13 @@ public:
     return getExtInfo().isNoReturn();
   }
 
-  CanSILFunctionType substInterfaceGenericArgs(SILModule &silModule,
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
                                                Module *astModule,
                                                ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
-            getInterfaceParameters(), getInterfaceResult());
+            getParameters(), getResult());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,

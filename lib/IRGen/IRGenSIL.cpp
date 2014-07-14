@@ -830,7 +830,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
     if (requiresIndirectResult()) {
-      auto retTy = IGF.CurSILFn->mapTypeIntoContext(funcTy->getInterfaceResult()
+      auto retTy = IGF.CurSILFn->mapTypeIntoContext(funcTy->getResult()
                                                           .getSILType());
       auto &retTI = IGF.IGM.getTypeInfo(retTy);
       IGF.IndirectReturn = retTI.getAddressForPointer(params.claimNext());
@@ -851,7 +851,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTy,
       [&]() -> bool {
         auto retType
-          = IGF.CurSILFn->mapTypeIntoContext(funcTy->getInterfaceResult()
+          = IGF.CurSILFn->mapTypeIntoContext(funcTy->getResult()
                                                     .getSILType());
         return IGF.IGM.requiresIndirectResult(retType, IGF.CurSILFnExplosionLevel);
       });
@@ -901,7 +901,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   SmallVector<clang::CanQualType,4> argTys;
   auto const &clangCtx = IGF.IGM.getClangASTContext();
 
-  const auto &resultInfo = funcTy->getInterfaceResult();
+  const auto &resultInfo = funcTy->getResult();
   auto clangResultTy = IGF.IGM.getClangType(resultInfo.getSILType());
   unsigned nextArgTyIdx = 0;
 
@@ -1693,7 +1693,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   CanSILFunctionType origCalleeType = i->getOrigCalleeType();
   
   auto argValues = i->getArgumentsWithoutIndirectResult();
-  auto params = origCalleeType->getInterfaceParametersWithoutIndirectResult();
+  auto params = origCalleeType->getParametersWithoutIndirectResult();
   assert(argValues.size() == params.size());
   auto subs = i->getSubstitutions();
   
@@ -1733,7 +1733,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     getCallEmissionForLoweredValue(*this, i, origCalleeType, substCalleeType,
                                    calleeLV, i->getSubstitutions());
   
-  auto params = origCalleeType->getInterfaceParametersWithoutIndirectResult();
+  auto params = origCalleeType->getParametersWithoutIndirectResult();
   auto args = i->getArgumentsWithoutIndirectResult();
   assert(params.size() == args.size());
 
@@ -1863,7 +1863,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // NB: We collect the arguments under the substituted type.
   auto args = i->getArguments();
-  auto params = i->getSubstCalleeType()->getInterfaceParameters();
+  auto params = i->getSubstCalleeType()->getParameters();
   params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs(ResilienceExpansion::Maximal);

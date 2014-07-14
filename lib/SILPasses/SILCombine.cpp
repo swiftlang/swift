@@ -868,7 +868,7 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
       return nullptr;
 
     // Emit a destroy value for each captured closure argument.
-    auto Params = ClosureTy->getInterfaceParameters();
+    auto Params = ClosureTy->getParameters();
     auto Args = PAI->getArguments();
     unsigned Delta = Params.size() - Args.size();
     assert(Delta <= Params.size() && "Error, more Args to partial apply than "
@@ -937,10 +937,10 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
 
   SILFunction *F = FRI->getReferencedFunction();
   SILType FnType = F->getLoweredType();
-  SILType ResultTy = F->getLoweredFunctionType()->getSILInterfaceResult();
+  SILType ResultTy = F->getLoweredFunctionType()->getSILResult();
   if (!Subs.empty()) {
-    FnType = FnType.substInterfaceGenericArgs(PAI->getModule(), Subs);
-    ResultTy = FnType.getAs<SILFunctionType>()->getSILInterfaceResult();
+    FnType = FnType.substGenericArgs(PAI->getModule(), Subs);
+    ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
   }
 
   ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
@@ -1015,8 +1015,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   OperandValueArrayRef Ops = AI->getArgumentsWithoutIndirectResult();
-  auto OldOpTypes = SubstCalleeTy->getInterfaceParameterSILTypes();
-  auto NewOpTypes = ConvertCalleeTy->getInterfaceParameterSILTypes();
+  auto OldOpTypes = SubstCalleeTy->getParameterSILTypes();
+  auto NewOpTypes = ConvertCalleeTy->getParameterSILTypes();
 
   assert(Ops.size() == OldOpTypes.size() &&
          "Ops and op types must have same size.");
@@ -1048,7 +1048,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
   SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
   return ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
-                           ConvertCalleeTy->getSILInterfaceResult(),
+                           ConvertCalleeTy->getSILResult(),
                            ArrayRef<Substitution>(), Args, false,
                            *FRI->getReferencedFunction());
 }

@@ -156,12 +156,12 @@ struct MapSILTypeIntoContext : CanTypeVisitor<MapSILTypeIntoContext, CanType> {
     // Dependent members can appear in lowered position inside SIL functions.
     
     SmallVector<SILParameterInfo, 4> params;
-    for (auto &param : t->getInterfaceParameters())
+    for (auto &param : t->getParameters())
       params.push_back(param.transform([&](CanType pt) -> CanType {
         return visit(pt);
       }));
     
-    SILResultInfo result = t->getInterfaceResult()
+    SILResultInfo result = t->getResult()
       .transform([&](CanType elt) -> CanType {
         return visit(elt);
       });

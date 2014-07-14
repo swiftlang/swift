@@ -22,11 +22,11 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                               ArrayRef<Substitution> subs) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
-    FTI = FTI->substInterfaceGenericArgs(M, M.getSwiftModule(), subs);
+    FTI = FTI->substGenericArgs(M, M.getSwiftModule(), subs);
   
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
-  auto params = FTI->getInterfaceParameters();
+  auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
@@ -37,7 +37,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
-                                            FTI->getInterfaceResult(),
+                                            FTI->getResult(),
                                             M.getASTContext());
   return SILType::getPrimitiveObjectType(appliedFnType);
 }

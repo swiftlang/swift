@@ -3472,7 +3472,7 @@ namespace {
         }
           
         // Testify to generic parameters in the Self type.
-        auto params = fnType->getInterfaceParameters();
+        auto params = fnType->getParameters();
         CanType selfTy = params.back().getType();
         if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
           selfTy = metaTy.getInstanceType();
@@ -3497,7 +3497,7 @@ namespace {
       // class-pointer argument.
 
       // Just consider the 'self' parameter for now.
-      auto params = fnType->getInterfaceParameters();
+      auto params = fnType->getParameters();
       if (params.empty()) return;
       SourceKind source = considerParameter(params.back());
 
@@ -3521,7 +3521,7 @@ namespace {
       // TODO: The ArchetypeBuilder should be cached in the generic signature.
       ParamArchetypes.addGenericSignature(FnType->getGenericSignature());
 
-      auto paramType = FnType->getInterfaceParameters()[0].getType();
+      auto paramType = FnType->getParameters()[0].getType();
       considerBoundGenericType(cast<BoundGenericType>(paramType), 0);
     }
     
@@ -3769,7 +3769,7 @@ namespace {
     CanType getArgTypeInContext() const {
       return ArchetypeBuilder::mapTypeIntoContext(
                             IGF.IGM.SILMod->getSwiftModule(), ContextParams,
-                            FnType->getInterfaceParameters().back().getType())
+                            FnType->getParameters().back().getType())
         ->getCanonicalType();
     }
 
@@ -4150,8 +4150,8 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   CanType substInputType;
-  if (!substFnType->getInterfaceParameters().empty()) {
-    auto selfParam = substFnType->getInterfaceParameters().back();
+  if (!substFnType->getParameters().empty()) {
+    auto selfParam = substFnType->getParameters().back();
     substInputType = selfParam.getType();
     // If the parameter is a direct metatype parameter, this is a static method
     // of the instance type. We can assume this because:

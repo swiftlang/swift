@@ -311,7 +311,7 @@ static bool processBBTopDown(
   if (&BB == &*BB.getParent()->begin()) {
     auto Args = BB.getBBArgs();
     auto SignatureParams =
-        BB.getParent()->getLoweredFunctionType()->getInterfaceParameters();
+        BB.getParent()->getLoweredFunctionType()->getParameters();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       SILArgument *A = Args[i];
       ParameterConvention P = SignatureParams[i].getConvention();

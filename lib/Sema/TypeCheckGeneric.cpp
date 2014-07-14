@@ -566,13 +566,13 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-static Type getInterfaceResultType(TypeChecker &TC, FuncDecl *fn,
+static Type getResultType(TypeChecker &TC, FuncDecl *fn,
                                    Type resultType) {
   // Look through optional types.
   OptionalTypeKind optKind;
   if (auto origValueType = resultType->getAnyOptionalObjectType(optKind)) {
     // Get the interface type of the result.
-    Type ifaceValueType = getInterfaceResultType(TC, fn, origValueType);
+    Type ifaceValueType = getResultType(TC, fn, origValueType);
 
     // Preserve the optional type's original spelling if the interface
     // type is the same as the original.
@@ -660,7 +660,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     if (!funcTy) {
       funcTy = TupleType::getEmpty(Context);
     } else {
-      funcTy = getInterfaceResultType(*this, fn, funcTy);
+      funcTy = getResultType(*this, fn, funcTy);
     }
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {

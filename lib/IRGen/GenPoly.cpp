@@ -61,27 +61,27 @@ void checkFunctionsAreCompatible(IRGenModule &IGM,
   
   // The result types must either both be reference types with the same
   // convention, or must be equivalent value types.
-  auto origResultTy = getContextType(origTy->getInterfaceResult().getType());
-  auto substResultTy = getContextType(substTy->getInterfaceResult().getType());
+  auto origResultTy = getContextType(origTy->getResult().getType());
+  auto substResultTy = getContextType(substTy->getResult().getType());
   
   if (origResultTy->hasReferenceSemantics()) {
     assert(substResultTy->hasReferenceSemantics()
            && "result abstraction difference survived to IRGen");
-    assert(origTy->getInterfaceResult().getConvention()
-             == substTy->getInterfaceResult().getConvention()
+    assert(origTy->getResult().getConvention()
+             == substTy->getResult().getConvention()
            && "result abstraction difference survived to IRGen");
   } else {
     // FIXME: Assert that the substTy is a valid substitution of origTy.
-    //assert(origTy->getInterfaceResult() == substTy->getInterfaceResult()
+    //assert(origTy->getResult() == substTy->getResult()
     //       && "result abstraction difference survived to IRGen");
   }
-  assert(origTy->getInterfaceParameters().size()
-           == substTy->getInterfaceParameters().size()
+  assert(origTy->getParameters().size()
+           == substTy->getParameters().size()
          && "parameter abstraction difference survived to IRGen");
   for (unsigned i = 0, e = origTy->
-       getInterfaceParameters().size(); i < e; ++i) {
-    auto &origParam = origTy->getInterfaceParameters()[i];
-    auto &substParam = substTy->getInterfaceParameters()[i];
+       getParameters().size(); i < e; ++i) {
+    auto &origParam = origTy->getParameters()[i];
+    auto &substParam = substTy->getParameters()[i];
     auto origParamTy = getContextType(origParam.getType());
     auto substParamTy = getContextType(substParam.getType());
     // Direct parameters must be both reference types or matching value types.

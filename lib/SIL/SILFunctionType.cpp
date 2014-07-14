@@ -65,8 +65,8 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
   return SILFunctionType::get(type->getGenericSignature(),
                               extInfo,
                               callee,
-                              type->getInterfaceParameters(),
-                              type->getInterfaceResult(),
+                              type->getParameters(),
+                              type->getResult(),
                               type->getASTContext());
   SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 }
@@ -1283,12 +1283,12 @@ namespace {
     SILFunctionTypeSubstituter(TypeConverter &TC,
                                CanSILFunctionType origFnType)
       : TC(TC), OrigFnType(origFnType),
-        OrigParams(origFnType->getInterfaceParameters())
+        OrigParams(origFnType->getParameters())
     {}
 
     SILResultInfo substResult(AbstractionPattern origResultType,
                               CanType substResultType) {
-      SILResultInfo origResult = OrigFnType->getInterfaceResult();
+      SILResultInfo origResult = OrigFnType->getResult();
       bool origHasIndirectResult = OrigFnType->hasIndirectResult();
       bool resultIsDependent;
 
@@ -1492,11 +1492,11 @@ namespace {
       GenericContextScope scope(TheSILModule.Types,
                                 origType->getGenericSignature());
     
-      SILResultInfo substResult = subst(origType->getInterfaceResult());
+      SILResultInfo substResult = subst(origType->getResult());
 
       SmallVector<SILParameterInfo, 8> substParams;
-      substParams.reserve(origType->getInterfaceParameters().size());
-      for (auto &origParam : origType->getInterfaceParameters()) {
+      substParams.reserve(origType->getParameters().size());
+      for (auto &origParam : origType->getParameters()) {
         substParams.push_back(subst(origParam));
       }
 
@@ -1593,7 +1593,7 @@ CanSILFunctionType SILType::substFuncType(SILModule &silModule,
 /// it has the form of the normal SILFunctionType for the substituted
 /// type, except using the original conventions.
 CanSILFunctionType
-SILFunctionType::substInterfaceGenericArgs(SILModule &silModule,
+SILFunctionType::substGenericArgs(SILModule &silModule,
                                            Module *astModule,
                                            ArrayRef<Substitution> subs) {
   if (subs.empty()) {

@@ -67,12 +67,12 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                                 CanSILFunctionType fnType,
                                 CanType newSelfType,
                                 SILDeclRef methodName) {
-  auto oldParams = fnType->getInterfaceParameters();
+  auto oldParams = fnType->getParameters();
   SmallVector<SILParameterInfo, 4> newParams;
   newParams.append(oldParams.begin(), oldParams.end() - 1);
   newParams.push_back({newSelfType, oldParams.back().getConvention()});
   
-  auto newResult = fnType->getInterfaceResult();
+  auto newResult = fnType->getResult();
   // If the method returns Self, substitute AnyObject for the result type.
   if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
     if (fnDecl->hasDynamicSelf()) {
@@ -1486,11 +1486,11 @@ static SILValue emitRawApply(SILGenFunction &gen,
   assert(bool(resultAddr) == substFnType->hasIndirectResult());
   if (substFnType->hasIndirectResult()) {
     assert(resultAddr.getType() ==
-             substFnType->getIndirectInterfaceResult().getSILType().getAddressType());
+             substFnType->getIndirectResult().getSILType().getAddressType());
     argValues.push_back(resultAddr);
   }
 
-  auto inputTypes = substFnType->getInterfaceParametersWithoutIndirectResult();
+  auto inputTypes = substFnType->getParametersWithoutIndirectResult();
   assert(inputTypes.size() == args.size());
   
   // Gather the arguments.
@@ -1513,7 +1513,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
     argValues.push_back(argValue);
   }
 
-  auto resultType = substFnType->getInterfaceResult().getSILType();
+  auto resultType = substFnType->getResult().getSILType();
   auto calleeType = SILType::getPrimitiveObjectType(substFnType);
   SILValue result = gen.B.createApply(loc, fnValue, calleeType,
                                       resultType, subs, argValues,
@@ -1540,7 +1540,7 @@ ManagedValue SILGenFunction::emitApply(
   auto loweredFormalResultType = formalResultTL.getLoweredType();
   AbstractCC cc = overrideCC ? *overrideCC : substFnType->getAbstractCC();
 
-  SILType actualResultType = substFnType->getSemanticInterfaceResultSILType();
+  SILType actualResultType = substFnType->getSemanticResultSILType();
 
   // Check whether there are abstraction differences (beyond just
   // direct vs. indirect) between the lowered formal result type and
@@ -1578,11 +1578,11 @@ ManagedValue SILGenFunction::emitApply(
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
   SILValue lifetimeExtendedSelf;
-  if (substFnType->getInterfaceResult().getConvention()
+  if (substFnType->getResult().getConvention()
         == ResultConvention::UnownedInnerPointer) {
     lifetimeExtendedSelf = args.back().getValue();
     
-    switch (substFnType->getInterfaceParameters().back().getConvention()) {
+    switch (substFnType->getParameters().back().getConvention()) {
     case swift::ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
@@ -1659,7 +1659,7 @@ ManagedValue SILGenFunction::emitApply(
 
   // Otherwise, manage the direct result.
   } else {
-    switch (substFnType->getInterfaceResult().getConvention()) {
+    switch (substFnType->getResult().getConvention()) {
     case ResultConvention::Owned:
       // Already retained.
       break;
@@ -1948,7 +1948,7 @@ namespace {
     AbstractCC CC;
 
     ParamLowering(CanSILFunctionType fnType) :
-      Params(fnType->getInterfaceParametersWithoutIndirectResult()),
+      Params(fnType->getParametersWithoutIndirectResult()),
       CC(fnType->getAbstractCC()) {}
 
     ArrayRef<SILParameterInfo>
@@ -2637,12 +2637,12 @@ namespace {
                                           C.getIdentifier(getBuiltinName(Kind)),
                                           getTypeTraitSILType(C));
       auto builtinTy = builtin->getType().castTo<SILFunctionType>();
-      auto substTy = builtinTy->substInterfaceGenericArgs(gen.SGM.M,
+      auto substTy = builtinTy->substGenericArgs(gen.SGM.M,
                                     gen.SGM.M.getSwiftModule(), substitutions);
       
       auto apply = gen.B.createApply(loc, builtin,
                                  SILType::getPrimitiveObjectType(substTy),
-                                 builtinTy->getInterfaceResult().getSILType(),
+                                 builtinTy->getResult().getSILType(),
                                  substitutions, args[0].getValue());
       return ManagedValue::forUnmanaged(apply);
     }
@@ -3058,7 +3058,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   auto fnTy = method.getType().castTo<SILFunctionType>();
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us.
-  auto resultInfo = fnTy->getInterfaceResult();
+  auto resultInfo = fnTy->getResult();
   if (resultInfo.getConvention() == ResultConvention::UnownedInnerPointer)
     resultInfo = SILResultInfo(resultInfo.getType(), ResultConvention::Unowned);
   
@@ -3067,8 +3067,8 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                        .withCallingConv(AbstractCC::Freestanding)
                        .withRepresentation(FunctionType::Representation::Thick),
                      ParameterConvention::Direct_Owned,
-                     fnTy->getInterfaceParameters()
-                       .slice(0, fnTy->getInterfaceParameters().size() - 1),
+                     fnTy->getParameters()
+                       .slice(0, fnTy->getParameters().size() - 1),
                      resultInfo, gen.getASTContext());
   
   // Retain 'self' because the partial apply will take ownership.

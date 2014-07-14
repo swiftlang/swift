@@ -805,7 +805,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    auto ArgTys = FTI->getInterfaceParameterSILTypes();
+    auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) == ListOfValues.size() &&
            "Argument number mismatch in ApplyInst.");
@@ -825,7 +825,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     SubstFnTy,
-                                    FTI->getInterfaceResult().getSILType(),
+                                    FTI->getResult().getSILType(),
                                     Substitutions, Args, Transparent);
     break;
   }
@@ -835,7 +835,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
-    auto ArgTys = FTI->getInterfaceParameterSILTypes();
+    auto ArgTys = FTI->getParameterSILTypes();
 
     assert((ArgTys.size() << 1) >= ListOfValues.size() &&
            "Argument number mismatch in PartialApplyInst.");

@@ -2080,7 +2080,7 @@ public:
     }
     Printer << "(";
     bool first = true;
-    for (auto param : T->getInterfaceParameters()) {
+    for (auto param : T->getParameters()) {
       if (first) {
         first = false;
       } else {
@@ -2090,7 +2090,7 @@ public:
     }
     Printer << ") -> ";
 
-    T->getInterfaceResult().print(Printer, Options);
+    T->getResult().print(Printer, Options);
   }
   
   void visitSILBlockStorageType(SILBlockStorageType *T) {

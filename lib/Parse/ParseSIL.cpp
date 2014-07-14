@@ -2787,12 +2787,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();
     substFTI
-      = silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(),
+      = silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(),
                                            subs);
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   
-  auto ArgTys = substFTI->getInterfaceParameterSILTypes();
+  auto ArgTys = substFTI->getParameterSILTypes();
 
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
@@ -2809,7 +2809,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              substFTI->getInterfaceResult().getSILType(),
+                              substFTI->getResult().getSILType(),
                               subs, Args,
                               Transparent);
     break;

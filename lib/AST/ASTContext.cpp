@@ -1899,7 +1899,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
   SILFunctionTypeBits.NumParameters = interfaceParams.size();
   assert(!isIndirectParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
-  memcpy(getMutableInterfaceParameters().data(), interfaceParams.data(),
+  memcpy(getMutableParameters().data(), interfaceParams.data(),
          interfaceParams.size() * sizeof(SILParameterInfo));
 
   // Make sure the interface types are sane.
@@ -1910,14 +1910,14 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
       assert(gparam->isCanonical() && "generic signature is not canonicalized");
     }
 
-    for (auto param : getInterfaceParameters()) {
+    for (auto param : getParameters()) {
       (void)param;
       assert(!param.getType().findIf([](Type t) {
         return t->is<ArchetypeType>()
           && !t->castTo<ArchetypeType>()->getSelfProtocol();
       }) && "interface type of generic type should not contain context archetypes");
     }
-    assert(!getInterfaceResult().getType().findIf([](Type t) {
+    assert(!getResult().getType().findIf([](Type t) {
       return t->is<ArchetypeType>();
     }) && "interface type of generic type should not contain context archetypes");
   }

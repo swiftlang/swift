@@ -2318,12 +2318,12 @@ void Serializer::writeType(Type ty) {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
     auto callingConvention = fnTy->getAbstractCC();
-    auto interfaceResult = fnTy->getInterfaceResult();
+    auto interfaceResult = fnTy->getResult();
     auto stableInterfaceResultConvention =
       getRawStableResultConvention(interfaceResult.getConvention());
 
     SmallVector<TypeID, 8> paramTypes;
-    for (auto param : fnTy->getInterfaceParameters()) {
+    for (auto param : fnTy->getParameters()) {
       paramTypes.push_back(addTypeRef(param.getType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       paramTypes.push_back(TypeID(conv));

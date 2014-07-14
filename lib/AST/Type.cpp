@@ -2288,7 +2288,7 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
 
-    SILResultInfo origInterfaceResult = fnTy->getInterfaceResult();
+    SILResultInfo origInterfaceResult = fnTy->getResult();
     Type transInterfaceResult = origInterfaceResult.getType().transform(fn);
     if (!transInterfaceResult)
       return Type();
@@ -2296,7 +2296,7 @@ case TypeKind::Id:
     changed = changed || (canTransInterfaceResult != origInterfaceResult.getType());
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
-    for (auto origParam : fnTy->getInterfaceParameters()) {
+    for (auto origParam : fnTy->getParameters()) {
       Type transParam = origParam.getType().transform(fn);
       if (!transParam) return Type();
 

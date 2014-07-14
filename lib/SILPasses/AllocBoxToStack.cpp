@@ -203,7 +203,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
       // apply instructions do not capture the pointer when it is passed
       // indirectly
       if (apply->getSubstCalleeType()
-          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+          ->getParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -218,7 +218,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
       auto args = partialApply->getArguments();
       auto params = partialApply->getSubstCalleeType()
-        ->getInterfaceParameters();
+        ->getParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
         if (canValueEscape(User, /*examineApply = */ true))
@@ -255,7 +255,7 @@ static size_t getParameterIndexForOperand(Operand *O) {
   if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
     Type = Apply->getSubstCalleeType();
     ArgCount = Apply->getArguments().size();
-    assert(Type->getInterfaceParameters().size() == ArgCount &&
+    assert(Type->getParameters().size() == ArgCount &&
            "Expected all arguments to be supplied!");
   } else {
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
@@ -263,7 +263,7 @@ static size_t getParameterIndexForOperand(Operand *O) {
     ArgCount = PartialApply->getArguments().size();
   }
 
-  size_t ParamCount = Type->getInterfaceParameters().size();
+  size_t ParamCount = Type->getParameters().size();
   assert(ParamCount >= ArgCount && "Expected fewer arguments to function!");
 
   auto OperandIndex = O->getOperandNumber();
@@ -527,7 +527,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
   // Generate a new parameter list with deleted parameters removed.
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   unsigned Index = 0;
-  for (auto &param : OrigFTI->getInterfaceParameters()) {
+  for (auto &param : OrigFTI->getParameters()) {
     if (!DeadParamIndices.count(Index))
       ClonedInterfaceArgTys.push_back(param);
     ++Index;
@@ -540,7 +540,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
-                         OrigFTI->getInterfaceResult(),
+                         OrigFTI->getResult(),
                          M.getASTContext());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
@@ -648,7 +648,7 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
   CanSILFunctionType CanFnTy = Cloner.getCloned()->getLoweredFunctionType();
   auto &M = PartialApply->getModule();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substInterfaceGenericArgs(M,
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
                                                              M.getSwiftModule(),
                                                              Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
