@@ -649,21 +649,20 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     return;
   }
 
-  // Infix operator must be binary.
+  // Infix operator is only allowed on operator declarations, not on func.
   if (isa<InfixAttr>(attr)) {
-    if (!FD->isBinaryOperator()) {
-      TC.diagnose(attr->getLocation(), diag::invalid_infix_input);
-      attr->setInvalid();
-      return;
-    }
-  } else {
-    // Otherwise, must be unary.
-    if (!FD->isUnaryOperator()) {
-      TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,
-                  attr->getAttrName());
-      attr->setInvalid();
-      return;
-    }
+    TC.diagnose(attr->getLocation(), diag::invalid_infix_on_func)
+      .fixItRemove(attr->getLocation());
+    attr->setInvalid();
+    return;
+  }
+
+  // Otherwise, must be unary.
+  if (!FD->isUnaryOperator()) {
+    TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,
+                attr->getAttrName());
+    attr->setInvalid();
+    return;
   }
 }
 

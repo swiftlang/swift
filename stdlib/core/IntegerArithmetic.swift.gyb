@@ -60,7 +60,7 @@ func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 // protocol should be presented to users as part of SignedNumberType.
 public protocol _SignedNumberType : Comparable, IntegerLiteralConvertible {
   // Subtraction is a requirement for SignedNumberType
-  infix func - (lhs: Self, rhs: Self) -> Self
+  func - (lhs: Self, rhs: Self) -> Self
 }
 
 // SignedNumberType itself contains only operator requirements having

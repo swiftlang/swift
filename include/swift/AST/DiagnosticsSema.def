@@ -292,17 +292,13 @@ ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,sema_tcd,none,
       "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
-
-ERROR(invalid_infix_input,sema_tcd,none,
-      "function with 'infix' specified must take a two element tuple as input",
-     ())
+ERROR(invalid_infix_on_func,sema_tcd,none,
+      "'infix' modifier is not required or allowed on func declarations", ())
 ERROR(attribute_requires_operator_identifier,sema_tcd,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,sema_tcd,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(assignment_without_inout,sema_tcd,none,
-      "assignment operator must have an initial inout argument", ())
 ERROR(inout_cant_be_variadic,sema_tce,none,
       "inout arguments cannot be variadic", ())
 ERROR(inout_only_parameter,sema_tce,none,

@@ -83,13 +83,13 @@ postfix operator -+- {}
 
 infix operator +-+= {}
 
-infix func +-+ (x: Int, y: Int) -> Int {}
+infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}}
 prefix func +-+ (x: Int) -> Int {}
 
 prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
 postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
 
-infix func +-+= (inout x: Int, y: Int) -> Int {}
+infix func +-+= (inout x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}}
 
 var n = 0
 
