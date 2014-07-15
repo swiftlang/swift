@@ -1,5 +1,6 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-dynamic %s -emit-silgen | FileCheck %s
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-dynamic %s -emit-sil -verify
 
 import Foundation
 import gizmo
@@ -8,7 +9,7 @@ class Foo: Proto {
   // Not objc or dynamic, so only a vtable entry
   init(native: Int) {}
   func nativeMethod() {}
-  var nativeProp: Int
+  var nativeProp: Int = 0
   subscript(#native: Int) -> Int {
     get { return native }
     set {}
@@ -18,7 +19,7 @@ class Foo: Proto {
   // by vtable
   @objc init(objc: Int) {}
   @objc func objcMethod() {}
-  @objc var objcProp: Int
+  @objc var objcProp: Int = 0
   @objc subscript(#objc: Int) -> Int {
     get { return objc }
     set {}
@@ -27,7 +28,7 @@ class Foo: Proto {
   // dynamic, so it has only an ObjC entry point
   dynamic init(dynamic: Int) {}
   dynamic func dynamicMethod() {}
-  dynamic var dynamicProp: Int
+  dynamic var dynamicProp: Int = 0
   dynamic subscript(#dynamic: Int) -> Int {
     get { return dynamic }
     set {}
@@ -228,6 +229,12 @@ class Subclass: Foo {
   dynamic override func overriddenByDynamic() {}
 }
 
+extension Gizmo {
+  convenience init(convenienceInExtension: Int) {
+    self.init(bellsOn: convenienceInExtension)
+  }
+}
+
 // CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
 func nativeMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
@@ -287,9 +294,17 @@ func foreignMethodDispatch() {
   // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!setter.1.foreign
   g.count = x
   // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!getter.1.foreign
-  let y = g[0]
+  let y: AnyObject! = g[0]
   // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!setter.1.foreign
   g[0] = y
+}
+
+extension Gizmo {
+  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT19foreignClassFactorySi_S_
+  // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  convenience init(foreignClassFactory x: Int) {
+    return self.init(stuff: x)
+  }
 }
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones

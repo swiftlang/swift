@@ -54,6 +54,8 @@ typedef long NSInteger;
 @property void (^block)(void);
 @property NSInteger count;
 
++ (instancetype)gizmoWithStuff:(NSInteger)x;
+
 @end
 
 @interface Guisemeau : Gizmo

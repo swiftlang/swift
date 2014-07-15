@@ -992,8 +992,9 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 
 bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
-    // If a function has an associated Clang node, it's foreign.
-    if (fd->hasClangNode())
+    // If a function has an associated Clang node, it's foreign and only has
+    // an ObjC entry point.
+    if (vd->hasClangNode())
       return true;
 
     // Property accessors should be generated alongside the property.
@@ -1006,6 +1007,11 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
       return fd->isObjC() || fd->getAttrs().hasAttribute<IBActionAttr>();
   }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
+    // If a function has an associated Clang node, it's foreign and only has
+    // an ObjC entry point.
+    if (vd->hasClangNode())
+      return true;
+
     if (getASTContext().LangOpts.EnableDynamic)
       return cd->getAttrs().hasAttribute<DynamicAttr>();
     else
