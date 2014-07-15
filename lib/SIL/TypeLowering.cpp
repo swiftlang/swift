@@ -492,39 +492,36 @@ namespace {
     const Impl &asImpl() const { return static_cast<const Impl&>(*this); }
     Impl &asImpl() { return static_cast<Impl&>(*this); }
 
-    /// The number of children of this aggregate. The data follows the instance
-    /// data.
-    unsigned NumChildren;
-
+    // A reference to the lazily-allocated children vector.
+    mutable ArrayRef<Child> Children = {};
+    
   protected:
-    LoadableAggTypeLowering(SILType type, ArrayRef<Child> children)
-        : NonTrivialLoadableTypeLowering(type),
-          NumChildren(children.size()) {
-      memcpy(reinterpret_cast<Child*>(&asImpl()+1),
-             children.data(),
-             NumChildren * sizeof(Child));
-    }
-
+    virtual void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+      const = 0;
+    
   public:
-    static const Impl *create(TypeConverter &TC, IsDependent_t dependent,
-                              CanType type, ArrayRef<Child> children) {
-      size_t bufferSize =
-        sizeof(Impl) + sizeof(Child) * children.size();
-      void *buffer = operator new(bufferSize, TC, dependent);
-      auto silType = SILType::getPrimitiveObjectType(type);
-      return ::new(buffer) Impl(silType, children);
+    LoadableAggTypeLowering(CanType type)
+      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type)) {
     }
 
-    ArrayRef<Child> getChildren() const {
-      auto buffer = reinterpret_cast<const Child*>(&asImpl() + 1);
-      return ArrayRef<Child>(buffer, NumChildren);
+    ArrayRef<Child> getChildren(SILModule &M) const {
+      if (Children.data() == nullptr) {
+        SmallVector<Child, 4> children;
+        lowerChildren(M, children);
+        auto isDependent = IsDependent_t(getLoweredType().isDependentType());
+        auto buf = operator new(sizeof(Child) * children.size(), M.Types,
+                                isDependent);
+        memcpy(buf, children.data(), sizeof(Child) * children.size());
+        Children = {reinterpret_cast<Child*>(buf), children.size()};
+      }
+      return Children;
     }
 
     template <class T>
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
-      for (auto &child : getChildren()) {
+      for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
         // Skip trivial children.
         if (childLowering.isTrivial())
@@ -557,7 +554,7 @@ namespace {
     void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue aggValue,
                               LoweringStyle style) const override {
-      for (auto &child : getChildren()) {
+      for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
         SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
                                                          child.getIndex(),
@@ -598,9 +595,8 @@ namespace {
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
-    LoadableTupleTypeLowering(SILType type,
-                              ArrayRef<Child> children)
-      : LoadableAggTypeLowering(type, children) {}
+    LoadableTupleTypeLowering(CanType type)
+      : LoadableAggTypeLowering(type) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue, unsigned index,
@@ -613,15 +609,29 @@ namespace {
                               ArrayRef<SILValue> values) const {
       return B.createTuple(loc, getLoweredType(), values);
     }
+  
+  private:
+    void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+    const override {
+      // The children are just the elements of the lowered tuple.
+      auto silTy = getLoweredType();
+      auto tupleTy = silTy.castTo<TupleType>();
+      children.reserve(tupleTy->getFields().size());
+      unsigned index = 0;
+      for (auto elt : tupleTy.getElementTypes()) {
+        auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
+        children.push_back(Child{index, M.Types.getTypeLowering(silElt)});
+        ++index;
+      }
+    }
   };
 
   /// A lowering for loadable but non-trivial struct types.
   class LoadableStructTypeLowering final
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
-    LoadableStructTypeLowering(SILType type,
-                               ArrayRef<Child> children)
-      : LoadableAggTypeLowering(type, children) {}
+    LoadableStructTypeLowering(CanType type)
+      : LoadableAggTypeLowering(type) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue structValue, VarDecl *field,
@@ -633,6 +643,25 @@ namespace {
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                               ArrayRef<SILValue> values) const {
       return B.createStruct(loc, getLoweredType(), values);
+    }
+        
+  private:
+    void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+    const override {
+      auto silTy = getLoweredType();
+      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      assert(structDecl);
+      
+      for (auto prop : structDecl->getStoredProperties()) {
+        // Lower the type according to the abstraction level of its original
+        // declaration.
+        auto origTy = AbstractionPattern(prop->getType());
+        auto substTy = silTy.getSwiftRValueType()
+          ->getTypeOfMember(M.getSwiftModule(), prop, nullptr);
+        
+        children.push_back(
+                         Child{prop, M.Types.getTypeLowering(origTy, substTy)});
+      }
     }
   };
   
@@ -656,16 +685,6 @@ namespace {
     };
     
   private:
-    /// The number of tail-allocated NonTrivialElements following this object.
-    unsigned numNonTrivial;
-    
-    LoadableEnumTypeLowering(SILType type,
-                             ArrayRef<NonTrivialElement> nonTrivial)
-      : NonTrivialLoadableTypeLowering(type), numNonTrivial(nonTrivial.size())
-    {
-      memcpy(reinterpret_cast<NonTrivialElement*>(this+1), nonTrivial.data(),
-             numNonTrivial * sizeof(NonTrivialElement));
-    }
 
     using SimpleOperationTy = void (*)(SILBuilder &B, SILLocation loc, SILValue value,
                                        const TypeLowering &valueLowering,
@@ -680,7 +699,8 @@ namespace {
       auto &M = B.getFunction().getModule();
 
       // Create all the blocks up front, so we can set up our switch_enum.
-      for (auto &elt : getNonTrivialElements()) {
+      auto nonTrivialElts = getNonTrivialElements(M);
+      for (auto &elt : nonTrivialElts) {
         auto bb = new (M) SILBasicBlock(&B.getFunction());
         auto argTy = elt.getLowering().getLoweredType();
         new (M) SILArgument(argTy, bb);
@@ -696,7 +716,7 @@ namespace {
       
       for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
         SILBasicBlock *bb = nonTrivialBBs[i].second;
-        const TypeLowering &lowering = getNonTrivialElements()[i].getLowering();
+        const TypeLowering &lowering = nonTrivialElts[i].getLowering();
         B.emitBlock(bb);
         operation(B, loc, bb->getBBArgs()[0], lowering, doneBB);
       }
@@ -704,24 +724,42 @@ namespace {
       B.emitBlock(doneBB);
     }
     
+    /// A reference to the lazily-allocated array of non-trivial enum cases.
+    mutable ArrayRef<NonTrivialElement> NonTrivialElements = {};
+    
   public:
-    static const LoadableEnumTypeLowering *create(TypeConverter &TC,
-                                       IsDependent_t dependent,
-                                       CanType type,
-                                       ArrayRef<NonTrivialElement> nonTrivial) {
-      void *buffer
-        = operator new(sizeof(LoadableEnumTypeLowering)
-                         + sizeof(NonTrivialElement) * nonTrivial.size(),
-                       TC, dependent);
-      
-      auto silTy = SILType::getPrimitiveObjectType(type);
-      
-      return ::new (buffer) LoadableEnumTypeLowering(silTy, nonTrivial);
+    LoadableEnumTypeLowering(CanType type)
+      : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type))
+    {
     }
     
-    ArrayRef<NonTrivialElement> getNonTrivialElements() const {
-      auto buffer = reinterpret_cast<const NonTrivialElement*>(this+1);
-      return ArrayRef<NonTrivialElement>(buffer, numNonTrivial);
+    ArrayRef<NonTrivialElement> getNonTrivialElements(SILModule &M) const {
+      SILType silTy = getLoweredType();
+      EnumDecl *enumDecl = silTy.getEnumOrBoundGenericEnum();
+      assert(enumDecl);
+      
+      if (NonTrivialElements.data() == nullptr) {
+        SmallVector<NonTrivialElement, 4> elts;
+        
+        for (auto elt : enumDecl->getAllElements()) {
+          if (!elt->hasArgumentType()) continue;
+          auto origTy = AbstractionPattern(elt->getArgumentType());
+          auto substTy = silTy.getSwiftRValueType()
+            ->getTypeOfMember(M.getSwiftModule(), elt, nullptr,
+                              elt->getArgumentType());
+          elts.push_back(NonTrivialElement{elt,
+                                     M.Types.getTypeLowering(origTy, substTy)});
+        }
+        
+        auto isDependent = IsDependent_t(silTy.isDependentType());
+        
+        auto buf = operator new(sizeof(NonTrivialElement) * elts.size(),
+                                M.Types, isDependent);
+        memcpy(buf, elts.data(), sizeof(NonTrivialElement) * elts.size());
+        NonTrivialElements = {reinterpret_cast<NonTrivialElement*>(buf),
+                              elts.size()};
+      }
+      return NonTrivialElements;
     }
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
@@ -928,37 +966,36 @@ namespace {
 
       if (hasOnlyTrivialChildren)
         return handleTrivial(tupleType);
-      return LoadableTupleTypeLowering::create(TC, Dependent,
-                                               OrigType, childElts);
+      return new (TC, Dependent) LoadableTupleTypeLowering(OrigType);
     }
 
     const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
       
-      typedef LoadableStructTypeLowering::Child Child;
-      SmallVector<Child, 8> childFields;
-
       // For consistency, if it's anywhere resilient, we need to treat the type
       // as resilient in SIL.
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
-      bool hasOnlyTrivialChildren = true;
+      // Classify the type according to its stored properties.
+      bool trivial = true;
       for (auto field : D->getStoredProperties()) {
-        auto origFieldType = AbstractionPattern(field->getType());
         auto substFieldType =
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
-        auto &lowering = TC.getTypeLowering(origFieldType, substFieldType);
-        if (lowering.isAddressOnly()) {
+        switch (classifyType(substFieldType->getCanonicalType(), TC.M)) {
+        case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(structType);
+        case LoweredTypeKind::AggWithReference:
+        case LoweredTypeKind::Reference:
+          trivial = false;
+          break;
+        case LoweredTypeKind::Trivial:
+          break;
         }
-        hasOnlyTrivialChildren &= lowering.isTrivial();
-        childFields.push_back(Child(field, lowering));
       }
 
-      if (hasOnlyTrivialChildren)
+      if (trivial)
         return handleTrivial(structType);
-      return LoadableStructTypeLowering::create(TC, Dependent,
-                                                OrigType, childFields);
+      return new (TC, Dependent) LoadableStructTypeLowering(OrigType);
     }
         
     const TypeLowering *visitAnyEnumType(CanType enumType, EnumDecl *D) {
@@ -975,39 +1012,43 @@ namespace {
           if (D == TC.Context.getOptionalDecl()) {
             return &TC.getTypeLowering(OptionalType::get(selfType));
           } else if (D == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
-            return &TC.getTypeLowering(ImplicitlyUnwrappedOptionalType::get(selfType));
+            return &TC.getTypeLowering(
+                                ImplicitlyUnwrappedOptionalType::get(selfType));
           }
         }
       }
 
-      typedef LoadableEnumTypeLowering::NonTrivialElement NonTrivialElement;
-      SmallVector<NonTrivialElement, 8> nonTrivialElts;
-      
       // If any of the enum elements have address-only data, the enum is
       // address-only.
+      bool trivial = true;
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect address-only-ness.
         if (!elt->hasArgumentType())
           continue;
         
-        auto eltType = enumType->getTypeOfMember(D->getModuleContext(),
-                                                  elt, nullptr,
-                                                  elt->getArgumentType())
+        auto substEltType = enumType->getTypeOfMember(D->getModuleContext(),
+                                                      elt, nullptr,
+                                                      elt->getArgumentType())
           ->getCanonicalType();
         
-        if (eltType == enumType)
+        if (substEltType == enumType)
           continue;
-        
-        auto &lowering = TC.getTypeLowering(eltType);
-        if (lowering.isAddressOnly())
+
+        switch (classifyType(substEltType->getCanonicalType(), TC.M)) {
+        case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(enumType);
-        if (!lowering.isTrivial())
-          nonTrivialElts.push_back(NonTrivialElement(elt, lowering));        
+        case LoweredTypeKind::AggWithReference:
+        case LoweredTypeKind::Reference:
+          trivial = false;
+          break;
+        case LoweredTypeKind::Trivial:
+          break;
+        }
+        
       }
-      if (nonTrivialElts.empty())
+      if (trivial)
         return handleTrivial(enumType);
-      return LoadableEnumTypeLowering::create(TC, Dependent,
-                                              OrigType, nonTrivialElts);
+      return new (TC, Dependent) LoadableEnumTypeLowering(OrigType);
     }
 
     const TypeLowering *visitDynamicSelfType(CanDynamicSelfType type) {

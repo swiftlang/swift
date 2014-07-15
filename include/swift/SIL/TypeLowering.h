@@ -336,6 +336,8 @@ public:
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc,
                      IsDependent_t dependent);
+  void *operator new[](size_t size, TypeConverter &tc,
+                       IsDependent_t dependent);
 
   // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
   // The latter is made challenging because the existence of the
