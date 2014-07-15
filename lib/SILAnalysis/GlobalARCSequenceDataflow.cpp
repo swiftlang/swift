@@ -238,12 +238,11 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   }
 
   // We should never have an argument path merge with a non-argument path.
-  if (!Argument.isNull()) {
-    RefCountState<TopDownRefCountState>::clear();
-    DEBUG(
-        llvm::dbgs() << "            Can not merge Argument with Non-Argument "
-                        "path... Bailing!\n");
-    return false;
+  if (Argument.isNull() != Other.Argument.isNull()) {
+      RefCountState<TopDownRefCountState>::clear();
+      DEBUG(llvm::dbgs() << "            Can not merge Argument with "
+            "Non-Argument path... Bailing!\n");
+      return false;
   }
 
   Increments.insert(Other.Increments.begin(), Other.Increments.end());
