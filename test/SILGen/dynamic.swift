@@ -229,12 +229,6 @@ class Subclass: Foo {
   dynamic override func overriddenByDynamic() {}
 }
 
-extension Gizmo {
-  convenience init(convenienceInExtension: Int) {
-    self.init(bellsOn: convenienceInExtension)
-  }
-}
-
 // CHECK-LABEL: sil @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
 func nativeMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
@@ -300,10 +294,22 @@ func foreignMethodDispatch() {
 }
 
 extension Gizmo {
+  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT22convenienceInExtensionSi_S_
+  // CHECK:         class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
+  convenience init(convenienceInExtension: Int) {
+    self.init(bellsOn: convenienceInExtension)
+  }
+
   // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT19foreignClassFactorySi_S_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
     return self.init(stuff: x)
+  }
+
+  // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT24foreignClassExactFactorySi_S_
+  // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  convenience init(foreignClassExactFactory x: Int) {
+    return self.init(exactlyStuff: x)
   }
 }
 

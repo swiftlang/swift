@@ -55,6 +55,7 @@ typedef long NSInteger;
 @property NSInteger count;
 
 + (instancetype)gizmoWithStuff:(NSInteger)x;
++ (Gizmo*)gizmoWithExactlyStuff:(NSInteger)x;
 
 @end
 
