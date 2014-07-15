@@ -1,0 +1,66 @@
+// RUN: %sil-opt %s -licm -verify | FileCheck %s
+
+import Builtin
+import Swift
+
+var startTime: Double
+var sum1: Int
+
+// CHECK-LABEl: @sink_cond_fail
+sil @sink_cond_fail : $@thin () -> () {
+// CHECK: bb0
+bb0:
+  %0 = global_addr #startTime : $*Double
+  %1 = global_addr #sum1 : $*Int
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = struct $Int (%2 : $Builtin.Word)
+  store %3 to %1 : $*Int
+  %5 = function_ref @callee : $@cc(cdecl) @thin () -> Double
+  %6 = apply %5() : $@cc(cdecl) @thin () -> Double
+  store %6 to %0 : $*Double
+  %8 = integer_literal $Builtin.Word, 1000000000
+  %9 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  br bb2(%2 : $Builtin.Word)
+
+// CHECK: bb1:
+bb1:
+  %11 = tuple ()
+  return %11 : $()
+
+// CHECK: bb2(
+bb2(%13 : $Builtin.Word):
+  // CHECK-NEXT: integer_literal
+  %14 = integer_literal $Builtin.Word, 1
+  // CHECK-NEXT: builtin_function_ref
+  %15 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  // CHECK-NEXT: integer_literal
+  %16 = integer_literal $Builtin.Int1, -1
+  // CHECK-NEXT: apply
+  %17 = apply %15(%13, %14, %16) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  // CHECK-NEXT: tuple_extract
+  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0
+  // CHECK-NEXT: tuple_extract
+  %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %19 : $Builtin.Int1
+  // CHECK-NEXT: struct_element_addr
+  %21 = struct_element_addr %1 : $*Int, #Int.value
+  // CHECK-NEXT: load
+  %22 = load %21 : $*Builtin.Word
+  // CHECK-NEXT: apply
+  %23 = apply %15(%22, %14, %16) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  // CHECK-NEXT: tuple_extract
+  %24 = tuple_extract %23 : $(Builtin.Word, Builtin.Int1), 0
+  // CHECK-NEXT: tuple_extract
+  %25 = tuple_extract %23 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %25 : $Builtin.Int1
+  // CHECK-NEXT: struct
+  %27 = struct $Int (%24 : $Builtin.Word)
+  // CHECK-NEXT: store
+  store %27 to %1 : $*Int
+  // CHECK-NEXT: cond_fail
+  // CHECK-NEXT: cond_fail
+  %29 = apply %9(%18, %8) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %29, bb1, bb2(%18 : $Builtin.Word)
+}
+
+sil @callee : $@cc(cdecl) @thin () -> Double

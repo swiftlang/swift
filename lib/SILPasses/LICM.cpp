@@ -95,6 +95,81 @@ static bool mayRead(SILInstruction *I) {
   return I->mayReadFromMemory();
 }
 
+/// Check if an address does not depend on other values in a basic block.
+static SILInstruction *addressIndependent(SILValue Addr) {
+  Addr = Addr.stripCasts();
+  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Addr))
+    return GAI;
+  if (StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(Addr))
+    return addressIndependent(SEAI->getOperand());
+  return nullptr;
+}
+
+/// Check if two addresses can potentially access the same memory.
+/// For now, return true when both can be traced to the same global variable.
+static bool addressCanPairUp(SILValue Addr1, SILValue Addr2) {
+  SILInstruction *Origin1 = addressIndependent(Addr1);
+  return Origin1 && Origin1 == addressIndependent(Addr2);
+}
+
+/// Move cond_fail down if it can potentially help register promotion later.
+static bool sinkCondFail(SILLoop *Loop) {
+  // Only handle innermost loops for now.
+  if (!Loop->getSubLoops().empty())
+    return false;
+
+  bool Changed = false;
+  for (auto *BB : Loop->getBlocks()) {
+    // A list of CondFails that can be moved down.
+    SmallVector<CondFailInst*, 4> CFs;
+    // A pair of load and store that are independent of the CondFails and
+    // can potentially access the same memory.
+    LoadInst *LIOfPair = nullptr;
+    bool foundPair = false;
+
+    for (auto &Inst : *BB) {
+      if (foundPair) {
+        // Move CFs to right before Inst.
+        for (unsigned I = 0, E = CFs.size(); I < E; I++) {
+          DEBUG(llvm::dbgs() << "sinking cond_fail down ");
+          DEBUG(CFs[I]->dump());
+          DEBUG(llvm::dbgs() << "  before ");
+          DEBUG(Inst.dump());
+          CFs[I]->moveBefore(&Inst);
+        }
+        Changed = true;
+
+        foundPair = false;
+        LIOfPair = nullptr;
+      }
+
+      if (auto CF = dyn_cast<CondFailInst>(&Inst)) {
+        CFs.push_back(CF);
+      } else if (auto LI = dyn_cast<LoadInst>(&Inst)) {
+        if (addressIndependent(LI->getOperand())) {
+          LIOfPair = LI;
+        } else {
+          CFs.clear();
+          LIOfPair = nullptr;
+        }
+      } else if (auto SI = dyn_cast<StoreInst>(&Inst)) {
+        if (addressIndependent(SI->getDest())) {
+          if (LIOfPair &&
+              addressCanPairUp(SI->getDest(), LIOfPair->getOperand()))
+            foundPair = true;
+        } else {
+          CFs.clear();
+          LIOfPair = nullptr;
+        }
+      } else if (mayHaveSideEffects(&Inst)) {
+        CFs.clear();
+        LIOfPair = nullptr;
+      }
+    }
+  }
+  return Changed;
+}
+
 static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               AliasAnalysis *AA, bool ShouldVerify) {
   auto HeaderBB = Loop->getHeader();
@@ -255,7 +330,9 @@ public:
       }
 
       while (!Worklist.empty()) {
-        Changed |= hoistInstructions(Worklist.pop_back_val(), DT, LI, AA,
+        SILLoop *work = Worklist.pop_back_val();
+        Changed |= sinkCondFail(work);
+        Changed |= hoistInstructions(work, DT, LI, AA,
                                      ShouldVerify);
       }
     }
