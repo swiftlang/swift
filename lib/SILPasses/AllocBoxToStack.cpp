@@ -388,6 +388,7 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
                                         /* examinePartialApply = */ true,
                                         /* inAppliedFunction = */ false,
                                         ElidedOperands)) {
+    (void)User;
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI

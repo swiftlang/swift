@@ -727,6 +727,8 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
     DEBUG(llvm::dbgs() << "        SUCCESS! Devirtualized : " << *AI);
     ApplyInst *NewApply =
         replaceDynApplyWithStaticApply(AI, StaticRef, Subs, Init, PEI);
+    (void)NewApply;
+
     DEBUG(llvm::dbgs() << "                To : " << *NewApply);
     NumDynApply++;
     return true;
