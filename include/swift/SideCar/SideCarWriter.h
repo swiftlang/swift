@@ -21,6 +21,10 @@
 
 #include "swift/SideCar/Types.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
 namespace side_car {
 
@@ -36,6 +40,9 @@ public:
 
   SideCarWriter(const SideCarWriter &) = delete;
   SideCarWriter &operator=(const SideCarWriter &) = delete;
+
+  /// Write the side car data to the given stream.
+  void writeToStream(llvm::raw_ostream &os);
 
   /// Add information about a specific Objective-C class.
   ///

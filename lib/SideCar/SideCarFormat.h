@@ -49,6 +49,50 @@ using ModuleIDField = BCVBR<8>;
 using SelectorID = Fixnum<31>;
 using SelectorIDField = BCVBR<16>;
 
+/// The various types of blocks that can occur within a side car file.
+///
+/// These IDs must \em not be renumbered or reordered without incrementing
+/// VERSION_MAJOR.
+enum BlockID {
+  /// The side car block, which contains all of the other blocks.
+  SIDE_CAR_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
+
+  /// The control block, which contains all of the information that needs to
+  /// be validated prior to committing to loading the side car file.
+  ///
+  /// \sa control_block
+  CONTROL_BLOCK_ID,
+
+  /// The identifier data block, which maps identifier strings to IDs.
+  IDENTIFIER_BLOCK_ID,
+};
+
+namespace control_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
+  enum {
+    METADATA = 1,
+  };
+
+  using MetadataLayout = BCRecordLayout<
+    METADATA, // ID
+    BCFixed<16>, // Module format major version
+    BCFixed<16>  // Module format minor version
+  >;
+}
+
+namespace identifier_block {
+  enum {
+    IDENTIFIER_DATA = 1,
+  };
+
+  using IdentifierDataLayout = BCRecordLayout<
+    IDENTIFIER_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from identifier strings to decl kinds / decl IDs
+  >;
+}
+
 } // end namespace side_car
 } // end namespace swift
 
