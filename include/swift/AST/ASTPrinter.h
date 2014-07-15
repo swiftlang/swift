@@ -41,6 +41,9 @@ public:
   /// Called before printing at the point which would be considered the location
   /// of the declaration (normally the name of the declaration).
   virtual void printDeclLoc(const Decl *D) {}
+  /// Called after printing the name of the declaration (the signature for
+  /// functions).
+  virtual void printDeclNameEndLoc(const Decl *D) {}
   /// Called after finishing printing of a declaration.
   virtual void printDeclPost(const Decl *D) {}
 

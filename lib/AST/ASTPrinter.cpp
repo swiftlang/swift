@@ -138,8 +138,11 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   /// \brief Record the location of this declaration, which is about to
   /// be printed.
-  void recordDeclLoc(Decl *decl) {
+  template<typename FnTy>
+  void recordDeclLoc(Decl *decl, const FnTy &Fn) {
     Printer.callPrintDeclLoc(decl);
+    Fn();
+    Printer.printDeclNameEndLoc(decl);
   }
 
   void printClangDocumentationComment(const clang::Decl *D) {
@@ -407,8 +410,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    recordDeclLoc(named->getDecl());
-    Printer.printName(named->getBoundName());
+    recordDeclLoc(named->getDecl(),
+      [&]{
+        Printer.printName(named->getBoundName());
+      });
     break;
   }
 
@@ -805,19 +810,23 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
     Printer << "func ";
     break;
   }
-  recordDeclLoc(decl);
-  interleave(decl->getFullAccessPath(),
-             [&](const ImportDecl::AccessPathElement &Elem) {
-               Printer << Elem.first.str();
-             },
-             [&] { Printer << "."; });
+  recordDeclLoc(decl,
+    [&]{
+      interleave(decl->getFullAccessPath(),
+                 [&](const ImportDecl::AccessPathElement &Elem) {
+                   Printer << Elem.first.str();
+                 },
+                 [&] { Printer << "."; });
+    });
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   printAttributes(decl);
   Printer << "extension ";
-  recordDeclLoc(decl);
-  decl->getExtendedType().print(Printer, Options);
+  recordDeclLoc(decl,
+    [&]{
+      decl->getExtendedType().print(Printer, Options);
+    });
   printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
@@ -825,7 +834,6 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 }
 
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
-  recordDeclLoc(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
 
@@ -868,8 +876,10 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "typealias ";
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   if (Options.TypeDefinitions) {
     bool ShouldPrint = true;
     Type Ty = decl->getUnderlyingType();
@@ -885,8 +895,10 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 }
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   printInheritedWithSuperclass(decl);
 }
 
@@ -895,8 +907,10 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printAttributes(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "typealias ";
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   printInheritedWithSuperclass(decl);
 
   if (!decl->getDefaultDefinitionLoc().isNull()) {
@@ -911,8 +925,10 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "enum ";
-  recordDeclLoc(decl);
-  printNominalDeclName(decl);
+  recordDeclLoc(decl,
+    [&]{
+      printNominalDeclName(decl);
+    });
   printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
@@ -925,8 +941,10 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "struct ";
-  recordDeclLoc(decl);
-  printNominalDeclName(decl);
+  recordDeclLoc(decl,
+    [&]{
+      printNominalDeclName(decl);
+    });
   printInherited(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
@@ -939,8 +957,10 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "class ";
-  recordDeclLoc(decl);
-  printNominalDeclName(decl);
+  recordDeclLoc(decl,
+    [&]{
+      printNominalDeclName(decl);
+    });
   printInheritedWithSuperclass(decl);
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
@@ -953,8 +973,10 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << "protocol ";
-  recordDeclLoc(decl);
-  printNominalDeclName(decl);
+  recordDeclLoc(decl,
+    [&]{
+      printNominalDeclName(decl);
+    });
 
   // Figure out whether we need an explicit 'class' in the inheritance.
   bool explicitClass = false;
@@ -987,8 +1009,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << (decl->isLet() ? "let " : "var ");
   }
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   if (decl->hasType()) {
     Printer << ": ";
     decl->getType().print(Printer, Options);
@@ -1169,33 +1193,43 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isAccessor()) {
     printDocumentationComment(decl);
     printAttributes(decl);
-    recordDeclLoc(decl);
     switch (decl->getAccessorKind()) {
     case AccessorKind::NotAccessor: break;
     case AccessorKind::IsGetter:
-      Printer << "get {";
+      recordDeclLoc(decl,
+        [&]{
+          Printer << "get";
+        });
+      Printer << " {";
       break;
     case AccessorKind::IsDidSet:
-      Printer << "didSet {";
+      recordDeclLoc(decl,
+        [&]{
+          Printer << "didSet";
+        });
+      Printer << " {";
       break;
     case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:
-      Printer << (decl->isSetter() ? "set" : "willSet");
+      recordDeclLoc(decl,
+        [&]{
+          Printer << (decl->isSetter() ? "set" : "willSet");
 
-      auto BodyParams = decl->getBodyParamPatterns();
-      auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();
-      if (auto *TP = dyn_cast<TuplePattern>(ValueParam)) {
-        if (!TP->isImplicit() && !TP->getFields().empty()) {
-          auto *P = TP->getFields().begin()->getPattern()->
-                        getSemanticsProvidingPattern();
-          Identifier Name = P->getBoundName();
-          if (!Name.empty() && !P->isImplicit()) {
-            Printer << "(";
-            Printer.printName(Name);
-            Printer << ")";
+          auto BodyParams = decl->getBodyParamPatterns();
+          auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();
+          if (auto *TP = dyn_cast<TuplePattern>(ValueParam)) {
+            if (!TP->isImplicit() && !TP->getFields().empty()) {
+              auto *P = TP->getFields().begin()->getPattern()->
+                            getSemanticsProvidingPattern();
+              Identifier Name = P->getBoundName();
+              if (!Name.empty() && !P->isImplicit()) {
+                Printer << "(";
+                Printer.printName(Name);
+                Printer << ")";
+              }
+            }
           }
-        }
-      }
+        });
       Printer << " {";
     }
     if (Options.FunctionDefinitions && decl->getBody()) {
@@ -1214,16 +1248,18 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     if (!Options.SkipIntroducerKeywords)
       Printer << "func ";
-    recordDeclLoc(decl);
-    if (!decl->hasName())
-      Printer << "<anonymous>";
-    else
-      Printer.printName(decl->getName());
-    if (decl->isGeneric()) {
-      printGenericParams(decl->getGenericParams());
-    }
+    recordDeclLoc(decl,
+      [&]{
+        if (!decl->hasName())
+          Printer << "<anonymous>";
+        else
+          Printer.printName(decl->getName());
+        if (decl->isGeneric()) {
+          printGenericParams(decl->getGenericParams());
+        }
 
-    printFunctionParameters(decl);
+        printFunctionParameters(decl);
+      });
 
     auto &Context = decl->getASTContext();
     Type ResultTy = decl->getResultType();
@@ -1242,7 +1278,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
-  Printer.printName(elt->getName());
+  recordDeclLoc(elt,
+    [&]{
+      Printer.printName(elt->getName());
+    });
 
   if (elt->hasArgumentType()) {
     Type Ty = elt->getArgumentType();
@@ -1253,7 +1292,6 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   // FIXME: Attributes?
-  recordDeclLoc(decl);
   Printer << "case ";
 
   interleave(decl->getElements().begin(), decl->getElements().end(),
@@ -1277,9 +1315,11 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
   printOverrideKeyword(decl);
   printAccessibility(decl);
-  recordDeclLoc(decl);
-  Printer << "subscript ";
-  printPattern(decl->getIndices());
+  recordDeclLoc(decl,
+    [&]{
+      Printer << "subscript ";
+      printPattern(decl->getIndices());
+    });
   Printer << " -> ";
   decl->getElementType().print(Printer, Options);
 
@@ -1295,11 +1335,13 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       decl->getInitKind() == CtorInitializerKind::ConvenienceFactory)
     Printer << "convenience ";
   
-  recordDeclLoc(decl);
-  Printer << "init";
-  if (decl->isGeneric())
-    printGenericParams(decl->getGenericParams());
-  printFunctionParameters(decl);
+  recordDeclLoc(decl,
+    [&]{
+      Printer << "init";
+      if (decl->isGeneric())
+        printGenericParams(decl->getGenericParams());
+      printFunctionParameters(decl);
+    });
   
   if (decl->getInitKind() == CtorInitializerKind::Factory) {
     Printer << " -> ";
@@ -1317,8 +1359,10 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  recordDeclLoc(decl);
-  Printer << "deinit ";
+  recordDeclLoc(decl,
+    [&]{
+      Printer << "deinit ";
+    });
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
@@ -1330,8 +1374,10 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   Printer << "infix operator ";
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   Printer << " {";
   Printer.printNewline();
   {
@@ -1364,8 +1410,10 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
   Printer << "prefix operator ";
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   Printer << " {";
   Printer.printNewline();
   Printer << "}";
@@ -1373,8 +1421,10 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   Printer << "postfix operator ";
-  recordDeclLoc(decl);
-  Printer.printName(decl->getName());
+  recordDeclLoc(decl,
+    [&]{
+      Printer.printName(decl->getName());
+    });
   Printer << " {";
   Printer.printNewline();
   Printer << "}";
