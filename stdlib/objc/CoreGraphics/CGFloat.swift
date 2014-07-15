@@ -13,7 +13,7 @@
 @exported import CoreGraphics
 import Darwin
 
-public struct CGFloat {
+public struct CGFloat : Reflectable {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
   /// 32-bit architectures and Double on 64-bit architectures.
@@ -42,6 +42,10 @@ public struct CGFloat {
 
   @transparent public init(_ value: Double) {
     self.native = NativeType(value)
+  }
+  
+  public func getMirror() -> MirrorType {
+    return reflect(native)
   }
 
   /// The native value.
