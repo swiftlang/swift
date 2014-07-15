@@ -6,7 +6,7 @@
   public class func classMethod() {}
   public func implicitlyObjC() {}
 
-  @IBOutlet public var outlet : ObjCClass = ObjCClass()
+  @IBOutlet public var outlet : ObjCClass! = ObjCClass()
   @IBAction public func performAction(_: AnyObject?) {}
 }
 

@@ -14,7 +14,7 @@ func IBFunction() -> () {}
 @objc
 class IBOutletWrapperTy {
   @IBOutlet
-  var value : IBOutletWrapperTy = IBOutletWrapperTy() // no-warning
+  var value : IBOutletWrapperTy! = IBOutletWrapperTy() // no-warning
 
   @IBOutlet
   class var staticValue: IBOutletWrapperTy = 52  // expected-error {{type 'IBOutletWrapperTy' does not conform to protocol 'IntegerLiteralConvertible'}}
@@ -50,7 +50,6 @@ class NonObjC {}
 // Check where @IBOutlet can occur
 @objc class X {
   // Class type
-  @IBOutlet var outlet1: X
   @IBOutlet var outlet2: X?
   @IBOutlet var outlet3: X!
 
@@ -59,14 +58,12 @@ class NonObjC {}
   @IBOutlet var outlet3a: NonObjC! // expected-error{{'IBOutlet' property cannot have non-'@objc' class type 'NonObjC'}}
 
   // AnyObject
-  @IBOutlet var outlet4: AnyObject
   @IBOutlet var outlet5: AnyObject?
   @IBOutlet var outlet6: AnyObject!
 
   // Protocol types
   @IBOutlet var outlet7: P1 // expected-error{{'IBOutlet' property cannot have non-object type 'P1'}}
   @IBOutlet var outlet8: CP1 // expected-error{{'IBOutlet' property cannot have non-object type 'CP1'}}
-  @IBOutlet var outlet9: OP1
   @IBOutlet var outlet10: P1? // expected-error{{'IBOutlet' property cannot have non-object type}}
   @IBOutlet var outlet11: CP1? // expected-error{{'IBOutlet' property cannot have non-object type}}
   @IBOutlet var outlet12: OP1?
@@ -100,7 +97,6 @@ class NonObjC {}
   @IBOutlet weak var outlet31: X!
 
   // String
-  @IBOutlet var outlet32: String
   @IBOutlet var outlet33: String?
   @IBOutlet var outlet34: String!
 
@@ -110,23 +106,19 @@ class NonObjC {}
   @IBOutlet var outlet37: (X, X)  // expected-error{{'IBOutlet' property cannot have non-object type}}
   @IBOutlet var outlet38: Int  // expected-error{{'IBOutlet' property cannot have non-object type}}
 
-  @IBOutlet var collection1a: [AnyObject]
-  @IBOutlet var collection1b: ([AnyObject])?
-  @IBOutlet var collection1c: ([AnyObject])!
+  @IBOutlet var collection1b: [AnyObject]?
+  @IBOutlet var collection1c: [AnyObject]!
 
-  @IBOutlet var collection2a: [X]
-  @IBOutlet var collection2b: ([X])?
-  @IBOutlet var collection2c: ([X])!
+  @IBOutlet var collection2b: [X]?
+  @IBOutlet var collection2c: [X]!
 
-  @IBOutlet var collection3a: [OP1]
-  @IBOutlet var collection3b: ([OP1])?
-  @IBOutlet var collection3c: ([OP1])!
+  @IBOutlet var collection3b: [OP1]?
+  @IBOutlet var collection3c: [OP1]!
 
   @IBOutlet var collection4a: [CP1] // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
   @IBOutlet var collection4b: ([CP1])? // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
   @IBOutlet var collection4c: ([CP1])! // expected-error{{'IBOutlet' property cannot be an array of non-object type}}
 
-  @IBOutlet var collection5a: [String]    // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var collection5b: ([String])?  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var collection5c: ([String])!  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
 
@@ -151,14 +143,10 @@ class NonObjC {}
    let o2 = outlet2
   }
   
-  // This outlet is strong, so it cannot be tested.
-  @IBOutlet var outlet3 : Infer
-
   // This outlet is strong and optional.
   @IBOutlet var outlet4: AnyObject?
 
   func testStrong() {
-    if outlet3 {}      // expected-error {{type 'Infer' does not conform to protocol 'BooleanType'}}
     if outlet4 {}
   }
 }
@@ -172,21 +160,29 @@ class NonObjC {}
 }
 
 class SwiftGizmo {
-  @IBOutlet var a : C
-  @IBOutlet var b : [C]
-  @IBOutlet var c : String
-  @IBOutlet var d : [String]  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
-  @IBOutlet var e : Proto
+  @IBOutlet var a : C!
+  @IBOutlet var b : [C]!
+  @IBOutlet var c : String!
+  @IBOutlet var d : [String]! // expected-error{{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var e : Proto!
 
   @IBOutlet var f : C?
   @IBOutlet var g : C!
 
   @IBOutlet weak var h : C?
   @IBOutlet weak var i : C!
-  @IBOutlet unowned var j : C
+  @IBOutlet unowned var j : C! // expected-error{{'unowned' cannot be applied to non-class type 'C!'}}
 
 
   @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}
+
+  init() {}
+}
+
+class MissingOptional {
+  @IBOutlet var a: C // expected-error{{'IBOutlet' property has non-optional type 'C'}}
+  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{21-21=?}}
+  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{21-21=!}}
 
   init() {}
 }

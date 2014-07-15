@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -168,14 +169,40 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 
   // Look through ownership types, and optionals.
   type = type->getReferenceStorageReferent();
-  if (Type underlying = type->getAnyOptionalObjectType())
+  bool wasOptional = false;
+  if (Type underlying = type->getAnyOptionalObjectType()) {
     type = underlying;
+    wasOptional = true;
+  }
 
 
   bool isArray = false;
   if (auto isError = isAcceptableOutletType(type, isArray, TC))
     return diagnoseAndRemoveAttr(attr, isError.getValue(),
                                  /*array=*/isArray, type);
+
+  // If the type wasn't optional, complain.
+  if (!wasOptional) {
+    auto symbolLoc = Lexer::getLocForEndOfToken(
+                       TC.Context.SourceMgr,
+                       VD->getTypeSourceRangeForDiagnostics().End);
+    TC.diagnose(attr->getLocation(), diag::iboutlet_non_optional,
+                type);
+    TC.diagnose(symbolLoc, diag::note_make_optional,
+                OptionalType::get(type))
+      .fixItInsert(symbolLoc, "?");
+    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional,
+                ImplicitlyUnwrappedOptionalType::get(type))
+      .fixItInsert(symbolLoc, "!");
+
+    // Recover by setting the implicitly-unwrapped optional type.
+    type = ImplicitlyUnwrappedOptionalType::get(type);
+    if (auto refStorageType = VD->getType()->getAs<ReferenceStorageType>())
+      type = ReferenceStorageType::get(type, refStorageType->getOwnership(),
+                                       TC.Context);
+
+    VD->overwriteType(type);
+  }
 }
 
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {

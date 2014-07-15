@@ -234,7 +234,7 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * array;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary * dictionary;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollection;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollectionNonOptional;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray * outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * outletCollectionProto;
 // CHECK-NEXT: init
@@ -271,7 +271,7 @@ private class Private : A1 {}
   var dictionary: Dictionary<String, String> = [:]
 
   @IBOutlet var outletCollection: [Properties]!
-  @IBOutlet var outletCollectionNonOptional: [Properties] = []
+  @IBOutlet var outletCollectionOptional: [Properties]? = []
   @IBOutlet var outletCollectionAnyObject: [AnyObject]?
   @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
 }

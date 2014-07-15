@@ -119,7 +119,7 @@ class TestNSCopying {
 class TestComputedOutlet {
   var _disclosedView : TestComputedOutlet! = .None
 
-  @IBOutlet var disclosedView : TestComputedOutlet {
+  @IBOutlet var disclosedView : TestComputedOutlet! {
   get { return _disclosedView }
   set { _disclosedView = newValue }
   }

@@ -995,11 +995,9 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (pbd->hasInit())
     return true;
 
-  // If it is an IBOutlet, is NSManaged, or is a lazy variable, it is trivially
-  // true.
+  // If it is NSManaged or is a lazy variable, it is trivially true.
   if (auto var = pbd->getSingleVar()) {
-    if (var->getAttrs().hasAttribute<IBOutletAttr>() ||
-        var->getAttrs().hasAttribute<NSManagedAttr>() ||
+    if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
         var->getAttrs().hasAttribute<LazyAttr>())
       return true;
   }
@@ -2853,7 +2851,7 @@ public:
     validateAttributes(TC, VD);
     TC.checkDeclAttributesEarly(VD);
 
-    // The instance var requires ObjC interop if it has an @objc or @iboutlet
+    // The instance var requires ObjC interop if it has an @objc or @IBOutlet
     // attribute or if it's a member of an ObjC class or protocol.
     if (VD->getDeclContext()->getDeclaredTypeInContext()) {
       auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());

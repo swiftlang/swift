@@ -339,6 +339,13 @@ ERROR(iboutlet_nonobject_type,sema_tcd,none,
       "non-object type %1", (bool, Type))
 ERROR(iboutlet_only_mutable,sema_tcd,none,
       "'IBOutlet' attribute requires property to be mutable", ())
+ERROR(iboutlet_non_optional,sema_tcd,none,
+      "'IBOutlet' property has non-optional type %0", (Type))
+NOTE(note_make_optional,sema_tcd,none,
+      "add '?' to form the optional type %0", (Type))
+NOTE(note_make_implicitly_unwrapped_optional,sema_tcd,none,
+      "add '!' to form the implicitly unwrapped optional type %0", (Type))
+
 ERROR(invalid_ibinspectable,sema_tcd,none,
       "only instance properties can be declared 'IBInspectable'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
