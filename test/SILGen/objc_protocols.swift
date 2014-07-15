@@ -192,3 +192,19 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
   var i2 = im(int: i)
   return i2
 }
+
+class InitializableConformer: Initializable {
+  required init(int: Int) {}
+}
+// CHECK-LABEL: sil @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
+
+class InitializableConformerByExtension {
+  init() {}
+}
+
+extension InitializableConformerByExtension: Initializable {
+  convenience init(int: Int) {
+    self.init()
+  }
+}
+// CHECK-LABEL: sil @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_

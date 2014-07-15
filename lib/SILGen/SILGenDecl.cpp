@@ -1380,6 +1380,8 @@ public:
             SGM.emitObjCMethodThunk(method);
           else if (auto *prop = dyn_cast<VarDecl>(vd))
             SGM.emitObjCPropertyMethodThunks(prop);
+          else if (auto *ctor = dyn_cast<ConstructorDecl>(vd))
+            SGM.emitObjCConstructorThunk(ctor);
           else
             llvm_unreachable("unexpected conformance mapping");
         });
