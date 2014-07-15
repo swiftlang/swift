@@ -911,9 +911,9 @@ ERROR(expected_attribute_name,attribute_parsing,none,
 ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
-      "duplicate attribute", ())
+      "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,parsing,none,
-     "attribute already specified here", ())
+     "%select{attribute|modifier}0 already specified here", (bool))
 
 ERROR(invalid_attribute_inversion,attribute_parsing,none,
       "attribute may not be inverted", ())
@@ -935,13 +935,13 @@ ERROR(operator_attributes,attribute_parsing,none,
       "invalid attributes specified for operator", ())
 
 ERROR(attr_expected_lparen,attribute_parsing,none,
-"expected '(' in '%0' attribute", (StringRef))
+"expected '(' in '%0' %select{attribute|modifier}0", (StringRef, bool))
 
 ERROR(attr_expected_rparen,attribute_parsing,none,
-"expected ')' in '%0' attribute", (StringRef))
+"expected ')' in '%0' %select{attribute|modifier}0", (StringRef, bool))
 
 ERROR(attr_expected_comma,attribute_parsing,none,
-"expected ',' in '%0' attribute", (StringRef))
+"expected ',' in '%0' %select{attribute|modifier}0", (StringRef))
 
 ERROR(attr_expected_string_literal,attribute_parsing,none,
 "expected string literal in '%0' attribute", (StringRef))
@@ -954,7 +954,7 @@ ERROR(attr_only_at_non_local_scope, attribute_parsing, none,
 
 // accessibility
 ERROR(attr_accessibility_expected_set,attribute_parsing,none,
-      "expected 'set' as subject of '%0' attribute", (StringRef))
+      "expected 'set' as subject of '%0' modifier", (StringRef))
 
 // availability
 ERROR(attr_availability_platform,attribute_parsing,none,

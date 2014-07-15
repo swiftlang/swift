@@ -364,7 +364,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Inline: {
     if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -385,7 +386,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     consumeToken(tok::identifier);
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -435,7 +437,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -450,7 +453,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Asmname: {
     if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -470,7 +474,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -490,7 +495,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DAK_Semantics: {
     if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -510,7 +516,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -530,7 +537,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Availability: {
     if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -605,7 +613,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName);
+      diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 
@@ -732,9 +741,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   if (DuplicateAttribute) {
-    diagnose(Loc, diag::duplicate_attribute)
+    diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
       .highlight(AttrRange);
-    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute)
+    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute, DeclAttribute::isDeclModifier(DK))
       .highlight(DuplicateAttribute->getRange());
   }
 
@@ -850,7 +859,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   
   // Diagnose duplicated attributes.
   if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute);
+    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
     return false;
   }
 
@@ -959,7 +968,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   if (justChecking) {
     // do nothing
   } else if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute);
+    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
   } else {
     Attributes.setAttr(attr, Loc);
   }
@@ -1000,7 +1009,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
       
     if (Attributes.hasOwnership()) {
-      diagnose(Loc, diag::duplicate_attribute);
+      diagnose(Loc, diag::duplicate_attribute, /*isModifier*/false);
       break;
     }
     if (!justChecking)

@@ -48,10 +48,10 @@ func test_postfix(x: Int) {
 prefix operator ~~~ {} // expected-note 2{{prefix operator found here}}
 
 // Unary operators require a prefix or postfix attribute
-func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' attribute}}{{1-1=prefix }}
+func ~~~(x: Float) {} // expected-error{{prefix unary operator missing 'prefix' modifier}}{{1-1=prefix }}
 
 protocol P {
-  func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' attribute}}{{3-3=prefix }}
+  func ~~~(x: Self) // expected-error{{prefix unary operator missing 'prefix' modifier}}{{3-3=prefix }}
 }
 
 prefix func +// this should be a comment, not an operator

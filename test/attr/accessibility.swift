@@ -1,31 +1,31 @@
 // RUN: %swift %s -parse -verify
 
 // CHECK PARSING
-private // expected-note {{attribute already specified here}}
-private // expected-error {{duplicate attribute}}
+private // expected-note {{modifier already specified here}}
+private // expected-error {{duplicate modifier}}
 func duplicateAttr() {}
 
-private // expected-note {{attribute already specified here}}
-public // expected-error {{duplicate attribute}}
+private // expected-note {{modifier already specified here}}
+public // expected-error {{duplicate modifier}}
 func duplicateAttrChanged() {}
 
-private // expected-note 2 {{attribute already specified here}}
-public // expected-error {{duplicate attribute}}
-internal // expected-error {{duplicate attribute}}
+private // expected-note 2 {{modifier already specified here}}
+public // expected-error {{duplicate modifier}}
+internal // expected-error {{duplicate modifier}}
 func triplicateAttrChanged() {}
 
 private(set)
 public
 var customSetter = 0
 
-private(set) // expected-note {{attribute already specified here}}
-public(set) // expected-error {{duplicate attribute}}
+private(set) // expected-note {{modifier already specified here}}
+public(set) // expected-error {{duplicate modifier}}
 var customSetterDuplicateAttr = 0
 
-private(set) // expected-note {{attribute already specified here}}
-public // expected-note {{attribute already specified here}}
-public(set) // expected-error {{duplicate attribute}}
-private // expected-error {{duplicate attribute}}
+private(set) // expected-note {{modifier already specified here}}
+public // expected-note {{modifier already specified here}}
+public(set) // expected-error {{duplicate modifier}}
+private // expected-error {{duplicate modifier}}
 var customSetterDuplicateAttrsAllAround = 0
 
 // Check that the parser made it here.
@@ -47,45 +47,45 @@ private struct TestStruct {
 
 private class TestClass {
   private init() {}
-  internal deinit {} // expected-error {{'internal' attribute cannot be applied to this declaration}}
+  internal deinit {} // expected-error {{'internal' modifier cannot be applied to this declaration}}
 }
 
 private enum TestEnum {
-  private case Foo, Bar // expected-error {{'private' attribute cannot be applied to this declaration}}
+  private case Foo, Bar // expected-error {{'private' modifier cannot be applied to this declaration}}
 }
 
 private protocol TestProtocol {
-  private typealias Foo // expected-error {{'private' attribute cannot be used in protocols}}
-  internal var Bar: Int { get } // expected-error {{'internal' attribute cannot be used in protocols}}
-  public func baz() // expected-error {{'public' attribute cannot be used in protocols}}
+  private typealias Foo // expected-error {{'private' modifier cannot be used in protocols}}
+  internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}}
+  public func baz() // expected-error {{'public' modifier cannot be used in protocols}}
 }
 
-public(set) func publicSetFunc() {} // expected-error {{'public(set)' attribute can only be applied to variables and subscripts}}
+public(set) func publicSetFunc() {} // expected-error {{'public(set)' modifier can only be applied to variables and subscripts}}
 
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
 private(set) var defaultVisOK = 0
 private(set) public var publicVis = 0
 
-private(set) var computed: Int { // expected-error {{'private(set)' attribute cannot be applied to read-only variables}}
+private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only variables}}
   return 42
 }
 private(set) var computedRW: Int {
   get { return 42 }
   set { }
 }
-private(set) let constant = 42 // expected-error {{'private(set)' attribute cannot be applied to constants}}
+private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to constants}}
 
 public struct Properties {
   private(set) var stored = 42
-  private(set) var computed: Int { // expected-error {{'private(set)' attribute cannot be applied to read-only properties}}
+  private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only properties}}
     return 42
   }
   private(set) var computedRW: Int {
     get { return 42 }
     set { }
   }
-  private(set) let constant = 42 // expected-error {{'private(set)' attribute cannot be applied to read-only properties}}
+  private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
 
   public(set) subscript(#a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
@@ -105,7 +105,7 @@ public struct Properties {
     set {}
   }
 
-  private(set) subscript(#e: Int) -> Int { return 0 } // expected-error {{'private(set)' attribute cannot be applied to read-only subscripts}}
+  private(set) subscript(#e: Int) -> Int { return 0 } // expected-error {{'private(set)' modifier cannot be applied to read-only subscripts}}
 }
 
 private extension Properties {
@@ -116,5 +116,5 @@ private extension Properties {
 }
 
 internal protocol EmptyProto {}
-private extension Properties : EmptyProto {} // expected-error {{'private' attribute cannot be used with extensions that declare protocol conformances}}
-private(set) extension Properties : EmptyProto {} // expected-error {{'private(set)' attribute can only be applied to variables and subscripts}}
+private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}}
+private(set) extension Properties : EmptyProto {} // expected-error {{'private(set)' modifier can only be applied to variables and subscripts}}
