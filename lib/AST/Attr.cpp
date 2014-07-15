@@ -43,6 +43,15 @@ DeclAttributes &Decl::getMutableAttrs() {
   return *const_cast<DeclAttributes*>(&getAttrs());
 }
 
+/// Returns true if this attribute can appear on the specified decl.
+bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
+  unsigned Options = getOptions(DK);
+  switch (D->getKind()) {
+#define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
 const AvailabilityAttr *DeclAttributes::getUnavailable() const {
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
@@ -245,8 +254,9 @@ StringRef DeclAttribute::getAttrName() const {
       return "public";
     }
   case DAK_Override:
+    return "<<override>>";
   case DAK_RawDocComment:
-    llvm_unreachable("cannot get the name of a virtual attribute");
+    return "<<raw doc comment>>";
   }
 }
 

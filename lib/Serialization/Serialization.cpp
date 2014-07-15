@@ -1242,8 +1242,7 @@ static void checkAllowedAttributes(const Decl *D) {
 #define DEF_VERIFY_ATTR(DECL)\
 static void verifyAttrSerializable(const DECL ## Decl *D) {\
   for (auto Attr : D->getAttrs()) {\
-  if (!Attr->canAppearOn ## DECL())\
-    llvm_unreachable("attribute cannot appear on a " #DECL);\
+    assert(Attr->canAppearOnDecl(D) && "attribute cannot appear on a " #DECL);\
 }\
 }
 

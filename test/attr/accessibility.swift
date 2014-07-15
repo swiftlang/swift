@@ -47,20 +47,20 @@ private struct TestStruct {
 
 private class TestClass {
   private init() {}
-  internal deinit {} // expected-error {{'internal' modifier cannot be applied to this declaration}}
+  internal deinit {} // expected-error {{'internal' attribute cannot be applied to this declaration}}
 }
 
 private enum TestEnum {
-  private case Foo, Bar // expected-error {{'private' modifier cannot be applied to this declaration}}
+  private case Foo, Bar // expected-error {{'private' attribute cannot be applied to this declaration}}
 }
 
 private protocol TestProtocol {
-  private typealias Foo // expected-error {{'private' modifier cannot be used in protocols}}
+  private typealias Foo // expected-error {{'private' attribute cannot be applied to this declaration}}
   internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}}
   public func baz() // expected-error {{'public' modifier cannot be used in protocols}}
 }
 
-public(set) func publicSetFunc() {} // expected-error {{'public(set)' modifier can only be applied to variables and subscripts}}
+public(set) func publicSetFunc() {} // expected-error {{'public' attribute cannot be applied to this declaration}}
 
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
@@ -117,4 +117,4 @@ private extension Properties {
 
 internal protocol EmptyProto {}
 private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}}
-private(set) extension Properties : EmptyProto {} // expected-error {{'private(set)' modifier can only be applied to variables and subscripts}}
+private(set) extension Properties : EmptyProto {} // expected-error {{'private' attribute cannot be applied to this declaration}}

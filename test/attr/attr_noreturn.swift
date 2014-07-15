@@ -3,37 +3,37 @@
 @noreturn
 func exit(_: Int) {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 class InvalidOnClass {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 struct InvalidOnStruct {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 enum InvalidOnEnum {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 protocol InvalidOnProtocol {}
 
 struct InvalidOnExtension {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}
 extension InvalidOnExtension {}
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 var invalidOnVar = 0
 
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 let invalidOnLet = 0
 
 class InvalidOnClassMembers {
-  @noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{3-12=}}
+  @noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{3-12=}}
   init() {}
 
-  @noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{3-12=}}
+  @noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{3-12=}}
   deinit {}
 
-  @noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{3-12=}}
+  @noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{3-12=}}
   subscript(i: Int) -> Int {
     get {
       return 0
@@ -131,6 +131,6 @@ func testRvalue(lhs: (), rhs: @noreturn () -> ()) -> () {
 
 var fnr: @noreturn (_: Int) -> () = exit
 // This might be a desirable syntax, but it does not get properly propagated to SIL, so reject it for now.
-@noreturn // expected-error {{'noreturn' attribute cannot be applied to this declaration}}{{1-10=}}
+@noreturn // expected-error {{'noreturn' may only be used on 'func' declarations}}{{1-10=}}
 var fpr: (_: Int) -> () = exit
 

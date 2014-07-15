@@ -337,31 +337,54 @@ protected:
     DeclAttrBits.Invalid = 0;
   }
 
+public:
   enum DeclAttrOptions {
-    OnFunc = 0x1,
-    OnExtension = 1 << 2,
-    OnPatternBinding = 1 << 3,
-    OnOperator = 1 << 4,
-    OnTypeAlias = 1 << 5,
-    OnType = 1 << 6,
-    OnStruct = 1 << 7,
-    OnEnum = 1 << 8,
-    OnClass = 1 << 9,
-    OnProtocol = 1 << 10,
-    OnVar = 1 << 11,
-    OnSubscript = 1 << 12,
-    OnConstructor = 1 << 13,
-    OnDestructor = 1 << 14,
-    OnImport = 1 << 15,
-    OnAnyDecl = OnFunc | OnExtension | OnPatternBinding | OnOperator |
-                OnTypeAlias | OnType | OnStruct | OnEnum | OnClass |
-                OnProtocol | OnVar | OnSubscript | OnConstructor |
-                OnDestructor | OnImport,
-    AllowMultipleAttributes = 1 << 16,
+    /// True if multiple instances of this attribute are allowed on a single
+    /// declaration.
+    AllowMultipleAttributes = 1 << 0,
 
     /// True if this is a decl modifier - i.e., that it should not be spelled
     /// with an @.
-    DeclModifier = 1 << 17
+    DeclModifier = 1 << 1,
+
+    // There is one entry for each DeclKind here, and some higher level buckets
+    // down below.  These are used in Attr.def to control which kinds of
+    // declarations an attribute can be attached to.
+    OnImport           = 1 << 8,
+    OnExtension        = 1 << 9,
+    OnPatternBinding   = 1 << 10,
+    OnEnumCase         = 1 << 11,
+    OnTopLevelCode     = 1 << 12,
+    OnIfConfig         = 1 << 13,
+    OnInfixOperator    = 1 << 14,  // "infix operator"
+    OnPrefixOperator   = 1 << 15,  // "prefix operator"
+    OnPostfixOperator  = 1 << 16,  // "postfix operator"
+
+    OnEnum             = 1 << 17,
+    OnStruct           = 1 << 18,
+    OnClass            = 1 << 19,
+    OnProtocol         = 1 << 20,
+    OnTypeAlias        = 1 << 21,
+    OnVar              = 1 << 22,
+    OnSubscript        = 1 << 23,
+
+    OnConstructor      = 1 << 24,
+    OnDestructor       = 1 << 25,
+    OnFunc             = 1 << 26,
+    OnEnumElement      = 1 << 27,
+
+    OnGenericTypeParam = 1 << 28,
+    OnAssociatedType   = 1 << 29,
+    OnParam            = 1 << 30,
+
+    // More coarse-grained aggregations for use in Attr.def.
+    OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
+
+    OnAnyDecl = OnImport|OnExtension|OnPatternBinding|OnEnumCase|
+                OnTopLevelCode|OnIfConfig|OnInfixOperator|OnPrefixOperator|
+                OnPostfixOperator|OnEnum|OnStruct|OnClass|OnProtocol|
+                OnTypeAlias|OnVar|OnSubscript|OnConstructor|OnDestructor|
+                OnFunc|OnEnumElement|OnGenericTypeParam|OnAssociatedType|OnParam
   };
 
   static unsigned getOptions(DeclAttrKind DK);
@@ -403,77 +426,13 @@ public:
   /// Print the attribute to the provided stream.
   void print(llvm::raw_ostream &OS) const;
 
-  /// Returns true if this attribute can appear on a function.
-  bool canAppearOnFunc() const {
-    return getOptions() & OnFunc;
+  /// Returns true if this attribute can appear on the specified decl.  This is
+  /// controlled by the flags in Attr.def.
+  bool canAppearOnDecl(const Decl *D) const {
+    return canAttributeAppearOnDecl(getKind(), D);
   }
 
-  /// Returns true if this attribute can appear on an extension.
-  bool canAppearOnExtension() const {
-    return getOptions() & OnExtension;
-  }
-
-  /// Returns true if this attribute can appear on an pattern binding.
-  bool canAppearOnPatternBinding() const {
-    return getOptions() & OnPatternBinding;
-  }
-
-  /// Returns true if this attribute can appear on an operator.
-  bool canAppearOnOperator() const {
-    return getOptions() & OnOperator;
-  }
-
-  /// Returns true if this attribute can appear on a typealias.
-  bool canAppearOnTypeAlias() const {
-    return getOptions() & OnTypeAlias;
-  }
-
-  /// Returns true if this attribute can appear on a type declaration.
-  bool canAppearOnType() const {
-    return getOptions() & OnType;
-  }
-
-  /// Returns true if this attribute can appear on a struct.
-  bool canAppearOnStruct() const {
-    return getOptions() & OnStruct;
-  }
-
-  /// Returns true if this attribute can appear on an enum.
-  bool canAppearOnEnum() const {
-    return getOptions() & OnEnum;
-  }
-
-  /// Returns true if this attribute can appear on a class.
-  bool canAppearOnClass() const {
-    return getOptions() & OnClass;
-  }
-
-  /// Returns true if this attribute can appear on a protocol.
-  bool canAppearOnProtocol() const {
-    return getOptions() & OnProtocol;
-  }
-
-  /// Returns true if this attribute can appear on a var declaration.
-  bool canAppearOnVar() const {
-    return getOptions() & OnVar;
-  }
-
-  /// Returns true if this attribute can appear on a subscript declaration.
-  bool canAppearOnSubscript() const {
-    return getOptions() & OnSubscript;
-  }
-
-  /// Returns true if this attribute can appear on a constructor/initializer
-  /// declaration.
-  bool canAppearOnConstructor() const {
-    return getOptions() & OnConstructor;
-  }
-
-  /// Returns true if this attribute can appear on a deinitializer
-  /// declaration.
-  bool canAppearOnDestructor() const {
-    return getOptions() & OnDestructor;
-  }
+  static bool canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D);
 
   /// Returns true if multiple instances of an attribute kind
   /// can appear on a delcaration.

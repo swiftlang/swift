@@ -19,7 +19,7 @@ class Sub : Super {
     }
   }
 
-  final init() {} // expected-error {{final may only be applied to classes, properties, methods, and subscripts}}
+  final init() {} // expected-error {{'final' attribute cannot be applied to this declaration}}
 }
 
 
@@ -58,6 +58,6 @@ class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super
     }
   }
 
-  final init() {} // expected-error {{final may only be applied to classes, properties, methods, and subscripts}}
+  final init() {} // expected-error {{'final' attribute cannot be applied to this declaration}}
 }
 

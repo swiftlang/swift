@@ -10,7 +10,7 @@ import Foundation
 
 @NSManaged var global: Int // expected-error {{'NSManaged' attribute only allowed on a property in a class}}
 
-@NSManaged     // expected-error {{'NSManaged' attribute only allowed on a property in a class}}
+@NSManaged     // expected-error {{'NSManaged' may only be used on 'var' declarations}}
 func managedFunction() {}
 
 class SwiftGizmo : Gizmo {

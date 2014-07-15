@@ -3,12 +3,12 @@
 @IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
 var iboutlet_global: Int
 
-@IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
+@IBOutlet // expected-error {{'IBOutlet' may only be used on 'var' declarations}}
 class IBOutletClassTy {}
-@IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
+@IBOutlet // expected-error {{'IBOutlet' may only be used on 'var' declarations}}
 struct IBStructTy {}
 
-@IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
+@IBOutlet // expected-error {{'IBOutlet' may only be used on 'var' declarations}}
 func IBFunction() -> () {}
 
 @objc
@@ -21,7 +21,7 @@ class IBOutletWrapperTy {
   // expected-error@-2 {{only instance properties can be declared 'IBOutlet'}}
   // expected-error@-2 {{class variables not yet supported}}
 
-  @IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
+  @IBOutlet // expected-error {{'IBOutlet' may only be used on 'var' declarations}}
   func click() -> () {}
 
   @IBOutlet // expected-error {{'IBOutlet' attribute requires property to be mutable}}

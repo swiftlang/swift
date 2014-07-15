@@ -119,19 +119,19 @@ func optionalSubscriptExistential(t: P1) {
 // optional cannot be used on non-protocol declarations
 optional var optError: Int = 10 // expected-error{{'optional' can only be applied to protocol members}}
 
-optional struct optErrorStruct { // expected-error{{'optional' can only be applied to protocol members}}
+optional struct optErrorStruct { // expected-error{{'optional' attribute cannot be applied to this declaration}}
   optional var ivar: Int // expected-error{{'optional' can only be applied to protocol members}}
   optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
 }
 
-optional class optErrorClass { // expected-error{{'optional' can only be applied to protocol members}}
+optional class optErrorClass { // expected-error{{'optional' attribute cannot be applied to this declaration}}
   optional var ivar: Int = 0 // expected-error{{'optional' can only be applied to protocol members}}
   optional func foo() { } // expected-error{{'optional' can only be applied to protocol members}}
 }
   
 protocol optErrorProtocol {
   optional func foo(x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
-  optional typealias Assoc
+  optional typealias Assoc  // expected-error{{'optional' attribute cannot be applied to this declaration}}
 }
 
 @objc protocol optionalInitProto {

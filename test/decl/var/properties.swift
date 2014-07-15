@@ -912,10 +912,10 @@ class CopyableClass : NSCopying {}
 
 
 
-@NSCopying  // expected-error {{'NSCopying' attribute may only be used on properties in classes}}
+@NSCopying  // expected-error {{'NSCopying' may only be used on 'var' declarations}}}}
 func copyFunction() {}
 
-@NSCopying   // expected-error {{'NSCopying' attribute may only be used on properties in classes}}
+@NSCopying   // expected-error {{'NSCopying' may only be used on 'var' declarations}}
 struct CopyingStruct  {
   @NSCopying var x : CopyableClass   // expected-error {{'NSCopying' attribute may only be used on properties in classes}}
 }

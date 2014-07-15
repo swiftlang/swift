@@ -7,6 +7,8 @@ struct NotObjCAble {
 
 @objc class ObjCClass {}
 
+dynamic prefix operator +!+ {}  // expected-error{{'dynamic' attribute cannot be applied to this declaration}}
+
 class Foo {
   dynamic init() {}
   dynamic init(x: NotObjCAble) {} // expected-error{{method cannot be marked dynamic because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
@@ -24,7 +26,7 @@ class Foo {
 
   dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked dynamic because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
-  dynamic deinit {} // expected-error{{only methods, initializers, properties, and subscripts may be dynamic}}
+  dynamic deinit {} // expected-error{{'dynamic' attribute cannot be applied to this declaration}}
 
   func notDynamic() {}
 

@@ -49,6 +49,7 @@ public:
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Dynamic)
   IGNORED_ATTR(Final)
+  IGNORED_ATTR(IBDesignable)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(ObjC)
@@ -57,63 +58,47 @@ public:
   IGNORED_ATTR(Required)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+  IGNORED_ATTR(Inline)
 
+  IGNORED_ATTR(Exported)
+  IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
 
 #undef IGNORED_ATTR
 
-  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
-
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
-  void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
-  void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr);
+  void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
-  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
   void visitAssignmentAttr(AssignmentAttr *attr);
-  void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
-  void visitInlineAttr(InlineAttr *attr);
+  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
 };
 } // end anonymous namespace
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
-  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || !FD->getDeclContext()->isClassOrClassExtensionContext() ||
+  const FuncDecl *FD = cast<FuncDecl>(D);
+  if (!FD->getDeclContext()->isClassOrClassExtensionContext() ||
       FD->isStatic() || FD->isAccessor())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
 
 }
 
-void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
-  // Only classes can be marked with 'IBDesignable'.
-  if (!isa<ClassDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_decl);
-
-}
-
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
-  auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !VD->getDeclContext()->isClassOrClassExtensionContext() ||
+  auto *VD = cast<VarDecl>(D);
+  if (!VD->getDeclContext()->isClassOrClassExtensionContext() ||
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
-
 }
 
-void AttributeEarlyChecker::visitInlineAttr(InlineAttr *attr) {
-  // Only functions can be marked with 'inline'.
-  if (!isa<AbstractFunctionDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_inline_decl);
-
-}
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
@@ -156,8 +141,8 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
-  auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !VD->getDeclContext()->isClassOrClassExtensionContext() ||
+  auto *VD = cast<VarDecl>(D);
+  if (!VD->getDeclContext()->isClassOrClassExtensionContext() ||
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
@@ -207,12 +192,9 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // @NSManaged may only be used on properties.
-  auto *VD = dyn_cast<VarDecl>(D);
+  auto *VD = cast<VarDecl>(D);
 
   // NSManaged only applies to non-class properties within a class.
-  if (!VD)
-    return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
-
   if (VD->isStatic() || !VD->getDeclContext()->isClassOrClassExtensionContext())
     return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
 
@@ -249,33 +231,14 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
 }
 
 void AttributeEarlyChecker::
-visitUIApplicationMainAttr(UIApplicationMainAttr *A) {
-  // @UIApplicationMain can only be applied to classes.
-  auto CD = dyn_cast<ClassDecl>(D);
-  if (!CD)
-    return diagnoseAndRemoveAttr(A, diag::attr_UIApplicationMain_not_class);
-}
-
-void AttributeEarlyChecker::
 visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr) {
-  // Only function declarations can be can have this attribute,
-  // and it is only legal when debugger support is on.
-  auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD)
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
-
+  // This is only legal when debugger support is on.
   if (!D->getASTContext().LangOpts.DebuggerSupport)
     return diagnoseAndRemoveAttr(attr, diag::attr_for_debugger_support_only);
 }
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   diagnoseAndRemoveAttr(attr, diag::assignment_attribute_removed);
-}
-
-void AttributeEarlyChecker::visitExportedAttr(ExportedAttr *attr) {
-  if (!isa<ImportDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
-
 }
 
 void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
@@ -286,9 +249,7 @@ void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
 
 void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // lazy may only be used on properties.
-  auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD)
-    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_var);
+  auto *VD = cast<VarDecl>(D);
 
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
@@ -405,10 +366,40 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   D->setEarlyAttrValidation();
 
   AttributeEarlyChecker Checker(*this, D);
-
   for (auto attr : D->getMutableAttrs()) {
-    if (attr->isValid())
+    if (!attr->isValid()) continue;
+
+    // If Attr.def says that the attribute cannot appear on this kind of
+    // declaration, diagnose it and disable it.
+    if (attr->canAppearOnDecl(D)) {
+      // Otherwise, check it.
       Checker.visit(attr);
+      continue;
+    }
+
+    // Otherwise, this attribute cannot be applied to this declaration.  If the
+    // attribute is only valid on one kind of declaration (which is pretty
+    // common) give a specific helpful error.
+    unsigned PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
+    StringRef OnlyKind;
+    if (PossibleDeclKinds == DeclAttribute::OnVar)
+      OnlyKind = "var";
+    else if (PossibleDeclKinds == DeclAttribute::OnFunc)
+      OnlyKind = "func";
+    else if (PossibleDeclKinds == DeclAttribute::OnClass)
+      OnlyKind = "class";
+    else if (PossibleDeclKinds == DeclAttribute::OnStruct)
+      OnlyKind = "struct";
+    else if (PossibleDeclKinds == DeclAttribute::OnConstructor)
+      OnlyKind = "init";
+    else if (PossibleDeclKinds == DeclAttribute::OnProtocol)
+      OnlyKind = "protocol";
+
+    if (!OnlyKind.empty())
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+                                    attr, OnlyKind);
+    else
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
 }
 
@@ -632,7 +623,7 @@ static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
-          (isa<PrefixAttr>(attr) && name == "<"));     // generic argument list
+          (isa<PrefixAttr>(attr)  && name == "<"));    // generic argument list
 }
 
 void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
@@ -696,12 +687,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
 
 void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // The @NSCopying attribute is only allowed on stored properties.
-  auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD) {
-    TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
-    attr->setInvalid();
-    return;
-  }
+  auto *VD = cast<VarDecl>(D);
 
   // It may only be used on class members.
   auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
@@ -810,12 +796,7 @@ void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // The required attribute only applies to constructors.
-  auto ctor = dyn_cast<ConstructorDecl>(D);
-  if (!ctor) {
-    TC.diagnose(attr->getLocation(), diag::required_non_initializer);
-    attr->setInvalid();
-    return;
-  }
+  auto ctor = cast<ConstructorDecl>(D);
   auto parentTy = ctor->getExtensionType();
   if (!parentTy) {
     // Constructor outside of nominal type context; we've already complained
@@ -865,7 +846,6 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
   }
 }
 
-// FIXME: Merge validateAttributes into this.
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
 

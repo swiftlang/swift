@@ -3,14 +3,14 @@
 // -------------------------------------------------------------------------
 // Restrictions on where required can appear
 // -------------------------------------------------------------------------
-required class AC { } // expected-error{{'required' can only be applied to an initializer}}
+required class AC { } // expected-error{{'required' may only be used on 'init' declarations}}
 
 class C {
   required init(string s: String) { } // expected-note{{'required' initializer with type '(string: String)' not overridden}}
 
-  required var s: String // expected-error{{'required' can only be applied to an initializer}}
+  required var s: String // expected-error{{'required' may only be used on 'init' declarations}}
 
-  required func f() { } // expected-error{{'required' can only be applied to an initializer}}
+  required func f() { } // expected-error{{'required' may only be used on 'init' declarations}}
 }
 
 struct S {

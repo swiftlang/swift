@@ -22,24 +22,24 @@ protocol Protocol_Class2 : class {}
 
 //===--- Subjects of @objc attribute.
 
-@objc
+@objc  
 var subject_globalVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 
 var subject_getterSetter: Int {
-  @objc
+  @objc 
   get { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
     return 0
   }
   @objc
-  set { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  set {  // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
   }
 }
 
 var subject_global_observingAccesorsVar1: Int = 0 {
-  @objc
+  @objc 
   willSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
   }
-  @objc
+  @objc 
   didSet { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
   }
 }
@@ -111,8 +111,8 @@ func subject_genericFunc<T>(t: T) { // expected-error {{only classes, protocols,
 func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}}
 }
 
-@objc
-struct subject_struct { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+@objc // expected-error {{'objc' attribute cannot be applied to this declaration}}
+struct subject_struct {
   @objc
   var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 
@@ -123,8 +123,8 @@ struct subject_struct { // expected-error {{only classes, protocols, methods, pr
   func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 }
 
-@objc
-struct subject_genericStruct<T> { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+@objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+struct subject_genericStruct<T> {
   @objc
   var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 
@@ -163,36 +163,20 @@ class subject_genericClass<T> { // no-error
   func subject_instanceFunc() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
-@objc
-enum subject_enum { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-  @objc
-  case subject_enumElement1 // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+@objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+enum subject_enum {
+  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+  case subject_enumElement1
 
-  @objc
-  case subject_enumElement2(Int) // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
+  @objc   // expected-error {{'objc' attribute cannot be applied to this declaration}}
+  case subject_enumElement2(Int) 
 
-  @objc
+  @objc   
   init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 
   @objc
   func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
 }
-
-@objc
-enum subject_genericEnum<T> { // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-  @objc
-  case subject_enumElement1 // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-
-  @objc
-  case subject_enumElement2(Int) // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-
-  @objc
-  init() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-
-  @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, properties, and subscript declarations can be declared '@objc'}}
-}
-
 
 @objc
 protocol subject_protocol1 {

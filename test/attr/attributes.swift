@@ -17,18 +17,18 @@ func f5(inout x: binary) {}
 
 @IBDesignable
 class IBDesignableClassTy {
-  @IBDesignable func foo() {} // expected-error {{only classes can be declared 'IBDesignable'}}
+  @IBDesignable func foo() {} // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
 }
 
-@IBDesignable // expected-error {{only classes can be declared 'IBDesignable'}}
+@IBDesignable // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
 struct IBDesignableStructTy {}
 
-@IBDesignable // expected-error {{only classes can be declared 'IBDesignable'}}
+@IBDesignable // expected-error {{'IBDesignable' may only be used on 'class' declarations}}
 protocol IBDesignableProtTy {}
 
 class Inspect {
   @IBInspectable var value : Int = 0
-  @IBInspectable func foo() {} // expected-error {{only instance properties can be declared 'IBInspectable'}}
+  @IBInspectable func foo() {} // expected-error {{'IBInspectable' may only be used on 'var' declarations}}
 
   @IBInspectable class var cval: Int { return 0 } // expected-error {{only instance properties can be declared 'IBInspectable'}}
 }
@@ -186,12 +186,12 @@ var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
-@inline(never) var noinlineVar : Int // expected-error {{'inline' attribute cannot be applied to this declaration}}
-@inline(never) class FooClass { // expected-error {{'inline' attribute cannot be applied to this declaration}}
+@inline(never) var noinlineVar : Int // expected-error {{'inline(never)' may only be used on 'func' declarations}}
+@inline(never) class FooClass { // expected-error {{'inline(never)' may only be used on 'func' declarations}}
 }
 
 class A {
-  @inline(never) init(a : Int) {}
+  @inline(never) init(a : Int) {} // expected-error {{'inline(never)' may only be used on 'func' declarations}}
   var b : Int {
     @inline(never) get {
       return 42

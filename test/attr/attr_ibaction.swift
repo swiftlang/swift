@@ -1,11 +1,11 @@
 // RUN: %swift %s -verify
 
-@IBAction // expected-error {{only instance methods can be declared 'IBAction'}}
+@IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 var iboutlet_global: Int
 
-@IBAction // expected-error {{only instance methods can be declared 'IBAction'}}
+@IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 class IBOutletClassTy {}
-@IBAction // expected-error {{only instance methods can be declared 'IBAction'}}
+@IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
 struct IBStructTy {}
 
 @IBAction // expected-error {{only instance methods can be declared 'IBAction'}}
@@ -19,7 +19,7 @@ class IBActionWrapperTy {
     @IBAction  // expected-error {{only instance methods can be declared 'IBAction'}}
     func inner(_: AnyObject) -> () {}
   }
-  @IBAction // expected-error {{only instance methods can be declared 'IBAction'}}
+  @IBAction // expected-error {{'IBAction' may only be used on 'func' declarations}}
   var value : Void = ()
 
   @IBAction
