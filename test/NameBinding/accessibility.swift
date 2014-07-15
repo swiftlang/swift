@@ -34,3 +34,16 @@ Foo.z() // expected-error {{'Foo.Type' does not have a member named 'z'}}
 Foo.a()
 Foo.b()
 Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
+
+
+class Sub : Base {
+  func test() {
+    value = 4 // expected-error {{cannot assign to 'value' in 'self'}}
+    self.value = 4 // expected-error {{cannot assign to 'value' in 'self'}}
+    super.value = 4 // expected-error {{cannot assign to the result of this expression}}
+
+    method() // expected-error {{use of unresolved identifier 'method'}}
+    self.method() // expected-error {{'Sub' does not have a member named 'method'}}
+    super.method() // expected-error {{'Base' does not have a member named 'method'}}
+  }
+}

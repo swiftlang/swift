@@ -11,3 +11,9 @@ public struct Foo {
   internal static func y() {}
   private static func z() {}
 }
+
+public class Base {
+  public internal(set) var value = 0
+  internal func method() {}
+}
+
