@@ -562,7 +562,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // relaxed later, but this is strict now for bringup.
 
     if (!consumeIf(tok::comma)) {
-      diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName);
+      diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
     }
 

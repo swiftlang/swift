@@ -935,13 +935,13 @@ ERROR(operator_attributes,attribute_parsing,none,
       "invalid attributes specified for operator", ())
 
 ERROR(attr_expected_lparen,attribute_parsing,none,
-"expected '(' in '%0' %select{attribute|modifier}0", (StringRef, bool))
+"expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_rparen,attribute_parsing,none,
-"expected ')' in '%0' %select{attribute|modifier}0", (StringRef, bool))
+"expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_comma,attribute_parsing,none,
-"expected ',' in '%0' %select{attribute|modifier}0", (StringRef))
+"expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_string_literal,attribute_parsing,none,
 "expected string literal in '%0' attribute", (StringRef))
