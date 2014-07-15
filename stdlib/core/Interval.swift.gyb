@@ -41,7 +41,7 @@ public protocol IntervalType {
 /// `end`.  Cannot represent an empty interval.
 %   end
 public struct ${Self}<T: Comparable>
-  : IntervalType, Equatable, Printable, DebugPrintable {
+  : IntervalType, Equatable, Printable, DebugPrintable, Reflectable {
 
   public typealias Bound = T
 
@@ -84,6 +84,10 @@ public struct ${Self}<T: Comparable>
   /// Returns `true` iff the `Interval` contains `x`
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
+  }
+  
+  public func getMirror() -> MirrorType {
+    return _IntervalMirror(self)
   }
 
   var _start: T
@@ -133,7 +137,33 @@ public func ... <T: Comparable>(start: T, end: T) -> ClosedInterval<T> {
   return ClosedInterval(start, end)
 }
 
-/// eturns `true` iff `pattern` contains `value`
+/// Returns `true` iff `pattern` contains `value`
 public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
+}
+
+// Reflection support
+%import gyb
+%TBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
+
+%Boilerplate = gyb.executeTemplate(TBoilerplate,\
+%                                  introspecteeType='T',\
+%                                  disposition='Struct')
+
+struct _IntervalMirror<T: protocol<IntervalType,Printable>>: MirrorType {
+  ${Boilerplate}
+  
+  public var count: Int { return 2 }
+
+  public subscript(i: Int) -> (String, MirrorType) {
+    switch i {
+      case 0: return ("start",reflect(_value.start))
+      case 1: return ("end",reflect(_value.end))
+      default: _fatalError("MirrorType access out of bounds")
+    }
+  }
+
+  public var summary: String { return _value.description }
+
+  public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
