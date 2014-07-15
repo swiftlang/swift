@@ -548,9 +548,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
   
-  Opts.ImportUnions = Args.hasArg(OPT_enable_union_import);
+  Opts.ImportUnions |= Args.hasArg(OPT_enable_union_import);
   
-  Opts.EnableDynamic = Args.hasArg(OPT_enable_dynamic);
+  Opts.EnableDynamic |= Args.hasArg(OPT_enable_dynamic);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
