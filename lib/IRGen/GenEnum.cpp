@@ -3159,7 +3159,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       elementsWithNoPayload.push_back({elt, nullptr});
       continue;
     }
-    auto *argTI = TC.tryGetCompleteTypeInfo(argType->getCanonicalType());
+    auto argLoweredTy = TC.IGM.SILMod->Types.getLoweredType(argType);
+    auto *argTI = TC.tryGetCompleteTypeInfo(argLoweredTy.getSwiftRValueType());
     if (!argTI) {
       elementsWithRecursivePayload.push_back({elt, nullptr});
       continue;
