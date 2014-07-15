@@ -183,7 +183,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   for (auto &EV : PredVals)
     addNewEdgeValueToBranch(EV.first->getTerminator(), BB, EV.second);
 
-  if (PHI)
+  if (InsertedPHIs)
     InsertedPHIs->push_back(PHI);
 
   return SILValue(PHI, 0);
