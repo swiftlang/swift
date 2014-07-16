@@ -1095,6 +1095,12 @@ class infer_instanceVar1 {
   var var_Optional_fail21: AnyObject.Type??
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
+  // CHECK-LABEL: @objc var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
+  var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
+  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
+  var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
+  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
+  var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
 
   weak var var_Weak1: Class_ObjC1?
   weak var var_Weak2: Protocol_ObjC1?
@@ -1572,6 +1578,8 @@ class HasNSManaged {
   func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {
 
+  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {}
+  // CHECK-LABEL: {{^}} @objc func cFunctionPointer(p: CFunctionPointer<() -> ()>)
 }
 
 // @objc with nullary names

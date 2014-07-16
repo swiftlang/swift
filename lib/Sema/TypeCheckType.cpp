@@ -2229,6 +2229,16 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
       }
       }
     }
+    
+    // CFunctionPointer is representable in ObjC if the pointed-to function type
+    // is.
+    if (NTD == Context.getCFunctionPointerDecl())
+      if (auto bgt = T->getAs<BoundGenericType>()) {
+        if (bgt->getGenericArgs().size() == 1
+            && bgt->getGenericArgs()[0]->is<FunctionType>()
+            && isRepresentableInObjC(DC, bgt->getGenericArgs()[0]))
+          return true;
+      }
   }
 
   // If it's a mapped type, it's representable.

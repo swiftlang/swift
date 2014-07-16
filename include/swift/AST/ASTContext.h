@@ -381,6 +381,9 @@ public:
 
   /// Retrieve the declaration of Swift.AutoreleasingUnsafePointer<T>.
   NominalTypeDecl *getAutoreleasingUnsafePointerDecl() const;
+
+  /// Retrieve the declaration of Swift.CFunctionPointer<T>.
+  NominalTypeDecl *getCFunctionPointerDecl() const;
   
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \

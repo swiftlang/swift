@@ -92,6 +92,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.AutoreleasingUnsafePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafePointerDecl = nullptr;
 
+  /// The declaration of Swift.CFunctionPointer<T -> U>.
+  NominalTypeDecl *CFunctionPointerDecl = nullptr;
+
   /// The declaration of NSObject.
   NominalTypeDecl *NSObjectDecl = nullptr;
 
@@ -548,6 +551,13 @@ NominalTypeDecl *ASTContext::getAutoreleasingUnsafePointerDecl() const {
       = findSyntaxSugarImpl(*this, "AutoreleasingUnsafePointer");
   
   return Impl.AutoreleasingUnsafePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
+  if (!Impl.CFunctionPointerDecl)
+    Impl.CFunctionPointerDecl = findSyntaxSugarImpl(*this, "CFunctionPointer");
+  
+  return Impl.CFunctionPointerDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
