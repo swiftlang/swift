@@ -31,6 +31,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/ReST/Parser.h"
+#include "swift/SideCar/SideCarWriter.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -65,6 +66,7 @@ enum class ActionType {
   PrintModuleImports,
   PrintUSRs,
   ParseReST,
+  GenerateAPIAnnotation
 };
 
 namespace options {
@@ -102,6 +104,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-usrs", "Print USRs for all decls"),
            clEnumValN(ActionType::ParseReST,
                       "parse-rest", "Parse a ReST file"),
+           clEnumValN(ActionType::GenerateAPIAnnotation,
+                      "generate-api-annotation", 
+                      "Generate an API annotation file"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -110,6 +115,10 @@ SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
 static llvm::cl::list<std::string>
 InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"),
                llvm::cl::ZeroOrMore);
+
+static llvm::cl::opt<std::string>
+OutputFilename("o",
+               llvm::cl::desc("Output file name"));
 
 static llvm::cl::list<std::string>
 BuildConfigs("D", llvm::cl::desc("Build configurations"));
@@ -1594,6 +1603,30 @@ static int doParseReST(StringRef SourceFilename) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+/// Generate an API annotation file from the known Objective-C methods
+/// file.
+///
+/// FIXME: This is a horrible, horrible hack.
+void generateAPIAnnotation(StringRef fileName) {  
+  using namespace side_car;
+  SideCarWriter writer;
+
+  StringRef moduleName = "Foundation"; // FIXME: this is a lie
+  #define INSTANCE_METHOD(ClassName, Selector, Options)
+  #define CLASS_METHOD(ClassName, Selector, Options)
+  #define OBJC_CONTEXT(ClassName, Options) \
+    writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo());
+  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
+    writer.addObjCProperty(moduleName, #ContextName, #PropertyName,  \
+                           ObjCPropertyInfo());
+#include "../../lib/ClangImporter/KnownObjCMethods.def"
+
+  std::string errorInfo;
+  llvm::raw_fd_ostream os(fileName.str().c_str(), errorInfo, 
+                          llvm::sys::fs::OpenFlags::F_None);
+  writer.writeToStream(os);
+}
+
 int main(int argc, char *argv[]) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -1606,6 +1639,18 @@ int main(int argc, char *argv[]) {
     llvm::cl::PrintHelpMessage();
     return 1;
   }
+  
+  if (options::Action == ActionType::GenerateAPIAnnotation) {
+    if (options::OutputFilename.empty()) {
+      llvm::errs() << "output file required\n";
+      llvm::cl::PrintHelpMessage();
+      return 1;
+    }
+
+    generateAPIAnnotation(options::OutputFilename);
+    return 0;
+  }
+
   if (options::SourceFilename.empty()) {
     llvm::errs() << "source file required\n";
     llvm::cl::PrintHelpMessage();
@@ -1664,6 +1709,7 @@ int main(int argc, char *argv[]) {
 
   switch (options::Action) {
   case ActionType::None:
+  case ActionType::GenerateAPIAnnotation:
     llvm_unreachable("should be handled above");
 
   case ActionType::CodeCompletion:
