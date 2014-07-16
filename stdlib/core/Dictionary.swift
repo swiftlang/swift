@@ -1282,7 +1282,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
 }
 
 struct _NativeDictionaryIndex<Key : Hashable, Value> :
-    BidirectionalIndexType {
+  BidirectionalIndexType, Comparable {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
   typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
@@ -1329,7 +1329,15 @@ func == <Key : Hashable, Value> (
   return lhs.offset == rhs.offset
 }
 
-struct _CocoaDictionaryIndex : BidirectionalIndexType {
+func < <Key : Hashable, Value> (
+  lhs: _NativeDictionaryIndex<Key, Value>,
+  rhs: _NativeDictionaryIndex<Key, Value>
+) -> Bool {
+  // FIXME: assert that lhs and rhs are from the same dictionary.
+  return lhs.offset < rhs.offset
+}
+
+struct _CocoaDictionaryIndex : BidirectionalIndexType, Comparable {
   // Assumption: we rely on NSDictionary.getObjects:andKeys: when being
   // repeatedly called on the same NSDictionary, returning keys in the same
   // order every time.
@@ -1384,6 +1392,15 @@ func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
   return lhs.currentKeyIndex == rhs.currentKeyIndex
 }
 
+func <(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
+  _precondition(lhs.cocoaDictionary === rhs.cocoaDictionary,
+      "can not compare indexes pointing to different dictionaries")
+  _precondition(lhs.allKeys.value == rhs.allKeys.value,
+      "one or both of the indexes have been invalidated")
+
+  return lhs.currentKeyIndex < rhs.currentKeyIndex
+}
+
 enum _DictionaryIndexRepresentation<Key : Hashable, Value> {
   typealias _Index = DictionaryIndex<Key, Value>
   typealias _NativeIndex = _Index._NativeIndex
@@ -1394,7 +1411,7 @@ enum _DictionaryIndexRepresentation<Key : Hashable, Value> {
 }
 
 public struct DictionaryIndex<Key : Hashable, Value> :
-    BidirectionalIndexType {
+  BidirectionalIndexType, Comparable {
   // Index for native storage is efficient.  Index for bridged NSDictionary is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -1481,6 +1498,24 @@ public func == <Key : Hashable, Value> (
     return lhsNative == rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
     return lhsCocoa == rhsCocoa
+  default:
+    _preconditionFailure("comparing indexes from different dictionaries")
+  }
+}
+
+public func < <Key : Hashable, Value> (
+  lhs: DictionaryIndex<Key, Value>,
+  rhs: DictionaryIndex<Key, Value>
+) -> Bool {
+  if _fastPath(lhs._guaranteedNative) {
+    return lhs._nativeIndex < rhs._nativeIndex
+  }
+
+  switch (lhs.value, rhs.value) {
+  case (._Native(let lhsNative), ._Native(let rhsNative)):
+    return lhsNative < rhsNative
+  case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
+    return lhsCocoa < rhsCocoa
   default:
     _preconditionFailure("comparing indexes from different dictionaries")
   }

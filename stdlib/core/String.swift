@@ -305,7 +305,7 @@ extension String {
 /// String is a CollectionType of Character
 extension String : CollectionType {
   // An adapter over UnicodeScalarView that advances by whole Character
-  public struct Index : BidirectionalIndexType, Reflectable {
+  public struct Index : BidirectionalIndexType, Comparable, Reflectable {
     public init(_ _base: UnicodeScalarView.Index) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
@@ -473,6 +473,10 @@ extension String : CollectionType {
 
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
+}
+
+public func < (lhs: String.Index, rhs: String.Index) -> Bool {
+  return lhs._base < rhs._base
 }
 
 extension String : Sliceable {

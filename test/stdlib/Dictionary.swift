@@ -245,6 +245,11 @@ func testCOW_Fast_IndexesDontAffectUniquenessCheck() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
+  assert(startIndex < endIndex)
+  assert(startIndex <= endIndex)
+  assert(!(startIndex >= endIndex))
+  assert(!(startIndex > endIndex))
+  
   assert(identity1 == reinterpretCast(d))
 
   d[40] = 2040
@@ -266,6 +271,10 @@ func testCOW_Slow_IndexesDontAffectUniquenessCheck() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
+  assert(startIndex < endIndex)
+  assert(startIndex <= endIndex)
+  assert(!(startIndex >= endIndex))
+  assert(!(startIndex > endIndex))
   assert(identity1 == reinterpretCast(d))
 
   d[TestKeyTy(40)] = TestValueTy(2040)
@@ -286,6 +295,11 @@ func testCOW_Fast_SubscriptWithIndexDoesNotReallocate() {
   var identity1: Word = reinterpretCast(d)
 
   var startIndex = d.startIndex
+  let empty = startIndex == d.endIndex
+  assert((d.startIndex < d.endIndex) == !empty)
+  assert(d.startIndex <= d.endIndex)
+  assert((d.startIndex >= d.endIndex) == empty)
+  assert(!(d.startIndex > d.endIndex))
   assert(identity1 == reinterpretCast(d))
 
   assert(d[startIndex].1 != 0)
@@ -301,6 +315,11 @@ func testCOW_Slow_SubscriptWithIndexDoesNotReallocate() {
   var identity1: Word = reinterpretCast(d)
 
   var startIndex = d.startIndex
+  let empty = startIndex == d.endIndex
+  assert((d.startIndex < d.endIndex) == !empty)
+  assert(d.startIndex <= d.endIndex)
+  assert((d.startIndex >= d.endIndex) == empty)
+  assert(!(d.startIndex > d.endIndex))
   assert(identity1 == reinterpretCast(d))
 
   assert(d[startIndex].1.value != 0)
@@ -1881,6 +1900,10 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
+  assert(startIndex < endIndex)
+  assert(startIndex <= endIndex)
+  assert(!(startIndex >= endIndex))
+  assert(!(startIndex > endIndex))
   assert(identity1 == reinterpretCast(d))
 
   var pairs = Array<(Int, Int)>()
@@ -1908,6 +1931,10 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
+  assert(startIndex < endIndex)
+  assert(startIndex <= endIndex)
+  assert(!(startIndex >= endIndex))
+  assert(!(startIndex > endIndex))
   assert(identity1 == reinterpretCast(d))
 
   var pairs = Array<(Int, Int)>()
@@ -1935,6 +1962,10 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex == endIndex)
+  assert(!(startIndex < endIndex))
+  assert(startIndex <= endIndex)
+  assert(startIndex >= endIndex)
+  assert(!(startIndex > endIndex))
   assert(identity1 == reinterpretCast(d))
 
   // Keep indexes alive during the calls above.
@@ -1954,6 +1985,10 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex == endIndex)
+  assert(!(startIndex < endIndex))
+  assert(startIndex <= endIndex)
+  assert(startIndex >= endIndex)
+  assert(!(startIndex > endIndex))
   assert(identity1 == reinterpretCast(d))
 
   // Keep indexes alive during the calls above.

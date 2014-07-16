@@ -17,6 +17,13 @@ public func ==(
   return lhs._position == rhs._position
 }
 
+public func <(
+  lhs: String.UnicodeScalarView.Index,
+  rhs: String.UnicodeScalarView.Index
+) -> Bool {
+  return lhs._position < rhs._position
+}
+
 extension String {
   public struct UnicodeScalarView : Sliceable, SequenceType {
     init(_ _core: _StringCore) {
@@ -38,7 +45,7 @@ extension String {
       }
     }
 
-    public struct Index : BidirectionalIndexType {
+    public struct Index : BidirectionalIndexType, Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core

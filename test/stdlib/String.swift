@@ -16,6 +16,7 @@ func checkUnicodeScalarViewIteration(
     var end = us.endIndex
     var decoded: [UInt32] = []
     while i != end {
+      expectTrue(i < i.successor()) // Check for Comparable conformance
       decoded += us[i].value
       i = i.successor()
     }
@@ -61,6 +62,24 @@ StringTests.test("unicodeScalars") {
   checkUnicodeScalarViewIteration([ 0xffff ], "\u{ffff}")
   checkUnicodeScalarViewIteration([ 0x10000 ], "\u{00010000}")
   checkUnicodeScalarViewIteration([ 0x10ffff ], "\u{0010ffff}")
+}
+
+StringTests.test("indexComparability") {
+  let empty = ""
+  expectTrue(empty.startIndex == empty.endIndex)
+  expectFalse(empty.startIndex != empty.endIndex)
+  expectTrue(empty.startIndex <= empty.endIndex)
+  expectTrue(empty.startIndex >= empty.endIndex)
+  expectFalse(empty.startIndex > empty.endIndex)
+  expectFalse(empty.startIndex < empty.endIndex)
+
+  let nonEmpty = "borkus biqualificated"
+  expectFalse(nonEmpty.startIndex == nonEmpty.endIndex)
+  expectTrue(nonEmpty.startIndex != nonEmpty.endIndex)
+  expectTrue(nonEmpty.startIndex <= nonEmpty.endIndex)
+  expectFalse(nonEmpty.startIndex >= nonEmpty.endIndex)
+  expectFalse(nonEmpty.startIndex > nonEmpty.endIndex)
+  expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
 }
 
 StringTests.test("_splitFirst") {
