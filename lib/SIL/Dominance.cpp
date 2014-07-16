@@ -69,3 +69,24 @@ PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
   recalculate(*F);
 }
+
+bool
+PostDominanceInfo::
+properlyDominates(SILInstruction *I1, SILInstruction *I2) {
+  SILBasicBlock *BB1 = I1->getParent(), *BB2 = I2->getParent();
+
+  // If the blocks are different, it's as easy as whether BB1 post dominates
+  // BB2.
+  if (BB1 != BB2)
+    return properlyDominates(BB1, BB2);
+
+  // Otherwise, they're in the same block, and we just need to check
+  // whether A comes after B.
+  for (SILBasicBlock::iterator II = I1, IE = BB1->end(); II != IE; ++II) {
+    if (&*II == I2) {
+      return false;
+    }
+  }
+
+  return true;
+}

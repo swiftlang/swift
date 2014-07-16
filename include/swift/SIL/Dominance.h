@@ -69,6 +69,10 @@ public:
 class PostDominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
 public:
   PostDominanceInfo(SILFunction *F);
+
+  bool properlyDominates(SILInstruction *A, SILInstruction *B);
+
+  using DominatorTreeBase::properlyDominates;
 };
 
 
