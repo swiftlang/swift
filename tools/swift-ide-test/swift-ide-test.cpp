@@ -1630,6 +1630,12 @@ namespace {
     }
     return std::move(known);
   }
+
+  side_car::ObjCPropertyInfo &&operator|(side_car::ObjCPropertyInfo &&known,
+                                         side_car::NullableKind kind) {
+    known.setNullabilityAudited(kind);
+    return std::move(known);
+  }
 }
 
 /// Generate an API annotation file from the known Objective-C methods
@@ -1665,7 +1671,7 @@ void generateAPIAnnotation(StringRef fileName) {
     writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options);
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
     writer.addObjCProperty(#ContextName, #PropertyName,              \
-                           ObjCPropertyInfo());
+                           ObjCPropertyInfo() | OptionalTypeKind);
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
   #undef MAKE_SELECTOR_REF
 
