@@ -239,7 +239,7 @@ enum class ObjCReason {
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
-class TypeChecker : public LazyResolver {
+class TypeChecker final : public LazyResolver {
 public:
   ASTContext &Context;
   DiagnosticEngine &Diags;

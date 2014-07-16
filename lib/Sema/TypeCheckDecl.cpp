@@ -448,12 +448,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
 
   typeDecl->setProtocols(allProtocolsCopy);
   if (superclassTy) {
-    if (auto classDecl = dyn_cast<ClassDecl>(decl))
+    if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
       classDecl->setSuperclass(superclassTy);
-    else if (auto enumDecl = dyn_cast<EnumDecl>(decl))
+      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
+    } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
       enumDecl->setRawType(superclassTy);
-    else
+    } else {
       cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
+    }
   }
 
   // For protocol decls, fill in null conformances.
@@ -3668,16 +3670,6 @@ public:
       checkRequiredInClassInits(CD);
 
     if (!IsFirstPass) {
-#if 0
-      // If this class needs an implicit constructor, add it.
-      SmallVector<Decl*, 2> ImplicitInits;
-      TC.addImplicitConstructors(CD, ImplicitInits);
-      
-      // Type check any generated initializers.
-      for (auto D : ImplicitInits)
-        visit(D);
-#endif
-
       // Check that we don't inherit from a final class.
       if (auto superclassTy = CD->getSuperclass()) {
         ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
@@ -6204,6 +6196,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
+  assert(!classDecl->hasSuperclass() ||
+         classDecl->getSuperclass()->getAnyNominal()
+           ->addedImplicitInitializers());
   if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
       !classDecl->getSuperclass()->isSpecialized()) {
     // We can't define these overrides if we have any uninitialized
@@ -6234,6 +6229,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 
     return;
   }
+
 
   // For a class with no superclass, automatically define a default
   // constructor.

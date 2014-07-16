@@ -1657,8 +1657,6 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   }
 
   // Check all of the designated initializers in the direct superclass.
-  if (resolver)
-    resolver->resolveImplicitConstructors(superclassDecl);
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
     if (AvailabilityAttr::isUnavailable(member))
       continue;
