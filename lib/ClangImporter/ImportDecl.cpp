@@ -3498,8 +3498,8 @@ namespace {
                                   isInSystemModule(dc));
       if (!type)
         return nullptr;
-
-      auto result = new (Impl.SwiftContext) VarDecl(
+      
+      auto result = Impl.createDeclWithClangNode<VarDecl>(clangGetter,
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(clangGetter->getLocation()),
           name, type, dc);
@@ -3507,7 +3507,6 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
-      result->setAccessibility(Accessibility::Public);
       addObjCAttribute(result, Nothing);
 
       if (overridden)

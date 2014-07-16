@@ -291,6 +291,8 @@ func foreignMethodDispatch() {
   let y: AnyObject! = g[0]
   // CHECK: class_method [volatile] {{%.*}} : $Guisemeau, #Guisemeau.subscript!setter.1.foreign
   g[0] = y
+  // CHECK: class_method [volatile] {{%.*}} : $NSObject, #NSObject.description!getter.1.foreign
+  let z = g.description
 }
 
 extension Gizmo {
