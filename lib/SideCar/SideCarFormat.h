@@ -40,12 +40,6 @@ const uint16_t VERSION_MINOR = 0;
 using IdentifierID = Fixnum<31>;
 using IdentifierIDField = BCVBR<16>;
 
-using ClassID = Fixnum<31>;
-using ClassIDField = BCVBR<31>;
-
-using ModuleID = Fixnum<15>;
-using ModuleIDField = BCVBR<8>;
-
 using SelectorID = Fixnum<31>;
 using SelectorIDField = BCVBR<16>;
 

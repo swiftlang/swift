@@ -76,12 +76,6 @@ class SideCarWriter::Implementation {
   /// Mapping from strings to identifier IDs.
   llvm::StringMap<IdentifierID> IdentifierIDs;
 
-  /// Mapping from names to class ID.
-  llvm::StringMap<ClassID> ClassIDs;
-
-  /// Mapping from names to module ID.
-  llvm::StringMap<ModuleID> ModuleIDs;
-
   /// Mapping from selectors to selector ID.
   llvm::DenseMap<StoredObjCSelector, SelectorID> SelectorIDs;
 
@@ -119,28 +113,6 @@ public:
 
     // Add to the identifier table.
     known = IdentifierIDs.insert({identifier, IdentifierIDs.size() + 1}).first;
-    return known->second;
-  }
-
-  /// Retrieve the ID for the given class.
-  ClassID getClass(StringRef name) {
-    auto known = ClassIDs.find(name);
-    if (known != ClassIDs.end())
-      return known->second;
-
-    // Add to the class table.
-    known = ClassIDs.insert({name, ClassIDs.size()}).first;
-    return known->second;
-  }
-
-  /// Retrieve the ID for the given module.
-  ModuleID getModule(StringRef name) {
-    auto known = ModuleIDs.find(name);
-    if (known != ModuleIDs.end())
-      return known->second;
-
-    // Add to the module table.
-    known = ModuleIDs.insert({name, ModuleIDs.size()}).first;
     return known->second;
   }
 
@@ -320,8 +292,8 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = sizeof(ModuleID) + sizeof(ClassID);
-      uint32_t dataLength = 1;
+      uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
+      uint32_t dataLength = 2;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -330,25 +302,21 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer<little> writer(out);
-      writer.write<ModuleID>(key.first);
-      writer.write<ClassID>(key.second);
+      writer.write<IdentifierID>(key.first);
+      writer.write<IdentifierID>(key.second);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer<little> writer(out);
-
-      uint8_t byte = 0;
+      // FIXME: Inefficient representation.
+      uint8_t bytes[2] = { 0, 0 };
       if (auto nullable = data.getDefaultNullability()) {
-        // FIXME: Terrible solution. This needs abstraction.
-        byte |= 0x01;
-        byte <<= 1;
-        byte |= static_cast<uint8_t>(*nullable);
+        bytes[0] = 1;
+        bytes[1] = static_cast<uint8_t>(*nullable);
       } else {
         // Nothing to do.
       }
-      
-      writer.write<uint8_t>(byte);
+      out.write(reinterpret_cast<const char *>(bytes), 2);
     }
   };
 } // end anonymous namespace
@@ -395,7 +363,7 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = sizeof(ClassID) + sizeof(IdentifierID);
+      uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
       uint32_t dataLength = 1;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -405,7 +373,7 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer<little> writer(out);
-      writer.write<ClassID>(key.first);
+      writer.write<IdentifierID>(key.first);
       writer.write<IdentifierID>(key.second);
     }
 
@@ -473,7 +441,7 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = sizeof(ClassID) + sizeof(SelectorID) + 1;
+      uint32_t keyLength = sizeof(IdentifierID) + sizeof(SelectorID) + 1;
       uint32_t dataLength = 4 + sizeof(uint64_t) + data.UnavailableMsg.size(); 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -483,7 +451,7 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer<little> writer(out);
-      writer.write<ClassID>(std::get<0>(key));
+      writer.write<IdentifierID>(std::get<0>(key));
       writer.write<SelectorID>(std::get<1>(key));
       writer.write<uint8_t>(std::get<2>(key));
     }
@@ -640,15 +608,15 @@ void SideCarWriter::writeToStream(raw_ostream &os) {
 
 void SideCarWriter::addObjCClass(StringRef moduleName, StringRef name,
                                  const ObjCClassInfo &info) {
-  ModuleID moduleID = Impl.getModule(moduleName);
-  ClassID classID = Impl.getClass(name);
+  IdentifierID moduleID = Impl.getIdentifier(moduleName);
+  IdentifierID classID = Impl.getIdentifier(name);
   assert(!Impl.ObjCClasses.count({moduleID, classID}));
   Impl.ObjCClasses[{moduleID, classID}] = info;
 }
 
 void SideCarWriter::addObjCProperty(StringRef className, StringRef name,
                                     const ObjCPropertyInfo &info) {
-  ClassID classID = Impl.getClass(className);
+  IdentifierID classID = Impl.getIdentifier(className);
   IdentifierID nameID = Impl.getIdentifier(name);
   assert(!Impl.ObjCProperties.count({classID, nameID}));
   Impl.ObjCProperties[{classID, nameID}] = info;
@@ -658,7 +626,7 @@ void SideCarWriter::addObjCMethod(StringRef className,
                                   ObjCSelectorRef selector, 
                                   bool isInstanceMethod, 
                                   const ObjCMethodInfo &info) {
-  ClassID classID = Impl.getClass(className);
+  IdentifierID classID = Impl.getIdentifier(className);
   SelectorID selectorID = Impl.getSelector(selector);
   assert(!Impl.ObjCMethods.count({classID, selectorID, isInstanceMethod}));
   Impl.ObjCMethods[{classID, selectorID, isInstanceMethod}] = info;

@@ -19,9 +19,100 @@
 #include "swift/SideCar/SideCarReader.h"
 #include "SideCarFormat.h"
 #include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Support/EndianStream.h"
+#include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 using namespace side_car;
+using namespace llvm::support;
+
+namespace {
+  /// Used to deserialize the on-disk identifier table.
+  class IdentifierTableInfo {
+  public:
+    using internal_key_type = StringRef;
+    using external_key_type = StringRef;
+    using data_type = IdentifierID;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    internal_key_type GetInternalKey(external_key_type key) {
+      return key;
+    }
+    
+    hash_value_type ComputeHash(internal_key_type key) {
+      return llvm::HashString(key);
+    }
+    
+    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+      return lhs == rhs;
+    }
+    
+    static std::pair<unsigned, unsigned> 
+    ReadKeyDataLength(const uint8_t *&data) {
+      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      return { keyLength, dataLength };
+    }
+    
+    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+      return StringRef(reinterpret_cast<const char *>(data), length);
+    }
+    
+    static data_type ReadData(internal_key_type key, const uint8_t *data,
+                              unsigned length) {
+      return endian::readNext<uint32_t, little, unaligned>(data);
+    }
+  };
+
+  /// Used to deserialize the on-disk Objective-C class table.
+  class ObjCClassTableInfo {
+  public:
+    using internal_key_type = std::pair<unsigned, unsigned>;
+    using external_key_type = internal_key_type;
+    using data_type = ObjCClassInfo;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    internal_key_type GetInternalKey(external_key_type key) {
+      return key;
+    }
+    
+    hash_value_type ComputeHash(internal_key_type key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+    
+    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+      return lhs == rhs;
+    }
+    
+    static std::pair<unsigned, unsigned> 
+    ReadKeyDataLength(const uint8_t *&data) {
+      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      return { keyLength, dataLength };
+    }
+    
+    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+      auto moduleID = endian::readNext<IdentifierID, little, unaligned>(data);
+      auto classID = endian::readNext<IdentifierID, little, unaligned>(data);
+      return { moduleID, classID };
+    }
+    
+    static data_type ReadData(internal_key_type key, const uint8_t *data,
+                              unsigned length) {
+      ObjCClassInfo info;
+      if (*data++) {
+        info.setDefaultNullability(static_cast<NullableKind>(*data));
+      }
+      ++data;
+
+      return info;
+    }
+  };
+} // end anonymous namespace
 
 class SideCarReader::Implementation {
 public:
@@ -31,14 +122,47 @@ public:
   /// The reader attached to \c InputBuffer.
   llvm::BitstreamReader InputReader;
 
+  using SerializedIdentifierTable =
+      llvm::OnDiskIterableChainedHashTable<IdentifierTableInfo>;
+
+  /// The identifier table.
+  std::unique_ptr<SerializedIdentifierTable> IdentifierTable;
+
+  using SerializedObjCClassTable =
+      llvm::OnDiskIterableChainedHashTable<ObjCClassTableInfo>;
+
+  /// The Objective-C class table.
+  std::unique_ptr<SerializedObjCClassTable> ObjCClassTable;
+
+  /// Retrieve the identifier ID for the given string, or an empty
+  /// optional if the string is unknown.
+  Optional<IdentifierID> getIdentifier(StringRef str);
+
   bool readControlBlock(llvm::BitstreamCursor &cursor, 
                         SmallVectorImpl<uint64_t> &scratch);
-  bool readIdentifierBlock(llvm::BitstreamCursor &cursor);
-  bool readObjCClassBlock(llvm::BitstreamCursor &cursor);
+  bool readIdentifierBlock(llvm::BitstreamCursor &cursor,
+                           SmallVectorImpl<uint64_t> &scratch);
+  bool readObjCClassBlock(llvm::BitstreamCursor &cursor,
+                          SmallVectorImpl<uint64_t> &scratch);
   bool readObjCPropertyBlock(llvm::BitstreamCursor &cursor);
   bool readObjCMethodBlock(llvm::BitstreamCursor &cursor);
   bool readObjCSelectorBlock(llvm::BitstreamCursor &cursor);
 };
+
+Optional<IdentifierID> SideCarReader::Implementation::getIdentifier(
+                         StringRef str) {
+  if (!IdentifierTable)
+    return Nothing;
+
+  if (str.empty())
+    return 0;
+
+  auto known = IdentifierTable->find(str);
+  if (known == IdentifierTable->end())
+    return Nothing;
+
+  return *known;
+}
 
 bool SideCarReader::Implementation::readControlBlock(
        llvm::BitstreamCursor &cursor,
@@ -91,13 +215,109 @@ bool SideCarReader::Implementation::readControlBlock(
 }
 
 bool SideCarReader::Implementation::readIdentifierBlock(
-       llvm::BitstreamCursor &cursor) {
-  return cursor.SkipBlock();
+       llvm::BitstreamCursor &cursor,
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(IDENTIFIER_BLOCK_ID))
+    return true;
+
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown sub-block, possibly for use by a future version of the
+      // side-car format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case identifier_block::IDENTIFIER_DATA: {
+      // Already saw identifier table.
+      if (IdentifierTable)
+        return true;
+
+      uint32_t tableOffset;
+      identifier_block::IdentifierDataLayout::readRecord(scratch, tableOffset);
+      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+      IdentifierTable.reset(
+        SerializedIdentifierTable::Create(base + tableOffset,
+                                          base + sizeof(uint32_t),
+                                          base));
+      break;
+    }
+
+    default:
+      // Unknown record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return false;
 }
 
 bool SideCarReader::Implementation::readObjCClassBlock(
-       llvm::BitstreamCursor &cursor) {
-  return cursor.SkipBlock();
+       llvm::BitstreamCursor &cursor,
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(OBJC_CLASS_BLOCK_ID))
+    return true;
+
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown sub-block, possibly for use by a future version of the
+      // side-car format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case objc_class_block::OBJC_CLASS_DATA: {
+      // Already saw Objective-C class table.
+      if (ObjCClassTable)
+        return true;
+
+      uint32_t tableOffset;
+      objc_class_block::ObjCClassDataLayout::readRecord(scratch, tableOffset);
+      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+      ObjCClassTable.reset(
+        SerializedObjCClassTable::Create(base + tableOffset,
+                                         base + sizeof(uint32_t),
+                                         base));
+      break;
+    }
+
+    default:
+      // Unknown record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return false;
 }
 
 bool SideCarReader::Implementation::readObjCPropertyBlock(
@@ -160,14 +380,14 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
       break;
 
     case IDENTIFIER_BLOCK_ID:
-      if (!hasValidControlBlock || Impl.readIdentifierBlock(cursor)) {
+      if (!hasValidControlBlock || Impl.readIdentifierBlock(cursor, scratch)) {
         failed = true;
         return;
       }
       break;
 
     case OBJC_CLASS_BLOCK_ID:
-      if (!hasValidControlBlock || Impl.readObjCClassBlock(cursor)) {
+      if (!hasValidControlBlock || Impl.readObjCClassBlock(cursor, scratch)) {
         failed = true;
         return;
       }
@@ -226,5 +446,25 @@ SideCarReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
     return nullptr;
 
   return std::move(reader);
+}
+
+Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef moduleName, 
+                                                       StringRef name) {
+  if (!Impl.ObjCClassTable)
+    return Nothing;
+
+  Optional<IdentifierID> moduleID = Impl.getIdentifier(moduleName);
+  if (!moduleID)
+    return Nothing;
+
+  Optional<IdentifierID> classID = Impl.getIdentifier(name);
+  if (!classID)
+    return Nothing;
+
+  auto known = Impl.ObjCClassTable->find({*moduleID, *classID});
+  if (known == Impl.ObjCClassTable->end())
+    return Nothing;
+
+  return *known;
 }
 

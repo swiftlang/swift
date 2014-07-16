@@ -1734,15 +1734,46 @@ bool generateAPIAnnotation(StringRef fileName) {
 ///
 /// FIXME: This is a horrible, horrible hack.
 bool checkAPIAnnotation(StringRef fileName) {
+  using namespace side_car;
+
   auto bufferOrError = llvm::MemoryBuffer::getFile(fileName);
   if (!bufferOrError)
     return true;
 
-  auto reader = side_car::SideCarReader::get(std::move(bufferOrError.get()));
+  auto reader = SideCarReader::get(std::move(bufferOrError.get()));
   if (!reader)
     return true;
 
-  // Okay.
+  // Okay. Go look for the data we expect.
+  StringRef moduleName = "Foundation"; // FIXME: this is a lie
+
+  // Constants used to map from KnownObjCMethods.def.
+  const auto OTK_None = side_car::NullableKind::NonNullable;
+  (void)OTK_None;
+  const auto OTK_Optional = side_car::NullableKind::Nullable;
+  (void)OTK_Optional;
+  const auto OTK_ImplicitlyUnwrappedOptional 
+    = side_car::NullableKind::Unknown;
+  (void)OTK_ImplicitlyUnwrappedOptional;
+
+  #define INSTANCE_METHOD(ClassName, Selector, Options)
+  #define CLASS_METHOD(ClassName, Selector, Options)
+  #define OBJC_CONTEXT(ClassName, Options)                              \
+    if (auto info = reader->lookupObjCClass(moduleName, #ClassName)) {  \
+      auto expectedInfo = ObjCClassInfo() | Options;                    \
+      if (*info != expectedInfo) {                                    \
+        llvm::errs() << "Class " << moduleName << "." << #ClassName     \
+                     << " has incorrect information\n";                 \
+        return true;                                                    \
+      }                                                                 \
+    } else {                                                            \
+      llvm::errs() << "Class " << moduleName << "." << #ClassName       \
+                   << " not found in side car file\n";                  \
+      return true;                                                      \
+    }
+  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)
+#include "../../lib/ClangImporter/KnownObjCMethods.def"
+
   return false;
 }
 

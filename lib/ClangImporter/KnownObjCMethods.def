@@ -447,3 +447,5 @@ OBJC_PROPERTY(UIApplicationDelegate, window, OTK_Optional)
 
 #undef INSTANCE_METHOD
 #undef CLASS_METHOD
+#undef OBJC_PROPERTY
+#undef OBJC_CONTEXT

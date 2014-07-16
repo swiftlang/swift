@@ -78,6 +78,15 @@ public:
     HasDefaultNullability = true;
     DefaultNullability = static_cast<unsigned>(kind);
   }
+
+  friend bool operator==(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
+    return lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
+           lhs.DefaultNullability == rhs.DefaultNullability;
+  }
+
+  friend bool operator!=(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// Describes side-car data for an Objective-C property.
