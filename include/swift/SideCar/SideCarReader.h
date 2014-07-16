@@ -18,12 +18,46 @@
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SIDE_CAR_READER_H
 #define SWIFT_SIDE_CAR_READER_H
+
+#include "swift/SideCar/Types.h"
+#include "swift/Basic/Optional.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include <memory>
+
 namespace swift {
 namespace side_car {
 
 /// A class that reads side-car data from a binary file that was written by
 /// the \c SideCarWriter.
 class SideCarReader {
+  class Implementation;
+
+  Implementation &Impl;
+
+  SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, bool &failed);
+
+public:
+  /// Create a new side-car reader from the given member buffer, which
+  /// contains the contents of a binary side-car file.
+  ///
+  /// \returns the new side-car reader, or null if an error occurred.
+  static std::unique_ptr<SideCarReader> 
+  get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer);
+
+  ~SideCarReader();
+
+  SideCarReader(const SideCarReader &) = delete;
+  SideCarReader &operator=(const SideCarReader &) = delete;
+
+  /// Look for information regarding the given Objective-C class in
+  /// the given module.
+  ///
+  /// \param moduleName The name of the module in which we are
+  /// searching for information.
+  /// \param name The name of the class we're looking for.
+  ///
+  /// \returns Information about the class, if known.
+  Optional<ObjCClassInfo> lookupObjCClass(StringRef moduleName, StringRef name);
 };
 
 } // end namespace side_car

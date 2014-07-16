@@ -1,5 +1,6 @@
 // RUN: %swift-ide-test -generate-api-annotation -o %t
 // RUN: llvm-bcanalyzer %t | FileCheck %s
+// RUN: %swift-ide-test -check-api-annotation %t
 
 // CHECK: Block ID #0 (BLOCKINFO_BLOCK)
 // CHECK: Block ID #[[IDENTIFIER_BLOCK:[0-9]+]] (IDENTIFIER_BLOCK)

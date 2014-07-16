@@ -31,6 +31,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/ReST/Parser.h"
+#include "swift/SideCar/SideCarReader.h"
 #include "swift/SideCar/SideCarWriter.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -66,7 +67,8 @@ enum class ActionType {
   PrintModuleImports,
   PrintUSRs,
   ParseReST,
-  GenerateAPIAnnotation
+  GenerateAPIAnnotation,
+  CheckAPIAnnotation,
 };
 
 namespace options {
@@ -107,6 +109,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::GenerateAPIAnnotation,
                       "generate-api-annotation", 
                       "Generate an API annotation file"),
+           clEnumValN(ActionType::CheckAPIAnnotation,
+                      "check-api-annotation", 
+                      "Check an API annotation file"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -1682,7 +1687,7 @@ namespace {
 /// file.
 ///
 /// FIXME: This is a horrible, horrible hack.
-void generateAPIAnnotation(StringRef fileName) {  
+bool generateAPIAnnotation(StringRef fileName) {  
   using namespace side_car;
   SideCarWriter writer;
 
@@ -1719,6 +1724,26 @@ void generateAPIAnnotation(StringRef fileName) {
   llvm::raw_fd_ostream os(fileName.str().c_str(), errorInfo, 
                           llvm::sys::fs::OpenFlags::F_None);
   writer.writeToStream(os);
+  os.flush();
+
+  return os.has_error();
+}
+
+/// Generate an API annotation file from the known Objective-C methods
+/// file.
+///
+/// FIXME: This is a horrible, horrible hack.
+bool checkAPIAnnotation(StringRef fileName) {
+  auto bufferOrError = llvm::MemoryBuffer::getFile(fileName);
+  if (!bufferOrError)
+    return true;
+
+  auto reader = side_car::SideCarReader::get(std::move(bufferOrError.get()));
+  if (!reader)
+    return true;
+
+  // Okay.
+  return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -1741,7 +1766,26 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    generateAPIAnnotation(options::OutputFilename);
+    if (generateAPIAnnotation(options::OutputFilename)) {
+      llvm::errs() << "could not generate " << options::OutputFilename << "\n";
+      return 1;
+    }
+
+    return 0;
+  }
+
+  if (options::Action == ActionType::CheckAPIAnnotation) {
+    if (options::InputFilenames.size() != 1) {
+      llvm::errs() << "single input file required\n";
+      llvm::cl::PrintHelpMessage();      
+      return 1;
+    }
+    
+    if (checkAPIAnnotation(options::InputFilenames[0])) {
+      llvm::errs() << "could not read " << options::InputFilenames[0] << "\n";
+      return 1;
+    }
+
     return 0;
   }
 
@@ -1804,6 +1848,7 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::None:
   case ActionType::GenerateAPIAnnotation:
+  case ActionType::CheckAPIAnnotation:
     llvm_unreachable("should be handled above");
 
   case ActionType::CodeCompletion:
