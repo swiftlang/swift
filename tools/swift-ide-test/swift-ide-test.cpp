@@ -1769,7 +1769,7 @@ bool checkAPIAnnotation(StringRef fileName) {
         return true;                                                  \
       }                                                               \
     } else {                                                          \
-      llvm::errs() << "Class " << moduleName << "method"              \
+      llvm::errs() << "Class " << moduleName << " method"             \
                    << " not found in side car file\n";                \
       return true;                                                    \
     }
@@ -1783,7 +1783,7 @@ bool checkAPIAnnotation(StringRef fileName) {
         return true;                                                  \
       }                                                               \
     } else {                                                          \
-      llvm::errs() << "Class " << moduleName << "method"              \
+      llvm::errs() << "Class " << moduleName << " method"             \
                    << " not found in side car file\n";                \
       return true;                                                    \
     }
