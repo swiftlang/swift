@@ -132,6 +132,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
 #include "swift/AST/Attr.def"
   case DAK_Inline:
   case DAK_Accessibility:
+  case DAK_Ownership:
     if (!DeclAttribute::isDeclModifier(getKind()))
       Printer << "@";
     Printer << getAttrName();
@@ -223,6 +224,14 @@ StringRef DeclAttribute::getAttrName() const {
       return "internal";
     case Accessibility::Public:
       return "public";
+    }
+
+  case DAK_Ownership:
+    switch (cast<OwnershipAttr>(this)->get()) {
+    case Ownership::Strong:    assert(0 && "Never present in the attribute");
+    case Ownership::Weak:      return "weak";
+    case Ownership::Unowned:   return "unowned";
+    case Ownership::Unmanaged: return "unowned(unsafe)";
     }
   case DAK_RawDocComment:
     return "<<raw doc comment>>";

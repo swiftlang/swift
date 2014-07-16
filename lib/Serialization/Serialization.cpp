@@ -1217,27 +1217,6 @@ static uint8_t getRawStableAccessibility(Accessibility access) {
   }
 }
 
-/// Asserts if the declaration has any attributes other than the ones
-/// specified in the template parameters.
-///
-/// This is a no-op in release builds.
-template <AttrKind ...KINDS>
-static void checkAllowedAttributes(const Decl *D) {
-#ifndef NDEBUG
-  DeclAttributes attrs = D->getAttrs();
-
-  for (AttrKind AK : std::vector<AttrKind>({ KINDS... }))
-    attrs.clearAttribute(AK);
-
-  if (attrs.containsTraditionalAttributes()) {
-    llvm::errs() << "Serialization: unhandled attributes ";
-    attrs.print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm_unreachable("TODO: handle the above attributes");
-  }
-#endif
-}
-
 #ifndef NDEBUG
 #define DEF_VERIFY_ATTR(DECL)\
 static void verifyAttrSerializable(const DECL ## Decl *D) {\
@@ -1293,6 +1272,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   switch (DA->getKind()) {
   case DAK_RawDocComment:
+  case DAK_Ownership: // Serialized as part of the type.
   case DAK_Count:
     llvm_unreachable("cannot serialize DAK_Count");
     return;
@@ -1422,8 +1402,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
-
-    checkAllowedAttributes<>(extension);
     verifyAttrSerializable(extension);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
@@ -1462,7 +1440,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
-    checkAllowedAttributes<>(binding);
     verifyAttrSerializable(binding);
 
     const Decl *DC = getDeclForContext(binding->getDeclContext());
@@ -1485,7 +1462,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
-    checkAllowedAttributes<>(op);
     verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
@@ -1502,7 +1478,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
-    checkAllowedAttributes<>(op);
     verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
@@ -1516,7 +1491,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
-    checkAllowedAttributes<>(op);
     verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
@@ -1533,7 +1507,6 @@ void Serializer::writeDecl(const Decl *D) {
     assert(!typeAlias->isObjC() && "ObjC typealias is not meaningful");
     assert(typeAlias->getProtocols().empty() &&
            "concrete typealiases cannot have protocols");
-    checkAllowedAttributes<>(typeAlias);
     verifyAttrSerializable(typeAlias);
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
@@ -1558,7 +1531,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
-    checkAllowedAttributes<>(genericParam);
     verifyAttrSerializable(genericParam);
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
@@ -1582,7 +1554,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
-    checkAllowedAttributes<>(assocType);
     verifyAttrSerializable(assocType);
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
@@ -1606,7 +1577,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Struct: {
     auto theStruct = cast<StructDecl>(D);
-    checkAllowedAttributes<>(theStruct);
     verifyAttrSerializable(theStruct);
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
@@ -1637,7 +1607,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Enum: {
     auto theEnum = cast<EnumDecl>(D);
-    checkAllowedAttributes<>(theEnum);
     verifyAttrSerializable(theEnum);
 
     const Decl *DC = getDeclForContext(theEnum->getDeclContext());
@@ -1668,7 +1637,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
-    checkAllowedAttributes<>(theClass);
     verifyAttrSerializable(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1733,9 +1701,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
-    checkAllowedAttributes<
-      AK_unowned, AK_unowned_unsafe, AK_weak
-    >(var);
     verifyAttrSerializable(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
@@ -1786,9 +1751,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Param: {
     auto param = cast<ParamDecl>(D);
-    checkAllowedAttributes<
-      AK_unowned, AK_unowned_unsafe, AK_weak
-    >(param);
     verifyAttrSerializable(param);
 
     const Decl *DC = getDeclForContext(param->getDeclContext());
@@ -1807,7 +1769,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
-    checkAllowedAttributes<>(fn);
     verifyAttrSerializable(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -1850,8 +1811,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::EnumElement: {
     auto elem = cast<EnumElementDecl>(D);
-    checkAllowedAttributes<>(elem);
-
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
@@ -1867,7 +1826,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
-    checkAllowedAttributes<>(subscript);
     verifyAttrSerializable(subscript);
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
@@ -1900,7 +1858,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-    checkAllowedAttributes<>(ctor);
     verifyAttrSerializable(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
@@ -1934,7 +1891,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Destructor: {
     auto dtor = cast<DestructorDecl>(D);
-    checkAllowedAttributes<>(dtor);
     verifyAttrSerializable(dtor);
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());

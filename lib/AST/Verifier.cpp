@@ -1306,9 +1306,9 @@ struct ASTNodeBase {};
 
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
-      if (var->getAttrs().hasOwnership() !=
+      if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
           isa<ReferenceStorageType>(var->getType().getPointer())) {
-        if (var->getAttrs().hasOwnership()) {
+        if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
         } else {

@@ -391,6 +391,37 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_Ownership: {
+    // Handle weak/unowned/unowned(unsafe).
+    Ownership Kind = AttrName == "weak" ? Ownership::Weak : Ownership::Unowned;
+    SourceLoc EndLoc = Loc;
+
+    if (Kind == Ownership::Unowned && Tok.is(tok::l_paren)) {
+      // Parse an optional specifier after unowned.
+      SourceLoc lp = consumeToken(tok::l_paren);
+      if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
+        consumeToken();
+      } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
+        consumeToken();
+        Kind = Ownership::Unmanaged;
+      } else {
+        diagnose(Tok, diag::attr_unowned_invalid_specifier);
+        consumeIf(tok::identifier);
+      }
+
+      SourceLoc rp;
+      parseMatchingToken(tok::r_paren, rp, diag::attr_unowned_expected_rparen,
+                         lp);
+      EndLoc = rp;
+    }
+
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) OwnershipAttr(SourceRange(Loc, EndLoc),
+                                                 Kind));
+    break;
+  }
+
   case DAK_Accessibility: {
 
     // Diagnose using accessibility in a local scope, which isn't meaningful.
@@ -816,35 +847,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
 
-  // Parse an optional specifier after @unowned.
-  if (attr == AK_unowned) {
-    SourceLoc lp = Tok.getLoc();
-    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      bool invalid = true;
-      if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
-        consumeToken();
-        invalid = false;
-      } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
-        consumeToken();
-        attr = AK_unowned_unsafe;
-        invalid = false;
-      }
-
-      if (invalid) {
-        diagnose(Tok, diag::attr_unowned_invalid_specifier);
-        (void) consumeIf(tok::identifier);
-        // Go ahead and try to parse the rparen.
-      }
-
-      SourceLoc rp;
-      parseMatchingToken(tok::r_paren, rp, diag::attr_unowned_expected_rparen,
-                         lp);
-
-      if (invalid)
-        return false;
-    }
-  }
-  
   // Diagnose duplicated attributes.
   if (Attributes.has(attr)) {
     diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
@@ -852,27 +854,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   }
 
   Attributes.setAttr(attr, Loc);
-
-  // Handle any attribute-specific processing logic.
-  switch (attr) {
-  default: break;
-  case AK_weak:
-  case AK_unowned:
-  case AK_unowned_unsafe: {
-    const char *Kind;
-    if (attr == AK_weak)
-      Kind = "weak";
-    else if (attr == AK_unowned)
-      Kind = "unowned";
-    else {
-      assert(attr == AK_unowned_unsafe);
-      Kind = "unowned(unsafe)";
-    }
-    // Ownership are context-sensitive keywords, not attributes.
-    diagnose(Loc, diag::ownership_not_attribute, Kind).fixItRemove(AtLoc);
-    break;
-  }
-  }
 
   return false;
 }
@@ -1338,38 +1319,13 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
     // Context sensitive keywords.
     case tok::identifier:
-      // Likewise, if this is a context sensitive keyword, parse it too.
-      if (Tok.isContextualKeyword("weak") ||
-          Tok.isContextualKeyword("unowned")) {
-        AttrKind attr = AK_Count;
-        bool isUnowned = Tok.getText() == "unowned";
-
-        SourceLoc Loc = Tok.getLoc();
-        if (isUnowned && peekToken().is(tok::l_paren) &&
-            isParenthesizedUnowned(*this)) {
-          consumeToken(tok::identifier);
-          consumeToken(tok::l_paren);
-          // TODO, no "safe" variant?
-          attr = Tok.getText() == "safe" ? AK_unowned : AK_unowned_unsafe;
-          consumeToken(tok::identifier);
-          consumeToken(tok::r_paren);
-        } else {
-          if (isUnowned)
-            attr = AK_unowned;
-          else
-            attr = AK_weak;
-          consumeToken(tok::identifier);
-        }
-        
-        if (Attributes.hasOwnership())
-          diagnose(Tok, diag::decl_already_ownership);
-        else
-          Attributes.setAttr(attr, Loc);
-        continue;
-      }
-        
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
+      if (Tok.isContextualKeyword("weak") ||
+          Tok.isContextualKeyword("unowned")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Ownership);
+        continue;
+      }
       if (Tok.isContextualKeyword("optional")) {
         parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Optional);
         continue;

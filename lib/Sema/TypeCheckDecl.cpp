@@ -1185,8 +1185,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have any type-adjusting attributes, apply them here.
   if (binding->getPattern()->hasType()) {
     if (auto var = binding->getSingleVar()) {
-      if (var->getAttrs().hasOwnership())
-        tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
+      if (auto *OA = var->getMutableAttrs().getAttribute<OwnershipAttr>())
+        tc.checkOwnershipAttr(var, OA);
     }
   }
 
@@ -2987,8 +2987,8 @@ public:
         if (auto var = PBD->getSingleVar()) {
           isDebuggerVar = var->isDebuggerVar();
             
-          if (var->getAttrs().hasOwnership())
-            TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
+          if (auto *OA = var->getMutableAttrs().getAttribute<OwnershipAttr>())
+            TC.checkOwnershipAttr(var, OA);
         }
 
         // Make sure we don't have a @NSManaged property.
@@ -4730,6 +4730,7 @@ public:
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
+    UNINTERESTING_ATTR(Ownership)
 
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
@@ -6501,27 +6502,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  // Ownership attributes (weak, unowned(safe), unowned(unsafe)).
-  if (Attrs.hasOwnership()) {
-    assert(unsigned(Attrs.isWeak()) +
-           unsigned(Attrs.isUnowned()) +
-           unsigned(Attrs.isUnmanaged()) == 1 &&
-           "multiple ownership attributes present?");
-
-    // Only 'var' declarations can have ownership.
-    // TODO: captures, consts, etc.
-    VarDecl *var = dyn_cast<VarDecl>(D);
-    if (!var) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_ownership_decl,
-                  (unsigned) Attrs.getOwnership());
-      D->getMutableAttrs().clearOwnership();
-      return;
-    }
-
-    TC.checkOwnershipAttr(var, Attrs.getOwnership());
-  }
-
- 
   // Only protocol members can be optional.
   if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {

@@ -1106,11 +1106,11 @@ class infer_instanceVar1 {
   weak var var_Weak7: protocol<Protocol_ObjC1>?
   weak var var_Weak8: protocol<Protocol_ObjC1, Protocol_ObjC2>?
 
-// CHECK-LABEL: @objc var var_Weak1: @sil_weak Class_ObjC1
-// CHECK-LABEL: @objc var var_Weak2: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc var var_Weak5: @sil_weak AnyObject
-// CHECK-LABEL: @objc var var_Weak7: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc weak var var_Weak1: @sil_weak Class_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
+// CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
 
 
   weak var var_Weak_fail1: PlainClass?
@@ -1133,11 +1133,11 @@ class infer_instanceVar1 {
   unowned var var_Unowned7: protocol<Protocol_ObjC1>
   unowned var var_Unowned8: protocol<Protocol_ObjC1, Protocol_ObjC2>
 
-// CHECK-LABEL: @objc var var_Unowned1: @sil_unowned Class_ObjC1
-// CHECK-LABEL: @objc var var_Unowned2: @sil_unowned Protocol_ObjC1
-// CHECK-LABEL: @objc var var_Unowned5: @sil_unowned AnyObject
-// CHECK-LABEL: @objc var var_Unowned7: @sil_unowned Protocol_ObjC1
-// CHECK-LABEL: @objc var var_Unowned8: @sil_unowned protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc unowned var var_Unowned1: @sil_unowned Class_ObjC1
+// CHECK-LABEL: @objc unowned var var_Unowned2: @sil_unowned Protocol_ObjC1
+// CHECK-LABEL: @objc unowned var var_Unowned5: @sil_unowned AnyObject
+// CHECK-LABEL: @objc unowned var var_Unowned7: @sil_unowned Protocol_ObjC1
+// CHECK-LABEL: @objc unowned var var_Unowned8: @sil_unowned protocol<Protocol_ObjC1, Protocol_ObjC2>
 
 
   unowned var var_Unowned_fail1: PlainClass
@@ -1521,7 +1521,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}}  @objc @IBOutlet var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}}  @objc @IBOutlet weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{'IBOutlet' property cannot have non-object type 'PlainStruct'}}

@@ -129,8 +129,8 @@ var weak0 : Ty0?
 weak
 var weak0x : Ty0?
 
-weak unowned var weak1 : Ty0? // expected-error {{declaration cannot have multiple ownership specifiers}}
-weak weak var weak2 : Ty0? // expected-error {{declaration cannot have multiple ownership specifiers}}
+weak unowned var weak1 : Ty0? // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
+weak weak var weak2 : Ty0? // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 unowned var weak3 : Ty0
 
 unowned var weak3a : Ty0
@@ -138,9 +138,9 @@ unowned(safe) var weak3b : Ty0
 unowned(unsafe) var weak3c : Ty0
 
 
-unowned unowned var weak4 : Ty0  // expected-error {{declaration cannot have multiple ownership specifiers}}
+unowned unowned var weak4 : Ty0  // expected-error {{duplicate modifier}}  expected-note {{modifier already specified here}}
 
-unowned weak var weak5 : Ty0 // expected-error {{declaration cannot have multiple ownership specifiers}}
+unowned weak var weak5 : Ty0 // expected-error {{duplicate modifier}}  expected-note {{modifier already specified here}}
 
 weak
 var weak6 : Int // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
@@ -166,7 +166,7 @@ var weak15 : Class // expected-error {{'weak' variable should have optional type
 
 weak var weak16 : Class!
 
-@weak var weak17 : Class? // expected-error {{'@weak' is not an attribute, use the 'weak' keyword instead}}
+@weak var weak17 : Class? // expected-error {{'weak' is a declaration modifier, not an attribute}}
 
 
 @exported var exportVar: Int // expected-error {{'exported' attribute cannot be applied to this declaration}}{{1-10=}}

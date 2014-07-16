@@ -71,7 +71,11 @@ public:
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
   void visitNonMutatingAttr(NonMutatingAttr *attr)  { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
-  
+
+  void visitOwnershipAttr(OwnershipAttr *attr) {
+    TC.checkOwnershipAttr(cast<VarDecl>(D), attr);
+  }
+
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -512,6 +516,7 @@ public:
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(Optional)
+    IGNORED_ATTR(Ownership)
     IGNORED_ATTR(Override)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(Semantics)
@@ -927,19 +932,23 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
-void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
+void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   Type type = var->getType();
 
   // Just stop if we've already processed this declaration.
   if (type->is<ReferenceStorageType>())
     return;
 
+  auto ownershipKind = attr->get();
+  assert(ownershipKind != Ownership::Strong &&
+         "Cannot specify 'strong' in an ownership attribute");
+
   // A weak variable must have type R? or R! for some ownership-capable type R.
   Type underlyingType = type;
   if (ownershipKind == Ownership::Weak) {
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
-      var->getMutableAttrs().clearOwnership();
+      attr->setInvalid();
       return;
     }
 
@@ -950,7 +959,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       // isn't Optional.
       diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
                OptionalType::get(type));
-      var->getMutableAttrs().clearOwnership();
+      attr->setInvalid();
 
       // If the IBOutlet attribute is present, remove it as well.
       if (auto attr = var->getMutableAttrs().getAttribute<IBOutletAttr>())
@@ -976,11 +985,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       diagnose(var->getStartLoc(), diag::invalid_ownership_type,
                (unsigned) ownershipKind, underlyingType);
     }
-    var->getMutableAttrs().clearOwnership();
+    attr->setInvalid();
     return;
   }
 
   // Change the type to the appropriate reference storage type.
-  if (ownershipKind != Ownership::Strong)
-    var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
+  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }

@@ -1543,9 +1543,8 @@ namespace {
       // Get-only properties are (readonly).
       if (!prop->isSettable(prop->getDeclContext()))
         outs << ",R";
-      // Weak properties are (weak).
-      else if (prop->getAttrs().getOwnership() == Ownership::Weak
-               || prop->getAttrs().getOwnership() == Ownership::Unowned)
+      // Weak and Unowned properties are (weak).
+      else if (prop->getAttrs().hasAttribute<OwnershipAttr>())
         outs << ",W";
       // If the property is @NSCopying, or is bridged to a value class, the
       // property is (copy).
@@ -1553,8 +1552,7 @@ namespace {
                || (hasObjectEncoding && !isObject))
         outs << ",C";
       // If it's of a managed object type, it is (retain).
-      else if (isObject
-               && prop->getAttrs().getOwnership() == Ownership::Strong)
+      else if (isObject)
         outs << ",&";
       // Otherwise, the property is of a value type, so it is
       // the default (assign).

@@ -1462,20 +1462,20 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
-      AttrKind attrKind = AK_Count;
+      Ownership ownershipKind = Ownership::Strong;
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
-        attrKind = AK_weak;
+        ownershipKind = Ownership::Weak;
       } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
-        attrKind = AK_unowned;
+        ownershipKind = Ownership::Unowned;
 
         // Skip over "safe" and "unsafe" if present.
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
-            attrKind = AK_unowned; // FIXME: No "safe" variant.
+            ownershipKind = Ownership::Unowned; // FIXME: No "safe" variant.
           else if (Tok.getText() == "unsafe")
-            attrKind = AK_unowned_unsafe;
+            ownershipKind = Ownership::Unmanaged;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
           consumeIf(tok::identifier);
@@ -1532,14 +1532,11 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // expression.  This uses the parent declcontext (not the closure) since
       // the initializer expression is evaluated before the closure is formed.
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
-                                       /*isLet*/attrKind != AK_weak,
+                                       /*isLet*/ownershipKind !=Ownership::Weak,
                                        nameLoc, name, Type(), CurDeclContext);
       // Attributes.
-      if (attrKind != AK_Count) {
-        DeclAttributes Attributes;
-        Attributes.setAttr(attrKind, loc);
-        VD->getMutableAttrs() = Attributes;
-      }
+      if (ownershipKind != Ownership::Strong)
+        VD->getMutableAttrs().add(new (Context) OwnershipAttr(ownershipKind));
       
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
       

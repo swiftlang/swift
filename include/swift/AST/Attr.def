@@ -192,10 +192,11 @@ VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility,
 DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
           /* Not serialized */46)
 
+// Also handles unowned and unowned(weak).
+DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
+          /* Not serialized */45)
+DECL_ATTR_ALIAS(unowned, Ownership)
 
-ATTR(unowned)
-VIRTUAL_ATTR(unowned_unsafe)
-ATTR(weak)
 
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS)

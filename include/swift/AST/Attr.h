@@ -805,6 +805,22 @@ public:
   }
 };
 
+/// Represents weak/unowned/unowned(unsafe) decl modifiers.
+class OwnershipAttr : public DeclAttribute {
+  const Ownership ownership;
+public:
+  OwnershipAttr(SourceRange range, Ownership kind)
+    : DeclAttribute(DAK_Ownership, range.Start, range, /*Implicit=*/false),
+      ownership(kind) {}
+
+  OwnershipAttr(Ownership kind) : OwnershipAttr(SourceRange(), kind) {}
+
+  Ownership get() const { return ownership; }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Ownership;
+  }
+};
+
 /// Defines the attribute that we use to model documentation comments.
 class RawDocCommentAttr : public DeclAttribute {
   /// Source range of the attached comment.  This comment is located before
@@ -829,7 +845,7 @@ class DeclAttributes {
   /// Source locations for every possible attribute that can be parsed in
   /// source.
   SourceLoc AttrLocs[AK_Count];
-  bool HasAttr[AK_Count] = { false };
+  bool HasAttr[AK_Count] = { };
 
   unsigned NumAttrsSet : 8;
 
@@ -919,10 +935,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  bool isWeak() const { return has(AK_weak); }
-  bool isUnowned() const { return has(AK_unowned); }
-  bool isUnmanaged() const { return has(AK_unowned_unsafe); }
-
   // FIXME: eventually take a platform argument.
   bool isUnavailable() const { return getUnavailable() != nullptr; }
 
@@ -931,22 +943,6 @@ public:
   //
   // FIXME: eventually take a platform argument.
   const AvailabilityAttr *getUnavailable() const;
-
-  bool hasOwnership() const {
-    return isWeak() || isUnowned() || isUnmanaged();
-  }
-  Ownership getOwnership() const {
-    if (isWeak()) return Ownership::Weak;
-    if (isUnowned()) return Ownership::Unowned;
-    if (isUnmanaged()) return Ownership::Unmanaged;
-    return Ownership::Strong;
-  }
-
-  void clearOwnership() {
-    clearAttribute(AK_weak);
-    clearAttribute(AK_unowned);
-    clearAttribute(AK_unowned_unsafe);
-  }
 
   void print(llvm::raw_ostream &OS) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;

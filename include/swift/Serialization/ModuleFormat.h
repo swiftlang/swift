@@ -1018,7 +1018,8 @@ namespace decls_block {
   BCBlob      // semantics value
   >;
 
-  // Stub, unused.
+  // Stub layouts, unused.
+  using OwnershipDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<

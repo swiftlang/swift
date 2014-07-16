@@ -1310,9 +1310,6 @@ ERROR(dot_protocol_on_non_existential,sema_tct,none,
       "'Protocol' type only applies to existential types", ())
 
 // Ownership
-ERROR(invalid_ownership_decl,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' only applies to 'var' declarations",
-      (unsigned))
 ERROR(invalid_ownership_type,attribute_parsing,none,
       "'%select{strong|weak|unowned}0' cannot be applied to "
       "non-class type %1", (unsigned, Type))
