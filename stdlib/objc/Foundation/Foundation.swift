@@ -847,34 +847,34 @@ extension NSSet : SequenceType {
 // should get this from the extension on 'NSSet' above.
 extension NSMutableSet : SequenceType {}
 
-// FIXME: A class because we can't pass a struct with class fields through an
-// [objc] interface without prematurely destroying the references.
-public class NSDictionaryGenerator : GeneratorType {
-  var fastGenerator : NSFastGenerator
-  var dictionary : NSDictionary {
-    return fastGenerator.enumerable as NSDictionary
-  }
+extension NSDictionary : SequenceType {
+  // FIXME: A class because we can't pass a struct with class fields through an
+  // [objc] interface without prematurely destroying the references.
+  public class Generator : GeneratorType {
+    var _fastGenerator: NSFastGenerator
+    var _dictionary: NSDictionary {
+      return _fastGenerator.enumerable as NSDictionary
+    }
 
-  public func next() -> (key: AnyObject, value: AnyObject)? {
-    switch fastGenerator.next() {
-    case .None:
-      return .None
-    case .Some(var key):
-      // Deliberately avoid the subscript operator in case the dictionary
-      // contains non-copyable keys. This is rare since NSMutableDictionary
-      // requires them, but we don't want to paint ourselves into a corner.
-      return (key: key, value: dictionary.objectForKey(key))
+    public func next() -> (key: AnyObject, value: AnyObject)? {
+      switch _fastGenerator.next() {
+      case .None:
+        return .None
+      case .Some(var key):
+        // Deliberately avoid the subscript operator in case the dictionary
+        // contains non-copyable keys. This is rare since NSMutableDictionary
+        // requires them, but we don't want to paint ourselves into a corner.
+        return (key: key, value: _dictionary.objectForKey(key))
+      }
+    }
+
+    public init(_ dict: NSDictionary) {
+      _fastGenerator = NSFastGenerator(dict)
     }
   }
 
-  public init(_ dict: NSDictionary) {
-    self.fastGenerator = NSFastGenerator(dict)
-  }
-}
-
-extension NSDictionary : SequenceType {
-  public func generate() -> NSDictionaryGenerator {
-    return NSDictionaryGenerator(self)
+  public func generate() -> Generator {
+    return Generator(self)
   }
 }
 
