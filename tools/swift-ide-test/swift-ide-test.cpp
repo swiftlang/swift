@@ -1651,14 +1651,23 @@ void generateAPIAnnotation(StringRef fileName) {
     = side_car::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
-  #define INSTANCE_METHOD(ClassName, Selector, Options)
-  #define CLASS_METHOD(ClassName, Selector, Options)
+  #define MAKE_SELECTOR_REF(NumPieces, ...) \
+    ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
+  #define INSTANCE_METHOD(ClassName, Selector, Options)          \
+    writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
+                         /*isInstanceMethod=*/true,              \
+                         ObjCMethodInfo());
+  #define CLASS_METHOD(ClassName, Selector, Options)             \
+    writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
+                         /*isInstanceMethod=*/false,             \
+                         ObjCMethodInfo());
   #define OBJC_CONTEXT(ClassName, Options) \
     writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options);
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
     writer.addObjCProperty(#ContextName, #PropertyName,              \
                            ObjCPropertyInfo());
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
+  #undef MAKE_SELECTOR_REF
 
   std::string errorInfo;
   llvm::raw_fd_ostream os(fileName.str().c_str(), errorInfo, 
