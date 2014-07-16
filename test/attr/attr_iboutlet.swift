@@ -161,7 +161,8 @@ class NonObjC {}
 
 class SwiftGizmo {
   @IBOutlet var a : C!
-  @IBOutlet var b : [C]!
+  @IBOutlet var b1 : [C]
+  @IBOutlet var b2 : [C]!
   @IBOutlet var c : String!
   @IBOutlet var d : [String]! // expected-error{{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
   @IBOutlet var e : Proto!
@@ -171,8 +172,8 @@ class SwiftGizmo {
 
   @IBOutlet weak var h : C?
   @IBOutlet weak var i : C!
-  @IBOutlet unowned var j : C! // expected-error{{'unowned' cannot be applied to non-class type 'C!'}}
-
+  @IBOutlet unowned var j : C
+  @IBOutlet unowned(unsafe) var k : C
 
   @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}
 
@@ -183,6 +184,8 @@ class MissingOptional {
   @IBOutlet var a: C // expected-error{{'IBOutlet' property has non-optional type 'C'}}
   // expected-note @-1{{add '?' to form the optional type 'C?'}}{{21-21=?}}
   // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{21-21=!}}
+
+  @IBOutlet weak var b: C // expected-error{{'weak' variable should have optional type 'C?'}}
 
   init() {}
 }

@@ -223,21 +223,27 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   auto type = VD->getType();
 
   // Look through ownership types, and optionals.
-  type = type->getReferenceStorageReferent();
+  Optional<Ownership> ownership;
+  if (auto rst = type->getAs<ReferenceStorageType>()) {
+    ownership = rst->getOwnership();
+    type = rst->getReferentType();
+  }
+
   bool wasOptional = false;
   if (Type underlying = type->getAnyOptionalObjectType()) {
     type = underlying;
     wasOptional = true;
   }
 
-
   bool isArray = false;
   if (auto isError = isAcceptableOutletType(type, isArray, TC))
     return diagnoseAndRemoveAttr(attr, isError.getValue(),
                                  /*array=*/isArray, type);
 
-  // If the type wasn't optional, complain.
-  if (!wasOptional) {
+  // If the type wasn't optional, an array, or unowned, complain.
+  if (!wasOptional && !isArray &&
+      !(ownership && (*ownership == Ownership::Unowned ||
+                      *ownership == Ownership::Unmanaged))) {
     auto symbolLoc = Lexer::getLocForEndOfToken(
                        TC.Context.SourceMgr,
                        VD->getTypeSourceRangeForDiagnostics().End);
@@ -945,6 +951,11 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
                OptionalType::get(type));
       var->getMutableAttrs().clearOwnership();
+
+      // If the IBOutlet attribute is present, remove it as well.
+      if (auto attr = var->getMutableAttrs().getAttribute<IBOutletAttr>())
+        var->getMutableAttrs().removeAttribute(attr);
+
       return;
     } else {
       // This is also an error, but the code below will diagnose it.
