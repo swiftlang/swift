@@ -394,7 +394,7 @@ class d0121_TestClassDerived : d0120_TestClassBase {
   override final subscript(i: Int) -> Int {
     return 0
   }
-// PASS_COMMON-NEXT: {{^}}  final override subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  override final subscript (i: Int) -> Int { get }{{$}}
 }
 
 protocol d0130_TestProtocol {
@@ -431,7 +431,7 @@ protocol d0150_TestClassProtocol : class {}
 
 
 @noreturn @asmname("exit") func d0160_testNoReturn()
-// PASS_COMMON-LABEL: {{^}}@asmname("exit") @noreturn func d0160_testNoReturn(){{$}}
+// PASS_COMMON-LABEL: {{^}}@noreturn @asmname("exit") func d0160_testNoReturn(){{$}}
 
 @noreturn func d0161_testNoReturn() { d0160_testNoReturn() }
 // PASS_COMMON-LABEL: {{^}}@noreturn func d0161_testNoReturn(){{$}}
@@ -461,14 +461,14 @@ class d0170_TestAvailability {
   @availability(iOS, unavailable)
   @availability(OSX, unavailable)
   func f3() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(OSX, unavailable) @availability(iOS, unavailable) func f3(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable) @availability(OSX, unavailable) func f3(){{$}}
 }
 
 @objc class d0180_TestIBAttrs {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -480,10 +480,10 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBOutlet @objc var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable var inspectableProp: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
 }
 
 struct d0190_LetVarDecls {
@@ -681,7 +681,7 @@ class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase
     }
     set {}
   }
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  final override var baseProp2: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  override final var baseProp2: Int{{$}}
 }
 
 //===---

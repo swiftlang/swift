@@ -947,7 +947,8 @@ public:
   void print(llvm::raw_ostream &OS) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 
-  template <typename T, typename DERIVED> class iterator_base {
+  template <typename T, typename DERIVED>
+  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
     T *Impl;
   public:
     explicit iterator_base(T *Impl) : Impl(Impl) {}

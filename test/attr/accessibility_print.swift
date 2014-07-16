@@ -253,3 +253,9 @@ private struct GC_NestedOuterPrivate {
     let y = 0
   }
 } // CHECK: {{^[}]}}
+
+// CHECK-LABEL: class MultipleAttributes {
+class MultipleAttributes {
+  // CHECK: {{^}} final {{(/\*)?private(\*/)?}} func foo()
+  final private func foo() {}
+}

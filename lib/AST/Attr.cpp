@@ -74,11 +74,12 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (NumAttrsSet == 0 && !DeclAttrs)
     return;
 
+  SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());
+  std::reverse(orderedAttributes.begin(), orderedAttributes.end());
+
   bool hadDeclModifier = false;
-  for (auto DA : *this) {
+  for (auto DA : orderedAttributes) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
-      continue;
-    if (isa<AbstractAccessibilityAttr>(DA))
       continue;
     if (std::find(Options.ExcludeAttrList.begin(),
                   Options.ExcludeAttrList.end(),
@@ -106,14 +107,9 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (!Options.ExclusiveAttrList.empty())
     return;
 
-  if (auto accessAttr = getAttribute<AccessibilityAttr>())
-    Printer << accessAttr->getAttrName() << " ";
-  if (auto setterAccessAttr = getAttribute<SetterAccessibilityAttr>())
-    Printer << setterAccessAttr->getAttrName() << " ";
-
   // Process decl modifiers in a second pass, after the attributes.
   if (hadDeclModifier) {
-    for (auto DA : *this) {
+    for (auto DA : orderedAttributes) {
       if (DA->isDeclModifier())
         DA->print(Printer);
     }

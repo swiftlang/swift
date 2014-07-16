@@ -1521,7 +1521,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}}  @objc @IBOutlet weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @IBOutlet @objc weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{'IBOutlet' property cannot have non-object type 'PlainStruct'}}
@@ -1539,7 +1539,7 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @objc @NSManaged var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @NSManaged @objc var goodManaged: Class_ObjC1
 
   @NSManaged
   var badManaged: PlainStruct
