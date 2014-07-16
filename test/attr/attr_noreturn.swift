@@ -101,9 +101,6 @@ class DerivedClassB : BaseClass {
   @noreturn override class func doesReturn() {}
 }
 
-@!noreturn // expected-error {{attribute may not be inverted}}
-func invalidInversion() {}
-
 struct MethodWithNoreturn {
   @noreturn
   func neverReturns() { exit(0) }

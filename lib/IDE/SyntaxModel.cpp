@@ -717,7 +717,7 @@ bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
 
     if (Tok.is(tok::at_sign))
       AtLoc = Tok.getLoc();
-    else if (Tok.isNot(tok::exclaim_postfix))
+    else
       AtLoc = SourceLoc();
   }
 

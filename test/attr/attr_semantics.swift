@@ -8,8 +8,6 @@ func duplicatesemantics() {}
 // should parse fine.
 func somethingThatShouldParseFine() {}
 
-@!semantics("foo") // expected-error {{attribute may not be inverted}}
-func invalidInversion() {}
 
 func func_with_nested_semantics() {
    @semantics("exit") // expected-error {{attribute 'semantics' can only be used in a non-local scope}}

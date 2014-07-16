@@ -313,11 +313,8 @@ void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
       SF->FirstObjCAttrLoc = L;
 }
 
-bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
-                                   SourceLoc AtLoc,
-                                   SourceLoc InversionLoc,
-                                   StringRef AttrName,
-                                   DeclAttrKind DK) {
+bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
+                                   StringRef AttrName, DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
@@ -329,9 +326,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // Delay issuing the diagnostic until we parse the attribute.
       DiscardAttribute = true;
     }
-
-  if (InversionLoc.isValid())
-    diagnose(InversionLoc, diag::invalid_attribute_inversion);
 
   if ((DK == DAK_Prefix || DK == DAK_Postfix) && !DiscardAttribute &&
       Attributes.getUnaryOperatorKind() != UnaryOperatorKind::None) {
@@ -780,12 +774,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 /// but rejected since they have context-sensitive keywords.
 ///
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
-  SourceLoc InversionLoc;
-  bool isInverted = false;
-  if (consumeIf(tok::exclaim_postfix)) {
-    InversionLoc = PreviousLoc;
-    isInverted = true;
-  }
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
@@ -812,8 +800,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     // over to the alternate parsing path.
     DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
     if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, AtLoc, InversionLoc,
-                                   Tok.getText(), DK);
+      return parseNewDeclAttribute(Attributes, AtLoc, Tok.getText(), DK);
 
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
@@ -864,13 +851,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   }
 
   Attributes.setAttr(attr, Loc);
-
-  // If this is an inverted attribute like "@!mutating", verify that inversion
-  // is ok.
-  if (isInverted) {
-      diagnose(InversionLoc, diag::invalid_attribute_inversion);
-      isInverted = false;
-  }
 
   // Handle any attribute-specific processing logic.
   switch (attr) {
@@ -1352,8 +1332,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     case tok::kw_internal:
     case tok::kw_public:
       // We still model these specifiers as attributes.
-      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
-                            Tok.getText(), DAK_Accessibility);
+      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Tok.getText(),
+                            DAK_Accessibility);
       continue;
 
     // Context sensitive keywords.
@@ -1391,57 +1371,57 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
       if (Tok.isContextualKeyword("optional")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
                               Tok.getText(), DAK_Optional);
         continue;
       }
       if (Tok.isContextualKeyword("required")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
                               Tok.getText(), DAK_Required);
         continue;
       }
       if (Tok.isContextualKeyword("lazy")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
                               Tok.getText(), DAK_Lazy);
         continue;
       }
       if (Tok.isContextualKeyword("final")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, /*InversionLoc=*/{},
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
                               Tok.getText(), DAK_Final);
         continue;
       }
       if (Tok.isContextualKeyword("dynamic")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Dynamic);
         continue;
       }
       if (Tok.isContextualKeyword("prefix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Prefix);
         continue;
       }
       if (Tok.isContextualKeyword("postfix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Postfix);
         continue;
       }
       if (Tok.isContextualKeyword("infix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Infix);
         continue;
       }
       if (Tok.isContextualKeyword("override")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Override);
         continue;
       }
       if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Mutating);
         continue;
       }
       if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_NonMutating);
         continue;
       }
@@ -2365,10 +2345,10 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       // Parse the contextual keywords for 'mutating' and 'nonmutating' before
       // get and set.
       if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_Mutating);
       } else if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                               Tok.getText(), DAK_NonMutating);
       }
 
@@ -2446,10 +2426,10 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // Parse the contextual keywords for 'mutating' and 'nonmutating' before
     // get and set.
     if (Tok.isContextualKeyword("mutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                             Tok.getText(), DAK_Mutating);
     } else if (Tok.isContextualKeyword("nonmutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
                             Tok.getText(), DAK_NonMutating);
     }
     

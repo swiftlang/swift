@@ -653,8 +653,7 @@ public:
   void setFirstObjCAttributeLocation(SourceLoc L);
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                             SourceLoc InversionLoc, StringRef AttrName,
-                             DeclAttrKind DK);
+                             StringRef AttrName, DeclAttrKind DK);
 
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))

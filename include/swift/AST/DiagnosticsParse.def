@@ -902,8 +902,6 @@ ERROR(duplicate_attribute,attribute_parsing,none,
 NOTE(previous_attribute,parsing,none,
      "%select{attribute|modifier}0 already specified here", (bool))
 
-ERROR(invalid_attribute_inversion,attribute_parsing,none,
-      "attribute may not be inverted", ())
 ERROR(cannot_combine_attribute,attribute_parsing,none,
       "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
