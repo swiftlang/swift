@@ -662,7 +662,6 @@ class LoadStoreOpts : public SILFunctionTransform {
           << F->getName() << " *****\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
 
     // Remove dead stores, merge duplicate loads, and forward stores to loads.
     bool Changed = false;
