@@ -157,6 +157,19 @@ func test_StdlibTypesPrinted() {
     optionalString = "meow"
     printedIs(optionalString, "Optional(\"meow\")")
   }
+  if true {
+    struct Wrapper: Printable {
+      let x: Printable? = nil
+
+      var description: String {
+        return "Wrapper(" + x.debugDescription + ")"
+      }
+    }
+    printedIs(Wrapper(), "Wrapper(nil)")
+    printedIs(Wrapper(x: Wrapper()), "Wrapper(Optional(Wrapper(nil)))")
+    printedIs(Wrapper(x: Wrapper(x: Wrapper())),
+        "Wrapper(Optional(Wrapper(Optional(Wrapper(nil)))))")
+  }
 
   println("test_StdlibTypesPrinted done")
 }
@@ -357,6 +370,24 @@ struct StructPrintable : Printable, ProtocolUnrelatedToPrinting {
   }
 }
 
+struct LargeStructPrintable : Printable, ProtocolUnrelatedToPrinting {
+  let a: Int
+  let b: Int
+  let c: Int
+  let d: Int
+
+  init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) {
+    self.a = a
+    self.b = b
+    self.c = c
+    self.d = d
+  }
+
+  var description: String {
+    return "<\(a) \(b) \(c) \(d)>"
+  }
+}
+
 struct StructDebugPrintable : DebugPrintable {
   let x: Int
 
@@ -440,6 +471,23 @@ func test_ObjectPrinting() {
   }
 
   if true {
+    let s = LargeStructPrintable(10, 20, 30, 40)
+    printedIs(s, "<10 20 30 40>")
+  }
+  if true {
+    let s: ProtocolUnrelatedToPrinting = LargeStructPrintable(10, 20, 30, 40)
+    printedIs(s, "<10 20 30 40>")
+  }
+  if true {
+    let s: Printable = LargeStructPrintable(10, 20, 30, 40)
+    printedIs(s, "<10 20 30 40>")
+  }
+  if true {
+    let s: Any = LargeStructPrintable(10, 20, 30, 40)
+    printedIs(s, "<10 20 30 40>")
+  }
+
+  if true {
     let s = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
@@ -518,6 +566,10 @@ func test_ArrayPrinting() {
   printedIs([ StructPrintable(1), StructPrintable(2),
               StructPrintable(3) ],
             "[►1◀︎, ►2◀︎, ►3◀︎]")
+
+  printedIs([ LargeStructPrintable(10, 20, 30, 40),
+              LargeStructPrintable(50, 60, 70, 80) ],
+            "[<10 20 30 40>, <50 60 70 80>]")
 
   printedIs([ StructDebugPrintable(1) ], "[►1◀︎]")
 

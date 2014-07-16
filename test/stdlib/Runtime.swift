@@ -1,5 +1,7 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
+// RUN: %target-run %t.out | FileCheck %s
 
+import Swift
 import StdlibUnittest
 import Foundation
 
@@ -208,15 +210,18 @@ RuntimeBridging.test("isBridgedVerbatimToObjectiveC") {
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
 typealias P1 = BooleanType
-protocol P2 {}
+typealias P2 = Printable
+protocol Q1 {}
 
-struct StructConformsToP1 : BooleanType, P2 {
+// A small struct that can be stored inline in an opaque buffer.
+struct StructConformsToP1 : BooleanType, Q1 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-struct Struct2ConformsToP1<T : BooleanType> : BooleanType, P2 {
+// A small struct that can be stored inline in an opaque buffer.
+struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   init(_ value: T) {
     self.value = value
   }
@@ -226,15 +231,58 @@ struct Struct2ConformsToP1<T : BooleanType> : BooleanType, P2 {
   var value: T
 }
 
-struct StructDoesNotConformToP1 : P2 {}
+// A large struct that can not be stored inline in an opaque buffer.
+struct Struct3ConformsToP2 : Printable, Q1 {
+  var a: UInt64 = 10
+  var b: UInt64 = 20
+  var c: UInt64 = 30
+  var d: UInt64 = 40
 
-class ClassConformsToP1 : BooleanType, P2 {
+  var description: String {
+    // Don't rely on string interpolation, it uses the casts that we are trying
+    // to test.
+    var result = ""
+    result += _uint64ToString(a) + " "
+    result += _uint64ToString(b) + " "
+    result += _uint64ToString(c) + " "
+    result += _uint64ToString(d)
+    return result
+  }
+}
+
+// A large struct that can not be stored inline in an opaque buffer.
+struct Struct4ConformsToP2<T : Printable> : Printable, Q1 {
+  var value: T
+  var e: UInt64 = 50
+  var f: UInt64 = 60
+  var g: UInt64 = 70
+  var h: UInt64 = 80
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  var description: String {
+    // Don't rely on string interpolation, it uses the casts that we are trying
+    // to test.
+    var result = value.description + " "
+    result += _uint64ToString(e) + " "
+    result += _uint64ToString(f) + " "
+    result += _uint64ToString(g) + " "
+    result += _uint64ToString(h)
+    return result
+  }
+}
+
+struct StructDoesNotConformToP1 : Q1 {}
+
+class ClassConformsToP1 : BooleanType, Q1 {
   func getLogicValue() -> Bool {
     return true
   }
 }
 
-class Class2ConformsToP1<T : BooleanType> : BooleanType, P2 {
+class Class2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   init(_ value: T) {
     self.value = [ value ]
   }
@@ -245,12 +293,14 @@ class Class2ConformsToP1<T : BooleanType> : BooleanType, P2 {
   var value: Array<T>
 }
 
-class ClassDoesNotConformToP1 : P2 {}
+class ClassDoesNotConformToP1 : Q1 {}
 
 RuntimeBridging.test("dynamicCastToExistential1") {
   var someP1Value = StructConformsToP1()
   var someP1Value2 = Struct2ConformsToP1(true)
   var someNotP1Value = StructDoesNotConformToP1()
+  var someP2Value = Struct3ConformsToP2()
+  var someP2Value2 = Struct4ConformsToP2(Struct3ConformsToP2())
   var someP1Ref = ClassConformsToP1()
   var someP1Ref2 = Class2ConformsToP1(true)
   var someNotP1Ref = ClassDoesNotConformToP1()
@@ -258,24 +308,32 @@ RuntimeBridging.test("dynamicCastToExistential1") {
   expectTrue(_stdlib_conformsToProtocol(someP1Value, P1.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Value2, P1.self))
   expectFalse(_stdlib_conformsToProtocol(someNotP1Value, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2, P2.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Ref, P1.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Ref2, P1.self))
   expectFalse(_stdlib_conformsToProtocol(someNotP1Ref, P1.self))
 
   expectTrue(_stdlib_conformsToProtocol(someP1Value as P1, P1.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Value2 as P1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as P2, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as P2, P2.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Ref as P1, P1.self))
 
-  expectTrue(_stdlib_conformsToProtocol(someP1Value as P2, P1.self))
-  expectTrue(_stdlib_conformsToProtocol(someP1Value2 as P2, P1.self))
-  expectFalse(_stdlib_conformsToProtocol(someNotP1Value as P2, P1.self))
-  expectTrue(_stdlib_conformsToProtocol(someP1Ref as P2, P1.self))
-  expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as P2, P1.self))
-  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as P2, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Value2 as Q1, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Value as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as Q1, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as Q1, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref as Q1, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as Q1, P1.self))
+  expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as Q1, P1.self))
 
   expectTrue(_stdlib_conformsToProtocol(someP1Value as Any, P1.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Value2 as Any, P1.self))
   expectFalse(_stdlib_conformsToProtocol(someNotP1Value as Any, P1.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value as Any, P2.self))
+  expectTrue(_stdlib_conformsToProtocol(someP2Value2 as Any, P2.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Ref as Any, P1.self))
   expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as Any, P1.self))
   expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as Any, P1.self))
@@ -286,16 +344,29 @@ RuntimeBridging.test("dynamicCastToExistential1") {
 
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value, P1.self).getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2, P1.self).getLogicValue())
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value, P2.self).description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value2, P2.self).description)
+
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref, P1.self).getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2, P1.self).getLogicValue())
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as P2, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as P2, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as P2, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as P2, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Q1, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Q1, P1.self).getLogicValue())
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value as Q1, P2.self).description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value2 as Q1, P2.self).description)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Q1, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Q1, P1.self).getLogicValue())
 
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Any, P1.self).getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Any, P1.self).getLogicValue())
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value as Any, P2.self).description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1Unconditional(someP2Value2 as Any, P2.self).description)
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Any, P1.self).getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Any, P1.self).getLogicValue())
 
@@ -304,25 +375,41 @@ RuntimeBridging.test("dynamicCastToExistential1") {
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2, P1.self)!.getLogicValue())
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value, P1.self))
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1(someP2Value, P2.self)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1(someP2Value2, P2.self)!.description)
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2, P1.self)!.getLogicValue())
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref, P1.self))
 
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as P1, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as P1, P1.self)!.getLogicValue())
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1(someP2Value as P2, P2.self)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1(someP2Value2 as P2, P2.self)!.description)
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as P1, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as P1, P1.self)!.getLogicValue())
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as P2, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as P2, P1.self)!.getLogicValue())
-  expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value as P2, P1.self))
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as P2, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as P2, P1.self)!.getLogicValue())
-  expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as P2, P1.self))
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Q1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Q1, P1.self)!.getLogicValue())
+  expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value as Q1, P1.self))
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1(someP2Value as Q1, P2.self)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1(someP2Value2 as Q1, P2.self)!.description)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Q1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Q1, P1.self)!.getLogicValue())
+  expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as Q1, P1.self))
 
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Any, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Any, P1.self)!.getLogicValue())
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value as Any, P1.self))
+  expectEqual("10 20 30 40",
+      _stdlib_dynamicCastToExistential1(someP2Value as Any, P2.self)!.description)
+  expectEqual("10 20 30 40 50 60 70 80",
+      _stdlib_dynamicCastToExistential1(someP2Value2 as Any, P2.self)!.description)
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Any, P1.self)!.getLogicValue())
   expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Any, P1.self)!.getLogicValue())
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as Any, P1.self))

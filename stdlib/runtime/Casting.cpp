@@ -1384,14 +1384,24 @@ recur:
   }
 }
 
-static const Metadata *getDynamicTypeMetadata(OpaqueValue *value,
-                                              const Metadata *type) {
-  if (type->getKind() == MetadataKind::Existential) {
-    const auto existentialMetadata =
-        static_cast<const ExistentialTypeMetadata *>(type);
-    return existentialMetadata->getDynamicType(value);
-  }
-  return type;
+/// Given a possibly-existential value, find its dynamic type and the
+/// address of its storage.
+static bool findDynamicValueAndType_NoMetatypes(OpaqueValue *value,
+                                                const Metadata *type,
+                                                OpaqueValue *&outValue,
+                                                const Metadata *&outType) {
+  // FIXME: workaround for <rdar://problem/17695211>.
+  //
+  // Filter out metatypes because 'findDynamicValueAndType' can crash.
+  // Metatypes sometimes contain garbage metadata pointers.
+  //
+  // When the bug is fixed, replace calls to this function with direct calls to
+  // 'findDynamicValueAndType'.
+  if (type->getKind() == MetadataKind::Metatype ||
+      type->getKind() == MetadataKind::ExistentialMetatype)
+    return false;
+  findDynamicValueAndType(value, type, outValue, outType);
+  return true;
 }
 
 static const void *
@@ -1425,12 +1435,18 @@ extern "C" bool
 swift_stdlib_conformsToProtocol(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  // Existentials don't carry complete type information about the value, but
-  // it is necessary to find the witness tables.  Find the dynamic type and
-  // use it instead.
-  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
-                                                         sourceType, destType);
+  // Find the actual type of the source.
+  OpaqueValue *sourceDynamicValue;
+  const Metadata *sourceDynamicType;
+  if (!findDynamicValueAndType_NoMetatypes(sourceValue, sourceType,
+                                           sourceDynamicValue,
+                                           sourceDynamicType)) {
+    sourceType->vw_destroy(sourceValue);
+    return false;
+  }
+
+  auto vw = findWitnessTableForDynamicCastToExistential1(
+      sourceDynamicValue, sourceDynamicType, destType);
   sourceType->vw_destroy(sourceValue);
   return vw != nullptr;
 }
@@ -1448,24 +1464,32 @@ extern "C" FixedOpaqueExistentialContainer<1>
 swift_stdlib_dynamicCastToExistential1Unconditional(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  // Existentials don't carry complete type information about the value, but
-  // it is necessary to find the witness tables.  Find the dynamic type and
-  // use it instead.
-  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
-                                                         sourceType, destType);
+  // Find the actual type of the source.
+  OpaqueValue *sourceDynamicValue;
+  const Metadata *sourceDynamicType;
+  if (!findDynamicValueAndType_NoMetatypes(sourceValue, sourceType,
+                                           sourceDynamicValue,
+                                           sourceDynamicType)) {
+    swift::crash("Swift dynamic cast failed: "
+                 "type (metatype) does not conform to the protocol");
+  }
+
+  auto vw = findWitnessTableForDynamicCastToExistential1(
+      sourceDynamicValue, sourceDynamicType, destType);
   if (!vw)
     swift::crash("Swift dynamic cast failed: "
                  "type does not conform to the protocol");
 
-  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
-  // It is important so that we don't return a value with Existential metadata.
+  // Note: use the 'sourceDynamicType', which has been adjusted to the
+  // dynamic type of the value.  It is important so that we don't return a
+  // value with Existential metadata.
   using box = OpaqueExistentialBox<1>;
 
   box::Container outValue;
-  outValue.Header.Type = sourceType;
+  outValue.Header.Type = sourceDynamicType;
   outValue.WitnessTables[0] = vw;
-  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+  sourceDynamicType->vw_initializeBufferWithTake(outValue.getBuffer(),
+                                                 sourceDynamicValue);
 
   return outValue;
 }
@@ -1493,25 +1517,33 @@ _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  // Existentials don't carry complete type information about the value, but
-  // it is necessary to find the witness tables.  Find the dynamic type and
-  // use it instead.
-  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
-                                                         sourceType, destType);
+  // Find the actual type of the source.
+  OpaqueValue *sourceDynamicValue;
+  const Metadata *sourceDynamicType;
+  if (!findDynamicValueAndType_NoMetatypes(sourceValue, sourceType,
+                                           sourceDynamicValue,
+                                           sourceDynamicType)) {
+    sourceType->vw_destroy(sourceValue);
+    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
+  }
+
+  auto vw = findWitnessTableForDynamicCastToExistential1(
+      sourceDynamicValue, sourceDynamicType, destType);
   if (!vw) {
     sourceType->vw_destroy(sourceValue);
     return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
   }
 
-  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
-  // It is important so that we don't return a value with Existential metadata.
+  // Note: use the 'sourceDynamicType', which has been adjusted to the
+  // dynamic type of the value.  It is important so that we don't return a
+  // value with Existential metadata.
   using box = OpaqueExistentialBox<1>;
 
   box::Container outValue;
-  outValue.Header.Type = sourceType;
+  outValue.Header.Type = sourceDynamicType;
   outValue.WitnessTables[0] = vw;
-  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+  sourceDynamicType->vw_initializeBufferWithTake(outValue.getBuffer(),
+                                                 sourceDynamicValue);
 
   return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
       reinterpret_cast<OpaqueValue *>(&outValue), destType);

@@ -23,7 +23,6 @@ println(cfstrAsNSStr)
 let cfstrAsStr = String(cfstr)
 println(cfstrAsStr)
 
-// FIXME: this should print the string data
-// CHECK-NEXT: C10Foundation19_NSContiguousString
+// CHECK-NEXT: Created as String
 let cfstr2: CFString = str as NSString
 println(cfstr2)

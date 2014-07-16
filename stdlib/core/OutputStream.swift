@@ -324,7 +324,7 @@ func _uint64ToStringImpl(
     radix: Int64, uppercase: Bool
 ) -> UWord
 
-internal func _uint64ToString(
+func _uint64ToString(
     value: UInt64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
