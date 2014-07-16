@@ -1292,6 +1292,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
 
   switch (DA->getKind()) {
+  case DAK_RawDocComment:
   case DAK_Count:
     llvm_unreachable("cannot serialize DAK_Count");
     return;

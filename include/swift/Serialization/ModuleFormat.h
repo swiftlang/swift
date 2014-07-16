@@ -1018,6 +1018,9 @@ namespace decls_block {
   BCBlob      // semantics value
   >;
 
+  // Stub, unused.
+  using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
+
   using InlineDeclAttrLayout = BCRecordLayout<
   Inline_DECL_ATTR,
   BCFixed<2>  // inline value
