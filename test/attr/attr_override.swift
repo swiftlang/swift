@@ -143,9 +143,9 @@ class B : A {
     get { return 5 }
   }
 
-  override init() { } // expected-error{{'override' attribute cannot be applied to this declaration}}
-  override deinit { } // expected-error{{'override' attribute cannot be applied to this declaration}}
-  override typealias Inner = Int // expected-error{{'override' attribute cannot be applied to this declaration}}
+  override init() { } // expected-error{{'override' modifier cannot be applied to this declaration}}
+  override deinit { } // expected-error{{'override' modifier cannot be applied to this declaration}}
+  override typealias Inner = Int // expected-error{{'override' modifier cannot be applied to this declaration}}
 }
 
 extension B {

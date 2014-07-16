@@ -398,6 +398,8 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
                                     attr, OnlyKind);
+    else if (attr->isDeclModifier())
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
@@ -428,6 +430,7 @@ public:
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
+    IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(Optional)
@@ -445,7 +448,6 @@ public:
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
-  void visitNoReturnAttr(NoReturnAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
@@ -782,16 +784,6 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
                           NLKind::QualifiedLookup, results);
   for (auto D : results)
     TC.validateDecl(D);
-}
-
-void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
-  auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute, attr)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
