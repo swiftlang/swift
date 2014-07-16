@@ -20,7 +20,7 @@ public protocol IntervalType {
 
   /// Return `rhs` clamped to `self`.  The bounds of the result, even
   /// if it is empty, are always within the bounds of `self`
-  func clamp(rhs: Self) -> Self
+  func clamp(intervalToClamp: Self) -> Self
   
   /// True iff the `Interval` is empty
   var isEmpty: Bool {get}
@@ -91,17 +91,19 @@ public struct ${Self}<T: Comparable>
     return x >= start && x ${upperBoundCompare} end
   }
 
-  /// Return `rhs` clamped to `self`.  The bounds of the result, even
-  /// if it is empty, are always limited to the bounds of `self`
-  public func clamp(rhs: ${Self}) -> ${Self} {
+  /// Return `intervalToClamp` clamped to `self`.  The bounds of the
+  /// result, even if it is empty, are always limited to the bounds of
+  /// `self`
+  public func clamp(intervalToClamp: ${Self}) -> ${Self} {
+    
     return ${Self}(
-      self.start > rhs.start ? self.start
-        : self.end < rhs.start ? self.end
-        : rhs.start,
+      self.start > intervalToClamp.start ? self.start
+        : self.end < intervalToClamp.start ? self.end
+        : intervalToClamp.start,
 
-      self.end < rhs.end ? self.end
-        : self.start > rhs.end ? self.start
-        : rhs.end
+      self.end < intervalToClamp.end ? self.end
+        : self.start > intervalToClamp.end ? self.start
+        : intervalToClamp.end
     )
   }
   
