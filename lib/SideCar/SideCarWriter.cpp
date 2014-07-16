@@ -364,7 +364,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
-      uint32_t dataLength = 1;
+      uint32_t dataLength = 2;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -379,19 +379,16 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer<little> writer(out);
-
-      uint8_t byte = 0;
+      // FIXME: Terrible solution. This needs abstraction.
+      uint8_t bytes[2] = { 0, 0 };
       if (auto nullable = data.getNullability()) {
-        // FIXME: Terrible solution. This needs abstraction.
-        byte |= 0x1;
-        byte <<= 2;
-        byte |= static_cast<uint8_t>(*nullable);
+        bytes[0] = 1;
+        bytes[1] = static_cast<uint8_t>(*nullable);
       } else {
         // Nothing to do.
       }
       
-      writer.write<uint8_t>(byte);
+      out.write(reinterpret_cast<const char *>(bytes), 2);
     }
   };
 } // end anonymous namespace

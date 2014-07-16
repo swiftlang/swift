@@ -58,6 +58,16 @@ public:
   ///
   /// \returns Information about the class, if known.
   Optional<ObjCClassInfo> lookupObjCClass(StringRef moduleName, StringRef name);
+
+  /// Look for information regarding the given Objective-C property in
+  /// the given class.
+  ///
+  /// \param className The name of the class we are looking in.
+  /// \param name The name of the property we're looking for.
+  ///
+  /// \returns Information about the property, if known.
+  Optional<ObjCPropertyInfo> lookupObjCProperty(StringRef className, 
+                                                StringRef name);
 };
 
 } // end namespace side_car

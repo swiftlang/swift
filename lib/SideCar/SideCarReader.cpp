@@ -112,6 +112,53 @@ namespace {
       return info;
     }
   };
+
+  /// Used to deserialize the on-disk Objective-C class table.
+  class ObjCPropertyTableInfo {
+  public:
+    // (class ID, name ID)
+    using internal_key_type = std::pair<unsigned, unsigned>; 
+    using external_key_type = internal_key_type;
+    using data_type = ObjCPropertyInfo;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    internal_key_type GetInternalKey(external_key_type key) {
+      return key;
+    }
+    
+    hash_value_type ComputeHash(internal_key_type key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+    
+    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+      return lhs == rhs;
+    }
+    
+    static std::pair<unsigned, unsigned> 
+    ReadKeyDataLength(const uint8_t *&data) {
+      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      return { keyLength, dataLength };
+    }
+    
+    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+      auto classID = endian::readNext<IdentifierID, little, unaligned>(data);
+      auto nameID = endian::readNext<IdentifierID, little, unaligned>(data);
+      return { classID, nameID };
+    }
+    
+    static data_type ReadData(internal_key_type key, const uint8_t *data,
+                              unsigned length) {
+      ObjCPropertyInfo info;
+      if (*data++) {
+        info.setNullabilityAudited(static_cast<NullableKind>(*data));
+      }
+      ++data;
+
+      return info;
+    }
+  };
 } // end anonymous namespace
 
 class SideCarReader::Implementation {
@@ -134,6 +181,12 @@ public:
   /// The Objective-C class table.
   std::unique_ptr<SerializedObjCClassTable> ObjCClassTable;
 
+  using SerializedObjCPropertyTable =
+      llvm::OnDiskIterableChainedHashTable<ObjCPropertyTableInfo>;
+
+  /// The Objective-C property table.
+  std::unique_ptr<SerializedObjCPropertyTable> ObjCPropertyTable;
+
   /// Retrieve the identifier ID for the given string, or an empty
   /// optional if the string is unknown.
   Optional<IdentifierID> getIdentifier(StringRef str);
@@ -144,7 +197,8 @@ public:
                            SmallVectorImpl<uint64_t> &scratch);
   bool readObjCClassBlock(llvm::BitstreamCursor &cursor,
                           SmallVectorImpl<uint64_t> &scratch);
-  bool readObjCPropertyBlock(llvm::BitstreamCursor &cursor);
+  bool readObjCPropertyBlock(llvm::BitstreamCursor &cursor, 
+                             SmallVectorImpl<uint64_t> &scratch);
   bool readObjCMethodBlock(llvm::BitstreamCursor &cursor);
   bool readObjCSelectorBlock(llvm::BitstreamCursor &cursor);
 };
@@ -321,8 +375,57 @@ bool SideCarReader::Implementation::readObjCClassBlock(
 }
 
 bool SideCarReader::Implementation::readObjCPropertyBlock(
-       llvm::BitstreamCursor &cursor) {
-  return cursor.SkipBlock();
+       llvm::BitstreamCursor &cursor, 
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(OBJC_PROPERTY_BLOCK_ID))
+    return true;
+
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown sub-block, possibly for use by a future version of the
+      // side-car format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case objc_property_block::OBJC_PROPERTY_DATA: {
+      // Already saw Objective-C property table.
+      if (ObjCPropertyTable)
+        return true;
+
+      uint32_t tableOffset;
+      objc_property_block::ObjCPropertyDataLayout::readRecord(scratch, 
+                                                              tableOffset);
+      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+      ObjCPropertyTable.reset(
+        SerializedObjCPropertyTable::Create(base + tableOffset,
+                                            base + sizeof(uint32_t),
+                                            base));
+      break;
+    }
+
+    default:
+      // Unknown record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return false;
 }
 
 bool SideCarReader::Implementation::readObjCMethodBlock(
@@ -395,7 +498,7 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
       break;
 
     case OBJC_PROPERTY_BLOCK_ID:
-      if (Impl.readObjCPropertyBlock(cursor)) {
+      if (Impl.readObjCPropertyBlock(cursor, scratch)) {
         failed = true;
         return;
       }
@@ -468,3 +571,23 @@ Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef moduleName,
   return *known;
 }
 
+Optional<ObjCPropertyInfo> SideCarReader::lookupObjCProperty(
+                             StringRef className, 
+                             StringRef name) {
+  if (!Impl.ObjCPropertyTable)
+    return Nothing;
+
+  Optional<IdentifierID> classID = Impl.getIdentifier(className);
+  if (!classID)
+    return Nothing;
+
+  Optional<IdentifierID> propertyID = Impl.getIdentifier(name);
+  if (!propertyID)
+    return Nothing;
+
+  auto known = Impl.ObjCPropertyTable->find({*classID, *propertyID});
+  if (known == Impl.ObjCPropertyTable->end())
+    return Nothing;
+
+  return *known;
+}

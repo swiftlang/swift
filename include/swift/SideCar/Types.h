@@ -114,6 +114,18 @@ public:
     NullabilityAudited = true;
     Nullable = static_cast<unsigned>(kind);
   }
+
+
+  friend bool operator==(const ObjCPropertyInfo &lhs, 
+                         const ObjCPropertyInfo &rhs) {
+    return lhs.NullabilityAudited == rhs.NullabilityAudited &&
+           lhs.Nullable == rhs.Nullable;
+  }
+
+  friend bool operator!=(const ObjCPropertyInfo &lhs, 
+                         const ObjCPropertyInfo &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// A temporary reference to an Objective-C selector, suitable for

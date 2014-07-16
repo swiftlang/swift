@@ -1771,7 +1771,19 @@ bool checkAPIAnnotation(StringRef fileName) {
                    << " not found in side car file\n";                  \
       return true;                                                      \
     }
-  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)
+  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)    \
+    if (auto info = reader->lookupObjCProperty(#ContextName, #PropertyName)) { \
+      auto expectedInfo = ObjCPropertyInfo() | OptionalTypeKind;        \
+      if (*info != expectedInfo) {                                      \
+        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
+                     << " has incorrect information\n";                 \
+        return true;                                                    \
+      }                                                                 \
+    } else {                                                            \
+        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
+                   << " not found in side car file\n";                  \
+      return true;                                                      \
+    }
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
 
   return false;
