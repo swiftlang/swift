@@ -223,6 +223,17 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   DEBUG(llvm::dbgs() << "            Performing TopDown Merge.\n");
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
+  DEBUG(llvm::dbgs() << "                V: ";
+        if (getValue())
+          getValue()->dump();
+        else
+          llvm::dbgs() << "\n";
+        llvm::dbgs() << "                OtherV: ";
+        if (Other.getValue())
+          Other.getValue()->dump();
+        else
+          llvm::dbgs() << "\n");
+
   LatState = NewState;
   KnownSafe &= Other.KnownSafe;
 
@@ -260,6 +271,17 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   DEBUG(llvm::dbgs() << "            Performing BottomUp Merge.\n");
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
+  DEBUG(llvm::dbgs() << "                V: ";
+        if (getValue())
+          getValue()->dump();
+        else
+          llvm::dbgs() << "\n";
+        llvm::dbgs() << "                OtherV: ";
+        if (Other.getValue())
+          Other.getValue()->dump();
+        else
+          llvm::dbgs() << "\n");
+
   LatState = NewState;
   KnownSafe &= Other.KnownSafe;
 
