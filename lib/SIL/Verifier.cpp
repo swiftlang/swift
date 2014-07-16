@@ -1231,6 +1231,11 @@ public:
             "operand must be of a class type");
     require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
+    
+    require(CMI->getMember().isForeign
+            || !CMI->getMember().getDecl()->hasClangNode(),
+            "foreign method cannot be dispatched natively");
+    
     /* TODO: We should enforce that ObjC methods are dispatched on ObjC
        metatypes, but IRGen appears not to care right now.
     if (auto metaTy = operandType.getAs<AnyMetatypeType>()) {
