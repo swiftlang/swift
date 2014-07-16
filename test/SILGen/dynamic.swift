@@ -311,6 +311,17 @@ extension Gizmo {
   convenience init(foreignClassExactFactory x: Int) {
     return self.init(exactlyStuff: x)
   }
+
+  @objc func foreignObjCExtension() { }
+  dynamic func foreignDynamicExtension() { }
+}
+
+// CHECK-LABEL: sil @_TF7dynamic24foreignExtensionDispatchFCSo5GizmoT_
+func foreignExtensionDispatch(g: Gizmo) {
+  // CHECK: function_ref @_TFCSo5Gizmo20foreignObjCExtensionfS_FT_T_
+  g.foreignObjCExtension()
+  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
+  g.foreignDynamicExtension()
 }
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
