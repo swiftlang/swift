@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/SideCar/SideCarWriter.h"
 #include "SideCarFormat.h"
+#include "swift/Basic/DenseMapInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
@@ -58,16 +59,15 @@ public:
   /// Information about Objective-C properties.
   ///
   /// Indexed by the class ID and property name.
-  llvm::DenseMap<
-    std::pair<unsigned, unsigned>,
-    std::vector<std::tuple<ModuleID, ObjCPropertyInfo>>> ObjCProperties;
+  llvm::DenseMap<std::pair<unsigned, unsigned>, ObjCPropertyInfo> 
+    ObjCProperties;
 
   /// Information about Objective-C methods.
   ///
-  /// Indexed by the class ID and selector ID.
-  llvm::DenseMap<
-    std::pair<unsigned, unsigned>,
-    std::vector<std::tuple<bool, ModuleID, ObjCMethodInfo>>> ObjCMethods;
+  /// Indexed by the class ID, selector ID, and Boolean (stored as a
+  /// char) indicating whether this is a class or instance method.
+  llvm::DenseMap<std::tuple<unsigned, unsigned, char>, ObjCMethodInfo> 
+    ObjCMethods;
 
   /// Retrieve the ID for the given identifier.
   IdentifierID getIdentifier(StringRef identifier) {
@@ -361,23 +361,21 @@ void SideCarWriter::addObjCClass(StringRef moduleName, StringRef name,
   Impl.ObjCClasses[{moduleID, classID}] = info;
 }
 
-void SideCarWriter::addObjCProperty(StringRef moduleName, StringRef className,
-                                    StringRef name,
+void SideCarWriter::addObjCProperty(StringRef className, StringRef name,
                                     const ObjCPropertyInfo &info) {
-  ModuleID moduleID = Impl.getModule(moduleName);
   ClassID classID = Impl.getClass(className);
   IdentifierID nameID = Impl.getIdentifier(name);
-  Impl.ObjCProperties[{classID, nameID}].push_back({moduleID, info});
+  assert(!Impl.ObjCProperties.count({classID, nameID}));
+  Impl.ObjCProperties[{classID, nameID}] = info;
 }
 
-void SideCarWriter::addObjCMethod(StringRef moduleName, StringRef className,
-                                  StringRef selector, bool isInstanceMethod,
+void SideCarWriter::addObjCMethod(StringRef className, StringRef selector, 
+                                  bool isInstanceMethod, 
                                   const ObjCMethodInfo &info) {
-  ModuleID moduleID = Impl.getModule(moduleName);
   ClassID classID = Impl.getClass(className);
   SelectorID selectorID = Impl.getSelector(selector);
-  Impl.ObjCMethods[{classID, selectorID}]
-    .push_back({isInstanceMethod, moduleID, info});
+  assert(!Impl.ObjCMethods.count({classID, selectorID, isInstanceMethod}));
+  Impl.ObjCMethods[{classID, selectorID, isInstanceMethod}] = info;
 }
 
 

@@ -54,24 +54,21 @@ public:
 
   /// Add information about a specific Objective-C property.
   ///
-  /// \param moduleName The module in which this property is declared.
   /// \param className The class in which this property resides.
   /// \param name The name of this property.
   /// \param info Information about this property.
-  void addObjCProperty(StringRef moduleName, StringRef className,
-                       StringRef name, const ObjCPropertyInfo &info);
+  void addObjCProperty(StringRef className, StringRef name, 
+                       const ObjCPropertyInfo &info);
 
   /// Add information about a specific Objective-C method.
   ///
-  /// \param moduleName The module in which this method is declared.
   /// \param className The class in which this method resides.
   /// \param selector The selector that names this method.
   /// \param isInstanceMethod Whether this method is an instance method
   /// (vs. a class method).
   /// \param info Information about this method.
-  void addObjCMethod(StringRef moduleName, StringRef className,
-                     StringRef selector, bool isInstanceMethod,
-                     const ObjCMethodInfo &info);
+  void addObjCMethod(StringRef className, StringRef selector, 
+                     bool isInstanceMethod, const ObjCMethodInfo &info);
 };
 
 } // end namespace side_car

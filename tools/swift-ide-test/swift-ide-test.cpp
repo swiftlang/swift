@@ -1656,7 +1656,7 @@ void generateAPIAnnotation(StringRef fileName) {
   #define OBJC_CONTEXT(ClassName, Options) \
     writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options);
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
-    writer.addObjCProperty(moduleName, #ContextName, #PropertyName,  \
+    writer.addObjCProperty(#ContextName, #PropertyName,              \
                            ObjCPropertyInfo());
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
 
