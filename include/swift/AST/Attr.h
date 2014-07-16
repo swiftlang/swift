@@ -347,6 +347,9 @@ public:
     /// with an @.
     DeclModifier = 1 << 1,
 
+    /// True if this shouldn't be serialized.
+    NotSerialized = 1 << 2,
+
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of
     // declarations an attribute can be attached to.
@@ -439,14 +442,21 @@ public:
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
   }
-  
-  
+
   bool isDeclModifier() const {
-    return getOptions() & DeclModifier;
+    return isDeclModifier(getKind());
   }
   static bool isDeclModifier(DeclAttrKind DK) {
     return getOptions(DK) & DeclModifier;
   }
+
+  static bool isNotSerialized(DeclAttrKind DK) {
+    return getOptions(DK) & NotSerialized;
+  }
+  bool isNotSerialized() const {
+    return isNotSerialized(getKind());
+  }
+
 
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;
@@ -462,6 +472,9 @@ public:
   SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
     : DeclAttribute(Kind, AtLoc,
                     SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
+                    /*Implicit=*/false) { }
+  SimpleDeclAttr(SourceLoc NameLoc)
+    : DeclAttribute(Kind, SourceLoc(), SourceRange(NameLoc, NameLoc),
                     /*Implicit=*/false) { }
 
   static bool classof(const DeclAttribute *DA) {
@@ -788,18 +801,6 @@ public:
   InlineKind getKind() const { return Kind; }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Inline;
-  }
-};
-
-/// Defines the attribute that we use to model the 'override' keyword.
-class OverrideAttr : public DeclAttribute {
-public:
-  OverrideAttr(SourceLoc OverrideLoc)
-      : DeclAttribute(DAK_Override, SourceLoc(), OverrideLoc,
-                      /*Implicit=*/false) {}
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Override;
   }
 };
 

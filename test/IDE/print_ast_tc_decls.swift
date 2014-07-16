@@ -389,9 +389,9 @@ class d0121_TestClassDerived : d0120_TestClassBase {
 // PASS_COMMON-NEXT: {{^}}  /* required(inferred) */ init(){{$}}
 
   final override func baseFunc2() {}
-// PASS_COMMON-NEXT: {{^}}  final override func baseFunc2(){{$}}
+// PASS_COMMON-NEXT: {{^}}  {{(override |final )+}}func baseFunc2(){{$}}
 
-  final override subscript(i: Int) -> Int {
+  override final subscript(i: Int) -> Int {
     return 0
   }
 // PASS_COMMON-NEXT: {{^}}  final override subscript (i: Int) -> Int { get }{{$}}
@@ -675,7 +675,7 @@ class d0260_ExplodePattern_TestClassBase {
 class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {{{$}}
 
-  final override var baseProp2: Int {
+  override final var baseProp2: Int {
     get {
       return 0
     }

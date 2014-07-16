@@ -1,6 +1,6 @@
 // RUN: %swift -parse %s -verify
 
-@override // expected-error {{unknown attribute 'override'}}
+@override // expected-error {{'override' can only be specified on class members}} expected-error {{'override' is a declaration modifier, not an attribute}}
 func virtualAttributeCanNotBeUsedInSource() {}
 
 class MixedKeywordsAndAttributes {
@@ -16,11 +16,11 @@ class DuplicateOverrideBase {
   class func cf4() {}
 }
 class DuplicateOverrideDerived : DuplicateOverrideBase {
-  override override func f1() {} // expected-error {{'override' specified twice}}{{12-20=}}
-  override override class func cf1() {} // expected-error {{'override' specified twice}}{{12-20=}}
-  override class override func cf2() {} // expected-error {{'override' specified twice}}{{18-26=}}
-  class override override func cf3() {} // expected-error {{'override' specified twice}}{{18-26=}}
-  override class override class func cf4() {} // expected-error {{'override' specified twice}}{{18-26=}} expected-error{{'class' specified twice}}{{27-32=}}
+  override override func f1() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
+  override override class func cf1() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
+  override class override func cf2() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
+  class override override func cf3() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
+  override class override func cf4() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }
 
 @objc class ObjCClass {}
@@ -143,9 +143,9 @@ class B : A {
     get { return 5 }
   }
 
-  override init() { } // expected-error{{'override' is not valid on this declaration}}
-  override deinit { } // expected-error{{'override' is not valid on this declaration}}
-  override typealias Inner = Int // expected-error{{'override' is not valid on this declaration}}
+  override init() { } // expected-error{{'override' attribute cannot be applied to this declaration}}
+  override deinit { } // expected-error{{'override' attribute cannot be applied to this declaration}}
+  override typealias Inner = Int // expected-error{{'override' attribute cannot be applied to this declaration}}
 }
 
 extension B {

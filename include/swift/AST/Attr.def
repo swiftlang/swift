@@ -166,21 +166,23 @@ SIMPLE_DECL_ATTR(infix  , Infix  , OnFunc | OnOperator | DeclModifier, 23)
 SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | OnOperator | DeclModifier, 24)
 SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 
+SIMPLE_DECL_ATTR(override, Override,
+                 OnFunc | OnVar | OnSubscript | DeclModifier | NotSerialized,
+                 /* Not serialized */26)
+
+
+
 VIRTUAL_DECL_ATTR(accessibility, Accessibility,
                   OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
                   OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
-                  DeclModifier,
+                  DeclModifier | NotSerialized,
                   /* Not serialized */ 65535)
 
 VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility,
-                  OnVar | OnSubscript | DeclModifier,
+                  OnVar | OnSubscript | DeclModifier | NotSerialized,
                   /* Not serialized */ 65535)
 
-VIRTUAL_DECL_ATTR(override, Override,
-                  OnFunc | OnVar | OnSubscript | DeclModifier,
-                  /* Not serialized */ 65535)
-
-VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment, OnAnyDecl,
+VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
                   /* Not serialized */ 65535)
 
 

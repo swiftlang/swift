@@ -228,12 +228,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printOverrideKeyword(Decl *D) {
-    if (Options.PrintOverrideKeyword &&
-        D->getAttrs().hasAttribute<OverrideAttr>())
-      Printer << "override ";
-  }
-
   void printAccessibility(Accessibility access, StringRef suffix = "") {
     Printer << "/*";
     switch (access) {
@@ -1003,7 +997,6 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
-  printOverrideKeyword(decl);
   if (!Options.SkipIntroducerKeywords) {
     if (decl->isStatic())
       printStaticKeyword(decl->getCorrectStaticSpelling());
@@ -1243,7 +1236,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printDocumentationComment(decl);
     printAttributes(decl);
     printAccessibility(decl);
-    printOverrideKeyword(decl);
     if (decl->isStatic() && !decl->isOperator())
       printStaticKeyword(decl->getCorrectStaticSpelling());
     if (!Options.SkipIntroducerKeywords)
@@ -1313,7 +1305,6 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl);
-  printOverrideKeyword(decl);
   printAccessibility(decl);
   recordDeclLoc(decl,
     [&]{

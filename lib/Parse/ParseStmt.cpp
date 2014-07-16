@@ -1081,8 +1081,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(
-        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None,
-        SourceLoc());
+        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {

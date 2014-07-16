@@ -328,14 +328,6 @@ struct ASTNodeBase {};
         PrettyStackTraceDecl debugStack("verifying DeclContext", D);
         abort();
       }
-      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!isa<FuncDecl>(D) && !isa<VarDecl>(D) && !isa<SubscriptDecl>(D)) {
-          PrettyStackTraceDecl debugStack("verifying override", D);
-          Out << "'override' attribute on a non-overridable member\n";
-          D->dump(Out);
-          abort();
-        }
-      }
     }
     template<typename T>
     void verifyParsedBase(T ASTNode) {

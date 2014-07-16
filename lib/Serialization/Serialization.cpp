@@ -1287,6 +1287,10 @@ static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
 void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   using namespace decls_block;
 
+  // Completely ignore attributes that aren't serialized.
+  if (DA->isNotSerialized())
+    return;
+
   switch (DA->getKind()) {
   case DAK_Count:
     llvm_unreachable("cannot serialize DAK_Count");

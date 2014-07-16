@@ -194,8 +194,6 @@ ERROR(cskeyword_not_attribute,sema_tcd,none,
 ERROR(mutating_not_attribute,sema_tcd,none,
       "'mutating' is not an attribute, use the %select{|non}0mutating keyword",
      (unsigned))
-ERROR(override_invalid,sema_tcd,none,
-      "'override' is not valid on this declaration", ())
 ERROR(convenience_invalid,sema_tcd,none,
       "'convenience' is not valid on this declaration", ())
 
@@ -203,8 +201,6 @@ ERROR(decl_already_static,decl_parsing,none,
       "%0 specified twice", (StaticSpellingKind))
 ERROR(decl_already_mutating,decl_parsing,none,
       "'mutating' specified twice", ())
-ERROR(decl_already_override,decl_parsing,none,
-      "'override' specified twice", ())
 ERROR(decl_already_convenience,decl_parsing,none,
       "'convenience' specified twice", ())
 ERROR(decl_already_ownership,decl_parsing,none,

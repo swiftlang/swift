@@ -1936,11 +1936,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       break;
     case VarDeclStorageKind::Observing:
       var->makeObserving(SourceLoc(),
-                             cast_or_null<FuncDecl>(getDecl(willSetID)),
-                             cast_or_null<FuncDecl>(getDecl(didSetID)),
-                             SourceLoc());
+                         cast_or_null<FuncDecl>(getDecl(willSetID)),
+                         cast_or_null<FuncDecl>(getDecl(didSetID)),
+                         SourceLoc());
       var->setObservingAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
-                                     cast_or_null<FuncDecl>(getDecl(setterID)));
+                                 cast_or_null<FuncDecl>(getDecl(setterID)));
       break;
     }
 

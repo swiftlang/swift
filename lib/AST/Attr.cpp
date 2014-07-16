@@ -127,31 +127,17 @@ void DeclAttributes::print(ASTPrinter &Printer,
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
-  // This switch is not using Attr.def because some simple attributes have
-  // custom behavior.
+  if (getKind() == DAK_Required && isImplicit()) {
+    Printer << "/* required(inferred) */ ";
+    return;
+  }
+
   switch (getKind()) {
-  case DAK_IBAction:
-  case DAK_IBDesignable:
-  case DAK_IBInspectable:
-  case DAK_IBOutlet:
-  case DAK_Assignment:
-  case DAK_ClassProtocol:
-  case DAK_Exported:
-  case DAK_Final:
-  case DAK_Optional:
-  case DAK_NoReturn:
-  case DAK_UnsafeNoObjCTaggedPointer:
-  case DAK_NSCopying:
-  case DAK_NSManaged:
-  case DAK_UIApplicationMain:
-  case DAK_Lazy:
-  case DAK_LLDBDebuggerFunction:
+    // Handle all of the SIMPLE_DECL_ATTRs.
+#define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
+#include "swift/AST/Attr.def"
   case DAK_Inline:
-  case DAK_Dynamic:
   case DAK_Accessibility:
-  case DAK_Prefix:
-  case DAK_Postfix:
-  case DAK_Infix:
     if (!DeclAttribute::isDeclModifier(getKind()))
       Printer << "@";
     Printer << getAttrName();
@@ -189,18 +175,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     Printer << getAttrName() << "(set)";
     break;
 
-  case DAK_Override:
-    // A virtual attribute should be handled elsewhere.
-    return;
   case DAK_RawDocComment:
     // Not printed.
     return;
-  case DAK_Required:
-    if (isImplicit())
-      Printer << "/* required(inferred) */";
-    else
-      Printer << "required";
-    break;
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
@@ -253,8 +230,6 @@ StringRef DeclAttribute::getAttrName() const {
     case Accessibility::Public:
       return "public";
     }
-  case DAK_Override:
-    return "<<override>>";
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   }

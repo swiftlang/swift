@@ -687,8 +687,7 @@ public:
   ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc,
-                            StaticSpellingKind StaticSpelling,
-                            SourceLoc OverrideLoc);
+                            StaticSpellingKind StaticSpelling);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
   bool parseGetSetImpl(ParseDeclOptions Flags,
@@ -716,8 +715,7 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
-  ParserStatus parseDeclSubscript(SourceLoc OverrideLoc,
-                                  ParseDeclOptions Flags,
+  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls);
 
