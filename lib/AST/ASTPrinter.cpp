@@ -820,7 +820,10 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   Printer << "extension ";
   recordDeclLoc(decl,
     [&]{
-      decl->getExtendedType().print(Printer, Options);
+      // We cannot extend sugared types.
+      auto *nominal = decl->getExtendedType()->getAnyNominal();
+      assert(nominal && "extension of non-nominal type");
+      Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
   if (Options.TypeDefinitions) {

@@ -165,6 +165,13 @@ protocol P5 {}
 // CHECK: extension <Class@[[@LINE-2]]:7>C5</Class> : <Protocol@[[@LINE-1]]:10>P5</Protocol> {}
 extension C5 : P5 {}
 
+extension Array : P5 {}
+// CHECK: extension <iStruct@>Array</iStruct> : <Protocol{{.*}}>P5</Protocol> {}
+extension Optional : P5 {}
+// CHECK: extension <iEnum@>Optional</iEnum> : <Protocol{{.*}}>P5</Protocol> {}
+extension ImplicitlyUnwrappedOptional : P5 {}
+// CHECK: extension <iEnum@>ImplicitlyUnwrappedOptional</iEnum> : <Protocol{{.*}}>P5</Protocol> {}
+
 class C6 {
   func meth() {
     // CHECK: <Func@[[@LINE+5]]:8>meth2</Func>()

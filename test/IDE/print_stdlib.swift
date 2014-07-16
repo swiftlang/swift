@@ -32,3 +32,17 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PRIVATE7 -input-file %t.txt %s
 // CHECK-PRIVATE7-NOT: RawPointer
+
+// RUN: FileCheck -check-prefix=CHECK-ARRAY-SUGAR -input-file %t.txt %s
+// CHECK-ARRAY-SUGAR-NOT: extension [
+
+// RUN: FileCheck -check-prefix=CHECK-OPTIONAL-SUGAR -input-file %t.txt %s
+// CHECK-OPTIONAL-SUGAR-NOT: extension {{.*}}?
+
+// RUN: FileCheck -check-prefix=CHECK-IUO-SUGAR -input-file %t.txt %s
+// CHECK-IUO-SUGAR-NOT: extension {{.*}}!
+
+// RUN: FileCheck -check-prefix=CHECK-SUGAR -input-file %t.txt %s
+// CHECK-SUGAR: extension Array :
+// CHECK-SUGAR: extension ImplicitlyUnwrappedOptional :
+// CHECK-SUGAR: extension Optional :
