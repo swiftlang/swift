@@ -78,6 +78,7 @@ enum class PassKind {
   LoopRotate,
   LICM,
   IVInfoPrinter,
+  GlobalLoadStoreOpts,
 };
 
 enum class OptGroup {
@@ -257,6 +258,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::IVInfoPrinter,
                                    "iv-info-printer",
                                    "Display induction variable information."),
+                        clEnumValN(PassKind::GlobalLoadStoreOpts,
+                                   "global-load-store-opts",
+                                   "Multiple basic block load store opts."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -449,6 +453,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::IVInfoPrinter:
       PM.add(createIVInfoPrinter());
+      break;
+    case PassKind::GlobalLoadStoreOpts:
+      PM.add(createGlobalLoadStoreOpts());
       break;
     }
   }

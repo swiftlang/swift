@@ -1,0 +1,640 @@
+// RUN: %sil-opt %s -module-name Swift -global-load-store-opts -verify | FileCheck %s
+
+import Builtin
+
+struct A {
+  var i : Builtin.Int32
+}
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+enum Optional<T> {
+  case None
+  case Some(T)
+}
+
+class E : B { }
+
+sil @use : $@thin (Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @store_promotion
+// CHECK: store
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_retain
+// CHECK: return
+sil @store_promotion : $@thin (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = load %1#1 : $*B
+  %4 = load %1#1 : $*B
+  %5 = strong_retain %3 : $B
+  %6 = strong_retain %4 : $B
+  %7 = tuple()
+  %8 = return %7 : $()
+}
+
+// CHECK-LABEL: sil @store_after_store
+// CHECK: alloc_box
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK: return
+sil @store_after_store : $@thin (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = store %0 to %1#1 : $*B
+  %4 = tuple()
+  %5 = return %4 : $()
+}
+
+// CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: [[LOAD_RESULT:%[0-9]+]] = load
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[LOAD_RESULT]]
+// CHECK-NEXT: [[APPLY_RESULT:%[0-9]+]] = tuple_extract
+// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[APPLY_RESULT]]
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @eliminate_duplicate_loads_over_noread_builtins : $@thin (@inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  %2 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = apply %2(%1, %1, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = load %0 : $*Builtin.Int64
+  %6 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = apply %2(%5, %6, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
+  return %8 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dead_store_elimination_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_store_elimination_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load %0 : $*Builtin.Int64
+  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to %1 : $*Builtin.Int64
+  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  store %9 to %1 : $*Builtin.Int64
+  %10 = tuple()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @load_store_forwarding_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load %0 : $*Builtin.Int64
+  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to %1 : $*Builtin.Int64
+  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = load %1 : $*Builtin.Int64
+  %11 = apply %3(%10, %9, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  return %12 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_over_dealloc_stack
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: load
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil @load_store_forwarding_over_dealloc_stack : $@thin (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_stack $Builtin.Int64
+  %2 = alloc_stack $Builtin.Int64
+  store %0 to %1#1 : $*Builtin.Int64
+  %3 = alloc_stack $Builtin.Int64
+  %5 = load %2#1 : $*Builtin.Int64
+  dealloc_stack %3#0 : $*@local_storage Builtin.Int64
+  %4 = load %1#1 : $*Builtin.Int64
+  store %0 to %1#1 : $*Builtin.Int64
+  %6 = load %2#1 : $*Builtin.Int64
+  dealloc_stack %2#0 : $*@local_storage Builtin.Int64
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+struct Agg2 {
+  var t : (Builtin.Int64, Builtin.Int32)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+// CHECK-LABEL: sil @load_dedup_forwarding_from_aggregate_to_field
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]]
+// CHECK-NEXT: load [[INPUT_PTR]]
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @load_dedup_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
+bb0(%0 : $*Agg1):
+  %1 = load %0 : $*Agg1
+  %2 = struct_element_addr %0 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load %4 : $*Builtin.Int32
+  return %5 : $Builtin.Int32
+}
+
+struct Wrapper {
+  var value : Builtin.Int32
+}
+// CHECK-LABEL: promote_partial_load
+// CHECK: alloc_stack
+// CHECK-NOT: load
+// CHECK: [[RESULT:%[0-9]+]] = struct_extract
+// CHECK: return [[RESULT]]
+sil @promote_partial_load : $@thin (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_stack $Wrapper
+  %2 = struct $Wrapper (%0 : $Builtin.Int32)
+  store %2 to %1#1 : $*Wrapper
+  %3 = struct_element_addr %1#1 : $*Wrapper, #Wrapper.value
+  %4 = load %3 : $*Builtin.Int32
+  dealloc_stack %1#0 : $*@local_storage Wrapper
+  return %4 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @tbaa_class_alias_nonclass
+// CHECK: strong_retain [[RET:%[0-9]+]]
+// CHECK: strong_retain [[RET]]
+// CHECK: return
+sil @tbaa_class_alias_nonclass : $@thin (@owned B, @inout Agg1) -> () {
+bb0(%0 : $B, %1 : $*Agg1):
+  %2 = alloc_box $B
+  %3 = load %1 : $*Agg1
+  %4 = store %3 to %1 : $*Agg1
+  %5 = load %2#1 : $*B
+  %6 = store %3 to %1 : $*Agg1
+  %7 = load %2#1 : $*B
+  %8 = strong_retain %5 : $B   //%7 and %5 should really be one load.
+  %9 = strong_retain %7 : $B
+  %10 = tuple()
+  %11 = return %10 : $()
+}
+
+// CHECK-LABEL: sil @store_loaded_value
+// CHECK-NOT: store
+// CHECK: return
+sil @store_loaded_value : $@thin (@inout Agg2, @inout Agg1) -> () {
+bb0(%0 : $*Agg2, %1 : $*Agg1):
+  %2 = load %1 : $*Agg1
+  %3 = load %0 : $*Agg2
+  %4 = store %2 to %1 : $*Agg1
+  %5 = store %3 to %0 : $*Agg2
+  %6 = tuple()
+  %7 = return %6 : $()
+}
+
+// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+// CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32, [[INPUT_PTR2:%[0-9]+]] : $*Builtin.Int32):
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT: [[INT_LITERAL:%[0-9]+]] = integer_literal
+// CHECK-NEXT: [[INT_LOADED:%[0-9]+]] = load [[INPUT_PTR1]] : $*Builtin.Int32
+// CHECK-NEXT: store [[INT_LITERAL]] to [[ALLOCA]]#1 : $*Builtin.Int32
+// CHECK-NEXT: store [[INT_LITERAL]] to [[INPUT_PTR2]] : $*Builtin.Int32
+// CHECK-NEXT: dealloc_stack [[ALLOCA]]#0
+// CHECK-NEXT: tuple ([[INT_LOADED]] : $Builtin.Int32, [[INT_LOADED]] : $Builtin.Int32, [[INT_LITERAL]] : $Builtin.Int32)
+// CHECK-NEXT: return
+sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
+  %2 = alloc_stack $Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 32
+  store %3 to %2#1 : $*Builtin.Int32
+  %4 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  store %3 to %2#1 : $*Builtin.Int32
+  %5 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  %6 = load %2#1 : $*Builtin.Int32
+  dealloc_stack %2#0 : $*@local_storage Builtin.Int32
+  %7 = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32)
+  return %7 : $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $A
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.RawPointer
+// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_addr_cast
+sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+bb0(%0 : $Optional<A>):
+  %1 = alloc_stack $Optional<A>
+  store %0 to %1#1 : $*Optional<A>
+  %2 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1#1 : $*Optional<A> to $*A
+  %5 = load %4 : $*A
+  %6 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1#1 : $*Optional<A> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<A>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is layout
+// compatible with heap references, but does not have reference
+// semantics b/c it is a trivial type. We currently do not handle such a case.
+
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
+// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $B
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.RawPointer
+// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
+sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+bb0(%0 : $Optional<B>):
+  %1 = alloc_stack $Optional<B>
+  store %0 to %1#1 : $*Optional<B>
+  %2 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1#1 : $*Optional<B> to $*B
+  %5 = load %4 : $*B
+  %6 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1#1 : $*Optional<B> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<B>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_from_aggregate_to_field
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil @load_store_forwarding_from_aggregate_to_field : $@thin (Agg1) -> (Builtin.Int32) {
+bb0(%0 : $Agg1):
+  %1 = alloc_stack $Agg1
+  store %0 to %1#1 : $*Agg1
+  %2 = struct_element_addr %1#1 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load %4 : $*Builtin.Int32
+  dealloc_stack %1#0 : $*@local_storage Agg1
+  return %5 : $Builtin.Int32
+}
+
+
+
+// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
+// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
+// CHECK: bb0(
+
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.Int32
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $A
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.RawPointer
+// CHECK: unchecked_addr_cast
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_addr_cast
+sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
+bb0(%0 : $*Optional<A>):
+  %1 = load %0 : $*Optional<A>
+  %2 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %0 : $*Optional<A> to $*A
+  %5 = load %4 : $*A
+  %6 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+ }
+
+// *NOTE* This does not handle raw pointer since raw pointer is layout
+// compatible with heap references, but does not have reference
+// semantics b/c it is a trivial type. We currently do not handle such a case.
+
+// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
+// CHECK: bb0({{%[0-9]+}} : $*Optional<B>):
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.Int32
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.RawPointer
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.NativeObject>
+sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
+bb0(%0 : $*Optional<B>):
+  %1 = load %0 : $*Optional<B>
+  %2 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %0 : $*Optional<B> to $*B
+  %5 = load %4 : $*B
+  %6 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_to_load_forwarding_diamonds : $@thin (@inout Builtin.Int32) -> Builtin.Int32 {
+// CHECK: load
+// CHECK-NOT: load
+// CHECK: return
+sil @load_to_load_forwarding_diamonds : $@thin (@inout Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  %1 = load %0 : $*Builtin.Int32
+  // Simple diamond.
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  // Triangle
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %2 = load %0 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @load_to_load_conflicting_branches_diamond : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK: load
+// CHECK: bb1:
+// CHECK-NOT: load
+// CHECK: store
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK: load
+sil @load_to_load_conflicting_branches_diamond : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = load %0 : $*Builtin.Int32
+  %2 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
+  apply %2(%1) : $@thin (Builtin.Int32) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load %0 : $*Builtin.Int32
+  %4 = integer_literal $Builtin.Int32, 2
+  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  store %4 to %0 : $*Builtin.Int32
+  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %5 = load %0 : $*Builtin.Int32
+  apply %2(%5) : $@thin (Builtin.Int32) -> Builtin.Int1
+  br bb3
+
+bb2:
+  %6 = load %0 : $*Builtin.Int32
+  apply %2(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  br bb3
+
+bb3:
+  %7 = load %0 : $*Builtin.Int32
+  apply %2(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_to_load_irreducible_loop : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK: load
+// CHECK: bb1:
+// CHECK: load
+// CHECK: store
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK: load
+sil @load_to_load_irreducible_loop : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = load %0 : $*Builtin.Int32
+  %2 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
+  apply %2(%1) : $@thin (Builtin.Int32) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = load %0 : $*Builtin.Int32
+  %4 = integer_literal $Builtin.Int32, 2
+  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  store %4 to %0 : $*Builtin.Int32
+  apply %2(%3) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %5 = load %0 : $*Builtin.Int32
+  apply %2(%5) : $@thin (Builtin.Int32) -> Builtin.Int1
+  cond_br undef, bb2, bb3
+
+bb2:
+  %6 = load %0 : $*Builtin.Int32
+  apply %2(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  cond_br undef, bb1, bb3
+
+bb3:
+  %7 = load %0 : $*Builtin.Int32
+  apply %2(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @load_to_load_loop : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
+// CHECK: bb0([[PTR0:%[0-9]+]] : $*Builtin.Int32, [[PTR1:%[0-9]+]] : $*Builtin.Int32):
+// CHECK: load [[PTR0]]
+// CHECK: bb1:
+// CHECK: load [[PTR0]]
+// CHECK: store {{%[0-9]+}} to [[PTR0]]
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK: load [[PTR1]]
+sil @load_to_load_loop : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
+  %2 = load %0 : $*Builtin.Int32
+  %99 = load %1 : $*Builtin.Int32
+  %3 = builtin_function_ref "trunc" : $@thin (Builtin.Int32) -> Builtin.Int1
+  apply %3(%2) : $@thin (Builtin.Int32) -> Builtin.Int1
+  br bb1
+
+bb1:
+  %4 = load %0 : $*Builtin.Int32
+  %5 = integer_literal $Builtin.Int32, 2
+  apply %3(%4) : $@thin (Builtin.Int32) -> Builtin.Int1
+  store %5 to %0 : $*Builtin.Int32
+  apply %3(%4) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %6 = load %0 : $*Builtin.Int32
+  apply %3(%6) : $@thin (Builtin.Int32) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = load %0 : $*Builtin.Int32
+  apply %3(%7) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %8 = load %1 : $*Builtin.Int32
+  apply %3(%8) : $@thin (Builtin.Int32) -> Builtin.Int1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @post_dominating_dead_store : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: store
+// CHECK-NOT: store
+// CHECK: return
+sil @post_dominating_dead_store : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  store %1 to %0 : $*Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  store %1 to %0 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can not eliminate any stores here since we would need to be able
+// to understand that the first store is post dominated by the set of
+// stores. We are not smart enough to do that.
+//
+// CHECK-LABEL: sil @post_dominating_dead_store_partial_fail : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK: store
+// CHECK: bb1:
+// CHECK: store
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK: store
+// CHECK: return
+sil @post_dominating_dead_store_partial_fail : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 2
+  store %1 to %0 : $*Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %2 to %0 : $*Builtin.Int32
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  store %3 to %0 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can't eliminate any stores here.
+// CHECK-LABEL: sil @post_dominating_dead_store_fail : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: store
+// CHECK: store
+// CHECK-NOT: store
+// CHECK: return
+sil @post_dominating_dead_store_fail : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 1
+  store %1 to %0 : $*Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %2 to %0 : $*Builtin.Int32
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -20,10 +20,13 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
@@ -118,6 +121,9 @@ class LSBBForwarder {
   /// The alias analysis that we are using for alias queries.
   AliasAnalysis *AA;
 
+  /// The post dominance analysis that we use for dead store elimination.
+  PostDominanceInfo *PDI;
+
   /// The current list of store instructions that stored to memory locations
   /// that were not read/written to since the store was executed.
   llvm::SmallPtrSet<StoreInst *, 8> Stores;
@@ -131,11 +137,25 @@ class LSBBForwarder {
 
   /// During the last run of the forwarder, did we make any changes.
   bool Changed;
+
 public:
-  LSBBForwarder(SILBasicBlock *BB, AliasAnalysis *AA) : BB(BB), AA(AA),
-                                                        Changed(false) {}
+  LSBBForwarder() = default;
+
+  void init(SILBasicBlock *NewBB, AliasAnalysis *NewAA,
+            PostDominanceInfo *NewPDI) {
+    BB = NewBB;
+    AA = NewAA;
+    PDI = NewPDI;
+    Changed = false;
+  }
 
   bool optimize();
+
+  SILBasicBlock *getBB() const { return BB; }
+
+  void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
+                                             unsigned> &BBToBBIDMap,
+                              std::vector<LSBBForwarder> &BBIDToForwarderMap);
 
   /// Clear all state in the BB optimizer.
   void clear() {
@@ -144,7 +164,30 @@ public:
     Changed = false;
   }
 
+  /// Add this load to our tracking list.
+  void startTrackingLoad(LoadInst *LI) {
+    DEBUG(llvm::dbgs() << "        Tracking Load: " << *LI);
+    Loads.insert(LI);
+  }
+
+  void stopTrackingLoad(LoadInst *LI) {
+    DEBUG(llvm::dbgs() << "        No Longer Tracking Load: " << *LI);
+    Loads.erase(LI);
+  }
+
+  /// Add this store to our tracking list.
+  void startTrackingStore(StoreInst *SI) {
+    DEBUG(llvm::dbgs() << "        Tracking Store: " << *SI);
+    Stores.insert(SI);
+  }
+
+  void stopTrackingStore(StoreInst *SI) {
+    DEBUG(llvm::dbgs() << "        No Longer Store: " << *SI);
+    Stores.erase(SI);
+  }
+
   void deleteInstruction(SILInstruction *I) {
+    DEBUG(llvm::dbgs() << "        Deleting instruction recursively: " << *I);
     recursivelyDeleteTriviallyDeadInstructions(I, true,
                                                [&](SILInstruction *DeadI) {
       if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
@@ -161,9 +204,9 @@ public:
       if (AA->mayWriteToMemory(Inst, LI->getOperand()))
         InvalidatedLoadList.push_back(LI);
     for (auto *LI : InvalidatedLoadList) {
-      DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
-                            "such that a load is invalidated:" << *LI);
-      Loads.erase(LI);
+      DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
+                            " such that a load is invalidated:" << *LI);
+      stopTrackingLoad(LI);
     }
   }
 
@@ -173,9 +216,9 @@ public:
       if (AA->mayWriteToMemory(Inst, SI->getDest()))
         InvalidatedStoreList.push_back(SI);
     for (auto *SI : InvalidatedStoreList) {
-      DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
-                            "such that a store is invalidated:" << *SI);
-      Stores.erase(SI);
+      DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
+                            " such that a store is invalidated:" << *SI);
+      stopTrackingStore(SI);
     }
   }
 
@@ -185,9 +228,10 @@ public:
       if (AA->mayReadFromMemory(Inst, SI->getDest()))
         InvalidatedStoreList.push_back(SI);
     for (auto *SI : InvalidatedStoreList) {
-      DEBUG(llvm::dbgs() << "    Found an instruction that reads from memory "
-                            "such that a store is invalidated:" << *SI);
-      Stores.erase(SI);
+      DEBUG(llvm::dbgs() << "        Found an instruction that reads from "
+                            "memory such that a store is invalidated:"
+                         << *SI);
+      stopTrackingStore(SI);
     }
   }
 
@@ -198,6 +242,11 @@ public:
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
   void tryToForwardLoad(LoadInst *LI);
+
+private:
+
+  /// Merge in the state of an individual predecessor.
+  void mergePredecessorState(LSBBForwarder &OtherState);
 };
 
 } // end anonymous namespace
@@ -221,21 +270,42 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
   // destination.
   invalidateAliasingLoads(SI);
 
-  // If we are storing to a previously stored address then delete the old
-  // store.
+  // If we are storing to a previously stored address that this store post
+  // dominates, delete the old store.
+  llvm::SmallVector<StoreInst *, 4> StoresToDelete;
+  llvm::SmallVector<StoreInst *, 4> StoresToStopTracking;
   for (auto *PrevStore : Stores) {
     if (SI->getDest() != PrevStore->getDest())
       continue;
 
-    DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
+    // If this store does not post dominate prev store, we can not eliminate
+    // it. But do remove prev store from the store list and start tracking the
+    // new store.
+    //
+    // We are only given this if we are being used for multi-bb load store opts
+    // (when this is required). If we are being used for single-bb load store
+    // opts, this is not necessary, so skip it.
+    if (PDI && !PDI->properlyDominates(SI, PrevStore)) {
+      StoresToStopTracking.push_back(PrevStore);
+      DEBUG(llvm::dbgs() << "        Found dead store... That we don't "
+            "postdominate... Can't remove it but will track it.");
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "        Found a dead previous store... Removing...:"
           << *PrevStore);
     Changed = true;
-    deleteInstruction(PrevStore);
+    StoresToDelete.push_back(PrevStore);
     NumDeadStores++;
   }
 
+  for (StoreInst *I : StoresToDelete)
+    deleteInstruction(I);
+  for (StoreInst *I : StoresToStopTracking)
+    stopTrackingStore(I);
+
   // Insert SI into our store list.
-  Stores.insert(SI);
+  startTrackingStore(SI);
 }
 
 /// Given an unchecked_addr_cast with various address projections using it,
@@ -331,7 +401,7 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     if (!Result)
       continue;
 
-    DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
+    DEBUG(llvm::dbgs() << "        Forwarding store from: " << *PrevStore);
     SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
     Changed = true;
@@ -347,7 +417,7 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     if (!Result)
       continue;
 
-    DEBUG(llvm::dbgs() << "    Replacing with previous load: "
+    DEBUG(llvm::dbgs() << "        Replacing with previous load: "
                        << *Result);
     SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
@@ -356,19 +426,17 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     return;
   }
 
-  Loads.insert(LI);
+  startTrackingLoad(LI);
 }
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 bool LSBBForwarder::optimize() {
-  clear();
-
   auto II = BB->begin(), E = BB->end();
   while (II != E) {
     SILInstruction *Inst = II++;
 
-    DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
+    DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
@@ -386,15 +454,15 @@ bool LSBBForwarder::optimize() {
     // If this instruction has side effects, but is inert from a load store
     // perspective, skip it.
     if (isLSForwardingInertInstruction(Inst)) {
-      DEBUG(llvm::dbgs() << "    Found inert instruction: " << *Inst);
+      DEBUG(llvm::dbgs() << "        Found inert instruction: " << *Inst);
       continue;
     }
 
     if (auto *AI = dyn_cast<ApplyInst>(Inst))
       if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
         if (isReadNone(BI)) {
-          DEBUG(llvm::dbgs() << "    Found readnone builtin, does not affect "
-                "loads and stores.\n");
+          DEBUG(llvm::dbgs() << "        Found readnone builtin, does not "
+                "affect loads and stores.\n");
           continue;
         }
 
@@ -417,7 +485,107 @@ bool LSBBForwarder::optimize() {
     }
   }
 
+  DEBUG(llvm::dbgs() << "    Final State\n");
+  DEBUG(llvm::dbgs() << "        Tracking Loads:\n";
+        for (auto *LI : Loads) {
+          llvm::dbgs() << "            " << *LI;
+        });
+
+  DEBUG(llvm::dbgs() << "        Tracking Stores:\n";
+        for (auto *SI : Stores) {
+          llvm::dbgs() << "            " << *SI;
+        });
+
   return Changed;
+}
+
+void
+LSBBForwarder::
+mergePredecessorState(LSBBForwarder &OtherState) {
+  // Merge in the predecessor state.
+  DEBUG(llvm::dbgs() << "        Initial Stores:\n");
+  llvm::SmallVector<SILInstruction *, 8> DeleteList;
+  for (auto *SI : Stores) {
+    DEBUG(llvm::dbgs() << "            " << *SI);
+    if (OtherState.Stores.count(SI))
+      continue;
+    DeleteList.push_back(SI);
+  }
+
+  if (DeleteList.size()) {
+    DEBUG(llvm::dbgs() << "        Stores no longer being tracked:\n");
+    for (auto *SI : DeleteList) {
+      stopTrackingStore(cast<StoreInst>(SI));
+    }
+    DeleteList.clear();
+  } else {
+    DEBUG(llvm::dbgs() << "        All stores still being tracked!\n");
+  }
+
+  DEBUG(llvm::dbgs() << "            Initial Loads:\n");
+  for (auto *LI : Loads) {
+    DEBUG(llvm::dbgs() << "            " << *LI);
+    if (OtherState.Loads.count(LI))
+      continue;
+    DeleteList.push_back(LI);
+  }
+
+  if (DeleteList.size()) {
+    DEBUG(llvm::dbgs() << "        Loads no longer being tracked:\n");
+    for (auto *LI : DeleteList) {
+      stopTrackingLoad(cast<LoadInst>(LI));
+    }
+  } else {
+    DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
+  }
+}
+
+void
+LSBBForwarder::
+mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
+                                      unsigned> &BBToBBIDMap,
+                       std::vector<LSBBForwarder> &BBIDToForwarderMap) {
+  bool HasAtLeastOnePred = false;
+
+  // For each successor of BB...
+  for (auto Pred : BB->getPreds()) {
+
+    // Lookup the BBState associated with the predecessor and merge the
+    // predecessor in.
+    auto I = BBToBBIDMap.find(Pred);
+
+    // If we can not lookup the BBID then the BB was not in the post order
+    // implying that it is unreachable. LLVM will ensure that the BB is removed
+    // if we do not reach it at the SIL level. Since it is unreachable, ignore
+    // it.
+    if (I == BBToBBIDMap.end())
+      continue;
+
+    LSBBForwarder &Other = BBIDToForwarderMap[I->second];
+
+    // If we have not had at least one predecessor, initialize LSBBForwarder
+    // with the state of the initial predecessor.
+    if (!HasAtLeastOnePred) {
+      DEBUG(llvm::dbgs() << "    Initializing with pred: " << I->second
+                         << "\n");
+      Stores = Other.Stores;
+      Loads = Other.Loads;
+
+      DEBUG(llvm::dbgs() << "        Tracking Loads:\n";
+            for (auto *LI : Loads) {
+              llvm::dbgs() << "            " << *LI;
+            });
+
+      DEBUG(llvm::dbgs() << "        Tracking Stores:\n";
+            for (auto *SI : Stores) {
+              llvm::dbgs() << "            " << *SI;
+            });
+    } else {
+      DEBUG(llvm::dbgs() << "    Merging with pred: " << I->second << "\n");
+      mergePredecessorState(Other);
+    }
+    HasAtLeastOnePred = true;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -426,23 +594,85 @@ bool LSBBForwarder::optimize() {
 
 namespace {
 
+class GlobalLoadStoreOpts : public SILFunctionTransform {
+
+  /// The entry point to the transformation.
+  void run() {
+    SILFunction *F = getFunction();
+
+    DEBUG(llvm::dbgs() << "***** Load Store Elimination on function: "
+          << F->getName() << " *****\n");
+
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *POTA = PM->getAnalysis<PostOrderAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PDI = DA->getPostDomInfo(F);
+
+    auto ReversePostOrder = POTA->getReversePostOrder(F);
+    int PostOrderSize = std::distance(ReversePostOrder.begin(),
+                                      ReversePostOrder.end());
+    llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+    std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
+
+    for (SILBasicBlock *BB : ReversePostOrder) {
+      unsigned count = BBToBBIDMap.size();
+      BBToBBIDMap[BB] = count;
+      BBIDToForwarderMap[count].init(BB, AA, PDI);
+    }
+
+    bool Changed = false;
+    bool ChangedDuringIteration = false;
+    do {
+      ChangedDuringIteration = false;
+      for (SILBasicBlock *BB : ReversePostOrder) {
+        auto IDIter = BBToBBIDMap.find(BB);
+        assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
+        unsigned ID = IDIter->second;
+        LSBBForwarder &Forwarder = BBIDToForwarderMap[ID];
+        assert(Forwarder.getBB() == BB && "We just constructed this!?");
+
+        DEBUG(llvm::dbgs() << "Visiting BB #" << ID << "\n");
+
+        // Clear forwarder.
+        Forwarder.clear();
+
+        // Merge the predecessors.
+        Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
+
+        // Remove dead stores, merge duplicate loads, and forward stores to loads.
+        ChangedDuringIteration = Forwarder.optimize();
+        Changed |= ChangedDuringIteration;
+      }
+    } while (ChangedDuringIteration);
+
+    if (Changed)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+
+  StringRef getName() override { return "SIL Load Store Opts"; }
+};
+
 class LoadStoreOpts : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() {
-    SILFunction &F = *getFunction();
+    SILFunction *F = getFunction();
 
     DEBUG(llvm::dbgs() << "***** Load Store Elimination on function: "
-          << F.getName() << " *****\n");
+          << F->getName() << " *****\n");
 
-    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
 
     // Remove dead stores, merge duplicate loads, and forward stores to loads.
     bool Changed = false;
-    for (auto &BB : F) {
-      LSBBForwarder Forwarder(&BB, AA);
-      while (Forwarder.optimize())
+    for (auto &BB : *F) {
+      LSBBForwarder Forwarder;
+      Forwarder.init(&BB, AA, NULL);
+      while (Forwarder.optimize()) {
+        Forwarder.clear();
         Changed = true;
+      }
     }
 
     if (Changed)
@@ -454,6 +684,18 @@ class LoadStoreOpts : public SILFunctionTransform {
 
 } // end anonymous namespace
 
+llvm::cl::opt<bool>
+EnableGlobalLoadStoreOpts("enable-global-load-store-opts",
+                          llvm::cl::init(false));
+
 SILTransform *swift::createLoadStoreOpts() {
+  if (EnableGlobalLoadStoreOpts) {
+    return new GlobalLoadStoreOpts();
+  }
+
   return new LoadStoreOpts();
+}
+
+SILTransform *swift::createGlobalLoadStoreOpts() {
+  return new GlobalLoadStoreOpts();
 }
