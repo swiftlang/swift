@@ -58,12 +58,12 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   public typealias SubSlice = Slice<T>
   public subscript(subRange: Range<Int>) -> SubSlice {
     get {
-      return Slice(_buffer[subRange])
+      let clamped = (0..<count).clamp(subRange.startIndex..<subRange.endIndex)
+      return Slice(_buffer[clamped.start..<clamped.end])
     }
     set(rhs) {
-      if self[subRange]._buffer.identity != rhs._buffer.identity {
-        self.replaceRange(subRange, with: rhs)
-      }
+      let clamped = (0..<count).clamp(subRange.startIndex..<subRange.endIndex)
+      self.replaceRange(clamped.start..<clamped.end, with: rhs)
     }
   }
 
