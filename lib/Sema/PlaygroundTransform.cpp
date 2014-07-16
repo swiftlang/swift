@@ -729,7 +729,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
   public:
     virtual bool walkToDeclPre(Decl *D) {
-      if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
+      if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
             Instrumenter I(FD->getASTContext(), FD);
