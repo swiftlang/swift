@@ -37,15 +37,15 @@ func whileTrueReachable(v: Int) -> () {
 }
 
 func whileTrueTwoPredecessorsEliminated() -> () {
-    var x = 0
-    var v = 0
-    while (true) { // expected-note {{always evaluates to true}}
-      if false {
-        break
-      }
-      x++
+  var x = 0
+  var v = 0
+  while (true) { // expected-note {{always evaluates to true}}
+    if false {
+      break
     }
-    x--  // expected-warning {{will never be executed}}
+    x++
+  }
+  x--  // expected-warning {{will never be executed}}
 }
 
 func unreachableBranch() -> Int {
