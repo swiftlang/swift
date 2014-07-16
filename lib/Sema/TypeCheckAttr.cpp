@@ -227,17 +227,13 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   auto type = VD->getType();
 
   // Look through ownership types, and optionals.
-  Optional<Ownership> ownership;
-  if (auto rst = type->getAs<ReferenceStorageType>()) {
-    ownership = rst->getOwnership();
-    type = rst->getReferentType();
-  }
-
+  type = type->getReferenceStorageReferent();
   bool wasOptional = false;
   if (Type underlying = type->getAnyOptionalObjectType()) {
     type = underlying;
     wasOptional = true;
   }
+
 
   bool isArray = false;
   if (auto isError = isAcceptableOutletType(type, isArray, TC))
@@ -245,9 +241,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
                                  /*array=*/isArray, type);
 
   // If the type wasn't optional, an array, or unowned, complain.
-  if (!wasOptional && !isArray &&
-      !(ownership && (*ownership == Ownership::Unowned ||
-                      *ownership == Ownership::Unmanaged))) {
+  if (!wasOptional && !isArray) {
     auto symbolLoc = Lexer::getLocForEndOfToken(
                        TC.Context.SourceMgr,
                        VD->getTypeSourceRangeForDiagnostics().End);

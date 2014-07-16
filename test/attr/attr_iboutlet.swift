@@ -172,8 +172,12 @@ class SwiftGizmo {
 
   @IBOutlet weak var h : C?
   @IBOutlet weak var i : C!
-  @IBOutlet unowned var j : C
-  @IBOutlet unowned(unsafe) var k : C
+  @IBOutlet unowned var j : C // expected-error{{'IBOutlet' property has non-optional type 'C'}}
+  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{30-30=?}}
+  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{30-30=!}}
+  @IBOutlet unowned(unsafe) var k : C // expected-error{{'IBOutlet' property has non-optional type 'C'}}
+  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{38-38=?}}
+  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{38-38=!}}
 
   @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}
 
