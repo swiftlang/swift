@@ -65,6 +65,10 @@ enum BlockID {
 
   /// The identifier data block, which maps identifier strings to IDs.
   IDENTIFIER_BLOCK_ID,
+
+  /// The Objective-C class data block, which maps Objective-C class
+  /// names to information about the class.
+  OBJC_CLASS_BLOCK_ID,
 };
 
 namespace control_block {
@@ -90,6 +94,18 @@ namespace identifier_block {
     IDENTIFIER_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
+  >;
+}
+
+namespace objc_class_block {
+  enum {
+    OBJC_CLASS_DATA = 1,
+  };
+
+  using ObjCClassDataLayout = BCRecordLayout<
+    OBJC_CLASS_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from ObjC class names (as IDs) to ObjC class information
   >;
 }
 

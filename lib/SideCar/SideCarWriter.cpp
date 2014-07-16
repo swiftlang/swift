@@ -19,6 +19,7 @@
 #include "swift/SideCar/SideCarWriter.h"
 #include "SideCarFormat.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
@@ -50,12 +51,9 @@ class SideCarWriter::Implementation {
 public:
   /// Information about Objective-C classes.
   ///
-  /// Indexed by the class ID, and provides a sequence of (module ID,
-  /// class info) tuples with information about the class scoped to a particular
-  /// module.
-  llvm::DenseMap<
-    unsigned,
-    std::vector<std::tuple<ModuleID, ObjCClassInfo>>> ObjCClasses;
+  /// Indexed by the (module ID, class ID), and provides information
+  /// describing the class within that module.
+  llvm::DenseMap<std::pair<unsigned, unsigned>, ObjCClassInfo> ObjCClasses;
 
   /// Information about Objective-C properties.
   ///
@@ -121,6 +119,7 @@ private:
   void writeBlockInfoBlock(llvm::BitstreamWriter &writer);
   void writeControlBlock(llvm::BitstreamWriter &writer);
   void writeIdentifierBlock(llvm::BitstreamWriter &writer);
+  void writeObjCClassBlock(llvm::BitstreamWriter &writer);
 };
 
 /// Record the name of a block.
@@ -150,7 +149,8 @@ static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
   out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
-void SideCarWriter::Implementation::writeBlockInfoBlock(llvm::BitstreamWriter &writer){
+void SideCarWriter::Implementation::writeBlockInfoBlock(
+       llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);  
 
   SmallVector<unsigned char, 64> nameBuffer;
@@ -164,6 +164,9 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(llvm::BitstreamWriter &w
 
   BLOCK(IDENTIFIER_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
+
+  BLOCK(OBJC_CLASS_BLOCK);
+  BLOCK_RECORD(objc_class_block, OBJC_CLASS_DATA);
 #undef BLOCK
 #undef BLOCK_RECORD
 }
@@ -213,7 +216,8 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeIdentifierBlock(llvm::BitstreamWriter &writer){
+void SideCarWriter::Implementation::writeIdentifierBlock(
+       llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, IDENTIFIER_BLOCK_ID, 3);
 
   if (IdentifierIDs.empty())
@@ -236,6 +240,81 @@ void SideCarWriter::Implementation::writeIdentifierBlock(llvm::BitstreamWriter &
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk Objective-C class table.
+  class ObjCClassTableInfo {
+  public:
+    using key_type = std::pair<unsigned, unsigned>; // (module ID, class ID)
+    using key_type_ref = key_type;
+    using data_type = ObjCClassInfo;
+    using data_type_ref = const data_type &;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(ModuleID) + sizeof(ClassID);
+      uint32_t dataLength = 1;
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<ModuleID>(key.first);
+      writer.write<ClassID>(key.second);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      endian::Writer<little> writer(out);
+
+      uint8_t byte = 0;
+      if (auto nullable = data.getDefaultNullability()) {
+        // FIXME: Terrible solution. This needs abstraction.
+        byte |= 0x01;
+        byte <<= 1;
+        byte |= static_cast<uint8_t>(*nullable);
+      } else {
+        // Nothing to do.
+      }
+      
+      writer.write<uint8_t>(byte);
+    }
+  };
+} // end anonymous namespace
+
+void SideCarWriter::Implementation::writeObjCClassBlock(
+       llvm::BitstreamWriter &writer) {
+  BCBlockRAII restoreBlock(writer, OBJC_CLASS_BLOCK_ID, 3);
+
+  if (ObjCClasses.empty())
+    return;  
+
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<ObjCClassTableInfo> generator;
+    for (auto &entry : ObjCClasses)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  objc_class_block::ObjCClassDataLayout layout(writer);
+  layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+}
+
 void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   // Write the side car file into a buffer.
   SmallVector<char, 0> buffer;
@@ -252,6 +331,7 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeBlockInfoBlock(writer);
     writeControlBlock(writer);
     writeIdentifierBlock(writer);
+    writeObjCClassBlock(writer);
   }
 
   // Write the buffer to the stream.
@@ -277,7 +357,8 @@ void SideCarWriter::addObjCClass(StringRef moduleName, StringRef name,
                                  const ObjCClassInfo &info) {
   ModuleID moduleID = Impl.getModule(moduleName);
   ClassID classID = Impl.getClass(name);
-  Impl.ObjCClasses[classID].push_back({moduleID, info});
+  assert(!Impl.ObjCClasses.count({moduleID, classID}));
+  Impl.ObjCClasses[{moduleID, classID}] = info;
 }
 
 void SideCarWriter::addObjCProperty(StringRef moduleName, StringRef className,
