@@ -68,6 +68,18 @@ public:
   /// \returns Information about the property, if known.
   Optional<ObjCPropertyInfo> lookupObjCProperty(StringRef className, 
                                                 StringRef name);
+
+  /// Look for information regarding the given Objective-C method in
+  /// the given class.
+  ///
+  /// \param className The name of the class we are looking in.
+  /// \param selector The selector naming the method we're looking for.
+  /// \param isInstanceMethod Whether we are looking for an instance method.
+  ///
+  /// \returns Information about the method, if known.
+  Optional<ObjCMethodInfo> lookupObjCMethod(StringRef className,
+                                            ObjCSelectorRef selector,
+                                            bool isInstanceMethod);
 };
 
 } // end namespace side_car

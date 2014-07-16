@@ -33,45 +33,6 @@ using namespace swift;
 using namespace side_car;
 using namespace llvm::support;
 
-namespace {
-  /// A stored Objective-C selector.
-  struct StoredObjCSelector {
-    unsigned NumPieces;
-    llvm::SmallVector<IdentifierID, 2> Identifiers;
-  };
-}
-
-namespace llvm {
-  template<>
-  struct DenseMapInfo<StoredObjCSelector> {
-    typedef DenseMapInfo<unsigned> UnsignedInfo;
-
-    static inline StoredObjCSelector getEmptyKey() {
-      return StoredObjCSelector{ UnsignedInfo::getEmptyKey(), { } };
-    }
-
-    static inline StoredObjCSelector getTombstoneKey() {
-      return StoredObjCSelector{ UnsignedInfo::getTombstoneKey(), { } };
-    }
-    
-    static unsigned getHashValue(const StoredObjCSelector& value) {
-      auto hash = llvm::hash_value(value.NumPieces);
-      hash = hash_combine(hash, value.Identifiers.size());
-      for (auto piece : value.Identifiers)
-        hash = hash_combine(hash, static_cast<unsigned>(piece));
-      // FIXME: Mix upper/lower 32-bit values together to produce
-      // unsigned rather than truncating.
-      return hash;
-    }
-
-    static bool isEqual(const StoredObjCSelector &lhs, 
-                        const StoredObjCSelector &rhs) {
-      return lhs.NumPieces == rhs.NumPieces && 
-             lhs.Identifiers == rhs.Identifiers;
-    }
-  };
-}
-
 class SideCarWriter::Implementation {
   /// Mapping from strings to identifier IDs.
   llvm::StringMap<IdentifierID> IdentifierIDs;
@@ -439,7 +400,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(SelectorID) + 1;
-      uint32_t dataLength = 4 + sizeof(uint64_t) + data.UnavailableMsg.size(); 
+      uint32_t dataLength = 5 + sizeof(uint64_t) + data.UnavailableMsg.size(); 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -458,17 +419,13 @@ namespace {
       endian::Writer<little> writer(out);
 
       // FIXME: Inefficient representation
-      llvm::SmallVector<char, 4 + sizeof(uint64_t)> bytes;
-      bytes.reserve(bytes.size() + data.UnavailableMsg.size());
-      bytes.push_back(data.DesignatedInit);
-      bytes.push_back(data.FactoryAsInit);
-      bytes.push_back(data.Unavailable);
-      bytes.push_back(data.NullabilityAudited);
-      bytes.append((const char *)&data.NullabilityPayload,
-                   (const char *)&data.NullabilityPayload + sizeof(uint64_t));
-      bytes.append(data.UnavailableMsg.c_str(),
-                   data.UnavailableMsg.c_str() + data.UnavailableMsg.size());
-      out.write(bytes.data(), bytes.size());
+      writer.write<uint8_t>(data.DesignatedInit);
+      writer.write<uint8_t>(data.FactoryAsInit);
+      writer.write<uint8_t>(data.Unavailable);
+      writer.write<uint8_t>(data.NullabilityAudited);
+      writer.write<uint8_t>(data.NumAdjustedNullable);
+      writer.write<uint64_t>(data.NullabilityPayload);
+      out.write(data.UnavailableMsg.c_str(), data.UnavailableMsg.size());
     }
   };
 } // end anonymous namespace

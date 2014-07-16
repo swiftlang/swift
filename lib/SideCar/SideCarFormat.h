@@ -19,6 +19,9 @@
 #define SWIFT_SIDE_CAR_FORMAT_H
 
 #include "swift/Serialization/BCRecordLayout.h" // FIXME: layering
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 namespace side_car {
@@ -153,7 +156,47 @@ namespace objc_selector_block {
   >;
 }
 
+/// A stored Objective-C selector.
+struct StoredObjCSelector {
+  unsigned NumPieces;
+  llvm::SmallVector<IdentifierID, 2> Identifiers;
+};
+
 } // end namespace side_car
 } // end namespace swift
+
+namespace llvm {
+  template<>
+  struct DenseMapInfo<swift::side_car::StoredObjCSelector> {
+    typedef DenseMapInfo<unsigned> UnsignedInfo;
+
+    static inline swift::side_car::StoredObjCSelector getEmptyKey() {
+      return swift::side_car::StoredObjCSelector{ 
+               UnsignedInfo::getEmptyKey(), { } };
+    }
+
+    static inline swift::side_car::StoredObjCSelector getTombstoneKey() {
+      return swift::side_car::StoredObjCSelector{ 
+               UnsignedInfo::getTombstoneKey(), { } };
+    }
+    
+    static unsigned getHashValue(
+                      const swift::side_car::StoredObjCSelector& value) {
+      auto hash = llvm::hash_value(value.NumPieces);
+      hash = hash_combine(hash, value.Identifiers.size());
+      for (auto piece : value.Identifiers)
+        hash = hash_combine(hash, static_cast<unsigned>(piece));
+      // FIXME: Mix upper/lower 32-bit values together to produce
+      // unsigned rather than truncating.
+      return hash;
+    }
+
+    static bool isEqual(const swift::side_car::StoredObjCSelector &lhs, 
+                        const swift::side_car::StoredObjCSelector &rhs) {
+      return lhs.NumPieces == rhs.NumPieces && 
+             lhs.Identifiers == rhs.Identifiers;
+    }
+  };
+}
 
 #endif // LLVM_SWIFT_SIDE_CAR_FORMAT_H

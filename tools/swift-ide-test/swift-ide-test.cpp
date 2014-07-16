@@ -1756,8 +1756,37 @@ bool checkAPIAnnotation(StringRef fileName) {
     = side_car::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
-  #define INSTANCE_METHOD(ClassName, Selector, Options)
-  #define CLASS_METHOD(ClassName, Selector, Options)
+  #define MAKE_SELECTOR_REF(NumPieces, ...) \
+    ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
+
+  #define INSTANCE_METHOD(ClassName, Selector, Options)               \
+  if (auto info = reader->lookupObjCMethod(                           \
+                    #ClassName, MAKE_SELECTOR_REF Selector, true)) {  \
+      auto expectedInfo = ObjCMethodInfo() | Options;                 \
+      if (*info != expectedInfo) {                                    \
+        llvm::errs() << "Class " << moduleName << " method"           \
+                     << " has incorrect information\n";               \
+        return true;                                                  \
+      }                                                               \
+    } else {                                                          \
+      llvm::errs() << "Class " << moduleName << "method"              \
+                   << " not found in side car file\n";                \
+      return true;                                                    \
+    }
+  #define CLASS_METHOD(ClassName, Selector, Options)                  \
+  if (auto info = reader->lookupObjCMethod(                           \
+                    #ClassName, MAKE_SELECTOR_REF Selector, false)) { \
+      auto expectedInfo = ObjCMethodInfo() | Options;                 \
+      if (*info != expectedInfo) {                                    \
+        llvm::errs() << "Class " << moduleName << " method"           \
+                     << " has incorrect information\n";               \
+        return true;                                                  \
+      }                                                               \
+    } else {                                                          \
+      llvm::errs() << "Class " << moduleName << "method"              \
+                   << " not found in side car file\n";                \
+      return true;                                                    \
+    }
   #define OBJC_CONTEXT(ClassName, Options)                              \
     if (auto info = reader->lookupObjCClass(moduleName, #ClassName)) {  \
       auto expectedInfo = ObjCClassInfo() | Options;                    \
@@ -1785,6 +1814,7 @@ bool checkAPIAnnotation(StringRef fileName) {
       return true;                                                      \
     }
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
+  #undef MAKE_SELECTOR_REF
 
   return false;
 }

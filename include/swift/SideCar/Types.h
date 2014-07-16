@@ -218,6 +218,20 @@ public:
   NullableKind getReturnTypeInfo() {
     return getTypeInfo(0);
   }
+
+  friend bool operator==(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
+    return lhs.DesignatedInit == rhs.DesignatedInit &&
+           lhs.FactoryAsInit == rhs.FactoryAsInit &&
+           lhs.Unavailable == rhs.Unavailable &&
+           lhs.NullabilityAudited == rhs.NullabilityAudited &&
+           lhs.NumAdjustedNullable == rhs.NumAdjustedNullable &&
+           lhs.NullabilityPayload == rhs.NullabilityPayload &&
+           lhs.UnavailableMsg == rhs.UnavailableMsg;
+  }
+
+  friend bool operator!=(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 } // end namespace side_car
