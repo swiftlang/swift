@@ -138,7 +138,7 @@ public:
   uint64_t NullabilityPayload = 0;
 
   /// Message to use when this method is unavailable.
-  StringRef UnavailableMsg;
+  std::string UnavailableMsg;
 
   ObjCMethodInfo()
     : DesignatedInit(false),

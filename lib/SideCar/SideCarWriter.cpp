@@ -121,6 +121,7 @@ private:
   void writeIdentifierBlock(llvm::BitstreamWriter &writer);
   void writeObjCClassBlock(llvm::BitstreamWriter &writer);
   void writeObjCPropertyBlock(llvm::BitstreamWriter &writer);
+  void writeObjCMethodBlock(llvm::BitstreamWriter &writer);
 };
 
 /// Record the name of a block.
@@ -171,6 +172,9 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(
 
   BLOCK(OBJC_PROPERTY_BLOCK);
   BLOCK_RECORD(objc_property_block, OBJC_PROPERTY_DATA);
+
+  BLOCK(OBJC_METHOD_BLOCK);
+  BLOCK_RECORD(objc_method_block, OBJC_METHOD_DATA);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -324,7 +328,7 @@ namespace {
   /// Used to serialize the on-disk Objective-C property table.
   class ObjCPropertyTableInfo {
   public:
-    using key_type = std::pair<unsigned, unsigned>; // (module ID, class ID)
+    using key_type = std::pair<unsigned, unsigned>; // (class ID, name ID)
     using key_type_ref = key_type;
     using data_type = ObjCPropertyInfo;
     using data_type_ref = const data_type &;
@@ -395,6 +399,86 @@ void SideCarWriter::Implementation::writeObjCPropertyBlock(
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk Objective-C method table.
+  class ObjCMethodTableInfo {
+  public:
+    // (class ID, selector ID, is-instance)
+    using key_type = std::tuple<unsigned, unsigned, char>; 
+    using key_type_ref = key_type;
+    using data_type = ObjCMethodInfo;
+    using data_type_ref = const data_type &;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::hash_combine(std::get<0>(key), 
+                                std::get<1>(key), 
+                                std::get<2>(key));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(ClassID) + sizeof(SelectorID) + 1;
+      uint32_t dataLength = 4 + sizeof(uint64_t) + data.UnavailableMsg.size(); 
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<ClassID>(std::get<0>(key));
+      writer.write<SelectorID>(std::get<1>(key));
+      writer.write<uint8_t>(std::get<2>(key));
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      endian::Writer<little> writer(out);
+
+      // FIXME: Inefficient representation
+      llvm::SmallVector<char, 4 + sizeof(uint64_t)> bytes;
+      bytes.reserve(bytes.size() + data.UnavailableMsg.size());
+      bytes.push_back(data.DesignatedInit);
+      bytes.push_back(data.FactoryAsInit);
+      bytes.push_back(data.Unavailable);
+      bytes.push_back(data.NullabilityAudited);
+      bytes.append((const char *)&data.NullabilityPayload,
+                   (const char *)&data.NullabilityPayload + sizeof(uint64_t));
+      bytes.append(data.UnavailableMsg.c_str(),
+                   data.UnavailableMsg.c_str() + data.UnavailableMsg.size());
+      out.write(bytes.data(), bytes.size());
+    }
+  };
+} // end anonymous namespace
+
+void SideCarWriter::Implementation::writeObjCMethodBlock(
+       llvm::BitstreamWriter &writer) {
+  BCBlockRAII restoreBlock(writer, OBJC_METHOD_BLOCK_ID, 3);
+
+  if (ObjCProperties.empty())
+    return;  
+
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<ObjCMethodTableInfo> generator;
+    for (auto &entry : ObjCMethods)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  objc_method_block::ObjCMethodDataLayout layout(writer);
+  layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+}
+
 void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   // Write the side car file into a buffer.
   SmallVector<char, 0> buffer;
@@ -413,6 +497,7 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeIdentifierBlock(writer);
     writeObjCClassBlock(writer);
     writeObjCPropertyBlock(writer);
+    writeObjCMethodBlock(writer);
   }
 
   // Write the buffer to the stream.

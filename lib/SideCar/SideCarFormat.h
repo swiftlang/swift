@@ -74,6 +74,11 @@ enum BlockID {
   /// (class name, property name) pairs to information about the
   /// property.
   OBJC_PROPERTY_BLOCK_ID,
+
+  /// The Objective-C property data block, which maps Objective-C
+  /// (class name, selector, is_instance_method) tuples to information
+  /// about the method.
+  OBJC_METHOD_BLOCK_ID,
 };
 
 namespace control_block {
@@ -122,7 +127,21 @@ namespace objc_property_block {
   using ObjCPropertyDataLayout = BCRecordLayout<
     OBJC_PROPERTY_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
-    BCBlob  // map from ObjC class names (as IDs) to ObjC property information
+    BCBlob  // map from ObjC (class name, property name) pairs to ObjC
+            // property information
+  >;
+}
+
+namespace objc_method_block {
+  enum {
+    OBJC_METHOD_DATA = 1,
+  };
+
+  using ObjCMethodDataLayout = BCRecordLayout<
+    OBJC_METHOD_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from ObjC (class names, selector,
+            // is-instance-method) tuples to ObjC method information
   >;
 }
 
