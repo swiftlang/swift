@@ -54,7 +54,7 @@ class FooClass {
     self = FooClass()  // expected-error {{cannot assign to 'self' in a method}}
   }
   
-  mutating init(a : Bool) {}     // expected-error {{'mutating' isn't allowed on init methods}}
+  mutating init(a : Bool) {}     // expected-error {{'mutating' may only be used on 'func' declarations}}
   
   mutating            // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
   func baz() {}
@@ -180,8 +180,8 @@ struct TestMutableStruct {
     nonmutating set {}
   }
 
-  @mutating func mutating_attr() {}  // expected-error {{'mutating' is not an attribute, use the mutating keyword}}
-  @!mutating func nonmutating_attr() {}  // expected-error {{'mutating' is not an attribute, use the nonmutating keyword}}
+  @mutating func mutating_attr() {}  // expected-error {{'mutating' is a declaration modifier, not an attribute}}
+  @nonmutating func nonmutating_attr() {}  // expected-error {{'nonmutating' is a declaration modifier, not an attribute}}
 }
 
 func test_mutability() {
@@ -280,7 +280,7 @@ func test_properties() {
 }
 
 struct DuplicateMutating {
-  mutating mutating func f() {} // expected-error {{'mutating' specified twice}}{{12-20=}}
+  mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }
 
 protocol SubscriptNoGetter {
@@ -401,4 +401,19 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to 'x' in 'self'}}
 }
 
+
+
+func test_recovery_missing_name_1(var: Int) {} // expected-error 2{{expected ',' separator}} expected-error 2{{expected parameter type following ':'}}
+
+func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} expected-error 2{{expected parameter type following ':'}}
+
+
+// <rdar://problem/16792027> compiler infinite loops on a really really mutating function
+struct F {
+  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error 2 {{expected declaration}}
+  }
+  
+  mutating nonmutating func g() {  // expected-error {{method may not be declared both mutating and nonmutating}}
+  }
+}
 

@@ -4200,19 +4200,11 @@ public:
     }
 
     // Validate the mutating attribute if present, and install it into the bit
-    // on funcdecl (instead of just being in DeclAttrs).
-    Optional<bool> MutatingAttr = FD->getAttrs().getMutating();
-    if (MutatingAttr) {
-      if (!FD->getDeclContext()->isTypeContext())
-        TC.diagnose(FD->getAttrs().getLoc(AK_mutating),
-                    diag::mutating_invalid_global_scope);
-      else if (FD->getDeclContext()->getDeclaredTypeInContext()
-                 ->hasReferenceSemantics())
-        TC.diagnose(FD->getAttrs().getLoc(AK_mutating),
-                    diag::mutating_invalid_classes);
-      else
-        FD->setMutating(MutatingAttr.getValue());
-    }
+    // on funcdecl (instead of just being a DeclAttribute).
+    if (FD->getAttrs().hasAttribute<MutatingAttr>())
+      FD->setMutating(true);
+    else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
+      FD->setMutating(false);
 
     bool isInvalid = false;
 
@@ -4721,6 +4713,8 @@ public:
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Lazy)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
+    UNINTERESTING_ATTR(Mutating)
+    UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
     UNINTERESTING_ATTR(Optional)
@@ -5131,7 +5125,6 @@ public:
 
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
-    assert(!CD->getAttrs().hasMutating() && "Cannot parse this");
 
     // convenience initializers are only allowed on classes and in
     // extensions thereof.
@@ -6501,27 +6494,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           D->getMutableAttrs().removeAttribute(objcAttr);
         }
       }
-    }
-  }
-  
-  if (auto dynAttr = Attrs.getAttribute<DynamicAttr>()) {
-    // Only instance properties, methods,
-    // constructors, and subscripts of classes can be dynamic.
-    auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
-    if (!contextTy || !contextTy->getClassOrBoundGenericClass()) {
-      TC.diagnose(dynAttr->getLocation(), diag::dynamic_not_in_class);
-      const_cast<DynamicAttr *>(dynAttr)->setInvalid();
-    } else if (!isa<FuncDecl>(D)
-        && !isa<ConstructorDecl>(D)
-        && !isa<SubscriptDecl>(D)
-        && !isa<VarDecl>(D)) {
-      TC.diagnose(dynAttr->getLocation(), diag::invalid_dynamic_decl);
-      const_cast<DynamicAttr *>(dynAttr)->setInvalid();
-    }
-    
-    // Members cannot be both dynamic and final.
-    if (D->getAttrs().hasAttribute<FinalAttr>()) {
-      TC.diagnose(dynAttr->getLocation(), diag::dynamic_with_final);
     }
   }
 

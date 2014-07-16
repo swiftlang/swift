@@ -178,10 +178,6 @@ ERROR(decl_inner_scope,decl_parsing,none,
 
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
-ERROR(mutating_invalid,decl_parsing,none,
-      "'mutating' is not valid on this declaration", ())
-ERROR(mutating_invalid_init,decl_parsing,none,
-      "'mutating' isn't allowed on init methods", ())
 
 ERROR(ownership_not_attribute,sema_tcd,none,
       "'@%0' is not an attribute, use the '%0' keyword instead",
@@ -191,9 +187,6 @@ ERROR(cskeyword_not_attribute,sema_tcd,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
 
-ERROR(mutating_not_attribute,sema_tcd,none,
-      "'mutating' is not an attribute, use the %select{|non}0mutating keyword",
-     (unsigned))
 ERROR(convenience_invalid,sema_tcd,none,
       "'convenience' is not valid on this declaration", ())
 
@@ -278,8 +271,6 @@ ERROR(func_decl_without_paren,decl_parsing,PointsToFirstBadToken,
 ERROR(static_func_decl_global_scope,decl_parsing,none,
       "%select{ERROR|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(static_functions_not_mutating,sema_tcd,none,
-      "static functions may not be declared mutating", ())
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
 ERROR(func_static_not_allowed,decl_parsing,none,

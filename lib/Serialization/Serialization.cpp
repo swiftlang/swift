@@ -1810,9 +1810,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
-    checkAllowedAttributes<
-      AK_transparent, AK_mutating
-    >(fn);
+    checkAllowedAttributes<AK_transparent>(fn);
     verifyAttrSerializable(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());

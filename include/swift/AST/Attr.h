@@ -774,7 +774,8 @@ public:
   }
 };
 
-/// Represents a 'private', 'internal', or 'public' marker on a declaration.
+/// Represents a 'private', 'internal', or 'public' marker for a setter on a
+/// declaration.
 class SetterAccessibilityAttr : public AbstractAccessibilityAttr {
 public:
   SetterAccessibilityAttr(SourceLoc atLoc, SourceRange range,
@@ -845,11 +846,6 @@ public:
   /// This can happen when the attributes were parsed, but then cleared because
   /// they are not allowed in that context.
   SourceLoc AtLoc;
-
-  /// When the mutating attribute is present (i.e., we have a location for it),
-  /// indicating whether it was inverted ("nonmutating") or not ("mutating").
-  /// Clients should generally use the getMutating() accessor.
-  bool MutatingInverted = false;
 
   DeclAttributes() : NumAttrsSet(0), DeclAttrs(nullptr) {}
 
@@ -939,13 +935,6 @@ public:
 
   bool requiresStoredPropertyInits() const {
     return has(AK_requires_stored_property_inits);
-  }
-
-  bool hasMutating() const { return has(AK_mutating); }
-  Optional<bool> getMutating() const {
-    if (hasMutating())
-      return !MutatingInverted;
-    return Nothing;
   }
 
   bool hasOwnership() const {

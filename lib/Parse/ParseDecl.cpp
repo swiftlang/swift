@@ -868,22 +868,13 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If this is an inverted attribute like "@!mutating", verify that inversion
   // is ok.
   if (isInverted) {
-    if (attr == AK_mutating) {
-      Attributes.MutatingInverted = true;
-    } else {
       diagnose(InversionLoc, diag::invalid_attribute_inversion);
       isInverted = false;
-    }
   }
 
   // Handle any attribute-specific processing logic.
   switch (attr) {
   default: break;
-
-  case AK_mutating:
-    diagnose(Loc, diag::mutating_not_attribute, isInverted)
-      .fixItReplace(AtLoc, isInverted ? "non" : "");
-    break;
   case AK_weak:
   case AK_unowned:
   case AK_unowned_unsafe: {
@@ -1312,8 +1303,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   parseDeclAttributeList(Attributes);
 
   // Keep track of where and whether we see a contextual keyword on the decl.
-  SourceLoc StaticLoc, MutatingLoc, ConvenienceLoc;
-  bool isNonMutating = false;
+  SourceLoc StaticLoc, ConvenienceLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
@@ -1445,17 +1435,14 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                               Tok.getText(), DAK_Override);
         continue;
       }
-
-      if (Tok.isContextualKeyword("mutating") ||
-          Tok.isContextualKeyword("nonmutating")) {
-        if (MutatingLoc.isValid()) {
-          diagnose(Tok, diag::decl_already_mutating)
-            .highlight(MutatingLoc).fixItRemove(Tok.getLoc());
-        } else {
-          isNonMutating = Tok.isContextualKeyword("nonmutating");
-          MutatingLoc = Tok.getLoc();
-        }
-        consumeToken(tok::identifier);
+      if (Tok.isContextualKeyword("mutating")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Mutating);
+        continue;
+      }
+      if (Tok.isContextualKeyword("nonmutating")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_NonMutating);
         continue;
       }
 
@@ -1547,19 +1534,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       break;
 
     case tok::kw_func:
-      // If the 'mutating' or 'nonmutating' modifier was applied to the func,
-      // model it an attribute.
-      if (MutatingLoc.isValid()) {
-        if (!Attributes.AtLoc.isValid())
-          Attributes.AtLoc = MutatingLoc;
-        Attributes.setAttr(AK_mutating, MutatingLoc);
-        Attributes.MutatingInverted = isNonMutating;
-      }
-        
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
       Status = DeclResult;
       StaticLoc = SourceLoc();   // we handled static if present.
-      MutatingLoc = SourceLoc(); // we handled mutating if present.
       break;
 
     case tok::kw_subscript:
@@ -1607,13 +1584,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       diagnose(Entries.back()->getLoc(), diag::decl_not_static,
                StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
-    // If we parsed 'mutating' but didn't handle it above, complain about it.
-    if (MutatingLoc.isValid()) {
-      bool isInit = isa<ConstructorDecl>(Entries.back());
-      diagnose(Entries.back()->getLoc(),
-               isInit ? diag::mutating_invalid_init :  diag::mutating_invalid)
-          .fixItRemove(SourceRange(MutatingLoc));
-    }
     
     if (ConvenienceLoc.isValid())
       diagnose(Entries.back()->getLoc(), diag::convenience_invalid)
@@ -2394,13 +2364,12 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Parse the contextual keywords for 'mutating' and 'nonmutating' before
       // get and set.
-      if ((Tok.isContextualKeyword("mutating") ||
-           Tok.isContextualKeyword("nonmutating")) &&
-          (peekToken().isContextualKeyword("get") ||
-           peekToken().isContextualKeyword("set"))) {
-        Attributes.setAttr(AK_mutating, Tok.getLoc());
-        Attributes.MutatingInverted = Tok.isContextualKeyword("nonmutating");
-        consumeToken(tok::identifier);
+      if (Tok.isContextualKeyword("mutating")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_Mutating);
+      } else if (Tok.isContextualKeyword("nonmutating")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                              Tok.getText(), DAK_NonMutating);
       }
 
       AccessorKind Kind;
@@ -2476,13 +2445,12 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse the contextual keywords for 'mutating' and 'nonmutating' before
     // get and set.
-    if ((Tok.isContextualKeyword("mutating") ||
-         Tok.isContextualKeyword("nonmutating")) &&
-        (peekToken().isContextualKeyword("get") ||
-         peekToken().isContextualKeyword("set"))) {
-      Attributes.setAttr(AK_mutating, Tok.getLoc());
-      Attributes.MutatingInverted = Tok.isContextualKeyword("nonmutating");
-      consumeToken(tok::identifier);
+    if (Tok.isContextualKeyword("mutating")) {
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                            Tok.getText(), DAK_Mutating);
+    } else if (Tok.isContextualKeyword("nonmutating")) {
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, /*InversionLoc*/ {},
+                            Tok.getText(), DAK_NonMutating);
     }
     
     bool isImplicitGet = false;
@@ -3066,11 +3034,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
         diagnose(Tok, diag::class_func_in_struct)
             .fixItReplace(StaticLoc, "static");
     }
-  }
-
-  if (StaticLoc.isValid() && Attributes.hasMutating()) {
-    diagnose(Tok, diag::static_functions_not_mutating);
-    Attributes.clearAttribute(AK_mutating);
   }
 
   SourceLoc FuncLoc = consumeToken(tok::kw_func);

@@ -47,7 +47,6 @@ public:
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Availability)
   IGNORED_ATTR(ClassProtocol)
-  IGNORED_ATTR(Dynamic)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(IBDesignable)
   IGNORED_ATTR(NSCopying)
@@ -68,6 +67,11 @@ public:
 
 #undef IGNORED_ATTR
 
+  void visitMutationAttr(DeclAttribute *attr);
+  void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
+  void visitNonMutatingAttr(NonMutatingAttr *attr)  { visitMutationAttr(attr); }
+  void visitDynamicAttr(DynamicAttr *attr);
+  
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -81,6 +85,39 @@ public:
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
 };
 } // end anonymous namespace
+
+
+void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
+  FuncDecl *FD = cast<FuncDecl>(D);
+
+  if (!FD->getDeclContext()->isTypeContext())
+    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
+  if (FD->getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics())
+    return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes);
+  
+  // Verify we don't have both mutating and nonmutating.
+  if (FD->getAttrs().hasAttribute<MutatingAttr>())
+    if (auto *NMA = FD->getMutableAttrs().getAttribute<NonMutatingAttr>()) {
+      diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not);
+      if (NMA == attr) return;
+    }
+  
+  // Verify that we don't have a static function.
+  if (FD->isStatic())
+    return diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
+}
+
+void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
+  // Only instance members of classes can be dynamic.
+  auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
+  if (!contextTy || !contextTy->getClassOrBoundGenericClass())
+    return diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
+    
+  // Members cannot be both dynamic and final.
+  if (D->getAttrs().hasAttribute<FinalAttr>())
+    return diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
+}
+
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
@@ -430,6 +467,8 @@ public:
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
+    IGNORED_ATTR(Mutating)
+    IGNORED_ATTR(NonMutating)
     IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)

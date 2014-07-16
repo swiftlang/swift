@@ -120,10 +120,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
         DA->print(Printer);
     }
   }
-  
-  Optional<bool> MutatingAttr = getMutating();
-  if (MutatingAttr)
-    Printer << (MutatingAttr.getValue() ? "mutating " : "nonmutating ");
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {

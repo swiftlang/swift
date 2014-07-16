@@ -309,6 +309,11 @@ ERROR(mutating_invalid_global_scope,sema_tcd,none,
 ERROR(mutating_invalid_classes,sema_tcd,none,
       "'mutating' isn't valid on methods in classes or class-bound protocols",
       ())
+ERROR(functions_mutating_and_not,sema_tcd,none,
+      "method may not be declared both mutating and nonmutating", ())
+ERROR(static_functions_not_mutating,sema_tcd,none,
+      "static functions may not be declared mutating", ())
+
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,
@@ -1485,9 +1490,6 @@ ERROR(type_not_bridged,sema_objc,none,
 
 ERROR(dynamic_not_in_class,sema_dynamic,none,
       "only members of classes may be dynamic", ())
-ERROR(invalid_dynamic_decl,sema_dynamic,none,
-      "only methods, initializers, properties, and subscripts may be dynamic",
-      ())
 ERROR(dynamic_with_final,sema_dynamic,none,
       "a declaration cannot be both 'final' and 'dynamic'",
       ())
