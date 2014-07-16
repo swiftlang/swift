@@ -33,6 +33,45 @@ using namespace swift;
 using namespace side_car;
 using namespace llvm::support;
 
+namespace {
+  /// A stored Objective-C selector.
+  struct StoredObjCSelector {
+    unsigned NumPieces;
+    llvm::SmallVector<IdentifierID, 2> Identifiers;
+  };
+}
+
+namespace llvm {
+  template<>
+  struct DenseMapInfo<StoredObjCSelector> {
+    typedef DenseMapInfo<unsigned> UnsignedInfo;
+
+    static inline StoredObjCSelector getEmptyKey() {
+      return StoredObjCSelector{ UnsignedInfo::getEmptyKey(), { } };
+    }
+
+    static inline StoredObjCSelector getTombstoneKey() {
+      return StoredObjCSelector{ UnsignedInfo::getTombstoneKey(), { } };
+    }
+    
+    static unsigned getHashValue(const StoredObjCSelector& value) {
+      auto hash = llvm::hash_value(value.NumPieces);
+      hash = hash_combine(hash, value.Identifiers.size());
+      for (auto piece : value.Identifiers)
+        hash = hash_combine(hash, static_cast<unsigned>(piece));
+      // FIXME: Mix upper/lower 32-bit values together to produce
+      // unsigned rather than truncating.
+      return hash;
+    }
+
+    static bool isEqual(const StoredObjCSelector &lhs, 
+                        const StoredObjCSelector &rhs) {
+      return lhs.NumPieces == rhs.NumPieces && 
+             lhs.Identifiers == rhs.Identifiers;
+    }
+  };
+}
+
 class SideCarWriter::Implementation {
   /// Mapping from strings to identifier IDs.
   llvm::StringMap<IdentifierID> IdentifierIDs;
@@ -44,7 +83,7 @@ class SideCarWriter::Implementation {
   llvm::StringMap<ModuleID> ModuleIDs;
 
   /// Mapping from selectors to selector ID.
-  llvm::StringMap<SelectorID> SelectorIDs;
+  llvm::DenseMap<StoredObjCSelector, SelectorID> SelectorIDs;
 
   /// Scratch space for bitstream writing.
   SmallVector<uint64_t, 64> ScratchRecord;
@@ -71,12 +110,15 @@ public:
 
   /// Retrieve the ID for the given identifier.
   IdentifierID getIdentifier(StringRef identifier) {
+    if (identifier.empty())
+      return 0;
+
     auto known = IdentifierIDs.find(identifier);
     if (known != IdentifierIDs.end())
       return known->second;
 
     // Add to the identifier table.
-    known = IdentifierIDs.insert({identifier, IdentifierIDs.size()}).first;
+    known = IdentifierIDs.insert({identifier, IdentifierIDs.size() + 1}).first;
     return known->second;
   }
 
@@ -103,13 +145,22 @@ public:
   }
 
   /// Retrieve the ID for the given selector.
-  SelectorID getSelector(StringRef name) {
-    auto known = SelectorIDs.find(name);
+  SelectorID getSelector(ObjCSelectorRef selectorRef) {
+    // Translate the selector reference into a stored selector.
+    StoredObjCSelector selector;
+    selector.NumPieces = selectorRef.NumPieces;
+    selector.Identifiers.reserve(selectorRef.Identifiers.size());
+    for (auto piece : selectorRef.Identifiers) {
+      selector.Identifiers.push_back(getIdentifier(piece));
+    }
+
+    // Look for the stored selector.
+    auto known = SelectorIDs.find(selector);
     if (known != SelectorIDs.end())
       return known->second;
 
     // Add to the selector table.
-    known = SelectorIDs.insert({name, SelectorIDs.size()}).first;
+    known = SelectorIDs.insert({selector, SelectorIDs.size()}).first;
     return known->second;
   }
 
@@ -122,6 +173,7 @@ private:
   void writeObjCClassBlock(llvm::BitstreamWriter &writer);
   void writeObjCPropertyBlock(llvm::BitstreamWriter &writer);
   void writeObjCMethodBlock(llvm::BitstreamWriter &writer);
+  void writeObjCSelectorBlock(llvm::BitstreamWriter &writer);
 };
 
 /// Record the name of a block.
@@ -175,6 +227,9 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(
 
   BLOCK(OBJC_METHOD_BLOCK);
   BLOCK_RECORD(objc_method_block, OBJC_METHOD_DATA);
+
+  BLOCK(OBJC_SELECTOR_BLOCK);
+  BLOCK_RECORD(objc_selector_block, OBJC_SELECTOR_DATA);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -479,6 +534,73 @@ void SideCarWriter::Implementation::writeObjCMethodBlock(
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk Objective-C selector table.
+  class ObjCSelectorTableInfo {
+  public:
+    using key_type = StoredObjCSelector;
+    using key_type_ref = const key_type &;
+    using data_type = SelectorID;
+    using data_type_ref = data_type;
+    using hash_value_type = unsigned;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return llvm::DenseMapInfo<StoredObjCSelector>::getHashValue(key);
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(uint16_t) 
+                         + sizeof(IdentifierID) * key.Identifiers.size();
+      uint32_t dataLength = sizeof(SelectorID);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(key.NumPieces);
+      for (auto piece : key.Identifiers) {
+        writer.write<IdentifierID>(piece);
+      }
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<SelectorID>(data);
+    }
+  };
+} // end anonymous namespace
+
+void SideCarWriter::Implementation::writeObjCSelectorBlock(
+       llvm::BitstreamWriter &writer) {
+  BCBlockRAII restoreBlock(writer, OBJC_SELECTOR_BLOCK_ID, 3);
+
+  if (ObjCProperties.empty())
+    return;  
+
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<ObjCSelectorTableInfo> generator;
+    for (auto &entry : SelectorIDs)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  objc_selector_block::ObjCSelectorDataLayout layout(writer);
+  layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+}
+
 void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   // Write the side car file into a buffer.
   SmallVector<char, 0> buffer;
@@ -498,6 +620,7 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeObjCClassBlock(writer);
     writeObjCPropertyBlock(writer);
     writeObjCMethodBlock(writer);
+    writeObjCSelectorBlock(writer);
   }
 
   // Write the buffer to the stream.
@@ -535,7 +658,8 @@ void SideCarWriter::addObjCProperty(StringRef className, StringRef name,
   Impl.ObjCProperties[{classID, nameID}] = info;
 }
 
-void SideCarWriter::addObjCMethod(StringRef className, StringRef selector, 
+void SideCarWriter::addObjCMethod(StringRef className, 
+                                  ObjCSelectorRef selector, 
                                   bool isInstanceMethod, 
                                   const ObjCMethodInfo &info) {
   ClassID classID = Impl.getClass(className);

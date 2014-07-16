@@ -79,6 +79,11 @@ enum BlockID {
   /// (class name, selector, is_instance_method) tuples to information
   /// about the method.
   OBJC_METHOD_BLOCK_ID,
+
+  /// The Objective-C selector data block, which maps Objective-C
+  /// selector names (# of pieces, identifier IDs) to the selector ID
+  /// used in other tables.
+  OBJC_SELECTOR_BLOCK_ID,
 };
 
 namespace control_block {
@@ -142,6 +147,18 @@ namespace objc_method_block {
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from ObjC (class names, selector,
             // is-instance-method) tuples to ObjC method information
+  >;
+}
+
+namespace objc_selector_block {
+  enum {
+    OBJC_SELECTOR_DATA = 1,
+  };
+
+  using ObjCSelectorDataLayout = BCRecordLayout<
+    OBJC_SELECTOR_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from (# pieces, identifier IDs) to Objective-C selector ID.
   >;
 }
 

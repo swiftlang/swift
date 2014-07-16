@@ -67,7 +67,7 @@ public:
   /// \param isInstanceMethod Whether this method is an instance method
   /// (vs. a class method).
   /// \param info Information about this method.
-  void addObjCMethod(StringRef className, StringRef selector, 
+  void addObjCMethod(StringRef className, ObjCSelectorRef selector, 
                      bool isInstanceMethod, const ObjCMethodInfo &info);
 };
 
