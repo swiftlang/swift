@@ -314,8 +314,9 @@ void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                                   StringRef AttrName, DeclAttrKind DK) {
+                                   DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
+  StringRef AttrName = Tok.getText();
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
 
@@ -800,7 +801,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     // over to the alternate parsing path.
     DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
     if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, AtLoc, Tok.getText(), DK);
+      return parseNewDeclAttribute(Attributes, AtLoc, DK);
 
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
@@ -1332,8 +1333,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     case tok::kw_internal:
     case tok::kw_public:
       // We still model these specifiers as attributes.
-      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Tok.getText(),
-                            DAK_Accessibility);
+      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Accessibility);
       continue;
 
     // Context sensitive keywords.
@@ -1371,58 +1371,47 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
       if (Tok.isContextualKeyword("optional")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
-                              Tok.getText(), DAK_Optional);
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Optional);
         continue;
       }
       if (Tok.isContextualKeyword("required")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
-                              Tok.getText(), DAK_Required);
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Required);
         continue;
       }
       if (Tok.isContextualKeyword("lazy")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
-                              Tok.getText(), DAK_Lazy);
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Lazy);
         continue;
       }
       if (Tok.isContextualKeyword("final")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{},
-                              Tok.getText(), DAK_Final);
+        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Final);
         continue;
       }
       if (Tok.isContextualKeyword("dynamic")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Dynamic);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Dynamic);
         continue;
       }
       if (Tok.isContextualKeyword("prefix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Prefix);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Prefix);
         continue;
       }
       if (Tok.isContextualKeyword("postfix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Postfix);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Postfix);
         continue;
       }
       if (Tok.isContextualKeyword("infix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Infix);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Infix);
         continue;
       }
       if (Tok.isContextualKeyword("override")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Override);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Override);
         continue;
       }
       if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Mutating);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
         continue;
       }
       if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_NonMutating);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
         continue;
       }
 
@@ -2345,11 +2334,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       // Parse the contextual keywords for 'mutating' and 'nonmutating' before
       // get and set.
       if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_Mutating);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
       } else if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                              Tok.getText(), DAK_NonMutating);
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
       }
 
       AccessorKind Kind;
@@ -2426,11 +2413,9 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // Parse the contextual keywords for 'mutating' and 'nonmutating' before
     // get and set.
     if (Tok.isContextualKeyword("mutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                            Tok.getText(), DAK_Mutating);
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
     } else if (Tok.isContextualKeyword("nonmutating")) {
-      parseNewDeclAttribute(Attributes, /*AtLoc*/ {},
-                            Tok.getText(), DAK_NonMutating);
+      parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
     }
     
     bool isImplicitGet = false;
