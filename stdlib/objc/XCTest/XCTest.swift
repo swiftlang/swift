@@ -60,7 +60,7 @@ public func XCTAssertNil(expression: @auto_closure () -> AnyObject?, _ message: 
       passed = true
     } else {
       passed = false
-      expressionValueStr = reflect(expressionValueUnwrapped).summary
+      expressionValueStr = "\(expressionValueUnwrapped)"
     }
   } else {
     passed = true
@@ -91,7 +91,7 @@ public func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ messag
       passed = false
     } else {
       passed = true
-      expressionValueStr = reflect(expressionValueUnwrapped).summary
+      expressionValueStr = "\(expressionValueUnwrapped)"
     }
   } else {
     passed = false
@@ -155,8 +155,8 @@ public func XCTAssertEqual<T: Equatable>(expression1: @auto_closure () -> T, exp
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
@@ -176,8 +176,8 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @auto_closure () -> T, 
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
@@ -221,9 +221,9 @@ public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @auto_
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
-    var accuracyStr = reflect(accuracy).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
+    var accuracyStr = "\(accuracy)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
   }
@@ -267,9 +267,9 @@ public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @au
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
-    var accuracyStr = reflect(accuracy).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
+    var accuracyStr = "\(accuracy)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString, accuracyStr as NSString), message, file, line)
   }
@@ -289,8 +289,8 @@ public func XCTAssertGreaterThan<T: Comparable>(expression1: @auto_closure () ->
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
@@ -311,8 +311,8 @@ public func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @auto_closur
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
@@ -332,8 +332,8 @@ public func XCTAssertLessThan<T: Comparable>(expression1: @auto_closure () -> T,
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
@@ -354,8 +354,8 @@ public func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @auto_closure (
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
     
-    var expressionValueStr1 = reflect(expressionValue1).summary
-    let expressionValueStr2 = reflect(expressionValue2).summary
+    var expressionValueStr1 = "\(expressionValue1)"
+    let expressionValueStr2 = "\(expressionValue2)"
     
     _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
   }
