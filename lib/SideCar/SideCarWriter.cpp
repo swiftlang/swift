@@ -211,8 +211,6 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(
 #define BLOCK(X) emitBlockID(writer, X ## _ID, #X, nameBuffer)
 #define BLOCK_RECORD(K, X) emitRecordID(writer, K::X, #X, nameBuffer)
 
-  BLOCK(SIDE_CAR_BLOCK);
-
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
 
@@ -610,8 +608,6 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     // Emit the signature.
     for (unsigned char byte : SIDE_CAR_SIGNATURE)
       writer.Emit(byte, 8);
-
-    BCBlockRAII sideCarBlock(writer, SIDE_CAR_BLOCK_ID, 2);
 
     // Emit the blocks.
     writeBlockInfoBlock(writer);

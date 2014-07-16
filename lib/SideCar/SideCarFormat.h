@@ -54,14 +54,11 @@ using SelectorIDField = BCVBR<16>;
 /// These IDs must \em not be renumbered or reordered without incrementing
 /// VERSION_MAJOR.
 enum BlockID {
-  /// The side car block, which contains all of the other blocks.
-  SIDE_CAR_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
-
   /// The control block, which contains all of the information that needs to
   /// be validated prior to committing to loading the side car file.
   ///
   /// \sa control_block
-  CONTROL_BLOCK_ID,
+  CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   /// The identifier data block, which maps identifier strings to IDs.
   IDENTIFIER_BLOCK_ID,
