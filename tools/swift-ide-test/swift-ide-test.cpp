@@ -1604,6 +1604,12 @@ static int doParseReST(StringRef SourceFilename) {
 void anchorForGetMainExecutable() {}
 
 namespace {
+  // Unavailable option.
+  struct Unavailable {
+    StringRef Msg;
+    Unavailable(StringRef Msg) : Msg(Msg) { }
+  };
+
   // Signature has been audited with respect to optional types.
   struct OptionalTypeAdjustment {
     llvm::SmallVector<side_car::NullableKind, 3> AdjustedTypes;
@@ -1622,6 +1628,12 @@ namespace {
      }
   };
 
+  // DesignatedInit flag
+  enum DesignatedInitFlag { DesignatedInit };
+
+  // FactoryAsClassMethod flag
+  enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
+
   side_car::ObjCClassInfo &&operator|(side_car::ObjCClassInfo &&known,
                                       OptionalTypeAdjustment adjustment) {
     assert(adjustment.AdjustedTypes.size() <= 1);
@@ -1634,6 +1646,34 @@ namespace {
   side_car::ObjCPropertyInfo &&operator|(side_car::ObjCPropertyInfo &&known,
                                          side_car::NullableKind kind) {
     known.setNullabilityAudited(kind);
+    return std::move(known);
+  }
+
+  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known, 
+                                       Unavailable unavailable) {
+    known.Unavailable = true;
+    known.UnavailableMsg = unavailable.Msg;
+    return std::move(known);
+  }
+
+  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known,
+                                       OptionalTypeAdjustment adjustment) {
+    known.NullabilityAudited = true;
+    known.NumAdjustedNullable = adjustment.AdjustedTypes.size();
+    for (unsigned i = 0; i < known.NumAdjustedNullable; ++i)
+      known.addTypeInfo(i, adjustment.AdjustedTypes[i]);
+    return std::move(known);
+  }
+
+  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known, 
+                                       DesignatedInitFlag) {
+    known.DesignatedInit = true;
+    return std::move(known);
+  }
+
+  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known,
+                                       FactoryAsClassMethodFlag) {
+    known.setFactoryAsInitKind(side_car::FactoryAsInitKind::AsClassMethod);
     return std::move(known);
   }
 }
@@ -1662,11 +1702,11 @@ void generateAPIAnnotation(StringRef fileName) {
   #define INSTANCE_METHOD(ClassName, Selector, Options)          \
     writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
                          /*isInstanceMethod=*/true,              \
-                         ObjCMethodInfo());
+                         ObjCMethodInfo() | Options);
   #define CLASS_METHOD(ClassName, Selector, Options)             \
     writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
                          /*isInstanceMethod=*/false,             \
-                         ObjCMethodInfo());
+                         ObjCMethodInfo() | Options);
   #define OBJC_CONTEXT(ClassName, Options) \
     writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options);
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
