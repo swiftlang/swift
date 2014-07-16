@@ -28,6 +28,27 @@ public(set) // expected-error {{duplicate modifier}}
 private // expected-error {{duplicate modifier}}
 var customSetterDuplicateAttrsAllAround = 0
 
+private(get) // expected-error{{expected 'set' as subject of 'private' modifier}}
+var invalidSubject = 0
+
+private(42) // expected-error{{expected 'set' as subject of 'private' modifier}}
+var invalidSubject2 = 0
+
+private(a bunch of random tokens) // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
+var invalidSubject3 = 0
+
+private(set // expected-error{{expected ')' in 'private' modifier}}
+var unterminatedSubject = 0
+
+private(42 // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
+var unterminatedInvalidSubject = 0
+
+private() // expected-error{{expected 'set' as subject of 'private' modifier}}
+var emptySubject = 0
+
+private( // expected-error{{expected 'set' as subject of 'private' modifier}}
+var unterminatedEmptySubject = 0
+
 // Check that the parser made it here.
 duplicateAttr(1) // expected-error{{}}
 
