@@ -120,6 +120,7 @@ private:
   void writeControlBlock(llvm::BitstreamWriter &writer);
   void writeIdentifierBlock(llvm::BitstreamWriter &writer);
   void writeObjCClassBlock(llvm::BitstreamWriter &writer);
+  void writeObjCPropertyBlock(llvm::BitstreamWriter &writer);
 };
 
 /// Record the name of a block.
@@ -167,6 +168,10 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(
 
   BLOCK(OBJC_CLASS_BLOCK);
   BLOCK_RECORD(objc_class_block, OBJC_CLASS_DATA);
+
+  BLOCK(OBJC_PROPERTY_BLOCK);
+  BLOCK_RECORD(objc_property_block, OBJC_PROPERTY_DATA);
+
 #undef BLOCK
 #undef BLOCK_RECORD
 }
@@ -315,6 +320,81 @@ void SideCarWriter::Implementation::writeObjCClassBlock(
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk Objective-C property table.
+  class ObjCPropertyTableInfo {
+  public:
+    using key_type = std::pair<unsigned, unsigned>; // (module ID, class ID)
+    using key_type_ref = key_type;
+    using data_type = ObjCPropertyInfo;
+    using data_type_ref = const data_type &;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(ClassID) + sizeof(IdentifierID);
+      uint32_t dataLength = 1;
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<ClassID>(key.first);
+      writer.write<IdentifierID>(key.second);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      endian::Writer<little> writer(out);
+
+      uint8_t byte = 0;
+      if (auto nullable = data.getNullability()) {
+        // FIXME: Terrible solution. This needs abstraction.
+        byte |= 0x1;
+        byte <<= 2;
+        byte |= static_cast<uint8_t>(*nullable);
+      } else {
+        // Nothing to do.
+      }
+      
+      writer.write<uint8_t>(byte);
+    }
+  };
+} // end anonymous namespace
+
+void SideCarWriter::Implementation::writeObjCPropertyBlock(
+       llvm::BitstreamWriter &writer) {
+  BCBlockRAII restoreBlock(writer, OBJC_PROPERTY_BLOCK_ID, 3);
+
+  if (ObjCProperties.empty())
+    return;  
+
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<ObjCPropertyTableInfo> generator;
+    for (auto &entry : ObjCProperties)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  objc_property_block::ObjCPropertyDataLayout layout(writer);
+  layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+}
+
 void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   // Write the side car file into a buffer.
   SmallVector<char, 0> buffer;
@@ -332,6 +412,7 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeControlBlock(writer);
     writeIdentifierBlock(writer);
     writeObjCClassBlock(writer);
+    writeObjCPropertyBlock(writer);
   }
 
   // Write the buffer to the stream.

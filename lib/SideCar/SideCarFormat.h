@@ -69,6 +69,11 @@ enum BlockID {
   /// The Objective-C class data block, which maps Objective-C class
   /// names to information about the class.
   OBJC_CLASS_BLOCK_ID,
+
+  /// The Objective-C property data block, which maps Objective-C
+  /// (class name, property name) pairs to information about the
+  /// property.
+  OBJC_PROPERTY_BLOCK_ID,
 };
 
 namespace control_block {
@@ -106,6 +111,18 @@ namespace objc_class_block {
     OBJC_CLASS_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from ObjC class names (as IDs) to ObjC class information
+  >;
+}
+
+namespace objc_property_block {
+  enum {
+    OBJC_PROPERTY_DATA = 1,
+  };
+
+  using ObjCPropertyDataLayout = BCRecordLayout<
+    OBJC_PROPERTY_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from ObjC class names (as IDs) to ObjC property information
   >;
 }
 
