@@ -115,6 +115,10 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
   llvm::SmallPtrSet<SILInstruction *, 8> NextInsts;
   while (!DeadInsts.empty()) {
     for (auto I : DeadInsts) {
+      // Call the callback before we mutate the to be deleted instruction in any
+      // way.
+      Callback(I);
+
       // Check if any of the operands will become dead as well.
       MutableArrayRef<Operand> Ops = I->getAllOperands();
       for (Operand &Op : Ops) {
@@ -137,7 +141,6 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      Callback(I);
       I->eraseFromParent();
     }
 
