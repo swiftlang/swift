@@ -33,6 +33,9 @@ duplicateAttr(1) // expected-error{{}}
 
 
 // CHECK ALLOWED DECLS
+private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}}
+private(set) infix operator ~~~ {} // expected-error {{'private' modifier cannot be applied to this declaration}}
+
 private typealias MyInt = Int
 
 private struct TestStruct {
