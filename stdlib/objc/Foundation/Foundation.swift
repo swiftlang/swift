@@ -868,8 +868,8 @@ extension NSDictionary : SequenceType {
       }
     }
 
-    public init(_ dict: NSDictionary) {
-      _fastGenerator = NSFastGenerator(dict)
+    init(_ _dict: NSDictionary) {
+      _fastGenerator = NSFastGenerator(_dict)
     }
   }
 
