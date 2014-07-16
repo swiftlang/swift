@@ -31,7 +31,8 @@ public:
   /// The reader attached to \c InputBuffer.
   llvm::BitstreamReader InputReader;
 
-  bool readControlBlock(llvm::BitstreamCursor &cursor);
+  bool readControlBlock(llvm::BitstreamCursor &cursor, 
+                        SmallVectorImpl<uint64_t> &scratch);
   bool readIdentifierBlock(llvm::BitstreamCursor &cursor);
   bool readObjCClassBlock(llvm::BitstreamCursor &cursor);
   bool readObjCPropertyBlock(llvm::BitstreamCursor &cursor);
@@ -40,8 +41,53 @@ public:
 };
 
 bool SideCarReader::Implementation::readControlBlock(
-       llvm::BitstreamCursor &cursor) {
-  return cursor.SkipBlock();
+       llvm::BitstreamCursor &cursor,
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(CONTROL_BLOCK_ID))
+    return true;
+
+  bool sawMetadata = false;
+  
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown metadata sub-block, possibly for use by a future version of the
+      // side-car format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case control_block::METADATA:
+      // Already saw metadata.
+      if (sawMetadata)
+        return true;
+
+      if (scratch[0] != VERSION_MAJOR || scratch[1] != VERSION_MINOR)
+        return true;
+
+      sawMetadata = true;
+      break;
+
+    default:
+      // Unknown metadata record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return !sawMetadata;
 }
 
 bool SideCarReader::Implementation::readIdentifierBlock(
@@ -90,9 +136,9 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
     }
   }
 
-  // 
+  // Look at all of the blocks.
   bool hasValidControlBlock = false;
-
+  SmallVector<uint64_t, 64> scratch;
   auto topLevelEntry = cursor.advance();
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     switch (topLevelEntry.ID) {
@@ -105,7 +151,7 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
 
     case CONTROL_BLOCK_ID:
       // Only allow a single control block.
-      if (hasValidControlBlock || Impl.readControlBlock(cursor)) {
+      if (hasValidControlBlock || Impl.readControlBlock(cursor, scratch)) {
         failed = true;
         return;
       }
@@ -160,6 +206,11 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
     }
 
     topLevelEntry = cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+    failed = true;
+    return;
   }
 }
 
