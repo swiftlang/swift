@@ -1735,7 +1735,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   bool isLLDBExpressionModule(Module *M) {
     if (!M)
       return false;
-    return M->Name.str().startswith("lldb_expr_");
+    return M->Name.str().startswith("__lldb_expr_");
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
