@@ -4,6 +4,10 @@
 // optimization on i386, even in the iOS simulator.
 // XFAIL: CPU=i386
 
+// FIXME rdar://17694203 llvm change breaks Swift's 
+// fast-autorelease optimization on armv7
+// XFAIL: CPU=armv7
+
 import Foundation
 
 class PrintOnDeinit: NSObject {
