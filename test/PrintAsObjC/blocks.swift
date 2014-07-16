@@ -19,6 +19,8 @@ import ObjectiveC
 // CHECK-NEXT: - (void (^)(NSObject *))returnsBlockWithInput;
 // CHECK-NEXT: - (void (^)(NSObject *))returnsBlockWithParenthesizedInput;
 // CHECK-NEXT: - (void (^)(NSObject *, NSObject *))returnsBlockWithTwoInputs;
+// CHECK-NEXT: - (NSInteger (*)(NSInteger))functionPointers:(NSInteger (*)(NSInteger))input;
+// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* (*)(NSInteger (*)(NSInteger)))(NSInteger))input;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
@@ -45,5 +47,16 @@ import ObjectiveC
   }
   func returnsBlockWithTwoInputs() -> ((NSObject, NSObject) -> ())? {
     return nil
+  }
+
+  func functionPointers(input: CFunctionPointer<Int -> Int>)
+      -> CFunctionPointer<Int -> Int> {
+    return input
+  }
+
+  func functionPointerTakesAndReturnsFunctionPointer(
+    input: CFunctionPointer<CFunctionPointer<Int -> Int>
+                              -> CFunctionPointer<Int -> Int>>
+  ) {
   }
 }

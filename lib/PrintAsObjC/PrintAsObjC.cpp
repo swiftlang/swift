@@ -471,6 +471,13 @@ private:
       return true;
     }
 
+    if (SD == ctx.getCFunctionPointerDecl()) {
+      assert(BGT->getGenericArgs().size() == 1);
+      auto FT = BGT->getGenericArgs()[0]->castTo<FunctionType>();
+      printFunctionType(FT, '*');
+      return true;
+    }
+
     // Everything from here on is some kind of pointer type.
     bool isConst;
     if (SD == ctx.getConstUnsafePointerDecl()) {
@@ -581,6 +588,12 @@ private:
       visitType(MT);
     }
   }
+                      
+  void printFunctionType(FunctionType *FT, char pointerSigil) {
+    visitPart(FT->getResult());
+    os << " (" << pointerSigil;
+    openFunctionTypes.push_back(FT);
+  }
 
   void visitFunctionType(FunctionType *FT) {
     switch (FT->getRepresentation()) {
@@ -589,9 +602,7 @@ private:
     // Native Swift function types bridge to block types.
     case AnyFunctionType::Representation::Thick:
     case AnyFunctionType::Representation::Block:
-      visitPart(FT->getResult());
-      os << " (^";
-      openFunctionTypes.push_back(FT);
+      printFunctionType(FT, '^');
       break;
     }
   }
