@@ -35,6 +35,8 @@ class Foo: Proto {
   }
 
   func overriddenByDynamic() {}
+
+  @NSManaged var managedProp: Int
 }
 
 protocol Proto {
@@ -275,6 +277,14 @@ func dynamicMethodDispatch() {
   let y = c[dynamic: 0]
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign
   c[dynamic: 0] = y
+}
+
+// CHECK-LABEL: sil @_TF7dynamic15managedDispatchFCS_3FooT_
+func managedDispatch(c: Foo) {
+  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign
+  let x = c.managedProp
+  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
+  c.managedProp = x
 }
 
 // CHECK-LABEL: sil @_TF7dynamic21foreignMethodDispatchFT_T_

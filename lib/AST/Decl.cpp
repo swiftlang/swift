@@ -2113,8 +2113,11 @@ bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
   // Imported accessors are foreign and only have objc entry points.
   if (hasClangNode())
     return true;
+  // Otherwise, we only dispatch by @objc if the declaration is dynamic or
+  // NSManaged.
   if (getASTContext().LangOpts.EnableDynamic)
-    if (!getAttrs().hasAttribute<DynamicAttr>())
+    if (!getAttrs().hasAttribute<DynamicAttr>()
+        && !getAttrs().hasAttribute<NSManagedAttr>())
       return false;
   return true;
 }
