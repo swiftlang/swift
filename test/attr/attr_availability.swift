@@ -10,6 +10,11 @@ func unavailable_func_with_message() {}
 @availability(OSX, unavailable)
 func unavailable_multiple_platforms() {}
 
+@availability // expected-error {{expected '(' in 'availability' attribute}}
+func noArgs() {}
+@availability(*) // expected-error {{expected ',' in 'availability' attribute}} expected-error {{expected declaration}}
+func noKind() {}
+
 @availability(badPlatform, unavailable) // expected-error {{unknown platform 'badPlatform' for attribute 'availability'}}
 func unavailable_bad_platform() {}
 
