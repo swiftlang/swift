@@ -163,9 +163,16 @@ SIMPLE_DECL_ATTR(infix  , Infix  , OnFunc | OnOperator | DeclModifier, 23)
 SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | OnOperator | DeclModifier, 24)
 SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 
+SIMPLE_DECL_ATTR(transparent, Transparent,
+                 OnFunc|OnConstructor|OnVar|OnExtension, 26)
+SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
+                 OnClass, 27)
 
-SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier, 26)
-SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier, 27)
+
+SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
+                 /* Not serialized */ 47)
+SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier |
+                 NotSerialized, /* Not serialized */ 48)
 
 
 SIMPLE_DECL_ATTR(override, Override,
@@ -186,11 +193,9 @@ VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
                   /* Not serialized */ 65535)
 
 
-ATTR(transparent)
 ATTR(unowned)
 VIRTUAL_ATTR(unowned_unsafe)
 ATTR(weak)
-ATTR(requires_stored_property_inits)
 
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS)

@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 117;
+const uint16_t VERSION_MINOR = 118;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -654,7 +654,6 @@ namespace decls_block {
     DeclIDField,       // context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values (attribute)
     BCFixed<1>,        // requires stored property initial values
     BCFixed<1>,        // foreign
     TypeIDField,       // superclass
@@ -681,7 +680,6 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    BCFixed<1>,  // transparent?
     CtorInitializerKindField,  // initializer kind
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
@@ -728,7 +726,6 @@ namespace decls_block {
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // transparent?
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
     BCVBR<5>,     // number of parameter patterns

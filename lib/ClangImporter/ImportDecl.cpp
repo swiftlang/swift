@@ -4125,8 +4125,9 @@ namespace {
     void addInferredAttributes(Decl *decl, unsigned attributes) {
       using namespace inferred_attributes;
       if (attributes & requires_stored_property_inits) {
-        decl->getMutableAttrs().setAttr(AK_requires_stored_property_inits,
-                                        SourceLoc());
+        auto a = new (Impl.SwiftContext)
+          RequiresStoredPropertyInitsAttr(/*IsImplicit=*/true);
+        decl->getMutableAttrs().add(a);
         cast<ClassDecl>(decl)->setRequiresStoredPropertyInits(true);
       }
     }

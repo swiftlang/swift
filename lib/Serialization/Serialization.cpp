@@ -1422,9 +1422,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
 
-    // @transparent on extensions is propagated down to the methods and
-    // constructors during serialization.
-    checkAllowedAttributes<AK_transparent>(extension);
+    checkAllowedAttributes<>(extension);
     verifyAttrSerializable(extension);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
@@ -1669,8 +1667,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
-    checkAllowedAttributes<
-      AK_requires_stored_property_inits>(theClass);
+    checkAllowedAttributes<>(theClass);
     verifyAttrSerializable(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1688,7 +1685,6 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclRef(DC),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->getAttrs().requiresStoredPropertyInits(),
                             theClass->requiresStoredPropertyInits(),
                             theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
@@ -1737,7 +1733,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_unowned, AK_unowned_unsafe, AK_weak, AK_transparent
+      AK_unowned, AK_unowned_unsafe, AK_weak
     >(var);
     verifyAttrSerializable(var);
 
@@ -1810,7 +1806,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
-    checkAllowedAttributes<AK_transparent>(fn);
+    checkAllowedAttributes<>(fn);
     verifyAttrSerializable(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -1830,7 +1826,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isStatic(),
                            uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
                            fn->isObjC(),
-                           fn->isTransparent(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
                            fn->getBodyParamPatterns().size(),
@@ -1904,7 +1899,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-    checkAllowedAttributes<AK_transparent>(ctor);
+    checkAllowedAttributes<>(ctor);
     verifyAttrSerializable(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
@@ -1921,7 +1916,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(DC),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
-                                  ctor->isTransparent(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
                                   addTypeRef(ctor->getType()),

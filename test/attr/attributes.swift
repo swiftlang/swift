@@ -46,7 +46,7 @@ func zim() {}
 func zang()() {}
 @transparent
 func zung<T>() {}
-@transparent // expected-error{{'transparent' attribute cannot be applied to this declaration}}
+@transparent // expected-error{{'transparent' attribute cannot be applied to stored properties}}
 var zippity : Int
 func zoom(x: @transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}}
 protocol ProtoWithTransparent {
@@ -56,7 +56,7 @@ protocol ProtoWithTransparent {
 class TestTranspClass : ProtoWithTransparent {
   @transparent  // expected-error{{'transparent' attribute is not supported on declarations within classes}}
   init () {}
-  @transparent // expected-error{{'transparent' attribute is not supported on declarations within classes}}
+  @transparent // expected-error{{'transparent' attribute cannot be applied to this declaration}}
   deinit {}
   @transparent // expected-error{{'transparent' attribute is not supported on declarations within classes}}
   class func transStatic() {}

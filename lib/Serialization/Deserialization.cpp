@@ -1789,7 +1789,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit, isObjC, isTransparent;
+    bool isImplicit, isObjC;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID signatureID;
     TypeID interfaceID;
@@ -1797,7 +1797,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
-                                               isObjC, isTransparent,
+                                               isObjC,
                                                storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, rawAccessLevel,
@@ -1872,8 +1872,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       ctor->setImplicit();
-    if (isTransparent)
-      ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     if (auto initKind = getActualCtorInitializerKind(storedInitKind))
       ctor->setInitKind(*initKind);
     if (auto overridden
@@ -1990,7 +1988,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel;
-    bool isObjC, isTransparent, isMutating, hasDynamicSelf;
+    bool isObjC, isMutating, hasDynamicSelf;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -2001,8 +1999,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> nameIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
-                                        isStatic, rawStaticSpelling,
-                                        isObjC, isTransparent,
+                                        isStatic, rawStaticSpelling, isObjC,
                                         isMutating, hasDynamicSelf,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
@@ -2096,8 +2093,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
-    if (isTransparent)
-      fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
     // If we are an accessor on a var or subscript, make sure it is deserialized
@@ -2257,15 +2252,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, attrRequiresStoredPropertyInits;
-    bool requiresStoredPropertyInits;
-    bool foreign;
+    bool isImplicit, isObjC, requiresStoredPropertyInits, foreign;
     TypeID superclassID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawProtocolIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
-                                         attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
                                          foreign, superclassID, rawAccessLevel,
                                          rawProtocolIDs);
@@ -2294,9 +2286,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       theClass->setImplicit();
     if (superclassID)
       theClass->setSuperclass(getType(superclassID));
-    if (attrRequiresStoredPropertyInits)
-      theClass->getMutableAttrs().setAttr(AK_requires_stored_property_inits,
-                                          SourceLoc());
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
     if (foreign)

@@ -38,11 +38,11 @@ class RequiresInheritedBad : RequiresOkay { // expected-error{{class 'RequiresIn
 }
 
 // Diagnose attempts to use this attribute on a non-class.
-@requires_stored_property_inits struct S { } // expected-error{{'requires_stored_property_inits' attribute can only be applied to a class}}
+@requires_stored_property_inits struct S { } // expected-error{{'requires_stored_property_inits' may only be used on 'class' declarations}}
 
-@requires_stored_property_inits enum E { } // expected-error{{'requires_stored_property_inits' attribute can only be applied to a class}}
+@requires_stored_property_inits enum E { } // expected-error{{'requires_stored_property_inits' may only be used on 'class' declarations}}
 
-@requires_stored_property_inits func f() { } // expected-error{{'requires_stored_property_inits' attribute can only be applied to a class}}
+@requires_stored_property_inits func f() { } // expected-error{{'requires_stored_property_inits' may only be used on 'class' declarations}}
 
 
 @requires_stored_property_inits

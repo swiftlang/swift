@@ -319,8 +319,8 @@ ERROR(conversion_not_function,sema_tcd,none,
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))
-ERROR(transparent_not_valid,sema_tcd,none,
-      "'transparent' attribute cannot be applied to this declaration", ())
+ERROR(transparent_stored_property,sema_tcd,none,
+      "'transparent' attribute cannot be applied to stored properties", ())
 ERROR(transparent_on_invalid_extension,sema_tcd,none,
       "'transparent' attribute is only supported on struct and enum extensions", ())
 ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
@@ -1323,11 +1323,6 @@ ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,attribute_parsing,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
-
-// requires_stored_property_inits
-ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
-      "'requires_stored_property_inits' attribute can only be applied to a "
-      "class", ())
 
 ERROR(assignment_attribute_removed, decl_parsing,none,
       "@assignment attribute has been removed", ())

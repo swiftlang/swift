@@ -1533,7 +1533,7 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
   // Mark it transparent, there is no user benefit to this actually existing, we
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
-  Get->getMutableAttrs().setAttr(AK_transparent, Loc);
+  Get->getMutableAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
 
   // If the var is marked final, then so is the getter.
   if (VD->isFinal())
@@ -1555,7 +1555,7 @@ static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
 
   // Mark it transparent, there is no user benefit to this actually existing.
-  Set->getMutableAttrs().setAttr(AK_transparent, Loc);
+  Set->getMutableAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
 
   if (VD->isFinal())
     Set->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
@@ -3600,7 +3600,8 @@ public:
         while (true) {
           // If this class had the 'requires_stored_property_inits'
           // attribute, diagnose here.
-          if (source->getAttrs().requiresStoredPropertyInits())
+          if (source->getAttrs().
+                hasAttribute<RequiresStoredPropertyInitsAttr>())
             break;
 
           // If the superclass doesn't require in-class initial
@@ -4730,6 +4731,9 @@ public:
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
 
+    UNINTERESTING_ATTR(RequiresStoredPropertyInits)
+    UNINTERESTING_ATTR(Transparent)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailabilityAttr(AvailabilityAttr *attr) {
@@ -5430,7 +5434,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                     (superclassDecl && superclassDecl->isObjC()));
 
       // Determine whether we require in-class initializers.
-      if (CD->getAttrs().requiresStoredPropertyInits() ||
+      if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (superclassDecl && superclassDecl->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
     }
@@ -6517,53 +6521,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.checkOwnershipAttr(var, Attrs.getOwnership());
   }
 
-  if (Attrs.isTransparent()) {
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
-    auto *ED = dyn_cast<ExtensionDecl>(D);
-    auto *VD = dyn_cast<VarDecl>(D);
-
-    if ((!AFD && !ED & !VD) || (VD && VD->hasStorage())) {
-      TC.diagnose(Attrs.getLoc(AK_transparent), diag::transparent_not_valid);
-      D->getMutableAttrs().clearAttribute(AK_transparent);
-
-    // Only Struct and Enum extensions can be transparent.
-    } else if (ED) {
-      CanType ExtendedTy = DeclContext::getExtendedType(ED);
-      if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy)) {
-        TC.diagnose(Attrs.getLoc(AK_transparent),
-                    diag::transparent_on_invalid_extension);
-        D->getMutableAttrs().clearAttribute(AK_transparent);
-      }
-    } else if (isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor() &&
-               D->isImplicit()) {
-      // @transparent is always ok on implicitly generated accessors: they can
-      // be dispatched (even in classes) when the references are within the
-      // class themself.
-    } else {
-      assert(AFD || VD);
-      DeclContext *Ctx = AFD ? AFD->getParent() : VD->getDeclContext();
-      // Protocol declarations cannot be transparent.
-      if (isa<ProtocolDecl>(Ctx)) {
-        TC.diagnose(Attrs.getLoc(AK_transparent),
-                    diag::transparent_in_protocols_not_supported);
-        D->getMutableAttrs().clearAttribute(AK_transparent);
-      // Class declarations cannot be transparent.
-      } else if (isa<ClassDecl>(Ctx)) {
-        TC.diagnose(Attrs.getLoc(AK_transparent),
-                    diag::transparent_in_classes_not_supported);
-        D->getMutableAttrs().clearAttribute(AK_transparent);
-      }
-    }
-  }
-
-  // The requires_stored_property_inits attribute only applies to
-  // classes.
-  if (Attrs.requiresStoredPropertyInits() && !isa<ClassDecl>(D)) {
-    TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
-                diag::requires_stored_property_inits_nonclass);
-    D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
-  }
-
+ 
   // Only protocol members can be optional.
   if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {

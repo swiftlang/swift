@@ -292,7 +292,7 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
 
 bool Decl::isTransparent() const {
   // Check if the declaration had the attribute.
-  if (getAttrs().isTransparent())
+  if (getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
   // Check if this is a function declaration which is within a transparent

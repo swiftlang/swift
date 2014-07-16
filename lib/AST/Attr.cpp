@@ -96,17 +96,15 @@ void DeclAttributes::print(ASTPrinter &Printer,
       hadDeclModifier = true;
       continue;
     }
+    
+    if (!Options.PrintAttrTransparent && isa<TransparentAttr>(DA))
+      continue;
 
     DA->print(Printer);
   }
 
   if (!Options.ExclusiveAttrList.empty())
     return;
-
-  if (Options.PrintAttrTransparent && isTransparent())
-    Printer << "@transparent ";
-  if (requiresStoredPropertyInits())
-    Printer << "@requires_stored_property_inits ";
 
   if (auto accessAttr = getAttribute<AccessibilityAttr>())
     Printer << accessAttr->getAttrName() << " ";

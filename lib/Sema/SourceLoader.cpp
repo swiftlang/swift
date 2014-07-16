@@ -64,7 +64,7 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
                                       AbstractFunctionDecl *AFD,
                                       const DeclAttributes &Attrs,
                                       SourceRange BodyRange) override {
-    return Attrs.isTransparent();
+    return Attrs.hasAttribute<TransparentAttr>();
   }
 };
 

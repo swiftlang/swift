@@ -919,7 +919,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  bool isTransparent() const { return has(AK_transparent); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isUnmanaged() const { return has(AK_unowned_unsafe); }
@@ -932,10 +931,6 @@ public:
   //
   // FIXME: eventually take a platform argument.
   const AvailabilityAttr *getUnavailable() const;
-
-  bool requiresStoredPropertyInits() const {
-    return has(AK_requires_stored_property_inits);
-  }
 
   bool hasOwnership() const {
     return isWeak() || isUnowned() || isUnmanaged();

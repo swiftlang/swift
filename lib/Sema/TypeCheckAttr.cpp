@@ -58,15 +58,15 @@ public:
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Inline)
-
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
-
+  IGNORED_ATTR(RequiresStoredPropertyInits)
 #undef IGNORED_ATTR
 
+  void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
   void visitNonMutatingAttr(NonMutatingAttr *attr)  { visitMutationAttr(attr); }
@@ -86,6 +86,39 @@ public:
 };
 } // end anonymous namespace
 
+
+void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    CanType ExtendedTy = DeclContext::getExtendedType(ED);
+    // Only Struct and Enum extensions can be transparent.
+    if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy))
+      return diagnoseAndRemoveAttr(attr,diag::transparent_on_invalid_extension);
+    return;
+  }
+  
+  DeclContext *Ctx = D->getDeclContext();
+  // Protocol declarations cannot be transparent.
+  if (isa<ProtocolDecl>(Ctx))
+    return diagnoseAndRemoveAttr(attr,
+                                 diag::transparent_in_protocols_not_supported);
+  // Class declarations cannot be transparent.
+  if (isa<ClassDecl>(Ctx)) {
+    
+    // @transparent is always ok on implicitly generated accessors: they can
+    // be dispatched (even in classes) when the references are within the
+    // class themself.
+    if (!(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor() &&
+        D->isImplicit()))
+      return diagnoseAndRemoveAttr(attr,
+                                   diag::transparent_in_classes_not_supported);
+  }
+  
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Stored properties and variables can't be transparent.
+    if (VD->hasStorage())
+      return diagnoseAndRemoveAttr(attr, diag::transparent_stored_property);
+  }
+}
 
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
@@ -476,6 +509,8 @@ public:
     IGNORED_ATTR(Override)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(Semantics)
+    IGNORED_ATTR(Transparent)
+    IGNORED_ATTR(RequiresStoredPropertyInits)
 #undef IGNORED_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
