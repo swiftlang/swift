@@ -172,5 +172,33 @@ IntervalTestCase.test("rdar12016900") {
   }
 }
 
+IntervalTestCase.test("clamp") {
+  expectEqual(
+    (5..<10).clamp(0..<3), 5..<5)
+  expectEqual(
+    (5..<10).clamp(0..<9), 5..<9)
+  expectEqual(
+    (5..<10).clamp(0..<13), 5..<10)
+  expectEqual(
+    (5..<10).clamp(7..<9), 7..<9)
+  expectEqual(
+    (5..<10).clamp(7..<13), 7..<10)
+  expectEqual(
+    (5..<10).clamp(13..<15), 10..<10)
+
+  expectEqual(
+    (5...10).clamp(0...3), 5...5)
+  expectEqual(
+    (5...10).clamp(0...9), 5...9)
+  expectEqual(
+    (5...10).clamp(0...13), 5...10)
+  expectEqual(
+    (5...10).clamp(7...9), 7...9)
+  expectEqual(
+    (5...10).clamp(7...13), 7...10)
+  expectEqual(
+    (5...10).clamp(13...15), 10...10)
+}
+
 IntervalTestCase.run()
 // CHECK: {{^}}Interval: All tests passed

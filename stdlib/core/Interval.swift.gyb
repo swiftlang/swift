@@ -18,8 +18,13 @@ public protocol IntervalType {
   /// Returns `true` iff the interval contains `value`
   func contains(value: Bound) -> Bool
 
+  /// Return `rhs` clamped to `self`.  The bounds of the result, even
+  /// if it is empty, are always within the bounds of `self`
+  func clamp(rhs: Self) -> Self
+  
   /// True iff the `Interval` is empty
   var isEmpty: Bool {get}
+  
   
   /// The `Interval`\ 's lower bound. Invariant: `start` <= `end`
   var start: Bound {get}
@@ -85,6 +90,21 @@ public struct ${Self}<T: Comparable>
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
   }
+
+  /// Return `rhs` clamped to `self`.  The bounds of the result, even
+  /// if it is empty, are always limited to the bounds of `self`
+  public func clamp(rhs: ${Self}) -> ${Self} {
+    return ${Self}(
+      self.start > rhs.start ? self.start
+        : self.end < rhs.start ? self.end
+        : rhs.start,
+
+      self.end < rhs.end ? self.end
+        : self.start > rhs.end ? self.start
+        : rhs.end
+    )
+  }
+  
   
   public func getMirror() -> MirrorType {
     return _IntervalMirror(self)
