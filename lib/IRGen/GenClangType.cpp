@@ -114,6 +114,9 @@ namespace {
 class GenClangType : public CanTypeVisitor<GenClangType, clang::CanQualType> {
   IRGenModule &IGM;
   ClangTypeConverter &Converter;
+
+  clang::QualType convertFunctionType(CanFunctionType type);
+
 public:
   GenClangType(IRGenModule &IGM, ClangTypeConverter &converter)
     : IGM(IGM), Converter(converter) {}
@@ -239,6 +242,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     Array,
     Dictionary,
     Unmanaged,
+    CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case("ConstUnsafePointer", StructKind::ConstUnsafePointer)
@@ -246,6 +250,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case("Array", StructKind::Array)
     .Case("Dictionary", StructKind::Dictionary)
     .Case("Unmanaged", StructKind::Unmanaged)
+    .Case("CFunctionPointer", StructKind::CFunctionPointer)
     .Default(StructKind::Invalid);
   
   auto args = type.getGenericArgs();
@@ -275,6 +280,22 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   case StructKind::Array:
   case StructKind::Dictionary:
     return getClangIdType(getClangASTContext());
+      
+  case StructKind::CFunctionPointer: {
+    auto &clangCtx = getClangASTContext();
+
+    assert(args.size() == 1 &&
+           "CFunctionPointer should have a single generic argument!");
+    clang::QualType functionTy;
+    if (auto ft = dyn_cast<FunctionType>(args[0])) {
+      functionTy = convertFunctionType(ft);
+    } else {
+      // Fall back to void().
+      functionTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+    }
+    auto fnPtrTy = clangCtx.getPointerType(functionTy);
+    return getCanonicalType(fnPtrTy);
+  }
   }
 }
 
@@ -282,10 +303,7 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   llvm_unreachable("Imported enum without Clang decl!");
 }
 
-// FIXME: We hit this building Foundation, with a call on the type
-//        encoding path. It seems like we shouldn't see FunctionType
-//        at that point.
-clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
+clang::QualType GenClangType::convertFunctionType(CanFunctionType type) {
   auto &clangCtx = getClangASTContext();
   SmallVector<clang::QualType, 16> paramTypes;
   CanType result = type.getResult();
@@ -309,16 +327,25 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
       paramTypes.push_back(clangType);
     }
     clang::FunctionProtoType::ExtProtoInfo DefaultEPI;
-    auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, DefaultEPI);
-    auto blockTy = clangCtx.getBlockPointerType(fnTy);
-    return clangCtx.getCanonicalType(blockTy);
+    return clangCtx.getFunctionType(resultType, paramTypes, DefaultEPI);
   }
 no_clang_type:
   // Fall back to void(^)() for block types we can't convert otherwise. As long
   // as it's a pointer type it doesn't matter exactly which for either ABI type
   // generation or standard Obj-C type encoding, but protocol extended method
   // encodings will break.
-  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  return clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+}
+
+// FIXME: We hit this building Foundation, with a call on the type
+//        encoding path. It seems like we shouldn't see FunctionType
+//        at that point.
+clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
+  auto &clangCtx = getClangASTContext();
+
+  // Convert to a Clang function type.
+  auto fnTy = convertFunctionType(type);
+  // Turn it into a block pointer.
   auto blockTy = clangCtx.getBlockPointerType(fnTy);
   return clangCtx.getCanonicalType(blockTy);
 }
