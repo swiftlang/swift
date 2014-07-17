@@ -25,8 +25,12 @@
 #include "swift/SIL/SILInstruction.h"
 
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool> ShouldRotate("sil-looprotate",
+                                        llvm::cl::init(true));
 
 /// Splits the critical edges between from and to. This code assumes there is
 /// only one edge between the two basic blocks.
@@ -222,6 +226,9 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
   }
 
   // Rotate single basic block loops.
+  if (!ShouldRotate)
+    return false;
+
   bool DidRotate = rotateLoop(L, DT, LI, true, Latch, ShouldVerify);
 
   // Keep rotating at most until we hit the original latch.
