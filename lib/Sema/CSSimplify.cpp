@@ -1708,10 +1708,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     if (type1->isPotentiallyBridgedValueType() &&
         type1->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        type2->isBridgeableObjectType() &&
-        !(flags & TMF_ApplyingOperatorParameter) &&
-        TC.getBridgedToObjC(DC, type1)) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
+        !(flags & TMF_ApplyingOperatorParameter)) {
+      
+      auto isBridgeableTargetType = type2->isBridgeableObjectType();
+      
+      // Allow bridged conversions to CVarArgType through NSObject.
+      if (!isBridgeableTargetType && type2->isExistentialType()) {
+        if (auto nominalType = type2->getAs<NominalType>())
+          isBridgeableTargetType = nominalType->getDecl()->getName() ==
+                                      TC.Context.Id_CVarArgType;
+      }
+      
+      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
+      }
     }
 
     // Bridging from an Objective-C class type to a value type.
