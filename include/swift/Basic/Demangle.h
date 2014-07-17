@@ -25,12 +25,11 @@ namespace llvm {
 namespace swift {
 namespace Demangle {
 
-struct DemangleOptions
-{
+struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayTypeOfIVarFieldOffset = true;
 
-  DemangleOptions () : SynthesizeSugarOnTypes(false), DisplayTypeOfIVarFieldOffset(true) {}
+  DemangleOptions() {}
 };
 
 class Node;
