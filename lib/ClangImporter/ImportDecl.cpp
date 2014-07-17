@@ -4661,7 +4661,8 @@ void ClangImporter::Implementation::importAttributes(
       // Availability.
       if (knownMethod->Unavailable) {
         auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
-                      C, knownMethod->UnavailableMsg);
+                      C,
+                      SwiftContext.AllocateCopy(knownMethod->UnavailableMsg));
         MappedDecl->getMutableAttrs().add(attr);
 
         // If we made a protocol requirement unavailable, mark it optional:

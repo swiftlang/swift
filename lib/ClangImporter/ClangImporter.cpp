@@ -1212,117 +1212,10 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
   return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
 }
 
-// Namespace of options used for known methods.
-namespace known_methods {
-namespace {
-  // DesignatedInit flag
-  enum DesignatedInitFlag { DesignatedInit };
-  KnownObjCMethod &&operator|(KnownObjCMethod &&known, DesignatedInitFlag) {
-    known.DesignatedInit = true;
-    return std::move(known);
-  }
-
-  // FactoryAsClassMethod flag
-  enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
-  KnownObjCMethod &&operator|(KnownObjCMethod &&known,
-                              FactoryAsClassMethodFlag) {
-    known.setFactoryAsInitKind(FactoryAsInitKind::AsClassMethod);
-    return std::move(known);
-  }
-
-  // Unavailable option.
-  struct Unavailable {
-    StringRef Msg;
-    Unavailable(StringRef Msg) : Msg(Msg) { }
-  };
-  KnownObjCMethod &&operator|(KnownObjCMethod &&known, Unavailable unavailable){
-    known.Unavailable = true;
-    known.UnavailableMsg = unavailable.Msg;
-    return std::move(known);
-  }
-
-  // Signature has been audited with respect to optional types.
-  struct OptionalTypeAdjustment {
-    llvm::SmallVector<OptionalTypeKind, 3> AdjustedTypes;
-
-    template<typename ...Ts>
-    OptionalTypeAdjustment(unsigned numParams, Ts ...kinds) {
-      if (numParams > 0 ) {
-        assert(sizeof...(Ts) == numParams);
-        OptionalTypeKind actualKinds[] = { kinds... };
-        AdjustedTypes.append(actualKinds, actualKinds + numParams);
-      }
-     }
-  };
-  KnownObjCMethod &&operator|(KnownObjCMethod &&known,
-                              OptionalTypeAdjustment adjustment) {
-    known.OptionalTypesAudited = true;
-    known.NumAdjustedOptionalTypes = adjustment.AdjustedTypes.size();
-    for (unsigned i = 0; i < known.NumAdjustedOptionalTypes; ++i)
-      known.addTypeInfo(i, adjustment.AdjustedTypes[i]);
-    return std::move(known);
-  }
-}
-}
-
-void ClangImporter::Implementation::populateKnownObjCMethods() {
-  if (!KnownInstanceMethods.empty())
-    return;
-
-  // Add a known method.
-  auto addMethod = [&](Identifier className, ObjCSelector selector,
-                       bool isInstanceMethod, KnownObjCMethod known) {
-    auto &knownMethods = isInstanceMethod ? KnownInstanceMethods
-                                          : KnownClassMethods;
-    assert(knownMethods.find({className, selector}) == knownMethods.end() &&
-           "Method is already known!?");
-
-    // Record this known method.
-    knownMethods[{className, selector}] = known;
-
-    // If this method is a designated initializer, note that we know
-    // about the class's designated initializers.
-    if (known.DesignatedInit) {
-      HasKnownDesignatedInits.insert(className);
-    }
-  };
-
-  using namespace known_methods;
-
-  // Function object that creates a selector.
-  CreateSelector createSelector(SwiftContext);
-
-#define INSTANCE_METHOD(ClassName, Selector, Options)                   \
-  addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
-            /*isInstanceMethod=*/true, KnownObjCMethod() | Options);
-#define CLASS_METHOD(ClassName, Selector, Options)  \
-  addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
-            /*isInstanceMethod=*/false, KnownObjCMethod() | Options);
-#define OBJC_CONTEXT(ContextName, Options)
-#define OBJC_PROPERTY(ContextName, PropertyName, Options)
-#include "KnownObjCMethods.def"
-}
-
-static StringRef getObjCContextName(const clang::Decl *decl) {
-  // Find the name of the method's context.
-  auto objcDC = decl->getDeclContext();
-  StringRef contextName;
-  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(objcDC)) {
-    contextName = objcClass->getName();
-  } else if (auto objcCat = dyn_cast<clang::ObjCCategoryDecl>(objcDC)) {
-    contextName = objcCat->getClassInterface()->getName();
-  } else if (auto objcProto=dyn_cast<clang::ObjCProtocolDecl>(objcDC)) {
-    contextName = objcProto->getName();
-  } else {
-    // error case.
-    return StringRef();
-  }
-  return contextName;
-}
-
 /// Translate the "nullability" notion from API notes into an optional type
 /// kind.
-static OptionalTypeKind translateNullability(api_notes::NullableKind kind) {
+OptionalTypeKind ClangImporter::Implementation::translateNullability(
+                   api_notes::NullableKind kind) {
   switch (kind) {
   case api_notes::NullableKind::NonNullable:
     return OptionalTypeKind::OTK_None;
@@ -1335,43 +1228,8 @@ static OptionalTypeKind translateNullability(api_notes::NullableKind kind) {
   }
 }
 
-Optional<KnownObjCMethod> ClangImporter::Implementation::getKnownObjCMethod(
-                            const clang::ObjCMethodDecl *method) {
-  populateKnownObjCMethods();
-
-  // Find the name of the method's context.
-  StringRef contextName = getObjCContextName(method);
-  if (contextName.empty()) {
-    // error case.
-    return Nothing;
-  }
-
-  Identifier contextID = SwiftContext.getIdentifier(contextName);
-
-  // Look it up in the method maps.
-  ObjCSelector selector = importSelector(method->getSelector());
-  auto &knownMethods = method->isClassMethod() ? KnownClassMethods
-                                               : KnownInstanceMethods;
-  auto known = knownMethods.find({contextID, selector});
-  if (known != knownMethods.end())
-    return known->second;
-
-  // Check whether we know anything about the context containing this method.
-  auto *container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
-  if (auto contextInfo = getKnownObjCContext(container)) {
-    if (auto nullable = contextInfo->getDefaultNullability()) {
-      KnownObjCMethod info;
-      info.OptionalTypesAudited = true;
-      info.addTypeInfo(0, translateNullability(*nullable));
-      return info;
-    }
-  }
-
-  return Nothing;
-}
-
-Optional<api_notes::ObjCClassInfo>
-ClangImporter::Implementation::getKnownObjCContext(
+std::tuple<StringRef, api_notes::APINotesReader *, api_notes::APINotesReader *>
+ClangImporter::Implementation::getAPINotesForContext(
     const clang::ObjCContainerDecl *container) {
   // Find the primary set of API notes, in the module where this container
   // was declared.
@@ -1392,7 +1250,7 @@ ClangImporter::Implementation::getKnownObjCContext(
     if (auto secondaryModule = getClangSubmoduleForDecl(objcClass)) {
       if (*secondaryModule) {
         secondary = getAPINotesForModule(
-                      (*secondaryModule)->getTopLevelModule());
+                                         (*secondaryModule)->getTopLevelModule());
       }
     }
 
@@ -1405,14 +1263,72 @@ ClangImporter::Implementation::getKnownObjCContext(
 
   // If the primary and secondary are the same.
   if (primary == secondary) {
-    // Both null: we have no information.
-    if (!primary) {
-      return Nothing;
-    }
-
-    // Drop the secondary; we only need to look in one place.
+    // Drop the secondary; we only care about the primary.
     secondary = nullptr;
   }
+
+  return std::make_tuple(name, primary, secondary);
+}
+
+Optional<api_notes::ObjCMethodInfo>
+ClangImporter::Implementation::getKnownObjCMethod(
+    const clang::ObjCMethodDecl *method) {
+  auto *container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
+
+  // Figure out where to look for context information.
+  StringRef contextName;
+  api_notes::APINotesReader *primary;
+  api_notes::APINotesReader *secondary;
+  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
+
+  // Map the selector.
+  SmallVector<StringRef, 2> selectorPieces;
+  api_notes::ObjCSelectorRef selectorRef;
+  selectorRef.NumPieces = method->getSelector().getNumArgs();
+  for (unsigned i = 0, n = std::max(1u, selectorRef.NumPieces); i != n; ++i) {
+    selectorPieces.push_back(method->getSelector().getNameForSlot(i));
+  }
+  selectorRef.Identifiers = selectorPieces;
+
+  // Look for method information in the primary source.
+  if (primary) {
+    if (auto info = primary->lookupObjCMethod(contextName, selectorRef,
+                                              method->isInstanceMethod())) {
+      return info;
+    }
+  }
+
+  // Look for method information in the secondary source.
+  if (secondary) {
+    if (auto info = secondary->lookupObjCMethod(contextName, selectorRef,
+                                                method->isInstanceMethod())) {
+      return info;
+    }
+  }
+
+  // Look for auditing information in the primary source.
+  if (primary) {
+    if (auto contextInfo = primary->lookupObjCClass(contextName)) {
+      if (auto nullable = contextInfo->getDefaultNullability()) {
+        api_notes::ObjCMethodInfo info;
+        info.NullabilityAudited = true;
+        info.addTypeInfo(0, *nullable);
+        return info;
+      }
+    }
+  }
+
+  return Nothing;
+}
+
+Optional<api_notes::ObjCClassInfo>
+ClangImporter::Implementation::getKnownObjCContext(
+    const clang::ObjCContainerDecl *container) {
+  // Figure out where to look for context information.
+  StringRef name;
+  api_notes::APINotesReader *primary;
+  api_notes::APINotesReader *secondary;
+  std::tie(name, primary, secondary) = getAPINotesForContext(container);
 
   Optional<api_notes::ObjCClassInfo> primaryInfo;
   if (primary)
@@ -1445,30 +1361,40 @@ ClangImporter::Implementation::getKnownObjCContext(
 
 OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
                    const clang::ObjCPropertyDecl *prop) {
-  // Find the name of the property's context.
-  StringRef contextName = getObjCContextName(prop);
-  if (contextName.empty()) {
-    // error case.
-    return OTK_ImplicitlyUnwrappedOptional;
-  }
+  auto *container = cast<clang::ObjCContainerDecl>(prop->getDeclContext());
 
-  // Look for this property in any of the API notes files.
-  for (auto &entry : APINotesReaders) {
-    if (!entry.second)
-      continue;
+  // Figure out where to look for context information.
+  StringRef contextName;
+  api_notes::APINotesReader *primary;
+  api_notes::APINotesReader *secondary;
+  std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
 
-    auto info = entry.second->lookupObjCProperty(contextName, prop->getName());
-    if (!info)
-      continue;
-
-    // We found information about this property. Check whether we have
-    // nullability information.
-    if (auto nullability = info->getNullability()) {
-      return translateNullability(*nullability);
+  // Look for property information in the primary source.
+  if (primary) {
+    if (auto info = primary->lookupObjCProperty(contextName, prop->getName())) {
+      if (auto nullability = info->getNullability()) {
+        return translateNullability(*nullability);
+      }
     }
   }
 
-  // FIXME: Fall back to looking for class defaults information?
+  // Look for property information in the secondary source.
+  if (secondary) {
+    if (auto info = secondary->lookupObjCProperty(contextName,
+                                                  prop->getName())) {
+      if (auto nullability = info->getNullability()) {
+        return translateNullability(*nullability);
+      }
+    }
+  }
+
+  // Check whether the class itself has been audited in the primary source.
+  if (primary) {
+    if (auto classInfo = primary->lookupObjCClass(contextName)) {
+      if (auto nullability = classInfo->getDefaultNullability())
+        return translateNullability(*nullability);
+    }
+  }
 
   // We don't know anything.
   return OTK_ImplicitlyUnwrappedOptional;
@@ -1479,9 +1405,10 @@ bool ClangImporter::Implementation::hasDesignatedInitializers(
   if (classDecl->hasDesignatedInitializers())
     return true;
 
-  populateKnownObjCMethods();
-  auto className = SwiftContext.getIdentifier(classDecl->getName());
-  return HasKnownDesignatedInits.count(className) > 0;
+  if (auto info = getKnownObjCContext(classDecl))
+    return info->hasDesignatedInits();
+
+  return false;
 }
 
 bool ClangImporter::Implementation::isDesignatedInitializer(
@@ -1491,25 +1418,20 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
   if (classDecl->hasDesignatedInitializers())
     return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
 
-  populateKnownObjCMethods();
-  auto className = SwiftContext.getIdentifier(classDecl->getName());
-  auto selector = importSelector(method->getSelector());
-  auto known = KnownInstanceMethods.find({className, selector});
-  return known != KnownInstanceMethods.end() &&
-         known->second.DesignatedInit;
+  if (auto info = getKnownObjCMethod(method))
+    return info->DesignatedInit;
+
+  return false;
 }
 
 FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {
-  populateKnownObjCMethods();
-  auto className = SwiftContext.getIdentifier(classDecl->getName());
-  auto selector = importSelector(method->getSelector());
-  auto known = KnownClassMethods.find({className, selector});
-  if (known == KnownClassMethods.end())
-    return FactoryAsInitKind::Infer;
+  if (auto info = getKnownObjCMethod(method))
+    return static_cast<FactoryAsInitKind>(
+             static_cast<unsigned>(info->getFactoryAsInitKind()));
 
-  return known->second.getFactoryAsInitKind();
+  return FactoryAsInitKind::Infer;
 }
 
 #pragma mark Name lookup

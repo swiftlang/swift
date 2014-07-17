@@ -967,16 +967,16 @@ Type ClangImporter::Implementation::importMethodType(
     resultKind = ImportTypeKind::Result;
 
   // Check if we know more about the type from our whitelists.
-  Optional<KnownObjCMethod> knownMethod;
+  Optional<api_notes::ObjCMethodInfo> knownMethod;
   if (ImportWithTighterObjCPointerTypes)
     if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl))
       if (auto knownMethodTmp = getKnownObjCMethod(MD))
-        if (knownMethodTmp->OptionalTypesAudited)
+        if (knownMethodTmp->NullabilityAudited)
           knownMethod = knownMethodTmp;
 
-  OptionalTypeKind OptionalityOfReturn = knownMethod
-                                         ? knownMethod->getReturnTypeInfo()
-                                         : OTK_ImplicitlyUnwrappedOptional;
+  OptionalTypeKind OptionalityOfReturn
+    = knownMethod ? translateNullability(knownMethod->getReturnTypeInfo())
+                  : OTK_ImplicitlyUnwrappedOptional;
 
   // Import the result type.
   auto swiftResultTy = importType(resultType, resultKind,
@@ -1008,9 +1008,10 @@ Type ClangImporter::Implementation::importMethodType(
                                 ImportTypeKind::PropertyAccessor,
                                 isFromSystemModule);
     } else {
-      OptionalTypeKind OptionalityOfParam = knownMethod
-                                          ? knownMethod->getParamTypeInfo(index)
-                                          : OTK_ImplicitlyUnwrappedOptional;
+      OptionalTypeKind OptionalityOfParam
+        = knownMethod
+            ? translateNullability(knownMethod->getParamTypeInfo(index))
+            : OTK_ImplicitlyUnwrappedOptional;
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::Parameter,
                                 isFromSystemModule,

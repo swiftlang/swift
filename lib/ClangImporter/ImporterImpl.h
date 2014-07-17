@@ -201,91 +201,6 @@ enum class FactoryAsInitKind {
   AsInitializer
 };
 
-/// Describes an Objective-C method for which the we have special knowledge, as
-/// described in \c KnownObjCMethods.def.
-struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
-private:
-  static unsigned const OptionalTypeKindMask = 3;
-  static unsigned const OptionalTypeKindSize = 2;
-
-public:
-  /// Whether this is a designated initializer of its class.
-  unsigned DesignatedInit : 1;
-
-  /// Whether to treat this method as a factory or initializer.
-  unsigned FactoryAsInit : 2;
-
-  /// Whether this method is marked unavailable.
-  unsigned Unavailable : 1;
-
-  /// Whether the signature has been audited with respect to optional types.
-  /// If yes, we consider all types to be non-optional unless otherwise noted.
-  /// If this flag is not set, the pointer types are imported as implicitely
-  /// unwrapped optionals.
-  unsigned OptionalTypesAudited : 1;
-
-  /// Number of types whose optionality is encoded with the OptionalTypesPayload.
-  unsigned NumAdjustedOptionalTypes;
-
-  /// Stores the optionality of the return type and the parameters.
-  //  OptionalTypeKindSize bits are used to encode the optionality. The info
-  //  about the return type is stored at position 0, followed by the optionality
-  //  of the parameters.
-  uint64_t OptionalTypesPayload;
-
-  /// Message to use when this method is unavailable.
-  StringRef UnavailableMsg;
-
-  KnownObjCMethod() 
-    : DesignatedInit(false),
-      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
-      Unavailable(false),
-      OptionalTypesAudited(false),
-      NumAdjustedOptionalTypes(0),
-      OptionalTypesPayload(0){ }
-
-  FactoryAsInitKind getFactoryAsInitKind() const {
-    return static_cast<FactoryAsInitKind>(FactoryAsInit);
-  }
-
-  void setFactoryAsInitKind(FactoryAsInitKind kind) {
-    FactoryAsInit = static_cast<unsigned>(kind);
-  }
-
-  void addTypeInfo(unsigned index, OptionalTypeKind kind) {
-    assert(index <=
-           (sizeof(OptionalTypesPayload) * CHAR_BIT)/OptionalTypeKindSize);
-    assert(kind < OptionalTypeKindMask);
-    assert(OptionalTypesAudited == true);
-    unsigned kindValue =
-      (static_cast<unsigned>(kind)) << (index * OptionalTypeKindSize);
-    OptionalTypesPayload |= kindValue;
-  }
-
-private:
-  OptionalTypeKind getTypeInfo(unsigned index) {
-    assert(OptionalTypesAudited &&
-           "Checking the type adjustment on non-audited method.");
-    // If we don't have info about this parameter, return the default.
-    if (index > NumAdjustedOptionalTypes)
-      return OTK_None;
-    return static_cast<OptionalTypeKind>(( OptionalTypesPayload
-                                           >> (index * OptionalTypeKindSize) )
-                                         & OptionalTypeKindMask);
-  }
-
-public:
-  OptionalTypeKind getParamTypeInfo(unsigned index) {
-    index++;
-    return getTypeInfo(index);
-  }
-
-  OptionalTypeKind getReturnTypeInfo() {
-    return getTypeInfo(0);
-  }
-
-};
-
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader 
@@ -349,6 +264,9 @@ private:
   /// The active type checker, or null if there is no active type checker.
   LazyResolver *typeResolver = nullptr;
 
+  /// Translation API nullability from an API note into an optional kind.
+  static OptionalTypeKind translateNullability(api_notes::NullableKind kind);
+
 public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
@@ -368,28 +286,22 @@ public:
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
-  /// Classes for which we know the set of designated
-  /// initializers a priori.
-  llvm::DenseSet<Identifier> HasKnownDesignatedInits;
-
-  /// A map from (class or protocol name, selector) pairs to a prior information
-  /// about that instance method of an Objective-C class.
-  llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
-    KnownInstanceMethods;
-
-  /// A map from (class or protocol name, selector) pairs to a prior information
-  /// about that class method of an Objective-C class.
-  llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
-    KnownClassMethods;
-
-  /// Populate the tables of known methods, if it hasn't been done
-  /// already.
-  void populateKnownObjCMethods();
+  /// Retrieve the API notes readers that may contain information for the
+  /// given Objective-C container.
+  ///
+  /// \returns a (name, primary, secondary) tuple containing the name of the
+  /// entity to look for and the API notes readers where information could be
+  /// found. The "primary" reader is the reader describes the module where the
+  /// specific container is defined; the "secondary" reader describes the
+  /// module in which the type is originally defined, if it's different from
+  /// the primary. Either or both of the readers may be null.
+  std::tuple<StringRef, api_notes::APINotesReader*, api_notes::APINotesReader*>
+  getAPINotesForContext(const clang::ObjCContainerDecl *container);
 
   /// Retrieve any information known a priori about the given Objective-C
   /// method, if we have it.
-  Optional<KnownObjCMethod> getKnownObjCMethod(
-                              const clang::ObjCMethodDecl *method);
+  Optional<api_notes::ObjCMethodInfo> getKnownObjCMethod(
+                                        const clang::ObjCMethodDecl *method);
 
   /// Retrieve information about the given Objective-C context scoped to the
   /// given Swift module.

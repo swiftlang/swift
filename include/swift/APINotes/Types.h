@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIDE_TYPES_H
 #define SWIFT_SIDE_TYPES_H
 #include "swift/Basic/Optional.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <climits>
@@ -167,7 +168,7 @@ public:
 /// referenced by the identifier list persists.
 struct ObjCSelectorRef {
   unsigned NumPieces;
-  std::initializer_list<StringRef> Identifiers;
+  llvm::ArrayRef<StringRef> Identifiers;
 };
 
 /// Describes API notes data for an Objective-C method.
