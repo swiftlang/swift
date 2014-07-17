@@ -72,17 +72,17 @@ import Foundation
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([8 x i8]* @3, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC20objc_nsstring_bridge3BascfMS0_FT_S0_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([11 x i8]* @4, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC20objc_nsstring_bridge3BasD to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([3 x i8]* @13, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([3 x i8]* @{{.*}}, i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC20objc_nsstring_bridge3BasE to i8*)
 // CHECK:     }
 // CHECK:   ]
