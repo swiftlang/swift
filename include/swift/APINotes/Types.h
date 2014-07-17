@@ -59,10 +59,14 @@ class ObjCClassInfo {
   /// The default nullability.
   unsigned DefaultNullability : 2;
 
+  /// Whether this class has designated initializers recorded.
+  unsigned HasDesignatedInits : 1;
+
 public:
   ObjCClassInfo()
     : HasDefaultNullability(0),
-      DefaultNullability(0)
+      DefaultNullability(0),
+      HasDesignatedInits(0)
   { }
 
   /// Determine the default nullability for properties and methods of this
@@ -82,6 +86,9 @@ public:
     DefaultNullability = static_cast<unsigned>(kind);
   }
 
+  bool hasDesignatedInits() const { return HasDesignatedInits; }
+  void setHasDesignatedInits(bool value) { HasDesignatedInits = value; }
+
   /// Strip off any information within the class information structure that is
   /// module-local, such as 'audited' flags.
   void stripModuleLocalInfo() {
@@ -91,7 +98,8 @@ public:
 
   friend bool operator==(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
     return lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
-           lhs.DefaultNullability == rhs.DefaultNullability;
+           lhs.DefaultNullability == rhs.DefaultNullability &&
+           lhs.HasDesignatedInits == rhs.HasDesignatedInits;
   }
 
   friend bool operator!=(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
@@ -107,6 +115,7 @@ public:
       }
     }
 
+    lhs.HasDesignatedInits |= rhs.HasDesignatedInits;
     return lhs;
   }
 };

@@ -246,6 +246,9 @@ namespace {
     using hash_value_type = size_t;
     using offset_type = unsigned;
 
+    /// The number of bytes in a data entry.
+    static const unsigned dataBytes = 3;
+
     hash_value_type ComputeHash(key_type_ref key) {
       return static_cast<size_t>(llvm::hash_value(key));
     }
@@ -254,7 +257,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID);
-      uint32_t dataLength = 2;
+      uint32_t dataLength = dataBytes;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -269,14 +272,16 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       // FIXME: Inefficient representation.
-      uint8_t bytes[2] = { 0, 0 };
+      uint8_t bytes[dataBytes] = { 0, 0, 0 };
       if (auto nullable = data.getDefaultNullability()) {
         bytes[0] = 1;
         bytes[1] = static_cast<uint8_t>(*nullable);
       } else {
         // Nothing to do.
       }
-      out.write(reinterpret_cast<const char *>(bytes), 2);
+      bytes[2] = data.hasDesignatedInits();
+
+      out.write(reinterpret_cast<const char *>(bytes), dataBytes);
     }
   };
 } // end anonymous namespace
@@ -582,6 +587,12 @@ void APINotesWriter::addObjCMethod(StringRef className,
   SelectorID selectorID = Impl.getSelector(selector);
   assert(!Impl.ObjCMethods.count({classID, selectorID, isInstanceMethod}));
   Impl.ObjCMethods[{classID, selectorID, isInstanceMethod}] = info;
+
+  // If this method is a designated initializer, update the class to note that
+  // it has designated initializers.
+  if (info.DesignatedInit) {
+    Impl.ObjCClasses[classID].setHasDesignatedInits(true);
+  }
 }
 
 

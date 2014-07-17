@@ -107,7 +107,7 @@ namespace {
         info.setDefaultNullability(static_cast<NullableKind>(*data));
       }
       ++data;
-
+      info.setHasDesignatedInits(*data++);
       return info;
     }
   };
