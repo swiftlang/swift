@@ -1834,6 +1834,12 @@ public:
 
   void setAccessibility(Accessibility access) {
     assert(!hasAccessibility() && "accessibility already set");
+    overwriteAccessibility(access);
+  }
+
+  /// Overwrite the accessibility of this declaration.
+  /// This is needed in the LLDB REPL.
+  void overwriteAccessibility(Accessibility access) {
     TypeAndAccess.setInt(static_cast<unsigned>(access) + 1);
   }
 
