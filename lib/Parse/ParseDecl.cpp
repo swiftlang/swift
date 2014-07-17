@@ -806,7 +806,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 /// but rejected since they have context-sensitive keywords.
 ///
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
-
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in)) {
@@ -814,48 +813,28 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     return true;
   }
 
+  // XXX
+  
   // FIXME: This is bogus to only honor the first '@', but this
   // will be fixed once the attribute refactoring completes for
   // all existing declaration attributes.
   if (Attributes.AtLoc.isInvalid())
     Attributes.AtLoc = AtLoc;
 
-  // Determine which attribute it is, and diagnose it if unknown.
-  AttrKind attr = llvm::StringSwitch<AttrKind>(Tok.getText())
-#define ATTR(X) .Case(#X, AK_##X)
-#define VIRTUAL_ATTR(X)
-#include "swift/AST/Attr.def"
-               .Default(AK_Count);
-  
-  if (attr == AK_Count) {
-    // If the attribute follows the new representation, switch
-    // over to the alternate parsing path.
-    DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
-    if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, AtLoc, DK);
+  // If the attribute follows the new representation, switch
+  // over to the alternate parsing path.
+  DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
+  if (DK != DAK_Count)
+    return parseNewDeclAttribute(Attributes, AtLoc, DK);
 
-    if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
-      diagnose(Tok, diag::type_attribute_applied_to_decl);
-    else
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
-    // Recover by eating @foo when foo is not known.
-    consumeToken();
+  if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
+    diagnose(Tok, diag::type_attribute_applied_to_decl);
+  else
+    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+  // Recover by eating @foo when foo is not known.
+  consumeToken();
 
-    return true;
-  }
-
-  // Ok, it is a valid attribute, eat it, and then process it.
-  SourceLoc Loc = consumeToken();
-
-  // Diagnose duplicated attributes.
-  if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
-    return false;
-  }
-
-  Attributes.setAttr(attr, Loc);
-
-  return false;
+  return true;
 }
 
 bool Parser::canParseTypeAttribute() {
@@ -887,10 +866,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
     StringRef Text = Tok.getText();
     bool isDeclAttribute = llvm::StringSwitch<bool>(Text)
-#define ATTR(X) .Case(#X, true)
-#define VIRTUAL_ATTR(X)
-#define DECL_ATTR(X, ...) ATTR(X)
-#define DECL_ALIAS(X, ...) ATTR(X)
+#define DECL_ATTR(X, ...) .Case(#X, true)
+#define DECL_ALIAS(X, ...) .Case(#X, true)
 #define VIRTUAL_DECL_ATTR(X, ...)
 #include "swift/AST/Attr.def"
       .Default(false);
@@ -1569,9 +1546,6 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
 
-  if (Attributes.hasNonVirtualAttributes())
-    diagnose(Attributes.AtLoc, diag::import_attributes);
-
   DebuggerContextChange DCC (*this);
   
   if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
@@ -1627,8 +1601,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 
   auto *ID = ImportDecl::create(Context, CurDeclContext, ImportLoc, Kind,
                                 KindLoc, ImportPath);
-  if (Attributes.shouldSaveInAST())
-    ID->getMutableAttrs() = Attributes;
+  ID->getMutableAttrs() = Attributes;
   return DCC.fixupParserResult(ID);
 }
 
@@ -1823,8 +1796,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
-  if (Attributes.shouldSaveInAST())
-    ED->getMutableAttrs() = Attributes;
+  ED->getMutableAttrs() = Attributes;
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
@@ -2014,11 +1986,6 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   Identifier Id;
   SourceLoc IdLoc;
   ParserStatus Status;
-  
-  if (Attributes.hasNonVirtualAttributes() ||
-      Attributes.hasAttribute<OptionalAttr>())
-    diagnose(Attributes.AtLoc, diag::typealias_attributes);
-  
 
   Status |=
       parseIdentifierDeclName(*this, Id, IdLoc, tok::colon, tok::equal,
@@ -2052,8 +2019,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                      CurDeclContext,
                                      TypeAliasLoc, Id, IdLoc,
                                      UnderlyingTy.getPtrOrNull());
-    if (Attributes.shouldSaveInAST())
-      assocType->getMutableAttrs() = Attributes;
+    assocType->getMutableAttrs() = Attributes;
     if (!Inherited.empty())
       assocType->setInherited(Context.AllocateCopy(Inherited));
     addToScope(assocType);
@@ -2065,8 +2031,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                 UnderlyingTy.getPtrOrNull(),
                                 CurDeclContext);
-  if (Attributes.shouldSaveInAST())
-    TAD->getMutableAttrs() = Attributes;
+  TAD->getMutableAttrs() = Attributes;
   addToScope(TAD);
   return DCC.fixupParserResult(Status, TAD);
 }
@@ -2329,8 +2294,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                    StaticLoc, Flags, Kind, this);
-      if (Attributes.shouldSaveInAST())
-        TheDecl->getMutableAttrs() = Attributes;
+      TheDecl->getMutableAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
     }
@@ -2446,9 +2410,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // Set up a function declaration.
     TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                  StaticLoc, Flags, Kind, this);
-
-    if (Attributes.shouldSaveInAST())
-      TheDecl->getMutableAttrs() = Attributes;
+    TheDecl->getMutableAttrs() = Attributes;
 
     // Parse the body, if any.
     if (ExternalAsmName) {
@@ -2847,8 +2809,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->setParentPattern(PBD);
-      if (Attributes.shouldSaveInAST())
-        VD->getMutableAttrs() = Attributes;
+      VD->getMutableAttrs() = Attributes;
 
       Decls.push_back(VD);
     });
@@ -3060,8 +3021,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           
     // Add the attributes here so if we need them while parsing the body
     // they are available.
-    if (Attributes.shouldSaveInAST())
-      FD->getMutableAttrs() = Attributes;
+    FD->getMutableAttrs() = Attributes;
       
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
@@ -3185,9 +3145,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   EnumDecl *UD = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(UD);
-
-  if (Attributes.shouldSaveInAST())
-    UD->getMutableAttrs() = Attributes;
+  UD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
@@ -3441,9 +3399,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             GenericParams,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
-
-  if (Attributes.shouldSaveInAST())
-    SD->getMutableAttrs() = Attributes;
+  SD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
@@ -3521,8 +3477,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   setLocalDiscriminator(CD);
 
   // Attach attributes.
-  if (Attributes.shouldSaveInAST())
-    CD->getMutableAttrs() = Attributes;
+  CD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
@@ -3645,8 +3600,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.removeAttribute(classProto);
   }
 
-  if (Attributes.shouldSaveInAST())
-    Proto->getMutableAttrs() = Attributes;
+  Proto->getMutableAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
@@ -3737,8 +3691,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext);
-  if (Attributes.shouldSaveInAST())
-    Subscript->getMutableAttrs() = Attributes;
+  Subscript->getMutableAttrs() = Attributes;
   
   Decls.push_back(Subscript);
 
@@ -3883,8 +3836,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
     }
   }
 
-  if (Attributes.shouldSaveInAST())
-    CD->getMutableAttrs() = Attributes;
+  CD->getMutableAttrs() = Attributes;
 
   return makeParserResult(CD);
 }
@@ -3942,8 +3894,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  if (Attributes.shouldSaveInAST())
-    DD->getMutableAttrs() = Attributes;
+  DD->getMutableAttrs() = Attributes;
 
   // Reject 'destructor' functions outside of classes
   if (!(Flags & PD_AllowDestructor)) {
@@ -3960,9 +3911,6 @@ ParserResult<OperatorDecl>
 Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
-
-  if (Attributes.hasNonVirtualAttributes())
-    diagnose(Attributes.AtLoc, diag::operator_attributes);
 
   // Check to see if this is declared with the old syntax to help with migration
   // FIXME: Remove this.

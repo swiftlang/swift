@@ -64,7 +64,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
       bool IsAttr = llvm::StringSwitch<bool>(Tok.getText())
-#define ATTR(X) .Case(#X, true)
 #define TYPE_ATTR(X) .Case(#X, true)
 #define DECL_ATTR(X, ...) .Case(#X, true)
 #define DECL_ATTR_ALIAS(X, ...) .Case(#X, true)

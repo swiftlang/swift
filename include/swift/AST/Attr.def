@@ -14,10 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ATTR
-#define ATTR(X)
-#endif
-
 #ifndef DECL_ATTR
 #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)
 #endif
@@ -36,12 +32,6 @@
 
 #ifndef TYPE_ATTR
 #define TYPE_ATTR(X)
-#endif
-
-/// Virtual attributes are not necessarily spelled the same way
-/// they're written.
-#ifndef VIRTUAL_ATTR
-#define VIRTUAL_ATTR(X) ATTR(X)
 #endif
 
 #ifndef AVAILABILITY_PLATFORM
@@ -205,7 +195,6 @@ AVAILABILITY_PLATFORM(iOSApplicationExtension)
 AVAILABILITY_PLATFORM(OSXApplicationExtension)
 
 #undef AVAILABILITY_PLATFORM
-#undef VIRTUAL_ATTR
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef VIRTUAL_DECL_ATTR

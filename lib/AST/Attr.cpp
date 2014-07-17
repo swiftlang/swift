@@ -71,7 +71,7 @@ void DeclAttributes::print(llvm::raw_ostream &OS) const {
 
 void DeclAttributes::print(ASTPrinter &Printer,
                            const PrintOptions &Options) const {
-  if (NumAttrsSet == 0 && !DeclAttrs)
+  if (!DeclAttrs)
     return;
 
   SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());

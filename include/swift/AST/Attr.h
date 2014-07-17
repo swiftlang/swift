@@ -148,16 +148,6 @@ enum class Resilience : unsigned char {
   
 enum class AbstractCC : unsigned char;
 
-// Define enumerators for each attribute, e.g. AK_weak.
-enum AttrKind {
-#define ATTR(X) AK_##X,
-#include "swift/AST/Attr.def"
-  AK_Count
-};
-
-// FIXME: DeclAttrKind and AttrKind should eventually be merged, but
-// there is currently a representational difference as one set of
-// attributes is migrated from one implementation to another.
 enum DeclAttrKind : unsigned {
 #define DECL_ATTR(_, NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"
@@ -842,13 +832,6 @@ public:
 
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
-  /// Source locations for every possible attribute that can be parsed in
-  /// source.
-  SourceLoc AttrLocs[AK_Count];
-  bool HasAttr[AK_Count] = { };
-
-  unsigned NumAttrsSet : 8;
-
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;
 
@@ -863,62 +846,13 @@ public:
   /// they are not allowed in that context.
   SourceLoc AtLoc;
 
-  DeclAttributes() : NumAttrsSet(0), DeclAttrs(nullptr) {}
+  DeclAttributes() : DeclAttrs(nullptr) {}
 
-  bool shouldSaveInAST() const {
-    return AtLoc.isValid() || NumAttrsSet != 0 || DeclAttrs;
-  }
-
-  bool containsTraditionalAttributes() const {
-    return NumAttrsSet != 0;
-  }
-
-  bool hasNonVirtualAttributes() const {
-    return NumAttrsSet != 0;
-  }
-
-  void clearAttribute(AttrKind A) {
-    if (!has(A))
-      return;
-
-    AttrLocs[A] = SourceLoc();
-    HasAttr[A] = false;
-
-    NumAttrsSet--;
-  }
-
-  bool has(AttrKind A) const {
-    return HasAttr[A];
-  }
-
-  bool has(DeclAttrKind DK) const {
-    for (auto Attr : *this)
-      if (Attr->getKind() == DK)
-        return true;
-    return false;
-  }
-
-  SourceLoc getLoc(AttrKind A) const {
-    return AttrLocs[A];
-  }
-  
-  void setAttr(AttrKind A, SourceLoc L) {
-    bool HadAttribute = has(A);
-
-    AttrLocs[A] = L;
-    HasAttr[A] = true;
-
-    if (HadAttribute)
-      return;
-
-    NumAttrsSet++;
+  bool isEmpty() const {
+    return DeclAttrs == nullptr;
   }
 
   void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
-    for (auto Loc : AttrLocs) {
-      if (Loc.isValid())
-        Ranges.push_back(Loc);
-    }
     for (auto Attr : *this) {
       auto R = Attr->getRangeWithAt();
       if (R.isValid())

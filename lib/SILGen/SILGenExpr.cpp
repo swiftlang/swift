@@ -2841,7 +2841,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
      SILType::getPrimitiveAddressType(argvDecl->getType()->getCanonicalType()));
   argv = B.createLoad(mainClass, argv);
   
-  if (mainClass->getAttrs().has(DAK_UIApplicationMain)) {
+  if (mainClass->getAttrs().hasAttribute<UIApplicationMainAttr>()) {
     // Emit a UIKit main.
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
     

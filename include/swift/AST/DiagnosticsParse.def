@@ -912,13 +912,6 @@ ERROR(type_attribute_applied_to_decl,attribute_parsing,none,
 ERROR(decl_attribute_applied_to_type,attribute_parsing,none,
       "attribute can only be applied to declarations, not types", ())
 
-ERROR(import_attributes,attribute_parsing,none,
-      "invalid attributes specified for import", ())
-ERROR(typealias_attributes,attribute_parsing,none,
-      "invalid attributes specified for typealias", ())
-ERROR(operator_attributes,attribute_parsing,none,
-      "invalid attributes specified for operator", ())
-
 ERROR(attr_expected_lparen,attribute_parsing,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
