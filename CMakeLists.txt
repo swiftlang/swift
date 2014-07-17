@@ -210,8 +210,10 @@ set(SWIFT_EXTRA_FLAGS "" CACHE STRING
 set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
 if ( PATH_TO_SWIFT_BUILD STREQUAL "" )
    set(SWIFT_COMPILER "swift")
+   set(SWIFT_IDE_TEST "swift-ide-test")
 else()
    set(SWIFT_COMPILER "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
+   set(SWIFT_IDE_TEST "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift-ide-test")
 endif()
 
 # FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
@@ -473,7 +475,7 @@ function(compile_swift_files)
     foreach(apinote_module ${SWIFTFILE_API_NOTES})
       set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
       list(APPEND create_apinotes
-        COMMAND swift-ide-test -generate-api-annotation -o ${apinote_file} ${apinote_module})
+        COMMAND ${SWIFT_IDE_TEST} -generate-api-annotation -o ${apinote_file} ${apinote_module})
       list(APPEND apinote_files ${apinote_file})
       install(FILES ${apinote_file}
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
@@ -497,7 +499,9 @@ function(compile_swift_files)
     set(swift_compiler_path "${SWIFT_COMPILER}")
   endif()
   
-  if (apinote_files)
+  if (apinote_files AND SWIFT_IDE_TEST STREQUAL "swift-ide-test")
+    # We need to run swift-ide-test and we didn't get 
+    # one from PATH_TO_SWIFT_BUILD. Build it first.
     set(swift_ide_test_dependency swift-ide-test)
   else()
     set(swift_ide_test_dependency)
