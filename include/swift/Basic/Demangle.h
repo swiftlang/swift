@@ -13,10 +13,10 @@
 #ifndef SWIFT_BASIC_DEMANGLE_H
 #define SWIFT_BASIC_DEMANGLE_H
 
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/LLVM.h"
+#include <memory>
 
 namespace llvm {
   class raw_ostream;
@@ -34,9 +34,9 @@ struct DemangleOptions
 };
 
 class Node;
-typedef llvm::IntrusiveRefCntPtr<Node> NodePointer;
+typedef std::shared_ptr<Node> NodePointer;
 
-class Node : public llvm::RefCountedBase<Node> {
+class Node {
 public:
   enum class Kind : uint16_t {
 #define NODE(ID) ID,

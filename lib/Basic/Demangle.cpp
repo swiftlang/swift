@@ -1898,7 +1898,7 @@ private:
   
   /// Determine whether this is a "simple" type, from the type-simple
   /// production.
-  bool isSimpleType(NodePointer pointer) {
+  bool isSimpleType(Node *pointer) {
     switch (pointer->getKind()) {
     case Node::Kind::ArchetypeAndProtocol:
     case Node::Kind::ArchetypeRef:
@@ -2011,7 +2011,7 @@ private:
     }
   }
 
-  SugarType findSugar(NodePointer pointer) {
+  SugarType findSugar(Node *pointer) {
     if (pointer->getNumChildren() == 1 && 
         pointer->getKind() == Node::Kind::Type)
       return findSugar(pointer->getChild(0));
