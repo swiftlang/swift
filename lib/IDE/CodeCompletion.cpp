@@ -1863,6 +1863,7 @@ public:
 
     // FIXME: The pedantically correct way to find the type is to resolve the
     // Swift.StringLiteralType type.
+    addKeyword("__FUNCTION__", "String");
     addKeyword("__FILE__", "String");
     // Same: Swift.IntegerLiteralType.
     addKeyword("__LINE__", "Int");

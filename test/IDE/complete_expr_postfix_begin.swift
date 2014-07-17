@@ -94,6 +94,7 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule:    Int32[#Int32#]{{$}}
 // COMMON-DAG: Decl[Struct]/OtherModule:    Int64[#Int64#]{{$}}
 // COMMON-DAG: Decl[Struct]/OtherModule:      Bool[#Bool#]{{$}}
+// COMMON-DAG: Keyword/None: __FUNCTION__[#String#]{{$}}
 // COMMON-DAG: Keyword/None: __FILE__[#String#]{{$}}
 // COMMON-DAG: Keyword/None: __LINE__[#Int#]{{$}}
 // COMMON-DAG: Keyword/None: __COLUMN__[#Int#]{{$}}
