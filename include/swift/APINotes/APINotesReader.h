@@ -1,4 +1,4 @@
-//===--- SideCarReader.h - Side Car Reader ----------------------*- C++ -*-===//
+//===--- APINotesReader.h - API Notes Reader ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the \c SideCarReader class that reads source
-// side-car data providing additional information about source code as
+// This file defines the \c APINotesReader class that reads source
+// API notes data providing additional information about source code as
 // a separate input, such as the non-nil/nilable annotations for
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SIDE_CAR_READER_H
-#define SWIFT_SIDE_CAR_READER_H
+#ifndef SWIFT_API_NOTES_READER_H
+#define SWIFT_API_NOTES_READER_H
 
 #include "swift/APINotes/Types.h"
 #include "swift/Basic/Optional.h"
@@ -25,29 +25,29 @@
 #include <memory>
 
 namespace swift {
-namespace side_car {
+namespace api_notes {
 
-/// A class that reads side-car data from a binary file that was written by
-/// the \c SideCarWriter.
-class SideCarReader {
+/// A class that reads API notes data from a binary file that was written by
+/// the \c APINotesWriter.
+class APINotesReader {
   class Implementation;
 
   Implementation &Impl;
 
-  SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, bool &failed);
+  APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, bool &failed);
 
 public:
-  /// Create a new side-car reader from the given member buffer, which
-  /// contains the contents of a binary side-car file.
+  /// Create a new API notes reader from the given member buffer, which
+  /// contains the contents of a binary API notes file.
   ///
-  /// \returns the new side-car reader, or null if an error occurred.
-  static std::unique_ptr<SideCarReader> 
+  /// \returns the new API notes reader, or null if an error occurred.
+  static std::unique_ptr<APINotesReader> 
   get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer);
 
-  ~SideCarReader();
+  ~APINotesReader();
 
-  SideCarReader(const SideCarReader &) = delete;
-  SideCarReader &operator=(const SideCarReader &) = delete;
+  APINotesReader(const APINotesReader &) = delete;
+  APINotesReader &operator=(const APINotesReader &) = delete;
 
   /// Look for information regarding the given Objective-C class.
   ///
@@ -79,7 +79,7 @@ public:
                                             bool isInstanceMethod);
 };
 
-} // end namespace side_car
+} // end namespace api_notes
 } // end namespace swift
 
-#endif // LLVM_SWIFT_SIDE_CAR_READER_H
+#endif // LLVM_SWIFT_API_NOTES_READER_H

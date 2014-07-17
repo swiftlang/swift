@@ -1,4 +1,4 @@
-//===--- SideCarWriter.cpp - Side Car Writer --------------------*- C++ -*-===//
+//===--- APINotesWriter.cpp - API Notes Writer --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the \c SideCarWriter class that writes out
-// source side-car data providing additional information about source
+// This file implements the \c APINotesWriter class that writes out
+// source API notes data providing additional information about source
 // code as a separate input, such as the non-nil/nilable annotations
 // for method parameters.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/APINotes/SideCarWriter.h"
-#include "SideCarFormat.h"
+#include "swift/APINotes/APINotesWriter.h"
+#include "APINotesFormat.h"
 #include "swift/Basic/DenseMapInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -30,10 +30,10 @@
 #include <tuple>
 #include <vector>
 using namespace swift;
-using namespace side_car;
+using namespace api_notes;
 using namespace llvm::support;
 
-class SideCarWriter::Implementation {
+class APINotesWriter::Implementation {
   /// Mapping from strings to identifier IDs.
   llvm::StringMap<IdentifierID> IdentifierIDs;
 
@@ -136,7 +136,7 @@ static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
   out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
-void SideCarWriter::Implementation::writeBlockInfoBlock(
+void APINotesWriter::Implementation::writeBlockInfoBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);  
 
@@ -166,7 +166,7 @@ void SideCarWriter::Implementation::writeBlockInfoBlock(
 #undef BLOCK_RECORD
 }
 
-void SideCarWriter::Implementation::writeControlBlock(llvm::BitstreamWriter &writer) {
+void APINotesWriter::Implementation::writeControlBlock(llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, CONTROL_BLOCK_ID, 3);
   control_block::MetadataLayout metadata(writer);
   metadata.emit(ScratchRecord, VERSION_MAJOR, VERSION_MINOR);
@@ -211,7 +211,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeIdentifierBlock(
+void APINotesWriter::Implementation::writeIdentifierBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, IDENTIFIER_BLOCK_ID, 3);
 
@@ -281,7 +281,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeObjCClassBlock(
+void APINotesWriter::Implementation::writeObjCClassBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_CLASS_BLOCK_ID, 3);
 
@@ -353,7 +353,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeObjCPropertyBlock(
+void APINotesWriter::Implementation::writeObjCPropertyBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_PROPERTY_BLOCK_ID, 3);
 
@@ -429,7 +429,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeObjCMethodBlock(
+void APINotesWriter::Implementation::writeObjCMethodBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_METHOD_BLOCK_ID, 3);
 
@@ -497,7 +497,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void SideCarWriter::Implementation::writeObjCSelectorBlock(
+void APINotesWriter::Implementation::writeObjCSelectorBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_SELECTOR_BLOCK_ID, 3);
 
@@ -521,14 +521,14 @@ void SideCarWriter::Implementation::writeObjCSelectorBlock(
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
-void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
-  // Write the side car file into a buffer.
+void APINotesWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
+  // Write the API notes file into a buffer.
   SmallVector<char, 0> buffer;
   {
     llvm::BitstreamWriter writer(buffer);
 
     // Emit the signature.
-    for (unsigned char byte : SIDE_CAR_SIGNATURE)
+    for (unsigned char byte : API_NOTES_SIGNATURE)
       writer.Emit(byte, 8);
 
     // Emit the blocks.
@@ -546,27 +546,27 @@ void SideCarWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   os.flush();
 }
 
-SideCarWriter::SideCarWriter()
+APINotesWriter::APINotesWriter()
   : Impl(*new Implementation)
 {
 }
 
-SideCarWriter::~SideCarWriter() {
+APINotesWriter::~APINotesWriter() {
   delete &Impl;
 }
 
 
-void SideCarWriter::writeToStream(raw_ostream &os) {
+void APINotesWriter::writeToStream(raw_ostream &os) {
   Impl.writeToStream(os);
 }
 
-void SideCarWriter::addObjCClass(StringRef name, const ObjCClassInfo &info) {
+void APINotesWriter::addObjCClass(StringRef name, const ObjCClassInfo &info) {
   IdentifierID classID = Impl.getIdentifier(name);
   assert(!Impl.ObjCClasses.count(classID));
   Impl.ObjCClasses[classID] = info;
 }
 
-void SideCarWriter::addObjCProperty(StringRef className, StringRef name,
+void APINotesWriter::addObjCProperty(StringRef className, StringRef name,
                                     const ObjCPropertyInfo &info) {
   IdentifierID classID = Impl.getIdentifier(className);
   IdentifierID nameID = Impl.getIdentifier(name);
@@ -574,7 +574,7 @@ void SideCarWriter::addObjCProperty(StringRef className, StringRef name,
   Impl.ObjCProperties[{classID, nameID}] = info;
 }
 
-void SideCarWriter::addObjCMethod(StringRef className, 
+void APINotesWriter::addObjCMethod(StringRef className, 
                                   ObjCSelectorRef selector, 
                                   bool isInstanceMethod, 
                                   const ObjCMethodInfo &info) {

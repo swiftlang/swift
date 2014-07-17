@@ -1,4 +1,4 @@
-//===--- SideCarFormat.h - The internals of side car files ------*- C++ -*-===//
+//===--- APINotesFormat.h - The internals of API notes files ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Contains various constants and helper types to deal with side car
+/// \brief Contains various constants and helper types to deal with API notes
 /// files.
 ///
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SIDE_CAR_FORMAT_H
-#define SWIFT_SIDE_CAR_FORMAT_H
+#ifndef SWIFT_API_NOTES_FORMAT_H
+#define SWIFT_API_NOTES_FORMAT_H
 
 #include "swift/Serialization/BCRecordLayout.h" // FIXME: layering
 #include "llvm/ADT/DenseMapInfo.h"
@@ -24,18 +24,18 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-namespace side_car {
+namespace api_notes {
 
 using namespace swift::serialization;
 
-/// Magic number for side car files.
-const unsigned char SIDE_CAR_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x01 };
+/// Magic number for API notes files.
+const unsigned char API_NOTES_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x01 };
 
-/// Side car file major version number.
+/// API notes file major version number.
 ///
 const uint16_t VERSION_MAJOR = 0;
 
-/// Side car file minor version number.
+/// API notes file minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
 const uint16_t VERSION_MINOR = 0;
@@ -46,13 +46,13 @@ using IdentifierIDField = BCVBR<16>;
 using SelectorID = Fixnum<31>;
 using SelectorIDField = BCVBR<16>;
 
-/// The various types of blocks that can occur within a side car file.
+/// The various types of blocks that can occur within a API notes file.
 ///
 /// These IDs must \em not be renumbered or reordered without incrementing
 /// VERSION_MAJOR.
 enum BlockID {
   /// The control block, which contains all of the information that needs to
-  /// be validated prior to committing to loading the side car file.
+  /// be validated prior to committing to loading the API notes file.
   ///
   /// \sa control_block
   CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
@@ -162,26 +162,26 @@ struct StoredObjCSelector {
   llvm::SmallVector<IdentifierID, 2> Identifiers;
 };
 
-} // end namespace side_car
+} // end namespace api_notes
 } // end namespace swift
 
 namespace llvm {
   template<>
-  struct DenseMapInfo<swift::side_car::StoredObjCSelector> {
+  struct DenseMapInfo<swift::api_notes::StoredObjCSelector> {
     typedef DenseMapInfo<unsigned> UnsignedInfo;
 
-    static inline swift::side_car::StoredObjCSelector getEmptyKey() {
-      return swift::side_car::StoredObjCSelector{ 
+    static inline swift::api_notes::StoredObjCSelector getEmptyKey() {
+      return swift::api_notes::StoredObjCSelector{ 
                UnsignedInfo::getEmptyKey(), { } };
     }
 
-    static inline swift::side_car::StoredObjCSelector getTombstoneKey() {
-      return swift::side_car::StoredObjCSelector{ 
+    static inline swift::api_notes::StoredObjCSelector getTombstoneKey() {
+      return swift::api_notes::StoredObjCSelector{ 
                UnsignedInfo::getTombstoneKey(), { } };
     }
     
     static unsigned getHashValue(
-                      const swift::side_car::StoredObjCSelector& value) {
+                      const swift::api_notes::StoredObjCSelector& value) {
       auto hash = llvm::hash_value(value.NumPieces);
       hash = hash_combine(hash, value.Identifiers.size());
       for (auto piece : value.Identifiers)
@@ -191,12 +191,12 @@ namespace llvm {
       return hash;
     }
 
-    static bool isEqual(const swift::side_car::StoredObjCSelector &lhs, 
-                        const swift::side_car::StoredObjCSelector &rhs) {
+    static bool isEqual(const swift::api_notes::StoredObjCSelector &lhs, 
+                        const swift::api_notes::StoredObjCSelector &rhs) {
       return lhs.NumPieces == rhs.NumPieces && 
              lhs.Identifiers == rhs.Identifiers;
     }
   };
 }
 
-#endif // LLVM_SWIFT_SIDE_CAR_FORMAT_H
+#endif // LLVM_SWIFT_API_NOTES_FORMAT_H

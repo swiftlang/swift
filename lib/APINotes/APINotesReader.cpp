@@ -1,4 +1,4 @@
-//===--- SideCarReader.cpp - Side Car Reader --------------------*- C++ -*-===//
+//===--- APINotesReader.cpp - Side Car Reader --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the \c SideCarReader class that reads source
-// side-car data providing additional information about source code as
+// This file implements the \c APINotesReader class that reads source
+// API notes data providing additional information about source code as
 // a separate input, such as the non-nil/nilable annotations for
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/APINotes/SideCarReader.h"
-#include "SideCarFormat.h"
+#include "swift/APINotes/APINotesReader.h"
+#include "APINotesFormat.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -25,7 +25,7 @@
 #include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
-using namespace side_car;
+using namespace api_notes;
 using namespace llvm::support;
 
 namespace {
@@ -262,9 +262,9 @@ namespace {
   };
 } // end anonymous namespace
 
-class SideCarReader::Implementation {
+class APINotesReader::Implementation {
 public:
-  /// The input buffer for the side car data.
+  /// The input buffer for the API notes data.
   std::unique_ptr<llvm::MemoryBuffer> InputBuffer;
 
   /// The reader attached to \c InputBuffer.
@@ -322,7 +322,7 @@ public:
                              SmallVectorImpl<uint64_t> &scratch);
 };
 
-Optional<IdentifierID> SideCarReader::Implementation::getIdentifier(
+Optional<IdentifierID> APINotesReader::Implementation::getIdentifier(
                          StringRef str) {
   if (!IdentifierTable)
     return Nothing;
@@ -337,7 +337,7 @@ Optional<IdentifierID> SideCarReader::Implementation::getIdentifier(
   return *known;
 }
 
-Optional<SelectorID> SideCarReader::Implementation::getSelector(
+Optional<SelectorID> APINotesReader::Implementation::getSelector(
                        ObjCSelectorRef selector) {
   if (!ObjCSelectorTable || !IdentifierTable)
     return Nothing;
@@ -361,7 +361,7 @@ Optional<SelectorID> SideCarReader::Implementation::getSelector(
 
 }
 
-bool SideCarReader::Implementation::readControlBlock(
+bool APINotesReader::Implementation::readControlBlock(
        llvm::BitstreamCursor &cursor,
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(CONTROL_BLOCK_ID))
@@ -376,7 +376,7 @@ bool SideCarReader::Implementation::readControlBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown metadata sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -411,7 +411,7 @@ bool SideCarReader::Implementation::readControlBlock(
   return !sawMetadata;
 }
 
-bool SideCarReader::Implementation::readIdentifierBlock(
+bool APINotesReader::Implementation::readIdentifierBlock(
        llvm::BitstreamCursor &cursor,
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(IDENTIFIER_BLOCK_ID))
@@ -424,7 +424,7 @@ bool SideCarReader::Implementation::readIdentifierBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -464,7 +464,7 @@ bool SideCarReader::Implementation::readIdentifierBlock(
   return false;
 }
 
-bool SideCarReader::Implementation::readObjCClassBlock(
+bool APINotesReader::Implementation::readObjCClassBlock(
        llvm::BitstreamCursor &cursor,
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(OBJC_CLASS_BLOCK_ID))
@@ -477,7 +477,7 @@ bool SideCarReader::Implementation::readObjCClassBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -517,7 +517,7 @@ bool SideCarReader::Implementation::readObjCClassBlock(
   return false;
 }
 
-bool SideCarReader::Implementation::readObjCPropertyBlock(
+bool APINotesReader::Implementation::readObjCPropertyBlock(
        llvm::BitstreamCursor &cursor, 
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(OBJC_PROPERTY_BLOCK_ID))
@@ -530,7 +530,7 @@ bool SideCarReader::Implementation::readObjCPropertyBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -571,7 +571,7 @@ bool SideCarReader::Implementation::readObjCPropertyBlock(
   return false;
 }
 
-bool SideCarReader::Implementation::readObjCMethodBlock(
+bool APINotesReader::Implementation::readObjCMethodBlock(
        llvm::BitstreamCursor &cursor, 
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(OBJC_METHOD_BLOCK_ID))
@@ -584,7 +584,7 @@ bool SideCarReader::Implementation::readObjCMethodBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -624,7 +624,7 @@ bool SideCarReader::Implementation::readObjCMethodBlock(
   return false;
 }
 
-bool SideCarReader::Implementation::readObjCSelectorBlock(
+bool APINotesReader::Implementation::readObjCSelectorBlock(
        llvm::BitstreamCursor &cursor, 
        SmallVectorImpl<uint64_t> &scratch) {
   if (cursor.EnterSubBlock(OBJC_SELECTOR_BLOCK_ID))
@@ -637,7 +637,7 @@ bool SideCarReader::Implementation::readObjCSelectorBlock(
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown sub-block, possibly for use by a future version of the
-      // side-car format.
+      // API notes format.
       if (cursor.SkipBlock())
         return true;
       
@@ -678,7 +678,7 @@ bool SideCarReader::Implementation::readObjCSelectorBlock(
   return false;
 }
 
-SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, 
+APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, 
                              bool &failed) 
   : Impl(*new Implementation)
 {
@@ -692,7 +692,7 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
   llvm::BitstreamCursor cursor(Impl.InputReader);
 
   // Validate signature.
-  for (auto byte : SIDE_CAR_SIGNATURE) {
+  for (auto byte : API_NOTES_SIGNATURE) {
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte) {
       failed = true;
       return;
@@ -779,21 +779,21 @@ SideCarReader::SideCarReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
   }
 }
 
-SideCarReader::~SideCarReader() {
+APINotesReader::~APINotesReader() {
 }
 
-std::unique_ptr<SideCarReader> 
-SideCarReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
+std::unique_ptr<APINotesReader> 
+APINotesReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
   bool failed = false;
-  std::unique_ptr<SideCarReader> 
-    reader(new SideCarReader(std::move(inputBuffer), failed));
+  std::unique_ptr<APINotesReader> 
+    reader(new APINotesReader(std::move(inputBuffer), failed));
   if (failed)
     return nullptr;
 
   return std::move(reader);
 }
 
-Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef name) {
+Optional<ObjCClassInfo> APINotesReader::lookupObjCClass(StringRef name) {
   if (!Impl.ObjCClassTable)
     return Nothing;
 
@@ -808,7 +808,7 @@ Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef name) {
   return *known;
 }
 
-Optional<ObjCPropertyInfo> SideCarReader::lookupObjCProperty(
+Optional<ObjCPropertyInfo> APINotesReader::lookupObjCProperty(
                              StringRef className, 
                              StringRef name) {
   if (!Impl.ObjCPropertyTable)
@@ -829,7 +829,7 @@ Optional<ObjCPropertyInfo> SideCarReader::lookupObjCProperty(
   return *known;
 }
 
-Optional<ObjCMethodInfo> SideCarReader::lookupObjCMethod(
+Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
                            StringRef className,
                            ObjCSelectorRef selector,
                            bool isInstanceMethod) {

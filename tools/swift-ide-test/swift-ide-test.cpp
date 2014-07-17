@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "XMLValidator.h"
-#include "swift/APINotes/SideCarReader.h"
-#include "swift/APINotes/SideCarWriter.h"
+#include "swift/APINotes/APINotesReader.h"
+#include "swift/APINotes/APINotesWriter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -1624,7 +1624,7 @@ namespace {
 
   // Signature has been audited with respect to optional types.
   struct OptionalTypeAdjustment {
-    llvm::SmallVector<side_car::NullableKind, 3> AdjustedTypes;
+    llvm::SmallVector<api_notes::NullableKind, 3> AdjustedTypes;
 
     OptionalTypeAdjustment(unsigned numParams) {
       assert(numParams == 0);
@@ -1634,7 +1634,7 @@ namespace {
     OptionalTypeAdjustment(unsigned numParams, Ts ...kinds) {
       if (numParams > 0 ) {
         assert(sizeof...(Ts) == numParams);
-        side_car::NullableKind actualKinds[] = { kinds... };
+        api_notes::NullableKind actualKinds[] = { kinds... };
         AdjustedTypes.append(actualKinds, actualKinds + numParams);
       }
      }
@@ -1646,7 +1646,7 @@ namespace {
   // FactoryAsClassMethod flag
   enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
 
-  side_car::ObjCClassInfo &&operator|(side_car::ObjCClassInfo &&known,
+  api_notes::ObjCClassInfo &&operator|(api_notes::ObjCClassInfo &&known,
                                       OptionalTypeAdjustment adjustment) {
     assert(adjustment.AdjustedTypes.size() <= 1);
     if (adjustment.AdjustedTypes.size() == 1) {
@@ -1655,20 +1655,20 @@ namespace {
     return std::move(known);
   }
 
-  side_car::ObjCPropertyInfo &&operator|(side_car::ObjCPropertyInfo &&known,
-                                         side_car::NullableKind kind) {
+  api_notes::ObjCPropertyInfo &&operator|(api_notes::ObjCPropertyInfo &&known,
+                                         api_notes::NullableKind kind) {
     known.setNullabilityAudited(kind);
     return std::move(known);
   }
 
-  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known, 
+  api_notes::ObjCMethodInfo &&operator|(api_notes::ObjCMethodInfo &&known, 
                                        Unavailable unavailable) {
     known.Unavailable = true;
     known.UnavailableMsg = unavailable.Msg;
     return std::move(known);
   }
 
-  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known,
+  api_notes::ObjCMethodInfo &&operator|(api_notes::ObjCMethodInfo &&known,
                                        OptionalTypeAdjustment adjustment) {
     known.NullabilityAudited = true;
     known.NumAdjustedNullable = adjustment.AdjustedTypes.size();
@@ -1677,15 +1677,15 @@ namespace {
     return std::move(known);
   }
 
-  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known, 
+  api_notes::ObjCMethodInfo &&operator|(api_notes::ObjCMethodInfo &&known, 
                                        DesignatedInitFlag) {
     known.DesignatedInit = true;
     return std::move(known);
   }
 
-  side_car::ObjCMethodInfo &&operator|(side_car::ObjCMethodInfo &&known,
+  api_notes::ObjCMethodInfo &&operator|(api_notes::ObjCMethodInfo &&known,
                                        FactoryAsClassMethodFlag) {
-    known.setFactoryAsInitKind(side_car::FactoryAsInitKind::AsClassMethod);
+    known.setFactoryAsInitKind(api_notes::FactoryAsInitKind::AsClassMethod);
     return std::move(known);
   }
 }
@@ -1695,16 +1695,16 @@ namespace {
 ///
 /// FIXME: This is a horrible, horrible hack.
 bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
-  using namespace side_car;
-  SideCarWriter writer;
+  using namespace api_notes;
+  APINotesWriter writer;
 
   // Constants used to map from KnownObjCMethods.def.
-  const auto OTK_None = side_car::NullableKind::NonNullable;
+  const auto OTK_None = api_notes::NullableKind::NonNullable;
   (void)OTK_None;
-  const auto OTK_Optional = side_car::NullableKind::Nullable;
+  const auto OTK_Optional = api_notes::NullableKind::Nullable;
   (void)OTK_Optional;
   const auto OTK_ImplicitlyUnwrappedOptional 
-    = side_car::NullableKind::Unknown;
+    = api_notes::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
   StringRef currentModuleName;
@@ -1750,13 +1750,13 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
 ///
 /// FIXME: This is a horrible, horrible hack.
 bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
-  using namespace side_car;
+  using namespace api_notes;
 
   auto bufferOrError = llvm::MemoryBuffer::getFile(fileName);
   if (!bufferOrError)
     return true;
 
-  auto reader = SideCarReader::get(std::move(bufferOrError.get()));
+  auto reader = APINotesReader::get(std::move(bufferOrError.get()));
   if (!reader)
     return true;
 
@@ -1764,12 +1764,12 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
   StringRef currentModuleName;
 
   // Constants used to map from KnownObjCMethods.def.
-  const auto OTK_None = side_car::NullableKind::NonNullable;
+  const auto OTK_None = api_notes::NullableKind::NonNullable;
   (void)OTK_None;
-  const auto OTK_Optional = side_car::NullableKind::Nullable;
+  const auto OTK_Optional = api_notes::NullableKind::Nullable;
   (void)OTK_Optional;
   const auto OTK_ImplicitlyUnwrappedOptional 
-    = side_car::NullableKind::Unknown;
+    = api_notes::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
   #define START_MODULE(ModuleName) \
@@ -1794,7 +1794,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
       }                                                                 \
     } else if (moduleName == currentModuleName) {                       \
       llvm::errs() << "Class " << moduleName << " method"               \
-                   << " not found in side car file\n";                  \
+                   << " not found in API notes file\n";                  \
       return true;                                                      \
     }
   #define CLASS_METHOD(ClassName, Selector, Options)                    \
@@ -1813,7 +1813,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
       }                                                                 \
     } else if (moduleName == currentModuleName) {                       \
       llvm::errs() << "Class " << moduleName << " method"               \
-                   << " not found in side car file\n";                  \
+                   << " not found in API notes file\n";                  \
       return true;                                                      \
     }
   #define OBJC_CONTEXT(ClassName, Options)                          \
@@ -1831,7 +1831,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
       }                                                             \
     } else if (moduleName == currentModuleName) {                   \
       llvm::errs() << "Class " << moduleName << "." << #ClassName   \
-                   << " not found in side car file\n";              \
+                   << " not found in API notes file\n";              \
       return true;                                                  \
     }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)    \
@@ -1849,7 +1849,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
       }                                                                 \
     } else if (moduleName == currentModuleName) {                       \
         llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
-                   << " not found in side car file\n";                  \
+                   << " not found in API notes file\n";                  \
       return true;                                                      \
     }
 #include "../../lib/ClangImporter/KnownObjCMethods.def"

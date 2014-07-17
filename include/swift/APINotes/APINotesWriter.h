@@ -1,4 +1,4 @@
-//===--- SideCarWriter.h - Side Car Writer ----------------------*- C++ -*-===//
+//===--- APINotesWriter.h - API Notes Writer ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the \c SideCarWriter class that writes out source
-// side-car data providing additional information about source code as
+// This file defines the \c APINotesWriter class that writes out source
+// API notes data providing additional information about source code as
 // a separate input, such as the non-nil/nilable annotations for
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SIDE_CAR_WRITER_H
-#define SWIFT_SIDE_CAR_WRITER_H
+#ifndef SWIFT_API_NOTES_WRITER_H
+#define SWIFT_API_NOTES_WRITER_H
 
 #include "swift/APINotes/Types.h"
 
@@ -26,22 +26,22 @@ namespace llvm {
 }
 
 namespace swift {
-namespace side_car {
+namespace api_notes {
 
-/// A class that writes side-car data to a binary representation that can be
-/// read by the \c SideCarReader.
-class SideCarWriter {
+/// A class that writes API notes data to a binary representation that can be
+/// read by the \c APINotesReader.
+class APINotesWriter {
   class Implementation;
   Implementation &Impl;
 
 public:
-  SideCarWriter();
-  ~SideCarWriter();
+  APINotesWriter();
+  ~APINotesWriter();
 
-  SideCarWriter(const SideCarWriter &) = delete;
-  SideCarWriter &operator=(const SideCarWriter &) = delete;
+  APINotesWriter(const APINotesWriter &) = delete;
+  APINotesWriter &operator=(const APINotesWriter &) = delete;
 
-  /// Write the side car data to the given stream.
+  /// Write the API notes data to the given stream.
   void writeToStream(llvm::raw_ostream &os);
 
   /// Add information about a specific Objective-C class.
@@ -69,8 +69,8 @@ public:
                      bool isInstanceMethod, const ObjCMethodInfo &info);
 };
 
-} // end namespace side_car
+} // end namespace api_notes
 } // end namespace swift
 
-#endif // LLVM_SWIFT_SIDE_CAR_WRITER_H
+#endif // LLVM_SWIFT_API_NOTES_WRITER_H
 

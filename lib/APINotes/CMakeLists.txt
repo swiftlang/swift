@@ -1,4 +1,4 @@
 add_swift_library(swiftAPINotes
-  SideCarWriter.cpp
-  SideCarReader.cpp
+  APINotesWriter.cpp
+  APINotesReader.cpp
 )

@@ -1,4 +1,4 @@
-//===--- Data.h - Side Car Data Types ---------------------------*- C++ -*-===//
+//===--- Data.h - API Notes Data Types ---------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines data types used in the representation of side-car data.
+// This file defines data types used in the representation of API notes data.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,7 +23,7 @@
 #include <initializer_list>
 
 namespace swift {
-namespace side_car {
+namespace api_notes {
 
 using llvm::StringRef;
 
@@ -48,7 +48,7 @@ enum class FactoryAsInitKind {
   AsInitializer
 };
 
-/// Describes side-car data for an Objective-C class.
+/// Describes API notes data for an Objective-C class.
 class ObjCClassInfo {
   /// Whether this class has a default nullability.
   unsigned HasDefaultNullability : 1;
@@ -89,7 +89,7 @@ public:
   }
 };
 
-/// Describes side-car data for an Objective-C property.
+/// Describes API notes data for an Objective-C property.
 class ObjCPropertyInfo {
   /// Whether this property has been audited for nullability.
   unsigned NullabilityAudited : 1;
@@ -139,7 +139,7 @@ struct ObjCSelectorRef {
   std::initializer_list<StringRef> Identifiers;
 };
 
-/// Describes side-car data for an Objective-C method.
+/// Describes API notes data for an Objective-C method.
 class ObjCMethodInfo {
 private:
   static unsigned const NullableKindMask = 0x3;
@@ -234,7 +234,7 @@ public:
   }
 };
 
-} // end namespace side_car
+} // end namespace api_notes
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SIDE_TYPES_H
