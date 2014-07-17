@@ -16,7 +16,7 @@
 // method parameters.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/SideCar/SideCarReader.h"
+#include "swift/APINotes/SideCarReader.h"
 #include "SideCarFormat.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/EndianStream.h"

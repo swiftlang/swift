@@ -19,7 +19,7 @@
 #ifndef SWIFT_SIDE_CAR_READER_H
 #define SWIFT_SIDE_CAR_READER_H
 
-#include "swift/SideCar/Types.h"
+#include "swift/APINotes/Types.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <memory>

@@ -19,7 +19,7 @@
 #ifndef SWIFT_SIDE_CAR_WRITER_H
 #define SWIFT_SIDE_CAR_WRITER_H
 
-#include "swift/SideCar/Types.h"
+#include "swift/APINotes/Types.h"
 
 namespace llvm {
   class raw_ostream;

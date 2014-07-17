@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "XMLValidator.h"
+#include "swift/APINotes/SideCarReader.h"
+#include "swift/APINotes/SideCarWriter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -31,8 +33,6 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/ReST/Parser.h"
-#include "swift/SideCar/SideCarReader.h"
-#include "swift/SideCar/SideCarWriter.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"

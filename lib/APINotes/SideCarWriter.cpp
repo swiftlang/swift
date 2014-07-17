@@ -16,7 +16,7 @@
 // for method parameters.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/SideCar/SideCarWriter.h"
+#include "swift/APINotes/SideCarWriter.h"
 #include "SideCarFormat.h"
 #include "swift/Basic/DenseMapInfo.h"
 #include "llvm/ADT/DenseMap.h"
