@@ -520,8 +520,10 @@ class alignas(8) Decl {
 
     unsigned Associativity : 2;
     unsigned Precedence : 8;
+    unsigned IsAssocImplicit : 1;
+    unsigned IsPrecedenceImplicit : 1;
   };
-  enum { NumInfixOperatorDeclBits = NumDeclBits + 10 };
+  enum { NumInfixOperatorDeclBits = NumDeclBits + 12 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -4492,8 +4494,10 @@ public:
                     Identifier Name,
                     SourceLoc NameLoc,
                     SourceLoc LBraceLoc,
+                    bool IsAssocImplicit,
                     SourceLoc AssociativityLoc,
                     SourceLoc AssociativityValueLoc,
+                    bool IsPrecedenceImplicit,
                     SourceLoc PrecedenceLoc,
                     SourceLoc PrecedenceValueLoc,
                     SourceLoc RBraceLoc,
@@ -4511,9 +4515,15 @@ public:
     if (!InfixData.isValid()) {
       setInvalid();
     } else {
+      assert((AssociativityLoc.isInvalid() || !IsAssocImplicit) &&
+             "Associativity cannot be implicit if it came from user source");
+      assert((PrecedenceLoc.isInvalid() || !IsPrecedenceImplicit) &&
+             "Precedence cannot be implicit if it came from user source");
       InfixOperatorDeclBits.Precedence = InfixData.getPrecedence();
       InfixOperatorDeclBits.Associativity =
         static_cast<unsigned>(InfixData.getAssociativity());
+      InfixOperatorDeclBits.IsPrecedenceImplicit = IsPrecedenceImplicit;
+      InfixOperatorDeclBits.IsAssocImplicit = IsAssocImplicit;
     }
   }
   
@@ -4534,6 +4544,13 @@ public:
     if (isInvalid())
       return InfixData();
     return InfixData(getPrecedence(), getAssociativity());
+  }
+
+  bool isAssociativityImplicit() const {
+    return InfixOperatorDeclBits.IsAssocImplicit;
+  }
+  bool isPrecedenceImplicit() const {
+    return InfixOperatorDeclBits.IsPrecedenceImplicit;
   }
   
   /// True if this decl's attributes conflict with those declared by another

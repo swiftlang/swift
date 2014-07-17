@@ -2227,9 +2227,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     uint8_t rawAssociativity;
     unsigned precedence;
+    bool isAssocImplicit;
+    bool isPrecedenceImplicit;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 rawAssociativity, precedence);
+                                                 rawAssociativity, precedence,
+                                                 isAssocImplicit,
+                                                 isPrecedenceImplicit);
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.hasValue()) {
@@ -2243,7 +2247,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), 
                                                getIdentifier(nameID),
                                                SourceLoc(), SourceLoc(),
+                                               isAssocImplicit,
                                                SourceLoc(), SourceLoc(),
+                                               isPrecedenceImplicit,
                                                SourceLoc(), SourceLoc(),
                                                SourceLoc(), infixData);
     break;

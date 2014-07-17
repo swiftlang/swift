@@ -1377,7 +1377,7 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   Printer.printNewline();
   {
     IndentRAII indentMore(*this);
-    if (decl->getAssociativityLoc().isValid()) {
+    if (!decl->isAssociativityImplicit()) {
       indent();
       Printer << "associativity ";
       switch (decl->getAssociativity()) {
@@ -1393,7 +1393,7 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
       }
       Printer.printNewline();
     }
-    if (decl->getPrecedenceLoc().isValid()) {
+    if (!decl->isPrecedenceImplicit()) {
       indent();
       Printer << "precedence " << decl->getPrecedence();
       Printer.printNewline();

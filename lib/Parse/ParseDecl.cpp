@@ -4150,7 +4150,8 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
   
   auto Res = new (Context)
     InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, LBraceLoc,
-                      AssociativityLoc, AssociativityValueLoc,
+                      AssociativityLoc.isInvalid(), AssociativityLoc,
+                      AssociativityValueLoc, PrecedenceLoc.isInvalid(),
                       PrecedenceLoc, PrecedenceValueLoc, RBraceLoc,
                       InfixData(precedence, associativity));
   Res->getMutableAttrs() = Attributes;

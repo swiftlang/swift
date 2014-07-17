@@ -995,11 +995,37 @@ protocol d2600_ProtocolWithOperator1 {
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
-infix operator %%% {}
+infix operator %%% { }
 func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+// PASS_2500-LABEL: {{^}}infix operator %%% {
+// PASS_2500-NOT: associativity
+// PASS_2500-NOT: precedence
+// PASS_2500: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
+
+infix operator %%< {
+// PASS_2500-LABEL: {{^}}infix operator %%< {{{$}}
+  associativity left
+// PASS_2500-NEXT: {{^}}  associativity left{{$}}
+  precedence 47
+// PASS_2500-NEXT: {{^}}  precedence 47{{$}}
+}
+
+infix operator %%> {
+// PASS_2500-LABEL: {{^}}infix operator %%> {{{$}}
+  associativity right
+// PASS_2500-NEXT: {{^}}  associativity right{{$}}
+// PASS_2500-NOT: precedence
+}
+
+infix operator %%<> {
+// PASS_2500-LABEL: {{^}}infix operator %%<> {{{$}}
+  precedence 47
+// PASS_2500-NEXT: {{^}}  precedence 47{{$}}
+// PASS_2500-NOT: associativity
+}
+// PASS_2500: {{^}}}{{$}}
 
 //===---
 //===--- Printing of deduced associated types.
