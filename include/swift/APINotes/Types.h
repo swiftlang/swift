@@ -82,6 +82,13 @@ public:
     DefaultNullability = static_cast<unsigned>(kind);
   }
 
+  /// Strip off any information within the class information structure that is
+  /// module-local, such as 'audited' flags.
+  void stripModuleLocalInfo() {
+    HasDefaultNullability = false;
+    DefaultNullability = 0;
+  }
+
   friend bool operator==(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
     return lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
            lhs.DefaultNullability == rhs.DefaultNullability;
@@ -89,6 +96,18 @@ public:
 
   friend bool operator!=(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
     return !(lhs == rhs);
+  }
+
+  friend ObjCClassInfo &operator|=(ObjCClassInfo &lhs,
+                                   const ObjCClassInfo &rhs) {
+    // Merge nullability.
+    if (!lhs.getDefaultNullability()) {
+      if (auto nullable = rhs.getDefaultNullability()) {
+        lhs.setDefaultNullability(*nullable);
+      }
+    }
+
+    return lhs;
   }
 };
 

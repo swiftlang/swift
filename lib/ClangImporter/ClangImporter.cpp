@@ -525,7 +525,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   }
 
   // Try to load the API notes for this module.
-  (void)getAPINotesForModule(owner, clangModule->getTopLevelModule());
+  (void)getAPINotesForModule(clangModule->getTopLevelModule());
 
   return result;
 }
@@ -609,7 +609,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
 
 api_notes::APINotesReader *
 ClangImporter::Implementation::getAPINotesForModule(
-    ClangImporter &importer,
     const clang::Module *underlying) {
   assert(underlying == underlying->getTopLevelModule() &&
          "Only allowed on a top-level module");
@@ -1288,14 +1287,6 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
     }
   };
 
-  // Add a known context.
-  auto addContext = [&](Identifier className, KnownObjCMethod known) {
-    assert(KnownObjCContexts.find(className) == KnownObjCContexts.end() &&
-           "Context is already known!?");
-    // Record this known context.
-    KnownObjCContexts[className] = known;
-  };
-
   using namespace known_methods;
 
   // Function object that creates a selector.
@@ -1307,9 +1298,7 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
 #define CLASS_METHOD(ClassName, Selector, Options)  \
   addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
             /*isInstanceMethod=*/false, KnownObjCMethod() | Options);
-#define OBJC_CONTEXT(ContextName, Options)  \
-  addContext(SwiftContext.getIdentifier(#ContextName), \
-            KnownObjCMethod() | Options);
+#define OBJC_CONTEXT(ContextName, Options)
 #define OBJC_PROPERTY(ContextName, PropertyName, Options)
 #include "KnownObjCMethods.def"
 }
@@ -1331,35 +1320,6 @@ static StringRef getObjCContextName(const clang::Decl *decl) {
   return contextName;
 }
 
-KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
-                   const clang::ObjCMethodDecl *method) {
-  populateKnownObjCMethods();
-
-  // Find the name of the method's context.
-  StringRef contextName = getObjCContextName(method);
-  if (contextName.empty()) {
-    // error case.
-    return nullptr;
-  }
-
-  Identifier contextID = SwiftContext.getIdentifier(contextName);
-  // Look it up in the method maps.
-  ObjCSelector selector = importSelector(method->getSelector());
-  auto &knownMethods = method->isClassMethod() ? KnownClassMethods
-                                               : KnownInstanceMethods;
-  auto known = knownMethods.find({contextID, selector});
-  if (known != knownMethods.end())
-    return &known->second;
-
-  // Look it up in the contexts map if more specialized info is not available.
-  auto knownContext = KnownObjCContexts.find(contextID);
-  if (knownContext != KnownObjCContexts.end()) {
-    return &knownContext->second;
-  }
-
-  return nullptr;
-}
-
 /// Translate the "nullability" notion from API notes into an optional type
 /// kind.
 static OptionalTypeKind translateNullability(api_notes::NullableKind kind) {
@@ -1373,6 +1333,114 @@ static OptionalTypeKind translateNullability(api_notes::NullableKind kind) {
   case api_notes::NullableKind::Unknown:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
   }
+}
+
+Optional<KnownObjCMethod> ClangImporter::Implementation::getKnownObjCMethod(
+                            const clang::ObjCMethodDecl *method) {
+  populateKnownObjCMethods();
+
+  // Find the name of the method's context.
+  StringRef contextName = getObjCContextName(method);
+  if (contextName.empty()) {
+    // error case.
+    return Nothing;
+  }
+
+  Identifier contextID = SwiftContext.getIdentifier(contextName);
+
+  // Look it up in the method maps.
+  ObjCSelector selector = importSelector(method->getSelector());
+  auto &knownMethods = method->isClassMethod() ? KnownClassMethods
+                                               : KnownInstanceMethods;
+  auto known = knownMethods.find({contextID, selector});
+  if (known != knownMethods.end())
+    return known->second;
+
+  // Check whether we know anything about the context containing this method.
+  auto *container = cast<clang::ObjCContainerDecl>(method->getDeclContext());
+  if (auto contextInfo = getKnownObjCContext(container)) {
+    if (auto nullable = contextInfo->getDefaultNullability()) {
+      KnownObjCMethod info;
+      info.OptionalTypesAudited = true;
+      info.addTypeInfo(0, translateNullability(*nullable));
+      return info;
+    }
+  }
+
+  return Nothing;
+}
+
+Optional<api_notes::ObjCClassInfo>
+ClangImporter::Implementation::getKnownObjCContext(
+    const clang::ObjCContainerDecl *container) {
+  // Find the primary set of API notes, in the module where this container
+  // was declared.
+  api_notes::APINotesReader *primary = nullptr;
+  if (auto primaryModule = getClangSubmoduleForDecl(container)) {
+    if (*primaryModule) {
+      primary = getAPINotesForModule((*primaryModule)->getTopLevelModule());
+    }
+  }
+
+  StringRef name;
+
+  // Find the secondary set of API notes, in the module where the original
+  // class was declared.
+  api_notes::APINotesReader *secondary = nullptr;
+  if (auto category = dyn_cast<clang::ObjCCategoryDecl>(container)) {
+    auto *objcClass = category->getClassInterface();
+    if (auto secondaryModule = getClangSubmoduleForDecl(objcClass)) {
+      if (*secondaryModule) {
+        secondary = getAPINotesForModule(
+                      (*secondaryModule)->getTopLevelModule());
+      }
+    }
+
+    // For categories, use the name of the class itself.
+    name = objcClass->getName();
+  } else {
+    // For protocols and classes, we just need the class name.
+    name = container->getName();
+  }
+
+  // If the primary and secondary are the same.
+  if (primary == secondary) {
+    // Both null: we have no information.
+    if (!primary) {
+      return Nothing;
+    }
+
+    // Drop the secondary; we only need to look in one place.
+    secondary = nullptr;
+  }
+
+  Optional<api_notes::ObjCClassInfo> primaryInfo;
+  if (primary)
+    primaryInfo = primary->lookupObjCClass(name);
+
+  Optional<api_notes::ObjCClassInfo> secondaryInfo;
+  if (secondary)
+    secondaryInfo = secondary->lookupObjCClass(name);
+
+  // If neither place had information about this class, we're done.
+  if (!primaryInfo && !secondaryInfo)
+    return Nothing;
+
+  api_notes::ObjCClassInfo info;
+
+  // Merge in primary information, if available.
+  if (primaryInfo) {
+    info |= *primaryInfo;
+  }
+
+  // Merge in secondary information after stripping out anything that is not
+  // propagated from the class's defining module.
+  if (secondaryInfo) {
+    secondaryInfo->stripModuleLocalInfo();
+    info |= *secondaryInfo;
+  }
+
+  return info;
 }
 
 OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(

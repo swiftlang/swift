@@ -256,7 +256,7 @@ public:
     assert(index <=
            (sizeof(OptionalTypesPayload) * CHAR_BIT)/OptionalTypeKindSize);
     assert(kind < OptionalTypeKindMask);
-    assert(OptionalTypesAudited = true);
+    assert(OptionalTypesAudited == true);
     unsigned kindValue =
       (static_cast<unsigned>(kind)) << (index * OptionalTypeKindSize);
     OptionalTypesPayload |= kindValue;
@@ -382,18 +382,19 @@ public:
   llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
     KnownClassMethods;
 
-  /// A map from class or protocol name to a model method for this class, which
-  /// contains information about the methods of this class or protocol. This
-  /// info can be shadowed by more specific information from KnownMethods maps.
-  llvm::DenseMap<Identifier, KnownObjCMethod> KnownObjCContexts;
-
   /// Populate the tables of known methods, if it hasn't been done
   /// already.
   void populateKnownObjCMethods();
 
-  /// Retrieve any information known a priori about the given Objective-C,
+  /// Retrieve any information known a priori about the given Objective-C
   /// method, if we have it.
-  KnownObjCMethod *getKnownObjCMethod(const clang::ObjCMethodDecl *method);
+  Optional<KnownObjCMethod> getKnownObjCMethod(
+                              const clang::ObjCMethodDecl *method);
+
+  /// Retrieve information about the given Objective-C context scoped to the
+  /// given Swift module.
+  Optional<api_notes::ObjCClassInfo>
+  getKnownObjCContext(const clang::ObjCContainerDecl *container);
 
   /// Retrieve any information known a priori about the given Objective-C,
   /// property, if we have it. Specifically, the optionality of the type.
@@ -828,9 +829,7 @@ public:
   ///
   /// \returns an unowned pointer to the corresponding API notes reader, or
   /// nullptr if no API notes file exists.
-  api_notes::APINotesReader *getAPINotesForModule(
-                               ClangImporter &importer,
-                               const clang::Module *underlying);
+  api_notes::APINotesReader *getAPINotesForModule(const clang::Module *module);
 
   /// \brief Constructs a Swift module for the given Clang module.
   Module *finishLoadingClangModule(ClangImporter &importer,

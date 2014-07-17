@@ -967,7 +967,7 @@ Type ClangImporter::Implementation::importMethodType(
     resultKind = ImportTypeKind::Result;
 
   // Check if we know more about the type from our whitelists.
-  KnownObjCMethod *knownMethod = 0;
+  Optional<KnownObjCMethod> knownMethod;
   if (ImportWithTighterObjCPointerTypes)
     if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl))
       if (auto knownMethodTmp = getKnownObjCMethod(MD))
