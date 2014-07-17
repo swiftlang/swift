@@ -61,7 +61,11 @@
 #  error define OBJC_CONTEXT before including KnownMethods.def
 #endif
 
-// ObjectiveC
+#ifndef START_MODULE
+#  define START_MODULE(Name)
+#endif
+
+START_MODULE(ObjectiveC)
 INSTANCE_METHOD(NSObject, (0, "dealloc"), 
                 Unavailable("use 'deinit' to define a de-initializer"))
 
@@ -72,7 +76,7 @@ CLASS_METHOD(NSObject, (0, "class"), Unavailable("use 'self' instead"))
 INSTANCE_METHOD(NSObject, (0, "class"), 
                 Unavailable("use 'dynamicType' instead"))
 
-// Foundation
+START_MODULE(Foundation)
 INSTANCE_METHOD(NSArray, (0, "init"), DesignatedInit)
 INSTANCE_METHOD(NSArray, (1, "initWithObjects"), DesignatedInit)
 INSTANCE_METHOD(NSArray, (2, "initWithObjects", "count"), DesignatedInit)
@@ -186,7 +190,7 @@ INSTANCE_METHOD(NSXMLDTD, (3, "initWithData", "options", "error"),
 
 INSTANCE_METHOD(NSXMLParser, (1, "initWithData"), DesignatedInit)
 
-// AppKit
+START_MODULE(AppKit)
 INSTANCE_METHOD(NSCell, (0, "init"), DesignatedInit)
 INSTANCE_METHOD(NSCell, (1, "initWithCoder"), DesignatedInit)
 INSTANCE_METHOD(NSCell, (1, "initTextCell"), DesignatedInit)
@@ -369,10 +373,10 @@ OBJC_PROPERTY(NSView, previousValidKeyView, OTK_Optional)
 OBJC_PROPERTY(NSView, printJobTitle, OTK_None)
 OBJC_PROPERTY(NSView, registeredDraggedTypes, OTK_Optional)
 
-// NotificationCenter
+START_MODULE(NotificationCenter)
 CLASS_METHOD(NCWidgetController, (0, "widgetController"), FactoryAsClassMethod)
 
-// UIKit
+START_MODULE(UIKit)
 
 // FIXME: Differs from AppKit
 // INSTANCE_METHOD(NSTextAttachment, (2, "initWithData", "ofType"), 
@@ -449,3 +453,4 @@ OBJC_PROPERTY(UIApplicationDelegate, window, OTK_Optional)
 #undef CLASS_METHOD
 #undef OBJC_PROPERTY
 #undef OBJC_CONTEXT
+#undef START_MODULE

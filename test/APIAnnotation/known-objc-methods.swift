@@ -1,6 +1,22 @@
-// RUN: %swift-ide-test -generate-api-annotation -o %t
-// RUN: llvm-bcanalyzer %t | FileCheck %s
-// RUN: %swift-ide-test -check-api-annotation %t
+// ObjectiveC
+// RUN: %swift-ide-test -generate-api-annotation -o %t-ObjectiveC.apinotes ObjectiveC
+// RUN: %swift-ide-test -check-api-annotation ObjectiveC %t-ObjectiveC.apinotes
+
+// Foundation
+// RUN: %swift-ide-test -generate-api-annotation -o %t-Foundation.apinotes Foundation
+// RUN: %swift-ide-test -check-api-annotation Foundation %t-Foundation.apinotes
+
+// AppKit
+// RUN: %swift-ide-test -generate-api-annotation -o %t-AppKit.apinotes AppKit
+// RUN: %swift-ide-test -check-api-annotation AppKit %t-AppKit.apinotes
+// RUN: llvm-bcanalyzer %t-AppKit.apinotes | FileCheck %s
+// NotificationCenter
+// RUN: %swift-ide-test -generate-api-annotation -o %t-NotificationCenter.apinotes NotificationCenter
+// RUN: %swift-ide-test -check-api-annotation NotificationCenter %t-NotificationCenter.apinotes
+
+// UIKit
+// RUN: %swift-ide-test -generate-api-annotation -o %t-UIKit.apinotes UIKit
+// RUN: %swift-ide-test -check-api-annotation UIKit %t-UIKit.apinotes
 
 // CHECK: Block ID #0 (BLOCKINFO_BLOCK)
 // CHECK: Block ID #[[IDENTIFIER_BLOCK:[0-9]+]] (IDENTIFIER_BLOCK)

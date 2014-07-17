@@ -434,15 +434,16 @@ void SideCarWriter::Implementation::writeObjCMethodBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_METHOD_BLOCK_ID, 3);
 
-  if (ObjCProperties.empty())
+  if (ObjCMethods.empty())
     return;  
 
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
     llvm::OnDiskChainedHashTableGenerator<ObjCMethodTableInfo> generator;
-    for (auto &entry : ObjCMethods)
+    for (auto &entry : ObjCMethods) {
       generator.insert(entry.first, entry.second);
+    }
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
@@ -501,7 +502,7 @@ void SideCarWriter::Implementation::writeObjCSelectorBlock(
        llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, OBJC_SELECTOR_BLOCK_ID, 3);
 
-  if (ObjCProperties.empty())
+  if (SelectorIDs.empty())
     return;  
 
   llvm::SmallString<4096> hashTableBlob;

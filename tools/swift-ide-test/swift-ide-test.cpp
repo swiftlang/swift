@@ -1687,11 +1687,9 @@ namespace {
 /// file.
 ///
 /// FIXME: This is a horrible, horrible hack.
-bool generateAPIAnnotation(StringRef fileName) {  
+bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
   using namespace side_car;
   SideCarWriter writer;
-
-  StringRef moduleName = "Foundation"; // FIXME: this is a lie
 
   // Constants used to map from KnownObjCMethods.def.
   const auto OTK_None = side_car::NullableKind::NonNullable;
@@ -1702,21 +1700,32 @@ bool generateAPIAnnotation(StringRef fileName) {
     = side_car::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
+  StringRef currentModuleName;
+  #define START_MODULE(ModuleName) \
+    currentModuleName = #ModuleName;
   #define MAKE_SELECTOR_REF(NumPieces, ...) \
     ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
-  #define INSTANCE_METHOD(ClassName, Selector, Options)          \
-    writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
-                         /*isInstanceMethod=*/true,              \
-                         ObjCMethodInfo() | Options);
-  #define CLASS_METHOD(ClassName, Selector, Options)             \
-    writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector, \
-                         /*isInstanceMethod=*/false,             \
-                         ObjCMethodInfo() | Options);
-  #define OBJC_CONTEXT(ClassName, Options) \
-    writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options);
-  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind) \
-    writer.addObjCProperty(#ContextName, #PropertyName,              \
-                           ObjCPropertyInfo() | OptionalTypeKind);
+  #define INSTANCE_METHOD(ClassName, Selector, Options)             \
+    if (moduleName.equals(currentModuleName)) {                     \
+      writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector,  \
+                           /*isInstanceMethod=*/true,               \
+                           ObjCMethodInfo() | Options);             \
+    }
+  #define CLASS_METHOD(ClassName, Selector, Options)                \
+    if (moduleName == currentModuleName) {                          \
+      writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector,  \
+                           /*isInstanceMethod=*/false,              \
+                           ObjCMethodInfo() | Options);             \
+    }
+  #define OBJC_CONTEXT(ClassName, Options)                              \
+    if (moduleName == currentModuleName) {                              \
+      writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options); \
+    }
+  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)  \
+    if (moduleName == currentModuleName) {                            \
+      writer.addObjCProperty(#ContextName, #PropertyName,             \
+                             ObjCPropertyInfo() | OptionalTypeKind);  \
+    }
 #include "../../lib/ClangImporter/KnownObjCMethods.def"
   #undef MAKE_SELECTOR_REF
 
@@ -1733,7 +1742,7 @@ bool generateAPIAnnotation(StringRef fileName) {
 /// file.
 ///
 /// FIXME: This is a horrible, horrible hack.
-bool checkAPIAnnotation(StringRef fileName) {
+bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
   using namespace side_car;
 
   auto bufferOrError = llvm::MemoryBuffer::getFile(fileName);
@@ -1745,7 +1754,7 @@ bool checkAPIAnnotation(StringRef fileName) {
     return true;
 
   // Okay. Go look for the data we expect.
-  StringRef moduleName = "Foundation"; // FIXME: this is a lie
+  StringRef currentModuleName;
 
   // Constants used to map from KnownObjCMethods.def.
   const auto OTK_None = side_car::NullableKind::NonNullable;
@@ -1756,59 +1765,82 @@ bool checkAPIAnnotation(StringRef fileName) {
     = side_car::NullableKind::Unknown;
   (void)OTK_ImplicitlyUnwrappedOptional;
 
+  #define START_MODULE(ModuleName) \
+    currentModuleName = #ModuleName;
+
   #define MAKE_SELECTOR_REF(NumPieces, ...) \
     ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
 
-  #define INSTANCE_METHOD(ClassName, Selector, Options)               \
-  if (auto info = reader->lookupObjCMethod(                           \
-                    #ClassName, MAKE_SELECTOR_REF Selector, true)) {  \
-      auto expectedInfo = ObjCMethodInfo() | Options;                 \
-      if (*info != expectedInfo) {                                    \
-        llvm::errs() << "Class " << moduleName << " method"           \
-                     << " has incorrect information\n";               \
-        return true;                                                  \
-      }                                                               \
-    } else {                                                          \
-      llvm::errs() << "Class " << moduleName << " method"             \
-                   << " not found in side car file\n";                \
-      return true;                                                    \
+  #define INSTANCE_METHOD(ClassName, Selector, Options)                 \
+    if (auto info = reader->lookupObjCMethod(                           \
+                      #ClassName, MAKE_SELECTOR_REF Selector, true)) {  \
+      if (moduleName != currentModuleName) {                            \
+        llvm::errs() << "Class " << moduleName << " method"             \
+                     << " should not have been found\n";                \
+        return true;                                                    \
+      }                                                                 \
+      auto expectedInfo = ObjCMethodInfo() | Options;                   \
+      if (*info != expectedInfo) {                                      \
+        llvm::errs() << "Class " << moduleName << " method"             \
+                     << " has incorrect information\n";                 \
+        return true;                                                    \
+      }                                                                 \
+    } else if (moduleName == currentModuleName) {                       \
+      llvm::errs() << "Class " << moduleName << " method"               \
+                   << " not found in side car file\n";                  \
+      return true;                                                      \
     }
-  #define CLASS_METHOD(ClassName, Selector, Options)                  \
-  if (auto info = reader->lookupObjCMethod(                           \
-                    #ClassName, MAKE_SELECTOR_REF Selector, false)) { \
-      auto expectedInfo = ObjCMethodInfo() | Options;                 \
-      if (*info != expectedInfo) {                                    \
-        llvm::errs() << "Class " << moduleName << " method"           \
-                     << " has incorrect information\n";               \
-        return true;                                                  \
-      }                                                               \
-    } else {                                                          \
-      llvm::errs() << "Class " << moduleName << " method"             \
-                   << " not found in side car file\n";                \
-      return true;                                                    \
+  #define CLASS_METHOD(ClassName, Selector, Options)                    \
+    if (auto info = reader->lookupObjCMethod(                           \
+                      #ClassName, MAKE_SELECTOR_REF Selector, false)) { \
+      if (moduleName != currentModuleName) {                            \
+        llvm::errs() << "Class " << moduleName << " method"             \
+                     << " should not have been found\n";                \
+        return true;                                                    \
+      }                                                                 \
+      auto expectedInfo = ObjCMethodInfo() | Options;                   \
+      if (*info != expectedInfo) {                                      \
+        llvm::errs() << "Class " << moduleName << " method"             \
+                     << " has incorrect information\n";                 \
+        return true;                                                    \
+      }                                                                 \
+    } else if (moduleName == currentModuleName) {                       \
+      llvm::errs() << "Class " << moduleName << " method"               \
+                   << " not found in side car file\n";                  \
+      return true;                                                      \
     }
   #define OBJC_CONTEXT(ClassName, Options)                              \
     if (auto info = reader->lookupObjCClass(moduleName, #ClassName)) {  \
+      if (moduleName != currentModuleName) {                            \
+        llvm::errs() << "Class " << moduleName << "." << #ClassName     \
+                     << " should not have been found\n";                \
+        return true;                                                    \
+      }                                                                 \
       auto expectedInfo = ObjCClassInfo() | Options;                    \
-      if (*info != expectedInfo) {                                    \
+      if (*info != expectedInfo) {                                      \
         llvm::errs() << "Class " << moduleName << "." << #ClassName     \
                      << " has incorrect information\n";                 \
         return true;                                                    \
       }                                                                 \
-    } else {                                                            \
+    } else if (moduleName == currentModuleName) {                       \
       llvm::errs() << "Class " << moduleName << "." << #ClassName       \
                    << " not found in side car file\n";                  \
       return true;                                                      \
     }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)    \
     if (auto info = reader->lookupObjCProperty(#ContextName, #PropertyName)) { \
+      if (moduleName != currentModuleName) {                            \
+        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
+                     << " should not have been found\n";                \
+        return true;                                                    \
+      }                                                                 \
       auto expectedInfo = ObjCPropertyInfo() | OptionalTypeKind;        \
       if (*info != expectedInfo) {                                      \
         llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
                      << " has incorrect information\n";                 \
         return true;                                                    \
       }                                                                 \
-    } else {                                                            \
+    } else if (moduleName == currentModuleName) {                       \
         llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
                    << " not found in side car file\n";                  \
       return true;                                                      \
@@ -1839,7 +1871,14 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    if (generateAPIAnnotation(options::OutputFilename)) {
+    if (options::InputFilenames.size() != 1) {
+      llvm::errs() << "single input module required\n";
+      llvm::cl::PrintHelpMessage();
+      return 1;
+    }
+
+    if (generateAPIAnnotation(options::InputFilenames[0], 
+                              options::OutputFilename)) {
       llvm::errs() << "could not generate " << options::OutputFilename << "\n";
       return 1;
     }
@@ -1848,13 +1887,14 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::Action == ActionType::CheckAPIAnnotation) {
-    if (options::InputFilenames.size() != 1) {
-      llvm::errs() << "single input file required\n";
+    if (options::InputFilenames.size() != 2) {
+      llvm::errs() << "input file and module required\n";
       llvm::cl::PrintHelpMessage();      
       return 1;
     }
     
-    if (checkAPIAnnotation(options::InputFilenames[0])) {
+    if (checkAPIAnnotation(options::InputFilenames[0], 
+                           options::InputFilenames[1])) {
       llvm::errs() << "could not read " << options::InputFilenames[0] << "\n";
       return 1;
     }
