@@ -85,7 +85,7 @@ class LazyPropertyCrash  {
 // CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @_TToFC15objc_properties10SomeObjects8bareIvarS0_ to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
-// CHECK:     i8* getelementptr inbounds ([8 x i8]* @2, i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast ([[OPAQUE5:%.*]]* ([[OPAQUE6:%.*]]*, i8*)* @_TToFC15objc_properties10SomeObjectcfMS0_FT_S0_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
