@@ -46,9 +46,9 @@ class SideCarWriter::Implementation {
 public:
   /// Information about Objective-C classes.
   ///
-  /// Indexed by the (module ID, class ID), and provides information
+  /// Indexed by the class ID and provides information
   /// describing the class within that module.
-  llvm::DenseMap<std::pair<unsigned, unsigned>, ObjCClassInfo> ObjCClasses;
+  llvm::DenseMap<unsigned, ObjCClassInfo> ObjCClasses;
 
   /// Information about Objective-C properties.
   ///
@@ -239,7 +239,7 @@ namespace {
   /// Used to serialize the on-disk Objective-C class table.
   class ObjCClassTableInfo {
   public:
-    using key_type = std::pair<unsigned, unsigned>; // (module ID, class ID)
+    using key_type = unsigned; // class ID
     using key_type_ref = key_type;
     using data_type = ObjCClassInfo;
     using data_type_ref = const data_type &;
@@ -253,7 +253,7 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
+      uint32_t keyLength = sizeof(IdentifierID);
       uint32_t dataLength = 2;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -263,8 +263,7 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer<little> writer(out);
-      writer.write<IdentifierID>(key.first);
-      writer.write<IdentifierID>(key.second);
+      writer.write<IdentifierID>(key);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -561,12 +560,10 @@ void SideCarWriter::writeToStream(raw_ostream &os) {
   Impl.writeToStream(os);
 }
 
-void SideCarWriter::addObjCClass(StringRef moduleName, StringRef name,
-                                 const ObjCClassInfo &info) {
-  IdentifierID moduleID = Impl.getIdentifier(moduleName);
+void SideCarWriter::addObjCClass(StringRef name, const ObjCClassInfo &info) {
   IdentifierID classID = Impl.getIdentifier(name);
-  assert(!Impl.ObjCClasses.count({moduleID, classID}));
-  Impl.ObjCClasses[{moduleID, classID}] = info;
+  assert(!Impl.ObjCClasses.count(classID));
+  Impl.ObjCClasses[classID] = info;
 }
 
 void SideCarWriter::addObjCProperty(StringRef className, StringRef name,

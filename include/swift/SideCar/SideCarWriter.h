@@ -46,11 +46,9 @@ public:
 
   /// Add information about a specific Objective-C class.
   ///
-  /// \param moduleName The module in which this class is declared.
   /// \param name The name of this class.
   /// \param info Information about this class.
-  void addObjCClass(StringRef moduleName, StringRef name,
-                    const ObjCClassInfo &info);
+  void addObjCClass(StringRef name, const ObjCClassInfo &info);
 
   /// Add information about a specific Objective-C property.
   ///

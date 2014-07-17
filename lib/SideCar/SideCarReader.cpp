@@ -70,7 +70,7 @@ namespace {
   /// Used to deserialize the on-disk Objective-C class table.
   class ObjCClassTableInfo {
   public:
-    using internal_key_type = std::pair<unsigned, unsigned>;
+    using internal_key_type = unsigned; // name ID
     using external_key_type = internal_key_type;
     using data_type = ObjCClassInfo;
     using hash_value_type = size_t;
@@ -96,9 +96,8 @@ namespace {
     }
     
     static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-      auto moduleID = endian::readNext<IdentifierID, little, unaligned>(data);
       auto classID = endian::readNext<IdentifierID, little, unaligned>(data);
-      return { moduleID, classID };
+      return classID;
     }
     
     static data_type ReadData(internal_key_type key, const uint8_t *data,
@@ -794,20 +793,15 @@ SideCarReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
   return std::move(reader);
 }
 
-Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef moduleName, 
-                                                       StringRef name) {
+Optional<ObjCClassInfo> SideCarReader::lookupObjCClass(StringRef name) {
   if (!Impl.ObjCClassTable)
-    return Nothing;
-
-  Optional<IdentifierID> moduleID = Impl.getIdentifier(moduleName);
-  if (!moduleID)
     return Nothing;
 
   Optional<IdentifierID> classID = Impl.getIdentifier(name);
   if (!classID)
     return Nothing;
 
-  auto known = Impl.ObjCClassTable->find({*moduleID, *classID});
+  auto known = Impl.ObjCClassTable->find(*classID);
   if (known == Impl.ObjCClassTable->end())
     return Nothing;
 

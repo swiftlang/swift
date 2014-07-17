@@ -1717,9 +1717,9 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
                            /*isInstanceMethod=*/false,              \
                            ObjCMethodInfo() | Options);             \
     }
-  #define OBJC_CONTEXT(ClassName, Options)                              \
-    if (moduleName == currentModuleName) {                              \
-      writer.addObjCClass(moduleName, #ClassName, ObjCClassInfo() | Options); \
+  #define OBJC_CONTEXT(ClassName, Options)                        \
+    if (moduleName == currentModuleName) {                        \
+      writer.addObjCClass(#ClassName, ObjCClassInfo() | Options); \
     }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)  \
     if (moduleName == currentModuleName) {                            \
@@ -1809,23 +1809,23 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
                    << " not found in side car file\n";                  \
       return true;                                                      \
     }
-  #define OBJC_CONTEXT(ClassName, Options)                              \
-    if (auto info = reader->lookupObjCClass(moduleName, #ClassName)) {  \
-      if (moduleName != currentModuleName) {                            \
-        llvm::errs() << "Class " << moduleName << "." << #ClassName     \
-                     << " should not have been found\n";                \
-        return true;                                                    \
-      }                                                                 \
-      auto expectedInfo = ObjCClassInfo() | Options;                    \
-      if (*info != expectedInfo) {                                      \
-        llvm::errs() << "Class " << moduleName << "." << #ClassName     \
-                     << " has incorrect information\n";                 \
-        return true;                                                    \
-      }                                                                 \
-    } else if (moduleName == currentModuleName) {                       \
-      llvm::errs() << "Class " << moduleName << "." << #ClassName       \
-                   << " not found in side car file\n";                  \
-      return true;                                                      \
+  #define OBJC_CONTEXT(ClassName, Options)                          \
+    if (auto info = reader->lookupObjCClass(#ClassName)) {          \
+      if (moduleName != currentModuleName) {                        \
+        llvm::errs() << "Class " << moduleName << "." << #ClassName \
+                     << " should not have been found\n";            \
+        return true;                                                \
+      }                                                             \
+      auto expectedInfo = ObjCClassInfo() | Options;                \
+      if (*info != expectedInfo) {                                  \
+        llvm::errs() << "Class " << moduleName << "." << #ClassName \
+                     << " has incorrect information\n";             \
+        return true;                                                \
+      }                                                             \
+    } else if (moduleName == currentModuleName) {                   \
+      llvm::errs() << "Class " << moduleName << "." << #ClassName   \
+                   << " not found in side car file\n";              \
+      return true;                                                  \
     }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)    \
     if (auto info = reader->lookupObjCProperty(#ContextName, #PropertyName)) { \

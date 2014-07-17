@@ -49,15 +49,12 @@ public:
   SideCarReader(const SideCarReader &) = delete;
   SideCarReader &operator=(const SideCarReader &) = delete;
 
-  /// Look for information regarding the given Objective-C class in
-  /// the given module.
+  /// Look for information regarding the given Objective-C class.
   ///
-  /// \param moduleName The name of the module in which we are
-  /// searching for information.
   /// \param name The name of the class we're looking for.
   ///
   /// \returns Information about the class, if known.
-  Optional<ObjCClassInfo> lookupObjCClass(StringRef moduleName, StringRef name);
+  Optional<ObjCClassInfo> lookupObjCClass(StringRef name);
 
   /// Look for information regarding the given Objective-C property in
   /// the given class.
