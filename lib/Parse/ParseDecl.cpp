@@ -271,25 +271,7 @@ bool Parser::skipExtraTopLevelRBraces() {
   return true;
 }
 
-/// getTypeAttrFromString - If the specified string is a valid type attribute,
-/// return the kind.  Otherwise, return TAK_Count as a sentinel.
-static TypeAttrKind getTypeAttrFromString(StringRef Str) {
-  return llvm::StringSwitch<TypeAttrKind>(Str)
-#define TYPE_ATTR(X) .Case(#X, TAK_##X)
-#include "swift/AST/Attr.def"
-  .Default(TAK_Count);
-}
 
-/// If the specified string is a valid declaration attribute,
-/// return the kind.  Otherwise, return DAK_Count as a sentinel.
-static DeclAttrKind getDeclAttrFromString(StringRef Str) {
-  return llvm::StringSwitch<DeclAttrKind>(Str)
-#define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
-#define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
-#define VIRTUAL_DECL_ATTR(...)
-#include "swift/AST/Attr.def"
-  .Default(DAK_Count);
-}
 
 static StringRef getStringLiteralIfNotInterpolated(Parser &P,
                                                    SourceLoc Loc,
@@ -815,11 +797,11 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
-  DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
+  DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
   if (DK != DAK_Count)
     return parseNewDeclAttribute(Attributes, AtLoc, DK);
 
-  if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
+  if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
   else
     diagnose(Tok, diag::unknown_attribute, Tok.getText());
@@ -851,20 +833,12 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   }
   
   // Determine which attribute it is, and diagnose it if unknown.
-  TypeAttrKind attr = getTypeAttrFromString(Tok.getText());
+  TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
 
   if (attr == TAK_Count) {
     if (justChecking) return true;
 
-    StringRef Text = Tok.getText();
-    bool isDeclAttribute = llvm::StringSwitch<bool>(Text)
-#define DECL_ATTR(X, ...) .Case(#X, true)
-#define DECL_ALIAS(X, ...) .Case(#X, true)
-#define VIRTUAL_DECL_ATTR(X, ...)
-#include "swift/AST/Attr.def"
-      .Default(false);
-    
-    if (isDeclAttribute)
+    if (DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count)
       diagnose(Tok, diag::decl_attribute_applied_to_type);
     else
       diagnose(Tok, diag::unknown_attribute, Tok.getText());

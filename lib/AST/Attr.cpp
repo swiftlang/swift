@@ -23,7 +23,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/StringSwitch.h"
-
 using namespace swift;
 
 
@@ -31,6 +30,33 @@ using namespace swift;
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
                                   unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+/// Given a name like "auto_closure", return the type attribute ID that
+/// corresponds to it.  This returns TAK_Count on failure.
+///
+TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
+  return llvm::StringSwitch<TypeAttrKind>(Str)
+#define TYPE_ATTR(X) .Case(#X, TAK_##X)
+#include "swift/AST/Attr.def"
+  .Default(TAK_Count);
+}
+
+
+/// Given a name like "inline", return the decl attribute ID that corresponds
+/// to it.  Note that this is a many-to-one mapping, and that the identifier
+/// passed in may only be the first portion of the attribute (e.g. in the case
+/// of the 'unowned(unsafe)' attribute, the string passed in is 'unowned'.
+///
+/// Also note that this recognizes both attributes like '@inline' (with no @)
+/// and decl modifiers like 'final'.  This returns DAK_Count on failure.
+///
+DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
+  return llvm::StringSwitch<DeclAttrKind>(Str)
+#define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
+#define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DAK_##CLASS)
+#include "swift/AST/Attr.def"
+  .Default(DAK_Count);
 }
 
 /// A statically-allocated empty set of attributes.

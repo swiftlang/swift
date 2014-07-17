@@ -232,6 +232,11 @@ public:
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
   unsigned getOpenedID() const { return *OpenedID; }
+
+  /// Given a name like "auto_closure", return the type attribute ID that
+  /// corresponds to it.  This returns TAK_Count on failure.
+  ///
+  static TypeAttrKind getAttrKindFromString(StringRef Str);
 };
 
 class AttributeBase {
@@ -447,9 +452,18 @@ public:
     return isNotSerialized(getKind());
   }
 
-
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;
+
+  /// Given a name like "inline", return the decl attribute ID that corresponds
+  /// to it.  Note that this is a many-to-one mapping, and that the identifier
+  /// passed in may only be the first portion of the attribute (e.g. in the case
+  /// of the 'unowned(unsafe)' attribute, the string passed in is 'unowned'.
+  ///
+  /// Also note that this recognizes both attributes like '@inline' (with no @)
+  /// and decl modifiers like 'final'.  This returns DAK_Count on failure.
+  ///
+  static DeclAttrKind getAttrKindFromString(StringRef Str);
 };
 
 /// Describes a "simple" declaration attribute that carries no data.

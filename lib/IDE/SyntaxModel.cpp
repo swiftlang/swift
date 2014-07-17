@@ -63,14 +63,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     Optional<unsigned> Length;
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
-      bool IsAttr = llvm::StringSwitch<bool>(Tok.getText())
-#define TYPE_ATTR(X) .Case(#X, true)
-#define DECL_ATTR(X, ...) .Case(#X, true)
-#define DECL_ATTR_ALIAS(X, ...) .Case(#X, true)
-#define VIRTUAL_DECL_ATTR(X, ...)
-#include "swift/AST/Attr.def"
-      .Default(false);
-      if (IsAttr) {
+      if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count ||
+          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count) {
         // It's a known attribute, so treat it as a syntactic attribute node for
         // syntax coloring. If swift gets user attributes then all identifiers
         // will be treated as syntactic attribute nodes.
