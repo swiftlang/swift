@@ -1021,8 +1021,11 @@ namespace decls_block {
   >;
 
   // Stub layouts, unused.
-  using OwnershipDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
+  using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
+  using AccessibilityDeclAttrLayout = BCRecordLayout<Accessibility_DECL_ATTR>;
+  using SetterAccessibilityDeclAttrLayout =
+    BCRecordLayout<SetterAccessibility_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
   Inline_DECL_ATTR,

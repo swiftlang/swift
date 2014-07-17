@@ -1273,12 +1273,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   switch (DA->getKind()) {
   case DAK_RawDocComment:
   case DAK_Ownership: // Serialized as part of the type.
+  case DAK_Accessibility:
+  case DAK_AccessibilitySetter:
   case DAK_Count:
     llvm_unreachable("cannot serialize DAK_Count");
     return;
 
-#define VIRTUAL_DECL_ATTR(_, CLASS, ...)\
-  case DAK_##CLASS: return;
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)\
   case DAK_##CLASS: { \
     auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
@@ -2564,7 +2564,6 @@ void Serializer::writeAllDeclsAndTypes() {
 
 #define DECL_ATTR(X, NAME, ...) \
     registerDeclTypeAbbr<NAME##DeclAttrLayout>();
-#define VIRTUAL_DECL_ATTR(X, NAME, ...)
 #include "swift/AST/Attr.def"
   }
 

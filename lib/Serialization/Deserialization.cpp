@@ -1403,9 +1403,7 @@ getActualStaticSpellingKind(uint8_t raw) {
 static bool isDeclAttrRecord(unsigned ID) {
   using namespace decls_block;
   switch (ID) {
-#define DECL_ATTR(NAME, CLASS, ...) \
-  case CLASS##_DECL_ATTR: return true;
-#define VIRTUAL_DECL_ATTR(NAME, CLASS, ...)
+#define DECL_ATTR(NAME, CLASS, ...) case CLASS##_DECL_ATTR: return true;
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   default: return false;
   }

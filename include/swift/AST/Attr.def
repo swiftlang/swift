@@ -22,10 +22,6 @@
 #define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE) DECL_ATTR(X, CLASS, OPTIONS, CODE)
 #endif
 
-#ifndef VIRTUAL_DECL_ATTR
-#define VIRTUAL_DECL_ATTR(X, CLASS, OPTIONS, CODE) DECL_ATTR(X, CLASS, OPTIONS, CODE)
-#endif
-
 #ifndef DECL_ATTR_ALIAS
 #define DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
@@ -79,9 +75,6 @@ TYPE_ATTR(opened)
 // SIMPLE_DECL_ATTR is the same, but the class becomes
 // SimpleDeclAttr<DAK_##NAME>.
 //
-// VIRTUAL_DECL_ATTR is like DECL_ATTR, but it can not be spelled in the source
-// code as an attribute.  It is modelled as an attribute for the convenience of
-// implementation in the compiler.
 
 DECL_ATTR(asmname, Asmname,
           OnFunc | OnConstructor | OnDestructor, 0)
@@ -169,15 +162,18 @@ SIMPLE_DECL_ATTR(override, Override,
                  OnFunc | OnVar | OnSubscript | DeclModifier | NotSerialized,
                  /* Not serialized */49)
 
-VIRTUAL_DECL_ATTR(accessibility, Accessibility,
-                  OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
-                  OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
-                  DeclModifier | NotSerialized,
-                  /* Not serialized */ 65535)
+DECL_ATTR(private, Accessibility,
+          OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
+          OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
+          DeclModifier | NotSerialized,
+          /* Not serialized */ 44)
+DECL_ATTR_ALIAS(internal, Accessibility)
+DECL_ATTR_ALIAS(public, Accessibility)
 
-VIRTUAL_DECL_ATTR(accessibility, SetterAccessibility,
-                  OnVar | OnSubscript | DeclModifier | NotSerialized,
-                  /* Not serialized */ 65535)
+
+DECL_ATTR(__accessibility, SetterAccessibility,
+          OnVar | OnSubscript | DeclModifier | NotSerialized,
+          /* Not serialized */ 43)
 
 DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
           /* Not serialized */46)
@@ -197,7 +193,5 @@ AVAILABILITY_PLATFORM(OSXApplicationExtension)
 #undef AVAILABILITY_PLATFORM
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
-#undef VIRTUAL_DECL_ATTR
 #undef SIMPLE_DECL_ATTR
 #undef DECL_ATTR
-#undef ATTR
