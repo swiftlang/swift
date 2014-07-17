@@ -974,80 +974,16 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
-  // Unicode escapes of various lengths.
-  case 'x': {  //  \x HEX HEX
-    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2]);
-    if (ValidChars != 2) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
-      CurPtr += 1 + ValidChars;
-      return ~1U;
-    }
-
-    if (EmitDiagnostics && Diags)
-      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars))
-        .fixItReplace(SourceRange(getSourceLoc(CurPtr),
-                                  getSourceLoc(CurPtr+ValidChars+1)),
-                      "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
-
-    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
-    CurPtr += 1 + ValidChars;
-
-    break;
-  }
   case 'u': {  //  \u HEX HEX HEX HEX
-    if (CurPtr[1] == '{') {
-      ++CurPtr;
-      CharValue = lexUnicodeEscape(CurPtr, EmitDiagnostics ? this : nullptr);
-      if (CharValue == ~1U) return ~1U;
-      break;
-    }
-
-    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2])
-                        + !!isxdigit(CurPtr[3]) + !!isxdigit(CurPtr[4]);
-    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
-
-    if (ValidChars != 4) {
+    ++CurPtr;
+    if (*CurPtr != '{') {
       if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
-      CurPtr += 1 + ValidChars;
+        diagnose(CurPtr-1, diag::lex_unicode_escape_braces);
       return ~1U;
     }
 
-    if (EmitDiagnostics && Diags)
-      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars))
-      .fixItReplace(SourceRange(getSourceLoc(CurPtr),
-                                getSourceLoc(CurPtr+ValidChars+1)),
-                    "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
-
-    CurPtr += 1 + ValidChars;
-    break;
-  }
-  case 'U': {  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
-    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2])
-                        + !!isxdigit(CurPtr[3]) + !!isxdigit(CurPtr[4])
-                        + !!isxdigit(CurPtr[5]) + !!isxdigit(CurPtr[6])
-                        + !!isxdigit(CurPtr[7]) + !!isxdigit(CurPtr[8]);
-    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
-
-    if (ValidChars != 8) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_unicode_scalar);
-      CurPtr += 1 + ValidChars;
-      return ~1U;
-    }
-
-    if (EmitDiagnostics && Diags)
-      Diags->diagnose(getSourceLoc(CurPtr), diag::lex_unicode_escape_changed,
-                      StringRef(CurPtr+1, ValidChars))
-        .fixItReplace(SourceRange(getSourceLoc(CurPtr),
-                                  getSourceLoc(CurPtr+ValidChars+1)),
-                      "u{" + std::string(CurPtr+1, CurPtr+1+ValidChars) + "}");
-
-
-    CurPtr += 1 + ValidChars;
+    CharValue = lexUnicodeEscape(CurPtr, EmitDiagnostics ? this : nullptr);
+    if (CharValue == ~1U) return ~1U;
     break;
   }
   }

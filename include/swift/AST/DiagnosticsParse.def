@@ -115,12 +115,10 @@ ERROR(lex_invalid_u_escape,lexing,none,
 ERROR(lex_invalid_u_escape_rbrace,lexing,none,
       "expected '}' in \\u{...} escape sequence", ())
 
-ERROR(lex_unicode_escape_changed,lexing,none,
-      "unicode escapes changed, please use the \\u{%0} syntax instead",
-      (StringRef))
-
 ERROR(lex_invalid_unicode_scalar,lexing,none,
        "invalid unicode scalar", ())
+ERROR(lex_unicode_escape_braces,lexing,none,
+      "expected hexadecimal code in braces after unicode escape", ())
 
 
 ERROR(lex_invalid_character,lexing,none,
