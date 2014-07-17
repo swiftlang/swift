@@ -16,6 +16,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_3 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_4 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_5 | FileCheck %s -check-prefix=ERROR_COMMON
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -106,5 +107,6 @@ var topLevelClosure3 = { class C { func f() { #^DELAYED_3^# } } }
 
 class ClassWithClosureMember1 {
   var c1 = { #^DELAYED_4^# }
+  lazy var c1 = { #^DELAYED_5^# }
 }
 
