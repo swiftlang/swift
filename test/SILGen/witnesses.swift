@@ -42,16 +42,16 @@ func protocol_method(#x: Existentiable) -> Loadable {
   return x.foo()
 }
 // CHECK-LABEL: sil @_TF9witnesses15protocol_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.foo!1 : <`Self` : Existentiable> inout Self -> () -> Loadable, $@cc(witness_method) @callee_owned (@inout Self) -> Loadable
-// CHECK:         apply [[METHOD]]({{%.*}}) : $@cc(witness_method) @callee_owned (@inout Self) -> Loadable
+// CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.foo!1 : <`Self` : Existentiable> inout Self -> () -> Loadable, $@cc(witness_method) @callee_owned (@inout @sil_self Existentiable) -> Loadable
+// CHECK:         apply [[METHOD]]({{%.*}}) : $@cc(witness_method) @callee_owned (@inout @sil_self Existentiable) -> Loadable
 // CHECK:       }
 
 func protocol_generic_method(#x: Existentiable) -> Loadable {
   return x.generic()
 }
 // CHECK-LABEL: sil @_TF9witnesses23protocol_generic_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.generic!1 : <`Self` : Existentiable> inout Self -> <T> () -> T, $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout Self) -> ()
-// CHECK:         apply [[METHOD]]<Loadable>({{%.*}}, {{%.*}}) : $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout Self) -> ()
+// CHECK:         [[METHOD:%.*]] = protocol_method {{%.*}} : $*Existentiable, #Existentiable.generic!1 : <`Self` : Existentiable> inout Self -> <T> () -> T, $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout @sil_self Existentiable) -> ()
+// CHECK:         apply [[METHOD]]<Loadable>({{%.*}}, {{%.*}}) : $@cc(witness_method) @callee_owned <τ_1_0> (@out τ_1_0, @inout @sil_self Existentiable) -> ()
 // CHECK:       }
 
 @objc protocol ObjCAble {
@@ -59,7 +59,7 @@ func protocol_generic_method(#x: Existentiable) -> Loadable {
 }
 
 // CHECK-LABEL: sil @_TF9witnesses20protocol_objc_methodFT1xPS_8ObjCAble__T_ : $@thin (@owned ObjCAble) -> ()
-// CHECK:         protocol_method [volatile] %{{[0-9]+}} : $ObjCAble, #ObjCAble.foo!1.foreign : <`Self` : ObjCAble> Self -> () -> (), $@cc(objc_method) @thin (Self) -> ()
+// CHECK:         protocol_method [volatile] %{{[0-9]+}} : $ObjCAble, #ObjCAble.foo!1.foreign : <`Self` : ObjCAble> Self -> () -> (), $@cc(objc_method) @thin (@sil_self ObjCAble) -> ()
 func protocol_objc_method(#x: ObjCAble) {
   x.foo()
 }

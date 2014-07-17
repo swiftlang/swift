@@ -16,7 +16,7 @@ func foo<B : Runcible>(x: B) {
 func bar(var x: Runcible) {
   // CHECK: [[BOX:%.*]] = alloc_box $Runcible 
   // CHECK: [[EXIST:%.*]] = project_existential [[BOX]]#1 : $*Runcible
-  // CHECK: [[METHOD:%.*]] = protocol_method [[BOX]]#1 : $*Runcible, #Runcible.runce!1 : <`Self` : Runcible> inout Self -> <A> (A) -> (), $@cc(witness_method) @callee_owned <τ_1_0> (@in τ_1_0, @inout Self) -> ()
+  // CHECK: [[METHOD:%.*]] = protocol_method [[BOX]]#1 : $*Runcible, #Runcible.runce!1 : <`Self` : Runcible> inout Self -> <A> (A) -> (), $@cc(witness_method) @callee_owned <τ_1_0> (@in τ_1_0, @inout @sil_self Runcible) -> ()
   // CHECK: apply [[METHOD]]<Int>
   x.runce(5)
 }

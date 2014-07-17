@@ -96,6 +96,6 @@ func class_bound_method(var x: ClassBound) {
   // CHECK: [[X:%.*]] = load {{%.*}} : $*ClassBound
   // CHECK: [[PROJ:%.*]] = project_existential_ref [[X]] : $ClassBound
   // CHECK: [[METHOD:%.*]] = protocol_method [[X]] : {{.*}}, #ClassBound.classBoundMethod!1
-  // CHECK: apply [[METHOD]]([[PROJ]]) : $@cc(witness_method) @callee_owned (@owned Self) -> ()
+  // CHECK: apply [[METHOD]]([[PROJ]]) : $@cc(witness_method) @callee_owned (@owned @sil_self ClassBound) -> ()
 }
 

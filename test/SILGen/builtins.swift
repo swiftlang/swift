@@ -304,7 +304,7 @@ func canBeClassMetatype<T>() {
   Builtin.canBeClass(MixedCompoT.self)
 
   // CHECK: [[CAN_BE:%.*]] = builtin_function_ref "canBeClass"
-  // CHECK: apply [[CAN_BE]]<TT>
+  // CHECK: apply [[CAN_BE]]<T.Type>
   typealias TT = T.Type
   Builtin.canBeClass(TT.self)
 }

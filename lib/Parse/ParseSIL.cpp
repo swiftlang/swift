@@ -3101,15 +3101,15 @@ bool Parser::parseSILVTable() {
     return true;
 
   // Find the class decl.
-  SmallVector<ValueDecl*, 4> CurModuleResults;
-  SF.getParentModule()->lookupValue(Module::AccessPathTy(), Name,
-                                    NLKind::UnqualifiedLookup,
-                                    CurModuleResults);
-  if (CurModuleResults.size() != 1) {
+  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(*this, Name);
+  assert(Res.is<ValueDecl*>() && "Class look-up should return a Decl");
+  ValueDecl *VD = Res.get<ValueDecl*>();
+  if (!VD) {
     diagnose(Loc, diag::sil_vtable_class_not_found, Name);
     return true;
   }
-  ClassDecl *theClass = dyn_cast<ClassDecl>(CurModuleResults[0]);
+
+  ClassDecl *theClass = dyn_cast<ClassDecl>(VD);
   if (!theClass) {
     diagnose(Loc, diag::sil_vtable_class_not_found, Name);
     return true;
@@ -3203,6 +3203,11 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
     return nullptr;
   }
 
+  // FIXME: we currently emit _CocoaArrayType: _CocoaArrayType.
+  if (ConformingTy->is<ProtocolType>() &&
+      ConformingTy->getAs<ProtocolType>()->getDecl() == proto)
+    return nullptr;
+
   // Calling lookupConformance on a BoundGenericType will return a specialized
   // conformance. We use UnboundGenericType to find the normal conformance.
   Type lookupTy = ConformingTy;
@@ -3211,10 +3216,16 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
                                        P.Context);
   auto lookup = P.SF.getParentModule()->lookupConformance(
                          lookupTy, proto, nullptr);
+  if (!lookup.getPointer()) {
+    P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
+    return nullptr;
+  }
   NormalProtocolConformance *theConformance =
       dyn_cast<NormalProtocolConformance>(lookup.getPointer());
-  if (!theConformance)
+  if (!theConformance) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
+    return nullptr;
+  }
   return theConformance;
 }
 
@@ -3411,22 +3422,25 @@ bool Parser::parseSILWitnessTable() {
   ArchetypeBuilder builder(*SF.getParentModule(), Diags);
   auto conf = WitnessState.parseProtocolConformance(proto, dummy, builder,
                                                     false/*localScope*/);
-  if (!conf) {
-    diagnose(Tok, diag::sil_witness_protocol_conformance_not_found);
-    return true;
-  }
 
-  NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(conf);
+  NormalProtocolConformance *theConformance = conf ?
+      dyn_cast<NormalProtocolConformance>(conf) : nullptr;
 
   // If we don't have an lbrace, then this witness table is a declaration.
   if (Tok.getKind() != tok::l_brace) {
     // Default to public external linkage.
     if (!Linkage)
       Linkage = SILLinkage::PublicExternal;
-    SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+    // We ignore empty witness table without normal protocol conformance.
+    if (theConformance)
+      SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
     BodyScope.reset();
     return false;
+  }
+
+  if (!theConformance) {
+    diagnose(Tok, diag::sil_witness_protocol_conformance_not_found);
+    return true;
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();

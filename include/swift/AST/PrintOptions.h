@@ -105,6 +105,9 @@ struct PrintOptions {
   /// Whether to print accessibility information on all value decls.
   bool PrintAccessibility = false;
 
+  /// Whether we are printing for sil.
+  bool PrintForSIL = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     BothIfDifferent,

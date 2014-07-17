@@ -365,7 +365,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
   // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericCU__fMGS0_Q__FT_GS0_Q__ : $@thin <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
-  // CHECK: apply [[CTOR_GEN]]<Int64>([[META]])
+  // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
@@ -466,7 +466,7 @@ func standalone_generic<T>(x: T, y: T) -> T { return x }
 // CHECK-LABEL: sil  @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
 func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
-  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Int64>()
+  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
   // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out Builtin.Int64, @in Builtin.Int64, @in Builtin.Int64) -> ()) -> Builtin.Int64
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
@@ -477,7 +477,7 @@ func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
 func return_generic_tuple()
 -> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
-  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Int64, Int64)>()
+  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
   // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> ()) -> (Builtin.Int64, Builtin.Int64)
   // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]

@@ -321,7 +321,9 @@ void SILType::print(raw_ostream &OS) const {
   }
 
   // Print other types as their Swift representation.
-  getSwiftRValueType().print(OS);
+  PrintOptions SubPrinter;
+  SubPrinter.PrintForSIL = true;
+  getSwiftRValueType().print(OS, SubPrinter);
 }
 
 void SILType::dump() const {
@@ -602,10 +604,12 @@ public:
     if (Subs.empty())
       return;
     
+    PrintOptions SubPrinter;
+    SubPrinter.PrintForSIL = true;
     OS << '<';
     interleave(Subs,
                [&](const Substitution &s) {
-                 s.Replacement->print(OS);
+                 s.Replacement->print(OS, SubPrinter);
                },
                [&] { OS << ", "; });
     OS << '>';
@@ -1467,7 +1471,8 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME << "\n\n";
+  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
+     << "\nimport SwiftShims" << "\n\n";
 
   // Compute the list of emitted functions, whose AST Decls we do not need to
   // print.

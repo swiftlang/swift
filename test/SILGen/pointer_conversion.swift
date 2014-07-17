@@ -20,7 +20,7 @@ func pointerToPointer(mp: UnsafePointer<Int>,
   takesMutableVoidPointer(mp)
   // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion23takesMutableVoidPointerFGVSs13UnsafePointerT__T_
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs32_convertPointerToPointerArgumentUSs12_PointerType_S___FQ_Q0_
-  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>, UnsafePointer<Void>>
+  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>, UnsafePointer<()>>
   // CHECK: apply [[TAKES_MUTABLE_VOID_POINTER]]
 
   takesConstPointer(mp)
@@ -32,7 +32,7 @@ func pointerToPointer(mp: UnsafePointer<Int>,
   takesConstVoidPointer(mp)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGVSs18ConstUnsafePointerT__T_
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs32_convertPointerToPointerArgumentUSs12_PointerType_S___FQ_Q0_
-  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>, ConstUnsafePointer<Void>>
+  // CHECK: apply [transparent] [[CONVERT]]<UnsafePointer<Int>, ConstUnsafePointer<()>>
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 }
 
@@ -66,7 +66,7 @@ func stringToPointer(s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGVSs18ConstUnsafePointerT__T_
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFSs40_convertConstStringToUTF8PointerArgumentUSs12_PointerType__FSSTGSqPSs9AnyObject__Q__
-  // CHECK: apply [transparent] [[CONVERT_STRING]]<ConstUnsafePointer<Void>>([[TUPLE_BUF:%.*]]#1,
+  // CHECK: apply [transparent] [[CONVERT_STRING]]<ConstUnsafePointer<()>>([[TUPLE_BUF:%.*]]#1,
   // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
   // CHECK: [[POINTER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 1
