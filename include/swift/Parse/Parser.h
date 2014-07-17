@@ -719,8 +719,7 @@ public:
                                   SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
-  parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
-                SourceLoc ConvenienceLoc);
+  parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<DestructorDecl>
   parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
