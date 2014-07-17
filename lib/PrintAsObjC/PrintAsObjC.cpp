@@ -37,6 +37,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor;
 
   llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
+  Identifier ID_CFTypeRef;
 
   ASTContext &ctx;
   raw_ostream &os;
@@ -267,6 +268,17 @@ private:
     return true;
   }
 
+  bool isCFTypeRef(Type ty) {
+    if (ID_CFTypeRef.empty())
+      ID_CFTypeRef = ctx.getIdentifier("CFTypeRef");
+    while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
+      const TypeAliasDecl *TAD = aliasTy->getDecl();
+      if (TAD->hasClangNode() && TAD->getName() == ID_CFTypeRef)
+        return true;
+    }
+    return false;
+  }
+
   void visitVarDecl(VarDecl *VD) {
     assert(VD->getDeclContext()->isTypeContext() &&
            "cannot handle global variables right now");
@@ -290,17 +302,33 @@ private:
     if (!isSettable)
       os << ", readonly";
 
-    // FIXME: Include "weak", "strong", "assign" here.
-    // They aren't actually needed (they won't change runtime semantics), but
-    // they provide documentation and improve the quality of warnings.
-    // For now, just handle "copy", which we get warnings about.
+    // Print the ownership semantics, if relevant.
+    // We treat "unowned" as "assign" (even though it's more like
+    // "safe_unretained") because we want people to think twice about
+    // allowing that object to disappear.
+    // FIXME: Handle the "Unmanaged" wrapper struct.
     Type ty = VD->getType();
-    if (auto unwrappedTy = ty->getAnyOptionalObjectType())
-      ty = unwrappedTy;
-    if (auto nominal = ty->getStructOrBoundGenericStruct()) {
-      if (nominal == ctx.getArrayDecl() ||
-          nominal == ctx.getDictionaryDecl() ||
-          nominal == ctx.getStringDecl()) {
+    if (auto weakTy = ty->getAs<WeakStorageType>()) {
+      auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
+      auto innerClass = innerTy->getClassOrBoundGenericClass();
+      if ((innerClass && !innerClass->isForeign()) ||
+          (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
+        os << ", weak";
+      }
+    } else if (ty->is<UnownedStorageType>()) {
+      os << ", assign";
+    } else if (ty->is<UnmanagedStorageType>()) {
+      os << ", unsafe_unretained";
+    } else {
+      if (auto unwrappedTy = ty->getAnyOptionalObjectType())
+        ty = unwrappedTy;
+      if (auto nominal = ty->getStructOrBoundGenericStruct()) {
+        if (nominal == ctx.getArrayDecl() ||
+            nominal == ctx.getDictionaryDecl() ||
+            nominal == ctx.getStringDecl()) {
+          os << ", copy";
+        }
+      } else if (ty->is<FunctionType>()) {
         os << ", copy";
       }
     }

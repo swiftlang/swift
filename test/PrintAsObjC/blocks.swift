@@ -21,6 +21,8 @@ import ObjectiveC
 // CHECK-NEXT: - (void (^)(NSObject *, NSObject *))returnsBlockWithTwoInputs;
 // CHECK-NEXT: - (NSInteger (*)(NSInteger))functionPointers:(NSInteger (*)(NSInteger))input;
 // CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* (*)(NSInteger (*)(NSInteger)))(NSInteger))input;
+// CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ savedBlock)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* savedFunctionPointer)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
@@ -59,4 +61,7 @@ import ObjectiveC
                               -> CFunctionPointer<Int -> Int>>
   ) {
   }
+
+  var savedBlock: (Int -> Int)?
+  @objc var savedFunctionPointer: CFunctionPointer<Int -> Int> = nil
 }

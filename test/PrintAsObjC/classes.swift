@@ -225,10 +225,13 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
 // CHECK-NEXT: + (Properties *)shared;
 // CHECK-NEXT: + (void)setShared:(Properties *)newValue;
-// CHECK-NEXT: @property (nonatomic) Properties * weakOther;
-// CHECK-NEXT: @property (nonatomic) Properties * unownedOther;
-// CHECK-NEXT: @property (nonatomic) Properties * unmanagedOther;
-// CHECK-NEXT: @property (nonatomic) IBOutlet id outlet;
+// CHECK-NEXT: @property (nonatomic, weak) Properties * weakOther;
+// CHECK-NEXT: @property (nonatomic, assign) Properties * unownedOther;
+// CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * unmanagedOther;
+// CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> weakProto;
+// CHECK-NEXT: @property (nonatomic) CFTypeRef weakCF;
+// CHECK-NEXT: @property (nonatomic) CFStringRef weakCFString;
+// CHECK-NEXT: @property (nonatomic, weak) IBOutlet id outlet;
 // CHECK-NEXT: @property (nonatomic) IBOutlet Properties * typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * array;
@@ -263,8 +266,12 @@ private class Private : A1 {}
   unowned var unownedOther: Properties = .shared
   unowned(unsafe) var unmanagedOther: Properties = .shared
 
+  weak var weakProto: MyProtocol?
+  weak var weakCF: CFTypeRef?
+  weak var weakCFString: CFStringRef?
+
   @IBOutlet weak var outlet: AnyObject!
-  @IBOutlet weak var typedOutlet: Properties!
+  @IBOutlet var typedOutlet: Properties!
 
   var string = "abc"
   var array: Array<AnyObject> = []
