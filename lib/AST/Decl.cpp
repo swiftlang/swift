@@ -2115,6 +2115,8 @@ bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
 }
 
 bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
+  if (isFinal())
+    return false;
   if (!hasObjCGetterAndSetter())
     return false;
   // Imported accessors are foreign and only have objc entry points.

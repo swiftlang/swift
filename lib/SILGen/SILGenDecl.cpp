@@ -991,6 +991,10 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 }
 
 bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
+  // Final functions never require ObjC dispatch.
+  if (vd->isFinal())
+    return false;
+    
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign and only has
     // an ObjC entry point.
