@@ -842,10 +842,8 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     _DictionaryStorageType {
 
   typealias _NativeStorageElement = _DictionaryElement<Key, Value>
-  typealias NativeStorage =
-      _NativeDictionaryStorage<Key, Value>
-  typealias NativeStorageOwner =
-      _NativeDictionaryStorageOwner<Key, Value>
+  typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
+  typealias NativeStorageOwner = _NativeDictionaryStorageOwner<Key, Value>
   typealias CocoaStorage = _CocoaDictionaryStorage
   typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
 
@@ -1836,8 +1834,7 @@ public struct Dictionary<
   // DictionaryLiteralConvertible conformance
   //
   @semantics("readonly")
-  public
-  static func convertFromDictionaryLiteral(elements: (Key, Value)...)
+  public static func convertFromDictionaryLiteral(elements: (Key, Value)...)
                 -> Dictionary<Key, Value> {
     return Dictionary<Key, Value>(
         _nativeStorage: _NativeDictionaryStorage.fromArray(elements))
