@@ -1733,7 +1733,7 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
       writer.addObjCProperty(#ContextName, #PropertyName,             \
                              ObjCPropertyInfo() | OptionalTypeKind);  \
     }
-#include "../../lib/ClangImporter/KnownObjCMethods.def"
+#include "KnownObjCMethods.def"
   #undef MAKE_SELECTOR_REF
 
   std::string errorInfo;
@@ -1852,7 +1852,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
                    << " not found in API notes file\n";                  \
       return true;                                                      \
     }
-#include "../../lib/ClangImporter/KnownObjCMethods.def"
+#include "KnownObjCMethods.def"
   #undef MAKE_SELECTOR_REF
 
   return false;
