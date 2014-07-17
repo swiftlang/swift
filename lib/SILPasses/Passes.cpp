@@ -84,9 +84,19 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
 /// Perform semantic annotation/loop base optimizations.
 void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
-  // Get rid of int->enum->uncheck_enum_data.
+  // Perform classsic SSA optimizations for cleanup.
+  PM.add(createLowerAggregate());
   PM.add(createSILCombine());
+  PM.add(createSROA());
+  PM.add(createMem2Reg());
+  PM.add(createDCE());
+  PM.add(createSILCombine());
+  PM.add(createSimplifyCFG());
+
+  // Run high-level loop opts.
   PM.add(createLoopRotatePass());
+
+  // Cleanup.
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
@@ -160,14 +170,10 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   AddSSAPasses(PM, Module, true);
   PM.runOneIteration();
   PM.runOneIteration();
-#if 1
+#if 0
   PM.resetAndRemoveTransformations();
 #else
-
   // Run the high-level loop optimization passes.
-  // TODO: figure out what is really needed here to simplify the enums I still
-  // see sticking around without this iteration.
-  PM.runOneIteration();
   PM.resetAndRemoveTransformations();
   AddHighLevelLoopOptPasses(PM, Module);
   PM.runOneIteration();
@@ -199,7 +205,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   AddSSAPasses(PM, Module, false);
   PM.runOneIteration();
 
-#if 0
+#if 1
   PM.resetAndRemoveTransformations();
   // TODO: this should run as part of the last iteration of the previous
   // pass manager so that we can reuse analysis info.
