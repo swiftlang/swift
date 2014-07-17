@@ -657,4 +657,13 @@ extension Double {
   }
 }
 
+// <rdar://problem/17686667> If super.init is implicitly inserted, DI diagnostics have no location info
+class r17686667Base {}
+class r17686667Test : r17686667Base {
+  var x: Int
+  init() {  // expected-error {{property 'self.x' not initialized at implicitly generated super.init call}}
+
+  }
+}
+
 

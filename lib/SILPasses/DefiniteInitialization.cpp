@@ -533,7 +533,13 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // thing is accessed inappropriately.
   TheMemory.getPathStringToElement(FirstUndefElement, Name);
 
-  diagnose(Module, Inst->getLoc(), DiagMessage, Name);
+  // Figure out the source location to emit the diagnostic to.  If this is null,
+  // it is probably implicitly generated code, so we'll adjust it.
+  SILLocation DiagLoc = Inst->getLoc();
+  if (DiagLoc.isNull() || DiagLoc.getSourceLoc().isInvalid())
+    DiagLoc = Inst->getFunction()->getLocation();
+
+  diagnose(Module, DiagLoc, DiagMessage, Name);
 
   // As a debugging hack, print the instruction itself if there is no location
   // information.  This should never happen.
@@ -864,9 +870,14 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   // super.init also requires that all ivars are initialized before the
   // superclass initializer runs.
   for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
-    if (Liveness.get(i) != DIKind::Yes)
-      return diagnoseInitError(InstInfo,
-                               diag::ivar_not_initialized_at_superinit);
+    if (Liveness.get(i) == DIKind::Yes) continue;
+
+    // If the super.init call is implicit generated, produce a specific
+    // diagnostic.
+    bool isImplicit = InstInfo.Inst->getLoc().getSourceLoc().isInvalid();
+    auto diag = isImplicit ? diag::ivar_not_initialized_at_implicit_superinit :
+                diag::ivar_not_initialized_at_superinit;
+    return diagnoseInitError(InstInfo, diag);
   }
 
   // Otherwise everything is good!
