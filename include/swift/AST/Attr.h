@@ -836,16 +836,6 @@ class DeclAttributes {
   DeclAttribute *DeclAttrs;
 
 public:
-  /// The location of the first '@' in the attribute specifier.
-  ///
-  /// This is an invalid location if the declaration does not have any or has
-  /// only virtual attributes.
-  ///
-  /// This could be a valid location even if none of the attributes are set.
-  /// This can happen when the attributes were parsed, but then cleared because
-  /// they are not allowed in that context.
-  SourceLoc AtLoc;
-
   DeclAttributes() : DeclAttrs(nullptr) {}
 
   bool isEmpty() const {

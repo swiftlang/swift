@@ -813,14 +813,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     return true;
   }
 
-  // XXX
-  
-  // FIXME: This is bogus to only honor the first '@', but this
-  // will be fixed once the attribute refactoring completes for
-  // all existing declaration attributes.
-  if (Attributes.AtLoc.isInvalid())
-    Attributes.AtLoc = AtLoc;
-
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = getDeclAttrFromString(Tok.getText());

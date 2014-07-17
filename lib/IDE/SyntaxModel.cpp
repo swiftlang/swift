@@ -183,7 +183,7 @@ private:
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
-  bool handleAttrRanges(SourceLoc AtLoc, ArrayRef<SourceRange> Ranges);
+  bool handleAttrRanges(ArrayRef<SourceRange> Ranges);
 
   bool shouldPassBraceStructureNode(BraceStmt *S);
 
@@ -656,17 +656,16 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
 bool ModelASTWalker::handleAttrs(const DeclAttributes &Attrs) {
   SmallVector<SourceRange, 4> Ranges;
   Attrs.getAttrRanges(Ranges);
-  return handleAttrRanges(Attrs.AtLoc, Ranges);
+  return handleAttrRanges(Ranges);
 }
 
 bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
   SmallVector<SourceRange, 4> Ranges;
   Attrs.getAttrRanges(Ranges);
-  return handleAttrRanges(Attrs.AtLoc, Ranges);
+  return handleAttrRanges(Ranges);
 }
 
-bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
-                                      ArrayRef<SourceRange> Ranges) {
+bool ModelASTWalker::handleAttrRanges(ArrayRef<SourceRange> Ranges) {
   if (Ranges.empty())
     return true;
 
@@ -677,9 +676,7 @@ bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
   });
   Ranges = SortedRanges;
 
-  SourceLoc BeginLoc = AtLoc;
-  if (!AtLoc.isValid())
-    BeginLoc = Ranges.front().Start;
+  SourceLoc BeginLoc = Ranges.front().Start;
 
   std::vector<Token> Toks = swift::tokenize(
       LangOpts, SM, BufferID,
@@ -688,12 +685,8 @@ bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
       /*KeepComments=*/true,
       /*TokenizeInterpolatedString=*/false);
 
-  auto passAttrNode = [&](SourceLoc AtLoc, SourceRange AttrRange) -> bool {
-    SourceRange Range;
-    if (AtLoc.isValid())
-      Range = SourceRange(AtLoc, AttrRange.End);
-    else
-      Range = AttrRange;
+  auto passAttrNode = [&](SourceRange AttrRange) -> bool {
+    SourceRange Range = AttrRange;
     if (!passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
                            charSourceRangeFromSourceRange(SM, Range)}))
       return false;
@@ -710,18 +703,13 @@ bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
     if (Tok.getLoc() == Ranges.front().Start) {
       auto R = Ranges.front();
       Ranges = Ranges.slice(1);
-      if (!passAttrNode(AtLoc, R))
+      if (!passAttrNode(R))
         return false;
     }
-
-    if (Tok.is(tok::at_sign))
-      AtLoc = Tok.getLoc();
-    else
-      AtLoc = SourceLoc();
   }
 
   if (!Ranges.empty()) {
-    if (!passAttrNode(AtLoc, Ranges.front()))
+    if (!passAttrNode(Ranges.front()))
       return false;
   }
 
