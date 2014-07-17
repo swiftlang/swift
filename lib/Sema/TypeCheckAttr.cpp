@@ -55,6 +55,7 @@ public:
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
+  IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(Inline)
@@ -498,6 +499,7 @@ public:
     IGNORED_ATTR(Asmname)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)
+    IGNORED_ATTR(Convenience)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
