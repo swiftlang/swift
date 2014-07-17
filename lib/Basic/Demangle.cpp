@@ -234,8 +234,8 @@ public:
 
 /// The main class for parsing a demangling tree out of a mangled string.
 class Demangler {
-  SmallVector<NodePointer, 10> Substitutions;
-  SmallVector<unsigned, 4> ArchetypeCounts;
+  std::vector<NodePointer> Substitutions;
+  std::vector<unsigned> ArchetypeCounts;
   unsigned ArchetypeCount = 0;
   NameSource Mangled;
   NodePointer RootNode;
@@ -1092,7 +1092,8 @@ private:
       D.ArchetypeCounts.push_back(D.ArchetypeCount);
     }
     ~GenericContext() {
-      D.ArchetypeCount = D.ArchetypeCounts.pop_back_val();
+      D.ArchetypeCount = D.ArchetypeCounts.back();
+      D.ArchetypeCounts.pop_back();
     }
   };
 

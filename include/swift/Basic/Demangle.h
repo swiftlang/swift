@@ -13,10 +13,10 @@
 #ifndef SWIFT_BASIC_DEMANGLE_H
 #define SWIFT_BASIC_DEMANGLE_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/LLVM.h"
 #include <memory>
+#include <vector>
 
 namespace llvm {
   class raw_ostream;
@@ -57,8 +57,8 @@ private:
     IndexType IndexPayload;
   };
 
-  // It might even be worthwhile to use TinyPtrVector here.
-  typedef llvm::SmallVector<NodePointer, 2> NodeVector;
+  // FIXME: use allocator.
+  typedef std::vector<NodePointer> NodeVector;
   NodeVector Children;
 
   Node(Kind k)
