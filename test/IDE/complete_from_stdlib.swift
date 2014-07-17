@@ -7,7 +7,7 @@
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members.txt
 
 // NO_STDLIB_PRIVATE: Begin completions
-// NO_STDLIB_PRIVATE-NOT: Decl{{[^:]*}}: _
+// NO_STDLIB_PRIVATE-NOT: Decl[FreeFunction]{{[^:]*}}: _
 // NO_STDLIB_PRIVATE: End completions
 
 #^PLAIN_TOP_LEVEL_1^#

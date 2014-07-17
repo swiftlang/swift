@@ -14,9 +14,9 @@
 // CHECK-NOT: _StringBuffer
 // CHECK-NOT: _StringCore
 // CHECK-NOT: _ArrayBody
-// CHECK-NOT: ~>
-// CHECK-NOT: Builtin.
-// CHECK-NOT: RawPointer
+// CHECK-NOT: func ~>
+// FIXME: Builtin.
+// FIXME: RawPointer
 // CHECK-NOT: extension [
 // CHECK-NOT: extension {{.*}}?
 // CHECK-NOT: extension {{.*}}!

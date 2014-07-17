@@ -329,9 +329,20 @@ bool Decl::isPrivateStdlibDecl() const {
   if (FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  // Hide '~>' operator.
-  if (auto OperD = dyn_cast<OperatorDecl>(D))
-    return OperD->getName().str() == "~>";
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // Hide '~>' functions (but show the operator, because it defines
+    // precedence).
+    if (AFD->getNameStr() == "~>")
+      return true;
+  }
+
+  // Whitelist protocols and protocol requirements.
+  if (auto PD = dyn_cast<ProtocolDecl>(D)) {
+    return PD->getNameStr().startswith("_Builtin");
+  }
+  if (isa<ProtocolDecl>(D->getDeclContext()))
+    return false;
+
 
   auto VD = dyn_cast<ValueDecl>(D);
   if (!VD || !VD->hasName())
@@ -347,10 +358,6 @@ bool Decl::isPrivateStdlibDecl() const {
   // If it's a function with a parameter with leading underscore, it's a private
   // function.
   } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    // Hide '~>' operator.
-    if (AFD->getNameStr() == "~>")
-      return true;
-
     bool hasInternalParameter = false;
     for (auto Pat : AFD->getBodyParamPatterns()) {
       Pat->forEachVariable([&](VarDecl *Param) {
