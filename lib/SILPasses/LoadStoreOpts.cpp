@@ -546,8 +546,14 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                       unsigned> &BBToBBIDMap,
                        std::vector<LSBBForwarder> &BBIDToForwarderMap) {
   bool HasAtLeastOnePred = false;
+  bool HasSelfCycle = false;
+  for (auto Pred : BB->getPreds())
+    if (Pred == BB) {
+      HasSelfCycle = true;
+      break;
+    }
 
-  // For each successor of BB...
+  // For each predecessor of BB...
   for (auto Pred : BB->getPreds()) {
 
     // Lookup the BBState associated with the predecessor and merge the
@@ -565,7 +571,8 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 
     // If we have not had at least one predecessor, initialize LSBBForwarder
     // with the state of the initial predecessor.
-    if (!HasAtLeastOnePred) {
+    // If BB is also a predecessor of itself, we should not initialize.
+    if (!HasAtLeastOnePred && !HasSelfCycle) {
       DEBUG(llvm::dbgs() << "    Initializing with pred: " << I->second
                          << "\n");
       Stores = Other.Stores;
@@ -580,7 +587,7 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
             for (auto *SI : Stores) {
               llvm::dbgs() << "            " << *SI;
             });
-    } else {
+    } else if (Pred != BB) {
       DEBUG(llvm::dbgs() << "    Merging with pred: " << I->second << "\n");
       mergePredecessorState(Other);
     }
