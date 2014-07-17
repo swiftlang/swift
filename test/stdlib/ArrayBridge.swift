@@ -93,24 +93,24 @@ class BridgedObjC : Base, Printable, Barable {
 }
 
 struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
   
-  func bridgeToObjectiveC() -> BridgedObjC {
+  func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC(trak.value)
   }
 
-  static func isBridgedToObjectiveC() -> Bool {
+  static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
 
-  static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+  static func _bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
     assert(x.value >= 0, "not bridged")
     return BridgedSwift(x.value)
   }
 
-  static func bridgeFromObjectiveCConditional(x: BridgedObjC) -> BridgedSwift? {
+  static func _bridgeFromObjectiveCConditional(x: BridgedObjC) -> BridgedSwift? {
     return x.value >= 0 ? BridgedSwift(x.value) : nil
   }
   
@@ -307,7 +307,7 @@ func testExplicitlyBridged() {
 
   // Make sure we can bridge back.
   let roundTripBridgedSwifts
-    = [BridgedSwift].bridgeFromObjectiveC(bridgedSwiftsAsNSArray)
+    = [BridgedSwift]._bridgeFromObjectiveC(bridgedSwiftsAsNSArray)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
   println("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
@@ -317,7 +317,7 @@ func testExplicitlyBridged() {
 
   // ...and bridge *that* back
   let bridgedBackSwifts
-    = [BridgedSwift].bridgeFromObjectiveC(cocoaBridgedSwifts)
+    = [BridgedSwift]._bridgeFromObjectiveC(cocoaBridgedSwifts)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]

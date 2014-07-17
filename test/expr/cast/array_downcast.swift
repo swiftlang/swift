@@ -29,13 +29,13 @@ class A {
 }
 
 struct B : _BridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
-  func bridgeToObjectiveC() -> A {
+  func _bridgeToObjectiveC() -> A {
     return A()
   }
-  static func bridgeFromObjectiveC(x: A) -> B {
+  static func _bridgeFromObjectiveC(x: A) -> B {
     return B()
   }
 }

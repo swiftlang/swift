@@ -32,7 +32,7 @@ func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
   // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
   // CHECK-NEXT: (call_expr implicit type='[String]'
   // CHECK-NEXT: (dot_syntax_call_expr implicit type='(NSArray) -> Array<String>'
-  // CHECK-NEXT: (declref_expr implicit type='(Array<String>.Type) -> (NSArray) -> Array<String>' decl=Foundation.(file).Array.bridgeFromObjectiveC
+  // CHECK-NEXT: (declref_expr implicit type='(Array<String>.Type) -> (NSArray) -> Array<String>' decl=Foundation.(file).Array._bridgeFromObjectiveC
   // CHECK-NEXT: (type_expr implicit type='[String].Type' typerepr='<null>'))
   // CHECK-NEXT: (forced_checked_cast_expr type='NSArray'{{.*existential_to_concrete}}
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'

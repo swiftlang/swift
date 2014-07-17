@@ -5,13 +5,13 @@ class A {
 }
 
 struct B : _BridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
-  func bridgeToObjectiveC() -> A {
+  func _bridgeToObjectiveC() -> A {
     return A()
   }
-  static func bridgeFromObjectiveC(x: A) -> B {
+  static func _bridgeFromObjectiveC(x: A) -> B {
     return B()
   }
 }
@@ -37,13 +37,13 @@ class E {
 }
 
 struct F : _BridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return E.self
   }
-  func bridgeToObjectiveC() -> E {
+  func _bridgeToObjectiveC() -> E {
     return E()
   }
-  static func bridgeFromObjectiveC(x: E) -> F {
+  static func _bridgeFromObjectiveC(x: E) -> F {
     return F()
   }
 }
@@ -59,19 +59,19 @@ class G {
 }
 
 struct H : _ConditionallyBridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return G.self
   }
-  func bridgeToObjectiveC() -> G {
+  func _bridgeToObjectiveC() -> G {
     return G()
   }
-  static func bridgeFromObjectiveC(x: G) -> H {
+  static func _bridgeFromObjectiveC(x: G) -> H {
     return H()
   }
-  static func bridgeFromObjectiveCConditional(x: G) -> H? {
+  static func _bridgeFromObjectiveCConditional(x: G) -> H? {
     _preconditionFailure("implement")
   }
-  static func isBridgedToObjectiveC() -> Bool {
+  static func _isBridgedToObjectiveC() -> Bool {
     return false
   }
 }
@@ -83,13 +83,13 @@ g = h // should type check, but cause a failure at runtime
 
 
 struct I : _BridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
-  func bridgeToObjectiveC() -> AnyObject {
+  func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
-  static func bridgeFromObjectiveC(x: AnyObject) -> I {
+  static func _bridgeFromObjectiveC(x: AnyObject) -> I {
     return I()
   }
 }

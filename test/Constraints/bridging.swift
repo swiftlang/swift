@@ -14,15 +14,15 @@ class BridgedClassSub : BridgedClass { }
 struct BridgedStruct : Hashable, _BridgedToObjectiveCType {
   var hashValue: Int { return 0 }
 
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
 
-  func bridgeToObjectiveC() -> BridgedClass {
+  func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }
 
-  static func bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+  static func _bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
     return BridgedStruct()
   }
 }

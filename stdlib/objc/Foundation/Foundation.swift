@@ -373,11 +373,11 @@ extension String {
 }
 
 extension String : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSString.self
   }
 
-  public func bridgeToObjectiveC() -> NSString {
+  public func _bridgeToObjectiveC() -> NSString {
     if let ns = core.cocoaBuffer {
       if _cocoaStringLength(source: ns) == core.count {
         return ns as NSString
@@ -387,7 +387,7 @@ extension String : _BridgedToObjectiveCType {
     return _NSContiguousString(core)
   }
 
-  public static func bridgeFromObjectiveC(x: NSString) -> String {
+  public static func _bridgeFromObjectiveC(x: NSString) -> String {
     return String(x)
   }
 }
@@ -405,15 +405,15 @@ extension Int : _BridgedToObjectiveCType {
     value = number.integerValue.value
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(integer: self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> Int {
     return x.integerValue
   }
 }
@@ -423,17 +423,17 @@ extension UInt : _BridgedToObjectiveCType {
     value = number.unsignedIntegerValue.value
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     // FIXME: Need a blacklist for certain methods that should not
     // import NSUInteger as Int.
     return NSNumber(unsignedInteger: Int(self.value))
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> UInt {
     return UInt(x.unsignedIntegerValue.value)
   }
 }
@@ -443,15 +443,15 @@ extension Float : _BridgedToObjectiveCType {
     value = number.floatValue.value
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(float: self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> Float {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> Float {
     return x.floatValue
   }
 }
@@ -461,15 +461,15 @@ extension Double : _BridgedToObjectiveCType {
     value = number.doubleValue.value
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(double: self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> Double {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> Double {
     return x.doubleValue
   }
 }
@@ -480,15 +480,15 @@ extension Bool: _BridgedToObjectiveCType {
     else { self = false }
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber(bool: self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> Bool {
     return x.boolValue
   }
 }
@@ -499,16 +499,16 @@ extension CGFloat : _BridgedToObjectiveCType {
     self.native = CGFloat.NativeType(number)
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
 
-  public func bridgeToObjectiveC() -> NSNumber {
-    return self.native.bridgeToObjectiveC()
+  public func _bridgeToObjectiveC() -> NSNumber {
+    return self.native._bridgeToObjectiveC()
   }
 
-  public static func bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
-    return CGFloat(CGFloat.NativeType.bridgeFromObjectiveC(x))
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
+    return CGFloat(CGFloat.NativeType._bridgeFromObjectiveC(x))
   }
 }
 
@@ -569,23 +569,23 @@ public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
 ///
 /// to Objective-C code as a method that returns an `NSArray`.
 public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
-  return arr.bridgeToObjectiveC()
+  return arr._bridgeToObjectiveC()
 }
 
 extension Array : _ConditionallyBridgedToObjectiveCType {
-  public static func isBridgedToObjectiveC() -> Bool {
+  public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
 
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
 
-  public func bridgeToObjectiveC() -> NSArray {
+  public func _bridgeToObjectiveC() -> NSArray {
     return reinterpretCast(self._buffer._asCocoaArray())
   }
 
-  public static func bridgeFromObjectiveC(source: NSArray) -> Array {
+  public static func _bridgeFromObjectiveC(source: NSArray) -> Array {
     _precondition(Swift._isBridgedToObjectiveC(T.self),
         "array element type is not bridged to Objective-C")
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
@@ -598,8 +598,8 @@ extension Array : _ConditionallyBridgedToObjectiveCType {
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
-  public
-  static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
+  public static func _bridgeFromObjectiveCConditional(source: NSArray)
+      -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
       = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
@@ -654,8 +654,8 @@ public func _convertNSDictionaryToDictionary<
     Key : Hashable, Value>(d: NSDictionary)
     -> [Key : Value] {
   // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `bridgeToObjectiveC`.
-  return Dictionary.bridgeFromObjectiveC(d)
+  // than just dispatching to `_bridgeFromObjectiveC`.
+  return Dictionary._bridgeFromObjectiveC(d)
 }
 
 /// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
@@ -674,21 +674,21 @@ public func _convertDictionaryToNSDictionary<Key, Value>(
     d: [Key : Value]
 ) -> NSDictionary {
   // Note: there should be *a good justification* for doing something else
-  // than just dispatching to `bridgeToObjectiveC`.
-  return d.bridgeToObjectiveC()
+  // than just dispatching to `_bridgeToObjectiveC`.
+  return d._bridgeToObjectiveC()
 }
 
 // Dictionary<Key, Value> is conditionally bridged to NSDictionary
 extension Dictionary : _ConditionallyBridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
 
-  public func bridgeToObjectiveC() -> NSDictionary {
+  public func _bridgeToObjectiveC() -> NSDictionary {
     return reinterpretCast(_bridgeToObjectiveCImpl())
   }
 
-  public static func bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
+  public static func _bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
     if let result = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
         d as AnyObject) {
       return result
@@ -706,13 +706,13 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
       (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
        stop: UnsafePointer<ObjCBool>) in
       builder.add(
-          key: _bridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: _bridgeFromObjectiveC(anyObjectValue, Value.self))
+          key: Swift._bridgeFromObjectiveC(anyObjectKey, Key.self),
+          value: Swift._bridgeFromObjectiveC(anyObjectValue, Value.self))
     }
     return builder.take()
   }
 
-  public static func bridgeFromObjectiveCConditional(
+  public static func _bridgeFromObjectiveCConditional(
     x: NSDictionary
   ) -> Dictionary? {
     let anyDict = x as [NSObject : AnyObject]
@@ -724,7 +724,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
     return Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
   }
 
-  public static func isBridgedToObjectiveC() -> Bool {
+  public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Key.self) &&
            Swift._isBridgedToObjectiveC(Value.self)
   }
@@ -899,15 +899,15 @@ extension NSRange {
 }
 
 extension NSRange : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSValue.self
   }
 
-  public func bridgeToObjectiveC() -> NSValue {
+  public func _bridgeToObjectiveC() -> NSValue {
     return NSValue(range: self)
   }
 
-  public static func bridgeFromObjectiveC(x: NSValue) -> NSRange {
+  public static func _bridgeFromObjectiveC(x: NSValue) -> NSRange {
     return x.rangeValue
   }
 }

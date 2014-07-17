@@ -63,15 +63,15 @@ struct X : _BridgedToObjectiveCType {
     self.value = value
   }
 
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return Tracked.self
   }
 
-  func bridgeToObjectiveC() -> Tracked {
+  func _bridgeToObjectiveC() -> Tracked {
     return Tracked(value)
   }
 
-  static func bridgeFromObjectiveC(x: Tracked) -> X {
+  static func _bridgeFromObjectiveC(x: Tracked) -> X {
     return X(x.value)
   }
 

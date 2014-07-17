@@ -46,61 +46,61 @@ internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 extension String : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSString.self
   }
-  public func bridgeToObjectiveC() -> NSString {
+  public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  public static func bridgeFromObjectiveC(x: NSString) -> String {
+  public static func _bridgeFromObjectiveC(x: NSString) -> String {
     _fatalError("implement")
   }
 }
 
 extension Int : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> Int {
     _fatalError("implement")
   }
 }
 
 extension Array : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
-  public func bridgeToObjectiveC() -> NSArray {
+  public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  public static func bridgeFromObjectiveC(x: NSArray) -> Array {
+  public static func _bridgeFromObjectiveC(x: NSArray) -> Array {
     return []
   }
 }
 
 extension Dictionary : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
-  public func bridgeToObjectiveC() -> NSDictionary {
+  public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  public static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+  public static func _bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     return [:]
   }
 }
 
 extension CGFloat : _BridgedToObjectiveCType {
-  public static func getObjectiveCType() -> Any.Type {
+  public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
-  public func bridgeToObjectiveC() -> NSNumber {
+  public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
+  public static func _bridgeFromObjectiveC(x: NSNumber) -> CGFloat {
     return CGFloat()
   }
 }

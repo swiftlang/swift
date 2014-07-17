@@ -2278,7 +2278,7 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
   }
 
   return getWitnessType(type, bridgedProto, conformance,
-                        Context.getIdentifier("ObjectiveCType"),
+                        Context.getIdentifier("_ObjectiveCType"),
                         diag::broken_bridged_to_objc_protocol);
 }
 

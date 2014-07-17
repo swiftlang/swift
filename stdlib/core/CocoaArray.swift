@@ -23,11 +23,11 @@ import SwiftShims
 /// A subset of the NSArray interface with call-compatible selectors
 /// (e.g. _SwiftNSRange is layout-compatible with NSRange in
 /// getObjects:range: below).  Array<T> is backed by one of these, and
-/// when T isBridgedToObjectiveC, it can be used directly as an
+/// when _isBridgedToObjectiveC(T.self), it can be used directly as an
 /// NSArray.  It is safe to convert between NSArray and _CocoaArrayType via
 /// reinterpretCast.
-@unsafe_no_objc_tagged_pointer @objc public
-protocol _CocoaArrayType {
+@unsafe_no_objc_tagged_pointer @objc
+public protocol _CocoaArrayType {
   func objectAtIndex(index: Int) -> AnyObject
   
   func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)

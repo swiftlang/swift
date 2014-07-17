@@ -8,15 +8,15 @@ class BridgedClass : NSObject {
 }
 
 struct BridgedStruct : _BridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
 
-  func bridgeToObjectiveC() -> BridgedClass {
+  func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }
 
-  static func bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+  static func _bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
     return BridgedStruct()
   }
 }

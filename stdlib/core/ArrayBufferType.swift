@@ -28,7 +28,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
     -> UnsafePointer<Element>
 
   /// Convert to an NSArray.
-  /// Precondition: isBridgedToObjectiveC(Element.self)
+  /// Precondition: _isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
   func _asCocoaArray() -> _CocoaArrayType
 

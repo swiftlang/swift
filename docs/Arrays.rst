@@ -154,9 +154,9 @@ Bridging Rules and Terminology for all Types
   ObjectiveC::
 
     protocol _BridgedToObjectiveC {
-      typealias ObjectiveCType: AnyObject
-      func bridgeToObjectiveC() -> ObjectiveCType
-      class func bridgeFromObjectiveC(_: ObjectiveCType) -> Self
+      typealias _ObjectiveCType: AnyObject
+      func _bridgeToObjectiveC() -> _ObjectiveCType
+      class func _bridgeFromObjectiveC(_: _ObjectiveCType) -> Self
     }
 
   .. Note:: classes and ``@objc`` existentials shall not conform to
@@ -168,15 +168,15 @@ Bridging Rules and Terminology for all Types
   to ``_ConditionallyBridgedToObjectiveC``::
 
     protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
-      class func isBridgedToObjectiveC() -> Bool
-      class func bridgeFromObjectiveCConditional(_: ObjectiveCType) -> Self?
+      class func _isBridgedToObjectiveC() -> Bool
+      class func _bridgeFromObjectiveCConditional(_: _ObjectiveCType) -> Self?
     }
 
   Bridging from, or *bridging back* to, a type ``T`` conforming to
   ``_ConditionallyBridgedToObjectiveC`` when
-  ``T.isBridgedToObjectiveC()`` is ``false`` is a user programming
+  ``T._isBridgedToObjectiveC()`` is ``false`` is a user programming
   error that may be diagnosed at
-  runtime. ``bridgeFromObjectiveCConditional`` can be used to attempt
+  runtime. ``_bridgeFromObjectiveCConditional`` can be used to attempt
   to bridge back, and return ``nil`` if the entire object cannot be
   bridged.
 
@@ -189,12 +189,12 @@ Bridging Rules and Terminology for all Types
   - if ``T`` conforms to ``BridgedToObjectiveC`` and either
   
     - ``T`` does not conform to ``_ConditionallyBridgedToObjectiveC``
-    - or, ``T.isBridgedToObjectiveC()``
+    - or, ``T._isBridgedToObjectiveC()``
 
     then a value ``x`` of type ``T`` is **bridged** as
-    ``T.ObjectiveCType`` via ``x.bridgeToObjectiveC()``, and an object
-    ``y`` of ``T.ObjectiveCType`` is **bridged back** to ``T`` via
-    ``T.bridgeFromObjectiveC(y)``
+    ``T._ObjectiveCType`` via ``x._bridgeToObjectiveC()``, and an object
+    ``y`` of ``T._ObjectiveCType`` is **bridged back** to ``T`` via
+    ``T._bridgeFromObjectiveC(y)``
 
   - Otherwise, ``T`` **does not bridge** to Objective-C
 
@@ -230,7 +230,7 @@ conforms to ``_BridgedToObjectiveC``:
   - **Implicit upcasting** implicitly converts ``Derived[]`` to
     ``Base[]`` in O(1).  
   - **Implicit bridging** implicitly converts ``X[]`` to
-    ``X.ObjectiveCType[]`` in O(N).
+    ``X._ObjectiveCType[]`` in O(N).
 
   .. Note:: Either type of implicit conversion may be combined with
      `trivial bridging`_ in an implicit conversion to ``NSArray``.
@@ -240,7 +240,7 @@ conforms to ``_BridgedToObjectiveC``:
 
   - **Checked downcasting** converts ``Base[]`` to ``Derived[]?``.
   - **Checked bridging back** converts ``T[]`` to ``X[]?`` where
-    ``X.ObjectiveCType`` is ``T`` or a trivial subtype thereof.
+    ``X._ObjectiveCType`` is ``T`` or a trivial subtype thereof.
 
 * **Forced conversions** convert ``AnyObject[]`` or ``NSArray`` to
   ``T[]`` implicitly, in bridging thunks between Swift and Objective-C.

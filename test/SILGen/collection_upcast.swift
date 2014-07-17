@@ -10,15 +10,15 @@ func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 struct BridgedSwift : Hashable, _BridgedToObjectiveCType {
   var hashValue: Int { return 0 }
 
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
   
-  func bridgeToObjectiveC() -> BridgedObjC {
+  func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()
   }
 
-  static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+  static func _bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
     return BridgedSwift()
   }
 }

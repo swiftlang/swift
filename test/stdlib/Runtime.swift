@@ -19,24 +19,24 @@ struct NotBridgedValueType {
 }
 
 struct BridgedValueType : _ConditionallyBridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
 
-  func bridgeToObjectiveC() -> ClassA {
+  func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
   }
 
-  static func isBridgedToObjectiveC() -> Bool {
+  static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> BridgedValueType {
+  static func _bridgeFromObjectiveC(x: ClassA) -> BridgedValueType {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
     return BridgedValueType(value: x.value)
   }
 
-  static func bridgeFromObjectiveCConditional(x: ClassA) -> BridgedValueType? {
+  static func _bridgeFromObjectiveCConditional(x: ClassA) -> BridgedValueType? {
     if x.value % 2 == 0 {
       return BridgedValueType(value: x.value)
     }
@@ -58,25 +58,25 @@ struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveCType {
     value7 = value
   }
 
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
 
-  func bridgeToObjectiveC() -> ClassA {
+  func _bridgeToObjectiveC() -> ClassA {
     assert(value == value0)
     return ClassA(value: value0)
   }
 
-  static func isBridgedToObjectiveC() -> Bool {
+  static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType {
+  static func _bridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
     return BridgedLargeValueType(value: x.value)
   }
 
-  static func bridgeFromObjectiveCConditional(x: ClassA) -> BridgedLargeValueType? {
+  static func _bridgeFromObjectiveCConditional(x: ClassA) -> BridgedLargeValueType? {
     if x.value % 2 == 0 {
       return BridgedLargeValueType(value: x.value)
     }
@@ -97,28 +97,28 @@ struct BridgedLargeValueType : _ConditionallyBridgedToObjectiveCType {
 
 struct ConditionallyBridgedValueType<T>
   : _ConditionallyBridgedToObjectiveCType {
-  static func getObjectiveCType() -> Any.Type {
+  static func _getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
 
-  func bridgeToObjectiveC() -> ClassA {
+  func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType {
+  static func _bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType {
     assert(x.value % 2 == 0, "not bridged from Objective-C")
     return ConditionallyBridgedValueType(value: x.value)
   }
 
-  static func bridgeFromObjectiveCConditional(x: ClassA) 
-                -> ConditionallyBridgedValueType? {
+  static func _bridgeFromObjectiveCConditional(x: ClassA)
+      -> ConditionallyBridgedValueType? {
     if x.value % 2 == 0 {
       return ConditionallyBridgedValueType(value: x.value)
     }
     return .None
   }
 
-  static func isBridgedToObjectiveC() -> Bool {
+  static func _isBridgedToObjectiveC() -> Bool {
     return !((T.self as Any) as? String.Type)
   }
 

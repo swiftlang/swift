@@ -2136,8 +2136,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   return CheckedCastKind::Unresolved;
 }
 
-/// If the expression is a an implicit call to bridgeFromObjectiveC or
-/// bridgeFromObjectiveCConditional, returns the argument of that call.
+/// If the expression is a an implicit call to _bridgeFromObjectiveC or
+/// _bridgeFromObjectiveCConditional, returns the argument of that call.
 static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   auto call = dyn_cast<CallExpr>(expr);
   if (!call || !call->isImplicit())
@@ -2203,8 +2203,7 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
       isa<ConditionalCheckedCastExpr>(sub))
     return cast<ExplicitCastExpr>(sub);
 
-  // Otherwise, try to look through an implicit
-  // bridgeFromObjectiveC() call.
+  // Otherwise, try to look through an implicit _bridgeFromObjectiveC() call.
   if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
     sub = skipOptionalEvalAndBinds(arg);
     if (isa<ForcedCheckedCastExpr>(sub) || 
