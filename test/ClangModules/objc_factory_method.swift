@@ -2,6 +2,7 @@
 // RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache %s -verify
 
 import AppKit
+import NotificationCenter
 
 func testInstanceTypeFactoryMethod(queen: B) {
   var hive1 = Hive(queen: queen)

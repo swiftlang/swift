@@ -30,6 +30,11 @@ module UIKit {
   export *
 }
 
+module NotificationCenter {
+  header "NotificationCenter.h" 
+  export *
+}
+
 module objc_ext { header "objc_ext.h" }
 module macros {
   header "macros.h"

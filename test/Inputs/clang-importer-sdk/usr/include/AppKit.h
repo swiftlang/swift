@@ -70,10 +70,6 @@
 @interface NSObjectFactorySub : NSObjectFactory
 @end
 
-@interface NCWidgetController : NSObject
-+ (instancetype)widgetController;
-@end
-
 @interface NSString(Category)
 - (NSString*)nsStringMethod;
 + (NSInteger)nsStringClassMethod;
