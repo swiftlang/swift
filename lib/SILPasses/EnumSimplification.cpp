@@ -49,11 +49,41 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
       I->getOperand(0).getType().getEnumElementType(EnumDecl, Mod);
   auto *UEDI = Builder.createUncheckedEnumData(I->getLoc(), I->getOperand(0),
                                                EnumDecl, ArgType);
+
+  SILType UEDITy = UEDI->getType();
+
+  // If our payload is trivial, we do not need to insert any retain or release
+  // operations.
+  if (UEDITy.isTrivial(Mod))
+    return;
+
+  // If we have a retain value...
   if (isa<RetainValueInst>(I)) {
+    // And our payload has reference semantics, insert a strong_retain onto the
+    // payload.
+    if (UEDITy.hasReferenceSemantics()) {
+      Builder.createStrongRetain(I->getLoc(), UEDI);
+      return;
+    }
+
+    // Otherwise, insert a retain_value on the payload.
     Builder.createRetainValue(I->getLoc(), UEDI);
     return;
   }
 
+  // At this point we know that we must have a release_value and a non-trivial
+  // payload.
+  assert(isa<ReleaseValueInst>(I) && "If I is not a retain value here, it must "
+         "be a release value since enums do not have reference semantics.");
+
+  // If our payload has reference semantics, insert the strong release.
+  if (UEDITy.hasReferenceSemantics()) {
+    Builder.createStrongRelease(I->getLoc(), UEDI);
+    return;
+  }
+
+  // Otherwise if our payload is non-trivial but lacking reference semantics,
+  // insert the release_value.
   Builder.createReleaseValue(I->getLoc(), UEDI);
 }
 
@@ -193,8 +223,8 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
   }
 
   // Initialize our state with our first predecessor...
-  SILBasicBlock *BB = *PI;
-  auto Iter = BBToStateMap.find(BB);
+  SILBasicBlock *OtherBB = *PI;
+  auto Iter = BBToStateMap.find(OtherBB);
   if (Iter == BBToStateMap.end()) {
     DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
     return;
@@ -205,16 +235,16 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
 
   // If we are predecessors only successor, we can potentially hoist releases
   // into it.
-  if (FirstPredState.getBB()->getSingleSuccessor()) {
+  if (OtherBB->getSingleSuccessor()) {
     for (auto P : ValueToCaseMap.getItems())
-      EnumToEnumBBCaseListMap[P.first].push_back({BB, P.second});
+      EnumToEnumBBCaseListMap[P.first].push_back({OtherBB, P.second});
   }
 
   // If we only have one predecessor...
   if (PI == PE) {
     // Grab the terminator of that successor and if it is a switch enum, mix it
     // into this state.
-    TermInst *PredTerm = FirstPredState.getBB()->getTerminator();
+    TermInst *PredTerm = OtherBB->getTerminator();
     if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm))
       handlePredSwitchEnum(S);
 
@@ -223,6 +253,8 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
   }
 
   DEBUG(llvm::dbgs() << "            Merging in rest of perdecessors...\n");
+
+  llvm::SmallVector<SILValue, 4> ValuesToBlot;
 
   // And for each remaining predecessor...
   do {
@@ -233,7 +265,7 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
     }
 
     // Grab the predecessors state...
-    SILBasicBlock *OtherBB = *PI;
+    OtherBB = *PI;
 
     auto OtherIter = BBToStateMap.find(OtherBB);
     if (OtherIter == BBToStateMap.end()) {
@@ -259,12 +291,14 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
 
         // Check if out predecessor has any other successors. If that is true we
         // clear all the state since we can not hoist safely.
-        if (!PredState.getBB()->getSingleSuccessor()) {
+        if (!OtherBB->getSingleSuccessor()) {
           EnumToEnumBBCaseListMap.clear();
+          DEBUG(llvm::dbgs() << "                Predecessor has other "
+                "successors. Clearing BB cast list map.\n");
         } else {
           // Otherwise, add this case to our predecessor case list. We will unique
           // this after we have finished processing all predecessors.
-          auto Case = std::make_pair(PredState.getBB(), OtherValue->second);
+          auto Case = std::make_pair(OtherBB, OtherValue->second);
           EnumToEnumBBCaseListMap[OtherValue->first].push_back(Case);
         }
 
@@ -276,13 +310,20 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
         // BB path... Clear all predecessor cases that we are tracking so we
         // don't attempt to perform that optimization.
         EnumToEnumBBCaseListMap.clear();
+        DEBUG(llvm::dbgs() << "                Failed to find state. Clearing "
+              "BB cast list map.\n");
       }
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
       // are tracking. Blot it!
-      ValueToCaseMap.blot(P.first);
+      DEBUG(llvm::dbgs() << "                Blotting: " << P.first);
+      ValuesToBlot.push_back(P.first);
     }
   } while (PI != PE);
+
+  for (SILValue V : ValuesToBlot) {
+    ValueToCaseMap.blot(V);
+  }
 }
 
 bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
@@ -351,20 +392,33 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
     if (!RVI)
       continue;
 
+    DEBUG(llvm::dbgs() << "        Visiting release: " << *RVI);
+
     // Grab the operand of the release value inst.
     SILValue Op = RVI->getOperand();
 
     // Lookup the [(BB, EnumTag)] list for this operand.
     auto R = EnumToEnumBBCaseListMap.find(Op);
     // If we don't have one, skip this release value inst.
-    if (R == EnumToEnumBBCaseListMap.end())
+    if (R == EnumToEnumBBCaseListMap.end()) {
+      DEBUG(llvm::dbgs() << "            Could not find [(BB, EnumTag)] "
+            "list for release_value's operand. Bailing!\n");
       continue;
+    }
 
     auto &EnumBBCaseList = R->second;
     // If we don't have an enum tag for each predecessor of this BB, bail since
     // we do not know how to handle that BB.
-    if (EnumBBCaseList.size() != NumPreds)
+    if (EnumBBCaseList.size() != NumPreds) {
+      DEBUG(llvm::dbgs() << "            Found [(BB, EnumTag)] "
+            "list for release_value's operand, but we do not have an enum tag "
+            "for each predecessor. Bailing!\n");
+      DEBUG(llvm::dbgs() << "            List:\n");
+      DEBUG(for (auto P : EnumBBCaseList) {
+          llvm::dbgs() << "                "; P.second->dump(llvm::dbgs());
+        });
       continue;
+    }
 
     // Finally ensure that we have no users of this operand preceding the
     // release_value in this BB. If we have users like that we can not hoist the
@@ -376,8 +430,14 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
     // if we are going to use it.
     if (arc::valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
                                                SILBasicBlock::iterator(RVI),
-                                               AA.get()))
+                                               AA.get())) {
+      DEBUG(llvm::dbgs() << "            Release value has use that stops "
+            "hoisting! Bailing!\n");
       continue;
+    }
+
+    DEBUG(llvm::dbgs() << "            Its safe to perform the "
+          "transformation!\n");
 
     // Otherwise perform the transformation.
     for (auto P : EnumBBCaseList) {
@@ -468,9 +528,12 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA,
     // If our predecessors cover any of our enum values, attempt to move
     // releases up the CFG onto the enum payloads (if they exist) or eliminate
     // them entirely.
+    DEBUG(llvm::dbgs() << "    Attempting to move releases into "
+          "predecessors!\n");
     Changed |= State.moveReleasesUpCFGIfCasesCovered();
 
     // Then perform the dataflow.
+    DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
     Changed |= State.process();
   }
 

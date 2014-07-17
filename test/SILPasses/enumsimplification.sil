@@ -2,14 +2,16 @@
 
 import Builtin
 
+class C {}
+
 enum FakeOptional {
   case None
-  case Some(Builtin.Int32)
+  case Some(Builtin.NativeObject)
 }
 
 enum Either {
-  case First(Builtin.Int32)
-  case Second(Builtin.Int64)
+  case First(Builtin.NativeObject)
+  case Second(C)
 }
 
 enum ThreeCaseEnum {
@@ -18,11 +20,22 @@ enum ThreeCaseEnum {
   case C
 }
 
-class C {}
 enum FakeOptionalClass {
   case None
   case Some(C)
 }
+
+struct S {
+  var ptr : Builtin.NativeObject
+}
+
+enum ThreeCaseAbstractionDifference {
+  case A(Builtin.Int32)
+  case B(Builtin.NativeObject)
+  case C(S)
+}
+
+sil @get_object : $@thin () -> Builtin.NativeObject
 
 // CHECK-LABEL: sil @test1 : $@thin (FakeOptional) -> () {
 // CHECK: bb0
@@ -40,9 +53,9 @@ bb0(%0 : $FakeOptional):
 // CHECK: bb0
 // CHECK-NEXT: unchecked_enum_data
 // CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: release_value
+// CHECK-NEXT: strong_release
 sil @test2 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
@@ -55,6 +68,8 @@ bb0(%0 : $FakeOptional):
 // CHECK-LABEL: sil @test3 : $@thin () -> () {
 // CHECK: bb0
 // CHECK-NEXT: enum
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @test3 : $@thin () -> () {
@@ -68,18 +83,21 @@ bb0:
 
 // CHECK-LABEL: sil @test4 : $@thin () -> () {
 // CHECK: bb0
-// CHECK-NEXT: integer_literal
+// CHECK-NEXT: get_object
+// CHECK-NEXT: function_ref @get_object
+// CHECK-NEXT: apply
 // CHECK-NEXT: enum
 // CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: release_value
+// CHECK-NEXT: strong_release
 sil @test4 : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Int32, 0
-  %1 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int32
-  retain_value %1 : $FakeOptional
-  release_value %1 : $FakeOptional
+  %0 = function_ref @get_object : $@thin () -> Builtin.NativeObject
+  %1 = apply %0() : $@thin () -> Builtin.NativeObject
+  %2 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %1 : $Builtin.NativeObject
+  retain_value %2 : $FakeOptional
+  release_value %2 : $FakeOptional
   %9999 = tuple()
   return %9999 : $()
 }
@@ -87,22 +105,23 @@ bb0:
 // CHECK-LABEL: sil @test5 : $@thin () -> () {
 // CHECK: bb1:
 // CHECK-NEXT: [[DATA:%[0-9]+]] = unchecked_enum_data
-// CHECK-NEXT: retain_value [[DATA]]
+// CHECK-NEXT: strong_retain [[DATA]]
 // CHECK: bb2:
 // CHECK-NEXT: [[DATA1:%[0-9]+]] = unchecked_enum_data
-// CHECK-NEXT: retain_value [[DATA1]]
+// CHECK-NEXT: strong_retain [[DATA1]]
 sil @test5 : $@thin () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Int32, 0
-  %1 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int32
+  %0 = function_ref @get_object : $@thin () -> Builtin.NativeObject
+  %1 = apply %0() : $@thin () -> Builtin.NativeObject
+  %2 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %1 : $Builtin.NativeObject
   cond_br undef, bb1, bb2
 
 bb1:
-  retain_value %1 : $FakeOptional
+  retain_value %2 : $FakeOptional
   br bb3
 
 bb2:
-  retain_value %1 : $FakeOptional
+  retain_value %2 : $FakeOptional
   br bb3
 
 bb3:
@@ -113,10 +132,10 @@ bb3:
 // CHECK-LABEL: sil @test6 : $@thin (FakeOptional) -> () {
 // CHECK: bb1:
 // CHECK-NEXT: [[DATA:%[0-9]+]] = unchecked_enum_data
-// CHECK-NEXT: retain_value [[DATA]]
+// CHECK-NEXT: strong_retain [[DATA]]
 // CHECK: bb2:
 // CHECK-NEXT: [[DATA1:%[0-9]+]] = unchecked_enum_data
-// CHECK-NEXT: retain_value [[DATA1]]
+// CHECK-NEXT: strong_retain [[DATA1]]
 sil @test6 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
@@ -136,8 +155,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil @test7 : $@thin () -> () {
-// CHECK-NOT: retain_value
-// CHECK-NOT: retain_value
+// CHECK-NOT: retain
+// CHECK-NOT: retain
+// CHECK: return
 sil @test7 : $@thin () -> () {
 bb0:
   %0 = enum $FakeOptional, #FakeOptional.None!enumelt
@@ -162,7 +182,7 @@ bb3:
 // CHECK-NEXT: retain_value [[INPUT]]
 // CHECK: bb3:
 // CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
-// CHECK-NEXT: retain_value [[PAYLOAD]]
+// CHECK-NEXT: strong_retain [[PAYLOAD]]
 // CHECK: bb4:
 // CHECK-NEXT: retain_value [[INPUT]]
 sil @test8 : $@thin (FakeOptional) -> () {
@@ -191,9 +211,9 @@ bb4:
 // CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
 // CHECK: bb1:
 // CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
-// CHECK-NEXT: retain_value [[PAYLOAD]]
+// CHECK-NEXT: strong_retain [[PAYLOAD]]
 // CHECK: bb2:
-// CHECK-NOT: retain_value
+// CHECK-NOT: retain
 // CHECK: bb3:
 // CHECK-NEXT: retain_value [[INPUT]]
 sil @test9 : $@thin (FakeOptional) -> () {
@@ -270,11 +290,11 @@ bb2:
 
 // CHECK-LABEL: sil @test12 : $@thin (FakeOptional) -> () {
 // CHECK: bb1:
-// CHECK: release_value
+// CHECK: release
 // CHECK: bb2:
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 // CHECK: bb3:
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 sil @test12 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
@@ -293,9 +313,9 @@ bb3:
 
 // CHECK-LABEL: sil @test13 : $@thin (Either) -> () {
 // CHECK: bb1:
-// CHECK: release_value
+// CHECK: strong_release
 // CHECK: bb2:
-// CHECK: release_value
+// CHECK: strong_release
 // CHECK: bb3:
 // CHECK-NOT: release_value
 sil @test13 : $@thin (Either) -> () {
@@ -318,9 +338,9 @@ bb3:
 
 // CHECK-LABEL: sil @test14 : $@thin (Either) -> () {
 // CHECK: bb0(
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 // CHECK: bb1:
-// CHECK: release_value
+// CHECK: release
 sil @test14 : $@thin (Either) -> () {
 bb0(%0 : $Either):
   %1 = unchecked_enum_data %0 : $Either, #Either.First!enumelt.1
@@ -340,11 +360,11 @@ bb3:
 
 // CHECK-LABEL: sil @test15 : $@thin (Either, ThreeCaseEnum) -> () {
 // CHECK: bb1:
-// CHECK: release_value
+// CHECK: release
 // CHECK: bb2:
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 // CHECK: bb3:
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 sil @test15 : $@thin (Either, ThreeCaseEnum) -> () {
 bb0(%0 : $Either, %1 : $ThreeCaseEnum):
   %2 = unchecked_enum_data %0 : $Either, #Either.First!enumelt.1
@@ -371,12 +391,12 @@ sil @unknown : $@thin () -> ()
 
 // CHECK-LABEL: sil @test16 : $@thin (FakeOptionalClass) -> () {
 // CHECK: bb1:
-// CHECK-NOT: release_value
+// CHECK-NOT: release
 // CHECK: bb2:
 // CHECK: unchecked_enum_data
-// CHECK: release_value
+// CHECK: release
 // CHECK: bb3
-// CHECK: release_value
+// CHECK: release
 sil @test16 : $@thin (FakeOptionalClass) -> () {
 bb0(%0 : $FakeOptionalClass):
   switch_enum %0 : $FakeOptionalClass,
@@ -399,6 +419,39 @@ bb3:
   %9998 = function_ref @unknown : $@thin () -> ()
   apply %9998() : $@thin () -> ()
   release_value %0 : $FakeOptionalClass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @enum_simplification_abstraction_differences : $@thin (ThreeCaseAbstractionDifference) -> () {
+// CHECK: bb0(
+// CHECK-NOT: release
+// CHECK: bb1:
+// CHECK-NOT: release
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: bb3:
+// CHECK: release_value
+// CHECK: bb4:
+// CHECK-NOT: release_value
+sil @enum_simplification_abstraction_differences : $@thin (ThreeCaseAbstractionDifference) -> () {
+bb0(%0 : $ThreeCaseAbstractionDifference):
+  switch_enum %0 : $ThreeCaseAbstractionDifference,
+     case #ThreeCaseAbstractionDifference.A!enumelt.1: bb1,
+     case #ThreeCaseAbstractionDifference.B!enumelt.1: bb2,
+     case #ThreeCaseAbstractionDifference.C!enumelt.1: bb3
+
+bb1:
+  br bb4
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  release_value %0 : $ThreeCaseAbstractionDifference
   %9999 = tuple()
   return %9999 : $()
 }
