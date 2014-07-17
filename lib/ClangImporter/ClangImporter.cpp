@@ -524,6 +524,9 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     result->forAllVisibleModules({}, [](Module::ImportedModule import) {});
   }
 
+  // Try to load the API notes for this module.
+  (void)getAPINotesForModule(owner, clangModule->getTopLevelModule());
+
   return result;
 }
 
@@ -602,6 +605,62 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   cacheEntry.setPointer(file);
 
   return file;
+}
+
+api_notes::APINotesReader *
+ClangImporter::Implementation::getAPINotesForModule(
+    ClangImporter &importer,
+    const clang::Module *underlying) {
+  assert(underlying == underlying->getTopLevelModule() &&
+         "Only allowed on a top-level module");
+  // Check whether we already have an API notes reader.
+  auto known = APINotesReaders.find(underlying);
+  if (known != APINotesReaders.end())
+    return known->second.get();
+
+  /// Determine the name of the API notes we're looking for.
+  llvm::SmallString<64> notesFilename(underlying->Name);
+  notesFilename += '.';
+  notesFilename += api_notes::BINARY_APINOTES_EXTENSION;
+
+  // Look for a compiled API notes file in at the given search path. Sets
+  // the reader and returns true if one was found.
+  llvm::SmallString<64> scratch;
+  std::unique_ptr<api_notes::APINotesReader> reader;
+  auto findAPINotes = [&](StringRef searchPath) -> bool {
+    // Compute the file name we're looking for.
+    scratch.clear();
+    llvm::sys::path::append(scratch, searchPath, notesFilename.str());
+
+    // Try to open the file.
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> bufferOrErr
+      = llvm::MemoryBuffer::getFile(scratch.str());
+    if (!bufferOrErr)
+      return false;
+
+    // We found the API notes file; try to load it.
+    reader = api_notes::APINotesReader::get(std::move(bufferOrErr.get()));
+    return true;
+  };
+
+  // Look for a ModuleName.apinotes file in the import search paths.
+  // FIXME: Good thing we have no notion of layering for these paths.
+  bool foundAny = false;
+  for (const auto& searchPath : SwiftContext.SearchPathOpts.ImportSearchPaths) {
+    if (findAPINotes(searchPath)) {
+      foundAny = true;
+      break;
+    }
+  }
+
+  // If we didn't find anything in the user-provided import search paths, look
+  // in the runtime library import path.
+  if (!foundAny)
+    findAPINotes(SwiftContext.SearchPathOpts.RuntimeLibraryImportPath);
+
+  // Add the reader we formed (if any) to the table.
+  return APINotesReaders.insert({underlying, std::move(reader)})
+           .first->second.get();
 }
 
 Optional<clang::Module *>

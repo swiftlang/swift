@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/APINotes/APINotesReader.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -520,6 +521,11 @@ public:
   /// A map from Clang modules to their Swift wrapper modules.
   llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
+  /// A map from Clang modules to their associated API notes.
+  llvm::SmallDenseMap<
+    const clang::Module *,
+    std::unique_ptr<api_notes::APINotesReader>> APINotesReaders;
+
   /// The module unit that contains declarations from imported headers.
   ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
@@ -821,6 +827,15 @@ public:
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
                                        const clang::Module *underlying);
+
+  /// Retrieve the API notes reader that corresponds to the given Clang module,
+  /// loading it if necessary.
+  ///
+  /// \returns an unowned pointer to the corresponding API notes reader, or
+  /// nullptr if no API notes file exists.
+  api_notes::APINotesReader *getAPINotesForModule(
+                               ClangImporter &importer,
+                               const clang::Module *underlying);
 
   /// \brief Constructs a Swift module for the given Clang module.
   Module *finishLoadingClangModule(ClangImporter &importer,

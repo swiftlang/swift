@@ -11,7 +11,7 @@ add_swift_library(swiftClangImporter
   ImportDecl.cpp
   ImportMacro.cpp
   ImportType.cpp
-  DEPENDS swiftAST)
+  DEPENDS swiftAPINotes swiftAST)
 
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.

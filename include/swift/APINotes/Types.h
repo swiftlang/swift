@@ -25,6 +25,9 @@
 namespace swift {
 namespace api_notes {
 
+/// The file extension used for the binary representation of API notes.
+static const char BINARY_APINOTES_EXTENSION[] = "apinotesc";
+
 using llvm::StringRef;
 
 /// Describes the nullability of a particular value, whether it is a property,

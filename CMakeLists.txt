@@ -471,7 +471,7 @@ function(compile_swift_files)
 
     # If we're supposed to generate API notes, do so.
     foreach(apinote_module ${SWIFTFILE_API_NOTES})
-      set(apinote_file "${module_dir}/${apinote_module}.apinotes")
+      set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
       list(APPEND create_apinotes
         COMMAND swift-ide-test -generate-api-annotation -o ${apinote_file} ${apinote_module})
       list(APPEND apinote_files ${apinote_file})
