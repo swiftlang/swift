@@ -308,6 +308,7 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
+#     [API_NOTES module_name]            # Generate API notes for the given module
 #     [DEPENDS cmake_target...]         # CMake targets on which the object 
 #                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
@@ -315,7 +316,7 @@ endif()
 #     [OPT_FLAGS])                      # Optimization flags (overrides SWIFT_OPTIMIZE)
 function(compile_swift_files)
   parse_arguments(SWIFTFILE
-    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS"
+    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
   
@@ -450,6 +451,9 @@ function(compile_swift_files)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
   endif()
 
+  set(create_apinotes)
+  set(apinote_files)
+
   if(SWIFTFILE_IS_MAIN)
     set(module_file)
     set(create_module_dir)
@@ -464,6 +468,16 @@ function(compile_swift_files)
 
     set(create_module_dir
       COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir})
+
+    # If we're supposed to generate API notes, do so.
+    foreach(apinote_module ${SWIFTFILE_API_NOTES})
+      set(apinote_file "${module_dir}/${apinote_module}.apinotes")
+      list(APPEND create_apinotes
+        COMMAND swift-ide-test -generate-api-annotation -o ${apinote_file} ${apinote_module})
+      list(APPEND apinote_files ${apinote_file})
+      install(FILES ${apinote_file}
+        DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
+    endforeach()
 
     install(FILES ${module_file} ${module_doc_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
@@ -483,12 +497,19 @@ function(compile_swift_files)
     set(swift_compiler_path "${SWIFT_COMPILER}")
   endif()
   
+  if (apinote_files)
+    set(swift_ide_test_dependency swift-ide-test)
+  else()
+    set(swift_ide_test_dependency)
+  endif()
+
   add_custom_command(
-    OUTPUT ${objfile} ${module_file} ${module_doc_file}
+    OUTPUT ${objfile} ${module_file} ${module_doc_file} ${apinote_files}
     ${create_module_dir}
+    ${create_apinotes}
     COMMAND "${line_directive_tool}" ${source_files} -- 
       "${swift_compiler_path}" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS "${SWIFT_COMPILER}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS}
+    DEPENDS "${SWIFT_COMPILER}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS} ${swift_ide_test_dependency}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
@@ -525,7 +546,7 @@ endfunction(compute_library_subdir)
 #   handle_swift_sources(sourcesvar externalvar)
 function(handle_swift_sources sourcesvar externalvar name)
   parse_arguments(SWIFTSOURCES  
-    "DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS"
+    "DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
 
@@ -583,6 +604,7 @@ function(handle_swift_sources sourcesvar externalvar name)
       FLAGS ${swift_flags}
       SDK ${SWIFTSOURCES_SDK}
       ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
+      API_NOTES ${SWIFTSOURCES_API_NOTES}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
     list(APPEND result ${swift_obj})
   endif()
@@ -687,6 +709,7 @@ endfunction()
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
+#     [API_NOTES module_name]         # Generate API notes for the given module
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
@@ -694,7 +717,7 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;API_NOTES;FILE_DEPENDS;SDK;ARCHITECTURE" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
 
@@ -747,6 +770,7 @@ macro(add_swift_library_single target name)
     DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS}
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
+    API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
     ${IS_STDLIB_CORE_arg})
 
   add_library( ${target} ${libkind}
@@ -948,7 +972,7 @@ macro(add_swift_library_single target name)
     if (target_static AND LLVM_COMMON_LIBS)
       add_dependencies( ${target_static} ${LLVM_COMMON_LIBS} )
     endif()
-  endif()
+  endif() 
 
   # Set compilation and link flags.
   set_target_properties(${target} PROPERTIES 
@@ -993,6 +1017,7 @@ endmacro(translate_flag)
 #                                    # included in all SDKs.
 #     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
+#     [API_NOTES module_name]         # Generate API notes for the given module
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
@@ -1000,7 +1025,7 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS" 
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS;API_NOTES" 
     "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
@@ -1048,6 +1073,7 @@ macro(add_swift_library name)
         COMPILE_FLAGS
           "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
         LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+        API_NOTES ${SWIFTLIB_API_NOTES}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_INSTALL_FLAG}
         ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1108,6 +1134,7 @@ macro(add_swift_library name)
             COMPILE_FLAGS
               "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_COMPILE_FLAGS}"
             LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+            API_NOTES ${SWIFTLIB_API_NOTES}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
             ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
@@ -1177,6 +1204,7 @@ macro(add_swift_library name)
       COMPILE_FLAGS
         "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
       LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+      API_NOTES ${SWIFTLIB_API_NOTES}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
       ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
