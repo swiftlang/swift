@@ -17,6 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -122,6 +123,18 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
+
+  // FIXME: rdar://17671977 the initializer for a lazy property has already
+  // been moved into its implicit getter.
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *VD = PBD->getSingleVar()) {
+      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
+        auto *Get = VD->getGetter();
+        assert(Get && Get->isImplicit() && "lazy var not implicitly computed");
+        Get->getBody()->walk(*this);
+      }
+    }
+  }
 
   bool Continue = SEWalker.walkToDeclPost(D);
   if (!Continue)

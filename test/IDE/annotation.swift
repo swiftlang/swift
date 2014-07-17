@@ -252,3 +252,12 @@ c10.meth(0, withFloat: 0)
 func test7(withInt x: Int, andThis y: Float) {}
 // CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>withInt</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
 test7(withInt: 0, andThis: 0)
+
+class C11 {
+  // CHECK: var <Var>a</Var>: <iStruct@>Int</iStruct> = { var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:22>tmp</Var> }()
+  var a: Int = { var tmp = 0; return tmp }()
+  // CHECK: lazy var <Var>b</Var>: <iStruct@>Int</iStruct> = { var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:27>tmp</Var> }()
+  lazy var b: Int = { var tmp = 0; return tmp }()
+  // CHECK: var <Var>c</Var>: <iStruct@>Int</iStruct> { get { {var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:27>tmp</Var>}() } }
+  var c: Int { get { {var tmp = 0; return tmp}() } }
+}

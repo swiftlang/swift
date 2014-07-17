@@ -1800,6 +1800,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Load the existing storage and store it into the 'tmp1' temporary.
   auto *Tmp1VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Type(), Get);
+  Tmp1VD->setImplicit();
 
   auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
   auto *Tmp1Init = createPropertyLoadOrCallSuperclassGetter(Storage, SelfDecl);
@@ -1830,6 +1831,7 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   auto *Tmp2VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,
                                    SourceLoc(), Ctx.getIdentifier("tmp2"),
                                    VD->getType(), Get);
+  Tmp2VD->setImplicit();
 
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
