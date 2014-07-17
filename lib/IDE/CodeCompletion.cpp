@@ -829,6 +829,8 @@ public:
 
   void completeNominalMemberBeginning() override;
 
+  void addKeywords(CodeCompletionResultSink &Sink);
+
   void doneParsing() override;
 
   void deliverCompletionResults();
@@ -1861,18 +1863,6 @@ public:
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
                        /*IncludeTopLevel=*/false, Loc);
 
-    // FIXME: The pedantically correct way to find the type is to resolve the
-    // Swift.StringLiteralType type.
-    addKeyword("__FUNCTION__", "String");
-    addKeyword("__FILE__", "String");
-    // Same: Swift.IntegerLiteralType.
-    addKeyword("__LINE__", "Int");
-    addKeyword("__COLUMN__", "Int");
-    // Same: Swift.BooleanLiteralType.
-    addKeyword("false", "Bool");
-    addKeyword("true", "Bool");
-
-    addKeyword("nil", StringRef());
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
@@ -2233,10 +2223,96 @@ static bool isClangSubModule(Module *TheModule) {
   return false;
 }
 
+static void addDeclKeywords(CodeCompletionResultSink &Sink) {
+  auto AddKeyword = [&](StringRef Name) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
+    Builder.addTextChunk(Name);
+  };
+
+#define DECL_KEYWORD(kw) AddKeyword(#kw);
+#include "swift/Parse/Tokens.def"
+
+  // Context-sensitive keywords.
+  AddKeyword("weak");
+  AddKeyword("unowned");
+  AddKeyword("optional");
+  AddKeyword("required");
+  AddKeyword("lazy");
+  AddKeyword("final");
+  AddKeyword("dynamic");
+  AddKeyword("prefix");
+  AddKeyword("postfix");
+  AddKeyword("infix");
+  AddKeyword("override");
+  AddKeyword("mutating");
+  AddKeyword("nonmutating");
+  AddKeyword("convenience");
+}
+
+static void addStmtKeywords(CodeCompletionResultSink &Sink) {
+  auto AddKeyword = [&](StringRef Name, StringRef TypeAnnotation) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None);
+    Builder.addTextChunk(Name);
+    if (!TypeAnnotation.empty())
+      Builder.addTypeAnnotation(TypeAnnotation);
+  };
+
+#define STMT_KEYWORD(kw) AddKeyword(#kw, StringRef());
+#include "swift/Parse/Tokens.def"
+
+  // FIXME: The pedantically correct way to find the type is to resolve the
+  // Swift.StringLiteralType type.
+  AddKeyword("__FUNCTION__", "String");
+  AddKeyword("__FILE__", "String");
+  // Same: Swift.IntegerLiteralType.
+  AddKeyword("__LINE__", "Int");
+  AddKeyword("__COLUMN__", "Int");
+  // Same: Swift.BooleanLiteralType.
+  AddKeyword("false", "Bool");
+  AddKeyword("true", "Bool");
+
+  AddKeyword("nil", StringRef());
+}
+
+void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
+  switch (Kind) {
+  case CompletionKind::None:
+  case CompletionKind::DotExpr:
+    break;
+
+  case CompletionKind::PostfixExprBeginning:
+    addDeclKeywords(Sink);
+    addStmtKeywords(Sink);
+    break;
+
+  case CompletionKind::PostfixExpr:
+  case CompletionKind::PostfixExprParen:
+  case CompletionKind::SuperExpr:
+  case CompletionKind::SuperExprDot:
+  case CompletionKind::TypeSimpleBeginning:
+  case CompletionKind::TypeIdentifierWithDot:
+  case CompletionKind::TypeIdentifierWithoutDot:
+  case CompletionKind::CaseStmtBeginning:
+  case CompletionKind::CaseStmtDotPrefix:
+    break;
+
+  case CompletionKind::NominalMemberBeginning:
+    addDeclKeywords(Sink);
+    break;
+  }
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
     return;
   }
+
+  // Add keywords even if type checking fails completely.
+  addKeywords(CompletionContext.getResultSink());
 
   if (!typecheckContext())
     return;
@@ -2453,8 +2529,19 @@ void CodeCompletionCallbacksImpl::deliverCompletionResults() {
 
 void PrintingCodeCompletionConsumer::handleResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
-  OS << "Begin completions, " << Results.size() << " items\n";
+  unsigned NumResults = 0;
   for (auto Result : Results) {
+    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+      continue;
+    NumResults++;
+  }
+  if (NumResults == 0)
+    return;
+
+  OS << "Begin completions, " << NumResults << " items\n";
+  for (auto Result : Results) {
+    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+      continue;
     Result->print(OS);
     OS << "\n";
   }

@@ -20,6 +20,18 @@
 #define KEYWORD(kw)
 #endif
 
+/// DECL_KEYWORD(kw)
+///   Expands for every Swift keyword that can be used in a declaration.
+#ifndef DECL_KEYWORD
+#define DECL_KEYWORD(kw) KEYWORD(kw)
+#endif
+
+/// STMT_KEYWORD(kw)
+///   Expands for every Swift keyword used in statement grammar.
+#ifndef STMT_KEYWORD
+#define STMT_KEYWORD(kw) KEYWORD(kw)
+#endif
+
 /// PUNCTUATOR(name, str)
 ///   Expands for every Swift punctuator.
 ///   \param name  The symbolic name of the punctuator, such as
@@ -31,25 +43,25 @@
 #endif
 
 // Keywords that start decls.
-KEYWORD(class)
-KEYWORD(deinit)
-KEYWORD(enum)
-KEYWORD(extension)
-KEYWORD(func)
-KEYWORD(import)
-KEYWORD(init)
-KEYWORD(let)
-KEYWORD(operator)
-KEYWORD(protocol)
-KEYWORD(struct)
-KEYWORD(subscript)
-KEYWORD(typealias)
-KEYWORD(var)
+DECL_KEYWORD(class)
+DECL_KEYWORD(deinit)
+DECL_KEYWORD(enum)
+DECL_KEYWORD(extension)
+DECL_KEYWORD(func)
+DECL_KEYWORD(import)
+DECL_KEYWORD(init)
+DECL_KEYWORD(let)
+DECL_KEYWORD(operator)
+DECL_KEYWORD(protocol)
+DECL_KEYWORD(struct)
+DECL_KEYWORD(subscript)
+DECL_KEYWORD(typealias)
+DECL_KEYWORD(var)
 
-KEYWORD(internal)
-KEYWORD(private)
-KEYWORD(public)
-KEYWORD(static)
+DECL_KEYWORD(internal)
+DECL_KEYWORD(private)
+DECL_KEYWORD(public)
+DECL_KEYWORD(static)
 
 KEYWORD(undef)      // This is only enabled when parsing .sil files.
 KEYWORD(sil)        // This is only enabled when parsing .sil files.
@@ -59,20 +71,20 @@ KEYWORD(sil_global) // This is only enabled when parsing .sil files.
 KEYWORD(sil_witness_table) // This is only enabled when parsing .sil files.
 
 // Statement keywords.
-KEYWORD(if)
-KEYWORD(do)
-KEYWORD(else)
-KEYWORD(for)
-KEYWORD(in)
-KEYWORD(while)
-KEYWORD(return)
-KEYWORD(break)
-KEYWORD(continue)
-KEYWORD(fallthrough)
-KEYWORD(switch)
-KEYWORD(case)
-KEYWORD(default)
-KEYWORD(where)
+STMT_KEYWORD(if)
+STMT_KEYWORD(do)
+STMT_KEYWORD(else)
+STMT_KEYWORD(for)
+STMT_KEYWORD(in)
+STMT_KEYWORD(while)
+STMT_KEYWORD(return)
+STMT_KEYWORD(break)
+STMT_KEYWORD(continue)
+STMT_KEYWORD(fallthrough)
+STMT_KEYWORD(switch)
+STMT_KEYWORD(case)
+STMT_KEYWORD(default)
+STMT_KEYWORD(where)
 
 // Expression keywords.
 KEYWORD(as)
@@ -125,5 +137,6 @@ PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 
 
 #undef KEYWORD
-#undef IDENTIFIER_KEYWORD
+#undef DECL_KEYWORD
+#undef STMT_KEYWORD
 #undef PUNCTUATOR

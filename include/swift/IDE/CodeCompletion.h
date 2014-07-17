@@ -501,10 +501,11 @@ public:
 /// \c raw_ostream.
 class PrintingCodeCompletionConsumer : public CodeCompletionConsumer {
   llvm::raw_ostream &OS;
+  bool IncludeKeywords;
 
 public:
-  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS)
-      : OS(OS) {
+  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS, bool IncludeKeywords = true)
+      : OS(OS), IncludeKeywords(IncludeKeywords) {
   }
 
   void handleResults(

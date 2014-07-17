@@ -202,6 +202,11 @@ CodeCompletionDiagnostics("code-completion-diagnostics",
                                          "doing code completion"),
                           llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+CodeCompletionKeywords("code-completion-keywords",
+                       llvm::cl::desc("Include keywords in code completion results"),
+                       llvm::cl::init(true));
+
 // '-syntax-coloring' options.
 
 static llvm::cl::opt<bool>
@@ -324,7 +329,8 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
                             StringRef CodeCompletionToken,
-                            bool CodeCompletionDiagnostics) {
+                            bool CodeCompletionDiagnostics,
+                            bool CodeCompletionKeywords) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
     llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -357,7 +363,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-      new ide::PrintingCodeCompletionConsumer(llvm::outs()));
+      new ide::PrintingCodeCompletionConsumer(
+          llvm::outs(), CodeCompletionKeywords));
 
   // Cerate a factory for code completion callbacks that will feed the
   // Consumer.
@@ -1972,7 +1979,8 @@ int main(int argc, char *argv[]) {
     ExitCode = doCodeCompletion(InitInvok,
                                 options::SourceFilename,
                                 options::CodeCompletionToken,
-                                options::CodeCompletionDiagnostics);
+                                options::CodeCompletionDiagnostics,
+                                options::CodeCompletionKeywords);
     break;
 
   case ActionType::REPLCodeCompletion:
