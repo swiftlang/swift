@@ -1296,16 +1296,6 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
     KnownObjCContexts[className] = known;
   };
 
-  // Add a known property.
-  auto addProperty = [&](Identifier className, Identifier propertyName,
-                         OptionalTypeKind kind) {
-    assert(KnownObjCProperties.find({className, propertyName}) ==
-             KnownObjCProperties.end() &&
-           "Property is already known!?");
-    // Record this known property.
-    KnownObjCProperties[{className, propertyName}] = kind;
-  };
-
   using namespace known_methods;
 
   // Function object that creates a selector.
@@ -1320,10 +1310,7 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
 #define OBJC_CONTEXT(ContextName, Options)  \
   addContext(SwiftContext.getIdentifier(#ContextName), \
             KnownObjCMethod() | Options);
-#define OBJC_PROPERTY(ContextName, PropertyName, Options)  \
-  addProperty(SwiftContext.getIdentifier(#ContextName), \
-              SwiftContext.getIdentifier(#PropertyName), \
-              Options);
+#define OBJC_PROPERTY(ContextName, PropertyName, Options)
 #include "KnownObjCMethods.def"
 }
 
@@ -1373,10 +1360,23 @@ KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
   return nullptr;
 }
 
+/// Translate the "nullability" notion from API notes into an optional type
+/// kind.
+static OptionalTypeKind translateNullability(api_notes::NullableKind kind) {
+  switch (kind) {
+  case api_notes::NullableKind::NonNullable:
+    return OptionalTypeKind::OTK_None;
+
+  case api_notes::NullableKind::Nullable:
+    return OptionalTypeKind::OTK_Optional;
+
+  case api_notes::NullableKind::Unknown:
+    return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
+  }
+}
+
 OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
                    const clang::ObjCPropertyDecl *prop) {
-  populateKnownObjCMethods();
-
   // Find the name of the property's context.
   StringRef contextName = getObjCContextName(prop);
   if (contextName.empty()) {
@@ -1384,12 +1384,25 @@ OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
     return OTK_ImplicitlyUnwrappedOptional;
   }
 
-  Identifier contextID = SwiftContext.getIdentifier(contextName);
-  Identifier propIdentifier = SwiftContext.getIdentifier(prop->getName());
-  auto known = KnownObjCProperties.find({contextID, propIdentifier});
-  if (known != KnownObjCProperties.end())
-    return known->second;
+  // Look for this property in any of the API notes files.
+  for (auto &entry : APINotesReaders) {
+    if (!entry.second)
+      continue;
 
+    auto info = entry.second->lookupObjCProperty(contextName, prop->getName());
+    if (!info)
+      continue;
+
+    // We found information about this property. Check whether we have
+    // nullability information.
+    if (auto nullability = info->getNullability()) {
+      return translateNullability(*nullability);
+    }
+  }
+
+  // FIXME: Fall back to looking for class defaults information?
+
+  // We don't know anything.
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
