@@ -94,9 +94,6 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor|DeclModifier, 4)
 
-SIMPLE_DECL_ATTR(convenience, Convenience,
-                 OnConstructor|DeclModifier|NotSerialized, 42)
-
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 

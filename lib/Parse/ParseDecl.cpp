@@ -1208,7 +1208,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   parseDeclAttributeList(Attributes);
 
   // Keep track of where and whether we see a contextual keyword on the decl.
-  SourceLoc StaticLoc;
+  SourceLoc StaticLoc, ConvenienceLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
@@ -1313,8 +1313,15 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
         continue;
       }
+
       if (Tok.isContextualKeyword("convenience")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Convenience);
+        if (ConvenienceLoc.isValid()) {
+          diagnose(Tok, diag::decl_already_convenience)
+            .highlight(ConvenienceLoc).fixItRemove(Tok.getLoc());
+        } else {
+          ConvenienceLoc = Tok.getLoc();
+        }
+        consumeToken(tok::identifier);
         continue;
       }
         
@@ -1359,8 +1366,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = DeclResult;
       break;
     case tok::kw_init:
-      DeclResult = parseDeclInit(Flags, Attributes);
+      DeclResult = parseDeclInit(Flags, Attributes, ConvenienceLoc);
       Status = DeclResult;
+      ConvenienceLoc = SourceLoc(); // we handled 'convenience' if present.
       break;
     case tok::kw_deinit:
       DeclResult = parseDeclDeinit(Flags, Attributes);
@@ -1444,6 +1452,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       diagnose(Entries.back()->getLoc(), diag::decl_not_static,
                StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
+    
+    if (ConvenienceLoc.isValid())
+      diagnose(Entries.back()->getLoc(), diag::convenience_invalid)
+        .fixItRemove(SourceRange(ConvenienceLoc));
   }
 
   return Status;
@@ -3712,7 +3724,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 }
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                      SourceLoc ConvenienceLoc) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 
@@ -3740,17 +3753,18 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return SignatureStatus;
   }
 
+  CtorInitializerKind initKind = CtorInitializerKind::Designated;
+  if (ConvenienceLoc.isValid())
+    initKind = CtorInitializerKind::Convenience;
+
   auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
-  
-  CtorInitializerKind initKind = CtorInitializerKind::Designated;
-  if (Attributes.hasAttribute<ConvenienceAttr>())
-    initKind = CtorInitializerKind::Convenience;
   CD->setInitKind(initKind);
+  CD->setConvenienceLoc(ConvenienceLoc);
 
   // No need to setLocalDiscriminator.
 

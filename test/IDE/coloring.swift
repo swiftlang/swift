@@ -230,7 +230,7 @@ class MySubClass : MyCls {
     // CHECK: <attr-builtin>override</attr-builtin> <kw>func</kw> foo(x: <type>Int</type>) {}
     override func foo(x: Int) {}
 
-    // CHECK: <attr-builtin>convenience</attr-builtin> <kw>init</kw>(a: <type>Int</type>) {}
+    // CHECK: <kw>convenience</kw> <kw>init</kw>(a: <type>Int</type>) {}
     convenience init(a: Int) {}
 }
 

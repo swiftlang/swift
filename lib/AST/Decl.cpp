@@ -2828,13 +2828,19 @@ SourceRange ConstructorDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { getConstructorLoc(), BodyRange.End };
 
+  SourceLoc Start;
+  if (ConvenienceLoc.isValid())
+    Start = ConvenienceLoc;
+  else
+    Start = getConstructorLoc();
+
   SourceLoc End;
   if (auto body = getBody())
     End = body->getEndLoc();
   if (End.isInvalid())
     End = getSignatureSourceRange().End;
 
-  return { getConstructorLoc(), End };
+  return { Start, End };
 }
 
 Type ConstructorDecl::getArgumentType() const {
