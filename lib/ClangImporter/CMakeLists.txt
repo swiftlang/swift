@@ -24,7 +24,7 @@ target_link_libraries(swiftClangImporter
   clangSema
   clangAnalysis
   clangEdit
-  clangRewrite
+  clangRewriteCore
   clangRewriteFrontend
   clangAST
   clangLex
