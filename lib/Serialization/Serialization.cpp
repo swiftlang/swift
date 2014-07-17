@@ -1274,7 +1274,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_RawDocComment:
   case DAK_Ownership: // Serialized as part of the type.
   case DAK_Accessibility:
-  case DAK_AccessibilitySetter:
+  case DAK_SetterAccessibility:
   case DAK_Count:
     llvm_unreachable("cannot serialize DAK_Count");
     return;
