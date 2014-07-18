@@ -571,8 +571,12 @@ bool PrintAST::shouldPrint(const Decl *D) {
 }
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
+  // If we are printing StoredWithTrivialAccessors in sil, print get|set
+  // to differentiate from stored property.
   if (!ASD->hasAccessorFunctions() ||
-      ASD->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors){
+      (!Options.PrintForSIL &&
+       ASD->getStorageKind()
+       == AbstractStorageDecl::StoredWithTrivialAccessors)){
     // This is a 'let' vardecl.  We could print the initializer if we could
     // print expressions.
     return;
@@ -999,6 +1003,12 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
+  // Print @sil_stored when the attribute is not already
+  // on, decl has storage and it is on a class.
+  if (Options.PrintForSIL && decl->hasStorage() &&
+      decl->getDeclContext()->isClassOrClassExtensionContext() &&
+      !decl->getAttrs().hasAttribute<SILStoredAttr>())
+    Printer << "@sil_stored ";
   printAttributes(decl);
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords) {

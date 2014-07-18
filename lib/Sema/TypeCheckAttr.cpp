@@ -88,6 +88,7 @@ public:
   void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
+  void visitSILStoredAttr(SILStoredAttr *attr);
 };
 } // end anonymous namespace
 
@@ -174,6 +175,11 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
 }
 
+void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
+  auto *VD = cast<VarDecl>(D);
+  if (!VD->getDeclContext()->isClassOrClassExtensionContext())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
+}
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
@@ -518,6 +524,7 @@ public:
     IGNORED_ATTR(Semantics)
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(RequiresStoredPropertyInits)
+    IGNORED_ATTR(SILStored)
 #undef IGNORED_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {

@@ -5,6 +5,7 @@
 
 // CHECK: struct X {
 // CHECK-NEXT:  func test()
+// CHECK-NEXT:  init
 // CHECK-NEXT: }
 
 // CHECK: func unknown()

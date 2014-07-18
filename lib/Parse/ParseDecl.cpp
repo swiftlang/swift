@@ -2462,6 +2462,7 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                                     SourceLoc StaticLoc,
+                                    const DeclAttributes &Attributes,
                                     SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   
@@ -2581,7 +2582,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
 
   // Turn this into a computed variable.
   if (Set || Get) {
-    PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
+    if (Attributes.hasAttribute<SILStoredAttr>())
+      PrimaryVar->makeStoredWithTrivialAccessors(Get, Set);
+    else
+      PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
     return PrimaryVar;
   }
 
@@ -2742,7 +2746,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
       if (auto *boundVar =
-            parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Decls)) {
+            parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Attributes,
+                               Decls)) {
 
         if (PBD->getInit() && !boundVar->hasStorage()) {
           diagnose(pattern.get()->getLoc(), diag::getset_init)

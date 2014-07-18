@@ -3658,8 +3658,9 @@ public:
     // Mark all members of final classes as final.
     if (CD->isFinal())
       for (Decl *Member : CD->getMembers())
-        if (isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
-            isa<SubscriptDecl>(Member))
+        if ((isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
+             isa<SubscriptDecl>(Member)) &&
+            !Member->getAttrs().hasAttribute<FinalAttr>())
           Member->getMutableAttrs().add(new (TC.Context) FinalAttr(true));
 
     for (Decl *Member : CD->getMembers())
@@ -4737,6 +4738,7 @@ public:
 
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
+    UNINTERESTING_ATTR(SILStored)
 
 #undef UNINTERESTING_ATTR
 

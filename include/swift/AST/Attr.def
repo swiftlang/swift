@@ -165,6 +165,9 @@ SIMPLE_DECL_ATTR(override, Override,
                  OnFunc | OnVar | OnSubscript | DeclModifier | NotSerialized,
                  /* Not serialized */49)
 
+SIMPLE_DECL_ATTR(sil_stored, SILStored, OnVar | NotSerialized,
+                 /* Not serialized */41)
+
 DECL_ATTR(private, Accessibility,
           OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
           OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
