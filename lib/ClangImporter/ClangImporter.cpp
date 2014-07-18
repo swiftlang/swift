@@ -1526,8 +1526,7 @@ FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {
   if (auto info = getKnownObjCMethod(method))
-    return static_cast<FactoryAsInitKind>(
-             static_cast<unsigned>(info->getFactoryAsInitKind()));
+    return info->getFactoryAsInitKind();
 
   return FactoryAsInitKind::Infer;
 }

@@ -191,15 +191,7 @@ enum class SpecialMethodKind {
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
 
-/// Describes whether to classify a factory method as an initializer.
-enum class FactoryAsInitKind {
-  /// Infer based on name and type (the default).
-  Infer,
-  /// Treat as a class method.
-  AsClassMethod,
-  /// Treat as an initializer.
-  AsInitializer
-};
+using api_notes::FactoryAsInitKind;
 
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
