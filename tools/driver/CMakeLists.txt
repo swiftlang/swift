@@ -28,3 +28,11 @@ endif()
 
 install(TARGETS swift
   RUNTIME DESTINATION bin)
+
+add_custom_command(TARGET swift POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink swift swiftc
+    WORKING_DIRECTORY ${SWIFT_RUNTIME_OUTPUT_INTDIR})
+
+install(CODE
+    "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink swift swiftc \
+                     WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)")
