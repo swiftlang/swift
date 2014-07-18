@@ -3,7 +3,7 @@
 // RUN: not %swift -parse %s -import-objc-header %t/fake.h -module-cache-path %t 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
 // RUN: not %swift -parse %s -import-objc-header %S/../../Inputs/empty.swift -module-cache-path %t 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
 
-// MISSING-HEADER: error: could not import Objective-C header '{{.*}}/fake.h'
+// MISSING-HEADER: error: bridging header '{{.*}}/fake.h' does not exist
 // MISSING-HEADER-NOT: error
 
 // EMPTY-HEADER-NOT: header

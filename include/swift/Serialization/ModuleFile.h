@@ -105,6 +105,13 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
+  /// Info for the (lone) imported header for this module.
+  struct {
+    off_t fileSize;
+    time_t fileModTime;
+    StringRef contents;
+  } importedHeaderInfo = {};
+
   /// All of this module's link-time dependencies.
   SmallVector<LinkLibrary, 8> LinkLibraries;
 

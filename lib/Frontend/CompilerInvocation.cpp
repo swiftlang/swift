@@ -521,8 +521,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
 
-  if (const Arg *A = Args.getLastArg(OPT_import_objc_header))
+  if (const Arg *A = Args.getLastArg(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
+    Opts.SerializeBridgingHeader |=
+      !Opts.PrimaryInput && !Opts.ModuleOutputPath.empty();
+  }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_Xllvm),
                                  Args.filtered_end())) {

@@ -48,6 +48,12 @@ ERROR(clang_cannot_build_module,none,Fatal,
 ERROR(clang_cannot_import_header,none,Fatal,
   "could not import Objective-C header '%0'", (StringRef))
 
+ERROR(cannot_import_header,none,Fatal,
+  "bridging header '%0' does not exist", (StringRef))
+WARNING(could_not_rewrite_bridging_header,none,none,
+  "unknown error serializing bridging header; "
+  "target may not be debuggable outside of its original project", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

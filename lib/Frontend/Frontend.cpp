@@ -292,7 +292,7 @@ void CompilerInstance::performSema() {
   StringRef implicitHeaderPath =
     Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
-    clangImporter->importHeader(implicitHeaderPath, MainModule);
+    clangImporter->importBridgingHeader(implicitHeaderPath, MainModule);
     importedHeaderModule = clangImporter->getImportedHeaderModule();
     assert(importedHeaderModule);
   }
@@ -425,9 +425,7 @@ void CompilerInstance::performSema() {
   // Type-check each top-level input besides the main source file.
   for (auto File : MainModule->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
-      if (PrimaryBufferID == NO_SUCH_BUFFER ||
-          (SF->getBufferID().hasValue() &&
-           SF->getBufferID().getValue() == PrimaryBufferID))
+      if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext());
 
   // Even if there were no source files, we should still record known

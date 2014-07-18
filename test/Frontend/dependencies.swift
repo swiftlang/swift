@@ -24,7 +24,7 @@
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
-// RUN: %swift %clang-importer-sdk -I %S/Inputs/dependencies/ -import-objc-header extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %swift %clang-importer-sdk -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | FileCheck -check-prefix=CHECK-IMPORT %s
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift

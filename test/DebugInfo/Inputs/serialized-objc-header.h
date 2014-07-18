@@ -1,0 +1,2 @@
+@interface ObjCClass
+@end

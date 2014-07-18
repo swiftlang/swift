@@ -125,15 +125,35 @@ public:
   ///
   /// \param header A header name or full path, to be used in a \#import
   /// directive.
+  /// \param adapter The module that depends on the contents of this header.
+  /// \param expectedSize The size of the header when the module was compiled
+  ///        against it.
+  /// \param expectedModTime The mtime of the header when the module was
+  ///        compiled against it.
+  /// \param cachedContents A buffer to use if the header has been modified
+  ///        since the module was compiled.
   ///
   /// \sa getImportedHeaderModule
-  void importHeader(StringRef header, Module *adapter);
+  void importHeader(StringRef header, Module *adapter, off_t expectedSize,
+                    time_t expectedModTime, StringRef cachedContents);
+
+  /// Imports an Objective-C header file into the shared imported header module.
+  ///
+  /// \param header A header name or full path, to be used in a \#import
+  ///        directive.
+  /// \param adapter The module that depends on the contents of this header.
+  ///
+  /// \sa getImportedHeaderModule
+  void importBridgingHeader(StringRef header, Module *adapter);
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   ///
   /// \sa importHeader
   Module *getImportedHeaderModule();
+
+  std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
+                                        time_t &fileModTime);
 
   const clang::Module *getClangOwningModule(ClangNode Node) const;
 

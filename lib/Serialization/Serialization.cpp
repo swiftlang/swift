@@ -249,6 +249,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
   BLOCK_RECORD(input_block, LINK_LIBRARY);
   BLOCK_RECORD(input_block, IMPORTED_HEADER);
+  BLOCK_RECORD(input_block, IMPORTED_HEADER_CONTENTS);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -415,11 +416,12 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
                                  StringRef importedHeader,
                                  StringRef moduleLinkName,
                                  bool autolinkForceLoad) {
-  BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
+  BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
+  input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
 
   for (auto filename : inputFiles) {
     llvm::SmallString<128> path(filename);
@@ -455,9 +457,17 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
       continue;
 
     if (import.second == importedHeaderModule) {
-      assert(!importedHeader.empty());
+      off_t importedHeaderSize = 0;
+      time_t importedHeaderModTime = 0;
+      std::string contents;
+      if (!importedHeader.empty())
+        contents = clangImporter->getBridgingHeaderContents(
+            importedHeader, importedHeaderSize, importedHeaderModTime);
       ImportedHeader.emit(ScratchRecord, publicImportSet.count(import),
+                          importedHeaderSize, importedHeaderModTime,
                           importedHeader);
+      if (!contents.empty())
+        ImportedHeaderContents.emit(ScratchRecord, contents);
       continue;
     }
 

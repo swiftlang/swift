@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 119;
+const uint16_t VERSION_MINOR = 120;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -64,6 +64,9 @@ using BitOffsetField = BCFixed<31>;
 // same way.
 using CharOffset = BitOffset;
 using CharOffsetField = BitOffsetField;
+
+using FileSizeField = BCVBR<16>;
+using FileModTimeField = BCVBR<16>;
 
 enum class VarDeclStorageKind : uint8_t {
   Stored, StoredWithTrivialAccessors, Computed, Observing
@@ -340,7 +343,8 @@ namespace input_block {
     SOURCE_FILE = 1,
     IMPORTED_MODULE,
     LINK_LIBRARY,
-    IMPORTED_HEADER
+    IMPORTED_HEADER,
+    IMPORTED_HEADER_CONTENTS,
   };
 
   using SourceFileLayout = BCRecordLayout<
@@ -364,7 +368,14 @@ namespace input_block {
   using ImportedHeaderLayout = BCRecordLayout<
     IMPORTED_HEADER,
     BCFixed<1>, // exported?
-    BCBlob // a header path suitable for #import
+    FileSizeField, // file size (for validation)
+    FileModTimeField, // file mtime (for validation)
+    BCBlob // file path
+  >;
+
+  using ImportedHeaderContentsLayout = BCRecordLayout<
+    IMPORTED_HEADER_CONTENTS,
+    BCBlob
   >;
 }
 

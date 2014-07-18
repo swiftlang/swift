@@ -445,7 +445,6 @@ public:
   /// These are used to look up Swift classes forward-declared with \@class.
   TinyPtrVector<Module *> ImportedHeaderOwners;
 
-
   /// \brief Clang's objectAtIndexedSubscript: selector.
   clang::Selector objectAtIndexedSubscript;
 
@@ -515,6 +514,10 @@ public:
   clang::Preprocessor &getClangPreprocessor() const {
     return Instance->getPreprocessor();
   }
+
+  /// Imports the given header contents into the Clang context.
+  void importHeader(Module *adapter,
+                    std::unique_ptr<llvm::MemoryBuffer> contents);
 
   /// Returns the module \p D comes from, or \c Nothing if \p D does not have
   /// a valid associated module.

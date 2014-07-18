@@ -595,9 +595,19 @@ ModuleFile::ModuleFile(
           break;
         }
         case input_block::IMPORTED_HEADER: {
+          assert(!importedHeaderInfo.fileSize && "only one header allowed");
           bool exported;
-          input_block::ImportedHeaderLayout::readRecord(scratch, exported);
+          input_block::ImportedHeaderLayout::readRecord(scratch,
+            exported, importedHeaderInfo.fileSize,
+            importedHeaderInfo.fileModTime);
           Dependencies.push_back(Dependency::forHeader(blobData, exported));
+          break;
+        }
+        case input_block::IMPORTED_HEADER_CONTENTS: {
+          assert(Dependencies.back().isHeader() && "must follow header record");
+          assert(importedHeaderInfo.contents.empty() &&
+                 "contents seen already");
+          importedHeaderInfo.contents = blobData;
           break;
         }
         default:
@@ -780,7 +790,14 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
     if (dependency.isHeader()) {
       auto clangImporter =
         static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-      clangImporter->importHeader(dependency.RawPath, file->getParentModule());
+      // The path may be empty if the file being loaded is a partial AST,
+      // and the current compiler invocation is a merge-modules step.
+      if (!dependency.RawPath.empty()) {
+        clangImporter->importHeader(dependency.RawPath, file->getParentModule(),
+                                    importedHeaderInfo.fileSize,
+                                    importedHeaderInfo.fileModTime,
+                                    importedHeaderInfo.contents);
+      }
       Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
       dependency.Import = { {}, importedHeaderModule };
       continue;

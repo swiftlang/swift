@@ -20,6 +20,8 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -38,10 +40,13 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
+#include "clang/Rewrite/Frontend/FrontendActions.h"
+#include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
 #include <memory>
@@ -139,6 +144,25 @@ namespace {
       if (!isOverridden)
         Importer.addDependency(file);
       return true;
+    }
+  };
+
+  class StdStringMemBuffer : public llvm::MemoryBuffer {
+    const std::string storage;
+    const std::string name;
+  public:
+    StdStringMemBuffer(std::string &&source, StringRef name)
+        : storage(std::move(source)), name(name.str()) {
+      init(storage.data(), storage.data() + storage.size(),
+           /*null-terminated=*/true);
+    }
+
+    const char *getBufferIdentifier() const override {
+      return name.c_str();
+    }
+
+    BufferKind getBufferKind() const override {
+      return MemoryBuffer_Malloc;
     }
   };
 }
@@ -402,30 +426,27 @@ ClangImporter::create(ASTContext &ctx,
   return importer;
 }
 
-void ClangImporter::importHeader(StringRef header, Module *adapter) {
+void ClangImporter::Implementation::importHeader(
+    Module *adapter,
+    std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
   if (adapter)
-    Impl.ImportedHeaderOwners.push_back(adapter);
+    ImportedHeaderOwners.push_back(adapter);
 
-  clang::Preprocessor &pp = Impl.getClangPreprocessor();
-
-  llvm::SmallString<128> importLine{"#import \""};
-  importLine += header;
-  importLine += "\"\n";
-
-  auto sourceBuffer = llvm::MemoryBuffer::getMemBufferCopy(importLine,
-                                                           "<import>");
+  clang::Preprocessor &pp = getClangPreprocessor();
+  clang::FileID bufferID;
   {
-    auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+    auto &rawDiagClient = Instance->getDiagnosticClient();
     auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
-    auto importRAII = diagClient.handleImport(sourceBuffer);
+    auto importRAII = diagClient.handleImport(sourceBuffer.get());
 
     clang::SourceManager &sourceMgr =
-      Impl.getClangASTContext().getSourceManager();
+      getClangASTContext().getSourceManager();
     clang::SourceLocation includeLoc =
       sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
-    clang::FileID bufferID =
-      sourceMgr.createFileID(sourceBuffer, clang::SrcMgr::C_User,
-                             /*LoadedID=*/0, /*LoadedOffset=*/0, includeLoc);
+    bufferID = sourceMgr.createFileID(sourceBuffer.release(),
+                                      clang::SrcMgr::C_User,
+                                      /*LoadedID=*/0, /*LoadedOffset=*/0,
+                                      includeLoc);
 
     pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
     // Force the import to occur.
@@ -433,10 +454,93 @@ void ClangImporter::importHeader(StringRef header, Module *adapter) {
   }
 
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!Impl.Parser->ParseTopLevelDecl(parsed)) {}
+  while (!Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
 
-  Impl.bumpGeneration();
+  bumpGeneration();
+}
+
+void ClangImporter::importHeader(StringRef header, Module *adapter,
+                                 off_t expectedSize, time_t expectedModTime,
+                                 StringRef cachedContents) {
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+  const clang::FileEntry *headerFile = fileManager.getFile(header,
+                                                           /*open=*/true);
+  if (headerFile && headerFile->getSize() == expectedSize &&
+      headerFile->getModificationTime() == expectedModTime) {
+    return importBridgingHeader(header, adapter);
+  }
+
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
+    llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
+  };
+  Impl.importHeader(adapter, std::move(sourceBuffer));
+}
+
+void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+  const clang::FileEntry *headerFile = fileManager.getFile(header,
+                                                           /*open=*/true);
+  if (!headerFile) {
+    Impl.SwiftContext.Diags.diagnose({}, diag::cannot_import_header, header);
+    return;
+  }
+
+  llvm::SmallString<128> importLine{"#import \""};
+  importLine += header;
+  importLine += "\"\n";
+
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
+    llvm::MemoryBuffer::getMemBufferCopy(importLine, "<import>")
+  };
+
+  Impl.importHeader(adapter, std::move(sourceBuffer));
+}
+
+std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
+                                                     off_t &fileSize,
+                                                     time_t &fileModTime) {
+  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> invocation{
+    new clang::CompilerInvocation(*Impl.Invocation)
+  };
+  invocation->getFrontendOpts().DisableFree = false;
+  invocation->getFrontendOpts().Inputs.clear();
+  invocation->getFrontendOpts().Inputs.push_back(
+      clang::FrontendInputFile(headerPath, clang::IK_ObjC));
+
+  invocation->getPreprocessorOpts().resetNonModularOptions();
+
+  clang::CompilerInstance rewriteInstance;
+  rewriteInstance.setInvocation(&*invocation);
+  rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
+
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+  rewriteInstance.setFileManager(&fileManager);
+  rewriteInstance.createSourceManager(fileManager);
+  rewriteInstance.setTarget(&Impl.Instance->getTarget());
+
+  std::string result;
+  bool success = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
+    clang::RewriteIncludesAction action;
+    action.BeginSourceFile(rewriteInstance,
+                           invocation->getFrontendOpts().Inputs.front());
+    llvm::raw_string_ostream os(result);
+    clang::RewriteIncludesInInput(rewriteInstance.getPreprocessor(), &os,
+                                  rewriteInstance.getPreprocessorOutputOpts());
+    action.EndSourceFile();
+  });
+
+  success |= !rewriteInstance.getDiagnostics().hasErrorOccurred();
+  if (!success) {
+    Impl.SwiftContext.Diags.diagnose({},
+                                     diag::could_not_rewrite_bridging_header);
+    return "";
+  }
+
+  const clang::FileEntry *fileInfo = fileManager.getFile(headerPath);
+  fileSize = fileInfo->getSize();
+  fileModTime = fileInfo->getModificationTime();
+  return result;
 }
 
 Module *ClangImporter::loadModule(
