@@ -154,6 +154,16 @@ println("[\(advance(R(13), -3, R(0)).x)]")
 // CHECK-NEXT: R.advancedBy: 13, -3
 // CHECK-NEXT: [10]
 
+// Tests for advancing away from the end bound.
+println("[\(advance(R(13), -99, R(16)).x)]")
+// CHECK-NEXT: R.distanceTo: 13, 16
+// CHECK-NEXT: R.advancedBy: 13, -99
+// CHECK-NEXT: [-86]
+println("[\(advance(R(16), 99, R(13)).x)]")
+// CHECK-NEXT: R.distanceTo: 16, 13
+// CHECK-NEXT: R.advancedBy: 16, 99
+// CHECK-NEXT: [115]
+
 println("all done.")
 // CHECK-NEXT: all done.
 

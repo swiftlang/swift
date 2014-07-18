@@ -282,6 +282,17 @@ func ~> <T: _RandomAccessIndexType>(
   let end = rest.1.1
 
   let d = start.distanceTo(end)
-  return (n > 0 ? d < n : d > n) ? end : start.advancedBy(n)
+  var amount = n
+  if n < 0 {
+    if d < 0 && d > n {
+      return end
+    }
+  }
+  else {
+    if d > 0 && d < n {
+      return end
+    }
+  }
+  return start.advancedBy(amount)
 }
 
