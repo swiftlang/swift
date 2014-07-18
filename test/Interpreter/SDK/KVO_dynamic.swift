@@ -1,7 +1,8 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift -Xfrontend -enable-dynamic %s -o %t/a.out
 // RUN: %target-run %t/a.out
-// XFAIL: *
+// XFAIL: OS=macosx
+// XFAIL: CPU=arm64
 
 import Foundation
 
