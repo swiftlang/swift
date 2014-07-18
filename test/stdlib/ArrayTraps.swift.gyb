@@ -1,0 +1,165 @@
+// -*- swift -*-
+// These tests should crash.
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %S/../../utils/gyb -DRUN_TESTS= %s -o %t/ArrayTraps.swift
+// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
+// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/ArrayTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %S/../../utils/gyb -DRUN_TESTS="%target-run %t/a.out" -DSOURCE=%s %s > /dev/null
+//
+// CHECK: OK
+// CHECK: CRASHED: SIG{{ILL|TRAP}}
+
+// This file is gybbe'd twice, once to generate the test file, and
+// once to run the tests.  The second time, the output is thrown away,
+// but the list of tests is used to invoke the test executable
+// repeatedly with different arguments.
+import Foundation
+
+// Interpret the command line arguments.
+var arg = Process.arguments[1]
+
+%{
+  # A list of arguments that should be passed to successive
+  # invocations of the executable, to run all the different tests.
+  tests = [] 
+
+  # We test for bounds-checking traps for both reading and writing
+  # both single elements and slices of all three different array
+  # types.
+  arrayTypes = ('Array', 'ContiguousArray', 'Slice')
+
+  def test(x = None):
+    global Array
+    global io
+    tests.append(
+      '%s%s.%s' % (
+         Array, '.' + io if io else '', len(tests) if x is None else x))
+    return 'if arg == "%s"' % tests[-1]
+
+  def boundsTrap(index, exprToWrite):
+    global io
+    return 'println("OK")\n' + (
+      'let x = a[%s]' % index 
+       if io == 'read' else
+      'a[%s] = %s' % (index, exprToWrite))
+}%
+
+% for Array in arrayTypes:
+%   for io in ['read', 'write']:
+${test('Bounds1')} {
+  var a = ${Array}<Int>()
+  ${boundsTrap(0,1)}
+}
+
+${test('Bounds2')} {
+  var a = ${Array}<Int>()
+  ${boundsTrap(100,1)}
+}
+
+${test('Bounds3')} {
+  var a = ${Array}([ 10, 20, 30 ])
+  ${boundsTrap(3,1)}
+}
+
+${test('PopFromEmpty')} {
+  var a: ${Array}<Int> = []
+  println("OK")
+  a.removeLast()
+}
+
+${test('SliceBounds0')} {
+  var a = ${Array}<Int>()
+  ${boundsTrap('-1..<1','Slice()')}
+}
+
+${test('SliceBounds1')} {
+  var a = ${Array}([1])
+  ${boundsTrap('-1..<1','Slice()')}
+}
+
+${test('SliceBounds2')} {
+  var a = ${Array}([1])
+  ${boundsTrap('0..<2','Slice()')}
+}
+
+${test('SliceBounds2')} {
+  var a = ${Array}([1])
+  ${boundsTrap('1..<2','Slice()')}
+}
+
+%   end
+%   io = ''
+
+%   for index in -1, 2:
+${test('Insert%s' % index)} {
+  var a: ${Array}<Int> = [42]
+  println("OK")
+  a.insert(3, atIndex: ${index})
+}
+%   end
+
+%   for index in -1, 1, 2:
+${test('Remove%s' % index)} {
+  var a: ${Array}<Int> = [42]
+  println("OK")
+  a.removeAtIndex(${index})
+}
+%   end
+% end
+% Array = 'Array'
+
+class Base { }
+class Derived : Base { }
+
+${test('Downcast1')} {
+  let ba: [Base] = [Derived(), Base()]
+  // <rdar://problem/17340393> Array downcast should do deferred checking
+  // FIXME: The "OK" should be moved after "let d0 = da[0]" when we
+  // get deferred checking.
+  println("OK")
+  let da: [Derived] = _arrayDownCast(ba)
+  let d0 = da[0]
+  let d1 = da[1]
+}
+
+${test('Downcast2')} {
+  let a: [AnyObject] = ["String", 1]
+  // <rdar://problem/17340393> Array downcast should do deferred checking
+  // FIXME: The "OK" should be moved after "let s0 = sa[0]" when we
+  // get deferred checking.
+  println("OK")
+  let sa: [NSString] = _arrayBridgeFromObjectiveC(a)
+  let s0 = sa[0]
+  let s1 = sa[1]
+}
+
+${test('UnsafeLength')} {
+  let a = [42, 77, 88]
+  
+  if a.withUnsafePointerToElements({
+      UnsafeArray(start: $0, length: 1)[0]
+  }) == 42 {
+    println("OK")
+  }
+  
+  a.withUnsafePointerToElements {
+    UnsafeArray(start: $0, length: -1)
+  }
+}
+println("BUSTED: should have crashed already")
+exit(1)
+
+%{
+  if RUN_TESTS:
+    from subprocess import call
+    import sys
+    exitCode = 0
+    for t in tests:
+      if call(
+        '%s %s 2>&1 | FileCheck %s' % (RUN_TESTS, t, SOURCE), 
+        shell=True
+      ) != 0:
+        exitCode = 1
+        sys.stderr.write('%s failed\n' % t)
+    exit(exitCode)
+}%
