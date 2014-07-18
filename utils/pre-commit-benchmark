@@ -120,7 +120,7 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
                 rebuilt = True
         else:
             timingsText = open(timingsFile).read()
-            oldRepeat = timingsText.count('\nTotal, ')
+            oldRepeat = timingsText.count('\nTotal')
             if oldRepeat < repeat:
                 print('Only %s repeats in existing %s timings file' % (oldRepeat, exe))
                 timingsText = ''
