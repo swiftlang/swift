@@ -176,11 +176,6 @@ ImplicitObjCWith("implicit-objc-with",
                  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-ImportWithTighterObjCPointerTypes("import-tighter-objc-types",
-                 llvm::cl::desc("import audited APIs with the tighter types, not unwrapped optionals"),
-                 llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
                    llvm::cl::desc("Implicitly import Objective-C factory methods as initializers"),
                    llvm::cl::init(false));
@@ -1952,8 +1947,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().SplitPrepositions = options::SplitObjCSelectors;
   InitInvok.getClangImporterOptions().InferImplicitProperties =
     options::ImplicitProperties;
-  InitInvok.getClangImporterOptions().ImportWithTighterObjCPointerTypes =
-    options::ImportWithTighterObjCPointerTypes;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

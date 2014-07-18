@@ -14,7 +14,7 @@
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=AppKit -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true -import-tighter-objc-types=true > %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=AppKit -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 

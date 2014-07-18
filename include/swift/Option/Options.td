@@ -118,10 +118,6 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
-def import_tighter_objc_types : Flag<["-"], "import-tighter-objc-types">,
-  Flags<[FrontendOption,HelpHidden]>,
-  HelpText<"Import audited APIs with tighter types, not unwrapped optionals">;
-
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 

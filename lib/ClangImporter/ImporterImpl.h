@@ -228,7 +228,6 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
-  const bool ImportWithTighterObjCPointerTypes;
 
 private:
   /// \brief A count of the number of load module operations.

@@ -637,8 +637,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const llvm::Triple &triple)
   : SwiftContext(ctx),
     SplitPrepositions(ctx.LangOpts.SplitPrepositions),
-    InferImplicitProperties(opts.InferImplicitProperties),
-    ImportWithTighterObjCPointerTypes(opts.ImportWithTighterObjCPointerTypes)
+    InferImplicitProperties(opts.InferImplicitProperties)
 {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
