@@ -74,16 +74,16 @@ instructions. The semantic annotations don't necessarily need to be on
 public APIs. For example, the Array subscript operator may invoke two
 operations in the semantic model. One for checking the bounds and
 another one for accessing the elements. With this abstraction the
-optimizer can remove the ``checkBounds`` instruction and keep the
+optimizer can remove the ``checkSubscript`` instruction and keep the
 getElement instruction::
  
   @public subscript(index: Int) -> Element {
      get {
-      checkBounds(index)
+      checkSubscript(index)
       return getElement(index)
      }
 
-  @semantics("array.check_bounds") func checkBounds(index: Int) {
+  @semantics("array.check_subscript") func checkSubscript(index: Int) {
     ...
   }
 	
@@ -123,7 +123,7 @@ are always *control dependent*. A control dependent operation is one
 that may only be executed on the control flow paths in which the
 operation originally appeared, ignoring potential program
 exits. Generally, operations that only read state are not control
-dependent. One exception is ``check_bounds`` which is readonly but
+dependent. One exception is ``check_subscript`` which is readonly but
 control dependent because it may trap. Some operations are *guarded*
 by others. A guarded operation can never be executed before its
 guard.
@@ -133,7 +133,7 @@ array.get_element(index: Int) -> Element
    Read an element from the array at the specified index. No other
    elements are read. The storage descriptor is not read. No state is
    written. This operation is not control dependent, but may be
-   guarded by ``check_bounds``. Any ``check_bounds`` may act as a
+   guarded by ``check_subscript``. Any ``check_subscript`` may act as a
    guard, regardless of the index being checked [#f1]_.
 
 array.set_element(index: Int, e: Element)
@@ -141,9 +141,9 @@ array.set_element(index: Int, e: Element)
   Write an element into the array at the specified index. No state is
   read. No other elements are written. The storage descriptor is not
   written. This operation is control dependent and may be guarded by
-  ``check_bounds`` and ``make_mutable`` or ``mutate_unknown``.
+  ``check_subscript`` and ``make_mutable`` or ``mutate_unknown``.
 
-array.check_bounds(index: Int)
+array.check_subscript(index: Int)
 
   Read the array count from the storage descriptor. Execute a ``trap``
   if ``index < 0 || index >= count``. No elements are read. No state
@@ -208,17 +208,17 @@ guards
 
 An operation can only interfere-with or guard another if they may operate on the same Array.
 
-============== =============== ==========================================
-semantic op    relation        semantic ops
-============== =============== ==========================================
-make_mutable   guards          set_element
-check_bounds   guards          get_element, set_element
-set_element(i) interferes-with get_element(i)
-mutate_unknown itereferes-with get_element, set_element, check_bounds,
-                               get_count, get_capacity
-============== =============== ==========================================
+================ =============== ==========================================
+semantic op      relation        semantic ops
+================ =============== ==========================================
+make_mutable     guards          set_element
+check_subscript  guards          get_element, set_element
+set_element(i)   interferes-with get_element(i)
+mutate_unknown   itereferes-with get_element, set_element, check_subscript,
+                                 get_count, get_capacity
+================ =============== ==========================================
 
-.. [#f1] Any check_bounds(N) may act as a guard for
+.. [#f1] Any check_subscript(N) may act as a guard for
          ``get/set_element(i)`` as long as it can be shown that ``N >=
          i``.
 
