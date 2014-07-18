@@ -35,7 +35,7 @@ ${MirrorDecl} {
   }
   
   public var summary: String { 
-    return "Range(\(self[0].1.summary),\(self[1].1.summary))"
+    return "\(self[0].1.summary)..<\(self[1].1.summary)"
   }
 
   public var quickLookObject: QuickLookObject? { return .Text(summary) }
