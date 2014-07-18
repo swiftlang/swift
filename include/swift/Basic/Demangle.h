@@ -14,7 +14,6 @@
 #define SWIFT_BASIC_DEMANGLE_H
 
 #include "llvm/ADT/StringRef.h"
-#include "swift/Basic/LLVM.h"
 #include <memory>
 #include <vector>
 
@@ -64,7 +63,7 @@ private:
   Node(Kind k)
       : NodeKind(k), NodePayloadKind(PayloadKind::None) {
   }
-  Node(Kind k, StringRef t)
+  Node(Kind k, llvm::StringRef t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
     new (&TextPayload) std::string(t);
   }
