@@ -162,6 +162,7 @@ public:
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
+  LValue visitForceValueExpr(ForceValueExpr *e);
   
   // Expressions that wrap lvalues
   
@@ -338,6 +339,36 @@ namespace {
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
+    }
+  };
+  
+  class OptionalObjectComponent : public PhysicalPathComponent {
+    SILType SubstFieldType;
+  public:
+    OptionalObjectComponent(LValueTypeData typeData)
+      : PhysicalPathComponent(typeData)
+    {}
+    
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
+      // Assert that the optional value is present.
+      gen.emitPreconditionOptionalHasValue(loc, base.getValue());
+      // Project out the 'Some' payload.
+      OptionalTypeKind otk;
+      auto objTy
+        = base.getType().getSwiftRValueType()->getAnyOptionalObjectType(otk);
+      assert(objTy);
+      (void)objTy;
+      
+      EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+      // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
+      // a single-payload enum. There will (currently) never be spare bits
+      // embedded in the payload.
+      SILValue someAddr = gen.B
+        .createUncheckedTakeEnumDataAddr(loc, base.getValue(),
+                                   someDecl,
+                                   getTypeData().TypeOfRValue.getAddressType());
+      return ManagedValue::forUnmanaged(someAddr);
     }
   };
 
@@ -691,7 +722,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     lv.add<OwnershipComponent>(typeData);
   }
   
-  return std::move(lv);
+  return lv;
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
@@ -702,7 +733,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   lv.add<GetterSetterComponent>(decl, e->isSuper(),
                                 e->getDecl().getSubstitutions(),
                                 typeData, e->getIndex());
-  return std::move(lv);
+  return lv;
 }
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
@@ -717,7 +748,27 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   };
 
   lv.add<TupleElementComponent>(index, typeData);
-  return std::move(lv);
+  return lv;
+}
+
+LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e) {
+  LValue lv = visitRec(e->getSubExpr());
+
+  auto baseTypeData = lv.getTypeData();
+  
+  OptionalTypeKind otk;
+  CanType objectTy = baseTypeData.SubstFormalType.getAnyOptionalObjectType(otk);
+  assert(objectTy);
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+  
+  LValueTypeData typeData = {
+    AbstractionPattern(someDecl->getArgumentType()),
+    objectTy,
+    baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
+  };
+  
+  lv.add<OptionalObjectComponent>(typeData);
+  return lv;
 }
 
 LValue SILGenLValue::visitInOutExpr(InOutExpr *e) {
@@ -759,7 +810,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     lv.add<OwnershipComponent>(typeData);
   }
 
-  return std::move(lv);
+  return lv;
 }
 
 /// Load an r-value out of the given address.
@@ -875,7 +926,23 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
   (void)result;
 }
 
-SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc, 
+void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
+                                                      SILValue addr) {
+  SILType optType = addr.getType().getObjectType();
+  OptionalTypeKind optionalKind;
+  CanType valueType = getOptionalValueType(optType, optionalKind);
+
+  FuncDecl *fn =
+    getASTContext().getPreconditionOptionalHasValueDecl(nullptr, optionalKind);
+  Substitution sub = getSimpleSubstitution(fn, valueType);
+
+  // The argument to _preconditionOptionalHasValue is passed by reference.
+  emitApplyOfLibraryIntrinsic(loc, fn, sub,
+                              ManagedValue::forUnmanaged(addr),
+                              SGFContext());
+}
+
+SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
                                                    SILValue addr) {
   SILType optType = addr.getType().getObjectType();
   OptionalTypeKind optionalKind;

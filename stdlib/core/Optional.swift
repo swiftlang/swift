@@ -89,6 +89,12 @@ func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
 }
 
 @transparent internal
+func _preconditionOptionalHasValue<T>(inout v: T?) {
+  _precondition(v.getLogicValue(),
+                "unexpectedly found nil while unwrapping an Optional value")
+}
+
+@transparent internal
 func _getOptionalValue<T>(v: T?) -> T {
   switch v {
   case .Some(var x):

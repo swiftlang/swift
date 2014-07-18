@@ -102,6 +102,9 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
+  /// func _preconditionOptionalHasValue<T>(v : [inout] Optional<T>) -> T
+  FuncDecl *PreconditionOptionalHasValueDecls[NumOptionalTypeKinds] = {};
+
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
 
@@ -732,6 +735,34 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
     ? (PREFIX "Optional" SUFFIX)                       \
     : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
+FuncDecl *ASTContext::getPreconditionOptionalHasValueDecl(
+                  LazyResolver *resolver, OptionalTypeKind optionalKind) const {
+  auto &cache = Impl.PreconditionOptionalHasValueDecls[asIndex(optionalKind)];
+  if (cache) return cache;
+
+  auto name
+    = getOptionalIntrinsicName("_precondition", optionalKind, "HasValue");
+
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, name, resolver);
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be inout Optional<T>.
+  auto inputInOut = dyn_cast<InOutType>(input);
+  if (!inputInOut || !isOptionalType(*this, optionalKind,
+                                     inputInOut.getObjectType(), param))
+    return nullptr;
+
+  // Output must be ().
+  if (output != CanType(TheEmptyTupleType))
+    return nullptr;
+
+  cache = decl;
+  return decl;
+}
+
 FuncDecl *ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                         OptionalTypeKind optionalKind) const {
   auto &cache = Impl.DoesOptionalHaveValueDecls[asIndex(optionalKind)];
@@ -837,7 +868,8 @@ FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
-  return ctx.getDoesOptionalHaveValueDecl(resolver, optionalKind) &&
+  return ctx.getPreconditionOptionalHasValueDecl(resolver, optionalKind) &&
+         ctx.getDoesOptionalHaveValueDecl(resolver, optionalKind) &&
          ctx.getGetOptionalValueDecl(resolver, optionalKind) &&
          ctx.getInjectValueIntoOptionalDecl(resolver, optionalKind) &&
          ctx.getInjectNothingIntoOptionalDecl(resolver, optionalKind);

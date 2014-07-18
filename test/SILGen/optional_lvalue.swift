@@ -1,0 +1,30 @@
+// RUN: %swift -enable-optional-lvalues -emit-silgen %s | FileCheck %s
+
+// CHECK-LABEL: sil @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
+// CHECK:         [[SHADOW:%.*]] = alloc_box $Optional<Int>
+// CHECK:         [[PRECOND:%.*]] = function_ref @_TFSs29_preconditionOptionalHasValueU__FRGSqQ__T_
+// CHECK:         apply [transparent] [[PRECOND]]<Int>([[SHADOW]]#1)
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[SHADOW]]#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+// CHECK:         assign {{%.*}} to [[PAYLOAD]]
+func assign_optional_lvalue(inout x: Int?, y: Int) {
+  x! = y
+}
+
+// CHECK-LABEL: sil @_TF15optional_lvalue17assign_iuo_lvalueFTRGSQSi_Si_T_
+// CHECK:         [[SHADOW:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<Int>
+// CHECK:         [[PRECOND:%.*]] = function_ref @_TFSs48_preconditionImplicitlyUnwrappedOptionalHasValueU__FRGSQQ__T_
+// CHECK:         apply [transparent] [[PRECOND]]<Int>([[SHADOW]]#1)
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[SHADOW]]#1 : $*ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
+// CHECK:         assign {{%.*}} to [[PAYLOAD]]
+func assign_iuo_lvalue(inout x: Int!, y: Int) {
+  x! = y
+}
+
+// CHECK-LABEL: sil @_TF15optional_lvalue35assign_optional_lvalue_reabstractedFTRGSqFSiSi_FSiSi_T_
+// CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
+// CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
+// CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@out Int, @in Int) -> ()
+func assign_optional_lvalue_reabstracted(inout x: (Int -> Int)?,
+                                         y: Int -> Int) {
+  x! = y
+}

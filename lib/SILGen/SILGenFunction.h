@@ -905,6 +905,9 @@ public:
                                      SILValue dest,
                                      const TypeLowering &optTL);
 
+  /// \brief Emit a call to the library intrinsic _preconditionOptionalHasValue.
+  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
+  
   /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
   /// The result is a Builtin.Int1.

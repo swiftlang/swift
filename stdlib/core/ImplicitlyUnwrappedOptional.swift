@@ -87,6 +87,12 @@ func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
 }
 
 @transparent internal
+func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
+  _precondition(v.getLogicValue(),
+                "unexpectedly found nil while unwrapping an Optional value")
+}
+
+@transparent internal
 func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
   switch v {
   case .Some(let x):

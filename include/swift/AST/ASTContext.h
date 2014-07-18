@@ -391,6 +391,10 @@ public:
 #include "swift/AST/KnownDecls.def"
 
   /// Retrieve the declaration of
+  /// Swift._precondition{,ImplicitlyUnwrapped}OptionalHasValue.
+  FuncDecl *getPreconditionOptionalHasValueDecl(LazyResolver *resolver,
+                                                OptionalTypeKind kind) const;
+
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                          OptionalTypeKind kind) const;
