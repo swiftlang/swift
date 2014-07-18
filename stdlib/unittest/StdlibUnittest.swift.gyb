@@ -80,31 +80,27 @@ var _anyExpectFailed = false
 public func expectEqual<T : Equatable>(
     expected: T, actual: T,
     stackTrace: SourceLocStack? = nil,
+    _ collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if expected != actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
-    println()
-  }
+  expectEqual(expected, actual, {$0 == $1},
+    stackTrace: stackTrace, collectMoreInfo,
+    file: file, line: line)
 }
 
-public func expectEqual<T : Equatable>(
-    expected: T, actual: T,
+public func expectEqual<T>(
+    expected: T, actual: T, equal: (T,T)->Bool,
     stackTrace: SourceLocStack? = nil,
-    collectMoreInfo: () -> String,
+    _ collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if expected != actual {
+  if !equal(expected, actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
-    println(collectMoreInfo())
+    if collectMoreInfo { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -148,33 +144,16 @@ public func expectOptionalEqual<T : Equatable>(
 public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
+    _ collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if expected != actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
-    println()
-  }
-}
-
-public func expectEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
-    stackTrace: SourceLocStack? = nil,
-    collectMoreInfo: () -> String,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected != actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
-    println(collectMoreInfo())
-    println()
-  }
+  expectEqual(
+    expected, actual,
+    // FIXME: Simpler closures don't work here due to
+    // <rdar://problem/17716712> and <rdar://problem/17717618>
+    { (x: ${EquatableType}, y: ${EquatableType})->Bool in  x == y },
+    stackTrace: stackTrace, collectMoreInfo, 
+    file: file, line: line)
 }
 
 
@@ -465,6 +444,45 @@ func checkSliceableWithBidirectionalIndex<
     if start != sliceable.endIndex {
       ++start
     }
+  }
+}
+
+public func expectEqualSequence<
+  Expected: SequenceType,
+  Actual: SequenceType
+  where Expected.Generator.Element == Actual.Generator.Element, 
+     Expected.Generator.Element: Equatable
+>(
+    expected: Expected, actual: Actual,
+    stackTrace: SourceLocStack? = nil,
+    _ collectMoreInfo: (()->String)? = nil,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  expectEqualSequence(
+    expected, actual, { $0 == $1 },
+    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo,
+    file: file, line: line)
+}
+
+public func expectEqualSequence<
+  Expected: SequenceType,
+  Actual: SequenceType
+  where Expected.Generator.Element == Actual.Generator.Element
+>(
+    expected: Expected, actual: Actual,
+    sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
+    stackTrace: SourceLocStack? = nil,
+    collectMoreInfo: (()->String)? = nil,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !equal(expected, actual, sameValue) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
+    println("expected elements: \"\(expected)\"")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    if collectMoreInfo { println(collectMoreInfo!()) }
+    println()
   }
 }
 
