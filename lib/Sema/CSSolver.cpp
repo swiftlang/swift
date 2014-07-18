@@ -564,6 +564,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
+    case ConstraintKind::OptionalObject:
       // Relational constraints: break out to look for types above/below.
       break;
 

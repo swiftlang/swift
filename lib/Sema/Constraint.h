@@ -117,7 +117,10 @@ enum class ConstraintKind : char {
   Conjunction,
   /// \brief A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
-  Disjunction
+  Disjunction,
+  /// \brief The first type is an optional type whose object type is the second
+  /// type, preserving lvalue-ness.
+  OptionalObject,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -485,6 +488,7 @@ public:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::BindOverload:
+    case ConstraintKind::OptionalObject:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -499,7 +503,7 @@ public:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Conjunction:
-      return ConstraintClassification::Disjunction;
+      return ConstraintClassification::Conjunction;
 
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;

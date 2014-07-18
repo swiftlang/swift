@@ -2512,6 +2512,37 @@ getNameForValueLookup(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
+{
+  // Resolve the optional type.
+  Type optLValueTy = simplifyType(constraint.getFirstType());
+  Type optTy = optLValueTy->getRValueType();
+  
+  if (optTy->is<TypeVariableType>()) {
+    return SolutionKind::Unsolved;
+  }
+  
+  // If the base type is not optional, the constraint fails.
+  Type objectTy = optTy->getAnyOptionalObjectType();
+  if (!objectTy) {
+    recordFailure(constraint.getLocator(), Failure::IsNotOptional,
+                  optTy);
+    return SolutionKind::Error;
+  }
+  
+  // The object type is an lvalue if the optional was.
+  if (optLValueTy->is<LValueType>()) {
+    objectTy = LValueType::get(objectTy);
+  }
+
+  // Equate it to the other type in the constraint.
+  addConstraint(ConstraintKind::Bind, objectTy, constraint.getSecondType(),
+                constraint.getLocator());
+  
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
@@ -3197,6 +3228,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TypeMember:
     llvm_unreachable("Member constraints don't involve type matches");
 
+  case ConstraintKind::OptionalObject:
+    llvm_unreachable("optional object constraints don't involve type matches");
+      
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
@@ -3895,6 +3929,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getSecondType(),
                                          constraint.getLocator());
 
+  case ConstraintKind::OptionalObject:
+    return simplifyOptionalObjectConstraint(constraint);
+      
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:

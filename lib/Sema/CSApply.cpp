@@ -2778,6 +2778,12 @@ namespace {
     }
 
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
+      if (cs.getASTContext().LangOpts.EnableOptionalLValues) {
+        Type valueType = simplifyType(expr->getType());
+        expr->setType(valueType);
+        return expr;
+      }
+      
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
       Expr *subExpr = expr->getSubExpr();

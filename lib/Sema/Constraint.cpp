@@ -58,6 +58,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::OptionalObject:
     assert(!First.isNull());
     assert(!Second.isNull());
     assert(!Member && "Relational constraint cannot have a member");
@@ -192,6 +193,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
+  case ConstraintKind::OptionalObject: Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
@@ -439,6 +441,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::OptionalObject:
     constraint->getSecondType()->getTypeVariables(typeVars);
     SWIFT_FALLTHROUGH;
 

@@ -382,6 +382,8 @@ public:
     IsNotBridgedToObjectiveC,
     /// \brief The type is not a dynamic lookup value.
     IsNotDynamicLookup,
+    /// \brief The type is not an optional type.
+    IsNotOptional,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
     /// \brief The type is not a metatype.
@@ -483,6 +485,7 @@ public:
     case IsNotClass:
     case IsNotBridgedToObjectiveC:
     case IsNotDynamicLookup:
+    case IsNotOptional:
     case MissingArgument:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
@@ -2021,6 +2024,9 @@ private:
 
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);
+
+  /// \brief Attempt to simplify the optional object constraint.
+  SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);

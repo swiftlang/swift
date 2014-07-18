@@ -80,6 +80,10 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   case IsNotDynamicLookup:
     out << getFirstType().getString() << " is not a dynamic lookup value";
     break;
+      
+  case IsNotOptional:
+    out << getFirstType().getString() << "is not an optional type";
+    break;
 
   case TupleNameMismatch:
   case TupleNamePositionMismatch:
