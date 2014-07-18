@@ -32,13 +32,10 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     const clang::Diagnostic &clangDiag) {
   // Handle the module-not-found diagnostic specially if it's a top-level module
   // we're looking for.
-  if (clangDiag.getID() == clang::diag::err_module_not_found) {
-    if (auto *import = CurrentImport.dyn_cast<const clang::IdentifierInfo *>()){
-      if (clangDiag.getArgStdStr(0) == import->getName()) {
-        setCurrentImportMissing();
-        return;
-      }
-    }
+  if (clangDiag.getID() == clang::diag::err_module_not_found &&
+      CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
+    setCurrentImportMissing();
+    return;
   }
 
   clang::SourceManager &clangSrcMgr = clangDiag.getSourceManager();
@@ -48,22 +45,11 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   auto &ctx = ImporterImpl.SwiftContext;
 
-  if (clangDiag.getID() == clang::diag::err_module_not_built) {
-    if (auto *import = CurrentImport.dyn_cast<const clang::IdentifierInfo *>()){
-      if (clangDiag.getArgStdStr(0) == import->getName()) {
-        ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
-                           import->getName());
-        return;
-      }
-    }
-  } else if (clangDiag.getID() == clang::diag::err_pp_file_not_found) {
-    if (auto *buf = CurrentImport.dyn_cast<const llvm::MemoryBuffer *>()) {
-      if (clangSrcMgr.getBuffer(clangSrcMgr.getFileID(clangLoc)) == buf) {
-        ctx.Diags.diagnose(loc, diag::clang_cannot_import_header,
-                           clangDiag.getArgStdStr(0));
-        return;
-      }
-    }
+  if (clangDiag.getID() == clang::diag::err_module_not_built &&
+      CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
+    ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
+                       CurrentImport->getName());
+    return;
   }
 
   // Satisfy the default implementation (bookkeeping).

@@ -1,4 +1,6 @@
-@import Foundation;
+// Don't change this to @import; it tickles a particular former crash.
+#import <Foundation.h>
+
 @import ExternIntX;
 #import "Protocols.h"
 

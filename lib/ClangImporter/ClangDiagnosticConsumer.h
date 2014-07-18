@@ -20,14 +20,11 @@
 namespace swift {
 
 class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
-  using ImportTy =
-    PointerUnion<const clang::IdentifierInfo *, const llvm::MemoryBuffer *>;
-
   struct LoadModuleRAII {
     ClangDiagnosticConsumer *Consumer;
   public:
     LoadModuleRAII(ClangDiagnosticConsumer &consumer,
-                   ImportTy import)
+                   const clang::IdentifierInfo *import)
         : Consumer(&consumer) {
       assert(import);
       assert(!Consumer->CurrentImport);
@@ -57,7 +54,7 @@ private:
   friend struct LoadModuleRAII;
 
   ClangImporter::Implementation &ImporterImpl;
-  ImportTy CurrentImport;
+  const clang::IdentifierInfo *CurrentImport = nullptr;
   bool CurrentImportNotFound;
   bool DumpToStderr;
 
@@ -66,8 +63,8 @@ public:
                           clang::DiagnosticOptions &clangDiagOptions,
                           bool dumpToStderr);
 
-  LoadModuleRAII handleImport(ImportTy nameOrImportBuffer) {
-    return LoadModuleRAII(*this, nameOrImportBuffer);
+  LoadModuleRAII handleImport(const clang::IdentifierInfo *name) {
+    return LoadModuleRAII(*this, name);
   }
 
   bool isCurrentImportMissing() const {

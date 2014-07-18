@@ -429,29 +429,23 @@ ClangImporter::create(ASTContext &ctx,
 void ClangImporter::Implementation::importHeader(
     Module *adapter,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
-  if (adapter)
-    ImportedHeaderOwners.push_back(adapter);
+  assert(adapter);
+  ImportedHeaderOwners.push_back(adapter);
 
   clang::Preprocessor &pp = getClangPreprocessor();
-  clang::FileID bufferID;
-  {
-    auto &rawDiagClient = Instance->getDiagnosticClient();
-    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
-    auto importRAII = diagClient.handleImport(sourceBuffer.get());
+  clang::SourceManager &sourceMgr = getClangASTContext().getSourceManager();
 
-    clang::SourceManager &sourceMgr =
-      getClangASTContext().getSourceManager();
-    clang::SourceLocation includeLoc =
-      sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
-    bufferID = sourceMgr.createFileID(sourceBuffer.release(),
-                                      clang::SrcMgr::C_User,
-                                      /*LoadedID=*/0, /*LoadedOffset=*/0,
-                                      includeLoc);
+  clang::SourceLocation includeLoc =
+    sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
+  clang::FileID bufferID = sourceMgr.createFileID(sourceBuffer.release(),
+                                                  clang::SrcMgr::C_User,
+                                                  /*LoadedID=*/0,
+                                                  /*LoadedOffset=*/0,
+                                                  includeLoc);
 
-    pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
-    // Force the import to occur.
-    pp.LookAhead(0);
-  }
+  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+  // Force the import to occur.
+  pp.LookAhead(0);
 
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Parser->ParseTopLevelDecl(parsed)) {}
