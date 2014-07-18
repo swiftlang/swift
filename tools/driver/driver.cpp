@@ -44,6 +44,8 @@ std::string getExecutablePath(const char *FirstArg) {
 extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
                          void *MainAddr);
 
+extern int apinotes_main(ArrayRef<const char *> Args);
+
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -68,6 +70,10 @@ int main(int argc_, const char **argv_) {
       return frontend_main(llvm::makeArrayRef(argv.data()+2,
                                               argv.data()+argv.size()),
                            argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-apinotes") {
+      return apinotes_main(llvm::makeArrayRef(argv.data()+1,
+                                              argv.data()+argv.size()));
     }
   }
 

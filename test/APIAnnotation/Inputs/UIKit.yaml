@@ -1,0 +1,9 @@
+FrameworkName: UIKit
+FrameworkAvailability: iOS
+FrameworkClasses:
+  - ClassName: UIFont
+    Methods:
+      - Selector: "fontWithName:size:"
+    Properties:
+      - Name: familyName
+      - Name: fontName
