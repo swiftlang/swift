@@ -136,20 +136,52 @@ public protocol Sliceable : _Sliceable {
   // type information in protocol witness tables) Instead we constrain
   // to _Sliceable; at least error messages will be more informative.
   typealias SubSlice: _Sliceable
-  subscript(_: Range<Index>) -> SubSlice {get}
+  
+  /// Returns a `CollectionType` containing the elements delimited by
+  /// the given half-open range of indices.  Should be O(1) unless
+  /// bridging from Objective-C requires an O(N) conversion.
+  subscript(bounds: Range<Index>) -> SubSlice {get}
 }
 
 public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }
 
-public func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SubSlice {
-  return seq[seq.startIndex.successor()..<seq.endIndex]
+/// Return a slice containing all but the first element of `s`.
+/// Requires: `s` is non-empty.
+public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
+  return s[s.startIndex.successor()..<s.endIndex]
 }
 
+/// Return a slice containing all but the last element of `s`.
+/// Requires: `s` is non-empty.
 public func dropLast<
-  Seq: Sliceable 
-  where Seq.Index: BidirectionalIndexType
->(seq: Seq) -> Seq.SubSlice {
-  return seq[seq.startIndex..<seq.endIndex.predecessor()]
+  S: Sliceable 
+  where S.Index: BidirectionalIndexType
+>(s: S) -> S.SubSlice {
+  return s[s.startIndex..<s.endIndex.predecessor()]
+}
+
+/// Return a slice, up to `maxLength` in length, containing the
+/// initial elements of `s`.  O(1)+K when `S.Index` conforms to
+/// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
+/// of slicing `s`.
+public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
+  return s[
+    s.startIndex..<advance(
+      s.startIndex, max(0, numericCast(maxLength)), s.endIndex)
+  ]
+}
+
+/// Return a slice, up to `maxLength` in length, containing the
+/// final elements of `s`. O(1)+K when `S.Index` conforms to
+/// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
+/// of slicing `s`.
+public func suffix<
+  S: Sliceable where S.Index: BidirectionalIndexType
+>(s: S, maxLength: Int) -> S.SubSlice {
+  return s[
+    advance(
+      s.endIndex, -max(0, numericCast(maxLength)), s.startIndex)..<s.endIndex
+  ]
 }
