@@ -143,6 +143,10 @@ def enable_dynamic :
   Flag<["-"], "enable-dynamic">,
   HelpText<"Use dynamic specifier to control ObjC dispatch">;
 
+def enable_optional_lvalues :
+  Flag<["-"], "enable-optional-lvalues">,
+  HelpText<"Propagate lvalue-ness through optional operations">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

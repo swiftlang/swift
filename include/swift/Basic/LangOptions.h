@@ -81,6 +81,9 @@ namespace swift {
     /// codegen.
     bool EnableDynamic = false;
     
+    /// Enables lvalue propagation through optional operations.
+    bool EnableOptionalLValues = false;
+    
     /// Should access control be respected?
     bool EnableAccessControl = true;
     

@@ -555,6 +555,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableDynamic |= Args.hasArg(OPT_enable_dynamic);
 
+  Opts.EnableOptionalLValues |= Args.hasArg(OPT_enable_optional_lvalues);
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
