@@ -277,7 +277,9 @@ if [ ! -e "${WORKSPACE}/clang" ]; then
         exit 1
     fi
 fi
-ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+if [ ! -d "${CLANG_SOURCE_DIR}" ]; then
+    ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+fi
 
 CLANG="$TOOLCHAIN/usr/bin/clang"
 if [[ "$DISTCC" ]] ; then
