@@ -1018,13 +1018,16 @@ struct ClassMetadata : public HeapMetadata {
   constexpr ClassMetadata(const HeapMetadata &base,
                           const ClassMetadata *superClass,
                           uintptr_t data,
+                          ClassFlags flags,
                           const NominalTypeDescriptor *description,
-                          uintptr_t size, uintptr_t alignMask,
-                          uintptr_t classSize, uintptr_t addressPoint)
+                          uintptr_t size, uintptr_t addressPoint,
+                          uintptr_t alignMask,
+                          uintptr_t classSize, uintptr_t classAddressPoint)
     : HeapMetadata(base), SuperClass(superClass),
       CacheData{nullptr, nullptr}, Data(data),
+      Flags(flags), InstanceAddressPoint(addressPoint),
       InstanceSize(size), InstanceAlignMask(alignMask),
-      ClassSize(size), ClassAddressPoint(addressPoint),
+      Reserved(0), ClassSize(size), ClassAddressPoint(classAddressPoint),
       Description(description) {}
 
   /// The metadata for the superclass.  This is null for the root class.
@@ -1055,8 +1058,22 @@ private:
   // The Objective-C runtime knows the offsets to some of these fields.
   // Be careful when changing them.
 
-  /// The size and alignment mask of instances of this type.
-  uint32_t InstanceSize, InstanceAlignMask;
+  /// Swift-specific class flags.
+  ClassFlags Flags;
+
+  /// The address point of instances of this type.
+  uint32_t InstanceAddressPoint;
+
+  /// The required size of instances of this type.
+  /// 'InstanceAddressPoint' bytes go before the address point;
+  /// 'InstanceSize - InstanceAddressPoint' bytes go after it.
+  uint32_t InstanceSize;
+
+  /// The alignment mask of the address point of instances of this type.
+  uint16_t InstanceAlignMask;
+
+  /// Reserved for runtime use.
+  uint16_t Reserved;
 
   /// The total size of the class object, including prefix and suffix
   /// extents.
@@ -1096,6 +1113,15 @@ public:
     Description = nullptr;
   }
 
+  ClassFlags getFlags() const {
+    assert(isTypeMetadata());
+    return Flags;
+  }
+  void setFlags(ClassFlags flags) {
+    assert(isTypeMetadata());
+    Flags = flags;
+  }
+
   uintptr_t getInstanceSize() const {
     assert(isTypeMetadata());
     return InstanceSize;
@@ -1103,6 +1129,15 @@ public:
   void setInstanceSize(uintptr_t size) {
     assert(isTypeMetadata());
     InstanceSize = size;
+  }
+
+  uintptr_t getInstanceAddressPoint() const {
+    assert(isTypeMetadata());
+    return InstanceAddressPoint;
+  }
+  void setInstanceAddressPoint(uintptr_t size) {
+    assert(isTypeMetadata());
+    InstanceAddressPoint = size;
   }
 
   uintptr_t getInstanceAlignMask() const {
@@ -1131,7 +1166,16 @@ public:
     assert(isTypeMetadata());
     ClassAddressPoint = offset;
   }
-  
+
+  uint16_t getRuntimeReservedData() const {
+    assert(isTypeMetadata());
+    return Reserved;
+  }
+  void setRuntimeReservedData(uint16_t data) {
+    assert(isTypeMetadata());
+    Reserved = data;
+  }
+
   /// Get a pointer to the field offset vector, if present, or null.
   const uintptr_t *getFieldOffsets() const {
     assert(isTypeMetadata());

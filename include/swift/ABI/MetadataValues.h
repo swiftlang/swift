@@ -118,6 +118,21 @@ inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
   return a = (a | b);
 }
 
+/// Swift class flags.
+enum class ClassFlags : uint32_t {
+  /// Is this a Swift 1 class?
+  IsSwift1 = 0x1,
+};
+inline bool operator&(ClassFlags a, ClassFlags b) {
+  return (uint32_t(a) & uint32_t(b)) != 0;
+}
+inline ClassFlags operator|(ClassFlags a, ClassFlags b) {
+  return ClassFlags(uint32_t(a) | uint32_t(b));
+}
+inline ClassFlags &operator|=(ClassFlags &a, ClassFlags b) {
+  return a = (a | b);
+}
+
 }
 
 #endif

@@ -76,8 +76,11 @@ public:
       asImpl().addClassDataPointer();
     }
 
+    asImpl().addClassFlags();
+    asImpl().addInstanceAddressPoint();
     asImpl().addInstanceSize();
     asImpl().addInstanceAlignMask();
+    asImpl().addRuntimeReservedBits();
     asImpl().addClassSize();
     asImpl().addClassAddressPoint();
     asImpl().addNominalTypeDescriptor();
@@ -262,8 +265,11 @@ public:
   void addDestructorFunction() { addPointer(); }
   void addParentMetadataRef(ClassDecl *forClass) { addPointer(); }
   void addSuperClass() { addPointer(); }
+  void addClassFlags() { addInt32(); }
+  void addInstanceAddressPoint() { addInt32(); }
   void addInstanceSize() { addInt32(); }
-  void addInstanceAlignMask() { addInt32(); }
+  void addInstanceAlignMask() { addInt16(); }
+  void addRuntimeReservedBits() { addInt16(); }
   void addClassSize() { addInt32(); }
   void addClassAddressPoint() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
@@ -287,6 +293,9 @@ private:
   }
   void addInt32() {
     NextOffset += Size(4);
+  }
+  void addInt16() {
+    NextOffset += Size(2);
   }
 };
 

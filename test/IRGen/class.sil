@@ -48,8 +48,13 @@ class C {}
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1D to i64), i64 1),
+// \ CHECK:   i32 0,
+// \ CHECK:   i32 0,
 // \ CHECK:   i32 16,
-// \ CHECK:   i32 7,
+// \ CHECK:   i16 7,
+// \ CHECK:   i16 0,
+// \ CHECK:   i32 104,
+// \ CHECK:   i32 16,
 // \ CHECK:   {{.*}}* @_TMnC5class1D,
 // \ CHECK:   i32 (i16, i8, [[D_CLASS]]*)* @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_
 // \ CHECK: }
@@ -115,11 +120,11 @@ bb0(%0 : $D):
 sil @alloc_ref_dynamic : $@thin (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
-  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 40
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 48
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
   // CHECK:   [[SIZE32:%.*]] = load i32* [[T1]], align 8
   // CHECK:   [[SIZE:%.*]] = zext i32 [[SIZE32]] to i64
-  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 44
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 52
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
   // CHECK:   [[ALIGN32:%.*]] = load i32* [[T1]], align 4
   // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64

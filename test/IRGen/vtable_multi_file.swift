@@ -2,6 +2,6 @@
 
 // CHECK-LABEL: define void @_TF17vtable_multi_file36baseClassVtablesIncludeImplicitInitsFT_T_() {
 func baseClassVtablesIncludeImplicitInits() {
-  // CHECK: = load { i8*, i64, i64 } (%swift.type*)** getelementptr inbounds ({ i8*, i64, i64 } (%swift.type*)** bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @_TMdC17vtable_multi_file8Subclass, i32 0, i32 2) to { i8*, i64, i64 } (%swift.type*)**), i64 9)
+  // CHECK: = load { i8*, i64, i64 } (%swift.type*)** getelementptr inbounds ({ i8*, i64, i64 } (%swift.type*)** bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @_TMdC17vtable_multi_file8Subclass, i32 0, i32 2) to { i8*, i64, i64 } (%swift.type*)**), i64 10)
   println(Subclass.classProp)
 }

@@ -255,7 +255,7 @@ class SomeSwiftClass {
 // CHECK:      [[T0:%.*]] = getelementptr inbounds %C22class_bounded_generics14SomeSwiftClass* {{%.*}}, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = load %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* [[T1]] to void (%swift.type*)**
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)** [[T2]], i64 8
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)** [[T2]], i64 9
 // CHECK-NEXT: load void (%swift.type*)** [[T3]], align 8
 func class_bounded_metatype<T: SomeSwiftClass>(t : T) {
   t.dynamicType.foo()

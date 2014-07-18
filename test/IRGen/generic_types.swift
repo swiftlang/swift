@@ -8,7 +8,7 @@
 
 // CHECK: @_TMPdC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
 // CHECK:   void (i8*, i8*)* [[A_METADATA_FILL:@[a-z0-9_]+]],
-// CHECK:   i32 320,
+// CHECK:   i32 328,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [8 x i8*] zeroinitializer,
@@ -19,9 +19,12 @@
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
 // CHECK:   i64 0,
+// CHECK:   i32 0,
+// CHECK:   i32 0,
 // CHECK:   i32 24,
-// CHECK:   i32 7,
-// CHECK:   i32 128,
+// CHECK:   i16 7,
+// CHECK:   i16 0,
+// CHECK:   i32 136,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
@@ -29,7 +32,7 @@
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   void (i8*, i8*)* [[B_METADATA_FILL:@[a-z0-9_]+]],
-// CHECK:   i32 312,
+// CHECK:   i32 320,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [8 x i8*] zeroinitializer,
@@ -40,9 +43,12 @@
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
 // CHECK:   i64 0,
+// CHECK:   i32 0,
+// CHECK:   i32 0,
 // CHECK:   i32 24,
-// CHECK:   i32 7,
-// CHECK:   i32 120,
+// CHECK:   i16 7,
+// CHECK:   i16 0,
+// CHECK:   i32 128,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null
 // CHECK: }
@@ -71,7 +77,7 @@
 // CHECK: entry:
 // CHECK:   [[METADATA_ADDR:%.*]] = bitcast i8* %0 to i64*
 // CHECK:   [[ARG_ADDR:%.*]] = bitcast i8* %1 to i64*
-// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 10
+// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 11
 // CHECK:   [[ARG_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[ARG_ADDR]], i32 0
 // CHECK:   [[ARG:%.*]] = load i64* [[ARG_SLOT_ADDR]], align 8
 // CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8
@@ -82,7 +88,7 @@
 // CHECK: entry:
 // CHECK:   [[METADATA_ADDR:%.*]] = bitcast i8* %0 to i64*
 // CHECK:   [[ARG_ADDR:%.*]] = bitcast i8* %1 to i64*
-// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 10
+// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 11
 // CHECK:   [[ARG_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[ARG_ADDR]], i32 0
 // CHECK:   [[ARG:%.*]] = load i64* [[ARG_SLOT_ADDR]], align 8
 // CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8

@@ -827,6 +827,19 @@ namespace {
       NextOffset += Size(4);
     }
 
+    /// Add a constant 16-bit value.
+    void addConstantInt16(int16_t value) {
+      addInt16(llvm::ConstantInt::get(IGM.Int16Ty, value));
+    }
+
+    /// Add a 16-bit value.
+    void addInt16(llvm::Constant *value) {
+      assert(value->getType() == IGM.Int16Ty);
+      assert(NextOffset.isMultipleOf(Size(2)));
+      Fields.push_back(value);
+      NextOffset += Size(2);
+    }
+
     /// Add a constant of the given size.
     void addStruct(llvm::Constant *value, Size size) {
       assert(size.getValue()
@@ -1764,6 +1777,8 @@ namespace {
     using super::Target;
     using super::addWord;
     using super::addConstantWord;
+    using super::addInt16;
+    using super::addConstantInt16;
     using super::addInt32;
     using super::addConstantInt32;
     using super::addStruct;
@@ -1892,6 +1907,18 @@ namespace {
       }
     }
 
+    void addClassFlags() {
+      // Right now, we are not setting any flags.
+      // TODO: flag meaning "Swift 1.0"?
+      // TODO: flag saying "uses Swift refcounting"?
+      addConstantInt32(0);
+    }
+
+    void addInstanceAddressPoint() {
+      // Right now, we never allocate fields before the address point.
+      addConstantInt32(0);
+    }
+
     void addInstanceSize() {
       if (llvm::Constant *size
             = tryEmitClassConstantFragileInstanceSize(IGM, Target)) {
@@ -1908,13 +1935,17 @@ namespace {
     void addInstanceAlignMask() {
       if (llvm::Constant *align
             = tryEmitClassConstantFragileInstanceAlignMask(IGM, Target)) {
-        if (IGM.SizeTy != IGM.Int32Ty)
-          align = llvm::ConstantExpr::getTrunc(align, IGM.Int32Ty);
-        addInt32(align);
+        if (IGM.SizeTy != IGM.Int16Ty)
+          align = llvm::ConstantExpr::getTrunc(align, IGM.Int16Ty);
+        addInt16(align);
       } else {
         // Leave a zero placeholder to be filled at runtime
-        addConstantInt32(0);
+        addConstantInt16(0);
       }
+    }
+
+    void addRuntimeReservedBits() {
+      addConstantInt16(0);
     }
 
     void addClassSize() {
