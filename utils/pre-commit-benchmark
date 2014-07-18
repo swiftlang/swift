@@ -220,9 +220,12 @@ def checkAndUpdatePrecommitBench(srcroot):
     # Compute our benchmark directory name.
     benchdir = os.path.join(srcroot, 'benchmark', 'PrecommitBench')
 
-    # Make sure it is a directory that exists. Throw an error otherwise.
+    # If it's not there, clone it on demand.
     if not os.path.isdir(benchdir):
-        raise RuntimeError("Unable to find ${srcroot}/benchmark/PrecommitBench")
+        subprocess.check_call(
+            [
+                'git', 'clone',
+            ])
 
     # Make sure that our benchdir has a .git directory in it. This will ensure
     # that users update to the new repository location. We could do more in
