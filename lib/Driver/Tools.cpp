@@ -368,6 +368,17 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back(ModuleOutputPath.c_str());
   }
 
+  const std::string &ObjCHeaderOutputPath =
+    Output->getAdditionalOutputForType(types::ID::TY_ObjCHeader);
+  if (!ObjCHeaderOutputPath.empty()) {
+    assert(OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+           "The Swift tool should only emit an Obj-C header in single compile"
+           "mode!");
+
+    Arguments.push_back("-emit-objc-header-path");
+    Arguments.push_back(ObjCHeaderOutputPath.c_str());
+  }
+
   const std::string &SerializedDiagnosticsPath =
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
   if (!SerializedDiagnosticsPath.empty()) {

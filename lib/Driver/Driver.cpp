@@ -416,14 +416,6 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID);
 
-  bool shouldEmitObjCHeader = Args.hasArg(options::OPT_emit_objc_header,
-                                          options::OPT_emit_objc_header_path);
-  if (shouldEmitObjCHeader &&
-      OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
-    Diags.diagnose(SourceLoc(),
-                   diag::error_emit_objc_header_with_single_compile);
-  }
-
   OI.ShouldGenerateDebugInfo = Args.hasArg(options::OPT_g);
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
@@ -432,7 +424,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
   } else if ((OI.ShouldGenerateDebugInfo && OI.shouldLink()) ||
-             shouldEmitObjCHeader) {
+             Args.hasArg(options::OPT_emit_objc_header,
+                         options::OPT_emit_objc_header_path)) {
     // An option has been passed which requires a module, but the user hasn't
     // requested one. Generate a module, but treat it as an intermediate output.
     OI.ShouldGenerateModule = true;
@@ -1096,7 +1089,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   }
 
   // Choose the Objective-C header output path.
-  if (isa<MergeModuleJobAction>(JA) &&
+  if ((isa<MergeModuleJobAction>(JA) ||
+       (isa<CompileJobAction>(JA) &&
+        OI.CompilerMode == OutputInfo::Mode::SingleCompile)) &&
       C.getArgs().hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {
     StringRef ObjCHeaderPath;
