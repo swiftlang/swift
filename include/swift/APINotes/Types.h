@@ -52,8 +52,33 @@ enum class FactoryAsInitKind {
   AsInitializer
 };
 
+/// Describes API notes data for any entity.
+///
+/// This is used as the base of
+class CommonEntityInfo {
+public:
+  /// Message to use when this entity is unavailable.
+  std::string UnavailableMsg;
+
+  /// Whether this entity is marked unavailable.
+  unsigned Unavailable : 1;
+
+  CommonEntityInfo() : Unavailable(0) { }
+
+  friend bool operator==(const CommonEntityInfo &lhs,
+                         const CommonEntityInfo &rhs) {
+    return lhs.UnavailableMsg == rhs.UnavailableMsg &&
+           lhs.Unavailable == rhs.Unavailable;
+  }
+
+  friend bool operator!=(const CommonEntityInfo &lhs,
+                         const CommonEntityInfo &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
 /// Describes API notes data for an Objective-C class.
-class ObjCClassInfo {
+class ObjCClassInfo : public CommonEntityInfo {
   /// Whether this class has a default nullability.
   unsigned HasDefaultNullability : 1;
 
@@ -65,7 +90,8 @@ class ObjCClassInfo {
 
 public:
   ObjCClassInfo()
-    : HasDefaultNullability(0),
+    : CommonEntityInfo(),
+      HasDefaultNullability(0),
       DefaultNullability(0),
       HasDesignatedInits(0)
   { }
@@ -98,7 +124,8 @@ public:
   }
 
   friend bool operator==(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
-    return lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
+    return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
+           lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
            lhs.DefaultNullability == rhs.DefaultNullability &&
            lhs.HasDesignatedInits == rhs.HasDesignatedInits;
   }
@@ -122,7 +149,7 @@ public:
 };
 
 /// Describes API notes data for an Objective-C property.
-class ObjCPropertyInfo {
+class ObjCPropertyInfo : public CommonEntityInfo {
   /// Whether this property has been audited for nullability.
   unsigned NullabilityAudited : 1;
 
@@ -132,7 +159,8 @@ class ObjCPropertyInfo {
 
 public:
   ObjCPropertyInfo()
-    : NullabilityAudited(false),
+    : CommonEntityInfo(),
+      NullabilityAudited(false),
       Nullable(0) { }
 
   Optional<NullableKind> getNullability() const {
@@ -150,7 +178,8 @@ public:
 
   friend bool operator==(const ObjCPropertyInfo &lhs, 
                          const ObjCPropertyInfo &rhs) {
-    return lhs.NullabilityAudited == rhs.NullabilityAudited &&
+    return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
+           lhs.NullabilityAudited == rhs.NullabilityAudited &&
            lhs.Nullable == rhs.Nullable;
   }
 
@@ -186,7 +215,7 @@ struct ObjCSelectorRef {
 };
 
 /// Describes API notes data for an Objective-C method.
-class ObjCMethodInfo {
+  class ObjCMethodInfo : public CommonEntityInfo {
 private:
   static unsigned const NullableKindMask = 0x3;
   static unsigned const NullableKindSize = 2;
@@ -197,9 +226,6 @@ public:
 
   /// Whether to treat this method as a factory or initializer.
   unsigned FactoryAsInit : 2;
-
-  /// Whether this method is marked unavailable.
-  unsigned Unavailable : 1;
 
   /// Whether the signature has been audited with respect to nullability.
   /// If yes, we consider all types to be non-nullable unless otherwise noted.
@@ -216,13 +242,10 @@ public:
   //  of the parameters.
   uint64_t NullabilityPayload = 0;
 
-  /// Message to use when this method is unavailable.
-  std::string UnavailableMsg;
-
   ObjCMethodInfo()
-    : DesignatedInit(false),
+    : CommonEntityInfo(),
+      DesignatedInit(false),
       FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
-      Unavailable(false),
       NullabilityAudited(false),
       NumAdjustedNullable(0) { }
 
@@ -266,7 +289,8 @@ public:
   }
 
   friend bool operator==(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
-    return lhs.DesignatedInit == rhs.DesignatedInit &&
+    return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
+           lhs.DesignatedInit == rhs.DesignatedInit &&
            lhs.FactoryAsInit == rhs.FactoryAsInit &&
            lhs.Unavailable == rhs.Unavailable &&
            lhs.NullabilityAudited == rhs.NullabilityAudited &&

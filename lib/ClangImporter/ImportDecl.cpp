@@ -4539,7 +4539,7 @@ void ClangImporter::Implementation::importAttributes(
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
     //
-    // __attribute__((uanavailable)
+    // __attribute__((unavailable)
     //
     // Mapping: @availability(*,unavailable)
     //
@@ -4671,6 +4671,27 @@ void ClangImporter::Implementation::importAttributes(
           if (!MappedDecl->getAttrs().hasAttribute<OptionalAttr>())
             MappedDecl->getMutableAttrs().add(new (C)
                                               OptionalAttr(/*implicit*/false));
+        }
+      }
+    }
+  } else if (auto PD = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
+    if (auto knownProperty = getKnownObjCProperty(PD)) {
+      if (knownProperty->Unavailable) {
+        auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
+                      C,
+                      SwiftContext.AllocateCopy(knownProperty->UnavailableMsg));
+        MappedDecl->getMutableAttrs().add(attr);
+      }
+    }
+  } else if (auto CD = dyn_cast<clang::ObjCContainerDecl>(ClangDecl)) {
+    if (isa<clang::ObjCInterfaceDecl>(CD) || isa<clang::ObjCProtocolDecl>(CD)) {
+      if (auto knownContext = getKnownObjCContext(CD)) {
+        if (knownContext->Unavailable) {
+          auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
+                        C,
+                        SwiftContext.AllocateCopy(
+                          knownContext->UnavailableMsg));
+          MappedDecl->getMutableAttrs().add(attr);
         }
       }
     }

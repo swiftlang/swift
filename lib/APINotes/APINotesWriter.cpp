@@ -236,6 +236,21 @@ void APINotesWriter::Implementation::writeIdentifierBlock(
 }
 
 namespace {
+  /// Retrieve the serialized size of the given CommonEntityInfo, for use in
+  /// on-disk hash tables.
+  static unsigned getCommonEntityInfoSize(const CommonEntityInfo &info) {
+    return 3 + info.UnavailableMsg.size();
+  }
+
+  /// Emit a serialized representation of the common entity information.
+  static void emitCommonEntityInfo(raw_ostream &out,
+                                   const CommonEntityInfo &info) {
+    endian::Writer<little> writer(out);
+    writer.write<uint8_t>(info.Unavailable);
+    writer.write<uint16_t>(info.UnavailableMsg.size());
+    out.write(info.UnavailableMsg.c_str(), info.UnavailableMsg.size());
+  }
+
   /// Used to serialize the on-disk Objective-C class table.
   class ObjCClassTableInfo {
   public:
@@ -257,7 +272,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID);
-      uint32_t dataLength = dataBytes;
+      uint32_t dataLength = getCommonEntityInfoSize(data) + dataBytes;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -271,6 +286,8 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
+      emitCommonEntityInfo(out, data);
+
       // FIXME: Inefficient representation.
       uint8_t bytes[dataBytes] = { 0, 0, 0 };
       if (auto nullable = data.getDefaultNullability()) {
@@ -329,7 +346,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
-      uint32_t dataLength = 2;
+      uint32_t dataLength = getCommonEntityInfoSize(data) + 2;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -344,6 +361,8 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
+      emitCommonEntityInfo(out, data);
+
       // FIXME: Terrible solution. This needs abstraction.
       uint8_t bytes[2] = { 0, 0 };
       if (auto nullable = data.getNullability()) {
@@ -404,7 +423,8 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(SelectorID) + 1;
-      uint32_t dataLength = 5 + sizeof(uint64_t) + data.UnavailableMsg.size(); 
+      uint32_t dataLength = getCommonEntityInfoSize(data)
+                          + 4 + sizeof(uint64_t);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -420,16 +440,16 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
+      emitCommonEntityInfo(out, data);
+
       endian::Writer<little> writer(out);
 
       // FIXME: Inefficient representation
       writer.write<uint8_t>(data.DesignatedInit);
       writer.write<uint8_t>(data.FactoryAsInit);
-      writer.write<uint8_t>(data.Unavailable);
       writer.write<uint8_t>(data.NullabilityAudited);
       writer.write<uint8_t>(data.NumAdjustedNullable);
       writer.write<uint64_t>(data.NullabilityPayload);
-      out.write(data.UnavailableMsg.c_str(), data.UnavailableMsg.size());
     }
   };
 } // end anonymous namespace

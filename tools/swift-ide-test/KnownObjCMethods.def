@@ -125,6 +125,8 @@ INSTANCE_METHOD(NSIndexSet, (0, "init"), DesignatedInit)
 INSTANCE_METHOD(NSIndexSet, (1, "initWithIndexesInRange"), DesignatedInit)
 INSTANCE_METHOD(NSIndexSet, (1, "initWithIndexSet"), DesignatedInit)
 
+OBJC_CONTEXT(NSInvocation, Unavailable(""))
+
 INSTANCE_METHOD(NSInvocationOperation, (1, "initWithInvocation"), 
                 DesignatedInit)
 

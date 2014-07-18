@@ -1646,6 +1646,13 @@ namespace {
   // FactoryAsClassMethod flag
   enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
 
+  template<typename T>
+  T &&operator|(T &&known, Unavailable unavailable) {
+    known.Unavailable = true;
+    known.UnavailableMsg = unavailable.Msg;
+    return std::move(known);
+  }
+
   api_notes::ObjCClassInfo &&operator|(api_notes::ObjCClassInfo &&known,
                                       OptionalTypeAdjustment adjustment) {
     assert(adjustment.AdjustedTypes.size() <= 1);
@@ -1658,13 +1665,6 @@ namespace {
   api_notes::ObjCPropertyInfo &&operator|(api_notes::ObjCPropertyInfo &&known,
                                          api_notes::NullableKind kind) {
     known.setNullabilityAudited(kind);
-    return std::move(known);
-  }
-
-  api_notes::ObjCMethodInfo &&operator|(api_notes::ObjCMethodInfo &&known, 
-                                       Unavailable unavailable) {
-    known.Unavailable = true;
-    known.UnavailableMsg = unavailable.Msg;
     return std::move(known);
   }
 

@@ -29,6 +29,17 @@ using namespace api_notes;
 using namespace llvm::support;
 
 namespace {
+  /// Read serialized CommonEntityInfo.
+  void readCommonEntityInfo(const uint8_t *&data, CommonEntityInfo &info) {
+    info.Unavailable = *data++;
+
+    unsigned msgLength = endian::readNext<uint16_t, little, unaligned>(data);
+    info.UnavailableMsg
+      = std::string(reinterpret_cast<const char *>(data),
+                    reinterpret_cast<const char *>(data) + msgLength);
+    data += msgLength;
+  }
+
   /// Used to deserialize the on-disk identifier table.
   class IdentifierTableInfo {
   public:
@@ -103,6 +114,7 @@ namespace {
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
       ObjCClassInfo info;
+      readCommonEntityInfo(data, info);
       if (*data++) {
         info.setDefaultNullability(static_cast<NullableKind>(*data));
       }
@@ -150,6 +162,7 @@ namespace {
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
       ObjCPropertyInfo info;
+      readCommonEntityInfo(data, info);
       if (*data++) {
         info.setNullabilityAudited(static_cast<NullableKind>(*data));
       }
@@ -200,18 +213,15 @@ namespace {
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
       ObjCMethodInfo info;
-      const uint8_t *dataStart = data;
+      readCommonEntityInfo(data, info);
       info.DesignatedInit = endian::readNext<uint8_t, little, unaligned>(data);
       info.FactoryAsInit = endian::readNext<uint8_t, little, unaligned>(data);
-      info.Unavailable = endian::readNext<uint8_t, little, unaligned>(data);
       info.NullabilityAudited
         = endian::readNext<uint8_t, little, unaligned>(data);
       info.NumAdjustedNullable
         = endian::readNext<uint8_t, little, unaligned>(data);
       info.NullabilityPayload
         = endian::readNext<uint64_t, little, unaligned>(data);
-      info.UnavailableMsg = StringRef(reinterpret_cast<const char *>(data), 
-                                      length - (data - dataStart));
       return info;
     }
   };
