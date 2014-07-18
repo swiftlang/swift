@@ -1,8 +1,9 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift -Xfrontend -enable-dynamic %s -o %t/a.out
 // RUN: %target-run %t/a.out
-// XFAIL: OS=macosx
-// XFAIL: CPU=arm64
+
+// FIXME: Enable this test when arclite updates.
+// REQUIRES: rdar16892385
 
 import Foundation
 
