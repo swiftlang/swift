@@ -18,6 +18,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
@@ -97,15 +98,6 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
     }
   }
   return LoopBlocks.count(CurBB);
-}
-
-/// Place an ApplyInst's FuncRef so that it dominates the call site. FuncRef's
-/// may be shared by multiple ApplyInsts.
-static void placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
-  FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
-  SILBasicBlock *DomBB =
-    DT->findNearestCommonDominator(AI->getParent(), FuncRef->getParent());
-  FuncRef->moveBefore(DomBB->begin());
 }
 
 /// Optimize placement of initializer calls given a list of calls to the

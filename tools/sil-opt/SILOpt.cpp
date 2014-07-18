@@ -79,6 +79,7 @@ enum class PassKind {
   LICM,
   IVInfoPrinter,
   GlobalLoadStoreOpts,
+  ArrayOpts,
 };
 
 enum class OptGroup {
@@ -261,6 +262,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::GlobalLoadStoreOpts,
                                    "global-load-store-opts",
                                    "Multiple basic block load store opts."),
+                        clEnumValN(PassKind::ArrayOpts,
+                                   "array-opt",
+                                   "Array optimizations"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -456,6 +460,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::GlobalLoadStoreOpts:
       PM.add(createGlobalLoadStoreOpts());
+      break;
+    case PassKind::ArrayOpts:
+      PM.add(createArrayOpts());
       break;
     }
   }

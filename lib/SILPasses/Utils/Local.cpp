@@ -11,6 +11,7 @@
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -230,4 +231,19 @@ bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
       return true;
 
   return false;
+}
+
+/// Find a new position for an ApplyInst's FuncRef so that it dominates its
+/// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
+void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
+  FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getCallee());
+  SILBasicBlock *DomBB =
+    DT->findNearestCommonDominator(AI->getParent(), FuncRef->getParent());
+  if (DomBB == AI->getParent() && DomBB != FuncRef->getParent())
+    // Prefer to place the FuncRef immediately before the call. Since we're
+    // moving FuncRef up, this must be the only call to it in the block.
+    FuncRef->moveBefore(AI);
+  else
+    // Otherwise, conservatively stick it at the beginning of the block.
+    FuncRef->moveBefore(DomBB->begin());
 }

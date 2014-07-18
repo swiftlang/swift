@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
+  class DominanceInfo;
 
   /// \brief For each of the given instructions, if they are dead delete them
   /// along with their dead operands.
@@ -78,6 +79,9 @@ namespace swift {
   /// \brief Return true if the substitution map contains a
   /// substitution that is an unbound generic type.
   bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
+
+  /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
+  void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 } // end namespace swift
 
 #endif

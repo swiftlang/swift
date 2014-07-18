@@ -101,6 +101,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
   PM.add(createCSE());
   PM.add(createSILCombine());
   PM.add(createSimplifyCFG());
+  PM.add(createArrayOpts());
 }
 
 void AddLowLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
@@ -179,7 +180,6 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 #endif
-
 
   // Run two iterations of the low-level SSA passes.
   AddSSAPasses(PM, Module, false);
