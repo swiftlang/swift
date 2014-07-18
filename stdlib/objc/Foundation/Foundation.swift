@@ -204,7 +204,7 @@ func _cocoaStringSubscriptImpl(
 //
 
 /// An NSString built around a slice of contiguous Swift String storage
-class _NSContiguousString : NSString {
+final class _NSContiguousString : NSString {
   init(_ value: _StringCore) {
     _sanityCheck(
       value.hasContiguousStorage,
@@ -269,7 +269,7 @@ class _NSContiguousString : NSString {
 
 // A substring of an arbitrary immutable NSString.  The underlying
 // NSString is assumed to not provide contiguous UTF-16 storage.
-class _NSOpaqueString : NSString {
+final class _NSOpaqueString : NSString {
   func length() -> Int {
     return subRange.length
   }
@@ -760,7 +760,7 @@ extension NSFastEnumerationState {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
-public class NSFastGenerator : GeneratorType {
+final public class NSFastGenerator : GeneratorType {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
   var n: Int
@@ -850,7 +850,7 @@ extension NSMutableSet : SequenceType {}
 extension NSDictionary : SequenceType {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.
-  public class Generator : GeneratorType {
+  final public class Generator : GeneratorType {
     var _fastGenerator: NSFastGenerator
     var _dictionary: NSDictionary {
       return _fastGenerator.enumerable as NSDictionary
