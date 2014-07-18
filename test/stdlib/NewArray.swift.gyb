@@ -342,13 +342,10 @@ func testReplace/*<
     source += x
   }
   
-  for i in -3..<source.count+3  {
-    for j in i..<source.count+3 {
+  for i in indices(source) {
+    for j in i..<source.count {
 
-      let boundedI = min(max(i, 0), source.count)
-      let boundedJ = min(max(j, 0), source.count)
-      
-      let oldCount = boundedJ - boundedI
+      let oldCount = j - i
       for newCount in 0..<(2 * oldCount) {
         let newValues = X(100)..<X(100 + newCount)
 
@@ -363,14 +360,8 @@ func testReplace/*<
         }
 
         var a = make()
-        
-        a.replaceRange(boundedI..<boundedJ, with: newValues)
-
-        var b = make()
-        b[i..<j] = Slice(newValues)
-        if !equal(a, b) {
-          reportFailure(&a, "unequal slice replace")
-        }
+     
+        a.replaceRange(i..<j, with: newValues)
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
@@ -380,8 +371,8 @@ func testReplace/*<
         }
         
         for k in 0..<a.count {
-          let expectedValue = k < boundedI ? source[k].value
-          : k < boundedJ + growth ? 100 + k - boundedI
+          let expectedValue = k < i ? source[k].value
+          : k < j + growth ? 100 + k - i
           : source[k - growth].value
 
           if a[k].value != expectedValue {
