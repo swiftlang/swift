@@ -1103,7 +1103,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (Tok.isFollowingLParen()) {
       if (peekToken().is(tok::code_complete)) {
         consumeToken(tok::l_paren);
-        CodeCompletion->completePostfixExprParen(Result.get());
+        if (CodeCompletion && Result.isNonNull())
+          CodeCompletion->completePostfixExprParen(Result.get());
         // Eat the code completion token because we handled it.
         consumeToken(tok::code_complete);
         return makeParserCodeCompletionResult<Expr>();
