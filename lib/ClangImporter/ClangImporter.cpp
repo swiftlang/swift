@@ -1348,7 +1348,7 @@ ClangImporter::Implementation::getAPINotesForContext(
     if (auto secondaryModule = getClangSubmoduleForDecl(objcClass)) {
       if (*secondaryModule) {
         secondary = getAPINotesForModule(
-                                         (*secondaryModule)->getTopLevelModule());
+                                     (*secondaryModule)->getTopLevelModule());
       }
     }
 
@@ -1388,32 +1388,36 @@ ClangImporter::Implementation::getKnownObjCMethod(
   }
   selectorRef.Identifiers = selectorPieces;
 
-  // Look for method information in the primary source.
+  // Look for method and class information in the primary source.
+  Optional<api_notes::ObjCMethodInfo> methodInfo;
+  Optional<api_notes::ObjCClassInfo> classInfo;
+
   if (primary) {
-    if (auto info = primary->lookupObjCMethod(contextName, selectorRef,
-                                              method->isInstanceMethod())) {
-      return info;
-    }
+    // Look for method information in the primary source.
+    methodInfo = primary->lookupObjCMethod(contextName, selectorRef,
+                                           method->isInstanceMethod());
+
+    // Look for class information in the primary source.
+    classInfo = primary->lookupObjCClass(contextName);
+  }
+
+  // If we found method or class information in the primary source, return what
+  // we found.
+  if (methodInfo || classInfo) {
+    if (!methodInfo)
+      methodInfo = api_notes::ObjCMethodInfo();
+
+    // Merge class information into the method, if present.
+    if (classInfo)
+      *methodInfo |= *classInfo;
+
+    return methodInfo;
   }
 
   // Look for method information in the secondary source.
   if (secondary) {
-    if (auto info = secondary->lookupObjCMethod(contextName, selectorRef,
-                                                method->isInstanceMethod())) {
-      return info;
-    }
-  }
-
-  // Look for auditing information in the primary source.
-  if (primary) {
-    if (auto contextInfo = primary->lookupObjCClass(contextName)) {
-      if (auto nullable = contextInfo->getDefaultNullability()) {
-        api_notes::ObjCMethodInfo info;
-        info.NullabilityAudited = true;
-        info.addTypeInfo(0, *nullable);
-        return info;
-      }
-    }
+    return secondary->lookupObjCMethod(contextName, selectorRef,
+                                       method->isInstanceMethod());
   }
 
   return Nothing;

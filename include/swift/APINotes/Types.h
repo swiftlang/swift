@@ -264,6 +264,20 @@ public:
   friend bool operator!=(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
     return !(lhs == rhs);
   }
+
+  /// Merge class-wide information into the given method.
+  friend ObjCMethodInfo &operator|=(ObjCMethodInfo &lhs,
+                                    const ObjCClassInfo &rhs) {
+    // Merge nullability.
+    if (!lhs.NullabilityAudited) {
+      if (auto nullable = rhs.getDefaultNullability()) {
+        lhs.NullabilityAudited = true;
+        lhs.addTypeInfo(0, *nullable);
+      }
+    }
+
+    return lhs;
+  }
 };
 
 } // end namespace api_notes

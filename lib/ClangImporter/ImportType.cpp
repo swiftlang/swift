@@ -968,11 +968,14 @@ Type ClangImporter::Implementation::importMethodType(
 
   // Check if we know more about the type from our whitelists.
   Optional<api_notes::ObjCMethodInfo> knownMethod;
-  if (ImportWithTighterObjCPointerTypes)
-    if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl))
-      if (auto knownMethodTmp = getKnownObjCMethod(MD))
+  if (ImportWithTighterObjCPointerTypes) {
+    if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      if (auto knownMethodTmp = getKnownObjCMethod(MD)) {
         if (knownMethodTmp->NullabilityAudited)
           knownMethod = knownMethodTmp;
+      }
+    }
+  }
 
   OptionalTypeKind OptionalityOfReturn
     = knownMethod ? translateNullability(knownMethod->getReturnTypeInfo())
