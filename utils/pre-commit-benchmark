@@ -232,11 +232,11 @@ def compareTimingsFiles(file1, file2):
             continue
         compareScores(key, scores1[key], scores2[key], runs)
 
-def checkAndUpdatePrecommitBench(srcroot):
+def checkAndUpdatePrecommitBench(sourceDir):
     """Check that the precommit benchmark directory is in its appropriate
        location and attempt to update it to ToT."""
     # Compute our benchmark directory name.
-    benchdir = os.path.join(srcroot, 'benchmark', 'PrecommitBench')
+    benchdir = os.path.join(sourceDir, 'benchmark', 'PrecommitBench')
 
     # If it's not there, clone it on demand.
     if not os.path.isdir(benchdir):
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     # Update precommit bench to ToT. If it does not exist, throw an error.
     #
     # TODO: This name sucks.
-    checkAndUpdatePrecommitBench(SWIFT_SOURCE_ROOT)
+    checkAndUpdatePrecommitBench(sourceDir)
 
     workCacheDir = collectBenchmarks(exeNames, None, args.repeat)    
     baselineCacheDir = collectBenchmarks(exeNames, args.baseline, args.repeat)
