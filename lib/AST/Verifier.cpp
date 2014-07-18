@@ -1263,10 +1263,20 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ForceValueExpr *E) {
-      auto valueTy = E->getType();
-      auto optValueTy =
-        E->getSubExpr()->getType()->getAnyOptionalObjectType();
-      checkSameType(valueTy, optValueTy, "optional value type");
+      auto objectLVTy = E->getType();
+      auto objectTy = objectLVTy->getRValueType();
+      
+      auto optLVTy = E->getSubExpr()->getType();
+      auto optTy = optLVTy->getRValueType();
+      
+      checkSameType(objectTy, optTy->getAnyOptionalObjectType(),
+                    "optional value type");
+      
+      if (objectLVTy->is<LValueType>() != optLVTy->is<LValueType>()) {
+        Out << "ForceValueExpr must preserve lvalue-ness of base\n";
+        abort();
+      }
+      
       verifyCheckedBase(E);
     }
 
