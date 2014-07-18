@@ -747,7 +747,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       DeclContext *DCToTypeCheck = DC;
       while (!DCToTypeCheck->isModuleContext() &&
              !isa<AbstractFunctionDecl>(DCToTypeCheck) &&
-             !isa<NominalTypeDecl>(DCToTypeCheck))
+             !isa<NominalTypeDecl>(DCToTypeCheck) &&
+             !isa<TopLevelCodeDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
         // We found a function.  First, type check the nominal decl that
@@ -760,18 +761,20 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
         // initializer of a property).
         return typecheckContextImpl(DCToTypeCheck);
       }
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DCToTypeCheck)) {
+        return typeCheckTopLevelCodeDecl(TLCD);
+      }
       return false;
     }
-    if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
-      auto *NTD = cast<NominalTypeDecl>(DC);
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
       // First, type check the parent DeclContext.
       typecheckContextImpl(DC->getParent());
       if (NTD->hasType())
         return true;
       return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
     }
-    if (DC->getContextKind() == DeclContextKind::TopLevelCodeDecl) {
-      return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+      return typeCheckTopLevelCodeDecl(TLCD);
     }
     return true;
   }

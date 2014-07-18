@@ -12,7 +12,7 @@
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_1 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_3 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_4 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
@@ -21,6 +21,22 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_7 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_8 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_9 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_3 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_4 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_5 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_6 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_7 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_8 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_9 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_10 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_11 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_12 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_13 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_14 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_15 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -120,5 +136,89 @@ struct NestedStructWithClosureMember1 {
     var c1 = { #^DELAYED_8^# }
     lazy var c2 = { #^DELAYED_9^# }
   }
+}
+
+func acceptsTrailingClosureFooVoid(code: (FooStruct) -> Void) {}
+
+acceptsTrailingClosureFooVoid {
+  #^IN_TRAILING_CLOSURE_1^#
+}
+
+acceptsTrailingClosureFooVoid {
+  $0.#^IN_TRAILING_CLOSURE_2^#
+}
+
+acceptsTrailingClosureFooVoid {
+  item in #^IN_TRAILING_CLOSURE_3^#
+}
+
+acceptsTrailingClosureFooVoid {
+  item in item.#^IN_TRAILING_CLOSURE_4^#
+}
+
+acceptsTrailingClosureFooVoid {
+  item in
+  item.instanceFunc0()
+  item.#^IN_TRAILING_CLOSURE_5^#
+}
+
+func acceptsListAndTrailingClosureFooVoid(
+    list: [FooStruct], code: (FooStruct) -> Void) {
+}
+
+acceptsListAndTrailingClosureFooVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  #^IN_TRAILING_CLOSURE_6^#
+}
+
+acceptsListAndTrailingClosureFooVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  $0.#^IN_TRAILING_CLOSURE_7^#
+}
+
+acceptsListAndTrailingClosureFooVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in #^IN_TRAILING_CLOSURE_8^#
+}
+
+acceptsListAndTrailingClosureFooVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in item.#^IN_TRAILING_CLOSURE_9^#
+}
+
+acceptsListAndTrailingClosureFooVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in
+  item.instanceFunc0()
+  item.#^IN_TRAILING_CLOSURE_10^#
+}
+
+func acceptsListAndTrailingClosureTVoid<T>(list: [T], code: (T) -> Void) {}
+
+acceptsListAndTrailingClosureTVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  #^IN_TRAILING_CLOSURE_11^#
+}
+
+acceptsListAndTrailingClosureTVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  $0.#^IN_TRAILING_CLOSURE_12^#
+}
+
+acceptsListAndTrailingClosureTVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in #^IN_TRAILING_CLOSURE_13^#
+}
+
+acceptsListAndTrailingClosureTVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in item.#^IN_TRAILING_CLOSURE_14^#
+}
+
+acceptsListAndTrailingClosureTVoid(
+    [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
+  item in
+  item.instanceFunc0()
+  item.#^IN_TRAILING_CLOSURE_15^#
 }
 

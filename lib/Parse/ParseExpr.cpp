@@ -1139,11 +1139,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       SourceLoc braceLoc = Tok.getLoc();
       // Parse the closure.
       ParserResult<Expr> closure = parseExprClosure();
-      if (closure.hasCodeCompletion())
-        return closure;
-      
-      if (closure.isParseError())
-        return closure;
+      if (closure.isNull())
+        return nullptr;
 
       // Track the original end location of the expression we're trailing so
       // we can warn about excess newlines.
@@ -1154,8 +1151,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         diagnose(braceLoc, diag::trailing_closure_excess_newlines);
         diagnose(Result.get()->getLoc(), diag::trailing_closure_call_here);
       }
-      
-      
+
       // Introduce the trailing closure into the call, or form a call, as
       // necessary.
       if (auto call = dyn_cast<CallExpr>(Result.get())) {
@@ -1164,15 +1160,22 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
                                                  closure.get());
         call->setArg(arg);
+
+        if (closure.hasCodeCompletion())
+          Result.setHasCodeCompletion();
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
                                                  { }, { }, SourceLoc(), 
                                                  closure.get());
-        Result = makeParserResult(new (Context) CallExpr(Result.get(), arg,
-                                                       /*Implicit=*/true));
+        Result = makeParserResult(
+            ParserStatus(closure),
+            new (Context) CallExpr(Result.get(), arg, /*Implicit=*/true));
       }
-      
+
+      if (Result.hasCodeCompletion())
+        return Result;
+
       // We only allow a single trailing closure on a call.  This could be
       // generalized in the future, but needs further design.
       if (Tok.is(tok::l_brace)) break;
@@ -1733,8 +1736,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // If the body consists of a single expression, turn it into a return
   // statement.
+  //
+  // But don't do this transformation during code completion, as the source
+  // may be incomplete and the type mismatch in return statement will just
+  // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
+  if (!Status.hasCodeCompletion() &&
+      bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
     hasSingleExpressionBody = true;
     bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
                                                bodyElements[0].get<Expr*>());
