@@ -251,15 +251,21 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
                PersistentParserState *PersistentState)
+  : Parser(std::unique_ptr<Lexer>(
+             new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+                   BufferID, &SF.getASTContext().Diags,
+                   /*InSILMode=*/SIL != nullptr,
+                   SF.getASTContext().LangOpts.AttachCommentsToDecls
+                   ? CommentRetentionMode::AttachToNextToken
+                   : CommentRetentionMode::None)), SF, SIL, PersistentState) {
+}
+
+Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
+               SILParserState *SIL, PersistentParserState *PersistentState)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
-    L(new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-                BufferID, &SF.getASTContext().Diags,
-                /*InSILMode=*/SIL != nullptr,
-                SF.getASTContext().LangOpts.AttachCommentsToDecls
-                    ? CommentRetentionMode::AttachToNextToken
-                    : CommentRetentionMode::None)),
+    L(Lex.release()),
     SIL(SIL),
     Context(SF.getASTContext()) {
 
@@ -275,7 +281,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
 
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
-      SourceMgr.findBufferContainingLoc(ParserPos.Loc) == BufferID) {
+      SourceMgr.findBufferContainingLoc(ParserPos.Loc) == L->getBufferID()) {
     auto BeginParserPosition = getParserPosition(ParserPos);
     restoreParserPosition(BeginParserPosition);
   }
@@ -602,4 +608,48 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
              Prev->getName());
+}
+
+struct ParserUnit::Implementation {
+  LangOptions LangOpts;
+  SearchPathOptions SearchPathOpts;
+  DiagnosticEngine Diags;
+  ASTContext Ctx;
+  SourceFile *SF;
+  std::unique_ptr<Parser> TheParser;
+
+  Implementation(SourceManager &SM, unsigned BufferID)
+    : Diags(SM),
+      Ctx(LangOpts, SearchPathOpts, SM, Diags),
+      SF(new (Ctx) SourceFile(*Module::create(Ctx.getIdentifier("input"), Ctx),
+                              SourceFileKind::Main, BufferID,
+                              SourceFile::ImplicitModuleImportKind::None)) {
+  }
+};
+
+ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
+  : Impl(*new Implementation(SM, BufferID)) {
+
+  Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
+}
+
+ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+             unsigned Offset, unsigned EndOffset)
+  : Impl(*new Implementation(SM, BufferID)) {
+
+  std::unique_ptr<Lexer> Lex;
+  Lex.reset(new Lexer(Impl.LangOpts, SM,
+                      BufferID, &Impl.Diags,
+                      /*InSILMode=*/false,
+                      CommentRetentionMode::None,
+                      Offset, EndOffset));
+  Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF));
+}
+
+ParserUnit::~ParserUnit() {
+  delete &Impl;
+}
+
+Parser &ParserUnit::getParser() {
+  return *Impl.TheParser;
 }

@@ -185,6 +185,23 @@ namespace swift {
                                                     StringRef ModuleName,
                                                  llvm::LLVMContext &LLVMContext,
                                                     unsigned StartElem = 0);
+
+  /// A convenience wrapper for Parser functionality.
+  class ParserUnit {
+  public:
+    ParserUnit(SourceManager &SM, unsigned BufferID);
+    ParserUnit(SourceManager &SM, unsigned BufferID,
+               unsigned Offset, unsigned EndOffset);
+
+    ~ParserUnit();
+
+    Parser &getParser();
+
+  private:
+    struct Implementation;
+    Implementation &Impl;
+  };
+
 } // end namespace swift
 
 #endif

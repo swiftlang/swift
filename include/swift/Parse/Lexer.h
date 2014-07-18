@@ -191,6 +191,8 @@ public:
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
   }
 
+  unsigned getBufferID() const { return BufferID; }
+
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }

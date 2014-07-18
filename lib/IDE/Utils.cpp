@@ -11,14 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
-#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Parse/PersistentParserState.h"
+#include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -91,20 +86,10 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
-  LangOptions LangOpts;
-  SearchPathOptions SearchPathOpts;
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(MemBuf.release());
-  DiagnosticEngine Diags(SM);
-  ASTContext Ctx(LangOpts, SearchPathOpts, SM, Diags);
-  auto ModName = Ctx.getIdentifier("input");
-
-  Module &Mod = *Module::create(ModName, Ctx);
-  SourceFile &SF = *new (Ctx) SourceFile(Mod, SourceFileKind::Main, BufferID,
-                                    SourceFile::ImplicitModuleImportKind::None);
-
-  PersistentParserState PersistentState;
-  Parser P(BufferID, SF, /*SIL=*/nullptr, &PersistentState);
+  ParserUnit Parse(SM, BufferID);
+  Parser &P = Parse.getParser();
 
   bool Done;
   do {

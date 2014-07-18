@@ -265,6 +265,9 @@ public:
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
          PersistentParserState *PersistentState = nullptr);
+  Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
+         SILParserState *SIL = nullptr,
+         PersistentParserState *PersistentState = nullptr);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
