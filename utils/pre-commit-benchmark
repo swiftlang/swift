@@ -4,6 +4,10 @@
 # your SWIFT_BUILD_ROOT and SWIFT_SOURCE_ROOT settings, just like
 # build-script.sh
 
+# Note2: To avoid expensive rebuilds, it's often better to develop
+# this script somewhere outside the source tree and then move it back
+# when your changes are finished.
+
 import subprocess
 import sys
 import os
@@ -148,8 +152,6 @@ TOTALRE=re.compile(r"()(Totals),[ \t]*([\d.]+),[ \t]*([\d.]+)")
 KEYGROUP=2
 VALGROUP=4
 
-IsTime=1
-
 def parseFloat(word):
     try:
         return float(word)
@@ -177,34 +179,27 @@ def getScores(fname):
     return scores, runs
 
 def compareScores(key, score1, score2, runs):
-    print key,
+    row = [key]
     bestscore1 = None
     bestscore2 = None
     r = 0
     for score in score1:
-        if not bestscore1 or (IsTime and score < bestscore1) or (not IsTime and score > bestscore1):
+        if not bestscore1 or score < bestscore1:
             bestscore1 = score
-        print ", %.2f" % score,
+        row.append("%.2f" % score)
     for score in score2:
-        if not bestscore2 or (IsTime and score < bestscore2) or (not IsTime and score > bestscore2):
+        if not bestscore2 or score < bestscore2:
             bestscore2 = score
-        print ", %.2f" % score,
+        row.append("%.2f" % score)
         r += 1
     while r < runs:
-        print ", 0.0"
+        row.append("0.0")
 
-    if IsTime:
-        print ", %.2f" % abs(bestscore1-bestscore2),
-    else:
-        print ", %.2f" % abs(bestscore2-bestscore1),
-    Num=bestscore2
-    Den=bestscore1
-    if IsTime:
-        Num, Den = Den, Num
-    if Den > 0:
-        print ", %.1f%%"%(((Num/Den)-1)*100)
-    else:
-        print ", *"    
+    row.append("%.2f" % abs(bestscore1-bestscore2))
+    Num=bestscore1
+    Den=bestscore2
+    row.append("%.1f%%"%(((Num/Den)-1)*100) if Den > 0 else "*")
+    return row
 
 def compareTimingsFiles(file1, file2):
     scores1, runs1 = getScores(file1)
@@ -215,14 +210,15 @@ def compareTimingsFiles(file1, file2):
     keys.sort()
     if VERBOSE:
         print "comparing ", file1, "vs", file2, "=",
-        if IsTime: print file1, "/", file2
-        else: print file2, "/", file1
-    print "benchmark",
+        print file1, "/", file2
+
+    rows =  [["benchmark"]]
     for i in range(0,runs):
-        print ", baserun%d" % i,
+        rows[0].append("baserun%d" % i)
     for i in range(0,runs):
-        print ", optrun%d" % i,
-    print ", delta, speedup"
+        rows[0].append("optrun%d" % i)
+    rows[0] += ["delta", "speedup"]
+
     for key in keys:
         if not key in scores1:
             print key, "not in", file1
@@ -230,7 +226,21 @@ def compareTimingsFiles(file1, file2):
         if not key in scores2:
             print key, "not in", file2
             continue
-        compareScores(key, scores1[key], scores2[key], runs)
+        rows.append(compareScores(key, scores1[key], scores2[key], runs))
+        
+    widths = []
+    for row in rows:
+        for n, x in enumerate(row):
+            while n >= len(widths):
+                widths.append(0)
+            if len(x) > widths[n]:
+                widths[n] = len(x)
+    for row in rows:
+        for n, x in enumerate(row):
+            if n != 0:
+                print ',',
+            print ((widths[n] - len(x)) * ' ') + x,
+        print ''
 
 def checkAndUpdatePrecommitBench(sourceDir):
     """Check that the precommit benchmark directory is in its appropriate
@@ -281,7 +291,7 @@ if __name__ == '__main__':
         print('No changes between work tree and %s; nothing to compare.' % args.baseline)
     else:
         for exe in exeNames:
-            print("============ %s =============" % exe)
+            print '=' * 20, exe, '=' * 20
             timingsFileName = exe + '.out'
             compareTimingsFiles(
                 os.path.join(baselineCacheDir, timingsFileName),
