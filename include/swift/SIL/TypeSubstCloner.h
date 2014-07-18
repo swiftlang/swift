@@ -95,71 +95,70 @@ protected:
                                                  Inst->isVolatile()));
   }
 
- void visitApplyInst(ApplyInst *Inst) {
-   auto Args = this->template getOpValueArray<8>(Inst->getArguments());
+  void visitApplyInst(ApplyInst *Inst) {
+    auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
-   // Handle recursions by replacing the apply to the callee with an apply to
-   // the newly specialized function.
-   SILValue CalleeVal = Inst->getCallee();
-   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-   SILBuilder &Builder = getBuilder();
-   if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-     FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
-                                     &Builder.getFunction());
-     ApplyInst *NAI =
-       Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args,
-                           Inst->isTransparent());
-     doPostProcess(Inst, NAI);
-     return;
-   }
+    // Handle recursions by replacing the apply to the callee with an apply to
+    // the newly specialized function.
+    SILValue CalleeVal = Inst->getCallee();
+    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+    SILBuilder &Builder = getBuilder();
+    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
+                                      &Builder.getFunction());
+      ApplyInst *NAI =
+        Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args,
+                            Inst->isTransparent());
+      doPostProcess(Inst, NAI);
+      return;
+    }
 
-   SmallVector<Substitution, 16> TempSubstList;
-   for (auto &Sub : Inst->getSubstitutions())
-     TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       Original.getContextGenericParams(),
-                                       ApplySubs));
+    SmallVector<Substitution, 16> TempSubstList;
+    for (auto &Sub : Inst->getSubstitutions())
+      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
+                                        Original.getContextGenericParams(),
+                                        ApplySubs));
 
-   ApplyInst *N = Builder.createApply(
-          getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
-          getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
-          TempSubstList, Args, Inst->isTransparent());
-   doPostProcess(Inst, N);
- }
+    ApplyInst *N = Builder.createApply(
+      getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
+        getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
+        TempSubstList, Args, Inst->isTransparent());
+    doPostProcess(Inst, N);
+  }
 
- void visitPartialApplyInst(PartialApplyInst *Inst) {
-   auto Args = this->template getOpValueArray<8>(Inst->getArguments());
+  void visitPartialApplyInst(PartialApplyInst *Inst) {
+    auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
-   // Handle recursions by replacing the apply to the callee with an apply to
-   // the newly specialized function.
-   SILValue CalleeVal = Inst->getCallee();
-   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-   SILBuilder &Builder = getBuilder();
-   if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-     FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
-                                     &Builder.getFunction());
-     PartialApplyInst *NPAI =
-       Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
-                                  getOpType(Inst->getSubstCalleeSILType()),
-                                  ArrayRef<Substitution>(),
-                                  Args,
-                                  getOpType(Inst->getType()));
-     doPostProcess(Inst, NPAI);
-     return;
-   }
+    // Handle recursions by replacing the apply to the callee with an apply to
+    // the newly specialized function.
+    SILValue CalleeVal = Inst->getCallee();
+    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+    SILBuilder &Builder = getBuilder();
+    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
+                                      &Builder.getFunction());
+      PartialApplyInst *NPAI =
+        Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
+                                   getOpType(Inst->getSubstCalleeSILType()),
+                                   ArrayRef<Substitution>(),
+                                   Args,
+                                   getOpType(Inst->getType()));
+      doPostProcess(Inst, NPAI);
+      return;
+    }
 
-   SmallVector<Substitution, 16> TempSubstList;
-   for (auto &Sub : Inst->getSubstitutions())
-     TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       Original.getContextGenericParams(),
-                                       ApplySubs));
+    SmallVector<Substitution, 16> TempSubstList;
+    for (auto &Sub : Inst->getSubstitutions())
+      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
+                                        Original.getContextGenericParams(),
+                                        ApplySubs));
 
-   PartialApplyInst *N = Builder.createPartialApply(
-       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
-       getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
-       getOpType(Inst->getType()));
-   doPostProcess(Inst, N);
- }
-
+    PartialApplyInst *N = Builder.createPartialApply(
+      getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
+        getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
+        getOpType(Inst->getType()));
+    doPostProcess(Inst, N);
+  }
 
   void visitWitnessMethodInst(WitnessMethodInst *Inst) {
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
