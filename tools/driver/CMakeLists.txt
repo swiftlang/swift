@@ -1,5 +1,6 @@
 add_swift_executable(swift
   driver.cpp
+  api_notes.cpp
   frontend_main.cpp
   DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
           swiftSerialization swiftFrontend swiftClangImporter swiftIDE 
