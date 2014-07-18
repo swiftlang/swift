@@ -743,16 +743,22 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       SourceLoc EndTypeCheckLoc =
           ParsedExpr ? ParsedExpr->getStartLoc()
                      : P.Context.SourceMgr.getCodeCompletionLoc();
-      // Find the nearest outer function.
+      // Find the nearest containing function or nominal decl.
       DeclContext *DCToTypeCheck = DC;
       while (!DCToTypeCheck->isModuleContext() &&
-             !isa<AbstractFunctionDecl>(DCToTypeCheck))
+             !isa<AbstractFunctionDecl>(DCToTypeCheck) &&
+             !isa<NominalTypeDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
-      // First, type check the nominal decl that contains the function.
-      // Then type check the function itself.
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
+        // We found a function.  First, type check the nominal decl that
+        // contains the function.  Then type check the function itself.
         typecheckContextImpl(DCToTypeCheck->getParent());
         return typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+      }
+      if (isa<NominalTypeDecl>(DCToTypeCheck)) {
+        // We found a nominal decl (for example, the closure is used in an
+        // initializer of a property).
+        return typecheckContextImpl(DCToTypeCheck);
       }
       return false;
     }

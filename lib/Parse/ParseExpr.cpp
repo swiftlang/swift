@@ -108,7 +108,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   
   ParserResult<Expr> expr = parseExprSequence(Message, isExprBasic);
   if (expr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
+    return expr;
   if (expr.isNull())
     return nullptr;
   
@@ -188,7 +188,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     // Parse a unary expression.
     ParserResult<Expr> Primary = parseExprUnary(Message, isExprBasic);
     if (Primary.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
+      return Primary;
     if (Primary.isNull())
       return nullptr;
     
@@ -871,10 +871,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::l_paren:
-    if (Expr *E = parseExprList(tok::l_paren, tok::r_paren).getPtrOrNull())
-      Result = makeParserResult(E);
-    else
-      Result = makeParserErrorResult<Expr>();
+    Result = parseExprList(tok::l_paren, tok::r_paren);
     break;
 
   case tok::l_square:
@@ -1705,8 +1702,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
-  ParserStatus status;
-  status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
+  ParserStatus Status;
+  Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   // Parse the closing '}'.
   SourceLoc rightBrace;
@@ -1747,7 +1744,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
                                      rightBrace),
                    hasSingleExpressionBody);
 
-  return makeParserResult(closure);
+  return makeParserResult(Status, closure);
 }
 
 ///   expr-anon-closure-argument:
@@ -1881,9 +1878,6 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     return Status;
   });
 
-  if (Status.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
-
   // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
       (SubExprNames.empty() || SubExprNames[0].empty())) {
@@ -1893,8 +1887,10 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   }
 
   return makeParserResult(
-    TupleExpr::create(Context, LLoc, SubExprs, SubExprNames, SubExprNameLocs,
-                      RLoc, /*hasTrailingClosure=*/false, /*Implicit=*/false));
+      Status,
+      TupleExpr::create(Context, LLoc, SubExprs, SubExprNames, SubExprNameLocs,
+                        RLoc, /*hasTrailingClosure=*/false,
+                        /*Implicit=*/false));
 }
 
 /// \brief Parse an expression call suffix.

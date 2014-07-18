@@ -15,7 +15,7 @@ func test2(inout let x : Int) {}  // expected-error {{'inout' arguments may not 
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'runAction'}}  expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}}
     skview! // expected-error 2{{expected ',' separator}} expected-error {{use of unresolved identifier 'skview'}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
 

@@ -86,13 +86,12 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     CodeCompletion->setExprBeginning(getParserPosition());
 
   ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
-  if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
-    CodeCompletion->completeExpr();
-    return ResultExpr;
-  }
-
   if (ResultExpr.isNonNull())
     Result = ResultExpr.get();
+
+  if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
+    CodeCompletion->completeExpr();
+  }
 
   return ResultExpr;
 }

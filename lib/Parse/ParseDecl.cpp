@@ -2710,19 +2710,21 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         initParser.reset();
       }
       assert(!initParser.hasValue());
-      
-      if (init.hasCodeCompletion())
-        return makeParserCodeCompletionStatus();
-      if (init.isNull())
-        return makeParserError();
-      
-      if (Flags & PD_DisallowInit) {
+
+      if (Flags & PD_DisallowInit && init.isNonNull()) {
         diagnose(EqualLoc, diag::disallowed_init);
-        Status.setIsParseError();
         init = nullptr;
       }
       
       PBD->setInit(init.getPtrOrNull(), false);
+
+      // If we are doing second pass of code completion, we don't want to
+      // suddenly cut off parsing and throw away the declaration.
+      if (init.hasCodeCompletion() && isCodeCompletionFirstPass())
+        return makeParserCodeCompletionStatus();
+
+      if (init.isNull())
+        return makeParserError();
     }
     
     if (topLevelDecl) {

@@ -15,8 +15,12 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_1 | FileCheck %s -check-prefix=ERROR_COMMON
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_3 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_4 | FileCheck %s -check-prefix=ERROR_COMMON
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_5 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_4 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_5 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_6 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_7 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_8 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DELAYED_9 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -97,7 +101,6 @@ func testReturnInClosure1() {
 }
 
 //===--- Test that we do delayed parsing of closures.
-// FIXME: <rdar://problem/16274593> Code completion: implement delayed parsing of closures
 
 var topLevelClosure1 = { #^DELAYED_1^# }
 
@@ -107,6 +110,15 @@ var topLevelClosure3 = { class C { func f() { #^DELAYED_3^# } } }
 
 class ClassWithClosureMember1 {
   var c1 = { #^DELAYED_4^# }
-  lazy var c1 = { #^DELAYED_5^# }
+  lazy var c2 = { #^DELAYED_5^# }
+  var c3 = ({ #^DELAYED_6^# })()
+  lazy var c4 = ({ #^DELAYED_7^# })()
+}
+
+struct NestedStructWithClosureMember1 {
+  struct Nested {
+    var c1 = { #^DELAYED_8^# }
+    lazy var c2 = { #^DELAYED_9^# }
+  }
 }
 
