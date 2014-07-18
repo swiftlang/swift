@@ -24,18 +24,34 @@ sourceDir = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 
 import os
 
+def check_call(*args, **kw):
+    try:
+        return subprocess.check_call(*args, **kw)
+    except:
+        print('failed command:', args, kw)
+        sys.stdout.flush()
+        raise
+    
+def check_output(*args, **kw):
+    try:
+        return subprocess.check_output(*args, **kw)
+    except:
+        print('failed command:', args, kw)
+        sys.stdout.flush()
+        raise
+    
 def getTreeSha(treeish):
-    return subprocess.check_output(['git', 'show', treeish, '-s', '--format=%t'], cwd=sourceDir).rstrip()
+    return check_output(['git', 'show', treeish, '-s', '--format=%t'], cwd=sourceDir).rstrip()
     
 def getWorkTreeSha():
-    if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=sourceDir) == '':
+    if check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=sourceDir) == '':
         return getTreeSha('HEAD')
         
     # Create a stash without updating the working tree
-    stashId = subprocess.check_output(['git', 'stash', 'create', 'benchmark stash'], cwd=sourceDir).rstrip()
-    subprocess.check_call(['git', 'update-ref', '-m', 'benchmark stash', 'refs/stash', stashId], cwd=sourceDir)
+    stashId = check_output(['git', 'stash', 'create', 'benchmark stash'], cwd=sourceDir).rstrip()
+    check_call(['git', 'update-ref', '-m', 'benchmark stash', 'refs/stash', stashId], cwd=sourceDir)
     sha = getTreeSha('stash@{0}')
-    subprocess.check_call(['git', 'stash', 'drop', '-q'], cwd=sourceDir)
+    check_call(['git', 'stash', 'drop', '-q'], cwd=sourceDir)
     return sha
     
 def buildBenchmarks(cacheDir):
@@ -49,9 +65,9 @@ def buildBenchmarks(cacheDir):
     
     # Ensure swift is built with the appropriate options
     if os.path.isfile(cmakeCache):
-        subprocess.check_call(['cmake', '.'] + configArgs, cwd=buildDir)
+        check_call(['cmake', '.'] + configArgs, cwd=buildDir)
 
-    subprocess.check_call(
+    check_call(
         [ os.path.join(sourceDir, 'utils', 'build-script.sh'),
           '-R', '--', '--config-args=%s' % ' '.join(configArgs)
       ])
@@ -82,7 +98,7 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
             print('Missing timings file for %s' % exe)
             m = re.search(
                 r'^\* (?:\(detached from (.*)\)|(.*))$',
-                subprocess.check_output(['git', 'branch'], cwd=sourceDir),
+                check_output(['git', 'branch'], cwd=sourceDir),
                 re.MULTILINE
             )
             
@@ -90,10 +106,10 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
 
             if not rebuilt:
                 if treeish is not None:
-                    subprocess.check_call(['git', 'stash', 'save', '--include-untracked'], cwd=sourceDir)
+                    check_call(['git', 'stash', 'save', '--include-untracked'], cwd=sourceDir)
 
                     try:
-                        subprocess.check_call(['git', 'checkout', treeish], cwd=sourceDir)
+                        check_call(['git', 'checkout', treeish], cwd=sourceDir)
                         buildBenchmarks(cacheDir)
                     finally:
                         subprocess.call(['git', 'checkout', saveHead], cwd=sourceDir)
@@ -113,7 +129,7 @@ def collectBenchmarks(exeNames, treeish = None, repeat = 3):
             print('Running new benchmarks...')
             for iteration in range(0, repeat):
                 print('  %s iteration %s' % (exe, iteration))
-                output = subprocess.check_output(os.path.join(binDir, exe))
+                output = check_output(os.path.join(binDir, exe))
                 print(output)
                 timingsText += output
                 
@@ -224,7 +240,7 @@ def checkAndUpdatePrecommitBench(srcroot):
 
     # If it's not there, clone it on demand.
     if not os.path.isdir(benchdir):
-        subprocess.check_call(
+        check_call(
             [
                 'git', 'clone',
             ])
@@ -238,7 +254,7 @@ def checkAndUpdatePrecommitBench(srcroot):
         raise RuntimeError("PrecommitBench dir is not a .git repo?!")
 
     # We always update the benchmarks to ToT.
-    subprocess.check_call(['git', 'pull', 'origin', 'master'], cwd=benchdir)
+    check_call(['git', 'pull', 'origin', 'master'], cwd=benchdir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
