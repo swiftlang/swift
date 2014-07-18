@@ -90,6 +90,8 @@ println("[\(distance(F(10), F(13)))]")
 // CHECK-NEXT: F.successor: 11
 // CHECK-NEXT: F.successor: 12
 // CHECK-NEXT: [3]
+println("[\(advance(F(7), 0).x)]")
+// CHECK-NEXT: [7]
 println("[\(advance(F(7), 2).x)]")
 // CHECK-NEXT: F.successor: 7
 // CHECK-NEXT: F.successor: 8
@@ -116,6 +118,8 @@ println("[\(advance(B(7), -3).x)]")
 // CHECK-NEXT: B.predecessor: 6
 // CHECK-NEXT: B.predecessor: 5
 // CHECK-NEXT: [4]
+println("[\(advance(B(13), 0, B(17)).x)]")
+// CHECK-NEXT: [13]
 println("[\(advance(B(13), 99, B(17)).x)]")
 // CHECK-NEXT: B.successor: 13
 // CHECK-NEXT: B.successor: 14
