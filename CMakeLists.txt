@@ -184,7 +184,7 @@ set(SWIFT_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 set(SWIFT_INCLUDE_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/include)
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
-option(SWIFT_STDLIB_INTERNAL_CHECKS "Enable internal checks for the Swift standard library" YES)
+option(SWIFT_STDLIB_INTERNAL_CHECKS "Enable internal checks for the Swift standard library" NO)
 option(SWIFT_VERIFY_ALL "Run SIL verification after each transform when building Swift files in the build process" NO)
 option(SWIFT_STDLIB_USE_ASSERT_CONFIG_RELEASE "Should the stdlib be build with assert config set to release" NO)
 option(SWIFT_EMIT_SORTED_SIL "Sort SIL output by name to enable diffing of output" NO)
