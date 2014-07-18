@@ -213,7 +213,28 @@ def compareTimingsFiles(file1, file2):
             print key, "not in", file2
             continue
         compareScores(key, scores1[key], scores2[key], runs)
-    
+
+def checkAndUpdatePrecommitBench(srcroot):
+    """Check that the precommit benchmark directory is in its appropriate
+       location and attempt to update it to ToT."""
+    # Compute our benchmark directory name.
+    benchdir = os.path.join(srcroot, 'benchmark', 'PrecommitBench')
+
+    # Make sure it is a directory that exists. Throw an error otherwise.
+    if not os.path.isdir(benchdir):
+        raise RuntimeError("Unable to find ${srcroot}/benchmark/PrecommitBench")
+
+    # Make sure that our benchdir has a .git directory in it. This will ensure
+    # that users update to the new repository location. We could do more in
+    # depth checks, but this is meant just as a simple sanity check for careless
+    # errors.
+    gitdir = os.path.join(benchdir, '.git')
+    if not os.path.exists(gitdir):
+        raise RuntimeError("PrecommitBench dir is not a .git repo?!")
+
+    # We always update the benchmarks to ToT.
+    subprocess.check_call(['git', 'pull', 'origin', 'master'], cwd=benchdir)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Show performance improvements/regressions in your Git working tree state')
@@ -226,6 +247,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     exeNames = ['PrecommitBench_O' + x for x in args.optimization]
+
+    # Update precommit bench to ToT. If it does not exist, throw an error.
+    #
+    # TODO: This name sucks.
+    checkAndUpdatePrecommitBench(SWIFT_SOURCE_ROOT)
 
     workCacheDir = collectBenchmarks(exeNames, None, args.repeat)    
     baselineCacheDir = collectBenchmarks(exeNames, args.baseline, args.repeat)
