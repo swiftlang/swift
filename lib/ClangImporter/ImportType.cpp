@@ -825,9 +825,11 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
 Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl,
        bool isFromSystemModule) {
-  OptionalTypeKind optionality = ImportWithTighterObjCPointerTypes
-                                 ? getKnownObjCProperty(decl)
-                                 : OTK_ImplicitlyUnwrappedOptional;
+  OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
+  if (auto info = getKnownObjCProperty(decl)) {
+    if (auto nullability = info->getNullability())
+      optionality = translateNullability(*nullability);
+  }
   return importType(decl->getType(), ImportTypeKind::Property,
                     isFromSystemModule, optionality);
 }

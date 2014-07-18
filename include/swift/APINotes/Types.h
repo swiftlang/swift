@@ -158,6 +158,20 @@ public:
                          const ObjCPropertyInfo &rhs) {
     return !(lhs == rhs);
   }
+
+  /// Merge class-wide information into the given method.
+  friend ObjCPropertyInfo &operator|=(ObjCPropertyInfo &lhs,
+                                      const ObjCClassInfo &rhs) {
+    // Merge nullability.
+    if (!lhs.NullabilityAudited) {
+      if (auto nullable = rhs.getDefaultNullability()) {
+        lhs.NullabilityAudited = true;
+        lhs.Nullable = static_cast<unsigned>(*nullable);
+      }
+    }
+
+    return lhs;
+  }
 };
 
 /// A temporary reference to an Objective-C selector, suitable for

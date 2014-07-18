@@ -1461,9 +1461,10 @@ ClangImporter::Implementation::getKnownObjCContext(
   return info;
 }
 
-OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
-                   const clang::ObjCPropertyDecl *prop) {
-  auto *container = cast<clang::ObjCContainerDecl>(prop->getDeclContext());
+Optional<api_notes::ObjCPropertyInfo>
+ClangImporter::Implementation::getKnownObjCProperty(
+    const clang::ObjCPropertyDecl *property) {
+  auto *container = cast<clang::ObjCContainerDecl>(property->getDeclContext());
 
   // Figure out where to look for context information.
   StringRef contextName;
@@ -1471,35 +1472,37 @@ OptionalTypeKind ClangImporter::Implementation::getKnownObjCProperty(
   api_notes::APINotesReader *secondary;
   std::tie(contextName, primary, secondary) = getAPINotesForContext(container);
 
-  // Look for property information in the primary source.
+  // Look for property and class information in the primary source.
+  Optional<api_notes::ObjCPropertyInfo> propertyInfo;
+  Optional<api_notes::ObjCClassInfo> classInfo;
+
   if (primary) {
-    if (auto info = primary->lookupObjCProperty(contextName, prop->getName())) {
-      if (auto nullability = info->getNullability()) {
-        return translateNullability(*nullability);
-      }
-    }
+    // Look for property information in the primary source.
+    propertyInfo = primary->lookupObjCProperty(contextName,property->getName());
+
+    // Look for class information in the primary source.
+    classInfo = primary->lookupObjCClass(contextName);
+  }
+
+  // If we found property or class information in the primary source, return
+  // what we found.
+  if (propertyInfo || classInfo) {
+    if (!propertyInfo)
+      propertyInfo = api_notes::ObjCPropertyInfo();
+
+    // Merge class information into the property, if present.
+    if (classInfo)
+      *propertyInfo |= *classInfo;
+
+    return propertyInfo;
   }
 
   // Look for property information in the secondary source.
   if (secondary) {
-    if (auto info = secondary->lookupObjCProperty(contextName,
-                                                  prop->getName())) {
-      if (auto nullability = info->getNullability()) {
-        return translateNullability(*nullability);
-      }
-    }
+    return secondary->lookupObjCProperty(contextName, property->getName());
   }
 
-  // Check whether the class itself has been audited in the primary source.
-  if (primary) {
-    if (auto classInfo = primary->lookupObjCClass(contextName)) {
-      if (auto nullability = classInfo->getDefaultNullability())
-        return translateNullability(*nullability);
-    }
-  }
-
-  // We don't know anything.
-  return OTK_ImplicitlyUnwrappedOptional;
+  return Nothing;
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(

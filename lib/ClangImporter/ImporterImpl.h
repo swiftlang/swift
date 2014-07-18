@@ -300,9 +300,10 @@ public:
   Optional<api_notes::ObjCClassInfo>
   getKnownObjCContext(const clang::ObjCContainerDecl *container);
 
-  /// Retrieve any information known a priori about the given Objective-C,
-  /// property, if we have it. Specifically, the optionality of the type.
-  OptionalTypeKind getKnownObjCProperty(const clang::ObjCPropertyDecl *prop);
+  /// Retrieve any information known a priori about the given Objective-C
+  /// property.
+  Optional<api_notes::ObjCPropertyInfo>
+  getKnownObjCProperty(const clang::ObjCPropertyDecl *property);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 
