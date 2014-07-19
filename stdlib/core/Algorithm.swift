@@ -99,9 +99,18 @@ public func partition<
 >(
   inout elements: C,
   range: Range<C.Index>,
+  var less: (C.Generator.Element, C.Generator.Element)->Bool
+) -> C.Index {
+  return _partition(&elements, range, &less)
+}
+
+public func _partition<
+  C: MutableCollectionType where C.Index: RandomAccessIndexType
+>(
+  inout elements: C,
+  range: Range<C.Index>,
   inout less: (C.Generator.Element, C.Generator.Element)->Bool
 ) -> C.Index {
-
   _precondition(
     range.startIndex != range.endIndex, "Can't partition an empty range")
 
@@ -165,7 +174,7 @@ func _quickSortImpl<
   }
 
    // Partition and sort.
-  let part_idx : C.Index = partition(&elements, range, &less)
+  let part_idx : C.Index = _partition(&elements, range, &less)
   _quickSortImpl(&elements, range.startIndex..<part_idx, &less);
   _quickSortImpl(&elements, (part_idx.successor())..<range.endIndex, &less);
 }
