@@ -47,9 +47,7 @@ mutIUO!.immS = S() // expected-error{{cannot assign}}
 immIUO!.mutS = S() // expected-error{{cannot assign}}
 immIUO!.immS = S() // expected-error{{cannot assign}}
 
-/* TODO: Implicit forcing of IUO
 mutIUO.mutS = S()
-mutIUO.immS = S() // e/xpected-error{{cannot assign}}
-immIUO.mutS = S() // e/xpected-error{{cannot assign}}
-immIUO.immS = S() // e/xpected-error{{cannot assign}}
-*/
+mutIUO.immS = S() // expected-error{{cannot assign}}
+immIUO.mutS = S() // expected-error{{cannot assign}}
+immIUO.immS = S() // expected-error{{cannot assign}}

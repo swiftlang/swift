@@ -3615,15 +3615,21 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
 
 Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                             ConstraintLocatorBuilder locator) {
+  auto optTy = expr->getType();
   // Coerce to an r-value.
-  auto rvalueTy = expr->getType()->getRValueType();
-  assert(rvalueTy->getImplicitlyUnwrappedOptionalObjectType()->isEqual(objTy));
+  if (!cs.getASTContext().LangOpts.EnableOptionalLValues) {
+    auto rvalueTy = optTy->getRValueType();
+    assert(rvalueTy->getImplicitlyUnwrappedOptionalObjectType()->isEqual(objTy));
 
-  if (cs.getTypeChecker().requireOptionalIntrinsics(expr->getLoc()))
-    return nullptr;
+    if (cs.getTypeChecker().requireOptionalIntrinsics(expr->getLoc()))
+      return nullptr;
 
-  expr = coerceToType(expr, rvalueTy, /*bogus?*/ locator);
-  if (!expr) return nullptr;
+    expr = coerceToType(expr, rvalueTy, /*bogus?*/ locator);
+    if (!expr) return nullptr;
+  } else {
+    if (optTy->is<LValueType>())
+      objTy = LValueType::get(objTy);
+  }
 
   expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr, expr->getEndLoc());
   expr->setType(objTy);
