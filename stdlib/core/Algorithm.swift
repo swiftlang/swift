@@ -104,7 +104,7 @@ public func partition<
   return _partition(&elements, range, &less)
 }
 
-public func _partition<
+func _partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout elements: C,
