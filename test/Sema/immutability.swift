@@ -1,6 +1,6 @@
 // RUN: %swift %s -verify
 
-let bad_property_1: Int {    // expected-error {{'let' declarations cannot be a computed property}} expected-error {{'let' declarations require an initializer expression}}
+let bad_property_1: Int {    // expected-error {{'let' declarations cannot be a computed property}}
   get {
     return 42
   }

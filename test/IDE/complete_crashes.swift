@@ -36,6 +36,11 @@ func badMembers2(a: BadMembers2) {
 
 func globalFunc() {}
 
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | FileCheck %s -check-prefix=WITH_GLOBAL
+class C {
+  let x : Int { #^LET_COMPUTED^# }
+}
+
 // WITH_GLOBAL: Begin completions
 // WITH_GLOBAL-DAG: Decl[FreeFunction]/CurrModule:      globalFunc()[#Void#]{{$}}
 // WITH_GLOBAL: End completions

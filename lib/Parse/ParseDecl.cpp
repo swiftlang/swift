@@ -2517,14 +2517,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       diagnose(LBLoc, diag::let_cannot_be_observing_property);
     else
       diagnose(LBLoc, diag::let_cannot_be_computed_property);
-    
-    auto errorTy = ErrorType::get(Context);
-    
-    if (Get) { Get->setType(errorTy); Get->setInvalid(); }
-    if (Set) { Set->setType(errorTy); Set->setInvalid(); }
-    if (WillSet) { WillSet->setType(errorTy); WillSet->setInvalid(); }
-    if (DidSet) { DidSet->setType(errorTy); DidSet->setInvalid(); }
-    return nullptr;
+
+    Invalid = true;
   }
   
   // If this is a willSet/didSet observing property, record this and we're done.
@@ -2586,14 +2580,13 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       PrimaryVar->makeStoredWithTrivialAccessors(Get, Set);
     else
       PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
-    return PrimaryVar;
+  } else {
+    // Otherwise this decl is invalid and the accessors have been rejected above.
+    // Make sure to at least record the braces range in the AST.
+    PrimaryVar->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
   }
 
-  // Otherwise this decl is invalid and the accessors have been rejected above.
-  // Make sure to at least record the braces range in the AST.
-  PrimaryVar->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
-
-  return nullptr;
+  return PrimaryVar;
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
