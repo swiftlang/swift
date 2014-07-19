@@ -80,6 +80,9 @@ extension NSObject : _PrintableNSObjectType {}
 @availability(*, unavailable, message="Please use String or NSString") public
 class NSSimpleCString {}
 
+@availability(*, unavailable, message="Please use String or NSString") public
+class NSConstantString {}
+
 @asmname("swift_convertStringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString {
   return string as NSString
