@@ -23,27 +23,21 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 
-namespace {
-  enum class ActionType {
-    None,
-    YAMLToBinary,
-  };
-};
-
 using namespace llvm;
-
 
 int apinotes_main(ArrayRef<const char *> Args) {
 
-  // Mark all our options with this category, everything else (except for -version
-  // and -help) will be hidden.
+  // Mark all our options with this category, everything else (except for
+  // -version and -help) will be hidden.
   static cl::OptionCategory APINotesCategory("API Notes options");
 
-  static cl::opt<ActionType>
-  Action(cl::desc("Mode:"), cl::init(ActionType::None),
+  static cl::opt<swift::api_notes::ActionType>
+  Action(cl::desc("Mode:"), cl::init(swift::api_notes::ActionType::None),
          cl::values(
-                    clEnumValN(ActionType::YAMLToBinary,
-                               "yaml-to-binary", "Convert YAML to binary format"),
+                    clEnumValN(swift::api_notes::ActionType::YAMLToBinary,
+                            "yaml-to-binary", "Convert YAML to binary format"),
+                    clEnumValN(swift::api_notes::ActionType::Dump,
+                            "dump", "Parse and dump the output"),
                     clEnumValEnd),
          cl::cat(APINotesCategory));
 
@@ -69,13 +63,13 @@ int apinotes_main(ArrayRef<const char *> Args) {
                               Args.data(),
                               "Swift API Notes Tool\n");
 
-  if (Action == ActionType::None) {
+  if (Action == swift::api_notes::ActionType::None) {
     errs() << "action required\n";
     cl::PrintHelpMessage();
     return 1;
   }
 
-  if (Action == ActionType::YAMLToBinary) {
+  if (Action == swift::api_notes::ActionType::YAMLToBinary) {
     if (OutputFilename.empty()) {
       errs() << "output file required\n";
       cl::PrintHelpMessage();
@@ -86,11 +80,18 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    swift::api_notes::compileAPINotes(InputFilename, os);
+    if (swift::api_notes::compileAPINotes(InputFilename, os))
+      return 1;
+    
     os.flush();
 
     return os.has_error();
   }
+
+  if (Action == swift::api_notes::ActionType::Dump) {
+    return swift::api_notes::parseAndDumpAPINotes(InputFilename);
+  }
+
   return 1;
 }
 

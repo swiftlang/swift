@@ -1,4 +1,4 @@
-//===--- Data.h - API Notes Data Types ---------------------------*- C++ -*-===//
+//===--- Types.h - API Notes Data Types --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

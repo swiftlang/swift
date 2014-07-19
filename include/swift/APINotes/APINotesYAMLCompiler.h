@@ -25,8 +25,16 @@ namespace llvm {
 namespace swift {
 namespace api_notes {
 
+  enum class ActionType {
+    None,
+    YAMLToBinary,
+    Dump,
+  };
+
   /// Converts API notes from YAML format to binary format.
-  void compileAPINotes(llvm::StringRef fromFileName, llvm::raw_ostream &os);
+  bool compileAPINotes(llvm::StringRef fromFileName, llvm::raw_ostream &os);
+
+  bool parseAndDumpAPINotes(llvm::StringRef fromFileName);
 
 } // end namespace api_notes
 } // end namespace swift
