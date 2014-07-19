@@ -383,7 +383,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
                              llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   // Scan all of the uses of the address of the box to see if any
-  // disqualifies the box from being promoted tot he stack.
+  // disqualifies the box from being promoted to the stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
                                         /* examinePartialApply = */ true,
                                         /* inAppliedFunction = */ false,
