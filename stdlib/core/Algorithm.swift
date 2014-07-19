@@ -91,7 +91,7 @@ func _insertionSort<
   }
 }
 
-/// Partition a non empty range into two partially sorted regions and return
+/// Partition a range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
 public func partition<
@@ -111,39 +111,42 @@ func _partition<
   range: Range<C.Index>,
   inout less: (C.Generator.Element, C.Generator.Element)->Bool
 ) -> C.Index {
-  _precondition(
-    range.startIndex != range.endIndex, "Can't partition an empty range")
+  var lo = range.startIndex
+  var hi = range.endIndex
 
-  // Variables i and j point to the next element to be visited.
-  var i = range.startIndex
-  var j = range.endIndex.predecessor()
-
+  if lo == hi {
+    return lo
+  }
+  
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
-  i++
 
-  // Continue to swap until all elements were visited and placed in one
-  // of the partitions.
-  while i.distanceTo(j) >= 0 {
-    while less(elements[i], pivot) {
-      i++
-      if (i.distanceTo(j) < 0) { break }
-    }
-    while less(pivot, elements[j]) {
-      j--
-      // We don't need to check if j is greater than zero because we placed
-      // our pivot at startIndex and comparing with pivot ends this loop.
-    }
-    if i.distanceTo(j) >= 0 {
-      swap(&elements[i], &elements[j])
-      i++
-      j--
-    }
+  // Loop invariants:
+  // * lo < hi
+  // * elements[i] < pivot, for i in range.startIndex+1..lo
+  // * pivot <= elements[i] for i in hi..range.endIndex
+  
+Loop: while true {
+  FindLo: do {
+      while ++lo != hi {
+        if !less(elements[lo], pivot) { break FindLo }
+      }
+      break Loop
+    } while false
+
+  FindHi: do {
+      while --hi != lo {
+        if less(elements[hi], pivot) { break FindHi }
+      }
+      break Loop
+    } while false
+    
+    swap(&elements[lo], &elements[hi])
   }
-
-  // Swap the pivot in between the two partitions.
-  swap(&elements[i.predecessor()], &elements[range.startIndex])
-  return i.predecessor()
+  
+  // swap the pivot into place
+  swap(&elements[--lo], &elements[range.startIndex])
+  return lo
 }
 
 
@@ -185,6 +188,10 @@ struct Less<T: Comparable> {
   }
 }
 
+/// Sort `collection` in-place according to `predicate`.  Requires:
+/// `predicate` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sort<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
@@ -194,6 +201,10 @@ public func sort<
   _quickSort(&collection, indices(collection), predicate)
 }
 
+/// Sort `collection` in-place.  Requires:
+/// `<` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sort<
   C: MutableCollectionType 
     where C.Index: RandomAccessIndexType, C.Generator.Element: Comparable
@@ -203,6 +214,10 @@ public func sort<
   _quickSort(&collection, indices(collection))
 }
 
+/// Sort `array` in-place according to `predicate`.  Requires:
+/// `predicate` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
   return array.withUnsafeMutableStorage {
     a in sort(&a, predicate)
@@ -213,6 +228,11 @@ public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
 // The functions below are a copy of the functions above except that
 // they don't accept a predicate and they are hardcoded to use the less-than
 // comparator.
+
+/// Sort `array` in-place.  Requires:
+/// `<` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sort<T : Comparable>(inout array: [T]) {
   return array.withUnsafeMutableStorage {
     a in sort(&a)
@@ -220,6 +240,11 @@ public func sort<T : Comparable>(inout array: [T]) {
   }
 }
 
+/// Return an `Array` containing the elements of `source` sorted
+/// according to `predicate`.  Requires: `predicate` induces a `strict
+/// weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sorted<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
@@ -231,6 +256,10 @@ public func sorted<
   return result
 }
 
+/// Return an `Array` containing the elements of `source`, sorted.
+/// Requires: `<` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sorted<
   C: MutableCollectionType 
     where C.Generator.Element: Comparable, C.Index: RandomAccessIndexType
@@ -240,6 +269,11 @@ public func sorted<
   return result
 }
 
+/// Return an `Array` containing the elements of `source` sorted
+/// according to `predicate`.  Requires: `predicate` induces a `strict
+/// weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sorted<
   S: SequenceType
 >(
@@ -251,6 +285,10 @@ public func sorted<
   return result
 }
 
+/// Return an `Array` containing the elements of `source`, sorted.
+/// Requires: `<` induces a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements.
 public func sorted<
   S: SequenceType 
     where S.Generator.Element: Comparable
@@ -305,7 +343,7 @@ func _insertionSort<
   }
 }
 
-/// Partition a non empty range into two partially sorted regions and return
+/// Partition a range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
 public func partition<
@@ -314,37 +352,43 @@ public func partition<
 >(
   inout elements: C,
   range: Range<C.Index>) -> C.Index {
+  
+  var lo = range.startIndex
+  var hi = range.endIndex
 
-  // Variables i and j point to the next element to be visited.
-  var i = range.startIndex
-  var j = range.endIndex.predecessor()
-
+  if lo == hi {
+    return lo
+  }
+  
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
-  i++
 
-  // Continue to swap until all elements were visited and placed in one
-  // of the partitions.
-  while i.distanceTo(j) >= 0 {
-    while Less.compare(elements[i], pivot) {
-      i++
-      if (i.distanceTo(j) < 0) { break }
-    }
-    while Less.compare(pivot, elements[j]) {
-      // We don't need to check if j is greater than zero because we placed
-      // our pivot at startIndex and comparing with pivot ends this loop.
-      j--
-    }
-    if i.distanceTo(j) >= 0 {
-      swap(&elements[i], &elements[j])
-      i++
-      j--
-    }
+  // Loop invariants:
+  // * lo < hi
+  // * elements[i] < pivot, for i in range.startIndex+1..lo
+  // * pivot <= elements[i] for i in hi..range.endIndex
+  
+Loop: while true {
+  FindLo: do {
+      while ++lo != hi {
+        if !(elements[lo] < pivot) { break FindLo }
+      }
+      break Loop
+    } while false
+
+  FindHi: do {
+      while --hi != lo {
+        if (elements[hi] < pivot) { break FindHi }
+      }
+      break Loop
+    } while false
+    
+    swap(&elements[lo], &elements[hi])
   }
-
-  // Swap the pivot in between the two partitions.
-  swap(&elements[i.predecessor()], &elements[range.startIndex])
-  return i.predecessor()
+  
+  // swap the pivot into place
+  swap(&elements[--lo], &elements[range.startIndex])
+  return lo
 }
 
 func _quickSort<
@@ -375,7 +419,7 @@ func _quickSortImpl<
 }
 //// End of non-predicate sort functions.
 
-
+/// Exchange the values of `a` and `b`
 public func swap<T>(inout a : T, inout b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.

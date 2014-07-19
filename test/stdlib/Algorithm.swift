@@ -1,7 +1,8 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
 import StdlibUnittest
+import Swift
 
 var Algorithm = TestCase("Algorithm")
 
@@ -254,6 +255,101 @@ Algorithm.test("sorted") {
       sorted(["apple", "Banana", "cherry"]) {
         countElements($0) > countElements($1)
       })
+}
+
+// A wrapper around Array<T> that disables any type-specific algorithm
+// optimizations and forces bounds checking on.
+struct A<T> : MutableSliceable {
+  init(_ a: Array<T>) {
+    impl = a
+  }
+
+  var startIndex: Int {
+    return 0
+  }
+
+  var endIndex: Int {
+    return impl.count
+  }
+
+  func generate() -> Array<T>.Generator {
+    return impl.generate()
+  }
+  
+  subscript(i: Int) -> T {
+    get {
+      expectTrue(i >= 0 && i < impl.count)
+      return impl[i]
+    }
+    set (x) {
+      expectTrue(i >= 0 && i < impl.count)
+      impl[i] = x
+    }
+  }
+
+  subscript(r: Range<Int>) -> Array<T>.SubSlice {
+    get {
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      return impl[r]
+    }
+    set (x) {
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      impl[r] = x
+    }
+  }
+  
+  var impl: Array<T>
+}
+
+func withInvalidOrderings(body: ((Int,Int)->Bool)->Void) {
+  // Test some ordering predicates that don't create strict weak orderings
+  body { (_,_) in true }
+  body { (_,_) in false }
+  var i = 0
+  body { (_,_) in i++ % 2 == 0 }
+  body { (_,_) in i++ % 3 == 0 }
+  body { (_,_) in i++ % 5 == 0 }
+}
+
+@asmname("random") func random() -> UInt32
+@asmname("srandomdev") func srandomdev()
+
+func randomArray() -> A<Int> {
+  let count = random() % 50
+  var a: [Int] = []
+  a.reserveCapacity(Int(count))
+  for i in 0..<count {
+    a.append(Int(random()))
+  }
+  return A(a)
+}
+
+Algorithm.test("invalidOrderings") {
+  srandomdev()
+  withInvalidOrderings {
+    var a = randomArray()
+    sort(&a, $0)
+  }
+  withInvalidOrderings {
+    var a: A<Int>
+    a = randomArray()
+    partition(&a, indices(a), $0)
+  }
+  /*
+  // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:
+  // abstraction difference in l-value
+  withInvalidOrderings {
+    var a = randomArray()
+    var pred = $0
+    _insertionSort(&a, indices(a), &pred)
+  }
+  */
+  withInvalidOrderings {
+    let predicate: (Int,Int)->Bool = $0
+    let result = lexicographicalCompare(randomArray(), randomArray(), predicate)
+  }
 }
 
 Algorithm.run()
