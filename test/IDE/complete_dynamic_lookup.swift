@@ -107,7 +107,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .nested2_Property[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectAtIndexedSubscript!({#(idx): Int32#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript!({#(key): AnyObject?#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript!({#(key): AnyObject!#})[#AnyObject!#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .topLevelClass_ObjcProperty1[#Int?#]{{$}}
@@ -124,7 +124,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcClass#}][#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcProtocol#}][#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#idx: Int32#}][#AnyObject!?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#key: AnyObject?#}][#AnyObject!?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#key: AnyObject!#}][#AnyObject!?#]{{$}}
 // DL_INSTANCE_NO_DOT: End completions
 
 // DL_INSTANCE_DOT: Begin completions
@@ -154,7 +154,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    nested2_Property[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectAtIndexedSubscript!({#(idx): Int32#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript!({#(key): AnyObject?#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript!({#(key): AnyObject!#})[#AnyObject!#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    topLevelClass_ObjcProperty1[#Int?#]{{$}}
