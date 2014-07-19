@@ -14,7 +14,7 @@ println(anyBar.description())
 */
 
 // Check whether the class name comes out properly in the description
-// CHECK: _TtC10MangleTest6Wibble
+// CHECK: MangleTest.Wibble
 @objc class Wibble : NSObject { }
 var anyWibble: AnyObject = Wibble()
 println(anyWibble.description)
@@ -22,5 +22,11 @@ println(anyWibble.description)
 // Check whether we can lookup the class with this name.
 var anyWibbleClass: AnyClass = NSClassFromString("_TtC10MangleTest6Wibble")
 var anyWibbleClass2 = anyWibble.dynamicType
-assert(NSStringFromClass(anyWibbleClass) == "_TtC10MangleTest6Wibble")
-assert(NSStringFromClass(anyWibbleClass2) == "_TtC10MangleTest6Wibble")
+assert(NSStringFromClass(anyWibbleClass) == "MangleTest.Wibble")
+assert(NSStringFromClass(anyWibbleClass2) == "MangleTest.Wibble")
+
+anyWibbleClass = NSClassFromString("MangleTest.Wibble")
+anyWibbleClass2 = anyWibble.dynamicType
+assert(NSStringFromClass(anyWibbleClass) == "MangleTest.Wibble")
+assert(NSStringFromClass(anyWibbleClass2) == "MangleTest.Wibble")
+

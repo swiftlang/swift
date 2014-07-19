@@ -455,7 +455,7 @@ class NSBetter: NSGood {
 // CHECK-LABEL: Swift ObjC subclass:
 // CHECK-NEXT:    _TtC10Reflection8NSBetter #0
 // CHECK-NEXT:      super: _TtC10Reflection6NSGood
-// CHECK-NEXT:        super: <_TtC10Reflection8NSBetter: {{0x[0-9a-f]+}}>
+// CHECK-NEXT:        super: <Reflection.NSBetter: {{0x[0-9a-f]+}}>
 println("Swift ObjC subclass:")
 dump(NSBetter())
 
