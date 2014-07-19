@@ -20,6 +20,18 @@ func assign_iuo_lvalue(inout x: Int!, y: Int) {
   x! = y
 }
 
+struct S {
+  var x: Int
+}
+
+// CHECK-LABEL: sil @_TF15optional_lvalue26assign_iuo_lvalue_implicitFTRGSQVS_1S_Si_T_
+// CHECK:         [[SHADOW:%.*]] = alloc_box
+// CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr [[SHADOW]]#1
+// CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
+func assign_iuo_lvalue_implicit(inout s: S!, y: Int) {
+  s.x = y
+}
+
 // CHECK-LABEL: sil @_TF15optional_lvalue35assign_optional_lvalue_reabstractedFTRGSqFSiSi_FSiSi_T_
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
