@@ -2,9 +2,6 @@
 // RUN: %target-build-swift -Xfrontend -enable-dynamic %s -o %t/a.out
 // RUN: %target-run %t/a.out
 
-// FIXME: Enable this test when arclite updates.
-// REQUIRES: rdar16892385
-
 import Foundation
 
 var kvoContext = 0
