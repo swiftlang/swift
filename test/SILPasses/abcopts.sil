@@ -1,0 +1,339 @@
+// RUN: %sil-opt -loop-rotate -abcopts -enable-abcopts=1 %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct ArrayInt{
+  var buffer : ArrayIntBuffer
+}
+
+// CHECK-LABEL: sil @abcopt_singleblock
+sil @abcopt_singleblock : $@thin(@inout ArrayInt, @inout ArrayInt) -> () {
+bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
+  // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD1:%[0-9]+]] = load %0
+
+  %2 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %3 = load %0 : $*ArrayInt
+  %4 = struct_extract %3 : $ArrayInt, #ArrayInt.buffer
+  %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %5 : $Builtin.NativeObject
+
+  // First check.
+  %6 = integer_literal $Builtin.Word, 0
+  %7 = struct $Int(%6 : $Builtin.Word)
+  %8 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: [[IDX1:%[0-9]+]] = struct $Int
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]]
+
+  // Redundant same index and array.
+  retain_value %5 : $Builtin.NativeObject
+  %9 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
+
+  // Not redundant - different index.
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = struct $Int(%10 : $Builtin.Word)
+  retain_value %5 : $Builtin.NativeObject
+  %12 = apply %2(%11, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: [[IDX2:%[0-9]+]] = struct $Int
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX2]]
+
+  // Not redundant - different array.
+  %13 = load %1 : $*ArrayInt
+  %14 = struct_extract %13 : $ArrayInt, #ArrayInt.buffer
+  %15 = struct_extract %14 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %15 : $Builtin.NativeObject
+  %16 = apply %2(%7, %13) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: [[LD2:%[0-9]+]] = load %1
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD2]]
+
+  // Not redundant same index and array but append in between.
+  %17 = function_ref @append : $@cc(method) @thin (@in Int, @inout ArrayInt) -> ()
+  %18 = alloc_stack $Int
+  %19 = apply %17(%18#1, %0) : $@cc(method) @thin (@in Int, @inout ArrayInt) -> ()
+  retain_value %5 : $Builtin.NativeObject
+  %20 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+
+  // Not redundant same index and array but unknown function in between.
+  retain_value %5 : $Builtin.NativeObject
+  %21 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %22 = function_ref @unknown_func : $@thin() -> ()
+  %23 = apply %22() : $@thin() -> ()
+  retain_value %5 : $Builtin.NativeObject
+  %24 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+  // CHECK: [[UNKNOWN:%[0-9]+]] = function_ref @unknown_func
+  // CHECK: apply [[UNKNOWN]]()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+
+  // Not redundant same index and array but odd store in between.
+  retain_value %5 : $Builtin.NativeObject
+  %25 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
+  %27 = pointer_to_address %26 : $Builtin.RawPointer to $*Builtin.Word
+  %29 = store %6 to %27 : $*Builtin.Word
+  retain_value %5 : $Builtin.NativeObject
+  %30 = apply %2(%7, %3) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: store
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+
+
+  %99 = dealloc_stack %18#0 : $*@local_storage Int
+  %100 = tuple ()
+  return %100 : $()
+// CHECK: return
+}
+
+// CHECK-LABEL: sil @not_dominating
+sil @not_dominating : $@thin (Int, @inout ArrayInt, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word, %5 : $Builtin.Word):
+  %6 = struct $Int (%5 : $Builtin.Word)
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%5, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+  // CHECK: struct $Int
+
+bb4:
+  %36 = integer_literal $Builtin.Word, 0
+  %37 = struct $Int(%36 : $Builtin.Word)
+  cond_br %8, bb5, bb6
+  // CHECK: [[IDX1:%[0-9]+]] = struct $Int
+
+bb5:
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %33 = load %24 : $*ArrayInt
+  %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
+  %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %35 : $Builtin.NativeObject
+  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+ br bb2
+  // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]]
+
+bb6:
+  // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %43 = load %24 : $*ArrayInt
+  %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
+  %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %45 : $Builtin.NativeObject
+  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]]
+ br bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = apply %11(%5, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
+  %15 = enum $Optional<Int>, #Optional.Some!enumelt.1, %6 : $Int
+  %16 = unchecked_enum_data %15 : $Optional<Int>, #Optional.Some!enumelt.1
+  %17 = struct_extract %16 : $Int, #Int.value
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %17, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+// CHECK: return
+
+// CHECK-LABEL: sil @dominating
+sil @dominating : $@thin (Int, @inout ArrayInt, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word, %5 : $Builtin.Word):
+  %6 = struct $Int (%5 : $Builtin.Word)
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%5, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+  // CHECK: struct $Int
+
+bb4:
+  %36 = integer_literal $Builtin.Word, 0
+  %37 = struct $Int(%36 : $Builtin.Word)
+  // CHECK: [[IDX1:%[0-9]+]] = struct $Int
+  // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], [[LD3]]
+  cond_br %8, bb5, bb6
+
+bb5:
+  // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %33 = load %24 : $*ArrayInt
+  %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
+  %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %35 : $Builtin.NativeObject
+  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+
+ br bb2
+
+bb6:
+  // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %43 = load %24 : $*ArrayInt
+  %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
+  %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %45 : $Builtin.NativeObject
+  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS2]]([[IDX1]], [[LD2]]
+ br bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = apply %11(%5, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
+  %15 = enum $Optional<Int>, #Optional.Some!enumelt.1, %6 : $Int
+  %16 = unchecked_enum_data %15 : $Optional<Int>, #Optional.Some!enumelt.1
+  %17 = struct_extract %16 : $Int, #Int.value
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %17, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+// CHECK: return
+
+// CHECK-LABEL: sil @dominating_but_append
+sil @dominating_but_append : $@thin (Int, @inout ArrayInt, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt, %25 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word, %5 : $Builtin.Word):
+  %6 = struct $Int (%5 : $Builtin.Word)
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%5, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+  // CHECK: struct $Int
+
+bb4:
+  %36 = integer_literal $Builtin.Word, 0
+  %37 = struct $Int(%36 : $Builtin.Word)
+  // CHECK: [[IDX1:%[0-9]+]] = struct $Int
+  // CHECK: [[CHECKBOUNDS3:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD3:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS3]]([[IDX1]], [[LD3]]
+  cond_br %8, bb5, bb6
+
+bb5:
+  // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD1:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %32 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %33 = load %24 : $*ArrayInt
+  %34 = struct_extract %33 : $ArrayInt, #ArrayInt.buffer
+  %35 = struct_extract %34 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %35 : $Builtin.NativeObject
+  %38 = apply %32(%37, %33) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], [[LD1]]
+ br bb2
+
+bb6:
+  // CHECK: [[CHECKBOUNDS2:%[0-9]+]] = function_ref @checkbounds
+  // CHECK: [[LD2:%[0-9]+]] = load {{.*}} : $*ArrayInt
+  %42 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %43 = load %24 : $*ArrayInt
+  %44 = struct_extract %43 : $ArrayInt, #ArrayInt.buffer
+  %45 = struct_extract %44 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %45 : $Builtin.NativeObject
+  %48 = apply %42(%37, %43) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS2]]([[IDX1]], [[LD2]]
+ br bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = apply %11(%5, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
+  %15 = enum $Optional<Int>, #Optional.Some!enumelt.1, %6 : $Int
+  %16 = unchecked_enum_data %15 : $Optional<Int>, #Optional.Some!enumelt.1
+  %17 = struct_extract %16 : $Int, #Int.value
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %17, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  %117 = function_ref @append : $@cc(method) @thin (@in Int, @inout ArrayInt) -> ()
+  %118 = alloc_stack $Int
+  %119 = apply %117(%118#1, %24) : $@cc(method) @thin (@in Int, @inout ArrayInt) -> ()
+  retain_value %55 : $Builtin.NativeObject
+  %120 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  dealloc_stack %118#0 : $*@local_storage Int
+  // CHECK: [[APPEND:%[0-9]+]] = function_ref @append
+  // CHECK: apply [[APPEND]]
+  // CHECK: apply [[CHECKBOUNDS3]]
+
+  br bb1(%21 : $Builtin.Word, %14 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+// CHECK: return
+
+
+sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> () {
+  bb0(%0: $Int, %1: $ArrayInt):
+    unreachable
+}
+
+sil public_external [semantics "array.mutate_unknown"] @append : $@cc(method) @thin (@in Int, @inout ArrayInt) -> () {
+  bb0(%0: $*Int, %1: $*ArrayInt):
+    unreachable
+}
+
+sil public_external [semantics "array.set_element"] @set : $@cc(method) @thin (Int, @in Int, @inout ArrayInt) -> () {
+  bb0(%0: $Int, %1: $*Int, %2: $*ArrayInt):
+    unreachable
+}
+
+
+sil @unknown_func : $@thin () -> () {
+  bb0:
+  unreachable
+}

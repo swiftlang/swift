@@ -42,4 +42,5 @@ add_swift_library(swiftSILPasses
   LICM.cpp
   IVInfoPrinter.cpp
   ArrayOpt.cpp
+  ArrayBoundsCheckOpts.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)

@@ -95,6 +95,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
 
   // Run high-level loop opts.
   PM.add(createLoopRotatePass());
+  PM.add(createABCOpt());
 
   // Cleanup.
   PM.add(createDCE());
