@@ -60,6 +60,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:

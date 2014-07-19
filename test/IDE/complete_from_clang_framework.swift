@@ -71,7 +71,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc1({#(a): Int32#})[#Int32#]{{$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc1AnonymousParam({#Int32#})[#Int32#]{{$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafePointer<Int32>#})[#Int32#]{{$}}
-// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithBlock({#(blk): ((Float) -> Int32)?#})[#Void#]{{$}}
+// CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithBlock({#(blk): ((Float) -> Int32)?##(Float) -> Int32#})[#Void#]{{$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment1()[#Void#]{{$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment2()[#Void#]{{$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule: fooFuncWithComment3()[#Void#]{{$}}
@@ -159,7 +159,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFunc3({#(a): Int32#}, {#(b): Float#}, {#(c): Double#}, {#(d): UnsafePointer<Int32>#})[#Int32#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn1()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncNoreturn2()[#Void#]{{$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithBlock({#(blk): ((Float) -> Int32)?#})[#Void#]{{$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithBlock({#(blk): ((Float) -> Int32)?##(Float) -> Int32#})[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithFunctionPointer({#(fptr): CFunctionPointer<((Float) -> Int32)>#})[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment1()[#Void#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFuncWithComment2()[#Void#]{{$}}

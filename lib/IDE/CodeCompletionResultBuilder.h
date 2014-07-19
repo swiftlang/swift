@@ -199,6 +199,24 @@ public:
 
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      Ty->getString());
+
+    // Resolve optional and alias to find out if we have function/closure
+    // parameter type.
+    auto *ParamType = Ty.getPointer();
+    if (auto OTy = ParamType->getOptionalObjectType())
+      ParamType = OTy.getPointer();
+    if (auto *NATy = dyn_cast<NameAliasType>(ParamType))
+      ParamType = NATy->getSinglyDesugaredType();
+
+    if (ParamType && isa<AnyFunctionType>(ParamType)) {
+      // If this is a closure type, add ChunkKind::CallParameterClosureType.
+      PrintOptions PO;
+      PO.PrintFunctionRepresentationAttrs = false;
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
+          ParamType->getString(PO));
+    }
+
     if (IsVarArg)
       addEllipsis();
     CurrentNestingLevel--;

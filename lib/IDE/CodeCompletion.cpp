@@ -148,11 +148,14 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::CallParameterInternalName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
+    case Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
       if (AnnotatedTextChunk)
         OS << "['";
       else if (C.getKind() == Chunk::ChunkKind::CallParameterInternalName)
         OS << "(";
+      else if (C.getKind() == Chunk::ChunkKind::CallParameterClosureType)
+        OS << "##";
       for (char Ch : C.getText()) {
         if (Ch == '\n')
           OS << "\\n";
@@ -648,6 +651,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:

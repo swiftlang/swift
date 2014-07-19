@@ -109,6 +109,9 @@ public:
       CallParameterColon,
       /// Required parameter type.
       CallParameterType,
+      /// Desugared closure parameter type. This can be used to get the
+      /// closure type if CallParameterType is a NameAliasType.
+      CallParameterClosureType,
 
       /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
       /// lookup.
@@ -159,6 +162,7 @@ public:
              Kind == ChunkKind::CallParameterInternalName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
+             Kind == ChunkKind::CallParameterClosureType ||
              Kind == ChunkKind::GenericParameterName ||
              Kind == ChunkKind::DynamicLookupMethodCallTail ||
              Kind == ChunkKind::OptionalMethodCallTail ||
