@@ -350,7 +350,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
 
 SILValue
 StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
-                                                  SILBasicBlock *StartBB) {
+                                               SILBasicBlock *StartBB) {
   DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
   // Walk the Dom tree in search of a defining value:
   DomTreeNode *Node = DT->getNode(StartBB);
