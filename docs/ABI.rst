@@ -462,12 +462,26 @@ classes.
   compatible rodata record for the class. This pointer value includes a tag.
   The **low bit is always set to 1** for Swift classes and always set to 0 for
   Objective-C classes.
+- The **class flags** are a 32-bit field at **offset 5**.
+- The **instance address point** is a 32-bit field following the class flags.
+  A pointer to an instance of this class points this number of bytes after the
+  beginning of the instance.
+- The **instance size** is a 32-bit field following the instance address point.
+  This is the number of bytes of storage present in every object of this type.
+- The **instance alignment mask** is a 16-bit field following the instance size.
+  This is a set of low bits which must not be set in a pointer to an instance
+  of this class.
+- The **runtime-reserved field** is a 16-bit field following the instance
+  alignment mask.  The compiler initializes this to zero.
+- The **class object size** is a 32-bit field following the runtime-reserved
+  field.  This is the total number of bytes of storage in the class metadata
+  object.
+- The **class object address point** is a 32-bit field following the class
+  object size.  This is the number of bytes of storage in the class metadata
+  object.
 - The `nominal type descriptor`_ for the most-derived class type is referenced
-  at **offset 5**.
-- The **instance size** is stored at **offset 6**. This is the total allocation
-  size for an instance of the class, including the size of its
-  `heap object header`_.
-- The **instance alignment** is stored at **offset 7**.
+  at an offset immediately following the class object address point. This is
+  **offset 8** on a 64-bit platform or **offset 11** on a 32-bit platform.
 - For each Swift class in the class's inheritance hierarchy, in order starting
   from the root class and working down to the most derived class, the following
   fields are present:
