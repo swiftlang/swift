@@ -171,15 +171,12 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   AddSSAPasses(PM, Module, true);
   PM.runOneIteration();
   PM.runOneIteration();
-#if 0
-  PM.resetAndRemoveTransformations();
-#else
+
   // Run the high-level loop optimization passes.
   PM.resetAndRemoveTransformations();
   AddHighLevelLoopOptPasses(PM, Module);
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
-#endif
 
   // Run two iterations of the low-level SSA passes.
   AddSSAPasses(PM, Module, false);
@@ -205,13 +202,9 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   AddSSAPasses(PM, Module, false);
   PM.runOneIteration();
 
-#if 1
   PM.resetAndRemoveTransformations();
-  // TODO: this should run as part of the last iteration of the previous
-  // pass manager so that we can reuse analysis info.
   AddLowLevelLoopOptPasses(PM, Module);
   PM.runOneIteration();
-#endif
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.
   Module.invalidateSILLoader();
