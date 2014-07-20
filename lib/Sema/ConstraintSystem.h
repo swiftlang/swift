@@ -394,6 +394,8 @@ public:
     MissingArgument,
     /// Extra argument in a call.
     ExtraArgument,
+    /// \brief Type has no public initializers.
+    NoPublicInitializers,
   };
 
 private:
@@ -487,6 +489,7 @@ public:
     case IsNotDynamicLookup:
     case IsNotOptional:
     case MissingArgument:
+    case NoPublicInitializers:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
 

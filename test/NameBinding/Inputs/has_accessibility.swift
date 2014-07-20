@@ -7,6 +7,8 @@ internal let zz: Int = 0
 #endif
 
 public struct Foo {
+  internal init() {}
+
   public static func x() {}
   internal static func y() {}
   private static func z() {}

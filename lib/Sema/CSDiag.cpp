@@ -131,6 +131,11 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   case ExtraArgument:
     out << "extra argument " << getValue();
     break;
+
+  case NoPublicInitializers:
+    out << getFirstType().getString()
+        << " does not have any public initializers";
+    break;
   }
 
   out << ")\n";
@@ -788,9 +793,24 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     }
     return false;
   }
-    
 
-  default:
+  case Failure::NoPublicInitializers: {
+    tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
+      .highlight(range1);
+    if (targetLocator && !useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, targetLocator);
+    break;
+  }
+
+  case Failure::FunctionAutoclosureMismatch:
+  case Failure::FunctionNoReturnMismatch:
+  case Failure::IsNotArchetype:
+  case Failure::IsNotClass:
+  case Failure::IsNotDynamicLookup:
+  case Failure::IsNotMetatype:
+  case Failure::TupleNameMismatch:
+  case Failure::TupleNamePositionMismatch:
+  case Failure::TupleVariadicMismatch:
     // FIXME: Handle all failure kinds
     return false;
   }

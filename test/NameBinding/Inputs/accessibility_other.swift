@@ -9,3 +9,7 @@ extension Foo {
   internal static func b() {}
   private static func c() {}
 }
+
+struct PrivateInit {
+  private init() {}
+}

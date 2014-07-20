@@ -35,6 +35,8 @@ Foo.a()
 Foo.b()
 Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
 
+Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
+PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
 
 class Sub : Base {
   func test() {

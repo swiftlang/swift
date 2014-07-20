@@ -2121,8 +2121,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   if (!ctors) {
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
-      recordFailure(locator, Failure::TypesNotConstructible,
-                    valueType, argType);
+      recordFailure(locator, Failure::NoPublicInitializers, valueType);
     }
     
     return SolutionKind::Error;

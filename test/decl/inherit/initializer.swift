@@ -84,8 +84,8 @@ class NotInherited2 : D { // expected-error{{class 'NotInherited2' has no initia
 }
 
 func testNotInherited2() {
-  var n1 = NotInherited2(int: 5) // expected-error{{'NotInherited2' is not constructible with '(int: $T0)'}}
-  var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' is not constructible with '(double: $T0)'}}
+  var n1 = NotInherited2(int: 5) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
+  var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
 // Inheritance of unnamed parameters.

@@ -274,6 +274,9 @@ ERROR(extra_argument_named,sema_tcc,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,sema_tcc,none,
       "extra argument in call", ())
+ERROR(no_accessible_initializers,sema_tcc,none,
+      "%0 cannot be constructed because it has no accessible initializers",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

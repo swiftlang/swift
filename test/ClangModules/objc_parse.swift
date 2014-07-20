@@ -397,10 +397,10 @@ func testProtocolMappingDifferentModules(obj: ObjCParseExtrasToo.ProtoOrClass, p
 
   let _: ProtoOrClass? // expected-error{{'ProtoOrClass' is ambiguous for type lookup in this context}}
 
-  let _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' is not constructible with '()'}}
+  let _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' cannot be constructed because it has no accessible initializers}}
   let _ = ObjCParseExtrasToo.ProtoInHelper()
   let _ = ObjCParseExtrasTooHelper.ClassInHelper()
-  let _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' is not constructible with '()'}}
+  let _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' cannot be constructed because it has no accessible initializers}}
 }
 
 func testProtocolClassShadowing(obj: ClassInHelper, p: ProtoInHelper) {
