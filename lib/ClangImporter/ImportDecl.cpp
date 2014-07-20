@@ -4840,8 +4840,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!Result)
     return nullptr;
 
-  if (TypedefIsSuperfluous)
+  if (TypedefIsSuperfluous) {
     SuperfluousTypedefs.insert(Canon);
+    if (auto tagDecl = dyn_cast<clang::TagDecl>(Result->getClangDecl()))
+      DeclsWithSuperfluousTypedefs.insert(tagDecl);
+  }
 
   if (!HadForwardDeclaration)
     ImportedDecls[Canon] = Result;

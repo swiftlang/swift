@@ -2230,6 +2230,10 @@ const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
   return ::getClangOwningModule(Node, getClangASTContext());
 }
 
+bool ClangImporter::hasTypedef(const clang::Decl *typeDecl) const {
+  return Impl.DeclsWithSuperfluousTypedefs.count(typeDecl);
+}
+
 std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash();
 }

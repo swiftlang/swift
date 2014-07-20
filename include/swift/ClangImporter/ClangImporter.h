@@ -24,6 +24,7 @@ namespace llvm {
 
 namespace clang {
   class ASTContext;
+  class Decl;
   class Module;
   class TargetInfo;
   class VisibleDeclConsumer;
@@ -156,6 +157,7 @@ public:
                                         time_t &fileModTime);
 
   const clang::Module *getClangOwningModule(ClangNode Node) const;
+  bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
 

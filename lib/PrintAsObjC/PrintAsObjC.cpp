@@ -470,13 +470,27 @@ private:
     visitPart(alias->getUnderlyingType());
   }
 
+  void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
+    auto clangDecl = dyn_cast_or_null<clang::TagDecl>(NTD->getClangDecl());
+    if (!clangDecl)
+      return;
+
+    if (clangDecl->getTypedefNameForAnonDecl())
+      return;
+
+    auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+    if (importer->hasTypedef(clangDecl))
+      return;
+
+    os << clangDecl->getKindName() << " ";
+  }
+
   void visitStructType(StructType *ST) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
     if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName()))
       return;
 
-    // FIXME: Check if we can actually use the name or if we have to tag it with
-    // "struct".
+    maybePrintTagKeyword(SD);
     os << SD->getName();
   }
 
@@ -542,9 +556,7 @@ private:
 
   void visitEnumType(EnumType *ET) {
     const EnumDecl *ED = ET->getDecl();
-
-    // FIXME: Check if we can actually use the name or if we have to tag it with
-    // "enum".
+    maybePrintTagKeyword(ED);
     os << ED->getName();
   }
 
@@ -556,6 +568,7 @@ private:
       if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
         os << clangDecl->getName() << " *";
       } else {
+        maybePrintTagKeyword(CD);
         os << clangDecl->getName();
       }
     } else {

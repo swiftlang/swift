@@ -321,6 +321,10 @@ public:
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
   llvm::DenseSet<const clang::Decl *> SuperfluousTypedefs;
+  /// Tag decls whose typedefs were imported instead.
+  ///
+  /// \sa SuperfluousTypedefs
+  llvm::DenseSet<const clang::Decl *> DeclsWithSuperfluousTypedefs;
 
   using ClangDeclAndFlag = llvm::PointerIntPair<const clang::Decl *, 1, bool>;
 
