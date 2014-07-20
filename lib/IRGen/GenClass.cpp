@@ -1793,7 +1793,7 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                            Context.TheBuiltinModule);
   SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(true);
-  SwiftRootClass->getMutableAttrs().add(ObjCAttr::createNullary(Context, name));
+  SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, name));
   SwiftRootClass->setImplicit();
   return SwiftRootClass;
 }

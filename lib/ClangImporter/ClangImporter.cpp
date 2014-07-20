@@ -1915,7 +1915,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
                                   ImportKind::Module, SourceLoc(), AccessPath,
                                   ImportedMod);
     if (IsExported)
-      ID->getMutableAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
     Results.push_back(ID);
   }
 }

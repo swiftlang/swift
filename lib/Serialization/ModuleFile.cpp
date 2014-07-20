@@ -979,7 +979,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
                                     SourceLoc(), AccessPath);
       if (Dep.isExported())
-        ID->getMutableAttrs().add(
+        ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       ImportDecls.push_back(ID);
     }

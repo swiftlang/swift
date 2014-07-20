@@ -573,6 +573,9 @@ protected:
 
   // FIXME: Unused padding here.
 
+  // Storage for the declaration attributes.
+  DeclAttributes Attrs;
+  
   /// The next declaration in the list of declarations within this
   /// member context.
   Decl *NextDecl = nullptr;
@@ -588,12 +591,8 @@ private:
   void operator=(const Decl&) = delete;
 
 protected:
-  // Storage for the declaration attributes.
-  const DeclAttributes *Attrs;
-  static const DeclAttributes EmptyAttrs;
 
-  Decl(DeclKind kind, DeclContext *DC)
-      : OpaqueBits(0), Context(DC), Attrs(&EmptyAttrs) {
+  Decl(DeclKind kind, DeclContext *DC) : OpaqueBits(0), Context(DC) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
@@ -655,10 +654,12 @@ public:
     return Context->getASTContext();
   }
 
-  DeclAttributes &getMutableAttrs();
-
   const DeclAttributes &getAttrs() const {
-    return *Attrs;
+    return Attrs;
+  }
+
+  DeclAttributes &getAttrs() {
+    return Attrs;
   }
 
   /// Returns the starting location of the entire declaration.

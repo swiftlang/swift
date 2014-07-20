@@ -1537,7 +1537,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                        nameLoc, name, Type(), CurDeclContext);
       // Attributes.
       if (ownershipKind != Ownership::Strong)
-        VD->getMutableAttrs().add(new (Context) OwnershipAttr(ownershipKind));
+        VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));
       
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
       

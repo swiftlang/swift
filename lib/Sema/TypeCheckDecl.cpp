@@ -1185,7 +1185,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have any type-adjusting attributes, apply them here.
   if (binding->getPattern()->hasType()) {
     if (auto var = binding->getSingleVar()) {
-      if (auto *OA = var->getMutableAttrs().getAttribute<OwnershipAttr>())
+      if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
         tc.checkOwnershipAttr(var, OA);
     }
   }
@@ -1533,11 +1533,11 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
   // Mark it transparent, there is no user benefit to this actually existing, we
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
-  Get->getMutableAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
+  Get->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
 
   // If the var is marked final, then so is the getter.
   if (VD->isFinal())
-    Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+    Get->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 }
 
 /// Synthesize the body of a trivial setter.
@@ -1555,10 +1555,10 @@ static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
 
   // Mark it transparent, there is no user benefit to this actually existing.
-  Set->getMutableAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
+  Set->getAttrs().add(new (Ctx) TransparentAttr(/*IsImplicit=*/true));
 
   if (VD->isFinal())
-    Set->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+    Set->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 
 }
 
@@ -1682,7 +1682,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
-      willSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+      willSet->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1709,7 +1709,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
         VD->getDeclContext()->isClassOrClassExtensionContext())
-      didSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+      didSet->getAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
@@ -1897,7 +1897,7 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   // Mark the vardecl to be final and implicit.  In a class, this prevents it
   // from being dynamically dispatched.
   if (VD->getDeclContext()->isClassOrClassExtensionContext())
-    Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
+    Storage->getAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
   
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
@@ -2882,7 +2882,7 @@ public:
     if (IsFirstPass && !checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
-      if (auto *OA = VD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+      if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!VD->getOverriddenDecl()) {
           TC.diagnose(VD, diag::property_does_not_override)
               .highlight(OA->getLocation());
@@ -2940,10 +2940,10 @@ public:
     // getter and setter as final as well.
     if (VD->isFinal()) {
       if (VD->getGetter() && !VD->getGetter()->isFinal())
-        VD->getGetter()->getMutableAttrs().add(
+        VD->getGetter()->getAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
       if (VD->getSetter() && !VD->getSetter()->isFinal())
-        VD->getSetter()->getMutableAttrs().add(
+        VD->getSetter()->getAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
     TC.checkDeclAttributes(VD);
@@ -2989,7 +2989,7 @@ public:
         if (auto var = PBD->getSingleVar()) {
           isDebuggerVar = var->isDebuggerVar();
             
-          if (auto *OA = var->getMutableAttrs().getAttribute<OwnershipAttr>())
+          if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
             TC.checkOwnershipAttr(var, OA);
         }
 
@@ -3138,10 +3138,10 @@ public:
     // getter and setter as final as well.
     if (SD->isFinal()) {
       if (SD->getGetter() && !SD->getGetter()->isFinal())
-        SD->getGetter()->getMutableAttrs().add(
+        SD->getGetter()->getAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
       if (SD->getSetter() && !SD->getSetter()->isFinal())
-        SD->getSetter()->getMutableAttrs().add(
+        SD->getSetter()->getAttrs().add(
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
 
@@ -3174,7 +3174,7 @@ public:
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
-      if (auto *OA = SD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!SD->getOverriddenDecl()) {
           TC.diagnose(SD, diag::subscript_does_not_override)
               .highlight(OA->getLocation());
@@ -3661,7 +3661,7 @@ public:
         if ((isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
              isa<SubscriptDecl>(Member)) &&
             !Member->getAttrs().hasAttribute<FinalAttr>())
-          Member->getMutableAttrs().add(new (TC.Context) FinalAttr(true));
+          Member->getAttrs().add(new (TC.Context) FinalAttr(true));
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -4015,11 +4015,11 @@ public:
         if (postfixOp) {
           insertionText = "postfix ";
           op = postfixOp;
-          FD->getMutableAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+          FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
         } else {
           insertionText = "prefix ";
           op = prefixOp;
-          FD->getMutableAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+          FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
         }
 
         // Emit diagnostic with the Fix-It.
@@ -4319,7 +4319,7 @@ public:
         // If the property is dynamic, propagate to this accessor.
         if (prop->getAttrs().hasAttribute<DynamicAttr>()
             && !FD->getAttrs().hasAttribute<DynamicAttr>())
-          FD->getMutableAttrs().add(
+          FD->getAttrs().add(
                                new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
@@ -4332,7 +4332,7 @@ public:
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not override anything,
       // complain.
-      if (auto *OA = FD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+      if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
         if (!FD->getOverriddenDecl()) {
           TC.diagnose(FD, diag::method_does_not_override)
               .highlight(OA->getLocation());
@@ -4806,14 +4806,14 @@ public:
 
       // Copy the name from the base declaration to the overriding
       // declaration.
-      Override->getMutableAttrs().add(attr->clone(TC.Context));
+      Override->getAttrs().add(attr->clone(TC.Context));
       return;
     }
             
     void visitDynamicAttr(DynamicAttr *attr) {
       if (!Override->getAttrs().hasAttribute<DynamicAttr>())
         // Dynamic is inherited.
-        Override->getMutableAttrs().add(
+        Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
     }
   };
@@ -4884,7 +4884,7 @@ public:
       else
         TC.diagnose(override, diag::missing_override);
       TC.diagnose(base, diag::overridden_here);
-      override->getMutableAttrs().add(
+      override->getAttrs().add(
           new (TC.Context) OverrideAttr(SourceLoc()));
     }
 
@@ -4896,7 +4896,7 @@ public:
     /// Check attributes associated with the base; some may need to merged with
     /// or checked against attributes in the overriding declaration.
     AttributeOverrideChecker attrChecker(TC, base, override);
-    for (auto attr : base->getMutableAttrs()) {
+    for (auto attr : base->getAttrs()) {
       attrChecker.visit(attr);
     }
 
@@ -4916,7 +4916,7 @@ public:
         if (!overridingGetter->getAttrs().hasAttribute<OverrideAttr>()) {
           // FIXME: Egregious hack to set 'override'.
           auto loc = overridingASD->getOverrideLoc();
-          overridingGetter->getMutableAttrs().add(
+          overridingGetter->getAttrs().add(
               new (TC.Context) OverrideAttr(loc));
         }
           
@@ -4927,7 +4927,7 @@ public:
         if (!overridingSetter->getAttrs().hasAttribute<OverrideAttr>()) {
           // FIXME: Egregious hack to set 'override'.
           auto loc = overridingASD->getOverrideLoc();
-          overridingSetter->getMutableAttrs().add(
+          overridingSetter->getAttrs().add(
               new (TC.Context) OverrideAttr(loc));
         }
         recordOverride(overridingASD->getSetter(), baseASD->getSetter());
@@ -5243,7 +5243,7 @@ public:
     // Determine whether this constructor is required.
     if (!CD->getAttrs().hasAttribute<RequiredAttr>()) {
       if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
-        CD->getMutableAttrs().add(
+        CD->getAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
     }
 
@@ -5560,7 +5560,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // If the var is marked final, then so is the getter.
       if (VD->isFinal()) {
         ASTContext &ctx = VD->getASTContext();
-        getter->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+        getter->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
       }
       // lazy getters are mutating on an enclosing struct.
       getter->setMutating();
@@ -5941,7 +5941,7 @@ createDesignatedInitOverride(TypeChecker &tc,
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
       if (objcAttr->hasName())
-        ctor->getMutableAttrs().add(objcAttr->clone(ctx));
+        ctor->getAttrs().add(objcAttr->clone(ctx));
     }
 
   }
@@ -6497,11 +6497,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                       numArgumentNames != 1,
                       numParameters,
                       numParameters != 1);
-          D->getMutableAttrs().add(
+          D->getAttrs().add(
             ObjCAttr::createUnnamed(TC.Context,
                                     objcAttr->AtLoc,
                                     objcAttr->Range.Start));
-          D->getMutableAttrs().removeAttribute(objcAttr);
+          D->getAttrs().removeAttribute(objcAttr);
         }
       }
     }
@@ -6512,15 +6512,15 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_protocol);
-      D->getMutableAttrs().removeAttribute(OA);
+      D->getAttrs().removeAttribute(OA);
     } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_objc_protocol);
-      D->getMutableAttrs().removeAttribute(OA);
+      D->getAttrs().removeAttribute(OA);
     } else if (isa<ConstructorDecl>(D)) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_initializer);
-      D->getMutableAttrs().removeAttribute(OA);
+      D->getAttrs().removeAttribute(OA);
     }
   }
 
@@ -6530,7 +6530,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       if (!PD->isObjC()) {
         TC.diagnose(AvAttr->getLocation(),
                     diag::unavailable_method_non_objc_protocol);
-        D->getMutableAttrs().removeAttribute(AvAttr);
+        D->getAttrs().removeAttribute(AvAttr);
       }
     }
   }

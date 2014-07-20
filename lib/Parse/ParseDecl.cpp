@@ -1554,7 +1554,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 
   auto *ID = ImportDecl::create(Context, CurDeclContext, ImportLoc, Kind,
                                 KindLoc, ImportPath);
-  ID->getMutableAttrs() = Attributes;
+  ID->getAttrs() = Attributes;
   return DCC.fixupParserResult(ID);
 }
 
@@ -1749,7 +1749,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
-  ED->getMutableAttrs() = Attributes;
+  ED->getAttrs() = Attributes;
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
@@ -1972,7 +1972,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                      CurDeclContext,
                                      TypeAliasLoc, Id, IdLoc,
                                      UnderlyingTy.getPtrOrNull());
-    assocType->getMutableAttrs() = Attributes;
+    assocType->getAttrs() = Attributes;
     if (!Inherited.empty())
       assocType->setInherited(Context.AllocateCopy(Inherited));
     addToScope(assocType);
@@ -1984,7 +1984,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                 UnderlyingTy.getPtrOrNull(),
                                 CurDeclContext);
-  TAD->getMutableAttrs() = Attributes;
+  TAD->getAttrs() = Attributes;
   addToScope(TAD);
   return DCC.fixupParserResult(Status, TAD);
 }
@@ -2247,7 +2247,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                    StaticLoc, Flags, Kind, this);
-      TheDecl->getMutableAttrs() = Attributes;
+      TheDecl->getAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
     }
@@ -2363,7 +2363,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     // Set up a function declaration.
     TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                  StaticLoc, Flags, Kind, this);
-    TheDecl->getMutableAttrs() = Attributes;
+    TheDecl->getAttrs() = Attributes;
 
     // Parse the body, if any.
     if (ExternalAsmName) {
@@ -2762,7 +2762,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->setParentPattern(PBD);
-      VD->getMutableAttrs() = Attributes;
+      VD->getAttrs() = Attributes;
 
       Decls.push_back(VD);
     });
@@ -2974,7 +2974,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           
     // Add the attributes here so if we need them while parsing the body
     // they are available.
-    FD->getMutableAttrs() = Attributes;
+    FD->getAttrs() = Attributes;
       
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
@@ -3098,7 +3098,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   EnumDecl *UD = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(UD);
-  UD->getMutableAttrs() = Attributes;
+  UD->getAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
@@ -3250,7 +3250,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
-    result->getMutableAttrs() = Attributes;
+    result->getAttrs() = Attributes;
     Elements.push_back(result);
     
     // Continue through the comma-separated list.
@@ -3352,7 +3352,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             GenericParams,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
-  SD->getMutableAttrs() = Attributes;
+  SD->getAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
@@ -3430,7 +3430,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   setLocalDiscriminator(CD);
 
   // Attach attributes.
-  CD->getMutableAttrs() = Attributes;
+  CD->getAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
@@ -3553,7 +3553,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.removeAttribute(classProto);
   }
 
-  Proto->getMutableAttrs() = Attributes;
+  Proto->getAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
@@ -3644,7 +3644,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext);
-  Subscript->getMutableAttrs() = Attributes;
+  Subscript->getAttrs() = Attributes;
   
   Decls.push_back(Subscript);
 
@@ -3787,7 +3787,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  CD->getMutableAttrs() = Attributes;
+  CD->getAttrs() = Attributes;
 
   return makeParserResult(CD);
 }
@@ -3845,7 +3845,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  DD->getMutableAttrs() = Attributes;
+  DD->getAttrs() = Attributes;
 
   // Reject 'destructor' functions outside of classes
   if (!(Flags & PD_AllowDestructor)) {
@@ -3941,7 +3941,7 @@ Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
   auto *Res =
     new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
                                      Name, NameLoc, LBraceLoc, RBraceLoc);
-  Res->getMutableAttrs() = Attributes;
+  Res->getAttrs() = Attributes;
   return makeParserResult(Res);
 }
 
@@ -3966,7 +3966,7 @@ Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
   auto Res =
     new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
                                       Name, NameLoc, LBraceLoc, RBraceLoc);
-  Res->getMutableAttrs() = Attributes;
+  Res->getAttrs() = Attributes;
   return makeParserResult(Res);
 }
 
@@ -4053,6 +4053,6 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
                       AssociativityValueLoc, PrecedenceLoc.isInvalid(),
                       PrecedenceLoc, PrecedenceValueLoc, RBraceLoc,
                       InfixData(precedence, associativity));
-  Res->getMutableAttrs() = Attributes;
+  Res->getAttrs() = Attributes;
   return makeParserResult(Res);
 }

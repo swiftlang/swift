@@ -1131,12 +1131,12 @@ void ValueDecl::setIsObjC(bool Value) {
     return;
 
   if (!Value) {
-    for (auto *Attr : getMutableAttrs()) {
+    for (auto *Attr : getAttrs()) {
       if (auto *OA = dyn_cast<ObjCAttr>(Attr))
         OA->setInvalid();
     }
   } else {
-    getMutableAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
+    getAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
   }
 }
 

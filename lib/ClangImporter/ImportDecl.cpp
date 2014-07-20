@@ -801,7 +801,7 @@ static FuncDecl *makeClassToClassImplicitConversion(ClassDecl *fromDecl,
       name, SourceLoc(), nullptr, Type(),
       params, TypeLoc::withoutLoc(resultType), fromDecl);
   conversionDecl->setImplicit();
-  conversionDecl->getMutableAttrs().add(new (C) FinalAttr(/*implicit*/ true));
+  conversionDecl->getAttrs().add(new (C) FinalAttr(/*implicit*/ true));
   conversionDecl->setAccessibility(Accessibility::Public);
 
   auto argType = TupleType::getEmpty(C);
@@ -1932,7 +1932,7 @@ namespace {
       result->setAccessibility(Accessibility::Public);
 
       if (decl->isNoReturn())
-        result->getMutableAttrs().add(
+        result->getAttrs().add(
             new (Impl.SwiftContext) NoReturnAttr(/*IsImplicit=*/false));
 
       // Keep track of inline function bodies so that we can generate
@@ -1990,7 +1990,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().add(
+        result->getAttrs().add(
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       // FIXME: Handle IBOutletCollection.
 
@@ -2081,7 +2081,7 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getMutableAttrs().add(ObjCAttr::create(ctx, name));
+      decl->getAttrs().add(ObjCAttr::create(ctx, name));
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
@@ -2227,7 +2227,7 @@ namespace {
           os << arg << ":";
         }
         os << ")'";
-        member->getMutableAttrs().add(
+        member->getAttrs().add(
           AvailabilityAttr::createImplicitUnavailableAttr(
             Impl.SwiftContext, 
             Impl.SwiftContext.AllocateCopy(os.str())));
@@ -2364,7 +2364,7 @@ namespace {
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
           isa<ProtocolDecl>(dc))
-        result->getMutableAttrs().add(new (Impl.SwiftContext)
+        result->getAttrs().add(new (Impl.SwiftContext)
                                       OptionalAttr(/*implicit*/false));
 
       // Mark this method @objc.
@@ -2381,7 +2381,7 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
-        result->getMutableAttrs().add(
+        result->getAttrs().add(
             new (Impl.SwiftContext) IBActionAttr(/*IsImplicit=*/false));
 
       // Check whether there's some special method to import.
@@ -2717,7 +2717,7 @@ namespace {
             = AvailabilityAttr::createImplicitUnavailableAttr(
                 Impl.SwiftContext,
                 Impl.SwiftContext.AllocateCopy(errorStr.str()));
-          ctor->getMutableAttrs().add(attr);
+          ctor->getAttrs().add(attr);
           continue;
         }
 
@@ -2769,7 +2769,7 @@ namespace {
 
       // If this initializer is required, add the appropriate attribute.
       if (required) {
-        result->getMutableAttrs().add(
+        result->getAttrs().add(
           new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
       }
 
@@ -2906,7 +2906,7 @@ namespace {
       thunk->setAccessibility(Accessibility::Public);
 
       if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
-        thunk->getMutableAttrs().add(objcAttr->clone(context));
+        thunk->getAttrs().add(objcAttr->clone(context));
       else
         thunk->setIsObjC(true);
       // FIXME: Should we record thunks?
@@ -2993,7 +2993,7 @@ namespace {
       thunk->setAccessibility(Accessibility::Public);
 
       if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
-        thunk->getMutableAttrs().add(objcAttr->clone(context));
+        thunk->getAttrs().add(objcAttr->clone(context));
       else
         thunk->setIsObjC(true);
 
@@ -3218,7 +3218,7 @@ namespace {
 
       // Optional subscripts in protocols.
       if (optionalMethods && isa<ProtocolDecl>(dc))
-        subscript->getMutableAttrs().add(new (Impl.SwiftContext)
+        subscript->getAttrs().add(new (Impl.SwiftContext)
                                          OptionalAttr(true));
 
       // Note that we've created this subscript.
@@ -3989,7 +3989,7 @@ namespace {
         llvm_unreachable("unknown bridged decl kind");
       auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
         Impl.SwiftContext, message);
-      VD->getMutableAttrs().add(attr);
+      VD->getAttrs().add(attr);
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
@@ -4127,7 +4127,7 @@ namespace {
       if (attributes & requires_stored_property_inits) {
         auto a = new (Impl.SwiftContext)
           RequiresStoredPropertyInitsAttr(/*IsImplicit=*/true);
-        decl->getMutableAttrs().add(a);
+        decl->getAttrs().add(a);
         cast<ClassDecl>(decl)->setRequiresStoredPropertyInits(true);
       }
     }
@@ -4362,12 +4362,12 @@ namespace {
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
-        result->getMutableAttrs().add(
+        result->getAttrs().add(
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       if (decl->getPropertyImplementation() == clang::ObjCPropertyDecl::Optional
           && isa<ProtocolDecl>(dc) &&
-          !result->getMutableAttrs().hasAttribute<OptionalAttr>())
-        result->getMutableAttrs().add(new (Impl.SwiftContext)
+          !result->getAttrs().hasAttribute<OptionalAttr>())
+        result->getAttrs().add(new (Impl.SwiftContext)
                                       OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
@@ -4547,7 +4547,7 @@ void ClangImporter::Implementation::importAttributes(
       auto Message = unavailable->getMessage();
       auto attr =
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
-      MappedDecl->getMutableAttrs().add(attr);
+      MappedDecl->getAttrs().add(attr);
       IsUnavailable = true;
       continue;
     }
@@ -4562,7 +4562,7 @@ void ClangImporter::Implementation::importAttributes(
         auto attr =
           AvailabilityAttr::createImplicitUnavailableAttr(C,
                                                       "Not available in Swift");
-        MappedDecl->getMutableAttrs().add(attr);
+        MappedDecl->getAttrs().add(attr);
         IsUnavailable = true;
         continue;
       }
@@ -4582,7 +4582,7 @@ void ClangImporter::Implementation::importAttributes(
       auto Message = deprecated->getMessage();
       auto attr =
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
-      MappedDecl->getMutableAttrs().add(attr);
+      MappedDecl->getAttrs().add(attr);
       IsUnavailable = true;
       continue;
     }
@@ -4604,7 +4604,7 @@ void ClangImporter::Implementation::importAttributes(
         auto Message = avail->getMessage();
         auto attr =
           AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
-        MappedDecl->getMutableAttrs().add(attr);
+        MappedDecl->getAttrs().add(attr);
         IsUnavailable = true;
         continue;
       }
@@ -4616,7 +4616,7 @@ void ClangImporter::Implementation::importAttributes(
                                           deprecated.getMinor())) {
           auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
                          DeprecatedAsUnavailableMessage);
-          MappedDecl->getMutableAttrs().add(attr);
+          MappedDecl->getAttrs().add(attr);
           IsUnavailable = true;
           continue;
         }
@@ -4636,7 +4636,7 @@ void ClangImporter::Implementation::importAttributes(
         false, /* FIXME: Adjust for minimum deployment target. */
         true);
 
-      MappedDecl->getMutableAttrs().add(AvAttr);
+      MappedDecl->getAttrs().add(AvAttr);
     }
   }
 
@@ -4652,7 +4652,7 @@ void ClangImporter::Implementation::importAttributes(
         sel.getNameForSlot(0).startswith("makeObjectsPerformSelector")) {
       auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
                     "'performSelector' methods are unavailable");
-      MappedDecl->getMutableAttrs().add(attr);
+      MappedDecl->getAttrs().add(attr);
       return;
     }
 
@@ -4663,13 +4663,13 @@ void ClangImporter::Implementation::importAttributes(
         auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
                       C,
                       SwiftContext.AllocateCopy(knownMethod->UnavailableMsg));
-        MappedDecl->getMutableAttrs().add(attr);
+        MappedDecl->getAttrs().add(attr);
 
         // If we made a protocol requirement unavailable, mark it optional:
         // nobody should have to satisfy it.
         if (isa<ProtocolDecl>(MappedDecl->getDeclContext())) {
           if (!MappedDecl->getAttrs().hasAttribute<OptionalAttr>())
-            MappedDecl->getMutableAttrs().add(new (C)
+            MappedDecl->getAttrs().add(new (C)
                                               OptionalAttr(/*implicit*/false));
         }
       }
@@ -4680,7 +4680,7 @@ void ClangImporter::Implementation::importAttributes(
         auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
                       C,
                       SwiftContext.AllocateCopy(knownProperty->UnavailableMsg));
-        MappedDecl->getMutableAttrs().add(attr);
+        MappedDecl->getAttrs().add(attr);
       }
     }
   } else if (auto CD = dyn_cast<clang::ObjCContainerDecl>(ClangDecl)) {
@@ -4691,7 +4691,7 @@ void ClangImporter::Implementation::importAttributes(
                         C,
                         SwiftContext.AllocateCopy(
                           knownContext->UnavailableMsg));
-          MappedDecl->getMutableAttrs().add(attr);
+          MappedDecl->getAttrs().add(attr);
         }
       }
     }
@@ -4701,7 +4701,7 @@ void ClangImporter::Implementation::importAttributes(
   if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {
     if (ID->getName() == "NSInvocation") {
       auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C, "");
-      MappedDecl->getMutableAttrs().add(attr);
+      MappedDecl->getAttrs().add(attr);
       return;
     }
   }
@@ -4717,7 +4717,7 @@ void ClangImporter::Implementation::importAttributes(
         if (isCFTypeDecl(t->getDecl())) {
           auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
             "Core Foundation objects are automatically memory managed");
-          MappedDecl->getMutableAttrs().add(attr);
+          MappedDecl->getAttrs().add(attr);
           return;
         }
 }
@@ -5117,7 +5117,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
   UnavailableMessage = SwiftContext.AllocateCopy(UnavailableMessage);
   auto UA = AvailabilityAttr::createImplicitUnavailableAttr(SwiftContext,
                                                             UnavailableMessage);
-  var->getMutableAttrs().add(UA);
+  var->getAttrs().add(UA);
   return var;
 }
 

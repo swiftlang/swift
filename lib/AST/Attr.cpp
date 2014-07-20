@@ -59,16 +59,6 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
   .Default(DAK_Count);
 }
 
-/// A statically-allocated empty set of attributes.
-const DeclAttributes Decl::EmptyAttrs;
-
-DeclAttributes &Decl::getMutableAttrs() {
-  // If we don't have mutable attribute storage yet, allocate some.
-  if (&getAttrs() == &EmptyAttrs)
-    Attrs = getASTContext().Allocate<DeclAttributes>();
-  return *const_cast<DeclAttributes*>(&getAttrs());
-}
-
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
   unsigned Options = getOptions(DK);

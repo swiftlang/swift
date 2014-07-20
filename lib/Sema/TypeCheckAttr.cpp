@@ -136,7 +136,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   
   // Verify we don't have both mutating and nonmutating.
   if (FD->getAttrs().hasAttribute<MutatingAttr>())
-    if (auto *NMA = FD->getMutableAttrs().getAttribute<NonMutatingAttr>()) {
+    if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not);
       if (NMA == attr) return;
     }
@@ -306,7 +306,7 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   }
 
   // @NSManaged properties cannot be @NSCopying
-  if (auto *NSCopy = VD->getMutableAttrs().getAttribute<NSCopyingAttr>())
+  if (auto *NSCopy = VD->getAttrs().getAttribute<NSCopyingAttr>())
     return diagnoseAndRemoveAttr(NSCopy, diag::attr_NSManaged_NSCopying);
 
 }
@@ -447,7 +447,7 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   D->setEarlyAttrValidation();
 
   AttributeEarlyChecker Checker(*this, D);
-  for (auto attr : D->getMutableAttrs()) {
+  for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
 
     // If Attr.def says that the attribute cannot appear on this kind of
@@ -929,7 +929,7 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
 
-  for (auto attr : D->getMutableAttrs()) {
+  for (auto attr : D->getAttrs()) {
     if (attr->isValid())
       Checker.visit(attr);
   }
@@ -965,8 +965,8 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
       attr->setInvalid();
 
       // If the IBOutlet attribute is present, remove it as well.
-      if (auto attr = var->getMutableAttrs().getAttribute<IBOutletAttr>())
-        var->getMutableAttrs().removeAttribute(attr);
+      if (auto attr = var->getAttrs().getAttribute<IBOutletAttr>())
+        var->getAttrs().removeAttribute(attr);
 
       return;
     } else {
