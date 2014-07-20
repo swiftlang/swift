@@ -43,7 +43,7 @@ static llvm::cl::opt<bool> ShouldReportBoundsChecks("sil-abcopts-report",
                                               llvm::cl::init(false));
 
 static llvm::cl::opt<bool> EnableABCOpts("enable-abcopts",
-                                         llvm::cl::init(false));
+                                         llvm::cl::init(true));
 
 using ArraySet = llvm::SmallPtrSet<SILValue, 16>;
 using IndexedArraySet =
