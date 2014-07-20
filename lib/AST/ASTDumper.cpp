@@ -471,27 +471,19 @@ namespace {
 
       if (FuncDecl *Get = VD->getGetter()) {
         OS << "\n";
-        OS.indent(Indent + 2);
-        OS << "get =";
         printRec(Get);
       }
       if (FuncDecl *Set = VD->getSetter()) {
         OS << "\n";
-        OS.indent(Indent + 2);
-        OS << "set =";
         printRec(Set);
       }
       if (VD->getStorageKind() == VarDecl::Observing) {
         if (FuncDecl *WillSet = VD->getWillSetFunc()) {
           OS << "\n";
-          OS.indent(Indent + 2);
-          OS << "willSet =";
           printRec(WillSet);
         }
         if (FuncDecl *DidSet = VD->getDidSetFunc()) {
           OS << "\n";
-          OS.indent(Indent + 2);
-          OS << "didSet =";
           printRec(DidSet);
         }
       }
