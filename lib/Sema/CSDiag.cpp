@@ -767,6 +767,27 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
     return false;
   }
+      
+  case Failure::IsNotOptional: {
+    if (auto force = dyn_cast_or_null<ForceValueExpr>(anchor)) {
+      // If there was an 'as' cast in the subexpression, note it.
+      if (auto cast = findForcedDowncast(tc.Context, force->getSubExpr())) {
+        tc.diagnose(force->getLoc(), diag::forcing_explicit_downcast,
+                    failure.getFirstType())
+          .highlight(cast->getLoc())
+          .fixItRemove(force->getLoc());
+        return true;
+      }
+      
+      tc.diagnose(loc, diag::forcing_injected_optional,
+                  failure.getFirstType())
+        .highlight(force->getSourceRange())
+        .fixItRemove(force->getExclaimLoc());
+      
+      return true;
+    }
+    return false;
+  }
     
 
   default:

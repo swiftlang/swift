@@ -51,3 +51,15 @@ mutIUO.mutS = S()
 mutIUO.immS = S() // expected-error{{cannot assign}}
 immIUO.mutS = S() // expected-error{{cannot assign}}
 immIUO.immS = S() // expected-error{{cannot assign}}
+
+func foo(x: Int) {}
+
+var nonOptional: S = S()
+_ = nonOptional! // expected-error{{operand of postfix '!' should have optional type; type is 'S'}}
+_ = nonOptional!.x // expected-error{{operand of postfix '!' should have optional type; type is 'S'}}
+
+class C {}
+class D: C {}
+
+let c = C()
+let d = (c as D)! // expected-error{{forced downcast already produces a non-optional value}}

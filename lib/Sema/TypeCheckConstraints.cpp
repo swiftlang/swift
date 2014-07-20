@@ -2166,6 +2166,9 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
     return forced;
   }
+  if (auto unresolved = dyn_cast<UnresolvedCheckedCastExpr>(expr)) {
+    return unresolved;
+  }
 
   // If we have an implicit force, look through it.
   if (auto forced = dyn_cast<ForceValueExpr>(expr)) {
@@ -2200,14 +2203,16 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   
   // If we have an explicit cast, we're done.
   if (isa<ForcedCheckedCastExpr>(sub) || 
-      isa<ConditionalCheckedCastExpr>(sub))
+      isa<ConditionalCheckedCastExpr>(sub) ||
+      isa<UnresolvedCheckedCastExpr>(sub))
     return cast<ExplicitCastExpr>(sub);
 
   // Otherwise, try to look through an implicit _bridgeFromObjectiveC() call.
   if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
     sub = skipOptionalEvalAndBinds(arg);
     if (isa<ForcedCheckedCastExpr>(sub) || 
-        isa<ConditionalCheckedCastExpr>(sub))
+        isa<ConditionalCheckedCastExpr>(sub) ||
+        isa<UnresolvedCheckedCastExpr>(sub))
       return cast<ExplicitCastExpr>(sub);
   }
 
