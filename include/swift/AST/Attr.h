@@ -344,6 +344,9 @@ public:
 
     /// True if this shouldn't be serialized.
     NotSerialized = 1 << 2,
+    
+    /// True if this attribute is only valid when parsing a .sil file.
+    SILOnly = 1 << 3,
 
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of

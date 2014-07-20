@@ -200,3 +200,8 @@ class A {
     }
   }
 }
+
+class SILStored {
+  @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
+}
+

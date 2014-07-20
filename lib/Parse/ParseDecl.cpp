@@ -316,6 +316,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
              DK == DAK_Prefix ? "postfix" : "prefix");
     DiscardAttribute = true;
   }
+ 
+  // If this is a SIL-only attribute, reject it.
+  if ((DeclAttribute::getOptions(DK) & DeclAttribute::SILOnly) != 0 &&
+      !isInSILMode()) {
+    diagnose(Loc, diag::only_allowed_in_sil, AttrName);
+    DiscardAttribute = true;
+  }  
 
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
