@@ -31,12 +31,15 @@ void DebuggerClient::anchor() {}
 
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
-  if (TypeResolver)
-    TypeResolver->resolveDeclSignature(D);
-  if (D->isInvalid() && !D->hasAccessibility())
-    return;
-  if (D->isAccessibleFrom(DC))
-    ChainedConsumer.foundDecl(D, reason);
+  if (D->getASTContext().LangOpts.EnableAccessControl) {
+    if (TypeResolver)
+      TypeResolver->resolveDeclSignature(D);
+    if (D->isInvalid() && !D->hasAccessibility())
+      return;
+    if (!D->isAccessibleFrom(DC))
+      return;
+  }
+  ChainedConsumer.foundDecl(D, reason);
 }
 
 
