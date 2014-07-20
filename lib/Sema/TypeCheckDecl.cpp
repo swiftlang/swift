@@ -1893,12 +1893,6 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   auto *Storage = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/false,
                                     VD->getLoc(), StorageName, StorageTy,
                                     VD->getDeclContext());
-
-  // Mark the vardecl to be final and implicit.  In a class, this prevents it
-  // from being dynamically dispatched.
-  if (VD->getDeclContext()->isClassOrClassExtensionContext())
-    Storage->getAttrs().add(new (Ctx) FinalAttr(true));
-  Storage->setImplicit();
   
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
@@ -1930,6 +1924,15 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
   VarDecl *SetValueDecl = firstParamPattern->getSingleVar();
   // FIXME: This is wrong for observed properties.
   synthesizeTrivialSetter(Set, Storage, SetValueDecl, TC);
+
+  // Mark the vardecl to be final, implicit, and private.  In a class, this
+  // prevents it from being dynamically dispatched.  Note that we do this after
+  // the accessors are set up, because we don't want the setter for the lazy
+  // property to inherit these properties from the storage.
+  if (VD->getDeclContext()->isClassOrClassExtensionContext())
+    Storage->getAttrs().add(new (Ctx) FinalAttr(true));
+  Storage->setImplicit();
+  Storage->setAccessibility(Accessibility::Private);
 
   TC.typeCheckDecl(Get, true);
   TC.typeCheckDecl(Get, false);

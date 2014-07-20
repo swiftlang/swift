@@ -47,6 +47,20 @@ class LazyPropertyCrash  {
 }
 
 
+// <rdar://problem/17127126> swift compiler segfaults trying to generate a setter for a @lazy property in a subclass of NSObject
+func test17127126(f : Class17127126) {
+  f.x = 2   // this is the problem
+}
+
+@objc
+class Class17127126 {
+  lazy var x = 1
+}
+
+
+
+
+
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
 // CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [19 x i8] c"T@\22SomeObject\22,N,R\00"
 
