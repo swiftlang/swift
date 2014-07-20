@@ -175,9 +175,9 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 struct _IntervalMirror<T: protocol<IntervalType,Printable>>: MirrorType {
   ${Boilerplate}
   
-  public var count: Int { return 2 }
+  var count: Int { return 2 }
 
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
       case 0: return ("start",reflect(_value.start))
       case 1: return ("end",reflect(_value.end))
@@ -185,7 +185,7 @@ struct _IntervalMirror<T: protocol<IntervalType,Printable>>: MirrorType {
     }
   }
 
-  public var summary: String { return _value.description }
+  var summary: String { return _value.description }
 
-  public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }

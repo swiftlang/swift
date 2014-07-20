@@ -384,6 +384,10 @@ ERROR(access_control_setter_more,sema_tcd,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{PRIVATE|an internal|a public}2 setter",
       (Accessibility, unsigned, Accessibility))
+ERROR(access_control_member_more,sema_tcd,none,
+      "%select{private|internal|PUBLIC}0 %1 cannot have "
+      "%select{PRIVATE|an internal|a public}2 %3",
+      (Accessibility, DescriptiveDeclKind, Accessibility, DescriptiveDeclKind))
 
 ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())

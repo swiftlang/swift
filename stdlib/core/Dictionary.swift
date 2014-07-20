@@ -626,7 +626,7 @@ class _NativeDictionaryStorageOwnerBase
   //
 
   @objc
-  public init(
+  init(
     objects: ConstUnsafePointer<AnyObject?>,
     forKeys: ConstUnsafePointer<Void>,
     count: Int
@@ -635,12 +635,12 @@ class _NativeDictionaryStorageOwnerBase
   }
 
   @objc
-  public var count: Int {
+  var count: Int {
     return bridgingCount.0
   }
 
   @objc
-  public func objectForKey(aKey: AnyObject?) -> AnyObject? {
+  func objectForKey(aKey: AnyObject?) -> AnyObject? {
     if let nonNullKey: AnyObject = aKey {
       return bridgingObjectForKey(nonNullKey, dummy: ())
     }
@@ -648,19 +648,19 @@ class _NativeDictionaryStorageOwnerBase
   }
 
   @objc
-  public func keyEnumerator() -> _SwiftNSEnumeratorType? {
+  func keyEnumerator() -> _SwiftNSEnumeratorType? {
     return bridgingKeyEnumerator(())
   }
 
   @objc
-  public func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+  func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
     return self
   }
 
   @objc
-  public func countByEnumeratingWithState(
+  func countByEnumeratingWithState(
       state: UnsafePointer<_SwiftNSFastEnumerationState>,
       objects: UnsafePointer<AnyObject>, count: Int
   ) -> Int {

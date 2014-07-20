@@ -18,6 +18,8 @@ public struct PublicStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func privateReq() {}
+
+  public var publicVar = 0
 }
 
 // expected-note@+1 + {{type declared here}}
@@ -25,6 +27,8 @@ internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func privateReq() {}
+
+  public var publicVar = 0 // expected-error {{internal struct cannot have a public var}}
 }
 
 // expected-note@+1 + {{type declared here}}
@@ -32,7 +36,23 @@ private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {}
   private func internalReq() {}
   private func privateReq() {}
+
+  public var publicVar = 0 // expected-error {{private struct cannot have a public var}}
 }
+
+extension PublicStruct {
+  public init(x: Int) { self.init() }
+}
+
+extension InternalStruct {
+  public init(x: Int) { self.init() } // expected-error {{internal struct cannot have a public initializer}}
+}
+
+extension PrivateStruct {
+  public init(x: Int) { self.init() } // expected-error {{private struct cannot have a public initializer}}
+}
+
+
 
 public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivateProto {
   func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-3=public }}
@@ -142,7 +162,7 @@ public struct Properties {
   let y = PrivateStruct() // expected-error {{property must be declared private because its type 'PrivateStruct' uses a private type}}
 }
 
-struct Subscripts {
+public struct Subscripts {
   subscript (a: PrivateStruct) -> Int { return 0 } // expected-error {{subscript must be declared private because its index uses a private type}}
   subscript (a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript must be declared private because its element type uses a private type}}
 
@@ -153,7 +173,7 @@ struct Subscripts {
   public subscript (a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared public because its element type uses an internal type}}
 }
 
-struct Methods {
+public struct Methods {
   func foo(a: PrivateStruct) -> Int { return 0 } // expected-error {{method must be declared private because its parameter uses a private type}}
   func bar(a: Int) -> PrivateStruct { return PrivateStruct() } // expected-error {{method must be declared private because its result uses a private type}}
 
@@ -165,7 +185,7 @@ struct Methods {
 }
 func privateParam(a: PrivateStruct) {} // expected-error {{function must be declared private because its parameter uses a private type}}
 
-struct Initializers {
+public struct Initializers {
   init(a: PrivateStruct) {} // expected-error {{initializer must be declared private because its parameter uses a private type}}
 
   public init(a: PrivateStruct, b: Int) {} // expected-error {{initializer cannot be declared public because its parameter uses a private type}}
@@ -292,7 +312,7 @@ public struct AccessorsControl : InternalMutationOperations {
 public struct PrivateSettersPublic : InternalMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
   public private(set) var size = 0 // expected-error {{setter for property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
-  internal private(set) subscript (Int) -> Int { // expected-error {{subscript setter must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{12-25=}}
+  public private(set) subscript (Int) -> Int { // expected-error {{subscript setter must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
     get { return 42 }
     set {}
   }
@@ -302,7 +322,7 @@ internal struct PrivateSettersInternal : PublicMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
   private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{3-15=}}
 
-  public private(set)subscript (Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{10-17=internal}}
+  internal private(set)subscript (Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{12-24=}}
     get { return 42 }
     set {}
   }
@@ -313,9 +333,17 @@ public protocol PublicReadOnlyOperations {
   subscript (Int) -> Int { get }
 }
 
-internal struct PrivateSettersForReadOnly : PublicReadOnlyOperations {
-  public private(set) var size = 0 // no-warning
+internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
+  public private(set) var size = 0 // expected-error {{internal struct cannot have a public var}}
   internal private(set) subscript (Int) -> Int { // no-warning
+    get { return 42 }
+    set {}
+  }
+}
+
+public struct PrivateSettersForReadOnlyPublic : PublicReadOnlyOperations {
+  public private(set) var size = 0 // no-warning
+  internal private(set) subscript (Int) -> Int { // expected-error {{subscript must be declared public because it matches a requirement in public protocol 'PublicReadOnlyOperations'}}
     get { return 42 }
     set {}
   }

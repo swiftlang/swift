@@ -36,27 +36,27 @@ internal func replApplicationMain() {
 struct _NSCursorMirror : MirrorType {
   var _value: NSCursor
 
-  public init(_ v: NSCursor) { _value = v }
+  init(_ v: NSCursor) { _value = v }
 
-  public var value: Any { return _value }
+  var value: Any { return _value }
 
-  public var valueType: Any.Type { return (_value as Any).dynamicType }
+  var valueType: Any.Type { return (_value as Any).dynamicType }
 
-  public var objectIdentifier: ObjectIdentifier? { return .None }
+  var objectIdentifier: ObjectIdentifier? { return .None }
 
-  public var count: Int { return 0 }
+  var count: Int { return 0 }
 
-  public subscript(_: Int) -> (String,MirrorType) {
+  subscript(_: Int) -> (String,MirrorType) {
     _fatalError("MirrorType access out of bounds")
   }
 
-  public var summary: String { return ""}
+  var summary: String { return ""}
 
-  public var quickLookObject: QuickLookObject? {
+  var quickLookObject: QuickLookObject? {
     return .Some(.Image(_value.image))
   }
   
-  public var disposition : MirrorDisposition { return .Aggregate }
+  var disposition : MirrorDisposition { return .Aggregate }
 }
 
 extension NSCursor : Reflectable {
@@ -70,23 +70,23 @@ struct _NSViewMirror : MirrorType {
 
   var _v : NSView
   
-  public init(_ v : NSView) {_v = v}
+  init(_ v : NSView) {_v = v}
   
-  public var value: Any { get { return _v } }
+  var value: Any { get { return _v } }
   
-  public var valueType: Any.Type { get { return (_v as Any).dynamicType } }
+  var valueType: Any.Type { get { return (_v as Any).dynamicType } }
   
-  public var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  var objectIdentifier: ObjectIdentifier? { get { return .None } }
   
-  public var count: Int { get { return 0 } }
+  var count: Int { get { return 0 } }
   
-  public subscript(_: Int) -> (String,MirrorType) {
+  subscript(_: Int) -> (String,MirrorType) {
     _fatalError("MirrorType access out of bounds")
   }
   
-  public var summary: String { get { return ""} }
+  var summary: String { get { return ""} }
   
-  public var quickLookObject: QuickLookObject? { get {
+  var quickLookObject: QuickLookObject? { get {
       // adapted from the Xcode QuickLooks implementation
       
       var result: QuickLookObject? = nil
@@ -116,7 +116,7 @@ struct _NSViewMirror : MirrorType {
       
   } }
   
-  public var disposition : MirrorDisposition { get { return .Aggregate } }
+  var disposition : MirrorDisposition { get { return .Aggregate } }
 }
 
 extension NSView : Reflectable {

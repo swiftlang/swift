@@ -572,7 +572,7 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 // Utility functions
 //===--------------------------------------------------------------------===//
 
-void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
+void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
   switch (desiredAccess) {
@@ -581,14 +581,19 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
   case Accessibility::Public:   fixItString = "public ";   break;
   }
 
-  const DeclAttribute *attr;
-  if (isForSetter)
+  DeclAttribute *attr;
+  if (isForSetter) {
     attr = VD->getAttrs().getAttribute<SetterAccessibilityAttr>();
-  else
+    if (auto setter = cast<AbstractStorageDecl>(VD)->getSetter())
+      setter->overwriteAccessibility(desiredAccess);
+  } else {
     attr = VD->getAttrs().getAttribute<AccessibilityAttr>();
+    VD->overwriteAccessibility(desiredAccess);
+  }
 
   if (isForSetter && VD->getAccessibility() == desiredAccess) {
     assert(attr);
+    attr->setInvalid();
     if (!attr->Range.isValid())
       return;
 
@@ -606,6 +611,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, const ValueDecl *VD,
     // This uses getLocation() instead of getRange() because we don't want to
     // replace the "(set)" part of a setter attribute.
     diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+    attr->setInvalid();
 
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
     if (auto PBD = var->getParentPattern())

@@ -274,27 +274,27 @@ public struct ${Self}<T>
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
-  public var count: Int { return 1 }
+  var count: Int { return 1 }
   
   func _getPointerValue() -> UInt64 {
     return UInt64(Int(Builtin.ptrtoint_Word(_value.value)))
   }
 
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("pointerValue",reflect(_getPointerValue()))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
 
-  public var summary: String {
+  var summary: String {
     let selfType = "${Self}"
     let ptrValue = _getPointerValue()
     if ptrValue == 0 { return "\(selfType)(nil)" }
     return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
 
 ${MirrorConformance}

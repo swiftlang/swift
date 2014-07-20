@@ -24,17 +24,17 @@ extension String {
   ${MirrorDecl} {
     ${MirrorBoilerplate}
 
-      public var count: Int { return distance(_value.startIndex,_value.endIndex) }
+      var count: Int { return distance(_value.startIndex,_value.endIndex) }
 
-      public subscript(i: Int) -> (String,MirrorType) { 
+      subscript(i: Int) -> (String,MirrorType) {
         if i >= count {
           _fatalError("MirrorType access out of bounds")
         }
         return ("[\(i)]",reflect(self[i]))
       }
 
-      public var summary: String { return String(_value._core) }
+      var summary: String { return String(_value._core) }
 
-      public var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+      var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
   }
 }

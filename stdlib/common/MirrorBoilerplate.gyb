@@ -39,11 +39,11 @@ init(_ x: ${introspecteeType}${genericArgString}) {
   _value = x
 }
 
-public var value: Any { return _value }
+var value: Any { return _value }
 
-public var valueType: Any.Type { return (_value as Any).dynamicType }
+var valueType: Any.Type { return (_value as Any).dynamicType }
 
-public var objectIdentifier: ObjectIdentifier? { return .None }
+var objectIdentifier: ObjectIdentifier? { return .None }
 
-public var disposition: MirrorDisposition { return ${disposition} }
+var disposition: MirrorDisposition { return ${disposition} }
 

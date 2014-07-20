@@ -451,23 +451,23 @@ extension String : CollectionType {
       _value = x
     }
 
-    public var value: Any { return _value }
+    var value: Any { return _value }
 
-    public var valueType: Any.Type { return (_value as Any).dynamicType }
+    var valueType: Any.Type { return (_value as Any).dynamicType }
 
-    public var objectIdentifier: ObjectIdentifier? { return .None }
+    var objectIdentifier: ObjectIdentifier? { return .None }
 
-    public var disposition: MirrorDisposition { return .Aggregate }
+    var disposition: MirrorDisposition { return .Aggregate }
     
-    public var count: Int { return 0 }
+    var count: Int { return 0 }
 
-    public subscript(i: Int) -> (String,MirrorType) { 
+    subscript(i: Int) -> (String,MirrorType) {
       _fatalError("MirrorType access out of bounds")
     }
 
-    public var summary: String { return "\(_value._utf16Index)" }
+    var summary: String { return "\(_value._utf16Index)" }
 
-    public var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
+    var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
   }
 }
 

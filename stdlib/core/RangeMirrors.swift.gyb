@@ -24,9 +24,9 @@
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}
-  public var count: Int { return 2 }
+  var count: Int { return 2 }
 
-  public subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("startIndex",reflect(_value.startIndex))
     case 1: return ("endIndex",reflect(_value.endIndex))
@@ -34,11 +34,11 @@ ${MirrorDecl} {
     }
   }
   
-  public var summary: String { 
+  var summary: String { 
     return "\(self[0].1.summary)..<\(self[1].1.summary)"
   }
 
-  public var quickLookObject: QuickLookObject? { return .Text(summary) }
+  var quickLookObject: QuickLookObject? { return .Text(summary) }
 }
 
 ${MirrorConformance}

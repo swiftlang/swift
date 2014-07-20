@@ -40,9 +40,9 @@
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
-  public var count: Int { return 2 }
+  var count: Int { return 2 }
   
-  public subscript(i: Int) -> (String, MirrorType) { 
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("${Children[0]}",reflect(_value.${Children[0]}))
     case 0: return ("${Children[1]}",reflect(_value.${Children[1]}))
@@ -50,9 +50,9 @@ ${MirrorDecl} {
     }
   }
   
-  public var summary: String { return "(${SummaryString})" }
+  var summary: String { return "(${SummaryString})" }
   
-  public var quickLookObject: QuickLookObject? { return .Some(.${QLTag}(${QLArgString})) }
+  var quickLookObject: QuickLookObject? { return .Some(.${QLTag}(${QLArgString})) }
 }
 
 ${MirrorConformance}

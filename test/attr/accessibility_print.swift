@@ -236,8 +236,8 @@ func GA_localTypes() {
 public struct GB_NestedOuter {
   // CHECK: /*internal*/ struct Inner {
   struct Inner {
-    // CHECK: internal{{(\*/)?}} let x
-    internal let x = 0
+    // CHECK: private{{(\*/)?}} let x
+    private let x = 0
     // CHECK: /*internal*/ let y
     let y = 0
   }
@@ -247,8 +247,8 @@ public struct GB_NestedOuter {
 private struct GC_NestedOuterPrivate {
   // CHECK: /*private*/ struct Inner {
   struct Inner {
-    // CHECK: internal{{(\*/)?}} let x
-    internal let x = 0
+    // CHECK: private{{(\*/)?}} let x
+    private let x = 0
     // CHECK: /*private*/ let y
     let y = 0
   }

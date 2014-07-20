@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Parse/Lexer.h"
 
@@ -501,7 +502,6 @@ public:
 #define IGNORED_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
-    IGNORED_ATTR(Accessibility)
     IGNORED_ATTR(Asmname)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)
@@ -538,7 +538,11 @@ public:
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
+
+  bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
+  void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
+
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
 
@@ -903,6 +907,28 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   }
 }
 
+bool AttributeChecker::visitAbstractAccessibilityAttr(
+    AbstractAccessibilityAttr *attr) {
+  if (Type ty = D->getDeclContext()->getDeclaredTypeInContext()) {
+    Accessibility typeAccess = ty->getAnyNominal()->getAccessibility();
+    if (attr->getAccess() > typeAccess) {
+      auto diag = TC.diagnose(attr->getLocation(),
+                              diag::access_control_member_more,
+                              typeAccess,
+                              ty->getAnyNominal()->getDescriptiveKind(),
+                              attr->getAccess(),
+                              D->getDescriptiveKind());
+      swift::fixItAccessibility(diag, cast<ValueDecl>(D), typeAccess);
+      return true;
+    }
+  }
+  return false;
+}
+
+void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
+  visitAbstractAccessibilityAttr(attr);
+}
+
 void
 AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
   auto getterAccess = cast<ValueDecl>(D)->getAccessibility();
@@ -924,6 +950,8 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
     attr->setInvalid();
     return;
   }
+
+  visitAbstractAccessibilityAttr(attr);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
