@@ -43,7 +43,7 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
-  const unsigned int LineOffset = 7;
+  const unsigned int LineOffset = 5;
 
   struct BracePair {
   public:
@@ -407,41 +407,7 @@ public:
           }
         }
         else if (ApplyExpr *AE = llvm::dyn_cast<ApplyExpr>(E)) {
-          bool Handled = false;
-          if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(AE->getFn())) {
-            AbstractFunctionDecl *FnD =
-              llvm::dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
-            if (FnD &&
-                FnD->getModuleContext() == Context.TheStdlibModule &&
-                FnD->getNaturalArgumentCount() == 1) {
-              StringRef FnName = FnD->getNameStr();
-              enum class CallType {
-                NotAPrint = 0,
-                Print,
-                Println
-              } CT = CallType::NotAPrint;
-              if (FnName.equals("print")) {
-                CT = CallType::Print;
-              } else if (FnName.equals("println")) {
-                CT = CallType::Println;
-              }
-              if (CT != CallType::NotAPrint) {
-                ParenExpr *PE = llvm::cast<ParenExpr>(AE->getArg());
-                Expr *S = PE->getSubExpr();
-                std::pair<PatternBindingDecl *, VarDecl *> PV =
-                  buildPatternAndVariable(S);
-                Expr *Log = logPrint(PV.second, AE->getSourceRange(),
-                                     (CT == CallType::Println));
-                Elements[EI] = PV.first;
-                Elements.insert(Elements.begin() + (EI + 1), PV.second);
-                Elements.insert(Elements.begin() + (EI + 2), Log);
-                EI += 2;
-                Handled = true;
-              }
-            }
-          }
-          if (!Handled &&
-              AE->getType()->getCanonicalType() ==
+          if (AE->getType()->getCanonicalType() ==
               Context.TheEmptyTupleType) {
             if (DotSyntaxCallExpr *DSCE =
                 llvm::dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
@@ -465,9 +431,7 @@ public:
                 ++EI;
               }
             }
-            Handled = true;
-          }
-          if (!Handled) {
+          } else {
             // do the same as for all other expressions
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(E);
@@ -606,18 +570,6 @@ public:
       DRE->getSourceRange(), VD->getName().str().str().c_str());
   }
 
-  Expr *logPrint(VarDecl *VD, SourceRange SR, bool IsPrintln) {
-    const char *LoggerName = IsPrintln ? "$builtin_println" : "$builtin_print";
-    DeclRefExpr *DRE = 
-      new (Context) DeclRefExpr(ConcreteDeclRef(VD),
-                                SourceLoc(),
-                                true, // implicit
-                                false, // uses direct property access
-                                Type());
-    Expr *Args[] = { DRE };
-    return buildLoggerCallWithArgs(LoggerName, Args, SR);
-  }
-
   std::pair<PatternBindingDecl*, VarDecl*>
     buildPatternAndVariable(Expr *InitExpr) {
     char NameBuf[11] = { 0 };
@@ -699,16 +651,7 @@ public:
   Expr *buildLoggerCallWithArgs(const char *LoggerName,
                                 MutableArrayRef<Expr *> Args,
                                 SourceRange SR) {
-    Expr *LoggerArgs = nullptr;
-
-    if (Args.size() == 1) {
-      LoggerArgs = new (Context) ParenExpr(SourceLoc(),
-                                           Args[0],
-                                           SourceLoc(),
-                                           false);
-    } else {
-      LoggerArgs = TupleExpr::createImplicit(Context, Args, { });
-    }
+    TupleExpr *LoggerArgs = TupleExpr::createImplicit(Context, Args, { });
 
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
@@ -743,13 +686,13 @@ public:
     ::snprintf(end_column_buf, buf_size, "%d", EndLC.second - 1);
 
     Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
-                                                       SR.End, true);
+                                                       SourceLoc(), true);
     Expr *EndLine = new (Context) IntegerLiteralExpr(end_line_buf,
-                                                     SR.End, true);
+                                                     SourceLoc(), true);
     Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf, 
-                                                         SR.End, true);
+                                                         SourceLoc(), true);
     Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf, 
-                                                       SR.End, true);
+                                                       SourceLoc(), true);
 
     Expr *SendDataArgExprs[] = {
         LoggerCall,
