@@ -36,7 +36,7 @@ struct B {
 
 func test2(var b : B!) {
   var x = b.x
-  b.x = x // expected-error {{cannot assign to 'x' in 'b'}}
+  b.x = x
 }
 
 struct Subscriptable {

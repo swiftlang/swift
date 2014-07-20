@@ -48,6 +48,17 @@ Latest
   declarations have been rearranged from "operator prefix +" to 
   "prefix operator +" for consistency.
 
+* The optional unwrapping operator 'x!' can now be assigned through, and
+  mutating methods and operators can be applied through it:
+
+    var x: Int! = 0
+    x! = 2
+    x!++
+
+    // Nested dictionaries can now be mutated directly:
+    var sequences = ["fibonacci": [1, 1, 2, 3, 0]]
+    sequences["fibonacci"]![4] = 5
+    sequences["fibonacci"]!.append(8)
 
 2014-07-03
 ----------
