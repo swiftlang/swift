@@ -1,6 +1,9 @@
 ; This is not really a Swift source file: -*- Text -*-
 ; RUN: swift-demangle `sed -ne '/C\HECK:/s/^.*C\HECK: \(.*\) --->.*/\1/p' < %s` | FileCheck %s
 
+; RUN: sed -ne '/C\HECK:/s/^\(.*C\HECK: \).*\( ---> \)\(.*\)/\1\3\2\3/p' < %s > %t
+; RUN: sed -ne '/C\HECK:/p' < %s | swift-demangle | diff %t -
+
 ; RUN: swift-demangle __TtSi | FileCheck %s -check-prefix=DOUBLE
 ; DOUBLE: _TtSi ---> Swift.Int
 
@@ -143,7 +146,7 @@
 ; CHECK: _TtGSqGSaC5sugar7MyClass__ ---> [sugar.MyClass]?
 ; CHECK: _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
 ; CHECK: _TtGV12generic_args7WrapperQq_FS0_4initUS_9AProtocol__FMGS0_Q__US1___FT4fromGS0_Q___GS0_Qd____ ---> generic_args.Wrapper<(archetype 0 of generic_args.Wrapper.init <A : generic_args.AProtocol>(generic_args.Wrapper<A>.Type) -> <B : generic_args.AProtocol>(from : generic_args.Wrapper<B>) -> generic_args.Wrapper<A>)>
-; CHECK: _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF
+; CHECK: _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF.DIEOffset
 ; CHECK: _TtaSs3Int ---> Swift.Int
 ; CHECK: _TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool)
 ; CHECK: _TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?) to @callee_owned (@in Swift.Int) -> (@out Swift.Int?)

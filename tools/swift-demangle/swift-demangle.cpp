@@ -16,13 +16,13 @@
 
 #include "swift/Basic/Demangle.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <string>
-#include <stdio.h>
-#include <stdlib.h>
 
 static llvm::cl::opt<bool>
 ExpandMode("expand",
@@ -44,26 +44,67 @@ static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
                llvm::cl::ZeroOrMore);
 
+static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
+                     const swift::Demangle::DemangleOptions &options) {
+  if (name.startswith("__"))
+    name = name.substr(1);
+  swift::Demangle::NodePointer pointer =
+    swift::Demangle::demangleSymbolAsNode(name);
+  if (ExpandMode) {
+    llvm::outs() << "Demangling for " << name << '\n';
+    pointer->print(llvm::outs());
+  }
+  if (!TreeOnly) {
+    std::string string = swift::Demangle::nodeToString(pointer, options);
+    if (!CompactMode)
+      llvm::outs() << name << " ---> ";
+    llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
+  }
+}
+
+static llvm::StringRef substrBefore(llvm::StringRef whole,
+                                    llvm::StringRef part) {
+  return whole.slice(0, part.data() - whole.data());
+}
+
+static llvm::StringRef substrAfter(llvm::StringRef whole,
+                                   llvm::StringRef part) {
+  return whole.substr((part.data() - whole.data()) + part.size());
+}
+
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram X(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
+
   swift::Demangle::DemangleOptions options;
   options.SynthesizeSugarOnTypes = !DisableSugar;
-  for (llvm::StringRef name : InputNames) {
-    if (name.startswith("__"))
-      name = name.substr(1);
-    swift::Demangle::NodePointer pointer = swift::Demangle::demangleSymbolAsNode(name);
-    if (ExpandMode) {
-      llvm::outs() << "Demangling for " << name << '\n';
-      pointer->print(llvm::outs());
+
+  if (InputNames.empty()) {
+    CompactMode = true;
+    auto input = llvm::MemoryBuffer::getSTDIN();
+    if (!input) {
+      llvm::errs() << input.getError().message() << '\n';
+      return EXIT_FAILURE;
     }
-    if (!TreeOnly) {
-      std::string string = swift::Demangle::nodeToString(pointer, options);
-      if (!CompactMode)
-        llvm::outs() << name << " ---> ";
-      llvm::outs() << (string.empty() ? name : llvm::StringRef(string)) << '\n';
+    llvm::StringRef inputContents = input.get()->getBuffer();
+
+    // This doesn't handle Unicode symbols, but maybe that's okay.
+    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9]+");
+    llvm::SmallVector<llvm::StringRef, 1> matches;
+    while (maybeSymbol.match(inputContents, &matches)) {
+      llvm::outs() << substrBefore(inputContents, matches.front());
+      demangle(llvm::outs(), matches.front(), options);
+      inputContents = substrAfter(inputContents, matches.front());
+    }
+    llvm::outs() << inputContents;
+
+  } else {
+    for (llvm::StringRef name : InputNames) {
+      demangle(llvm::outs(), name, options);
+      llvm::outs() << '\n';
     }
   }
-  return 0;
+
+  return EXIT_SUCCESS;
 }
