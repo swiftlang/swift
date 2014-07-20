@@ -52,15 +52,42 @@ extension PrivateStruct {
   public init(x: Int) { self.init() } // expected-error {{private struct cannot have a public initializer}} {{3-9=private}}
 }
 
-public extension PublicStruct {}
-internal extension PublicStruct {}
-private extension PublicStruct {}
-public extension InternalStruct {} // expected-error {{extension of internal struct cannot be declared public}} {{1-7=}}
-internal extension InternalStruct {}
-private extension InternalStruct {}
-public extension PrivateStruct {} // expected-error {{extension of private struct cannot be declared public}} {{1-7=}}
-internal extension PrivateStruct {} // expected-error {{extension of private struct cannot be declared internal}} {{1-9=}}
-private extension PrivateStruct {}
+public extension PublicStruct {
+  public func extMemberPublic() {}
+  private func extImplPublic() {}
+}
+internal extension PublicStruct {
+  public func extMemberInternal() {} // expected-error {{internal extension cannot have a public instance method}}
+  private func extImplInternal() {}
+}
+private extension PublicStruct {
+  public func extMemberPrivate() {} // expected-error {{private extension cannot have a public instance method}}
+  private func extImplPrivate() {}
+}
+public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-7=}}
+  public func extMemberPublic() {} // expected-error {{internal struct cannot have a public instance method}} {{3-9=internal}}
+  private func extImplPublic() {}
+}
+internal extension InternalStruct {
+  public func extMemberInternal() {} // expected-error {{internal extension cannot have a public instance method}}
+  private func extImplInternal() {}
+}
+private extension InternalStruct {
+  public func extMemberPrivate() {} // expected-error {{private extension cannot have a public instance method}}
+  private func extImplPrivate() {}
+}
+public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-7=}}
+  public func extMemberPublic() {} // expected-error {{private struct cannot have a public instance method}} {{3-9=private}}
+  private func extImplPublic() {}
+}
+internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-9=}}
+  public func extMemberInternal() {} // expected-error {{internal extension cannot have a public instance method}}
+  private func extImplInternal() {}
+}
+private extension PrivateStruct {
+  public func extMemberPrivate() {} // expected-error {{private extension cannot have a public instance method}}
+  private func extImplPrivate() {}
+}
 
 
 public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivateProto {

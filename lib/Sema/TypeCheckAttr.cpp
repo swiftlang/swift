@@ -934,8 +934,19 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                   typeAccess,
                   extendedTy->getAnyNominal()->getDescriptiveKind(),
                   attr->getAccess())
-      .fixItRemove(attr->getRange());
+        .fixItRemove(attr->getRange());
       attr->setInvalid();
+      return;
+    }
+  } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
+    auto extAttr = extension->getAttrs().getAttribute<AccessibilityAttr>();
+    if (extAttr && attr->getAccess() > extAttr->getAccess()) {
+      auto diag = TC.diagnose(attr->getLocation(),
+                              diag::access_control_member_more,
+                              extAttr->getAccess(),
+                              extension->getDescriptiveKind(),
+                              attr->getAccess(),
+                              D->getDescriptiveKind());
       return;
     }
   }
