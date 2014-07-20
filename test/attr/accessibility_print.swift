@@ -161,20 +161,6 @@ private extension FD_PrivateClass {
   func explicitPrivateExt() {}
 } // CHECK: {{^[}]}}
 
-// CHECK-SRC: internal
-// CHECK-LABEL: extension FD_PrivateClass {
-internal extension FD_PrivateClass {
-  // CHECK: /*internal*/ func explicitInternalExt()
-  func explicitInternalExt() {}
-} // CHECK: {{^[}]}}
-
-// CHECK-SRC: public
-// CHECK-LABEL: extension FD_PrivateClass {
-public extension FD_PrivateClass {
-  // CHECK: /*public*/ func explicitPublicExt()
-  func explicitPublicExt() {}
-} // CHECK: {{^[}]}}
-
 
 public class FE_PublicClass {}
 // CHECK-SRC: private

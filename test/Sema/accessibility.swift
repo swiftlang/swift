@@ -28,7 +28,7 @@ internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
   private func privateReq() {}
 
-  public var publicVar = 0 // expected-error {{internal struct cannot have a public var}}
+  public var publicVar = 0 // expected-error {{internal struct cannot have a public var}} {{3-9=internal}}
 }
 
 // expected-note@+1 + {{type declared here}}
@@ -37,7 +37,7 @@ private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   private func internalReq() {}
   private func privateReq() {}
 
-  public var publicVar = 0 // expected-error {{private struct cannot have a public var}}
+  public var publicVar = 0 // expected-error {{private struct cannot have a public var}} {{3-9=private}}
 }
 
 extension PublicStruct {
@@ -45,13 +45,22 @@ extension PublicStruct {
 }
 
 extension InternalStruct {
-  public init(x: Int) { self.init() } // expected-error {{internal struct cannot have a public initializer}}
+  public init(x: Int) { self.init() } // expected-error {{internal struct cannot have a public initializer}} {{3-9=internal}}
 }
 
 extension PrivateStruct {
-  public init(x: Int) { self.init() } // expected-error {{private struct cannot have a public initializer}}
+  public init(x: Int) { self.init() } // expected-error {{private struct cannot have a public initializer}} {{3-9=private}}
 }
 
+public extension PublicStruct {}
+internal extension PublicStruct {}
+private extension PublicStruct {}
+public extension InternalStruct {} // expected-error {{extension of internal struct cannot be declared public}} {{1-7=}}
+internal extension InternalStruct {}
+private extension InternalStruct {}
+public extension PrivateStruct {} // expected-error {{extension of private struct cannot be declared public}} {{1-7=}}
+internal extension PrivateStruct {} // expected-error {{extension of private struct cannot be declared internal}} {{1-9=}}
+private extension PrivateStruct {}
 
 
 public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivateProto {
