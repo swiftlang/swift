@@ -22,6 +22,11 @@ func assign_iuo_lvalue(inout x: Int!, y: Int) {
 
 struct S {
   var x: Int
+
+  var computed: Int {
+    get {}
+    set {}
+  }
 }
 
 // CHECK-LABEL: sil @_TF15optional_lvalue26assign_iuo_lvalue_implicitFTRGSQVS_1S_Si_T_
@@ -39,4 +44,12 @@ func assign_iuo_lvalue_implicit(inout s: S!, y: Int) {
 func assign_optional_lvalue_reabstracted(inout x: (Int -> Int)?,
                                          y: Int -> Int) {
   x! = y
+}
+
+// CHECK-LABEL: sil @_TF15optional_lvalue31assign_optional_lvalue_computedFTRGSqVS_1S_Si_Si
+// CHECK:         function_ref @_TFV15optional_lvalue1Ss8computedSi
+// CHECK:         function_ref @_TFV15optional_lvalue1Sg8computedSi
+func assign_optional_lvalue_computed(inout x: S?, y: Int) -> Int {
+  x!.computed = y
+  return x!.computed
 }

@@ -368,7 +368,7 @@ namespace {
         .createUncheckedTakeEnumDataAddr(loc, base.getValue(),
                                    someDecl,
                                    getTypeData().TypeOfRValue.getAddressType());
-      return ManagedValue::forUnmanaged(someAddr);
+      return ManagedValue::forLValue(someAddr);
     }
   };
 
