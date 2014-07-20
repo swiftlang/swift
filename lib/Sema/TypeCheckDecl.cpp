@@ -5926,7 +5926,7 @@ createDesignatedInitOverride(TypeChecker &tc,
                                         nullptr, classDecl);
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getAccessibility(),
-                                  Accessibility::Internal));
+                                  superclassCtor->getAccessibility()));
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;

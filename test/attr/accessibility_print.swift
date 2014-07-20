@@ -259,3 +259,14 @@ class MultipleAttributes {
   // CHECK: {{^}} final {{(/\*)?private(\*/)?}} func foo()
   final private func foo() {}
 }
+
+// CHECK-LABEL: public{{(\*/)?}} class PublicInitBase {
+public class PublicInitBase {
+  // CHECK: {{^}} {{(/\*)?public(\*/)?}} init()
+  public init() {}
+}
+
+// CHECK-LABEL: public{{(\*/)?}} class PublicInitInheritor : PublicInitBase {
+public class PublicInitInheritor : PublicInitBase {
+  // CHECK: {{^}} /*public*/ init()
+}
