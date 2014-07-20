@@ -155,10 +155,8 @@ SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 
 
-SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
-                 /* Not serialized */ 47)
-SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier |
-                 NotSerialized, /* Not serialized */ 48)
+SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier, 47)
+SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier, 48)
 
 
 SIMPLE_DECL_ATTR(override, Override,
