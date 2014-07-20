@@ -770,9 +770,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       var->overwriteType(ErrorType::get(Context));
     else
       var->overwriteType(type);
-    if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
-      checkOwnershipAttr(var,
-                         var->getAttrs().getAttribute<OwnershipAttr>());
+    if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>()) {
+      checkOwnershipAttr(var, attr);
       type = getTypeOfRValue(var, true);
     }
 
