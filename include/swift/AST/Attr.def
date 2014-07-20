@@ -94,9 +94,6 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor|DeclModifier, 4)
 
-SIMPLE_DECL_ATTR(convenience, Convenience,
-                 OnConstructor|DeclModifier|NotSerialized, 42)
-
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
@@ -154,37 +151,41 @@ SIMPLE_DECL_ATTR(transparent, Transparent,
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 
+SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier, 28)
+SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier, 29)
 
-SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier, 47)
-SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier, 48)
 
+// Non-serialized attributes.
+
+SIMPLE_DECL_ATTR(convenience, Convenience,
+                 OnConstructor|DeclModifier|NotSerialized, 43)
 
 SIMPLE_DECL_ATTR(override, Override,
                  OnFunc | OnVar | OnSubscript | DeclModifier | NotSerialized,
-                 /* Not serialized */49)
+                 /* Not serialized */44)
 
 SIMPLE_DECL_ATTR(sil_stored, SILStored, OnVar | NotSerialized,
-                 /* Not serialized */41)
+                 /* Not serialized */45)
 
 DECL_ATTR(private, Accessibility,
           OnFunc | OnExtension | OnTypeAlias | OnStruct | OnEnum |
           OnClass | OnProtocol | OnVar | OnSubscript | OnConstructor |
           DeclModifier | NotSerialized,
-          /* Not serialized */ 44)
+          /* Not serialized */ 46)
 DECL_ATTR_ALIAS(internal, Accessibility)
 DECL_ATTR_ALIAS(public, Accessibility)
 
 
 DECL_ATTR(__accessibility, SetterAccessibility,
           OnVar | OnSubscript | DeclModifier | NotSerialized,
-          /* Not serialized */ 43)
+          /* Not serialized */ 47)
 
 DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl | NotSerialized,
-          /* Not serialized */46)
+          /* Not serialized */48)
 
 // Also handles unowned and unowned(weak).
 DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
-          /* Not serialized */45)
+          /* Not serialized */49)
 DECL_ATTR_ALIAS(unowned, Ownership)
 
 
