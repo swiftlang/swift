@@ -364,6 +364,11 @@ extension ${Self} : AbsoluteValuable {
 }
 
 @transparent public
+prefix func +(x: ${Self}) -> ${Self} {
+  return x
+}
+
+@transparent public
 prefix func -(x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.fneg_FPIEEE${bits}(x.value))
 }
@@ -415,10 +420,6 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 // Standard Operator Table
 //===----------------------------------------------------------------------===//
-
-// Unary plus
-@transparent public
-prefix func + (rhs: ${Self}) -> ${Self} { return rhs }
 
 @transparent public
 prefix func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
