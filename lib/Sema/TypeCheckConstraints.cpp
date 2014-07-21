@@ -1937,14 +1937,20 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
   
   // On the other hand, casts can decrease optionality monadically.
-  while (auto fromValueType = fromType->getAnyOptionalObjectType())
+  unsigned extraFromOptionals = 0;
+  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
     fromType = fromValueType;
+    ++extraFromOptionals;
+  }
 
   // If the unwrapped from/to types are equivalent, this isn't a real
   // downcast. Complain.
   if (fromType->isEqual(toType)) {
+    assert(extraFromOptionals > 0 && "No extra 'from' optionals?");
+    
+    // FIXME: Add a Fix-It, when the caller provides us with enough information.
     diagnose(diagLoc, diag::downcast_same_type,
-             origFromType, origToType)
+             origFromType, origToType, std::string(extraFromOptionals, '!'))
       .highlight(diagFromRange)
       .highlight(diagToRange);
     return CheckedCastKind::Unresolved;
