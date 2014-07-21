@@ -1,0 +1,89 @@
+// RUN: %sil-opt %s -global-load-store-opts -verify | FileCheck %s
+// Verifies that we can correctly handle self cycles in control flow.
+
+import Builtin
+import Swift
+
+var total: Int
+
+class NewRangeGenerator1 {
+  final var current: Int
+  final let end: Int
+  init(start: Int, end: Int)
+}
+
+final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
+  init(start: Int, end: Int)
+}
+
+// CHECK-LABEL: sil @test
+sil @test : $@thin () -> () {
+bb0:
+  // CHECK: [[ID1:%[0-9]+]] = integer_literal $Builtin.Word, 0
+  // CHECK: [[ID2:%[0-9]+]] = struct $Int ([[ID1]]
+  // CHECK: [[ID3:%[0-9]+]] = integer_literal $Builtin.Word, 10
+  // CHECK: [[ID4:%[0-9]+]] = struct $Int ([[ID3]]
+  // CHECK: struct_extract [[ID2]]
+  // CHECK: struct_extract [[ID4]]
+  // CHECK: cond_br
+  %0 = global_addr #total : $*Int
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = struct $Int (%1 : $Builtin.Word)
+  store %2 to %0 : $*Int
+  %4 = integer_literal $Builtin.Word, 10
+  %5 = struct $Int (%4 : $Builtin.Word)
+  %6 = alloc_ref $NewHalfOpenRangeGenerator
+  %7 = upcast %6 : $NewHalfOpenRangeGenerator to $NewRangeGenerator1
+  %8 = ref_element_addr %7 : $NewRangeGenerator1, #NewRangeGenerator1.current
+  store %2 to %8 : $*Int
+  %10 = ref_element_addr %7 : $NewRangeGenerator1, #NewRangeGenerator1.end
+  store %5 to %10 : $*Int
+  %12 = struct_element_addr %8 : $*Int, #Int.value
+  %13 = struct_element_addr %10 : $*Int, #Int.value
+  %14 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %15 = load %12 : $*Builtin.Word
+  %16 = load %13 : $*Builtin.Word
+  %17 = apply %14(%15, %16) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %17, bb3, bb1
+
+bb2(%20 : $Builtin.Word):
+  // We should not forward the value in bb0 directly to the load since we store
+  // to the address inside the loop.
+  // CHECK: load
+  %21 = load %12 : $*Builtin.Word
+  %22 = integer_literal $Builtin.Word, 1
+  %23 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %24 = integer_literal $Builtin.Int1, -1
+  %25 = apply %23(%20, %22, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %26 = tuple_extract %25 : $(Builtin.Word, Builtin.Int1), 0
+  %27 = tuple_extract %25 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %27 : $Builtin.Int1
+  // CHECK: [[ID5:%[0-9]+]] = struct $Int
+  %29 = struct $Int (%26 : $Builtin.Word)
+  store %29 to %8 : $*Int
+  %31 = struct_element_addr %0 : $*Int, #Int.value
+  // CHECK: load
+  %32 = load %31 : $*Builtin.Word
+  %33 = apply %23(%32, %21, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %34 = tuple_extract %33 : $(Builtin.Word, Builtin.Int1), 0
+  %35 = tuple_extract %33 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %35 : $Builtin.Int1
+  %37 = struct $Int (%34 : $Builtin.Word)
+  store %37 to %0 : $*Int
+  // CHECK: struct_extract [[ID5]]
+  %39 = load %12 : $*Builtin.Word
+  // CHECK: load
+  %40 = load %13 : $*Builtin.Word
+  %41 = apply %14(%39, %40) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %41, bb3, bb2(%39 : $Builtin.Word)
+
+// bb1 is after bb2 to make sure the first predecessor of bb2 is not bb2 to
+// expose the bug.
+bb1:
+  br bb2(%15 : $Builtin.Word)
+
+bb3:
+  strong_release %7 : $NewRangeGenerator1
+  %44 = tuple ()
+  return %44 : $()
+}
