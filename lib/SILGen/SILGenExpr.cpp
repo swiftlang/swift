@@ -407,16 +407,22 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
                               accessor.getType().castTo<SILFunctionType>()
                                       ->getResult().getSILType(),
                               {}, {});
-    // FIXME: It'd be nice if the result of the accessor was natively an address.
+    // FIXME: It'd be nice if the result of the accessor was natively an
+    // address.
     addr = gen.B.createPointerToAddress(loc, addr,
                           gen.getLoweredType(var->getType()).getAddressType());
     return ManagedValue::forLValue(addr);
   }
   
-  // Global variables in main source files can be accessed directly.
-  // FIXME: And all global variables when lazy initialization is disabled.
-  SILValue addr = gen.B.createGlobalAddr(loc, var,
+  // Global variables can be accessed directly with global_addr.  Emit this
+  // instruction into the prolog of the function so we can memoize/CSE it in
+  // VarLocs.
+  auto &entryBB = gen.getFunction().getBlocks().front();
+  SILBuilder B(&entryBB, entryBB.begin());
+  auto addr = B.createGlobalAddr(loc, var,
                           gen.getLoweredType(var->getType()).getAddressType());
+
+  gen.VarLocs[var] = SILGenFunction::VarLoc::getAddress(addr);
   return ManagedValue::forLValue(addr);
 }
 

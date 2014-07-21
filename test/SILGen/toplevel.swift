@@ -42,3 +42,13 @@ func print_y() {
 y = 1
 print_y()
 
+
+// CHECK: sil @_TF8toplevel13testGlobalCSEFT_Si
+// CHECK-NOT: global_addr
+// CHECK: %0 = global_addr #x : $*Int
+// CHECK-NOT: global_addr
+// CHECK: return
+func testGlobalCSE() -> Int {
+  // We should only emit one global_addr in this function.
+  return x + x
+}
