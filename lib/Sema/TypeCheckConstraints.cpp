@@ -1939,7 +1939,17 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // On the other hand, casts can decrease optionality monadically.
   while (auto fromValueType = fromType->getAnyOptionalObjectType())
     fromType = fromValueType;
-  
+
+  // If the unwrapped from/to types are equivalent, this isn't a real
+  // downcast. Complain.
+  if (fromType->isEqual(toType)) {
+    diagnose(diagLoc, diag::downcast_same_type,
+             origFromType, origToType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+    return CheckedCastKind::Unresolved;
+  }
+
   // Strip metatypes. If we can cast two types, we can cast their metatypes.
   bool metatypeCast = false;
   while (auto toMetatype = toType->getAs<MetatypeType>()) {
