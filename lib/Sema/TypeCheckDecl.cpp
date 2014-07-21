@@ -5243,7 +5243,7 @@ public:
     // This only makes sense when the overridden constructor is required.
     checkOverrides(CD);
 
-    // Determine whether this constructor is required.
+    // Determine whether this initializer is required.
     if (!CD->getAttrs().hasAttribute<RequiredAttr>()) {
       if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
         CD->getAttrs().add(
@@ -6221,7 +6221,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
 
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit()
-          || superclassCtor->isRequired() || superclassCtor->isInvalid())
+          || superclassCtor->isInvalid())
         continue;
 
       // We have a designated initializer. Create an override of it.

@@ -28,7 +28,11 @@ extension C {
 // -------------------------------------------------------------------------
 // Subclass requirements for required
 // -------------------------------------------------------------------------
-class C2 : C { // expected-error{{class 'C2' does not implement its superclass's required members}}
+class C2 : C { // okay: implicitly defined
+}
+
+class C2b : C { // expected-error{{class 'C2b' does not implement its superclass's required members}}
+  init() {}
 }
 
 class C3 : C {
@@ -40,8 +44,17 @@ class C4 : C3 {
   init(string s: String) { } // expected-note{{'required' initializer with type '(string: String)' not overridden}}
 }
 
-class C5 : C4 { // expected-error{{class 'C5' does not implement its superclass's required members}}
+class C5 : C4 {
 }
 
+class C5b : C4 { // expected-error{{class 'C5b' does not implement its superclass's required members}}
+  init() {}
+}
 
+class Foo {
+  required init() { }
+}
 
+class Bar : Foo {
+  
+}
