@@ -177,14 +177,24 @@ extension ${Self} : ArrayType {
     return _getCount()
   }
 
-  /// How many elements the ${Self} can store without reallocation
+  /// How many elements the `${Self}` can store without reallocation
   public var capacity: Int {
     return _getCapacity()
   }
 
-  /// true if and only if the ${Self} is empty
+  /// `true` if and only if the `${Self}` is empty
   public var isEmpty: Bool {
     return count == 0
+  }
+  
+  /// Returns the first element.  Requires: `!isEmpty`
+  public func first() -> Element {
+    return Swift.first(self)
+  }
+  
+  /// Returns the last element.  Requires: `!isEmpty`
+  public func last() -> Element {
+    return Swift.last(self)
   }
   
   /// An object that guarantees the lifetime of this array's elements
