@@ -19,7 +19,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/QuotedString.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -724,10 +723,11 @@ private:
       return nullptr;
 
     // Decode operator names.
-    llvm::SmallString<32> opDecodeBuffer;
+    std::string opDecodeBuffer;
     if (isOperator) {
       static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
 
+      opDecodeBuffer.reserve(identifier.size());
       for (signed char c : identifier) {
         if (c < 0) {
           // Pass through Unicode characters.
