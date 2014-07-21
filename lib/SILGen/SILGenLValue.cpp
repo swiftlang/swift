@@ -291,7 +291,7 @@ namespace {
   public:
     RefElementComponent(VarDecl *field, SILType substFieldType,
                         LValueTypeData typeData)
-      : PhysicalPathComponent(typeData),
+      : PhysicalPathComponent(typeData, RefElementKind),
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base)
@@ -311,7 +311,8 @@ namespace {
     unsigned ElementIndex;
   public:
     TupleElementComponent(unsigned elementIndex, LValueTypeData typeData)
-      : PhysicalPathComponent(typeData), ElementIndex(elementIndex) {}
+      : PhysicalPathComponent(typeData, TupleElementKind),
+        ElementIndex(elementIndex) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc,
                         ManagedValue base) const override {
@@ -329,7 +330,7 @@ namespace {
   public:
     StructElementComponent(VarDecl *field, SILType substFieldType,
                            LValueTypeData typeData)
-      : PhysicalPathComponent(typeData),
+      : PhysicalPathComponent(typeData, StructElementKind),
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc,
@@ -345,7 +346,7 @@ namespace {
     SILType SubstFieldType;
   public:
     OptionalObjectComponent(LValueTypeData typeData)
-      : PhysicalPathComponent(typeData)
+      : PhysicalPathComponent(typeData, OptionalObjectKind)
     {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc,
@@ -375,7 +376,7 @@ namespace {
     ManagedValue Value;
   public:
     ValueComponent(ManagedValue value, LValueTypeData typeData) :
-      PhysicalPathComponent(typeData),
+      PhysicalPathComponent(typeData, ValueKind),
       Value(value) {
     }
 
@@ -426,7 +427,7 @@ namespace {
                           ArrayRef<Substitution> substitutions,
                           LValueTypeData typeData,
                           Expr *subscriptIndexExpr = nullptr)
-      : LogicalPathComponent(typeData),
+      : LogicalPathComponent(typeData, GetterSetterKind),
         decl(decl),
         IsSuper(isSuper),
         substitutions(substitutions.begin(), substitutions.end()),
@@ -437,7 +438,7 @@ namespace {
     GetterSetterComponent(const GetterSetterComponent &copied,
                           SILGenFunction &gen,
                           SILLocation loc)
-      : LogicalPathComponent(copied.getTypeData()),
+      : LogicalPathComponent(copied.getTypeData(), GetterSetterKind),
         decl(copied.decl),
         IsSuper(copied.IsSuper),
         substitutions(copied.substitutions),
@@ -482,7 +483,8 @@ namespace {
   public:
     OrigToSubstComponent(SILGenFunction &gen,
                          AbstractionPattern origType, CanType substType)
-      : LogicalPathComponent(getUnsubstitutedTypeData(gen, substType)),
+      : LogicalPathComponent(getUnsubstitutedTypeData(gen, substType),
+                             OrigToSubstKind),
         origType(origType), substType(substType)
     {}
     
@@ -519,7 +521,7 @@ namespace {
   class OwnershipComponent : public LogicalPathComponent {
   public:
     OwnershipComponent(LValueTypeData typeData)
-      : LogicalPathComponent(typeData) {
+      : LogicalPathComponent(typeData, OwnershipKind) {
     }
 
 

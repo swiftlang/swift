@@ -62,8 +62,26 @@ class PathComponent {
   LValueTypeData TypeData;
 
   friend class LValue;
-  unsigned AllocatedSize : 31;
-  const unsigned IsPhysical : 1;
+  unsigned AllocatedSize;
+public:
+  enum KindTy {
+    // Physical lvalue kinds
+    RefElementKind,             // ref_element_addr
+    TupleElementKind,           // tuple_element_addr
+    StructElementKind,          // struct_element_addr
+    OptionalObjectKind,         // optional projection
+    ValueKind,                  // random base pointer as an lvalue
+
+    // Logical LValue kinds
+    GetterSetterKind,           // property or subscript getter/setter
+    OrigToSubstKind,            // generic type substitution
+    OwnershipKind,              // weak pointer remapping
+    AutoreleasingWritebackKind, // autorelease pointer on set
+
+    FirstLogicalKind = GetterSetterKind
+  };
+private:
+  const KindTy Kind : 8;
 
   // This anchor method serves three purposes: it aligns the class to
   // a pointer boundary, it makes the class a primary base so that
@@ -75,8 +93,8 @@ class PathComponent {
   PathComponent &operator=(const PathComponent &) = delete;
 
 protected:
-  PathComponent(LValueTypeData typeData, bool isPhysical)
-    : TypeData(typeData), IsPhysical(isPhysical) {}
+  PathComponent(LValueTypeData typeData, KindTy Kind)
+    : TypeData(typeData), Kind(Kind) {}
 
   virtual ~PathComponent() {}
 
@@ -87,8 +105,8 @@ public:
   /// Is this component physical or logical?  If physical, this will
   /// be a subclass of PhysicalPathComponent.  If logical, this will
   /// be a subclass of LogicalPathComponent.
-  bool isPhysical() const { return IsPhysical; }
-  bool isLogical() const { return !IsPhysical; }
+  bool isPhysical() const { return Kind < FirstLogicalKind; }
+  bool isLogical() const { return Kind >= FirstLogicalKind; }
 
   // These are implemented inline after the respective class declarations.
 
@@ -107,6 +125,8 @@ public:
   CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
 
   const LValueTypeData &getTypeData() const { return TypeData; }
+
+  KindTy getKind() const { return Kind; }
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -116,8 +136,8 @@ class PhysicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  PhysicalPathComponent(LValueTypeData typeData)
-    : PathComponent(typeData, true) {}
+  PhysicalPathComponent(LValueTypeData typeData, KindTy Kind)
+    : PathComponent(typeData, Kind) {}
 
 public:
   virtual ManagedValue offset(SILGenFunction &gen,
@@ -141,8 +161,8 @@ class LogicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  LogicalPathComponent(LValueTypeData typeData)
-    : PathComponent(typeData, false) {}
+  LogicalPathComponent(LValueTypeData typeData, KindTy Kind)
+    : PathComponent(typeData, Kind) {}
 
 public:
   /// Clone the path component onto the heap.

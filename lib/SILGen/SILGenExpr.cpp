@@ -5303,7 +5303,7 @@ namespace {
 class AutoreleasingWritebackComponent : public LogicalPathComponent {
 public:
   AutoreleasingWritebackComponent(LValueTypeData typeData)
-    : LogicalPathComponent(typeData)
+    : LogicalPathComponent(typeData, AutoreleasingWritebackKind)
   {}
   
   std::unique_ptr<LogicalPathComponent>
