@@ -31,7 +31,7 @@ using namespace Demangle;
 
 [[noreturn]]
 static void unreachable(const char *Message) {
-  printf("fatal error: %s\n", Message);
+  fprintf(stderr, "fatal error: %s\n", Message);
   std::abort();
 }
 
