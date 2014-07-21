@@ -105,3 +105,17 @@ testArrayIsaBridged([1, 2, 3])
 // CHECK: Did not match
 testArrayIsaBridged([[1, 2], [3, 4], [5, 6]])
 
+func testNSMutableStringMatch(sa: NSMutableString) {
+  switch(sa) {
+  case "foobar":
+    println("MATCH")
+  default:
+    println("nomatch")
+  }
+}
+
+// CHECK: MATCH
+testNSMutableStringMatch("foobar")
+
+// CHECK: nomatch
+testNSMutableStringMatch("nope")

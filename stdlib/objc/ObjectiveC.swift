@@ -154,10 +154,6 @@ internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return Bool(x)
 }
 
-public func ~=(x: NSObject, y: NSObject) -> Bool {
-  return x.isEqual(y)
-}
-
 //===----------------------------------------------------------------------===//
 // FIXME: @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
