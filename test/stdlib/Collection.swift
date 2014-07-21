@@ -180,5 +180,19 @@ func testUnderestimateCount() {
 }
 testUnderestimateCount()
 
+func testIsEmptyFirstLast() {
+  // CHECK: testing isEmpty
+  println("testing isEmpty")
+  // CHECK-NEXT: true
+  println(isEmpty(10..<10))
+  // CHECK-NEXT: false
+  println(isEmpty(10...10))
+  // CHECK-NEXT: 10
+  println(first(10..<100))
+  // CHECK-NEXT: 99
+  println(last(10..<100))
+}
+testIsEmptyFirstLast()
+
 // CHECK: all done.
 println("all done.")
