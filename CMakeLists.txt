@@ -547,8 +547,8 @@ endfunction(compute_library_subdir)
 # list of externally-build sources.
 #
 # Usage:
-#   handle_swift_sources(sourcesvar externalvar)
-function(handle_swift_sources sourcesvar externalvar name)
+#   handle_swift_sources(sourcesvar externalsourcevar externaltargetvar)
+function(handle_swift_sources sourcesvar externalsourcevar externaltargetvar name)
   parse_arguments(SWIFTSOURCES  
     "DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
     "IS_MAIN;IS_STDLIB_CORE"
@@ -557,6 +557,7 @@ function(handle_swift_sources sourcesvar externalvar name)
   set(result)
   set(swift_sources)
   set(asm_sources)
+  set(compile_target)
   foreach(src ${${sourcesvar}})
     get_filename_component(extension ${src} EXT)
     if(extension STREQUAL ".swift")
@@ -611,11 +612,14 @@ function(handle_swift_sources sourcesvar externalvar name)
       API_NOTES ${SWIFTSOURCES_API_NOTES}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
     list(APPEND result ${swift_obj})
+    set(compile_target "compile_swift_${name}")
+    add_custom_target(${compile_target} DEPENDS ${swift_obj})
   endif()
 
   llvm_process_sources(result ${result})
   set(${sourcesvar} "${result}" PARENT_SCOPE)
-  set(${externalvar} ${swift_sources} ${asm_sources} PARENT_SCOPE)
+  set(${externalsourcevar} ${swift_sources} ${asm_sources} PARENT_SCOPE)
+  set(${externaltargetvar} ${compile_target} PARENT_SCOPE)
 endfunction()
 
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift resource files
@@ -772,7 +776,8 @@ macro(add_swift_library_single target name)
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
-    SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
+    SWIFTLIB_SINGLE_EXTERNAL_SOURCES
+    SWIFTLIB_SINGLE_EXTERNAL_TARGETS ${name}
     DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS} ${SWIFTLIB_SINGLE_DEPENDS}
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
@@ -782,6 +787,10 @@ macro(add_swift_library_single target name)
   add_library( ${target} ${libkind}
     ${SWIFTLIB_SINGLE_SOURCES}
     ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
+
+  if(SWIFTLIB_SINGLE_EXTERNAL_TARGETS)
+    add_dependencies(${target} ${SWIFTLIB_SINGLE_EXTERNAL_TARGETS})
+  endif()
 
   set_source_files_properties(
     ${SWIFTLIB_SINGLE_SOURCES}
@@ -917,9 +926,12 @@ macro(add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
       ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
-
     set_output_directory(${target_static}
       ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+    if(SWIFTLIB_SINGLE_EXTERNAL_TARGETS)
+      add_dependencies(${target} ${SWIFTLIB_SINGLE_EXTERNAL_TARGETS})
+    endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
@@ -1236,15 +1248,18 @@ macro(add_swift_executable name)
     ${ARGN})
   set(SWIFTEXE)
   
-  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name}
-    DEPENDS ${SWIFTEXE_FILE_DEPENDS} OPT_FLAGS ${SWIFTEXE_OPT_FLAGS}
-    IS_MAIN)
+  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES
+    SWIFTEXE_EXTERNAL_TARGETS ${name} DEPENDS ${SWIFTEXE_FILE_DEPENDS}
+    OPT_FLAGS ${SWIFTEXE_OPT_FLAGS} IS_MAIN)
 
   # Add the executable
   if (${SWIFTEXE_EXCLUDE_FROM_ALL})
     add_executable(${name} EXCLUDE_FROM_ALL ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   else()
     add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
+  endif()
+  if(SWIFTEXE_EXTERNAL_TARGETS)
+    add_dependencies(${name} ${SWIFTEXE_EXTERNAL_TARGETS})
   endif()
   set_source_files_properties(
     ${SWIFTEXE_DEFAULT_ARGS}
