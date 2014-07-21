@@ -77,7 +77,7 @@ public:
   }
 };
 
-/// Describes API notes data for an Objective-C class.
+/// Describes API notes data for an Objective-C class or protocol.
 class ObjCContextInfo : public CommonEntityInfo {
   /// Whether this class has a default nullability.
   unsigned HasDefaultNullability : 1;
