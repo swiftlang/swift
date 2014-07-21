@@ -16,35 +16,35 @@ import Foundation
 
 var nsValueBridging = TestCase("NSValueBridging")
 
-nsValueBridging.test("NSPoint") {
-  let nsValue = _bridgeToObjectiveC(NSPoint(x: 5, y: 7)) as NSValue
-  let swiftValue: NSPoint = _bridgeFromObjectiveC(nsValue, NSPoint.self)
-  expectEqual(swiftValue.x, 5)
-  expectEqual(swiftValue.y, 7)
+nsValueBridging.test("CGPoint") {
+  let nsValue = _bridgeToObjectiveC(CGPoint(x: 5, y: 7)) as NSValue
+  let swiftValue: CGPoint = _bridgeFromObjectiveC(nsValue, CGPoint.self)
+  expectEqual(5, swiftValue.x)
+  expectEqual(7, swiftValue.y)
 }
 
-nsValueBridging.test("NSSize") {
-  let nsValue = _bridgeToObjectiveC(NSSize(width: 5.5, height: 7.5)) as NSValue
-  let swiftValue: NSSize = _bridgeFromObjectiveC(nsValue, NSSize.self)
-  expectEqual(swiftValue.width, 5.5)
-  expectEqual(swiftValue.height, 7.5)
+nsValueBridging.test("CGSize") {
+  let nsValue = _bridgeToObjectiveC(CGSize(width: 5.5, height: 7.5)) as NSValue
+  let swiftValue: CGSize = _bridgeFromObjectiveC(nsValue, CGSize.self)
+  expectEqual(5.5, swiftValue.width)
+  expectEqual(7.5, swiftValue.height)
 }
 
-nsValueBridging.test("NSRect") {
+nsValueBridging.test("CGRect") {
   let nsValue = _bridgeToObjectiveC(
-    NSRect(x: 11, y: 13, width: 5.5, height: 7.5)) as NSValue
-  let swiftValue: NSRect = _bridgeFromObjectiveC(nsValue, NSRect.self)
-  expectEqual(swiftValue.origin.x, 11)
-  expectEqual(swiftValue.origin.y, 13)
-  expectEqual(swiftValue.size.width, 5.5)
-  expectEqual(swiftValue.size.height, 7.5)
+    CGRect(x: 11, y: 13, width: 5.5, height: 7.5)) as NSValue
+  let swiftValue: CGRect = _bridgeFromObjectiveC(nsValue, CGRect.self)
+  expectEqual(11, swiftValue.origin.x)
+  expectEqual(13, swiftValue.origin.y)
+  expectEqual(5.5, swiftValue.size.width)
+  expectEqual(7.5, swiftValue.size.height)
 }
 
 nsValueBridging.test("NSRange") {
   let nsValue = _bridgeToObjectiveC(NSRange(location: 17, length: 19)) as NSValue
   let swiftValue: NSRange = _bridgeFromObjectiveC(nsValue, NSRange.self)
-  expectEqual(swiftValue.location, 17)
-  expectEqual(swiftValue.length, 19)
+  expectEqual(17, swiftValue.location)
+  expectEqual(19, swiftValue.length)
 }
 
 nsValueBridging.run()
