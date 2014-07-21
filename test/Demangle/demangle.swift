@@ -35,7 +35,7 @@
 ; CHECK: _TtbSiSu ---> @objc_block (Swift.Int) -> Swift.UInt
 ; CHECK: _TtbTSiSc_Su ---> @objc_block (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
 ; CHECK: _TtFSiSu ---> (Swift.Int) -> Swift.UInt
-; CHECK: _TtKSiSu ---> @auto_closure (Swift.Int) -> Swift.UInt
+; CHECK: _TtKSiSu ---> @autoclosure (Swift.Int) -> Swift.UInt
 ; CHECK: _TtfSiFScSu ---> (Swift.Int)(Swift.UnicodeScalar) -> Swift.UInt
 ; CHECK: _TtFSiFScSu ---> (Swift.Int) -> (Swift.UnicodeScalar) -> Swift.UInt
 ; CHECK: _TtMSi ---> Swift.Int.Type

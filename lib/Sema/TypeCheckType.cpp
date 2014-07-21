@@ -1159,7 +1159,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
+    TAK_autoclosure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed
   };
   
@@ -1188,12 +1188,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Function attributes require a syntactic function type.
   FunctionTypeRepr *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
   if (hasFunctionAttr && fnRepr) {
-    // auto_closures must take () syntactically.
-    if (attrs.has(TAK_auto_closure)) {
+    // autoclosures must take () syntactically.
+    if (attrs.has(TAK_autoclosure)) {
       auto input = fnRepr->getArgsTypeRepr();
       auto inputTuple = dyn_cast<TupleTypeRepr>(input);
       if (inputTuple == 0 || !inputTuple->getElements().empty()) {
-        TC.diagnose(attrs.getLoc(TAK_auto_closure),
+        TC.diagnose(attrs.getLoc(TAK_autoclosure),
                     diag::autoclosure_function_input_nonunit)
           .highlight(input->getSourceRange());
       }
@@ -1223,7 +1223,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                     : AbstractCC::Freestanding,
                                   rep,
                                   attrs.has(TAK_noreturn),
-                                  attrs.has(TAK_auto_closure));
+                                  attrs.has(TAK_autoclosure));
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {

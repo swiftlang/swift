@@ -23,7 +23,7 @@
 /// evaluated.
 @transparent public
 func assert(
-  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
@@ -35,7 +35,7 @@ func assert(
 }
 @transparent public
 func assert<T : BooleanType>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
@@ -67,7 +67,7 @@ func fatalError(
 /// and abort.
 @transparent public
 func _precondition(
-  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -82,7 +82,7 @@ func _precondition(
 }
 @transparent public
 func _precondition<T : BooleanType>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -135,7 +135,7 @@ func _overflowChecked<T>(
 /// all possible errors.
 @transparent public
 func _debugPrecondition(
-  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug mode.
@@ -148,7 +148,7 @@ func _debugPrecondition(
 
 @transparent public
 func _debugPrecondition<T : BooleanType>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug mode.
@@ -177,7 +177,7 @@ func _debugPreconditionFailure(
 /// call to this function is a noop.
 @transparent public
 func _sanityCheck(
-  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
 #if INTERNAL_CHECKS_ENABLED
@@ -189,7 +189,7 @@ func _sanityCheck(
 
 @transparent public
 func _sanityCheck<T : BooleanType>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
 #if INTERNAL_CHECKS_ENABLED

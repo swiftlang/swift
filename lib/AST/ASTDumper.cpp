@@ -752,7 +752,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     if (isa<ClosureExpr>(ACE))
       os << "explicit closure discriminator=";
     if (isa<AutoClosureExpr>(ACE))
-      os << "auto_closure discriminator=";
+      os << "autoclosure discriminator=";
     os << ACE->getDiscriminator();
     break;
   }
@@ -1524,7 +1524,7 @@ public:
     OS << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {
-    printClosure(E, "auto_closure_expr") << '\n';
+    printClosure(E, "autoclosure_expr") << '\n';
     printRec(E->getSingleExpressionBody());
     OS << ')';
   }

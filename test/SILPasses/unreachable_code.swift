@@ -158,7 +158,7 @@ func testSwitchEnum(xi: Int) -> Int {
 }
 
 @noreturn @asmname("exit") func exit() -> ()
-func reachableThroughNonFoldedPredecessor(fn: @auto_closure () -> Bool = false) {
+func reachableThroughNonFoldedPredecessor(fn: @autoclosure () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()
   }

@@ -14,7 +14,7 @@ infix operator &&&&& {
   precedence 120
 }
 
-func &&&&&(lhs: BooleanType, rhs: @auto_closure ()->BooleanType) -> Bool {
+func &&&&&(lhs: BooleanType, rhs: @autoclosure ()->BooleanType) -> Bool {
   return lhs.getLogicValue() ? rhs().getLogicValue() : false
 }
 

@@ -4,7 +4,7 @@ struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil @_TF13auto_closures17call_auto_closure
-func call_auto_closure(var x: @auto_closure () -> Bool) -> Bool {
+func call_auto_closure(var x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
   // CHECK: [[XLOAD:%.*]] = load [[XBOX]]#1
   // CHECK: [[RET:%.*]] = apply [transparent] [[XLOAD]]()
@@ -13,7 +13,7 @@ func call_auto_closure(var x: @auto_closure () -> Bool) -> Bool {
 }
 
 // CHECK-LABEL: sil @_TF13auto_closures18call_auto_closure2
-func call_auto_closure2(inout x: @auto_closure () -> Bool) -> Bool {
+func call_auto_closure2(inout x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
   // CHECK: [[XLOAD:%.*]] = load [[XBOX]]#1
   // CHECK: [[RET:%.*]] = apply [transparent] [[XLOAD]]()

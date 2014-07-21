@@ -9,17 +9,17 @@ func test() {
 
 var b : Int -> Int = {$0}
 
-@auto_closure var c1 : () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
-var c2 : (field : @auto_closure Int)  // expected-error {{attribute only applies to syntactic function types}}
-var c3 : (field : @auto_closure Int -> Int)  // expected-error {{auto_closure argument type must be '()'}}
+@autoclosure var c1 : () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
+var c2 : (field : @autoclosure Int)  // expected-error {{attribute only applies to syntactic function types}}
+var c3 : (field : @autoclosure Int -> Int)  // expected-error {{autoclosure argument type must be '()'}}
 
-var d1 : (field : @auto_closure () -> Int)
-var d2 : @auto_closure () -> Int = 4
+var d1 : (field : @autoclosure () -> Int)
+var d2 : @autoclosure () -> Int = 4
 
-var d3 : @auto_closure () -> Float =
+var d3 : @autoclosure () -> Float =
    4
 
-var d4 : @auto_closure () -> Int =
+var d4 : @autoclosure () -> Int =
    d2 // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
 var e0 : [Int]

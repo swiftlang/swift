@@ -868,15 +868,15 @@
   <pre class="example">
   <i>// An auto closure value.  This captures an implicit closure over the</i>
   <i>// specified expression, instead of the expression itself.</i>
-  var a : @auto_closure () -&gt; Int = 4
+  var a : @autoclosure () -&gt; Int = 4
   
   <i>// Definition of an 'assert' function.  Assertions and logging routines</i>
   <i>// often want to conditionally evaluate their argument.</i>
-  func assert(condition : @auto_closure () -> Bool)
+  func assert(condition : @autoclosure () -> Bool)
     
   <i>// Definition of the || operator - it captures its right hand side as</i>
   <i>// an autoclosure so it can short-circuit evaluate it.</i>
-  func [infix_left=110] || (lhs: Bool, rhs: @auto_closure ()->Bool) -&gt; Bool
+  func [infix_left=110] || (lhs: Bool, rhs: @autoclosure ()->Bool) -&gt; Bool
     
   <i>// Example uses of these functions:</i>
   assert(i &lt; j)
@@ -1126,7 +1126,7 @@
     
     <i>// An auto closure value.  This captures an implicit closure over the</i>
     <i>// specified expression, instead of the expression itself.</i>
-    var a : @auto_closure () -> Int = 4
+    var a : @autoclosure () -> Int = 4
   </pre>
   
   <!-- ===================================================================== -->

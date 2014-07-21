@@ -1976,7 +1976,7 @@ END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 /// and a value of this function type is only assignable (in source code) from
 /// the destination type of the function. Sema inserts an ImplicitClosure to
 /// close over the value.  For example:
-///   var x : @auto_closure () -> int = 4
+///   var x : @autoclosure () -> int = 4
 class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function

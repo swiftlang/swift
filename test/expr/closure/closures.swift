@@ -1,12 +1,12 @@
 // RUN: %swift %s -verify
 
-var func4 : (fn : @auto_closure () -> ()) -> ()
+var func4 : (fn : @autoclosure () -> ()) -> ()
 var func6 : (fn : (Int,Int) -> Int) -> ()
 
 
 // Expressions can be auto-closurified, so that they can be evaluated separately
 // from their definition.
-var closure1 : @auto_closure () -> Int = 4  // Function producing 4 whenever it is called.
+var closure1 : @autoclosure () -> Int = 4  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // FIXME: expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}

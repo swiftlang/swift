@@ -18,8 +18,8 @@ var fi : F<Int>
 func f0(b : B) {} // expected-note{{in initialization of parameter 'b'}}
 
 func ternary<T>(cond: Bool,
-                ifTrue: @auto_closure () -> T,
-                ifFalse: @auto_closure () -> T) -> T {}
+                ifTrue: @autoclosure () -> T,
+                ifFalse: @autoclosure () -> T) -> T {}
 
 f0(c)
 f0(a) // expected-error{{'A' is not convertible to 'B'}}

@@ -28,11 +28,11 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 // [Implement overload resolution].
 
 @transparent public
-func &&(lhs: BooleanType, rhs: @auto_closure () -> BooleanType) -> Bool {
+func &&(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
   return lhs.getLogicValue() ? rhs().getLogicValue() : false
 }
 
 @transparent public
-func ||(lhs: BooleanType, rhs: @auto_closure () -> BooleanType) -> Bool {
+func ||(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
   return lhs.getLogicValue() ? true : rhs().getLogicValue()
 }

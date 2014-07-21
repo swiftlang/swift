@@ -1185,7 +1185,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
     return getBridgedFunctionType(*this, t, extInfo);
 
   AbstractCC cc = extInfo.getCC();
-  assert(!extInfo.isAutoClosure() && "auto_closures cannot be curried");
+  assert(!extInfo.isAutoClosure() && "autoclosures cannot be curried");
   assert(extInfo.getRepresentation() != FunctionType::Representation::Block
          && "objc blocks cannot be curried");
   

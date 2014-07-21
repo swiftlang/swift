@@ -108,7 +108,7 @@ func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   return x; 
 }
 
-func testCleanupCodeEmptyTuple(fn: @auto_closure () -> Bool = false,
+func testCleanupCodeEmptyTuple(fn: @autoclosure () -> Bool = false,
           message: String = "",
           file: String = __FILE__,
           line: Int = __LINE__) {

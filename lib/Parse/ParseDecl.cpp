@@ -872,6 +872,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   } else if (Attributes.has(attr)) {
     diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
   } else {
+
+    if (Text == "auto_closure")
+      diagnose(Loc, diag::auto_closure_attribute_renamed)
+        .fixItReplace(Loc, "autoclosure");
+
     Attributes.setAttr(attr, Loc);
   }
   

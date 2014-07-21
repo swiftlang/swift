@@ -1358,7 +1358,7 @@ ERROR(attribute_requires_function_type,attribute_parsing,none,
 ERROR(first_class_generic_function,type_parsing,PointsToFirstBadToken,
       "generic types cannot be used as first-class types", ())
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
-      "auto_closure argument type must be '()'", ())
+      "autoclosure argument type must be '()'", ())
 ERROR(objc_block_cannot_be_thin,attribute_parsing,none,
       "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,attribute_parsing,none,

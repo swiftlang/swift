@@ -929,8 +929,8 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator) {
-  // An @auto_closure function type can be a subtype of a
-  // non-@auto_closure function type.
+  // An @autoclosure function type can be a subtype of a
+  // non-@autoclosure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
     if (func2->isAutoClosure() || kind < TypeMatchKind::Subtype) {
       // If the second type is an autoclosure and the first type appears to

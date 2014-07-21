@@ -2661,10 +2661,10 @@ public:
 };
 
 /// \brief This is a closure of the contained subexpression that is formed
-/// when an scalar expression is converted to @auto_closure function type.
+/// when an scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
-///   var x : @auto_closure () -> int = 4
+///   var x : @autoclosure () -> int = 4
 /// \endcode
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;

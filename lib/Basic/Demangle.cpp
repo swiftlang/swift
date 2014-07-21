@@ -2236,7 +2236,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     Printer << pointer->getText();
     return;
   case Node::Kind::AutoClosureType:
-    Printer << "@auto_closure ";
+    Printer << "@autoclosure ";
     printChildren(pointer);
     return;
   case Node::Kind::FunctionType:

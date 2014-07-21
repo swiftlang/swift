@@ -4196,8 +4196,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercions to function type.
   if (auto toFunc = toType->getAs<FunctionType>()) {
     // Coercion to an autoclosure type produces an implicit closure.
-    // FIXME: The type checker is more lenient, and allows @auto_closures to
-    // be subtypes of non-@auto_closures, which is bogus.
+    // FIXME: The type checker is more lenient, and allows @autoclosures to
+    // be subtypes of non-@autoclosures, which is bogus.
     if (toFunc->isAutoClosure()) {
       // Convert the value to the expected result type of the function.
       expr = coerceToType(expr, toFunc->getResult(),

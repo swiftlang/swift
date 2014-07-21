@@ -177,13 +177,14 @@ ERROR(decl_inner_scope,decl_parsing,none,
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 
-ERROR(ownership_not_attribute,sema_tcd,none,
+ERROR(ownership_not_attribute,decl_parsing,none,
       "'@%0' is not an attribute, use the '%0' keyword instead",
       (StringRef))
-
-ERROR(cskeyword_not_attribute,sema_tcd,none,
+ 
+ERROR(cskeyword_not_attribute,decl_parsing,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
-
+ERROR(auto_closure_attribute_renamed,decl_parsing,none,
+      "the @auto_closure attribute was renamed to @autoclosure", ())
 
 ERROR(convenience_invalid,sema_tcd,none,
       "'convenience' is not valid on this declaration", ())

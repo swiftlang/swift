@@ -2011,7 +2011,7 @@ public:
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (info.isAutoClosure())
-      Printer << "@auto_closure ";
+      Printer << "@autoclosure ";
     switch (info.getCC()) {
     case AbstractCC::Freestanding: break;
     case AbstractCC::Method:

@@ -2,7 +2,7 @@
 
 func f0(x: Float) -> Float {}
 func f1(x: Float) -> Float {}
-func f2(x: @auto_closure () -> Float) {}
+func f2(x: @autoclosure () -> Float) {}
 
 var f : Float
 
@@ -12,7 +12,7 @@ f1(f1(f))
 f2(f)
 f2(1.0)
 
-func call_lvalue(rhs: @auto_closure ()->Bool) -> Bool {
+func call_lvalue(rhs: @autoclosure ()->Bool) -> Bool {
   return rhs()
 }
 

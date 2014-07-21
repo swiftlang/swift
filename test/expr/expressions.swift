@@ -11,7 +11,7 @@ var func1 : () -> ()    // No input, no output.
 var func2 : (Int) -> Int
 var func3 : () -> () -> ()                   // Takes nothing, returns a fn.
 var func3a : () -> (() -> ())                // same as func3
-var func4 : (fn : @auto_closure () -> ()) -> () // Takes a fn, returns nothing.
+var func4 : (fn : @autoclosure () -> ()) -> () // Takes a fn, returns nothing.
 var func6 : (fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
 var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
 

@@ -9,7 +9,7 @@ prefix func !!<T : BooleanType>(x: T) -> Bool {
   return x.getLogicValue()
 }
 
-func &&&(x: BooleanType, y: @auto_closure () -> BooleanType) -> Bool {
+func &&&(x: BooleanType, y: @autoclosure () -> BooleanType) -> Bool {
   return x.getLogicValue() ? y().getLogicValue() : false
 }
 

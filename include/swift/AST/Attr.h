@@ -233,7 +233,7 @@ public:
   bool hasOpenedID() const { return OpenedID.hasValue(); }
   unsigned getOpenedID() const { return *OpenedID; }
 
-  /// Given a name like "auto_closure", return the type attribute ID that
+  /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.  This returns TAK_Count on failure.
   ///
   static TypeAttrKind getAttrKindFromString(StringRef Str);
