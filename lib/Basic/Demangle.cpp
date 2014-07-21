@@ -680,7 +680,7 @@ private:
         return s;
       if (Punycode::decodePunycode(s, decodeBuffer))
         return {};
-      return StringRef(decodeBuffer.data(), decodeBuffer.size());
+      return decodeBuffer;
     };
     
     bool isOperator = false;
