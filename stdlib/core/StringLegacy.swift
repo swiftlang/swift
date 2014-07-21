@@ -115,6 +115,7 @@ func _formatSignedInteger(
 extension String {
 
   public init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
+    _precondition(radix > 1, "Radix must be greater than 1")
     var format = _formatSignedInteger(v, UInt64(radix), 
                                       ten: _uppercase ? "A" : "a")
     var asciiCount = 0
@@ -128,6 +129,7 @@ extension String {
 
   // FIXME: This function assumes UTF-16
   public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
+    _precondition(radix > 1, "Radix must be greater than 1")
     var format = _formatPositiveInteger(v, UInt64(radix), 
                                         ten: _uppercase ? "A" : "a")
     var asciiCount = v == 0 ? 1 : 0

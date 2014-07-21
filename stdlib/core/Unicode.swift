@@ -779,11 +779,11 @@ extension UTF16 {
   public static func copy<T: StringElementType, U: StringElementType>(
     source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
   ) {
-    if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
+    if strideof(T.self) == strideof(U.self) {
       _memcpy(
         dest: UnsafePointer(destination),
         src: UnsafePointer(source),
-        size: UInt(count) * UInt(Builtin.strideof(U.self)))
+        size: UInt(count) * UInt(strideof(U.self)))
     }
     else {
       for i in 0..<count {

@@ -103,5 +103,16 @@ func testSort() {
   // CHECK-NEXT: [9, 7, 3, 1]
 }
 testSort()
+
+func testArrayOfVoid() {
+  // This used to crash because it generated an array of void with stride == 0
+  // CHECK-NEXT: 123
+  [1,2,3].map {  
+    print($0)
+  }
+  println()
+}
+testArrayOfVoid()
+
 println("done!") // CHECK-NEXT: {{^done!$}}
 

@@ -346,12 +346,14 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   @transparent
   var maxLoadFactor: Double {
     get {
+      _sanityCheck(maxLoadFactorInverse > 0)
       return 1.0 / maxLoadFactorInverse
     }
     set(newValue) {
       // 1.0 might be useful for testing purposes; anything more is
       // crazy
       _sanityCheck(newValue <= 1.0)
+      _sanityCheck(newValue > 0)
       maxLoadFactorInverse = 1.0 / newValue
     }
   }

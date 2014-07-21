@@ -83,13 +83,13 @@ public struct ${Self}<T>
 %  if mutable:
   public static func alloc(num: Int) -> ${Self} {
     // Don't bother with overflow checking.
-    var size = Int(Builtin.strideof(T.self)) * num
+    var size = strideof(T.self) * num
     return ${Self}(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
 
   public func dealloc(num: Int) {
     // Overflow checking is actually not required here.
-    var size = Int(Builtin.strideof(T.self)) * num
+    var size = strideof(T.self) * num
     Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
   }
 %  end
@@ -312,7 +312,7 @@ func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 @transparent public
 func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return ${Self}(
-    Builtin.gep_Word(lhs.value, (rhs * Int(Builtin.strideof(T.self))).value))
+    Builtin.gep_Word(lhs.value, (rhs * strideof(T.self)).value))
 }
 
 @transparent public
@@ -331,7 +331,7 @@ func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
                          Builtin.ptrtoint_Word(rhs.value)))
-    / Int(Builtin.strideof(T.self))
+    / strideof(T.self)
 }
 
 @transparent public

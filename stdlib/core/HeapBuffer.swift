@@ -134,7 +134,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   /// Return the actual number of `Elements` we can possibly store.
   func _capacity() -> Int {
     return (_allocatedSize() - HeapBuffer._elementOffset())
-      / Int(Builtin.strideof(Element.self))
+      / strideof(Element.self)
   }
 
   init() {
@@ -154,7 +154,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
     _sanityCheck(capacity >= 0, "creating a HeapBuffer with negative capacity")
 
     let totalSize = HeapBuffer._elementOffset() +
-        capacity * Int(Builtin.strideof(Element.self))
+        capacity * strideof(Element.self)
     let alignMask = HeapBuffer._requiredAlignMask()
 
     self.storage = reinterpretCast(

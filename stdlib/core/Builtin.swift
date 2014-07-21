@@ -26,7 +26,7 @@ func sizeofValue<T>(_:T) -> Int {
 
 @transparent public
 func alignof<T>(_:T.Type) -> Int {
-  return Int(Builtin.alignof(T.self))
+  return max(Int(Builtin.alignof(T.self)), 1)
 }
 
 @transparent public
@@ -34,9 +34,10 @@ func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
 }
 
+// Like the builtin strideof, but never returns zero
 @transparent public
 func strideof<T>(_:T.Type) -> Int {
-  return Int(Builtin.strideof(T.self))
+  return max(Int(Builtin.strideof(T.self)), 1)
 }
 
 @transparent public
@@ -45,6 +46,8 @@ func strideofValue<T>(_:T) -> Int {
 }
 
 func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
+  _sanityCheck(offset >= 0)
+  _sanityCheck(alignment > 0)
   return (offset + alignment - 1) / alignment * alignment
 }
 
