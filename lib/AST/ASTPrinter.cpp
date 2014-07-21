@@ -1250,10 +1250,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printDocumentationComment(decl);
     printAttributes(decl);
     printAccessibility(decl);
-    if (decl->isStatic() && !decl->isOperator())
-      printStaticKeyword(decl->getCorrectStaticSpelling());
-    if (!Options.SkipIntroducerKeywords)
+    if (!Options.SkipIntroducerKeywords) {
+      if (decl->isStatic() && !decl->isOperator())
+        printStaticKeyword(decl->getCorrectStaticSpelling());
+      if (decl->isMutating())
+        Printer << "mutating ";
       Printer << "func ";
+    }
     recordDeclLoc(decl,
       [&]{
         if (!decl->hasName())

@@ -151,11 +151,12 @@ SIMPLE_DECL_ATTR(transparent, Transparent,
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 
-SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier, 28)
-SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier, 29)
-
-
 // Non-serialized attributes.
+
+SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
+                 /* Not serialized */ 28)
+SIMPLE_DECL_ATTR(nonmutating, NonMutating, OnFunc | DeclModifier | NotSerialized,
+                 /* Not serialized */ 29)
 
 SIMPLE_DECL_ATTR(convenience, Convenience,
                  OnConstructor|DeclModifier|NotSerialized, 43)
