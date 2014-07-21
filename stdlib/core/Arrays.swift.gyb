@@ -634,10 +634,6 @@ where C.Generator.Element == T
   }
   lhs._buffer.count = newCount
 }
-
-public func += <T>(inout lhs: ${Self}<T>, rhs: T) {
-  _arrayAppend(&lhs._buffer, rhs)
-}
 % end
 
 //===--- generic helpers --------------------------------------------------===//

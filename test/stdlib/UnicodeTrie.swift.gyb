@@ -82,7 +82,7 @@ class NonContiguousNSString : NSString {
     var g = scalars.generate()
     let hadError = transcode(UTF32.self, UTF16.self, g,
         SinkOf {
-          encoded += $0
+          encoded.append($0)
         },
         stopOnError: true)
     expectFalse(hadError)

@@ -344,7 +344,7 @@ NSStringAPIs.test("enumerateLines(_:)") {
   "abc\n\ndefghi\njklm".enumerateLines {
     (line: String, inout stop: Bool)
   in
-    lines += line
+    lines.append(line)
     if lines.count == 3 {
       stop = true
     }
@@ -365,9 +365,9 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
       orthography: nil) {
     (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, inout stop: Bool)
   in
-    tags += tag
-    tokens += s[tokenRange]
-    sentences += s[sentenceRange]
+    tags.append(tag)
+    tokens.append(s[tokenRange])
+    sentences.append(s[sentenceRange])
     if tags.count == 3 {
       stop = true
     }
@@ -391,7 +391,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
     (substring: String, substringRange: Range<String.Index>,
      enclosingRange: Range<String.Index>, inout stop: Bool)
   in
-    substrings += substring
+    substrings.append(substring)
     expectEqual(substring, s[substringRange])
     expectEqual(substring, s[enclosingRange])
   }
@@ -426,7 +426,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def где ".utf8)
     while (expectedStr.count != bufferLength) {
-      expectedStr += 0xff
+      expectedStr.append(0xff)
     }
     var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
@@ -447,7 +447,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     let bufferLength = 5
     var expectedStr: [UInt8] = Array("def ".utf8)
     while (expectedStr.count != bufferLength) {
-      expectedStr += 0xff
+      expectedStr.append(0xff)
     }
     var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
@@ -467,7 +467,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def где gh жз ".utf8)
     while (expectedStr.count != bufferLength) {
-      expectedStr += 0xff
+      expectedStr.append(0xff)
     }
     var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
@@ -487,7 +487,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     let bufferLength = 100
     var expectedStr: [UInt8] = Array("def ".utf8)
     while (expectedStr.count != bufferLength) {
-      expectedStr += 0xff
+      expectedStr.append(0xff)
     }
     var buffer = [UInt8](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
@@ -517,7 +517,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let bufferLength = 17
     var expectedStr = map("abc あかさた\0".utf8) { $0.asSigned() }
     while (expectedStr.count != bufferLength) {
-      expectedStr += (0xff).asSigned()
+      expectedStr.append((0xff).asSigned())
     }
     var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     var result = s.getCString(&buffer, maxLength: 100,
@@ -548,7 +548,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
     let bufferLength = 100
     var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) { $0.asSigned() }
     while (expectedStr.count != bufferLength) {
-      expectedStr += (0xff).asSigned()
+      expectedStr.append((0xff).asSigned())
     }
     var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
     expectTrue(s.getFileSystemRepresentation(&buffer, maxLength: bufferLength))

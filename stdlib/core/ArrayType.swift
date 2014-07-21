@@ -51,9 +51,6 @@ internal protocol ArrayType
   /// Append newElement to the Array in O(1) (amortized)
   mutating func append(newElement: Self.Generator.Element)
 
-  /// Operator form of append
-  func += (inout lhs: Self, rhs: Self.Generator.Element)
-
   /// Append elements from `sequence` to the Array
   mutating func extend<
       S : SequenceType

@@ -153,7 +153,7 @@ extension String {
     var result = ContiguousArray<UTF8.CodeUnit>()
     result.reserveCapacity(countElements(utf8) + 1)
     result += utf8
-    result += 0
+    result.append(0)
     return result
   }
 }

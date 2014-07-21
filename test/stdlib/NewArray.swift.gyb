@@ -123,7 +123,7 @@ where T.Generator.Element == T._Buffer.Element,
   
   for i in x.count..<(x.capacity + 1) {
     let bufferId1a = checkReallocation(x, bufferId1, false)
-    x += 13
+    x.append(13)
   }
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
@@ -157,7 +157,7 @@ where T.Generator.Element == T._Buffer.Element,
   }
 
   checkReallocations(x, "append") { (inout x: T)->() in x.append(42) }
-  checkReallocations(x, "+=") { (inout x: T)->() in x += 42 }
+  checkReallocations(x, "+=") { (inout x: T)->() in x.append(42) }
   println("done.")
 }
 
@@ -222,7 +222,7 @@ func testCocoa() {
   printSequence(a)
   // CHECK-NEXT: [foo, bar, baz]
   
-  a += "qux"
+  a.append("qux")
   printSequence(a)
   // CHECK-NEXT: [foo, bar, baz, qux]
 
@@ -309,7 +309,7 @@ func testSlice() {
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
 
   // Appending to aSlice works...
-  aSlice += "fodder"              
+  aSlice.append("fodder")
   println("<\(aSlice.count)>")    // CHECK-NEXT: <3>
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
@@ -334,7 +334,7 @@ func testReplace(make: ()->${A}<X>) {
   // comparison later.
   var source = ContiguousArray<A.Generator.Element>()
   for x in make() {
-    source += x
+    source.append(x)
   }
   
   for i in indices(source) {

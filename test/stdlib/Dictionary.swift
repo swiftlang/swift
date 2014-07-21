@@ -1022,7 +1022,7 @@ func testCOW_Fast_GenerateDoesNotReallocate() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
-    pairs += (key, value)
+    pairs += [(key, value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == reinterpretCast(d))
@@ -1039,7 +1039,18 @@ func testCOW_Slow_GenerateDoesNotReallocate() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
-    pairs += (key.value, value.value)
+    // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
+    // with array literal of pairs)
+    // pairs += [(key.value, value.value)]
+    
+    // FIXME: This doesn't work (<rdar://problem/17750582> generics over tuples)
+    // pairs.append((key.value, value.value))
+    
+    // FIXME: This doesn't work (<rdar://problem/17751359>)
+    // pairs.append(key.value, value.value)
+    
+    let kv = (key.value, value.value)
+    pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == reinterpretCast(d))
@@ -1219,7 +1230,7 @@ func testDeleteChainCollisionRandomized() {
     }
     let hashValue = uniformRandom(chainLength - chainOverlap) * collisionChains
     let k = TestKeyTy(value: value, hashValue: hashValue)
-    knownKeys += k
+    knownKeys += [k]
     return k
   }
 
@@ -1591,7 +1602,8 @@ func slurpFastEnumeration(
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
       let value: AnyObject = d.objectForKey(key)
-      pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      pairs += [kv]
     }
   }
 
@@ -1617,7 +1629,7 @@ func slurpFastEnumerationFromObjC(
     let pair = pairAnyObject as NSArray
     let key = (pair[0] as TestObjCKeyTy).value
     let value = (pair[1] as TestObjCValueTy).value
-    pairs += (key, value)
+    pairs += [(key, value)]
   }
   return pairs
 }
@@ -1909,7 +1921,8 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
     var (key, value: AnyObject) = d[i]
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == reinterpretCast(d))
@@ -1940,7 +1953,8 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
     var (key, value) = d[i]
-    pairs += (key.value, value.value)
+    let kv = (key.value, value.value)
+    pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == reinterpretCast(d))
@@ -2592,7 +2606,8 @@ func test_BridgedFromObjC_Verbatim_Generate() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the GeneratorType protocol, but
@@ -2615,7 +2630,8 @@ func test_BridgedFromObjC_Nonverbatim_Generate() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
-    pairs += (key.value, value.value)
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the GeneratorType protocol, but
@@ -2685,11 +2701,12 @@ func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   var expectedPairs = Array<(Int, Int)>()
   for i in 1...32 {
-    expectedPairs += (i, 1000 + i)
+    expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the GeneratorType protocol, but
@@ -2712,11 +2729,12 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
-    pairs += (key.value, value.value)
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   var expectedPairs = Array<(Int, Int)>()
   for i in 1...32 {
-    expectedPairs += (i, 1000 + i)
+    expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
   // The following is not required by the GeneratorType protocol, but
@@ -2742,7 +2760,8 @@ func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
@@ -2770,7 +2789,8 @@ func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
-    pairs += (key.value, value.value)
+    let kv = (key.value, value.value)
+    pairs.append(kv)
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
@@ -2955,7 +2975,8 @@ func test_BridgedFromObjC_Verbatim_ArrayOfDictionaries() {
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
     while let (key, value: AnyObject) = gen.next() {
-      pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+      pairs.append(kv)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
@@ -2979,7 +3000,8 @@ func test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries() {
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = gen.next() {
-      pairs += (key.value, value.value)
+      let kv = (key.value, value.value)
+      pairs.append(kv)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
@@ -3063,7 +3085,8 @@ func test_BridgedToObjC_KeyEnumerator_NextObject() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3175,7 +3198,8 @@ func test_BridgedToObjC_KeyValue_ValueTypesCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3207,7 +3231,8 @@ func test_BridgedToObjC_Key_ValueTypeCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3239,7 +3264,8 @@ func test_BridgedToObjC_Value_ValueTypeCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3281,7 +3307,8 @@ func test_BridgingRoundtrip() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3311,7 +3338,8 @@ func test_NSDictionaryToDictionaryCoversion() {
 
   var pairs = Array<(Int, Int)>()
   for (key, value: AnyObject) in d {
-    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 

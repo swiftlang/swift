@@ -329,7 +329,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     var g = EOFCountingGenerator(utfStr)
     transcode(codec, UTF32.self, g,
         SinkOf {
-          decoded += $0
+          decoded.append($0)
         },
         stopOnError: true)
     expectGE(1, g.numTimesReturnedEOF)
@@ -349,7 +349,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     var g = EOFCountingGenerator(utfStr)
     transcode(codec, UTF32.self, g,
         SinkOf {
-          decoded += $0
+          decoded.append($0)
         },
         stopOnError: false)
     expectEqual(1, g.numTimesReturnedEOF)
@@ -392,7 +392,7 @@ func checkEncodeUTF8(expected: [UInt8], scalars: [UInt32]) -> AssertionResult {
   var g = EOFCountingGenerator(scalars)
   let hadError = transcode(UTF32.self, UTF8.self, g,
       SinkOf {
-        encoded += $0
+        encoded.append($0)
       },
       stopOnError: true)
   expectFalse(hadError)
@@ -2261,7 +2261,7 @@ class NonContiguousNSString : NSString {
     var g = utf8.generate()
     let hadError = transcode(UTF8.self, UTF16.self, g,
         SinkOf {
-          encoded += $0
+          encoded.append($0)
         },
         stopOnError: true)
     expectFalse(hadError)
@@ -2278,7 +2278,7 @@ class NonContiguousNSString : NSString {
     var g = scalars.generate()
     let hadError = transcode(UTF32.self, UTF16.self, g,
         SinkOf {
-          encoded += $0
+          encoded.append($0)
         },
         stopOnError: true)
     expectFalse(hadError)
@@ -2337,7 +2337,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     var g = test.scalars.generate()
     transcode(UTF32.self, UTF16.self, g,
         SinkOf {
-          backingStorage += $0
+          backingStorage.append($0)
         },
         stopOnError: false)
 
@@ -2360,7 +2360,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     var g = expectedScalars.generate()
     transcode(UTF32.self, UTF8.self, g,
         SinkOf {
-          expected += $0
+          expected.append($0)
         },
         stopOnError: false)
 
@@ -2409,7 +2409,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
       var g = expectedScalars.generate()
       transcode(UTF32.self, UTF8.self, g,
           SinkOf {
-            expected += $0
+            expected.append($0)
           },
           stopOnError: false)
 
@@ -2475,7 +2475,7 @@ StringCookedViews.test("UTF16") {
     var g = expectedScalars.generate()
     transcode(UTF32.self, UTF16.self, g,
         SinkOf {
-          expected += $0
+          expected.append($0)
         },
         stopOnError: false)
 
@@ -2490,7 +2490,7 @@ StringCookedViews.test("UTF16") {
     var g = expectedScalars.generate()
     transcode(UTF32.self, UTF16.self, g,
         SinkOf {
-          expected += $0
+          expected.append($0)
         },
         stopOnError: false)
 

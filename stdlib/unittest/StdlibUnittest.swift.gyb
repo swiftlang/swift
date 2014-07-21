@@ -52,7 +52,7 @@ public struct SourceLocStack {
 
   func with(loc: SourceLoc) -> SourceLocStack {
     var locs = self.locs
-    locs += loc
+    locs.append(loc)
     return SourceLocStack(_locs: locs)
   }
 
@@ -354,7 +354,7 @@ func checkGenerator<
   var mutableGen = generator
   var actual: [Element] = []
   while let e = mutableGen.next() {
-    actual += e
+    actual.append(e)
   }
   expectEqual(expected, actual, stackTrace: stackTrace.withCurrentLoc())
 
@@ -398,7 +398,7 @@ func checkCollection<
       expectEqual(startIndex, collection.startIndex)
       expectEqual(endIndex, collection.endIndex)
 
-      actual += collection[index]
+      actual.append(collection[index])
       ++index
     }
 
