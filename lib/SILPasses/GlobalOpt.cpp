@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalopt"
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
@@ -109,7 +109,7 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst*> Calls) {
   DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-        << Demangle::demangleSymbolAsString(InitF->getName())
+        << demangle_wrappers::demangleSymbolAsString(InitF->getName())
         << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
   llvm::DenseMap<SILFunction*, ApplyInst*> ParentFuncs;

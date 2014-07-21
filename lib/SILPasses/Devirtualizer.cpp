@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-devirtualizer"
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILArgument.h"
@@ -802,8 +802,8 @@ public:
     // arguments for all existing functions.
     for (auto &F : *getModule()) {
       DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
-                       << Demangle::demangleSymbolAsString(F.getName())
-                       << "\n");
+              << demangle_wrappers::demangleSymbolAsString(F.getName())
+              << "\n");
       for (auto &BB : F) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
           ApplyInst *AI = dyn_cast<ApplyInst>(&*II);

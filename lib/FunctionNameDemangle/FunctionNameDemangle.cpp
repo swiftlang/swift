@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <swift/Basic/Demangle.h>
-#include <swift/FunctionNameDemangle/FunctionNameDemangle.h>
+#include "swift/Basic/DemangleWrappers.h"
+#include "swift/FunctionNameDemangle/FunctionNameDemangle.h"
 
 /// \returns true if \p MangledName starts with Swift prefix, "_T".
 static bool isSwiftPrefixed(const char *MangledName) {
@@ -34,8 +34,8 @@ size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
   swift::Demangle::DemangleOptions DemangleOptions;
   DemangleOptions.SynthesizeSugarOnTypes = true;
 
-  std::string Result =
-      swift::Demangle::demangleSymbolAsString(MangledName, DemangleOptions);
+  std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
+      MangledName, DemangleOptions);
 
   if (Result == MangledName)
     return 0; // Not a mangled name

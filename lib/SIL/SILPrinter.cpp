@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -33,10 +33,11 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormattedStream.h"
 
 using namespace swift;
-using namespace Demangle;
+using namespace demangle_wrappers;
 
 struct ID {
   enum ID_Kind {

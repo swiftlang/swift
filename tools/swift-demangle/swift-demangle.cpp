@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -49,10 +49,10 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   if (name.startswith("__"))
     name = name.substr(1);
   swift::Demangle::NodePointer pointer =
-    swift::Demangle::demangleSymbolAsNode(name);
+      swift::demangle_wrappers::demangleSymbolAsNode(name);
   if (ExpandMode) {
     llvm::outs() << "Demangling for " << name << '\n';
-    pointer->print(llvm::outs());
+    swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
   }
   if (!TreeOnly) {
     std::string string = swift::Demangle::nodeToString(pointer, options);

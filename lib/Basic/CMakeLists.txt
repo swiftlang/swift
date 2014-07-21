@@ -3,6 +3,7 @@ set(UNICODE_TABLES UnicodeExtendedGraphemeClusters.cpp.gyb)
 add_swift_library(swiftBasic
   Cache.cpp
   Demangle.cpp
+  DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   LangOptions.cpp
