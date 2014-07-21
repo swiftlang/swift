@@ -60,6 +60,8 @@ Latest
     sequences["fibonacci"]![4] = 5
     sequences["fibonacci"]!.append(8)
 
+* The @auto_closure attribute has been renamed to @autoclosure.
+
 2014-07-03
 ----------
 
