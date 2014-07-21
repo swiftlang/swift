@@ -32,9 +32,9 @@ namespace api_notes {
   };
 
   /// Converts API notes from YAML format to binary format.
-  bool compileAPINotes(llvm::StringRef fromFileName, llvm::raw_ostream &os);
+  bool compileAPINotes(llvm::StringRef yamlInput, llvm::raw_ostream &os);
 
-  bool parseAndDumpAPINotes(llvm::StringRef fromFileName);
+  bool parseAndDumpAPINotes(llvm::StringRef yamlInput);
 
 } // end namespace api_notes
 } // end namespace swift

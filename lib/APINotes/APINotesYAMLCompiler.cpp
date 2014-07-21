@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 #include "swift/APINotes/APINotesYAMLCompiler.h"
 #include "swift/APINotes/Types.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -310,18 +309,8 @@ namespace llvm {
 using llvm::yaml::Input;
 using llvm::yaml::Output;
 
-using llvm::ErrorOr;
-using llvm::MemoryBuffer;
-
-static bool parseAPINotes(llvm::StringRef fromFileName, Module &module) {
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileBufOrErr =
-    MemoryBuffer::getFile(fromFileName);
-  if (std::error_code EC = FileBufOrErr.getError()) {
-    llvm::errs() << "\n Could not open input file: " + EC.message() << '\n';
-    return true;
-  }
-
-  Input yin(FileBufOrErr.get()->getBuffer());
+static bool parseAPINotes(StringRef yamlInput, Module &module) {
+  Input yin(yamlInput);
   yin >> module;
 
   if (std::error_code ec = yin.error()) {
@@ -332,10 +321,10 @@ static bool parseAPINotes(llvm::StringRef fromFileName, Module &module) {
   return false;
 }
 
-bool api_notes::parseAndDumpAPINotes(llvm::StringRef fromFileName) {
+bool api_notes::parseAndDumpAPINotes(StringRef yamlInput)  {
   Module module;
 
-  if (parseAPINotes(fromFileName, module))
+  if (parseAPINotes(yamlInput, module))
     return true;
 
   Output yout(llvm::outs());
@@ -344,11 +333,11 @@ bool api_notes::parseAndDumpAPINotes(llvm::StringRef fromFileName) {
   return false;
 }
 
-bool api_notes::compileAPINotes(llvm::StringRef fromFileName,
+bool api_notes::compileAPINotes(StringRef yamlInput,
                                 llvm::raw_ostream &os) {
   Module module;
 
-  if (parseAPINotes(fromFileName, module))
+  if (parseAPINotes(yamlInput, module))
     return true;
 
   return false;

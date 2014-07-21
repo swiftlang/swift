@@ -17,6 +17,7 @@
 #include "swift/APINotes/APINotesYAMLCompiler.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -69,6 +70,14 @@ int apinotes_main(ArrayRef<const char *> Args) {
     return 1;
   }
 
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FileBufOrErr =
+    MemoryBuffer::getFile(InputFilename);
+  if (std::error_code EC = FileBufOrErr.getError()) {
+    llvm::errs() << "\n Could not open input file: " + EC.message() << '\n';
+    return true;
+  }
+  StringRef yamlInput = FileBufOrErr.get()->getBuffer();
+
   if (Action == swift::api_notes::ActionType::YAMLToBinary) {
     if (OutputFilename.empty()) {
       errs() << "output file required\n";
@@ -80,7 +89,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (swift::api_notes::compileAPINotes(InputFilename, os))
+    if (swift::api_notes::compileAPINotes(yamlInput, os))
       return 1;
     
     os.flush();
@@ -89,7 +98,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
   }
 
   if (Action == swift::api_notes::ActionType::Dump) {
-    return swift::api_notes::parseAndDumpAPINotes(InputFilename);
+    return swift::api_notes::parseAndDumpAPINotes(yamlInput);
   }
 
   return 1;
