@@ -5,5 +5,5 @@ add_swift_library(swiftCoreGraphics
   CGFloat.swift
   CoreGraphicsMirrors.swift.gyb
   INSTALL TARGET_LIBRARY
-  DEPENDS swiftCore swiftObjectiveC swiftDispatch
+  DEPENDS swiftCore swiftObjectiveC swiftDispatch swiftDarwin
   FRAMEWORK_DEPENDS CoreGraphics)

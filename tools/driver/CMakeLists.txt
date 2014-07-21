@@ -12,6 +12,11 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(swift edit ${CORE_FOUNDATION})
 
+# If building as part of clang, make sure the headers are installed.
+if(SWIFT_PATH_TO_CLANG_BUILD STREQUAL ${CMAKE_BINARY_DIR})
+  add_dependencies(swift clang-headers)
+endif()
+
 execute_process(
   COMMAND xcrun --toolchain default -f clang
   OUTPUT_VARIABLE default_toolchain_compiler)

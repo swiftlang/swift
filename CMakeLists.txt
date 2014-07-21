@@ -769,9 +769,11 @@ macro(add_swift_library_single target name)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
   
+  # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
+  # just any swiftmodule files that are associated with them.
   handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
     SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
-    DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS}
+    DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS} ${SWIFTLIB_SINGLE_DEPENDS}
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
     API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
