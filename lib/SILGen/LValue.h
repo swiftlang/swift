@@ -137,7 +137,9 @@ class PhysicalPathComponent : public PathComponent {
 
 protected:
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind)
-    : PathComponent(typeData, Kind) {}
+    : PathComponent(typeData, Kind) {
+    assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
+  }
 
 public:
   virtual ManagedValue offset(SILGenFunction &gen,
@@ -162,7 +164,9 @@ class LogicalPathComponent : public PathComponent {
 
 protected:
   LogicalPathComponent(LValueTypeData typeData, KindTy Kind)
-    : PathComponent(typeData, Kind) {}
+    : PathComponent(typeData, Kind) {
+    assert(isLogical() && "PhysicalPathComponent Kind isn't physical");
+  }
 
 public:
   /// Clone the path component onto the heap.
