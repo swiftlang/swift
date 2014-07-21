@@ -23,6 +23,8 @@ import CoreGraphics
 // for CF bridging)
 public let kCFStringEncodingASCII: CFStringEncoding = 0x0600
 
+public typealias NSRectEdge = CGRectEdge
+
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
 public typealias NSStringEncoding = UInt
 public let NSASCIIStringEncoding: UInt = 1
