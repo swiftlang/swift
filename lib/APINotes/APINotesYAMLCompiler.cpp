@@ -122,7 +122,7 @@ Each global variable definition is of the following form:
 */
 
 using llvm::StringRef;
-
+using namespace swift;
 namespace {
   enum class APIAvailability {
     Available = 0,
@@ -310,13 +310,10 @@ namespace llvm {
 using llvm::yaml::Input;
 using llvm::yaml::Output;
 
-namespace swift {
-namespace api_notes {
+using llvm::ErrorOr;
+using llvm::MemoryBuffer;
 
-using ::llvm::ErrorOr;
-using ::llvm::MemoryBuffer;
-
-bool parseAPINotes(llvm::StringRef fromFileName, Module &module) {
+static bool parseAPINotes(llvm::StringRef fromFileName, Module &module) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileBufOrErr =
     MemoryBuffer::getFile(fromFileName);
   if (std::error_code EC = FileBufOrErr.getError()) {
@@ -335,7 +332,7 @@ bool parseAPINotes(llvm::StringRef fromFileName, Module &module) {
   return false;
 }
 
-bool parseAndDumpAPINotes(llvm::StringRef fromFileName) {
+bool api_notes::parseAndDumpAPINotes(llvm::StringRef fromFileName) {
   Module module;
 
   if (parseAPINotes(fromFileName, module))
@@ -347,15 +344,12 @@ bool parseAndDumpAPINotes(llvm::StringRef fromFileName) {
   return false;
 }
 
-bool compileAPINotes(llvm::StringRef fromFileName, llvm::raw_ostream &os) {
+bool api_notes::compileAPINotes(llvm::StringRef fromFileName,
+                                llvm::raw_ostream &os) {
   Module module;
 
   if (parseAPINotes(fromFileName, module))
     return true;
 
   return false;
-
 }
-
-} // end namespace api_notes
-} // end namespace swift
