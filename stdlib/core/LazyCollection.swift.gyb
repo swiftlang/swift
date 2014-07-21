@@ -37,6 +37,26 @@ struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
     return _base.endIndex
   }
 
+  /// True if and only if the collection is empty
+  public
+  var isEmpty: Bool {
+    return startIndex == endIndex
+  }
+
+  /// Returns the first element.  Requires: `!isEmpty`
+  public
+  func first() -> S.Generator.Element {
+    return Swift.first(self)
+  }
+
+%  if traversal != 'Forward':
+  /// Returns the last element.  Requires: `!isEmpty`
+  public
+  func last() -> S.Generator.Element {
+    return Swift.last(self)
+  }
+%  end
+
   public
   subscript(i: S.Index) -> S.Generator.Element {
     return _base[i]
