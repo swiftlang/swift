@@ -44,9 +44,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
          "Cannot inline Objective-C methods or C functions in mandatory "
          "inlining");
 
-  // We can't handle specializations yet.
-  auto Subs = AI->getSubstitutions();
-  if (!Subs.empty())
+  if (AI->hasSubstitutions())
     return false;
 
   CalleeEntryBB = CalleeFunction->begin();
