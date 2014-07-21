@@ -5,6 +5,9 @@
 //
 // RUN: %target-run %t/a.out StringCharacterStartIndexPredecessor 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out StringCharacterEndIndexSuccessor 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out StringCharacterSubscriptEndIndex 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out StringUTF8ViewEndIndexSuccessor 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out StringUTF8ViewSubscriptEndIndex 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
@@ -31,6 +34,36 @@ if arg == "StringCharacterEndIndexSuccessor" {
   ++i
   println("OK")
   ++i
+}
+
+if arg == "StringCharacterSubscriptEndIndex" {
+  var s = "abc"
+  var i = s.startIndex
+  ++i
+  ++i
+  ++i
+  println("OK")
+  s[i]
+}
+
+if arg == "StringUTF8ViewEndIndexSuccessor" {
+  var s = "abc"
+  var i = s.utf8.startIndex
+  ++i
+  ++i
+  ++i
+  println("OK")
+  ++i
+}
+
+if arg == "StringUTF8ViewSubscriptEndIndex" {
+  var s = "abc"
+  var i = s.utf8.startIndex
+  ++i
+  ++i
+  ++i
+  println("OK")
+  s.utf8[i]
 }
 
 println("BUSTED: should have crashed already")

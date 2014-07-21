@@ -105,7 +105,8 @@ extension String {
           _sanityCheck(newCoreIndex > _coreIndex)
           return Index(_core, newCoreIndex, newBuffer1)
         }
-        return Index(_core, _coreIndex, ~0)
+        _precondition(_buffer & 0xFF != 0xFE, "can not increment endIndex")
+        return Index(_core, _coreIndex, ~1)
       }
       
       let _core: _StringCore
@@ -122,11 +123,13 @@ extension String {
     }
     
     public var endIndex: Index {
-      return Index(_core, _core.endIndex, ~0)
+      return Index(_core, _core.endIndex, ~1)
     }
 
     public subscript(i: Index) -> UTF8.CodeUnit {
-      return numericCast(i._buffer & 0xFF)
+      let result: UTF8.CodeUnit = numericCast(i._buffer & 0xFF)
+      _precondition(result != 0xFE, "can not subscript using endIndex")
+      return result
     }
 
     public func generate() -> IndexingGenerator<UTF8View> {
