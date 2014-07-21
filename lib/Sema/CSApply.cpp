@@ -2778,49 +2778,7 @@ namespace {
     }
 
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
-      if (cs.getASTContext().LangOpts.EnableOptionalLValues) {
-        Type valueType = simplifyType(expr->getType());
-        expr->setType(valueType);
-        return expr;
-      }
-      
       Type valueType = simplifyType(expr->getType());
-      auto &tc = cs.getTypeChecker();
-      Expr *subExpr = expr->getSubExpr();
-      
-      Type optType = OptionalType::get(valueType);
-        
-      // Coerce the subexpression to the appropriate optional type.
-      subExpr = coerceToType(subExpr, optType,
-                             cs.getConstraintLocator(expr));
-      if (!subExpr) return nullptr;
-
-      // Complain if the sub-expression was converted to T? via the
-      // inject-into-optional implicit conversion.
-      //
-      // It should be the case that that's always the last conversion applied.
-      if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
-        // If the injection was the result of an explicit unwrap (!), zap the
-        // redundant '!'.
-        if (auto forced = findForcedDowncast(tc.Context, 
-                                             injection->getSubExpr())) {
-          tc.diagnose(expr->getLoc(), diag::forcing_explicit_downcast,
-                      expr->getSubExpr()->getType()->getRValueType())
-            .highlight(forced->getLoc())
-            .fixItRemove(expr->getLoc());
-        } else {
-          // Generic diagnostic.
-          tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
-                      expr->getSubExpr()->getType()->getRValueType())
-            .highlight(subExpr->getSourceRange())
-            .fixItRemove(expr->getExclaimLoc());
-        }
-
-        // Don't diagnose this injection again.
-        DiagnosedOptionalInjections.insert(injection);
-      }
-
-      expr->setSubExpr(subExpr);
       expr->setType(valueType);
       return expr;
     }
@@ -3617,19 +3575,8 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
                                             ConstraintLocatorBuilder locator) {
   auto optTy = expr->getType();
   // Coerce to an r-value.
-  if (!cs.getASTContext().LangOpts.EnableOptionalLValues) {
-    auto rvalueTy = optTy->getRValueType();
-    assert(rvalueTy->getImplicitlyUnwrappedOptionalObjectType()->isEqual(objTy));
-
-    if (cs.getTypeChecker().requireOptionalIntrinsics(expr->getLoc()))
-      return nullptr;
-
-    expr = coerceToType(expr, rvalueTy, /*bogus?*/ locator);
-    if (!expr) return nullptr;
-  } else {
-    if (optTy->is<LValueType>())
-      objTy = LValueType::get(objTy);
-  }
+  if (optTy->is<LValueType>())
+    objTy = LValueType::get(objTy);
 
   expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr, expr->getEndLoc());
   expr->setType(objTy);

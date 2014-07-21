@@ -2553,15 +2553,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
     increaseScore(SK_ForceUnchecked);
     
-    if (getASTContext().LangOpts.EnableOptionalLValues) {
-      baseObjTy = objTy;
-      if (baseTy->is<LValueType>())
-        baseTy = LValueType::get(objTy);
-      else
-        baseTy = objTy;
-    } else {
-      baseTy = baseObjTy = objTy;
-    }
+    baseObjTy = objTy;
+    if (baseTy->is<LValueType>())
+      baseTy = LValueType::get(objTy);
+    else
+      baseTy = objTy;
   }
 
   // Dig out the instance type.

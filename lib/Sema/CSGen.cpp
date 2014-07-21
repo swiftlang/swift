@@ -1286,37 +1286,17 @@ namespace {
 
     Type visitForceValueExpr(ForceValueExpr *expr) {
       // Force-unwrap an optional of type T? to produce a T.
-
-      if (CS.getASTContext().LangOpts.EnableOptionalLValues) {
-        auto locator = CS.getConstraintLocator(expr);
-
-        auto objectTy = CS.createTypeVariable(locator,
-                                              TVO_PrefersSubtypeBinding
-                                              | TVO_CanBindToLValue);
-        
-        // The result is the object type of the optional subexpression.
-        CS.addConstraint(ConstraintKind::OptionalObject,
-                         expr->getSubExpr()->getType(), objectTy,
-                         locator);
-        return objectTy;
-      }
-      
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                           TVO_PrefersSubtypeBinding);
-
-      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
-      if (!optTy)
-        return Type();
-      
       auto locator = CS.getConstraintLocator(expr);
-      
-      // The subexpression is convertible to T?.
-      CS.addConstraint(ConstraintKind::Conversion, 
-                       expr->getSubExpr()->getType(), optTy,
-                       locator);
 
-      // The result is of type T.
-      return valueTy;
+      auto objectTy = CS.createTypeVariable(locator,
+                                            TVO_PrefersSubtypeBinding
+                                            | TVO_CanBindToLValue);
+      
+      // The result is the object type of the optional subexpression.
+      CS.addConstraint(ConstraintKind::OptionalObject,
+                       expr->getSubExpr()->getType(), objectTy,
+                       locator);
+      return objectTy;
     }
 
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
