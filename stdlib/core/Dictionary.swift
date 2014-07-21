@@ -1422,13 +1422,13 @@ public struct DictionaryIndex<Key : Hashable, Value> :
   typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
   typealias _CocoaIndex = _CocoaDictionaryIndex
 
-  var value: _DictionaryIndexRepresentation<Key, Value>
+  var _value: _DictionaryIndexRepresentation<Key, Value>
 
   static func _Native(index: _NativeIndex) -> DictionaryIndex {
-    return DictionaryIndex(value: ._Native(index))
+    return DictionaryIndex(_value: ._Native(index))
   }
   static func _Cocoa(index: _CocoaIndex) -> DictionaryIndex {
-    return DictionaryIndex(value: ._Cocoa(index))
+    return DictionaryIndex(_value: ._Cocoa(index))
   }
 
   @transparent
@@ -1438,7 +1438,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
 
   @transparent
   var _nativeIndex: _NativeIndex {
-    switch value {
+    switch _value {
     case ._Native(let nativeIndex):
       return nativeIndex
     case ._Cocoa:
@@ -1448,7 +1448,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
 
   @transparent
   var _cocoaIndex: _CocoaIndex {
-    switch value {
+    switch _value {
     case ._Native:
       _fatalError("internal error: does not contain a Cocoa index")
     case ._Cocoa(let cocoaIndex):
@@ -1463,7 +1463,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
       return ._Native(_nativeIndex.predecessor())
     }
 
-    switch value {
+    switch _value {
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.predecessor())
     case ._Cocoa(let cocoaIndex):
@@ -1476,7 +1476,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
       return ._Native(_nativeIndex.successor())
     }
 
-    switch value {
+    switch _value {
     case ._Native(let nativeIndex):
       return ._Native(nativeIndex.successor())
     case ._Cocoa(let cocoaIndex):
@@ -1493,7 +1493,7 @@ public func == <Key : Hashable, Value> (
     return lhs._nativeIndex == rhs._nativeIndex
   }
 
-  switch (lhs.value, rhs.value) {
+  switch (lhs._value, rhs._value) {
   case (._Native(let lhsNative), ._Native(let rhsNative)):
     return lhsNative == rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
@@ -1511,7 +1511,7 @@ public func < <Key : Hashable, Value> (
     return lhs._nativeIndex < rhs._nativeIndex
   }
 
-  switch (lhs.value, rhs.value) {
+  switch (lhs._value, rhs._value) {
   case (._Native(let lhsNative), ._Native(let rhsNative)):
     return lhsNative < rhsNative
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
@@ -1638,17 +1638,17 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
 
   typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 
-  var state: _DictionaryGeneratorRepresentation<Key, Value>
+  var _state: _DictionaryGeneratorRepresentation<Key, Value>
 
   static func _Native(
     #start: _NativeIndex, end: _NativeIndex
   ) -> DictionaryGenerator {
-    return DictionaryGenerator(state: ._Native(start: start, end: end))
+    return DictionaryGenerator(_state: ._Native(start: start, end: end))
   }
   static func _Cocoa(
     generator: _CocoaDictionaryGenerator
   ) -> DictionaryGenerator{
-    return DictionaryGenerator(state: ._Cocoa(generator))
+    return DictionaryGenerator(_state: ._Cocoa(generator))
   }
 
   @transparent
@@ -1657,13 +1657,13 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
   }
 
   mutating func _nativeNext() -> (Key, Value)? {
-    switch state {
+    switch _state {
     case ._Native(var startIndex, var endIndex):
       if startIndex == endIndex {
         return .None
       }
       let result = startIndex.nativeStorage.assertingGet(startIndex)
-      state = ._Native(start: startIndex.successor(), end: endIndex)
+      _state = ._Native(start: startIndex.successor(), end: endIndex)
       return result
     case ._Cocoa:
       _fatalError("internal error: not backed by NSDictionary")
@@ -1675,7 +1675,7 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
       return _nativeNext()
     }
 
-    switch state {
+    switch _state {
     case ._Native(var startIndex, var endIndex):
       return _nativeNext()
     case ._Cocoa(var cocoaGenerator):
