@@ -16,13 +16,16 @@ func ifTrue() -> Int {
   return 0 // expected-warning {{will never be executed}}
 }
 
+// Work-around <rdar://problem/17687851> by ensuring there is
+// something that appears to be user code in unreachable blocks.
+func userCode() {}
 
 func whileTrue() {
   var x = 0
   while true { // expected-note {{always evaluates to true}}
     x++
   }
-  x-- // expected-warning {{will never be executed}}
+  userCode() // expected-warning {{will never be executed}}
 }
 
 func whileTrueReachable(v: Int) -> () {
@@ -45,7 +48,7 @@ func whileTrueTwoPredecessorsEliminated() -> () {
     }
     x++
   }
-  x--  // expected-warning {{will never be executed}}
+  userCode()  // expected-warning {{will never be executed}}
 }
 
 func unreachableBranch() -> Int {
@@ -111,7 +114,7 @@ func testSwitchEnum(xi: Int) -> Int {
   var cond: X = .Two
   switch cond { // expected-warning {{switch condition evaluates to a constant}}
   case .One:
-    x++ // expected-note {{will never be executed}}
+    userCode() // expected-note {{will never be executed}}
   case .Two:
     x--  
   case .Three:
@@ -144,12 +147,12 @@ func testSwitchEnum(xi: Int) -> Int {
   case .Two: 
     x++
   default: 
-    x-- // expected-note{{will never be executed}}
+    userCode() // expected-note{{will never be executed}}
   }
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
   case .One: 
-    x++ // expected-note{{will never be executed}}
+    userCode() // expected-note{{will never be executed}}
   default: 
     x--
   }
