@@ -104,18 +104,17 @@ public:
   const_iterator begin() const { return Children.begin(); }
   const_iterator end() const { return Children.end(); }
 
-  Node *getFirstChild() const { return Children.front().get(); }
-  Node *getChild(size_t index) const { return Children[index].get(); }
+  NodePointer getFirstChild() const { return Children.front(); }
+  NodePointer getChild(size_t index) const { return Children[index]; }
 
   /// Add a new node as a child of this one.
   ///
   /// \param child - should have no parent or siblings
   /// \returns child
-  Node *addChild(NodePointer child) {
+  NodePointer addChild(NodePointer child) {
     assert(child && "adding null child!");
-    auto childRaw = child.get();
-    Children.push_back(std::move(child));
-    return childRaw;
+    Children.push_back(child);
+    return child;
   }
 
   /// A convenience method for adding two children at once.
