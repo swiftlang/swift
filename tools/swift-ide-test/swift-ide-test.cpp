@@ -1709,23 +1709,48 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
     ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
   #define INSTANCE_METHOD(ClassName, Selector, Options)             \
     if (moduleName.equals(currentModuleName)) {                     \
-      writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector,  \
+      auto contextID = writer.addObjCClass(#ClassName,              \
+                                           ObjCContextInfo());      \
+      writer.addObjCMethod(contextID, MAKE_SELECTOR_REF Selector,   \
+                           /*isInstanceMethod=*/true,               \
+                           ObjCMethodInfo() | Options);             \
+    }
+  #define PROTOCOL_INSTANCE_METHOD(ProtocolName, Selector, Options) \
+    if (moduleName.equals(currentModuleName)) {                     \
+      auto contextID = writer.addObjCProtocol(#ProtocolName,        \
+                                           ObjCContextInfo());      \
+      writer.addObjCMethod(contextID, MAKE_SELECTOR_REF Selector,   \
                            /*isInstanceMethod=*/true,               \
                            ObjCMethodInfo() | Options);             \
     }
   #define CLASS_METHOD(ClassName, Selector, Options)                \
     if (moduleName == currentModuleName) {                          \
-      writer.addObjCMethod(#ClassName, MAKE_SELECTOR_REF Selector,  \
+      auto contextID = writer.addObjCClass(#ClassName,              \
+                                           ObjCContextInfo());      \
+      writer.addObjCMethod(contextID, MAKE_SELECTOR_REF Selector,   \
                            /*isInstanceMethod=*/false,              \
                            ObjCMethodInfo() | Options);             \
     }
-  #define OBJC_CONTEXT(ClassName, Options)                        \
+  #define OBJC_CLASS(ClassName, Options)                            \
     if (moduleName == currentModuleName) {                        \
       writer.addObjCClass(#ClassName, ObjCContextInfo() | Options); \
     }
+  #define OBJC_PROTOCOL(ProtocolName, Options)                          \
+    if (moduleName == currentModuleName) {                              \
+      writer.addObjCProtocol(#ProtocolName, ObjCContextInfo() | Options); \
+    }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)  \
     if (moduleName == currentModuleName) {                            \
-      writer.addObjCProperty(#ContextName, #PropertyName,             \
+      auto contextID = writer.addObjCClass(#ContextName,              \
+                                           ObjCContextInfo());        \
+      writer.addObjCProperty(contextID, #PropertyName,                \
+                             ObjCPropertyInfo() | OptionalTypeKind);  \
+    }
+  #define OBJC_PROTOCOL_PROPERTY(ContextName, PropertyName, OptionalTypeKind)  \
+    if (moduleName == currentModuleName) {                            \
+      auto contextID = writer.addObjCProtocol(#ContextName,              \
+                                           ObjCContextInfo());        \
+      writer.addObjCProperty(contextID, #PropertyName,                \
                              ObjCPropertyInfo() | OptionalTypeKind);  \
     }
 #include "KnownObjCMethods.def"
@@ -1773,78 +1798,168 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
   #define MAKE_SELECTOR_REF(NumPieces, ...) \
     ObjCSelectorRef{NumPieces, { __VA_ARGS__ } }
 
-  #define INSTANCE_METHOD(ClassName, Selector, Options)                 \
-    if (auto info = reader->lookupObjCMethod(                           \
-                      #ClassName, MAKE_SELECTOR_REF Selector, true)) {  \
-      if (moduleName != currentModuleName) {                            \
-        llvm::errs() << "Class " << moduleName << " method"             \
-                     << " should not have been found\n";                \
-        return true;                                                    \
-      }                                                                 \
-      auto expectedInfo = ObjCMethodInfo() | Options;                   \
-      if (*info != expectedInfo) {                                      \
-        llvm::errs() << "Class " << moduleName << " method"             \
-                     << " has incorrect information\n";                 \
-        return true;                                                    \
-      }                                                                 \
-    } else if (moduleName == currentModuleName) {                       \
-      llvm::errs() << "Class " << moduleName << " method"               \
-                   << " not found in API notes file\n";                  \
-      return true;                                                      \
+  #define INSTANCE_METHOD(ClassName, Selector, Options)         \
+    if (auto classInfo = reader->lookupObjCClass(#ClassName)) { \
+      if (auto info = reader->lookupObjCMethod(                 \
+                        classInfo->first,                       \
+                        MAKE_SELECTOR_REF Selector, true)) {    \
+        if (moduleName != currentModuleName) {                  \
+          llvm::errs() << "Class " << #ClassName << " method"   \
+                       << " should not have been found\n";      \
+          return true;                                          \
+        }                                                       \
+        auto expectedInfo = ObjCMethodInfo() | Options;         \
+        if (*info != expectedInfo) {                            \
+          llvm::errs() << "Class " << #ClassName << " method"   \
+                       << " has incorrect information\n";       \
+          return true;                                          \
+        }                                                       \
+      } else if (moduleName == currentModuleName) {             \
+        llvm::errs() << "Class " << #ClassName << " method"     \
+                     << " not found in API notes file\n";       \
+        return true;                                            \
+      }                                                         \
+    } else if (moduleName == currentModuleName) {               \
+      llvm::errs() << "Class " << #ClassName                    \
+        << " not found in API notes file\n";                    \
+      return true;                                              \
+  }
+  #define PROTOCOL_INSTANCE_METHOD(ProtocolName, Selector, Options)         \
+    if (auto protocolInfo = reader->lookupObjCProtocol(#ProtocolName)) { \
+      if (auto info = reader->lookupObjCMethod(                 \
+                        protocolInfo->first,                       \
+                        MAKE_SELECTOR_REF Selector, true)) {    \
+        if (moduleName != currentModuleName) {                  \
+          llvm::errs() << "Protocol " << #ProtocolName << " method"   \
+                       << " should not have been found\n";      \
+          return true;                                          \
+        }                                                       \
+        auto expectedInfo = ObjCMethodInfo() | Options;         \
+        if (*info != expectedInfo) {                            \
+          llvm::errs() << "Protocol " << #ProtocolName << " method"   \
+                       << " has incorrect information\n";       \
+          return true;                                          \
+        }                                                       \
+      } else if (moduleName == currentModuleName) {             \
+        llvm::errs() << "Protocol " << #ProtocolName << " method"     \
+                     << " not found in API notes file\n";       \
+        return true;                                            \
+      }                                                         \
+     } else if (moduleName == currentModuleName) {              \
+      llvm::errs() << "Protocol " << #ProtocolName              \
+        << " not found in API notes file\n";                    \
+      return true;                                              \
     }
-  #define CLASS_METHOD(ClassName, Selector, Options)                    \
-    if (auto info = reader->lookupObjCMethod(                           \
-                      #ClassName, MAKE_SELECTOR_REF Selector, false)) { \
-      if (moduleName != currentModuleName) {                            \
-        llvm::errs() << "Class " << moduleName << " method"             \
-                     << " should not have been found\n";                \
-        return true;                                                    \
-      }                                                                 \
-      auto expectedInfo = ObjCMethodInfo() | Options;                   \
-      if (*info != expectedInfo) {                                      \
-        llvm::errs() << "Class " << moduleName << " method"             \
-                     << " has incorrect information\n";                 \
-        return true;                                                    \
-      }                                                                 \
-    } else if (moduleName == currentModuleName) {                       \
-      llvm::errs() << "Class " << moduleName << " method"               \
-                   << " not found in API notes file\n";                  \
-      return true;                                                      \
+  #define CLASS_METHOD(ClassName, Selector, Options)            \
+    if (auto classInfo = reader->lookupObjCClass(#ClassName)) { \
+      if (auto info = reader->lookupObjCMethod(                 \
+                        classInfo->first,                       \
+                        MAKE_SELECTOR_REF Selector, false)) {   \
+        if (moduleName != currentModuleName) {                  \
+          llvm::errs() << "Class " << #ClassName << " method"   \
+                       << " should not have been found\n";      \
+          return true;                                          \
+        }                                                       \
+        auto expectedInfo = ObjCMethodInfo() | Options;         \
+        if (*info != expectedInfo) {                            \
+          llvm::errs() << "Class " << #ClassName << " method"   \
+                       << " has incorrect information\n";       \
+          return true;                                          \
+        }                                                       \
+      } else if (moduleName == currentModuleName) {             \
+        llvm::errs() << "Class " << #ClassName << " method"     \
+                     << " not found in API notes file\n";       \
+        return true;                                            \
+      }                                                         \
+    } else if (moduleName == currentModuleName) {               \
+      llvm::errs() << "Class " << #ClassName                    \
+        << " not found in API notes file\n";                    \
+      return true;                                              \
     }
-  #define OBJC_CONTEXT(ClassName, Options)                          \
+  #define OBJC_CLASS(ClassName, Options)                            \
     if (auto info = reader->lookupObjCClass(#ClassName)) {          \
       if (moduleName != currentModuleName) {                        \
         llvm::errs() << "Class " << moduleName << "." << #ClassName \
                      << " should not have been found\n";            \
         return true;                                                \
       }                                                             \
-      auto expectedInfo = ObjCContextInfo() | Options;                \
-      if (*info != expectedInfo) {                                  \
+      auto expectedInfo = ObjCContextInfo() | Options;              \
+      if (info->second != expectedInfo) {                           \
         llvm::errs() << "Class " << moduleName << "." << #ClassName \
                      << " has incorrect information\n";             \
         return true;                                                \
       }                                                             \
     } else if (moduleName == currentModuleName) {                   \
       llvm::errs() << "Class " << moduleName << "." << #ClassName   \
-                   << " not found in API notes file\n";              \
+                   << " not found in API notes file\n";             \
       return true;                                                  \
     }
-  #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)    \
-    if (auto info = reader->lookupObjCProperty(#ContextName, #PropertyName)) { \
+  #define OBJC_PROTOCOL(ProtocolName, Options)                          \
+    if (auto info = reader->lookupObjCProtocol(#ProtocolName)) {        \
       if (moduleName != currentModuleName) {                            \
-        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
+        llvm::errs() << "Protocol " << moduleName << "." << #ProtocolName \
                      << " should not have been found\n";                \
         return true;                                                    \
       }                                                                 \
-      auto expectedInfo = ObjCPropertyInfo() | OptionalTypeKind;        \
-      if (*info != expectedInfo) {                                      \
-        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
+      auto expectedInfo = ObjCContextInfo() | Options;                  \
+      if (info->second != expectedInfo) {                               \
+        llvm::errs() << "Protocol " << moduleName << "." << #ProtocolName \
                      << " has incorrect information\n";                 \
         return true;                                                    \
       }                                                                 \
     } else if (moduleName == currentModuleName) {                       \
-        llvm::errs() << "Property " << #ContextName << "." << #PropertyName \
-                   << " not found in API notes file\n";                  \
+      llvm::errs() << "Protocol " << moduleName << "." << #ProtocolName \
+                   << " not found in API notes file\n";                 \
+      return true;                                                      \
+    }
+  #define OBJC_PROPERTY(ClassName, PropertyName, OptionalTypeKind)    \
+    if (auto classInfo = reader->lookupObjCClass(#ClassName)) {       \
+      if (auto info = reader->lookupObjCProperty(classInfo->first,      \
+                                                #PropertyName)) {       \
+        if (moduleName != currentModuleName) {                          \
+          llvm::errs() << "Property " << #ClassName << "." << #PropertyName \
+                       << " should not have been found\n";              \
+          return true;                                                  \
+        }                                                               \
+        auto expectedInfo = ObjCPropertyInfo() | OptionalTypeKind;      \
+        if (*info != expectedInfo) {                                    \
+          llvm::errs() << "Property " << #ClassName << "." << #PropertyName \
+                       << " has incorrect information\n";               \
+          return true;                                                  \
+        }                                                               \
+      } else if (moduleName == currentModuleName) {                     \
+          llvm::errs() << "Property " << #ClassName << "." << #PropertyName \
+                     << " not found in API notes file\n";               \
+        return true;                                                    \
+      }                                                                 \
+    } else if (moduleName == currentModuleName) {                       \
+      llvm::errs() << "Class " << #ClassName                            \
+        << " not found in API notes file\n";                            \
+      return true;                                                      \
+    }
+  #define OBJC_PROTOCOL_PROPERTY(ProtocolName, PropertyName, OptionalTypeKind) \
+    if (auto protocolInfo = reader->lookupObjCProtocol(#ProtocolName)) { \
+      if (auto info = reader->lookupObjCProperty(protocolInfo->first,   \
+                                                #PropertyName)) {       \
+        if (moduleName != currentModuleName) {                          \
+          llvm::errs() << "Property " << #ProtocolName << "." << #PropertyName \
+                       << " should not have been found\n";              \
+          return true;                                                  \
+        }                                                               \
+        auto expectedInfo = ObjCPropertyInfo() | OptionalTypeKind;      \
+        if (*info != expectedInfo) {                                    \
+          llvm::errs() << "Property " << #ProtocolName << "." << #PropertyName \
+                       << " has incorrect information\n";               \
+          return true;                                                  \
+        }                                                               \
+      } else if (moduleName == currentModuleName) {                     \
+          llvm::errs() << "Property " << #ProtocolName << "." << #PropertyName \
+                     << " not found in API notes file\n";               \
+        return true;                                                    \
+      }                                                                 \
+    } else if (moduleName == currentModuleName) {                       \
+      llvm::errs() << "Protocol " << #ProtocolName                      \
+        << " not found in API notes file\n";                            \
       return true;                                                      \
     }
 #include "KnownObjCMethods.def"

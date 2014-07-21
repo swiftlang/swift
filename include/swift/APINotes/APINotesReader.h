@@ -53,28 +53,37 @@ public:
   ///
   /// \param name The name of the class we're looking for.
   ///
-  /// \returns Information about the class, if known.
-  Optional<ObjCContextInfo> lookupObjCClass(StringRef name);
+  /// \returns The ID and information about the class, if known.
+  Optional<std::pair<ContextID, ObjCContextInfo>>
+  lookupObjCClass(StringRef name);
+
+  /// Look for information regarding the given Objective-C protocol.
+  ///
+  /// \param name The name of the protocol we're looking for.
+  ///
+  /// \returns The ID and information about the protocol, if known.
+  Optional<std::pair<ContextID, ObjCContextInfo>>
+  lookupObjCProtocol(StringRef name);
 
   /// Look for information regarding the given Objective-C property in
-  /// the given class.
+  /// the given context.
   ///
-  /// \param className The name of the class we are looking in.
+  /// \param contextID The ID that references the context we are looking for.
   /// \param name The name of the property we're looking for.
   ///
   /// \returns Information about the property, if known.
-  Optional<ObjCPropertyInfo> lookupObjCProperty(StringRef className, 
+  Optional<ObjCPropertyInfo> lookupObjCProperty(ContextID contextID,
                                                 StringRef name);
 
   /// Look for information regarding the given Objective-C method in
-  /// the given class.
+  /// the given context.
   ///
-  /// \param className The name of the class we are looking in.
+  /// \param contextID The ID that references the context we are looking for.
   /// \param selector The selector naming the method we're looking for.
   /// \param isInstanceMethod Whether we are looking for an instance method.
   ///
   /// \returns Information about the method, if known.
-  Optional<ObjCMethodInfo> lookupObjCMethod(StringRef className,
+  Optional<ObjCMethodInfo> lookupObjCMethod(ContextID contextID,
                                             ObjCSelectorRef selector,
                                             bool isInstanceMethod);
 };

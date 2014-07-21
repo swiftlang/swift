@@ -38,13 +38,15 @@ const uint16_t VERSION_MAJOR = 0;
 /// API notes file minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 1;
+const uint16_t VERSION_MINOR = 2;
 
 using IdentifierID = Fixnum<31>;
 using IdentifierIDField = BCVBR<16>;
 
 using SelectorID = Fixnum<31>;
 using SelectorIDField = BCVBR<16>;
+
+using StoredContextID = Fixnum<31>;
 
 /// The various types of blocks that can occur within a API notes file.
 ///
@@ -62,7 +64,7 @@ enum BlockID {
 
   /// The Objective-C class data block, which maps Objective-C class
   /// names to information about the class.
-  OBJC_CLASS_BLOCK_ID,
+  OBJC_CONTEXT_BLOCK_ID,
 
   /// The Objective-C property data block, which maps Objective-C
   /// (class name, property name) pairs to information about the
@@ -106,13 +108,13 @@ namespace identifier_block {
   >;
 }
 
-namespace objc_class_block {
+namespace objc_context_block {
   enum {
-    OBJC_CLASS_DATA = 1,
+    OBJC_CONTEXT_DATA = 1,
   };
 
-  using ObjCClassDataLayout = BCRecordLayout<
-    OBJC_CLASS_DATA,  // record ID
+  using ObjCContextDataLayout = BCRecordLayout<
+    OBJC_CONTEXT_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from ObjC class names (as IDs) to ObjC class information
   >;

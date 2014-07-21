@@ -48,24 +48,36 @@ public:
   ///
   /// \param name The name of this class.
   /// \param info Information about this class.
-  void addObjCClass(StringRef name, const ObjCContextInfo &info);
+  ///
+  /// \returns the ID of the class, which can be used to add properties and
+  /// methods to the class.
+  ContextID addObjCClass(StringRef name, const ObjCContextInfo &info);
+
+  /// Add information about a specific Objective-C protocol.
+  ///
+  /// \param name The name of this protocol.
+  /// \param info Information about this protocol.
+  ///
+  /// \returns the ID of the protocol, which can be used to add properties and
+  /// methods to the protocol.
+  ContextID addObjCProtocol(StringRef name, const ObjCContextInfo &info);
 
   /// Add information about a specific Objective-C property.
   ///
-  /// \param className The class in which this property resides.
+  /// \param contextID The context in which this property resides.
   /// \param name The name of this property.
   /// \param info Information about this property.
-  void addObjCProperty(StringRef className, StringRef name, 
+  void addObjCProperty(ContextID contextID, StringRef name,
                        const ObjCPropertyInfo &info);
 
   /// Add information about a specific Objective-C method.
   ///
-  /// \param className The class in which this method resides.
+  /// \param contextID The context in which this method resides.
   /// \param selector The selector that names this method.
   /// \param isInstanceMethod Whether this method is an instance method
   /// (vs. a class method).
   /// \param info Information about this method.
-  void addObjCMethod(StringRef className, ObjCSelectorRef selector, 
+  void addObjCMethod(ContextID contextID, ObjCSelectorRef selector,
                      bool isInstanceMethod, const ObjCMethodInfo &info);
 };
 

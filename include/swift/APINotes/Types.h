@@ -52,6 +52,16 @@ enum class FactoryAsInitKind {
   AsInitializer
 };
 
+/// Opaque context ID used to refer to an Objective-C class or protocol.
+class ContextID {
+  unsigned Value;
+
+  explicit ContextID(unsigned value) : Value(value) { }
+
+  friend class APINotesReader;
+  friend class APINotesWriter;
+};
+
 /// Describes API notes data for any entity.
 ///
 /// This is used as the base of

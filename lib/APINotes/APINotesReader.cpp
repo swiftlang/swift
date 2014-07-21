@@ -79,11 +79,12 @@ namespace {
   };
 
   /// Used to deserialize the on-disk Objective-C class table.
-  class ObjCClassTableInfo {
+  class ObjCContextTableInfo {
   public:
-    using internal_key_type = unsigned; // name ID
+    // identifier ID, is-protocol
+    using internal_key_type = std::pair<unsigned, char>;
     using external_key_type = internal_key_type;
-    using data_type = ObjCContextInfo;
+    using data_type = std::pair<unsigned, ObjCContextInfo>;
     using hash_value_type = size_t;
     using offset_type = unsigned;
 
@@ -107,20 +108,23 @@ namespace {
     }
     
     static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-      auto classID = endian::readNext<IdentifierID, little, unaligned>(data);
-      return classID;
+      auto nameID
+        = endian::readNext<IdentifierID, little, unaligned>(data);
+      auto isProtocol = endian::readNext<uint8_t, little, unaligned>(data);
+      return { nameID, isProtocol };
     }
     
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
-      ObjCContextInfo info;
-      readCommonEntityInfo(data, info);
+      data_type result;
+      result.first = endian::readNext<StoredContextID, little, unaligned>(data);
+      readCommonEntityInfo(data, result.second);
       if (*data++) {
-        info.setDefaultNullability(static_cast<NullableKind>(*data));
+        result.second.setDefaultNullability(static_cast<NullableKind>(*data));
       }
       ++data;
-      info.setHasDesignatedInits(*data++);
-      return info;
+      result.second.setHasDesignatedInits(*data++);
+      return result;
     }
   };
 
@@ -286,11 +290,11 @@ public:
   /// The identifier table.
   std::unique_ptr<SerializedIdentifierTable> IdentifierTable;
 
-  using SerializedObjCClassTable =
-      llvm::OnDiskIterableChainedHashTable<ObjCClassTableInfo>;
+  using SerializedObjCContextTable =
+      llvm::OnDiskIterableChainedHashTable<ObjCContextTableInfo>;
 
-  /// The Objective-C class table.
-  std::unique_ptr<SerializedObjCClassTable> ObjCClassTable;
+  /// The Objective-C context table.
+  std::unique_ptr<SerializedObjCContextTable> ObjCContextTable;
 
   using SerializedObjCPropertyTable =
       llvm::OnDiskIterableChainedHashTable<ObjCPropertyTableInfo>;
@@ -322,8 +326,8 @@ public:
                         SmallVectorImpl<uint64_t> &scratch);
   bool readIdentifierBlock(llvm::BitstreamCursor &cursor,
                            SmallVectorImpl<uint64_t> &scratch);
-  bool readObjCClassBlock(llvm::BitstreamCursor &cursor,
-                          SmallVectorImpl<uint64_t> &scratch);
+  bool readObjCContextBlock(llvm::BitstreamCursor &cursor,
+                            SmallVectorImpl<uint64_t> &scratch);
   bool readObjCPropertyBlock(llvm::BitstreamCursor &cursor, 
                              SmallVectorImpl<uint64_t> &scratch);
   bool readObjCMethodBlock(llvm::BitstreamCursor &cursor, 
@@ -474,10 +478,10 @@ bool APINotesReader::Implementation::readIdentifierBlock(
   return false;
 }
 
-bool APINotesReader::Implementation::readObjCClassBlock(
+bool APINotesReader::Implementation::readObjCContextBlock(
        llvm::BitstreamCursor &cursor,
        SmallVectorImpl<uint64_t> &scratch) {
-  if (cursor.EnterSubBlock(OBJC_CLASS_BLOCK_ID))
+  if (cursor.EnterSubBlock(OBJC_CONTEXT_BLOCK_ID))
     return true;
 
   auto next = cursor.advance();
@@ -499,17 +503,17 @@ bool APINotesReader::Implementation::readObjCClassBlock(
     StringRef blobData;
     unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
     switch (kind) {
-    case objc_class_block::OBJC_CLASS_DATA: {
+    case objc_context_block::OBJC_CONTEXT_DATA: {
       // Already saw Objective-C class table.
-      if (ObjCClassTable)
+      if (ObjCContextTable)
         return true;
 
       uint32_t tableOffset;
-      objc_class_block::ObjCClassDataLayout::readRecord(scratch, tableOffset);
+      objc_context_block::ObjCContextDataLayout::readRecord(scratch, tableOffset);
       auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
-      ObjCClassTable.reset(
-        SerializedObjCClassTable::Create(base + tableOffset,
+      ObjCContextTable.reset(
+        SerializedObjCContextTable::Create(base + tableOffset,
                                          base + sizeof(uint32_t),
                                          base));
       break;
@@ -739,8 +743,8 @@ APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
       }
       break;
 
-    case OBJC_CLASS_BLOCK_ID:
-      if (!hasValidControlBlock || Impl.readObjCClassBlock(cursor, scratch)) {
+    case OBJC_CONTEXT_BLOCK_ID:
+      if (!hasValidControlBlock || Impl.readObjCContextBlock(cursor, scratch)) {
         failed = true;
         return;
       }
@@ -803,36 +807,51 @@ APINotesReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
   return std::move(reader);
 }
 
-Optional<ObjCContextInfo> APINotesReader::lookupObjCClass(StringRef name) {
-  if (!Impl.ObjCClassTable)
+auto APINotesReader::lookupObjCClass(StringRef name)
+       -> Optional<std::pair<ContextID, ObjCContextInfo>> {
+  if (!Impl.ObjCContextTable)
     return Nothing;
 
   Optional<IdentifierID> classID = Impl.getIdentifier(name);
   if (!classID)
     return Nothing;
 
-  auto known = Impl.ObjCClassTable->find(*classID);
-  if (known == Impl.ObjCClassTable->end())
+  auto known = Impl.ObjCContextTable->find({*classID, '\0'});
+  if (known == Impl.ObjCContextTable->end())
     return Nothing;
 
-  return *known;
+  auto result = *known;
+  return { ContextID(result.first), result.second };
+}
+
+auto APINotesReader::lookupObjCProtocol(StringRef name)
+       -> Optional<std::pair<ContextID, ObjCContextInfo>> {
+  if (!Impl.ObjCContextTable)
+    return Nothing;
+
+  Optional<IdentifierID> classID = Impl.getIdentifier(name);
+  if (!classID)
+    return Nothing;
+
+  auto known = Impl.ObjCContextTable->find({*classID, '\1'});
+  if (known == Impl.ObjCContextTable->end())
+    return Nothing;
+
+  auto result = *known;
+  return { ContextID(result.first), result.second };
 }
 
 Optional<ObjCPropertyInfo> APINotesReader::lookupObjCProperty(
-                             StringRef className, 
+                             ContextID contextID,
                              StringRef name) {
   if (!Impl.ObjCPropertyTable)
-    return Nothing;
-
-  Optional<IdentifierID> classID = Impl.getIdentifier(className);
-  if (!classID)
     return Nothing;
 
   Optional<IdentifierID> propertyID = Impl.getIdentifier(name);
   if (!propertyID)
     return Nothing;
 
-  auto known = Impl.ObjCPropertyTable->find({*classID, *propertyID});
+  auto known = Impl.ObjCPropertyTable->find({contextID.Value, *propertyID});
   if (known == Impl.ObjCPropertyTable->end())
     return Nothing;
 
@@ -840,21 +859,17 @@ Optional<ObjCPropertyInfo> APINotesReader::lookupObjCProperty(
 }
 
 Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
-                           StringRef className,
+                           ContextID contextID,
                            ObjCSelectorRef selector,
                            bool isInstanceMethod) {
   if (!Impl.ObjCMethodTable)
-    return Nothing;
-
-  Optional<IdentifierID> classID = Impl.getIdentifier(className);
-  if (!classID)
     return Nothing;
 
   Optional<SelectorID> selectorID = Impl.getSelector(selector);
   if (!selectorID)
     return Nothing;
 
-  auto known = Impl.ObjCMethodTable->find({*classID, *selectorID, 
+  auto known = Impl.ObjCMethodTable->find({contextID.Value, *selectorID,
                                            isInstanceMethod});
   if (known == Impl.ObjCMethodTable->end())
     return Nothing;

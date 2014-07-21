@@ -44,21 +44,23 @@ class APINotesWriter::Implementation {
   SmallVector<uint64_t, 64> ScratchRecord;
 
 public:
-  /// Information about Objective-C classes.
+  /// Information about Objective-C contexts (classes or protocols).
   ///
-  /// Indexed by the class ID and provides information
-  /// describing the class within that module.
-  llvm::DenseMap<unsigned, ObjCContextInfo> ObjCClasses;
+  /// Indexed by the identifier ID and a bit indication whether we're looking
+  /// for a class (0) or protocol (1) and provides both the context ID and
+  /// information describing the context within that module.
+  llvm::DenseMap<std::pair<unsigned, char>,
+                 std::pair<unsigned, ObjCContextInfo>> ObjCContexts;
 
   /// Information about Objective-C properties.
   ///
-  /// Indexed by the class ID and property name.
+  /// Indexed by the context ID and property name.
   llvm::DenseMap<std::pair<unsigned, unsigned>, ObjCPropertyInfo> 
     ObjCProperties;
 
   /// Information about Objective-C methods.
   ///
-  /// Indexed by the class ID, selector ID, and Boolean (stored as a
+  /// Indexed by the context ID, selector ID, and Boolean (stored as a
   /// char) indicating whether this is a class or instance method.
   llvm::DenseMap<std::tuple<unsigned, unsigned, char>, ObjCMethodInfo> 
     ObjCMethods;
@@ -103,7 +105,7 @@ private:
   void writeBlockInfoBlock(llvm::BitstreamWriter &writer);
   void writeControlBlock(llvm::BitstreamWriter &writer);
   void writeIdentifierBlock(llvm::BitstreamWriter &writer);
-  void writeObjCClassBlock(llvm::BitstreamWriter &writer);
+  void writeObjCContextBlock(llvm::BitstreamWriter &writer);
   void writeObjCPropertyBlock(llvm::BitstreamWriter &writer);
   void writeObjCMethodBlock(llvm::BitstreamWriter &writer);
   void writeObjCSelectorBlock(llvm::BitstreamWriter &writer);
@@ -150,8 +152,8 @@ void APINotesWriter::Implementation::writeBlockInfoBlock(
   BLOCK(IDENTIFIER_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
 
-  BLOCK(OBJC_CLASS_BLOCK);
-  BLOCK_RECORD(objc_class_block, OBJC_CLASS_DATA);
+  BLOCK(OBJC_CONTEXT_BLOCK);
+  BLOCK_RECORD(objc_context_block, OBJC_CONTEXT_DATA);
 
   BLOCK(OBJC_PROPERTY_BLOCK);
   BLOCK_RECORD(objc_property_block, OBJC_PROPERTY_DATA);
@@ -251,12 +253,12 @@ namespace {
     out.write(info.UnavailableMsg.c_str(), info.UnavailableMsg.size());
   }
 
-  /// Used to serialize the on-disk Objective-C class table.
-  class ObjCClassTableInfo {
+  /// Used to serialize the on-disk Objective-C context table.
+  class ObjCContextTableInfo {
   public:
-    using key_type = unsigned; // class ID
+    using key_type = std::pair<unsigned, char>; // identifier ID, is-protocol
     using key_type_ref = key_type;
-    using data_type = ObjCContextInfo;
+    using data_type = std::pair<unsigned, ObjCContextInfo>;
     using data_type_ref = const data_type &;
     using hash_value_type = size_t;
     using offset_type = unsigned;
@@ -271,8 +273,10 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = sizeof(IdentifierID);
-      uint32_t dataLength = getCommonEntityInfoSize(data) + dataBytes;
+      uint32_t keyLength = sizeof(IdentifierID) + 1;
+      uint32_t dataLength = sizeof(ContextID)
+                          + getCommonEntityInfoSize(data.second)
+                          + dataBytes;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -281,40 +285,44 @@ namespace {
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       endian::Writer<little> writer(out);
-      writer.write<IdentifierID>(key);
+      writer.write<IdentifierID>(key.first);
+      writer.write<uint8_t>(key.second);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      emitCommonEntityInfo(out, data);
+      endian::Writer<little> writer(out);
+      writer.write<StoredContextID >(data.first);
+
+      emitCommonEntityInfo(out, data.second);
 
       // FIXME: Inefficient representation.
       uint8_t bytes[dataBytes] = { 0, 0, 0 };
-      if (auto nullable = data.getDefaultNullability()) {
+      if (auto nullable = data.second.getDefaultNullability()) {
         bytes[0] = 1;
         bytes[1] = static_cast<uint8_t>(*nullable);
       } else {
         // Nothing to do.
       }
-      bytes[2] = data.hasDesignatedInits();
+      bytes[2] = data.second.hasDesignatedInits();
 
       out.write(reinterpret_cast<const char *>(bytes), dataBytes);
     }
   };
 } // end anonymous namespace
 
-void APINotesWriter::Implementation::writeObjCClassBlock(
+void APINotesWriter::Implementation::writeObjCContextBlock(
        llvm::BitstreamWriter &writer) {
-  BCBlockRAII restoreBlock(writer, OBJC_CLASS_BLOCK_ID, 3);
+  BCBlockRAII restoreBlock(writer, OBJC_CONTEXT_BLOCK_ID, 3);
 
-  if (ObjCClasses.empty())
+  if (ObjCContexts.empty())
     return;  
 
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
-    llvm::OnDiskChainedHashTableGenerator<ObjCClassTableInfo> generator;
-    for (auto &entry : ObjCClasses)
+    llvm::OnDiskChainedHashTableGenerator<ObjCContextTableInfo> generator;
+    for (auto &entry : ObjCContexts)
       generator.insert(entry.first, entry.second);
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
@@ -323,7 +331,7 @@ void APINotesWriter::Implementation::writeObjCClassBlock(
     tableOffset = generator.Emit(blobStream);
   }
 
-  objc_class_block::ObjCClassDataLayout layout(writer);
+  objc_context_block::ObjCContextDataLayout layout(writer);
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
@@ -560,7 +568,7 @@ void APINotesWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeBlockInfoBlock(writer);
     writeControlBlock(writer);
     writeIdentifierBlock(writer);
-    writeObjCClassBlock(writer);
+    writeObjCContextBlock(writer);
     writeObjCPropertyBlock(writer);
     writeObjCMethodBlock(writer);
     writeObjCSelectorBlock(writer);
@@ -585,33 +593,63 @@ void APINotesWriter::writeToStream(raw_ostream &os) {
   Impl.writeToStream(os);
 }
 
-void APINotesWriter::addObjCClass(StringRef name, const ObjCContextInfo &info) {
+auto APINotesWriter::addObjCClass(StringRef name, const ObjCContextInfo &info)
+       -> ContextID {
   IdentifierID classID = Impl.getIdentifier(name);
-  assert(!Impl.ObjCClasses.count(classID));
-  Impl.ObjCClasses[classID] = info;
+
+  std::pair<unsigned, char> key(classID, 0);
+  auto known = Impl.ObjCContexts.find(key);
+  if (known != Impl.ObjCContexts.end()) {
+    known->second.second |= info;
+  } else {
+    unsigned nextID = Impl.ObjCContexts.size() + 1;
+
+    known = Impl.ObjCContexts.insert(
+              std::make_pair(key, std::make_pair(nextID, info)))
+              .first;
+  }
+
+  return ContextID(known->second.first);
 }
 
-void APINotesWriter::addObjCProperty(StringRef className, StringRef name,
-                                    const ObjCPropertyInfo &info) {
-  IdentifierID classID = Impl.getIdentifier(className);
+auto APINotesWriter::addObjCProtocol(StringRef name, const ObjCContextInfo &info)
+       -> ContextID {
+  IdentifierID protocolID = Impl.getIdentifier(name);
+
+  std::pair<unsigned, char> key(protocolID, 1);
+  auto known = Impl.ObjCContexts.find(key);
+  if (known != Impl.ObjCContexts.end()) {
+    known->second.second |= info;
+  } else {
+    unsigned nextID = Impl.ObjCContexts.size() + 1;
+
+    known = Impl.ObjCContexts.insert(
+              std::make_pair(key, std::make_pair(nextID, info)))
+              .first;
+  }
+
+  return ContextID(known->second.first);
+}
+void APINotesWriter::addObjCProperty(ContextID contextID, StringRef name,
+                                     const ObjCPropertyInfo &info) {
   IdentifierID nameID = Impl.getIdentifier(name);
-  assert(!Impl.ObjCProperties.count({classID, nameID}));
-  Impl.ObjCProperties[{classID, nameID}] = info;
+  assert(!Impl.ObjCProperties.count({contextID.Value, nameID}));
+  Impl.ObjCProperties[{contextID.Value, nameID}] = info;
 }
 
-void APINotesWriter::addObjCMethod(StringRef className, 
-                                  ObjCSelectorRef selector, 
-                                  bool isInstanceMethod, 
-                                  const ObjCMethodInfo &info) {
-  IdentifierID classID = Impl.getIdentifier(className);
+void APINotesWriter::addObjCMethod(ContextID contextID,
+                                   ObjCSelectorRef selector,
+                                   bool isInstanceMethod,
+                                   const ObjCMethodInfo &info) {
   SelectorID selectorID = Impl.getSelector(selector);
-  assert(!Impl.ObjCMethods.count({classID, selectorID, isInstanceMethod}));
-  Impl.ObjCMethods[{classID, selectorID, isInstanceMethod}] = info;
+  assert(!Impl.ObjCMethods.count({contextID.Value, selectorID,
+                                  isInstanceMethod}));
+  Impl.ObjCMethods[{contextID.Value, selectorID, isInstanceMethod}] = info;
 
   // If this method is a designated initializer, update the class to note that
   // it has designated initializers.
   if (info.DesignatedInit) {
-    Impl.ObjCClasses[classID].setHasDesignatedInits(true);
+    Impl.ObjCContexts[{contextID.Value, '\0'}].second.setHasDesignatedInits(true);
   }
 }
 
