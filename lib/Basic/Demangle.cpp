@@ -16,9 +16,7 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Strings.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/QuotedString.h"
@@ -1679,10 +1677,11 @@ private:
       addImplFunctionAttribute(type, "@noreturn");
 
     // Enter a new generic context if this type is generic.
-    Optional<GenericContext> genericContext;
+    // FIXME: replace with std::optional, when we have it.
+    std::vector<GenericContext> genericContext;
     if (Mangled.nextIf('G')) {
-      genericContext.emplace(*this);
-      NodePointer generics = demangleGenerics(genericContext.getValue());
+      genericContext.emplace_back(*this);
+      NodePointer generics = demangleGenerics(genericContext.front());
       if (!generics)
         return nullptr;
       type->addChild(generics);
@@ -1705,15 +1704,17 @@ private:
 
   enum class ImplConventionContext { Callee, Parameter, Result };
 
-  // impl-convention ::= 'a'                     // direct, autoreleased
-  // impl-convention ::= 'd'                     // direct, no ownership transfer
-  // impl-convention ::= 'D'                     // direct, no ownership transfer,
-                                                 // dependent on self
-  // impl-convention ::= 'g'                     // direct, guaranteed
-  // impl-convention ::= 'i'                     // indirect, ownership transfer
-  // impl-convention ::= 'l'                     // indirect, inout
-  // impl-convention ::= 'o'                     // direct, ownership transfer
-  Optional<StringRef> demangleImplConvention(ImplConventionContext ctxt) {
+  /// impl-convention ::= 'a'                     // direct, autoreleased
+  /// impl-convention ::= 'd'                     // direct, no ownership transfer
+  /// impl-convention ::= 'D'                     // direct, no ownership transfer,
+  ///                                             // dependent on self
+  /// impl-convention ::= 'g'                     // direct, guaranteed
+  /// impl-convention ::= 'i'                     // indirect, ownership transfer
+  /// impl-convention ::= 'l'                     // indirect, inout
+  /// impl-convention ::= 'o'                     // direct, ownership transfer
+  ///
+  /// Returns an empty string otherwise.
+  StringRef demangleImplConvention(ImplConventionContext ctxt) {
 #define CASE(CHAR, FOR_CALLEE, FOR_PARAMETER, FOR_RESULT)            \
     if (Mangled.nextIf(CHAR)) {                                      \
       switch (ctxt) {                                                \
@@ -1723,6 +1724,7 @@ private:
       }                                                              \
       llvm_unreachable("bad context");                               \
     }
+    auto Nothing = StringRef();
     CASE('a',   Nothing,                Nothing,         "@autoreleased")
     CASE('d',   "@callee_unowned",      "@unowned",      "@unowned")
     CASE('d',   Nothing,                Nothing,         "@unowned_inner_pointer")
@@ -1731,8 +1733,7 @@ private:
     CASE('l',   Nothing,                "@inout",        Nothing)
     CASE('o',   "@callee_owned",        "@owned",        "@owned")
     return Nothing;
-
-#undef RETURN
+#undef CASE
   }
 
   // impl-callee-convention ::= 't'
@@ -1741,10 +1742,10 @@ private:
     StringRef attr;
     if (Mangled.nextIf('t')) {
       attr = "@thin";
-    } else if (auto optConv =
-                 demangleImplConvention(ImplConventionContext::Callee)) {
-      attr = optConv.getValue();
     } else {
+      attr = demangleImplConvention(ImplConventionContext::Callee);
+    }
+    if (attr.empty()) {
       return failure();
     }
     type->addChild(Node::create(Node::Kind::ImplConvention, attr));
@@ -1787,13 +1788,13 @@ private:
     };
 
     auto convention = demangleImplConvention(getContext(kind));
-    if (!convention) return nullptr;
+    if (convention.empty()) return nullptr;
     auto type = demangleType();
     if (!type) return nullptr;
 
     NodePointer node = Node::create(kind);
     node->addChild(Node::create(Node::Kind::ImplConvention,
-                                convention.getValue()));
+                                convention));
     node->addChild(type);
     return node;
   }
