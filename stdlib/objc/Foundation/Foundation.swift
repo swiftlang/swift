@@ -901,20 +901,6 @@ extension NSRange {
   }
 }
 
-extension NSRange : _BridgedToObjectiveCType {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSValue.self
-  }
-
-  public func _bridgeToObjectiveC() -> NSValue {
-    return NSValue(range: self)
-  }
-
-  public static func _bridgeFromObjectiveC(x: NSValue) -> NSRange {
-    return x.rangeValue
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // NSZone
 //===----------------------------------------------------------------------===//
