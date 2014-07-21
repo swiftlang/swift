@@ -1,4 +1,4 @@
-//===--- NSValue.swift.gyb - Bridging things in NSValue ---------*-swift-*-===//
+//===--- NSValue.swift - Bridging things in NSValue -------------*-swift-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,25 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-% for thing in ('point', 'size', 'rect', 'range'):
-%   Self = ('NS' if thing == 'range' else 'CG') + thing.capitalize()
-
-extension ${Self} : _BridgedToObjectiveCType {
+extension NSRange : _BridgedToObjectiveCType {
   public static func _getObjectiveCType() -> Any.Type {
     return NSValue.self
   }
 
   public func _bridgeToObjectiveC() -> NSValue {
-    return NSValue(${thing}: self)
+    return NSValue(range: self)
   }
 
-  public static func _bridgeFromObjectiveC(x: NSValue) -> ${Self} {
-    return x.${thing}Value
+  public static func _bridgeFromObjectiveC(x: NSValue) -> NSRange {
+    return x.rangeValue
   }
 }
-
-% end
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
