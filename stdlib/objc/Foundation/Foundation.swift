@@ -50,7 +50,6 @@ public let NSUTF16LittleEndianStringEncoding: UInt = 0x94000100
 public let NSUTF32StringEncoding: UInt = 0x8c000100
 public let NSUTF32BigEndianStringEncoding: UInt = 0x98000100
 public let NSUTF32LittleEndianStringEncoding: UInt = 0x9c000100
-public let noErr: Int32 = 0
 
 
 //===----------------------------------------------------------------------===//
