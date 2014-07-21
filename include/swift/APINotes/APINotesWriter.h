@@ -48,7 +48,7 @@ public:
   ///
   /// \param name The name of this class.
   /// \param info Information about this class.
-  void addObjCClass(StringRef name, const ObjCClassInfo &info);
+  void addObjCClass(StringRef name, const ObjCContextInfo &info);
 
   /// Add information about a specific Objective-C property.
   ///

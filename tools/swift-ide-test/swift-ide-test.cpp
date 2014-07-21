@@ -1648,7 +1648,7 @@ namespace {
     return std::move(known);
   }
 
-  api_notes::ObjCClassInfo &&operator|(api_notes::ObjCClassInfo &&known,
+  api_notes::ObjCContextInfo &&operator|(api_notes::ObjCContextInfo &&known,
                                       OptionalTypeAdjustment adjustment) {
     assert(adjustment.AdjustedTypes.size() <= 1);
     if (adjustment.AdjustedTypes.size() == 1) {
@@ -1721,7 +1721,7 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
     }
   #define OBJC_CONTEXT(ClassName, Options)                        \
     if (moduleName == currentModuleName) {                        \
-      writer.addObjCClass(#ClassName, ObjCClassInfo() | Options); \
+      writer.addObjCClass(#ClassName, ObjCContextInfo() | Options); \
     }
   #define OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)  \
     if (moduleName == currentModuleName) {                            \
@@ -1818,7 +1818,7 @@ bool checkAPIAnnotation(StringRef moduleName, StringRef fileName) {
                      << " should not have been found\n";            \
         return true;                                                \
       }                                                             \
-      auto expectedInfo = ObjCClassInfo() | Options;                \
+      auto expectedInfo = ObjCContextInfo() | Options;                \
       if (*info != expectedInfo) {                                  \
         llvm::errs() << "Class " << moduleName << "." << #ClassName \
                      << " has incorrect information\n";             \

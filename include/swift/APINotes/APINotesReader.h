@@ -54,7 +54,7 @@ public:
   /// \param name The name of the class we're looking for.
   ///
   /// \returns Information about the class, if known.
-  Optional<ObjCClassInfo> lookupObjCClass(StringRef name);
+  Optional<ObjCContextInfo> lookupObjCClass(StringRef name);
 
   /// Look for information regarding the given Objective-C property in
   /// the given class.

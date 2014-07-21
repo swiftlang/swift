@@ -1389,7 +1389,7 @@ ClangImporter::Implementation::getKnownObjCMethod(
 
   // Look for method and class information in the primary source.
   Optional<api_notes::ObjCMethodInfo> methodInfo;
-  Optional<api_notes::ObjCClassInfo> classInfo;
+  Optional<api_notes::ObjCContextInfo> classInfo;
 
   if (primary) {
     // Look for method information in the primary source.
@@ -1422,7 +1422,7 @@ ClangImporter::Implementation::getKnownObjCMethod(
   return Nothing;
 }
 
-Optional<api_notes::ObjCClassInfo>
+Optional<api_notes::ObjCContextInfo>
 ClangImporter::Implementation::getKnownObjCContext(
     const clang::ObjCContainerDecl *container) {
   // Figure out where to look for context information.
@@ -1431,11 +1431,11 @@ ClangImporter::Implementation::getKnownObjCContext(
   api_notes::APINotesReader *secondary;
   std::tie(name, primary, secondary) = getAPINotesForContext(container);
 
-  Optional<api_notes::ObjCClassInfo> primaryInfo;
+  Optional<api_notes::ObjCContextInfo> primaryInfo;
   if (primary)
     primaryInfo = primary->lookupObjCClass(name);
 
-  Optional<api_notes::ObjCClassInfo> secondaryInfo;
+  Optional<api_notes::ObjCContextInfo> secondaryInfo;
   if (secondary)
     secondaryInfo = secondary->lookupObjCClass(name);
 
@@ -1443,7 +1443,7 @@ ClangImporter::Implementation::getKnownObjCContext(
   if (!primaryInfo && !secondaryInfo)
     return Nothing;
 
-  api_notes::ObjCClassInfo info;
+  api_notes::ObjCContextInfo info;
 
   // Merge in primary information, if available.
   if (primaryInfo) {
@@ -1473,7 +1473,7 @@ ClangImporter::Implementation::getKnownObjCProperty(
 
   // Look for property and class information in the primary source.
   Optional<api_notes::ObjCPropertyInfo> propertyInfo;
-  Optional<api_notes::ObjCClassInfo> classInfo;
+  Optional<api_notes::ObjCContextInfo> classInfo;
 
   if (primary) {
     // Look for property information in the primary source.

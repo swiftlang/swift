@@ -48,7 +48,7 @@ public:
   ///
   /// Indexed by the class ID and provides information
   /// describing the class within that module.
-  llvm::DenseMap<unsigned, ObjCClassInfo> ObjCClasses;
+  llvm::DenseMap<unsigned, ObjCContextInfo> ObjCClasses;
 
   /// Information about Objective-C properties.
   ///
@@ -256,7 +256,7 @@ namespace {
   public:
     using key_type = unsigned; // class ID
     using key_type_ref = key_type;
-    using data_type = ObjCClassInfo;
+    using data_type = ObjCContextInfo;
     using data_type_ref = const data_type &;
     using hash_value_type = size_t;
     using offset_type = unsigned;
@@ -585,7 +585,7 @@ void APINotesWriter::writeToStream(raw_ostream &os) {
   Impl.writeToStream(os);
 }
 
-void APINotesWriter::addObjCClass(StringRef name, const ObjCClassInfo &info) {
+void APINotesWriter::addObjCClass(StringRef name, const ObjCContextInfo &info) {
   IdentifierID classID = Impl.getIdentifier(name);
   assert(!Impl.ObjCClasses.count(classID));
   Impl.ObjCClasses[classID] = info;

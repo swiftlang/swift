@@ -78,7 +78,7 @@ public:
 };
 
 /// Describes API notes data for an Objective-C class.
-class ObjCClassInfo : public CommonEntityInfo {
+class ObjCContextInfo : public CommonEntityInfo {
   /// Whether this class has a default nullability.
   unsigned HasDefaultNullability : 1;
 
@@ -89,7 +89,7 @@ class ObjCClassInfo : public CommonEntityInfo {
   unsigned HasDesignatedInits : 1;
 
 public:
-  ObjCClassInfo()
+  ObjCContextInfo()
     : CommonEntityInfo(),
       HasDefaultNullability(0),
       DefaultNullability(0),
@@ -123,19 +123,19 @@ public:
     DefaultNullability = 0;
   }
 
-  friend bool operator==(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
+  friend bool operator==(const ObjCContextInfo &lhs, const ObjCContextInfo &rhs) {
     return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
            lhs.HasDefaultNullability == rhs.HasDefaultNullability &&
            lhs.DefaultNullability == rhs.DefaultNullability &&
            lhs.HasDesignatedInits == rhs.HasDesignatedInits;
   }
 
-  friend bool operator!=(const ObjCClassInfo &lhs, const ObjCClassInfo &rhs) {
+  friend bool operator!=(const ObjCContextInfo &lhs, const ObjCContextInfo &rhs) {
     return !(lhs == rhs);
   }
 
-  friend ObjCClassInfo &operator|=(ObjCClassInfo &lhs,
-                                   const ObjCClassInfo &rhs) {
+  friend ObjCContextInfo &operator|=(ObjCContextInfo &lhs,
+                                   const ObjCContextInfo &rhs) {
     // Merge nullability.
     if (!lhs.getDefaultNullability()) {
       if (auto nullable = rhs.getDefaultNullability()) {
@@ -190,7 +190,7 @@ public:
 
   /// Merge class-wide information into the given method.
   friend ObjCPropertyInfo &operator|=(ObjCPropertyInfo &lhs,
-                                      const ObjCClassInfo &rhs) {
+                                      const ObjCContextInfo &rhs) {
     // Merge nullability.
     if (!lhs.NullabilityAudited) {
       if (auto nullable = rhs.getDefaultNullability()) {
@@ -305,7 +305,7 @@ public:
 
   /// Merge class-wide information into the given method.
   friend ObjCMethodInfo &operator|=(ObjCMethodInfo &lhs,
-                                    const ObjCClassInfo &rhs) {
+                                    const ObjCContextInfo &rhs) {
     // Merge nullability.
     if (!lhs.NullabilityAudited) {
       if (auto nullable = rhs.getDefaultNullability()) {

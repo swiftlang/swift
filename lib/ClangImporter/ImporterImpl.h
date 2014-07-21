@@ -296,7 +296,7 @@ public:
 
   /// Retrieve information about the given Objective-C context scoped to the
   /// given Swift module.
-  Optional<api_notes::ObjCClassInfo>
+  Optional<api_notes::ObjCContextInfo>
   getKnownObjCContext(const clang::ObjCContainerDecl *container);
 
   /// Retrieve any information known a priori about the given Objective-C

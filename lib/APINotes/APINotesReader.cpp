@@ -83,7 +83,7 @@ namespace {
   public:
     using internal_key_type = unsigned; // name ID
     using external_key_type = internal_key_type;
-    using data_type = ObjCClassInfo;
+    using data_type = ObjCContextInfo;
     using hash_value_type = size_t;
     using offset_type = unsigned;
 
@@ -113,7 +113,7 @@ namespace {
     
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
-      ObjCClassInfo info;
+      ObjCContextInfo info;
       readCommonEntityInfo(data, info);
       if (*data++) {
         info.setDefaultNullability(static_cast<NullableKind>(*data));
@@ -803,7 +803,7 @@ APINotesReader::get(std::unique_ptr<llvm::MemoryBuffer> inputBuffer) {
   return std::move(reader);
 }
 
-Optional<ObjCClassInfo> APINotesReader::lookupObjCClass(StringRef name) {
+Optional<ObjCContextInfo> APINotesReader::lookupObjCClass(StringRef name) {
   if (!Impl.ObjCClassTable)
     return Nothing;
 
