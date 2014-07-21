@@ -78,7 +78,9 @@ static int adapt(int delta, int numpoints, bool firsttime) {
 // Section 6.2: Decoding procedure
 
 bool Punycode::decodePunycode(StringRef inputPunycode,
-                              SmallVectorImpl<char> &outUTF8) {
+                              std::string &outUTF8) {
+  outUTF8.clear();
+
   // -- Build the decoded string as UTF32 first because we need random access.
   SmallVector<UTF32, 32> output;
 
@@ -135,24 +137,26 @@ bool Punycode::decodePunycode(StringRef inputPunycode,
   }
   
   // -- Transcode to a UTF-8 result.
-  size_t reserve = outUTF8.size() + output.size()*4;
-  outUTF8.reserve(reserve);
+  size_t SizeUpperBound = output.size()*4;
+  std::vector<UTF8> Result(SizeUpperBound);
   const UTF32 *utf32_begin = output.begin();
-  UTF8 *utf8_begin = (UTF8*)outUTF8.end();
+  UTF8 *utf8_begin = Result.data();
   auto res = ConvertUTF32toUTF8(&utf32_begin, output.end(),
-                                &utf8_begin, (UTF8*)outUTF8.data() + reserve,
+                                &utf8_begin, Result.data() + SizeUpperBound,
                                 lenientConversion);
   assert(res == conversionOK && "wide-to-utf8 conversion failed!");
   (void)res;
-  outUTF8.set_size(utf8_begin - (UTF8*)outUTF8.begin());
-  
+  outUTF8 = std::string(Result.data(), utf8_begin);
+
   return false;
 }
 
 // Section 6.3: Encoding procedure
 
 void Punycode::encodePunycode(StringRef inputUTF8,
-                              SmallVectorImpl<char> &outPunycode) {
+                              std::string &outPunycode) {
+  outPunycode.clear();
+
   UTF32 n = initial_n;
   int delta = 0;
   int bias = initial_bias;

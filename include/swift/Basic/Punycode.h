@@ -21,8 +21,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_BASIC_PUNYCODE_H__
-#define __SWIFT_BASIC_PUNYCODE_H__
+#ifndef SWIFT_BASIC_PUNYCODE_H
+#define SWIFT_BASIC_PUNYCODE_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -32,16 +32,15 @@ namespace swift {
 namespace Punycode {
 
 /// Encodes a UTF-8-encoded Unicode string into Punycode.
-void encodePunycode(StringRef inputUTF8,
-                    SmallVectorImpl<char> &outPunycode);
+void encodePunycode(StringRef InputUTF8, std::string &OutPunycode);
 
 /// Decodes a Punycode string into a UTF-8-encoded Unicode string.
 ///
 /// Returns true if the encoding failed, false if it succeeded.
-bool decodePunycode(StringRef inputPunycode,
-                    SmallVectorImpl<char> &outUTF8);
+bool decodePunycode(StringRef InputPunycode, std::string &OutUTF8);
 
 } // end namespace Punycode
 } // end namespace swift
 
-#endif
+#endif // LLVM_SWIFT_BASIC_PUNYCODE_H
+

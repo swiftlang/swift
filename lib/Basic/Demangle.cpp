@@ -674,14 +674,14 @@ private:
       return nullptr;
     
     bool isPunycoded = Mangled.nextIf('X');
-    llvm::SmallString<32> decodeBuffer;
+    std::string decodeBuffer;
 
     auto decode = [&](StringRef s) -> StringRef {
       if (!isPunycoded)
         return s;
       if (Punycode::decodePunycode(s, decodeBuffer))
         return {};
-      return decodeBuffer;
+      return StringRef(decodeBuffer.data(), decodeBuffer.size());
     };
     
     bool isOperator = false;

@@ -88,7 +88,7 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
 
   // If the identifier contains non-ASCII character, we mangle with an initial
   // X and Punycode the identifier string.
-  llvm::SmallString<32> punycodeBuf;
+  std::string punycodeBuf;
 
   if (isNonAscii(str)) {
     Buffer << 'X';
