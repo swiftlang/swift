@@ -74,16 +74,18 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// from this buffer.
   subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {get}
 
-  /// Call body(p), where p is a pointer to the underlying contiguous storage
-  /// Requires: such contiguous storage exists or the buffer is empty
-  func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<Element>)->R
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.  If no such storage exists, it is
+  /// created on-demand.
+  func withUnsafeBufferPointer<R>(
+    body: (UnsafeBufferPointer<Element>)->R
   ) -> R
   
-  /// Call body(p), where p is a pointer to the underlying contiguous storage
-  /// Requires: such contiguous storage exists or the buffer is empty
-  mutating func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.  Requires: such
+  /// contiguous storage exists or the buffer is empty
+  mutating func withUnsafeMutableBufferPointer<R>(
+    body: (UnsafeMutableBufferPointer<Element>)->R
   ) -> R
   
   /// How many elements the buffer stores

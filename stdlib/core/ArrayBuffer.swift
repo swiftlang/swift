@@ -354,34 +354,36 @@ extension _ArrayBuffer {
     }
   }
 
-  /// Call `body(p)`, where `p` is a pointer to the underlying
-  /// contiguous storage.  If no contiguous storage exists, it is
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   public
-  func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<T>)->R
+  func withUnsafeBufferPointer<R>(
+    body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
     if _isClassOrObjCExistential(T.self) {
       if _nonNative {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }
-    let ret = body(self.baseAddress)
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, length: count))
     _fixLifetime(self)
     return ret
   }
   
-  /// Call `body(p)`, where `p` is a pointer to the underlying contiguous
-  /// storage.  Requires: Contiguous storage already exists
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.  Requires: such
+  /// contiguous storage exists or the buffer is empty
   public
-  mutating func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<T>)->R
+  mutating func withUnsafeMutableBufferPointer<R>(
+    body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
     _sanityCheck(
       baseAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
-    let ret = body(baseAddress)
+    let ret = body(
+      UnsafeMutableBufferPointer(start: baseAddress, length: count))
     _fixLifetime(self)
     return ret
   }

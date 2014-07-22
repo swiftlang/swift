@@ -389,33 +389,12 @@ extension ${Self} {
 
 extension ${Self} {
   /// Call body(p), where p is a pointer to the ${Self}'s contiguous storage
-  public func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<T>) -> R
+  public func withUnsafeBufferPointer<R>(
+    body: (UnsafeBufferPointer<T>) -> R
   ) -> R {
-    return _buffer.withUnsafePointerToElements(body)
+    return _buffer.withUnsafeBufferPointer(body)
   }
-  
-  public mutating func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<T>) -> R
-  ) -> R {
-    // Ensure unique storage
-    _arrayReserve(&_buffer, 0)
 
-    // Ensure that body can't invalidate the storage or its bounds by
-    // moving self into a temporary working array.
-    var work = ${Self}()
-    swap(&work, &self)
-
-    // Invoke the body
-    let ret = work._buffer.withUnsafeMutablePointerToElements(body)
-
-    // Put the working array back before returning.
-    swap(&work, &self)
-    return ret
-  }
-}
-
-extension ${Self} {
   public mutating func withUnsafeMutableBufferPointer<R>(
     body: (inout UnsafeMutableBufferPointer<T>)->R
   ) -> R {

@@ -145,18 +145,27 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return _base.baseAddress
   }
 
-  public func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<T>)->R
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.
+  public
+  func withUnsafeBufferPointer<R>(
+    body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
-    let p = _base.baseAddress
-    return withExtendedLifetime(_base) { body(p) }
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, length: count))
+    _fixLifetime(self)
+    return ret
   }
 
-  public mutating func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<T>)->R
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.  
+  public
+  mutating func withUnsafeMutableBufferPointer<R>(
+    body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
-    let p = _base.baseAddress
-    return withExtendedLifetime(_base) { body(p) }
+    let ret = body(
+      UnsafeMutableBufferPointer(start: baseAddress, length: count))
+    _fixLifetime(self)
+    return ret
   }
 
   public mutating func take() -> _ContiguousArrayBuffer {

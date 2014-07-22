@@ -208,8 +208,8 @@ import Foundation
 func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
-  return src.withUnsafePointerToElements {
-    let ns =  NSArray(objects: UnsafePointer($0), count: src.count)
+  return src.withUnsafeBufferPointer {
+    let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: src.count)
     return Array(_ArrayBuffer(reinterpretCast(ns) as _CocoaArrayType))
   }
 }
@@ -254,9 +254,9 @@ func testCocoa() {
   // CHECK-NEXT: true
 
   // Prove that we create contiguous storage for an opaque NSArray
-  a.withUnsafePointerToElements {
+  a.withUnsafeBufferPointer {
     (p)->() in
-    println(p.memory)
+    println(p[0])
     // CHECK-NEXT: foo
   }
 }

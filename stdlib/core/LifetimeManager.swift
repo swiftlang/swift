@@ -38,8 +38,8 @@ extension String {
   public func withCString<Result>(
     f: (UnsafePointer<Int8>)->Result
   ) -> Result {
-    return self.nulTerminatedUTF8.withUnsafePointerToElements {
-      f(UnsafePointer($0))
+    return self.nulTerminatedUTF8.withUnsafeBufferPointer {
+      f(UnsafePointer($0.baseAddress))
     }
   }
 }

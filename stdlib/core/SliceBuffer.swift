@@ -275,19 +275,26 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   //===--- misc -----------------------------------------------------------===//
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.
   public
-  func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<T>)->R
+  func withUnsafeBufferPointer<R>(
+    body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
-    let start = self.start
-    return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, length: count))
+    _fixLifetime(self)
+    return ret
   }
-  
-  public mutating
-  func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<T>)->R
+
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.  
+  public
+  mutating func withUnsafeMutableBufferPointer<R>(
+    body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
-    let start = self.start
-    return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)
+    let ret = body(
+      UnsafeMutableBufferPointer(start: baseAddress, length: count))
+    _fixLifetime(self)
+    return ret
   }
 }
