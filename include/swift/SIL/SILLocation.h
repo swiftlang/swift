@@ -270,6 +270,10 @@ public:
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
+  
+  SourceRange getSourceRange() const {
+    return { getStartSourceLoc(), getEndSourceLoc() };
+  }
 
   /// Pretty-print the value.
   void dump(const SourceManager &SM) const;

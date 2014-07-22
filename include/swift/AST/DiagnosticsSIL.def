@@ -61,6 +61,16 @@ ERROR(could_not_find_bridge_type,sil_gen,none,
       "could not find Objective-C bridge type for type '%0'; "
       "did you forget to import Foundation?", (StringRef))
 
+ERROR(writeback_overlap_property,sil_gen,none,
+      "inout writeback aliasing conflict detected on computed property %0",
+      (Identifier))
+ERROR(writeback_overlap_subscript,sil_gen,none,
+      "inout writeback aliasing conflict detected on subscript",
+      ())
+NOTE(writebackoverlap_note,sil_gen,none,
+      "concurrent writeback occurred here", ())
+
+
 
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,

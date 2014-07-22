@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "Initialization.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -63,9 +64,32 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   LValueWriteback &operator=(LValueWriteback&&) = default;
 
   LValueWriteback() = default;
-  LValueWriteback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
+  LValueWriteback(SILLocation loc,
+                  std::unique_ptr<LogicalPathComponent> &&comp,
                   ManagedValue base, Materialize temp)
     : loc(loc), component(std::move(comp)), base(base), temp(temp) {
+  }
+
+  void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
+    // If the two writebacks we're comparing are of different kinds (e.g.
+    // ownership conversion vs a computed property) then they aren't the
+    // same and thus cannot conflict.
+    if (component->getKind() != rhs.component->getKind())
+      return;
+
+    // If the lvalues don't have the same base value, then they aren't the same.
+    // Note that this is the primary source of false negative for this
+    // diagnostic.
+    if (base.getValue() != rhs.base.getValue())
+      return;
+
+    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,SGF);
+  }
+
+  void performWriteback(SILGenFunction &gen) {
+    ManagedValue mv = temp.claim(gen, loc);
+    auto formalTy = component->getSubstFormalType();
+    component->set(gen, loc, RValue(gen, loc, formalTy, mv), base);
   }
 };
 }
@@ -188,7 +212,8 @@ SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   ManagedValue value = get(gen, loc, getterBase, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
   
-  gen.getWritebackStack().emplace_back(loc, clone(gen, loc), base, temp);
+  gen.getWritebackStack().emplace_back(loc,
+                                       clone(gen, loc), base, temp);
   return temp.address;
 }
 
@@ -222,15 +247,27 @@ WritebackScope::WritebackScope(SILGenFunction &g)
 WritebackScope::~WritebackScope() {
   if (!gen)
     return;
-  
+
+  // Pop the InWritebackScope bit.
   gen->InWritebackScope = wasInWritebackScope;
+
+  // Check to see if there is anything going on here.
   auto i = gen->getWritebackStack().end(),
        deepest = gen->getWritebackStack().begin() + savedDepth;
+  if (i == deepest) return;
+
   while (i-- > deepest) {
-    ManagedValue mv = i->temp.claim(*gen, i->loc);
-    auto formalTy = i->component->getSubstFormalType();
-    i->component->set(*gen, i->loc, RValue(*gen, i->loc, formalTy, mv),
-                      i->base);
+    // Attempt to diagnose problems where obvious aliasing introduces illegal
+    // code.  We do a simple N^2 comparison here to detect this because it is
+    // extremely unlikely more than a few writebacks are active at once.
+    if (i != deepest) {
+      for (auto j = i-1; j >= deepest; --j)
+        i->diagnoseConflict(*j, *gen);
+    }
+
+    // Claim the address of each and then perform the writeback from the
+    // temporary allocation to the source we copied from.
+    i->performWriteback(*gen);
   }
   
   gen->getWritebackStack().erase(deepest, gen->getWritebackStack().end());
@@ -472,6 +509,36 @@ namespace {
       LogicalPathComponent *clone = new GetterSetterComponent(*this, gen, loc);
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
+
+    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      auto &rhs = (GetterSetterComponent&)*RHS;
+
+      // If the decls match, then this could conflict.
+      if (decl != rhs.decl || IsSuper != rhs.IsSuper) return;
+
+      // NOTE: This completely ignores subscript indices.  This can produce
+      // false negatives!  We should probably at least handle literal cases in
+      // the fullness of time and assume that variable indices can alias.
+      if (subscriptIndexExpr) return;
+
+      if (isa<VarDecl>(decl))
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_property,
+                         decl->getName())
+          .highlight(loc1.getSourceRange());
+      else
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
+          .highlight(loc1.getSourceRange());
+      
+      gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+        .highlight(loc2.getSourceRange());
+    }
+
   };
   
   /// Remap an lvalue referencing a generic type to an lvalue of its substituted
@@ -515,6 +582,17 @@ namespace {
         = new OrigToSubstComponent(gen, origType, substType);
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
+
+    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      //      auto &rhs = (GetterSetterComponent&)*RHS;
+
+    }
   };
 
   /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
@@ -550,6 +628,17 @@ namespace {
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone = new OwnershipComponent(getTypeData());
       return std::unique_ptr<LogicalPathComponent>(clone);
+    }
+
+    /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      //      auto &rhs = (GetterSetterComponent&)*RHS;
+
     }
   };
 }

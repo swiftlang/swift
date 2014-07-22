@@ -165,7 +165,7 @@ class LogicalPathComponent : public PathComponent {
 protected:
   LogicalPathComponent(LValueTypeData typeData, KindTy Kind)
     : PathComponent(typeData, Kind) {
-    assert(isLogical() && "PhysicalPathComponent Kind isn't physical");
+    assert(isLogical() && "LogicalPathComponent Kind isn't logical");
   }
 
 public:
@@ -180,7 +180,16 @@ public:
   /// Get the property.
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
                            ManagedValue base, SGFContext c) const = 0;
-  
+
+  /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+  /// the same dynamic PathComponent type as the receiver) to see if they are
+  /// identical.  If so, there is a conflicting writeback happening, so emit a
+  /// diagnostic.
+  virtual void diagnoseWritebackConflict(LogicalPathComponent *rhs,
+                                         SILLocation loc1, SILLocation loc2,
+                                         SILGenFunction &gen) = 0;
+
+
   /// Get the property, materialize a temporary lvalue for it, and if
   /// we're in a writeback scope, register a writeback.  This returns the
   /// address of the buffer.

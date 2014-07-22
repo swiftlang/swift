@@ -5337,6 +5337,18 @@ public:
     
     return ManagedValue::forUnmanaged(unowned);
   }
+
+  /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
+  /// the same dynamic PathComponent type as the receiver) to see if they are
+  /// identical.  If so, there is a conflicting writeback happening, so emit a
+  /// diagnostic.
+  void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                 SILLocation loc1, SILLocation loc2,
+                                 SILGenFunction &gen) override {
+    //      auto &rhs = (GetterSetterComponent&)*RHS;
+
+  }
+
 };
 } // end anonymous namespace
 
