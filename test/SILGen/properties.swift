@@ -102,8 +102,8 @@ func physical_struct_lvalue(c: Int) {
     r.y = a
 
    // CHECK: strong_retain %0 : $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned Ref) -> ()
+   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFC10properties3Refs1ySi : $@cc(method) @thin (Int, @owned Ref) -> ()
+   // CHECK: apply [transparent] [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned Ref) -> ()
    // CHECK: strong_release %0 : $Ref
   }
 
@@ -113,14 +113,14 @@ func physical_struct_lvalue(c: Int) {
     r.y = a
    // CHECK: strong_retain %0 : $RefSubclass
    // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : Ref
-   // CHECK: apply [[FN]](%1, [[R_SUP]]) :
-  
+   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFC10properties3Refs1ySi : $@cc(method) @thin (Int, @owned Ref) -> ()
+   // CHECK: apply [transparent] [[FN]](%1, [[R_SUP]]) :
+
     r.w = a
 
    // CHECK: strong_retain %0 : $RefSubclass
-   // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned RefSubclass) -> ()
+   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFC10properties11RefSubclasss1wSi : $@cc(method) @thin (Int, @owned RefSubclass) -> ()
+   // CHECK: apply [transparent] [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned RefSubclass) -> ()
   }
   
 
@@ -144,8 +144,8 @@ func physical_class_rvalue() -> Int {
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF10properties12class_rvalueFT_CS_3Ref
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
 
-  // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
-  // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFC10properties3Refg1ySi : $@cc(method) @thin (@owned Ref) -> Int
+  // CHECK: [[RET:%[0-9]+]] = apply [transparent] [[FN]]([[CLASS]])
   // CHECK: return [[RET]]
 }
 
@@ -190,7 +190,7 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[VAL_REF:%[0-9]+]] = load [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
-  // CHECK: [[GET_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!getter.1 : Ref -> () -> Val
+  // CHECK: [[GET_VAL_PROP_METHOD:%[0-9]+]] = function_ref @_TFC10properties3Refg8val_propVS_3Val : $@cc(method) @thin (@owned Ref) -> @owned Val
   // CHECK: [[VAL_REF_VAL_PROP:%[0-9]+]] = apply [[GET_VAL_PROP_METHOD]]([[VAL_REF]])
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%[0-9]+]] = alloc_stack $Val
   // CHECK: store [[VAL_REF_VAL_PROP]] to [[VAL_REF_VAL_PROP_MAT]]#1
@@ -211,7 +211,7 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]]#1)
   // -- writeback to val.ref.val_prop
   // CHECK: [[WB_VAL_REF_VAL_PROP:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]#1
-  // CHECK: [[SET_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!setter.1 : Ref -> (Val) -> ()
+  // CHECK: [[SET_VAL_PROP_METHOD:%[0-9]+]] = function_ref @_TFC10properties3Refs8val_propVS_3Val : $@cc(method) @thin (@owned Val, @owned Ref) -> ()
   // CHECK: apply [[SET_VAL_PROP_METHOD]]([[WB_VAL_REF_VAL_PROP]], [[VAL_REF]])
   // -- cleanup
   // CHECK: dealloc_stack [[V_R_VP_Z_TUPLE_MAT]]#0
@@ -643,8 +643,9 @@ class rdar16151899Derived : rdar16151899Base {
         
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK-NEXT: load{{.*}}Int
-        // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : rdar16151899Base
-        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
+        // CHECK-NEXT: // function_ref
+        // CHECK-NEXT: [[SETTER:%[0-9]+]] = function_ref @_TFC10properties16rdar16151899Bases1xSi : $@cc(method) @thin (Int, @owned rdar16151899Base) -> () // user: %18
+        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]])
     }
 }
 
@@ -822,11 +823,11 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil @_TF10properties12genericPropsFGCS_12GenericClassSS_T_ 
+// CHECK-LABEL: sil @_TF10properties12genericPropsFGCS_12GenericClassSS_T_
 func genericProps(x: GenericClass<String>) {
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK: function_ref @_TFC10properties12GenericClassg1xQ_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @owned GenericClass<τ_0_0>) -> () // user: %5
   let _ = x.x
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK: function_ref @_TFC10properties12GenericClassg1ySi : $@cc(method) @thin <τ_0_0> (@owned GenericClass<τ_0_0>) -> Int // user: %11
   let _ = x.y
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
   // CHECK: load [[Z]] : $*String

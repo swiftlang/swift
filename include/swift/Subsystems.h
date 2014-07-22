@@ -130,6 +130,14 @@ namespace swift {
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            unsigned StartElem = 0);
 
+  /// When the entire module has been parsed and checked, perform whole module
+  /// checks and resolutions.
+  ///
+  /// \param M The module
+  ///
+  /// \param WholeModuleCompilation Whether we're doing whole-module compilation
+  void performWholeModuleChecks(Module *M, bool WholeModuleCompilation);
+
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);
 

@@ -97,7 +97,7 @@ import gizmo
 
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
 
-class RootGeneric<T> {
+public class RootGeneric<T> {
   var x : UInt8
 
   init()
@@ -134,7 +134,7 @@ class RootNonGeneric {
 }
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
-class GenericInheritsGeneric<A, B> : RootGeneric<A> {
+public class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
 
   func zippity()

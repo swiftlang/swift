@@ -222,7 +222,8 @@ class ClassWithGetter : PropertyWithGetter {
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: class_method
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: apply
 // CHECK-NEXT: return
 
@@ -245,7 +246,8 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: class_method
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
 // CHECK-NEXT: apply
 // CHECK-NEXT: return
 
@@ -262,8 +264,9 @@ class ClassWithStoredProperty : PropertyWithGetter {
   // CHECK-NEXT: bb0(%0 : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: strong_retain %0 : $ClassWithStoredProperty
-  // CHECK-NEXT: %3 = class_method %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1
-  // CHECK-NEXT: %4 = apply %3(%0)
+  // CHECK-NEXT: // function_ref protocols.ClassWithStoredProperty.a.getter : Swift.Int
+  // CHECK-NEXT: function_ref @_TFC9protocols23ClassWithStoredPropertyg1aSi : $@cc(method) @thin (@owned ClassWithStoredProperty) -> Int
+  // CHECK-NEXT: %4 = apply [transparent] %3(%0)
   // CHECK-NEXT: strong_release %0 : $ClassWithStoredProperty
   // CHECK-NEXT: return %4 : $Int
 }

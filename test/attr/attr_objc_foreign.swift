@@ -7,11 +7,11 @@ import CoreGraphics
 
 // CHECK-LABEL: extension CGColor
 extension CGColor {
-  // CHECK-LABEL: {{^}} var red: CGFloat
+  // CHECK-LABEL: {{^}} final var red: CGFloat
   var red: CGFloat { return 0 }
-  // CHECK-LABEL: {{^}} func asCMYK() -> CGColor
+  // CHECK-LABEL: {{^}} final func asCMYK() -> CGColor
   func asCMYK() -> CGColor { return self }
-  // CHECK-LABEL: {{^}} subscript (x: CGColor) -> CGFloat
+  // CHECK-LABEL: {{^}} final subscript (x: CGColor) -> CGFloat
   subscript(x: CGColor) -> CGFloat { return 0 }
 
   @objc var blue: CGFloat { return 0 } // expected-error{{method cannot be marked @objc because Core Foundation types are not classes in Objective-C}}
@@ -23,7 +23,7 @@ extension CGColor {
 
 // CHECK-LABEL: extension CGColor : Foo
 extension CGColor: Foo { // expected-error{{Core Foundation class 'CGColor' cannot conform to @objc protocol 'Foo' because Core Foundation types are not classes in Objective-C}}
-  // CHECK-LABEL: {{^}} func foo()
+  // CHECK-LABEL: {{^}} final func foo()
   func foo() {}
 }
 

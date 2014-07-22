@@ -6,7 +6,7 @@ import gizmo
 // TODO: Generic base classes
 
 // Test for compilation order independence
-class C : B {
+public class C : B {
   // foo inherited from B
   override func bar() {}
   // bas inherited from A
@@ -15,7 +15,7 @@ class C : B {
   // zim inherited from B
   override func zang() {}
 
-  required init(int i: Int) { }
+  public required init(int i: Int) { }
 
   func flopsy() {}
   func mopsy() {}
@@ -33,7 +33,7 @@ class C : B {
 // CHECK:   #C.mopsy!1: _TFC7vtables1C5mopsyfS0_FT_T_
 // CHECK: }
 
-class A {
+public class A {
   func foo() {}
   func bar() {}
   func bas() {}
@@ -48,8 +48,8 @@ class A {
 // CHECK:   #A.init!initializer.1: _TFC7vtables1AcfMS0_FT_S0_
 // CHECK: }
 
-class B : A {
-  required init(int i: Int) { }
+public class B : A {
+  public required init(int i: Int) { }
 
   override func foo() {}
   // bar inherited from A

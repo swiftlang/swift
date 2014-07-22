@@ -8,7 +8,7 @@ import gizmo
 // A pure Swift class. We can access its isa directly.
 //
 
-class Purebred {
+public class Purebred {
   func method() {}
 }
 
@@ -28,7 +28,7 @@ entry(%0 : $Purebred):
 // A mixed Swift/ObjC class. We have to use object_getClass to access its isa.
 //
 
-class Mongrel: Gizmo {
+public class Mongrel: Gizmo {
   func method() {}
 }
 

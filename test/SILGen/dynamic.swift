@@ -281,9 +281,9 @@ func dynamicMethodDispatch() {
 
 // CHECK-LABEL: sil @_TF7dynamic15managedDispatchFCS_3FooT_
 func managedDispatch(c: Foo) {
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign
+  // CHECK: function_ref @_TFC7dynamic3Foog11managedPropSi : $@cc(method) @thin (@owned Foo) -> Int
   let x = c.managedProp
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
+  // CHECK: function_ref @_TFC7dynamic3Foos11managedPropSi : $@cc(method) @thin (Int, @owned Foo) -> ()
   c.managedProp = x
 }
 

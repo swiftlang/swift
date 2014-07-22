@@ -166,7 +166,8 @@ class ConformingClass : X {
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
   // CHECK-NEXT:    strong_retain %3 : $ConformingClass
   // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
-  // CHECK-NEXT:    %6 = class_method %3 : $ConformingClass, #ConformingClass.selfTypes!1 : ConformingClass -> (x: ConformingClass) -> ConformingClass , $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
+  // CHECK-NEXT:    // function_ref
+  // CHECK-NEXT:    %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_ : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass // user: %7
   // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
   // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
   // CHECK-NEXT:    %9 = tuple ()
@@ -182,7 +183,8 @@ func <~>(x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
 extension ConformingClass : ClassBounded { }
 // CHECK-LABEL: sil @_TTWC9witnesses15ConformingClassS_12ClassBoundedFS1_9selfTypesUS1___fQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass {
 // CHECK-NEXT:  bb0(%0 : $ConformingClass, %1 : $ConformingClass):
-// CHECK-NEXT:    %2 = class_method %1 : $ConformingClass, #ConformingClass.selfTypes!1 : ConformingClass -> (x: ConformingClass) -> ConformingClass , $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass // user: %3
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   %2 = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_ : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass // user: %3
 // CHECK-NEXT:    %3 = apply %2(%0, %1) : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
 // CHECK-NEXT:    return %3 : $ConformingClass
 // CHECK-NEXT:  }

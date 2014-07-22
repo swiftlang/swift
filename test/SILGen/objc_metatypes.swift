@@ -5,7 +5,7 @@ import gizmo
 
 @objc class ObjCClass {}
 
-class A {
+public class A {
   // CHECK-LABEL: sil @_TFC14objc_metatypes1A3foo
 
   // CHECK-LABEL: sil @_TToFC14objc_metatypes1A3foo
@@ -34,7 +34,7 @@ class A {
   dynamic func takeGizmo(g: Gizmo.Type) { }
 
   // CHECK-LABEL: sil @_TFC14objc_metatypes1A7callFoo
-  func callFoo() {
+  public func callFoo() {
     // Make sure we peephole Type/thick_to_objc_metatype.
     // CHECK-NOT: thick_to_objc_metatype
     // CHECK: metatype $@objc_metatype ObjCClass.Type

@@ -42,7 +42,7 @@ class ClassGenericFieldClass<T:ClassBound> {
   }
 }
 
-class ClassProtocolFieldClass {
+public class ClassProtocolFieldClass {
   var x : Int = 0
   var y : ClassBound
   var z : Int = 0
@@ -246,7 +246,7 @@ func class_protocol_field_class_fields(x: ClassProtocolFieldClass)
   // CHECK:  = call i64 %{{[0-9]+}}
 }
 
-class SomeSwiftClass {
+public class SomeSwiftClass {
   class func foo() {}
 }
 

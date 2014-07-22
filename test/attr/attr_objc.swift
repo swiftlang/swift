@@ -1352,11 +1352,11 @@ class infer_instanceVar5 {
 
   @objc
   var intstanceVar1: Int {
-  // CHECK: @objc var intstanceVar1: Int
+  // CHECK: @objc final var intstanceVar1: Int
     get {}
-    // CHECK: @objc get {}
+    // CHECK: @objc final get {}
     set {}
-    // CHECK: @objc set {}
+    // CHECK: @objc final set {}
   }
 }
 
@@ -1374,11 +1374,11 @@ class infer_subscript1 {
 
   @objc
   subscript(i: Int) -> Int {
-  // CHECK: @objc subscript (i: Int) -> Int
+  // CHECK: @objc final subscript (i: Int) -> Int
     get {}
-    // CHECK: @objc get {}
+    // CHECK: @objc final get {}
     set {}
-    // CHECK: @objc set {}
+    // CHECK: @objc final set {}
   }
 }
 
@@ -1400,12 +1400,12 @@ class infer_throughConformance1 : infer_throughConformanceProto1 {
   func funcObjC1() {}
   var varObjC1: Int = 0
   var varObjC2: Int = 0
-  // CHECK: @objc func funcObjC1() {
-  // CHECK: @objc var varObjC1: Int
-  // CHECK: @objc var varObjC2: Int
+  // CHECK: @objc final func funcObjC1() {
+  // CHECK: @objc final var varObjC1: Int
+  // CHECK: @objc final var varObjC2: Int
 
   func nonObjC1() {}
-  // CHECK: {{^}} func nonObjC1() {
+  // CHECK: {{^}} final func nonObjC1() {
 
   // CHECK: @objc deinit  {
 }
@@ -1427,12 +1427,12 @@ class infer_throughConformance2 : infer_throughConformanceProto2 {
   private func funcObjC1() {}
   private var varObjC1: Int = 0
   private var varObjC2: Int = 0
-  // CHECK: @objc private func funcObjC1() {
-  // CHECK: @objc private var varObjC1: Int
-  // CHECK: @objc private var varObjC2: Int
+  // CHECK: @objc private final func funcObjC1() {
+  // CHECK: @objc private final var varObjC1: Int
+  // CHECK: @objc private final var varObjC2: Int
 
   private func nonObjC1() {}
-  // CHECK: {{^}} private func nonObjC1() {
+  // CHECK: {{^}} private final func nonObjC1() {
 
   // CHECK: @objc deinit  {
 }
@@ -1527,11 +1527,11 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @IBOutlet @objc weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}}  @IBOutlet @objc weak final var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{'IBOutlet' property cannot have non-object type 'PlainStruct'}}
-  // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
+  // CHECK-LABEL: {{^}}  @IBOutlet final var badOutlet: PlainStruct
 }
 
 //===---
@@ -1545,13 +1545,13 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @NSManaged @objc var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @NSManaged @objc final var goodManaged: Class_ObjC1
 
   @NSManaged
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
-  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
+  // CHECK-LABEL: {{^}}  @NSManaged final var badManaged: PlainStruct
 }
 
 //===---
@@ -1593,26 +1593,26 @@ class Class_ObjC2 {
 }
 
 @objc() // expected-error{{expected name within parentheses of '@objc' attribute}}
-class Class_ObjC3 { 
+class Class_ObjC3 {
 }
 
 // @objc with selector names
 extension PlainClass {
-  // CHECK-LABEL: @objc(setFoo:) func
+  // CHECK-LABEL: @objc(setFoo:) final func
   @objc(setFoo:)
   func foo(b: Bool) { }
 
-  // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) func set
+  // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) final func set
   @objc(setWithRed:green:blue:alpha:)
   func set(Float, green: Float, blue: Float, alpha: Float)  { }
 
-  // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) class func createWith
+  // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) final class func createWith
   @objc(createWithRed:green blue:alpha)
   class func createWithRed(Float, green: Float, blue: Float, alpha: Float) { }
   // expected-error@-2{{missing ':' after selector piece in '@objc' attribute}}{{28-28=:}}
   // expected-error@-3{{missing ':' after selector piece in '@objc' attribute}}{{39-39=:}}
 
-  // CHECK-LABEL: @objc(::) func badlyNamed
+  // CHECK-LABEL: @objc(::) final func badlyNamed
   @objc(::)
   func badlyNamed(Int, y: Int) {}
 }

@@ -349,17 +349,17 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [[RADDR]]
   // CHECK: retain [[R1]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : RefWithProp -> (Int) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime11RefWithProps8int_propSi : $@cc(method) @thin (Int, @owned RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
 
   r.aleph_prop.b = v
   // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]
   // CHECK: retain [[R2]]
   // CHECK: retain [[R2]]
-  // CHECK: [[GETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!getter.1 : RefWithProp -> () -> Aleph
+  // CHECK: [[GETTER_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime11RefWithPropg10aleph_propVS_5Aleph : $@cc(method) @thin (@owned RefWithProp) -> @owned Aleph
   // CHECK: apply [[GETTER_METHOD]]([[R2]])
   // CHECK: [[ALEPH_PROP_MAT:%[0-9]+]] = alloc_stack $Aleph
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!setter.1 : RefWithProp -> (Aleph) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime11RefWithProps10aleph_propVS_5Aleph : $@cc(method) @thin (@owned Aleph, @owned RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R2]])
 
   // -- Written-back materializes are consumed by the writeback operation
@@ -395,8 +395,8 @@ class Foo<T> {
     // CHECK: assign {{.*}} to [[THIS_X]]
 
     z = Foo<T>.makeT()
+    // CHECK: [[MAKET:%[0-9]+]] = function_ref @_TFC8lifetime3Foo5makeTU__fMGS0_Q__FT_Q_ : $@thin <τ_0_0> (@out τ_0_0, @thick Foo<τ_0_0>.Type) -> ()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type
-    // CHECK: [[MAKET:%[0-9]+]] = class_method [[FOOMETA]] : {{.*}}, #Foo.makeT!1
     // CHECK: ref_element_addr
 
     // -- cleanup this lvalue and return this

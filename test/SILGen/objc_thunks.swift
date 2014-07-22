@@ -2,7 +2,7 @@
 // RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | FileCheck %s
 import gizmo
 
-class Hoozit : Gizmo {
+public class Hoozit : Gizmo {
   func typical(x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(objc_method) @thin (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
   // CHECK-NEXT: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
@@ -15,7 +15,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance
-  override func fork() { }
+  override public func fork() { }
   // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(objc_method) @thin (@owned Hoozit) -> () {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   // function_ref
@@ -25,7 +25,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_CONSUMED 'gizmo' argument by inheritance
-  override class func consume(gizmo: Gizmo?) { }
+  override public class func consume(gizmo: Gizmo?) { }
    // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozit7consumefMS0_FGSqCSo5Gizmo_T_ : $@cc(objc_method) @thin (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
   // CHECK-NEXT: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
@@ -57,7 +57,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[GETIMPL]](%0)
   // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
   // CHECK-NEXT: }
-  
+
   // CHECK-LABEL: sil [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
@@ -138,7 +138,7 @@ class Hoozit : Gizmo {
     set {}
   }
   // -- getter
-  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo 
+  // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozitg10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Hoozit) -> @autoreleased Gizmo
 
   // -- setter
   // CHECK-LABEL: sil  @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@cc(objc_method) @thin (Gizmo, Hoozit) -> () {
@@ -261,7 +261,7 @@ extension Hoozit {
   dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
   // CHECK-LABEL: sil @_TFC11objc_thunks6HoozitcfMS0_FT6doubleSd_S0_ : $@cc(method) @thin (Double, @owned Hoozit) -> @owned Hoozit
-  convenience init(double d: Double) { 
+  convenience init(double d: Double) {
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
     // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $X
     var x = X()
@@ -279,7 +279,7 @@ extension Hoozit {
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@thin () -> ()
     // CHECK-NEXT: strong_release [[X_BOX]]#0 : $Builtin.NativeObject
     // CHECK-NEXT: br [[EPILOG_BB]]
-    
+
     // CHECK: [[EPILOG_BB]]:
     // CHECK-NOT: super_method
     // CHECK: return
@@ -287,7 +287,7 @@ extension Hoozit {
     other()
   }
 
-  func foof() {}
+  public func foof() {}
   // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozit4fooffS0_FT_T_ : $@cc(objc_method) @thin (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }

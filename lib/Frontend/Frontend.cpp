@@ -437,6 +437,8 @@ void CompilerInstance::performSema() {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
+
+  performWholeModuleChecks(MainModule, PrimaryBufferID == NO_SUCH_BUFFER);
 }
 
 void CompilerInstance::performParseOnly() {

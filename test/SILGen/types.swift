@@ -10,8 +10,8 @@ class C {
     member = x
 
     // CHECK: strong_retain %1 : $C
-    // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
-    // CHECK: apply [[FN]](%0, %1) : $@cc(method) @thin (Int, @owned C) -> ()
+    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFC5types1Cs6memberSi : $@cc(method) @thin (Int, @owned C) -> ()
+    // CHECK: apply [transparent] [[FN]](%0, %1) : $@cc(method) @thin (Int, @owned C) -> ()
     // CHECK: strong_release %1 : $C
 
 

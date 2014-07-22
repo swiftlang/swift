@@ -15,16 +15,16 @@ func test1() -> Int {
 func takes_inout(inout a: Int) {}
 func takes_closure(fn: () -> ()) {}
 
-class SomeClass { 
+public class SomeClass {
   var x : Int
-  
+
   var computedProperty : Int { return 42 }
 
   init() { x = 0 }
   init(b : Bool) {
     if (b) {}
   } // expected-error {{property 'self.x' not initialized}}
-  
+
   func baseMethod() {}
 }
 
@@ -410,7 +410,7 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Int, b : Bool) {
     y = 42
-    someMethod() // expected-error 2 {{'self' used before super.init call}}
+    someMethod() // expected-error {{'self' used before super.init call}}
     super.init()
   }
 

@@ -92,16 +92,14 @@ func test_unowned_let_capture(aC : C) {
 }
 
 // CHECK-LABEL: sil shared @_TFF7unowned24test_unowned_let_captureFCS_1CT_U_FT_Si : $@thin (@owned @sil_unowned C) -> Int {
-// CHECK-NEXT: bb0(%0 : $@sil_unowned C):
-// CHECK-NEXT:   strong_retain_unowned %0 : $@sil_unowned C
-// CHECK-NEXT:   %2 = unowned_to_ref %0 : $@sil_unowned C to $C
-// CHECK-NEXT:   %3 = class_method %2 : $C, #C.f!1 : C -> () -> Int , $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   %4 = apply %3(%2) : $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   unowned_release %0 : $@sil_unowned C
-// CHECK-NEXT:   return %4 : $Int
-
-
-
+// CHECK-NEXT:bb0(%0 : $@sil_unowned C):
+// CHECK-NEXT:  // function_ref unowned.C.f (unowned.C)() -> Swift.Int
+// CHECK-NEXT:  %1 = function_ref @_TFC7unowned1C1ffS0_FT_Si : $@cc(method) @thin (@owned C) -> Int // user: %4
+// CHECK-NEXT:  strong_retain_unowned %0 : $@sil_unowned C      // id: %2
+// CHECK-NEXT:  %3 = unowned_to_ref %0 : $@sil_unowned C to $C  // user: %4
+// CHECK-NEXT:  %4 = apply %1(%3) : $@cc(method) @thin (@owned C) -> Int // user: %6
+// CHECK-NEXT:  unowned_release %0 : $@sil_unowned C            // id: %5
+// CHECK-NEXT:  return %4 : $Int                                // id: %6
 // <rdar://problem/16880044> unowned let properties don't work as struct and class members
 class TestUnownedMember {
   unowned let member : C

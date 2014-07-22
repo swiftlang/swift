@@ -440,10 +440,10 @@ class d0162_TestNoReturn {
 // PASS_COMMON-LABEL: {{^}}class d0162_TestNoReturn {{{$}}
 
   @noreturn func instanceFunc() { d0160_testNoReturn() }
-// PASS_COMMON-NEXT: {{^}}  @noreturn func instanceFunc(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @noreturn final func instanceFunc(){{$}}
 
   @noreturn func classFunc() {d0160_testNoReturn() }
-// PASS_COMMON-NEXT: {{^}}  @noreturn func classFunc(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @noreturn final func classFunc(){{$}}
 }
 
 
@@ -452,16 +452,16 @@ class d0170_TestAvailability {
 
   @availability(*, unavailable)
   func f1() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable) func f1(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable) final func f1(){{$}}
 
   @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
   func f2() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee") func f2(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee") final func f2(){{$}}
 
   @availability(iOS, unavailable)
   @availability(OSX, unavailable)
   func f3() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable) @availability(OSX, unavailable) func f3(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable) @availability(OSX, unavailable) final func f3(){{$}}
 }
 
 @objc class d0180_TestIBAttrs {
@@ -613,43 +613,43 @@ class d0250_ExplodePattern {
   var instanceVar1 = 0
   var instanceVar2 = 0.0
   var instanceVar3 = ""
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar1: Int{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar2: Double{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar3: String{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar1: Int{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar2: Double{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar3: String{{$}}
 
   var instanceVar4 = FooStruct()
   var (instanceVar5, instanceVar6) = (FooStruct(), FooStruct())
   var (instanceVar7, instanceVar8: FooStruct) = (FooStruct(), FooStruct())
   var (instanceVar9, instanceVar10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
   final var (instanceVar11, instanceVar12) = (FooStruct(), FooStruct())
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar4: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar5: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar6: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar7: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar8: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar9: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar10: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar4: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar5: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar6: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar7: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar8: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar9: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar10: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar11: FooStruct{{$}}
 // PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar12: FooStruct{{$}}
 
   let instanceLet1 = 0
   let instanceLet2 = 0.0
   let instanceLet3 = ""
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet1: Int{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet2: Double{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet3: String{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet1: Int{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet2: Double{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet3: String{{$}}
 
   let instanceLet4 = FooStruct()
   let (instanceLet5, instanceLet6) = (FooStruct(), FooStruct())
   let (instanceLet7, instanceLet8: FooStruct) = (FooStruct(), FooStruct())
   let (instanceLet9, instanceLet10: FooStruct) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet4: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet5: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet6: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet7: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet8: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet9: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  let instanceLet10: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet4: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet5: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet6: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet7: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet8: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet9: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet10: FooStruct{{$}}
 }
 
 class d0260_ExplodePattern_TestClassBase {
@@ -797,17 +797,17 @@ class d0600_InClassVar1 {
 // PASS_O600-LABEL: d0600_InClassVar1
 
   var instanceVar1: Int
-// PASS_COMMON: {{^}}  var instanceVar1: Int{{$}}
+// PASS_COMMON: {{^}}  final var instanceVar1: Int{{$}}
 // PASS_COMMON-NOT: instanceVar1
 
   var instanceVar2: Int = 42
-// PASS_COMMON: {{^}}  var instanceVar2: Int{{$}}
+// PASS_COMMON: {{^}}  final var instanceVar2: Int{{$}}
 // PASS_COMMON-NOT: instanceVar2
 
   // FIXME: this is sometimes printed without a type, see PASS_EXPLODE_PATTERN.
   // FIXME: PRINTED_WITHOUT_TYPE
   var instanceVar3 = 42
-// PASS_COMMON: {{^}}  var instanceVar3
+// PASS_COMMON: {{^}}  final var instanceVar3
 // PASS_COMMON-NOT: instanceVar3
 
   var instanceVar4: Int {
@@ -815,7 +815,7 @@ class d0600_InClassVar1 {
       return 42
     }
   }
-// PASS_COMMON: {{^}}  var instanceVar4: Int { get }{{$}}
+// PASS_COMMON: {{^}}  final var instanceVar4: Int { get }{{$}}
 // PASS_COMMON-NOT: instanceVar4
 
   // FIXME: uncomment when we have static vars.
@@ -837,7 +837,7 @@ class d0700_InClassSubscript1 {
       return 42
     }
   }
-// PASS_COMMON: {{^}}  subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  final subscript (i: Int) -> Int { get }{{$}}
 // PASS_COMMON-NOT: subscript
 }
 // PASS_COMMON: {{^}}}{{$}}
