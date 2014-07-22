@@ -1002,6 +1002,7 @@ func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
 // PASS_2500-LABEL: {{^}}infix operator %%% {
 // PASS_2500-NOT: associativity
 // PASS_2500-NOT: precedence
+// PASS_2500-NOT: assignment
 // PASS_2500: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 infix operator %%< {
@@ -1010,6 +1011,7 @@ infix operator %%< {
 // PASS_2500-NEXT: {{^}}  associativity left{{$}}
   precedence 47
 // PASS_2500-NEXT: {{^}}  precedence 47{{$}}
+// PASS_2500-NOT:         assignment
 }
 
 infix operator %%> {
@@ -1017,12 +1019,15 @@ infix operator %%> {
   associativity right
 // PASS_2500-NEXT: {{^}}  associativity right{{$}}
 // PASS_2500-NOT: precedence
+// PASS_2500-NOT: assignment
 }
 
 infix operator %%<> {
 // PASS_2500-LABEL: {{^}}infix operator %%<> {{{$}}
   precedence 47
+  assignment
 // PASS_2500-NEXT: {{^}}  precedence 47{{$}}
+// PASS_2500-NEXT: {{^}}  assignment{{$}}
 // PASS_2500-NOT: associativity
 }
 // PASS_2500: {{^}}}{{$}}

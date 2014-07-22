@@ -154,21 +154,24 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     (void)ifExpr;
     return InfixData(IntrinsicPrecedences::IfExpr,
-                     Associativity::Right);
+                     Associativity::Right,
+                     /*assignment*/ false);
 
   } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
     return InfixData(IntrinsicPrecedences::AssignExpr,
-                     Associativity::Right);
+                     Associativity::Right,
+                     /*assignment*/ true);
 
   } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
     return InfixData(IntrinsicPrecedences::ExplicitCastExpr,
-                     Associativity::None);
+                     Associativity::None,
+                     /*assignment*/ false);
 
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
@@ -185,7 +188,8 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
   
   TC.diagnose(E->getLoc(), diag::unknown_binop);
   // Recover with an infinite-precedence left-associative operator.
-  return InfixData((unsigned char)~0U, Associativity::Left);
+  return InfixData((unsigned char)~0U, Associativity::Left,
+                   /*assignment*/ false);
 }
 
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {

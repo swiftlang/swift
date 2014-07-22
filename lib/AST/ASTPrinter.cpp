@@ -1411,6 +1411,14 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
       Printer << "precedence " << decl->getPrecedence();
       Printer.printNewline();
     }
+    if (!decl->isAssignmentImplicit()) {
+      indent();
+      if (decl->isAssignment())
+        Printer << "assignment";
+      else
+        Printer << "/* not assignment */";
+      Printer.printNewline();
+    }
   }
   indent();
   Printer << "}";

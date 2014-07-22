@@ -2227,13 +2227,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     uint8_t rawAssociativity;
     unsigned precedence;
+    bool isAssignment;
     bool isAssocImplicit;
     bool isPrecedenceImplicit;
+    bool isAssignmentImplicit;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
                                                  rawAssociativity, precedence,
+                                                 isAssignment,
                                                  isAssocImplicit,
-                                                 isPrecedenceImplicit);
+                                                 isPrecedenceImplicit,
+                                                 isAssignmentImplicit);
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.hasValue()) {
@@ -2241,7 +2245,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    InfixData infixData(precedence, associativity.getValue());
+    InfixData infixData(precedence, associativity.getValue(),
+                        isAssignment);
 
     declOrOffset = new (ctx) InfixOperatorDecl(getDeclContext(contextID),
                                                SourceLoc(), 
@@ -2251,6 +2256,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                SourceLoc(), SourceLoc(),
                                                isPrecedenceImplicit,
                                                SourceLoc(), SourceLoc(),
+                                               isAssignmentImplicit,
+                                               SourceLoc(),
                                                SourceLoc(), infixData);
     break;
   }

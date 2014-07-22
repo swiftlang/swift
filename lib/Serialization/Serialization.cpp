@@ -1501,8 +1501,10 @@ void Serializer::writeDecl(const Decl *D) {
                                     addDeclRef(DC),
                                     associativity,
                                     op->getPrecedence(),
+                                    op->isAssignment(),
                                     op->isAssociativityImplicit(),
-                                    op->isPrecedenceImplicit());
+                                    op->isPrecedenceImplicit(),
+                                    op->isAssignmentImplicit());
     break;
   }
 

@@ -520,10 +520,12 @@ class alignas(8) Decl {
 
     unsigned Associativity : 2;
     unsigned Precedence : 8;
+    unsigned Assignment : 1;
     unsigned IsAssocImplicit : 1;
     unsigned IsPrecedenceImplicit : 1;
+    unsigned IsAssignmentImplicit : 1;
   };
-  enum { NumInfixOperatorDeclBits = NumDeclBits + 12 };
+  enum { NumInfixOperatorDeclBits = NumDeclBits + 14 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -4484,7 +4486,8 @@ public:
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
   SourceLoc AssociativityLoc, AssociativityValueLoc,
-    PrecedenceLoc, PrecedenceValueLoc;
+    PrecedenceLoc, PrecedenceValueLoc,
+    AssignmentLoc;
 
 public:
   InfixOperatorDecl(DeclContext *DC,
@@ -4498,6 +4501,8 @@ public:
                     bool IsPrecedenceImplicit,
                     SourceLoc PrecedenceLoc,
                     SourceLoc PrecedenceValueLoc,
+                    bool IsAssignmentImplicit,
+                    SourceLoc AssignmentLoc,
                     SourceLoc RBraceLoc,
                     InfixData InfixData)
     : OperatorDecl(DeclKind::InfixOperator, DC,
@@ -4509,7 +4514,8 @@ public:
       AssociativityLoc(AssociativityLoc),
       AssociativityValueLoc(AssociativityValueLoc),
       PrecedenceLoc(PrecedenceLoc),
-      PrecedenceValueLoc(PrecedenceValueLoc) {
+      PrecedenceValueLoc(PrecedenceValueLoc),
+      AssignmentLoc(AssignmentLoc) {
     if (!InfixData.isValid()) {
       setInvalid();
     } else {
@@ -4520,8 +4526,11 @@ public:
       InfixOperatorDeclBits.Precedence = InfixData.getPrecedence();
       InfixOperatorDeclBits.Associativity =
         static_cast<unsigned>(InfixData.getAssociativity());
+      InfixOperatorDeclBits.Assignment =
+         unsigned(InfixData.isAssignment());
       InfixOperatorDeclBits.IsPrecedenceImplicit = IsPrecedenceImplicit;
       InfixOperatorDeclBits.IsAssocImplicit = IsAssocImplicit;
+      InfixOperatorDeclBits.IsAssignmentImplicit = IsAssignmentImplicit;
     }
   }
   
@@ -4529,6 +4538,7 @@ public:
   SourceLoc getAssociativityValueLoc() const { return AssociativityValueLoc; }
   SourceLoc getPrecedenceLoc() const { return PrecedenceLoc; }
   SourceLoc getPrecedenceValueLoc() const { return PrecedenceValueLoc; }
+  SourceLoc getAssignmentLoc() const { return AssignmentLoc; }
 
   unsigned getPrecedence() const {
     return InfixOperatorDeclBits.Precedence;
@@ -4537,11 +4547,15 @@ public:
   Associativity getAssociativity() const {
     return Associativity(InfixOperatorDeclBits.Associativity);
   }
+  
+  bool isAssignment() const {
+    return InfixOperatorDeclBits.Assignment;
+  }
 
   InfixData getInfixData() const {
     if (isInvalid())
       return InfixData();
-    return InfixData(getPrecedence(), getAssociativity());
+    return InfixData(getPrecedence(), getAssociativity(), isAssignment());
   }
 
   bool isAssociativityImplicit() const {
@@ -4549,6 +4563,9 @@ public:
   }
   bool isPrecedenceImplicit() const {
     return InfixOperatorDeclBits.IsPrecedenceImplicit;
+  }
+  bool isAssignmentImplicit() const {
+    return InfixOperatorDeclBits.IsAssignmentImplicit;
   }
   
   /// True if this decl's attributes conflict with those declared by another

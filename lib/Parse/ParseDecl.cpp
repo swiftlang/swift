@@ -3988,12 +3988,14 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
 
   // Initialize InfixData with default attributes:
-  // precedence 100, associativity none
+  // precedence 100, associativity none, non-assignment
   unsigned char precedence = 100;
   Associativity associativity = Associativity::None;
+  bool assignment = false;
   
   SourceLoc AssociativityLoc, AssociativityValueLoc,
-    PrecedenceLoc, PrecedenceValueLoc;
+    PrecedenceLoc, PrecedenceValueLoc,
+    AssignmentLoc;
   
   while (!Tok.is(tok::r_brace)) {
     if (!Tok.is(tok::identifier)) {
@@ -4052,6 +4054,17 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
       continue;
     }
     
+    if (Tok.getText().equals("assignment")) {
+      if (AssignmentLoc.isValid()) {
+        diagnose(Tok, diag::operator_assignment_redeclared);
+        skipUntilDeclRBrace();
+        return nullptr;
+      }
+      AssignmentLoc = consumeToken();
+      assignment = true;
+      continue;
+    }
+    
     diagnose(Tok, diag::unknown_infix_operator_attribute, Tok.getText());
     skipUntilDeclRBrace();
     return nullptr;
@@ -4063,8 +4076,10 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
     InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, LBraceLoc,
                       AssociativityLoc.isInvalid(), AssociativityLoc,
                       AssociativityValueLoc, PrecedenceLoc.isInvalid(),
-                      PrecedenceLoc, PrecedenceValueLoc, RBraceLoc,
-                      InfixData(precedence, associativity));
+                      PrecedenceLoc, PrecedenceValueLoc,
+                      AssignmentLoc.isInvalid(), AssignmentLoc,
+                      RBraceLoc,
+                      InfixData(precedence, associativity, assignment));
   Res->getAttrs() = Attributes;
   return makeParserResult(Res);
 }

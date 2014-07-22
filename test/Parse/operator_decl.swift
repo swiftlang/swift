@@ -74,3 +74,11 @@ class Foo {
 // rdar://14690497
 infix operator ~> { precedence 99999 }   // expected-error {{'precedence' must be in the range of 0 to 255}}
 
+infix operator ->= {
+  assignment
+}
+
+infix operator ->== {
+  assignment assignment // expected-error{{'assignment' for infix operator declared multiple}}
+}
+
