@@ -557,14 +557,7 @@ extension NSArray : ArrayLiteralConvertible {
 /// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
 public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
-  if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
-    // Forced down-cast (possible deferred type-checking)
-    return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
-  }
-
-  var anyObjectArr: [AnyObject]
-    = Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
-  return _arrayBridgeFromObjectiveC(anyObjectArr)
+  return Array._bridgeFromObjectiveC(source)
 }
 
 /// The entry point for converting `Array` to `NSArray` in bridge
@@ -591,8 +584,15 @@ extension Array : _ConditionallyBridgedToObjectiveCType {
   }
 
   public static func _bridgeFromObjectiveC(source: NSArray) -> Array {
-    _precondition(Swift._isBridgedToObjectiveC(T.self),
-        "array element type is not bridged to Objective-C")
+    _precondition(
+      Swift._isBridgedToObjectiveC(T.self),
+      "array element type is not bridged to Objective-C")
+
+    // If we have the appropriate native storage already, just adopt it.
+    if let result = Array._bridgeFromObjectiveCAdoptingNativeStorage(source) {
+      return result
+    }
+    
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
       return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))

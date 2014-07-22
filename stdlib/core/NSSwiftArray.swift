@@ -33,42 +33,40 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   /// A type that every element in the array is.
   var staticElementType: Any.Type {
     _fatalError(
-      "Concrete subclasses must implement dynamicElementType")
+      "Concrete subclasses must implement staticElementType")
   }
-  
-  /// Returns the object located at the specified index.
+
+  /// Returns the object located at the specified `index`.
   func objectAtIndex(index: Int) -> AnyObject {
     let buffer = reinterpretCast(self) as Buffer
-    // If used as an NSArray, the element type can have no fancy
-    // bridging; just get it and return it
-    _sanityCheck(buffer.value.elementTypeIsBridgedVerbatim)
-    return buffer[index]
+    if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
+      return buffer[index]
+    }
+    return bridgingObjectAtIndex(index)
   }
 
-  // Copies the objects contained in the array that fall within the
-  // specified range to aBuffer.
+  /// Copies the objects contained in the array that fall within the
+  /// specified `range` to `aBuffer`.
   func getObjects(aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange) {
-
-    // These objects are "returned" at +0, so treat them as values to
-    // avoid retains.
-    var dst = UnsafePointer<Word>(aBuffer)
-
     let buffer = reinterpretCast(self) as Buffer
     
-    // If used as an NSArray, the element type can have no fancy
-    // bridging; just get it and return it.  Note however that if
-    // we're empty we might be emptyNSSwiftArray so don't assert in
-    // that case.
-    _sanityCheck(count == 0 || buffer.value.elementTypeIsBridgedVerbatim)
-    
-    if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
-      dst.initializeFrom(
-        UnsafePointer(buffer.elementStorage + range.location),
-        count: range.length)
+    if _fastPath(buffer.value.elementTypeIsBridgedVerbatim || count == 0) {
+      // These objects are "returned" at +0, so treat them as values to
+      // avoid retains.
+      var dst = UnsafePointer<Word>(aBuffer)
+      
+      if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
+        dst.initializeFrom(
+          UnsafePointer(buffer.elementStorage + range.location),
+          count: range.length)
+      }
+      
+      for i in range.location..<range.location + range.length {
+        dst++.initialize(reinterpretCast(buffer[i]))
+      }
     }
-    
-    for i in range.location..<range.location + range.length {
-      dst++.initialize(reinterpretCast(buffer[i]))
+    else {
+      bridgingGetObjects(aBuffer, range: range)
     }
   }
 
@@ -80,24 +78,54 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
     state: UnsafePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafePointer<AnyObject>, count bufferSize: Int
   ) -> Int {
-    var enumerationState = state.memory
-
     let buffer = reinterpretCast(self) as Buffer
-    // If used as an NSArray, the element type can have no fancy
-    // bridging; just get it and return it
-    _sanityCheck(buffer.value.elementTypeIsBridgedVerbatim)
-    
-    if enumerationState.state != 0 {
-      return 0
+    if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
+      var enumerationState = state.memory
+      
+      if enumerationState.state != 0 {
+        return 0
+      }
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr = reinterpretCast(buffer.elementStorage)
+      enumerationState.state = 1
+      state.memory = enumerationState
+      return buffer.value.count
     }
-    enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    enumerationState.itemsPtr = reinterpretCast(buffer.elementStorage)
-    enumerationState.state = 1
-    state.memory = enumerationState
-    return buffer.value.count
+    else {
+      return bridgingCountByEnumeratingWithState(
+        state, objects: objects, count: bufferSize)
+    }
   }
   
   var count: Int {
     return (reinterpretCast(self) as Buffer).value.count
   }
+
+  //===--- Support for bridging arrays non-verbatim-bridged types ---------===//
+  // The optional Void arguments prevent these methods from being
+  // @objc, rendering them overridable by the generic class
+  // _ContiguousArrayStorage<T>
+  
+  /// Returns the object located at the specified `index` when the
+  /// element type is not bridged verbatim.  
+  func bridgingObjectAtIndex(index: Int, _: Void = ()) -> AnyObject {
+    _fatalError(
+      "Concrete subclasses must implement bridgingObjectAtIndex")
+  }
+
+  /// Copies the objects contained in the array that fall within the
+  /// specified range to `aBuffer`.
+  func bridgingGetObjects(
+    aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange, _: Void = ()) {
+    _fatalError(
+      "Concrete subclasses must implement bridgingGetObjects")
+  }
+
+  func bridgingCountByEnumeratingWithState(
+    state: UnsafePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafePointer<AnyObject>, count bufferSize: Int, _: Void = ()
+  ) -> Int {
+    _fatalError(
+      "Concrete subclasses must implement bridgingCountByEnumeratingWithState")
+  } 
 }

@@ -85,8 +85,8 @@ func testScope() {
   let a = [X(1), X(2), X(3)]
   let nsx = a._asCocoaArray()
 
-  // construction of these tracked objects is eager
-  // CHECK-NEXT: trackedCount = 3 .
+  // construction of these tracked objects is lazy
+  // CHECK-NEXT: trackedCount = 0 .
   println("trackedCount = \(trackedCount) .")
 
   // We can get a single element out
@@ -94,10 +94,10 @@ func testScope() {
   var one = nsx.objectAtIndex(0) as Tracked
   println("nsx[0]: \(one.value) .")
 
-  // If we get the element again, it has the same object identity
-  // CHECK-NEXT: object identity matches: true
+  // We can get the element again, but it may not have the same identity
+  // CHECK-NEXT: object identity matches?
   var anotherOne = nsx.objectAtIndex(0) as Tracked
-  println("object identity matches: \(one === anotherOne)")
+  println("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
@@ -112,9 +112,6 @@ func testScope() {
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
   println("getObjects yields them at +0: \(_isUniquelyReferenced(&x))")
-  // CHECK-NEXT: trackedCount = 3 .
-  
-  println("trackedCount = \(trackedCount) .")
 }
 
 autoreleasepool() {

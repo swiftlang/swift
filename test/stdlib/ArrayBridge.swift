@@ -92,12 +92,16 @@ class BridgedObjC : Base, Printable, Barable {
   }
 }
 
+var bridgeFromOperationCount = 0
+var bridgeToOperationCount = 0
+
 struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
   static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
   
   func _bridgeToObjectiveC() -> BridgedObjC {
+    ++bridgeToOperationCount
     return BridgedObjC(trak.value)
   }
 
@@ -107,6 +111,7 @@ struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
 
   static func _bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
     assert(x.value >= 0, "not bridged")
+    ++bridgeFromOperationCount
     return BridgedSwift(x.value)
   }
 
@@ -127,6 +132,17 @@ struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
     return BridgedSwift(trak.value.successor())
   }
 
+  static func printStats() {
+    println(
+      "bridge operations "
+      + "(from, to) = (\(bridgeFromOperationCount), \(bridgeToOperationCount))")
+  }
+  
+  static func resetStats() {
+    bridgeFromOperationCount = 0
+    bridgeToOperationCount = 0
+  }
+  
   var trak: Tracked
 }
 
@@ -473,6 +489,36 @@ func testExplicitlyBridged() {
 }
 testExplicitlyBridged()
 
+func testRoundTrip() {
+  class Test : NSObject {
+    @objc func call(array: [BridgedSwift]) -> [BridgedSwift] { 
+
+      // CHECK-NEXT: ---Passed array---
+      println("---Passed array---")
+      // CHECK-NEXT: bridge operations (from, to) = (0, 0)
+      BridgedSwift.printStats()        
+
+      // Clear out the stats before returning array
+      BridgedSwift.resetStats()
+      return array
+    }
+  }
+  
+  var test = Test()
+  
+  let array = [
+    BridgedSwift(10), BridgedSwift(20),  BridgedSwift(30),
+    BridgedSwift(40), BridgedSwift(50) ]
+  
+  BridgedSwift.resetStats()
+  test.call(array)
+  
+  // CHECK-NEXT: ---Returned Array---
+  println("---Returned Array---")
+  // CHECK-NEXT: bridge operations (from, to) = (0, 0)  
+  BridgedSwift.printStats()
+}
+testRoundTrip()
 //===--- Non-bridging -----------------------------------------------------===//
 // X is not bridged to Objective-C
 //===----------------------------------------------------------------------===//

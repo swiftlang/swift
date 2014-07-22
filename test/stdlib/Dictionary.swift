@@ -4025,7 +4025,7 @@ ObjCThunks.test("Array/Accept") {
     helper.acceptArrayBridgedNonverbatim(
         [ TestBridgedValueTy(10), TestBridgedValueTy(20),
           TestBridgedValueTy(30) ])
-    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
   }
 }
 
@@ -4041,7 +4041,7 @@ ObjCThunks.test("Array/Return") {
   if true {
     TestBridgedValueTy.bridgeOperations = 0
     let a = helper.returnArrayBridgedNonverbatim()
-    expectEqual(6, TestBridgedValueTy.bridgeOperations) // FIXME: should be 0
+    expectEqual(0, TestBridgedValueTy.bridgeOperations)
 
     TestBridgedValueTy.bridgeOperations = 0
     expectEqual(10, a[0].value)

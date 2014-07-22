@@ -39,8 +39,9 @@ func testConvertArrayOfImplicitUnwrappedClass() {
   }
 }
 
-testConvertArrayOfImplicitUnwrappedClass()
-
+autoreleasepool {
+  testConvertArrayOfImplicitUnwrappedClass()
+}
 // CHECK: Active X objects = 0
 println("Active X objects = \(activeXObjects)")
 
