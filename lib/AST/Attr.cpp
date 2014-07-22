@@ -130,6 +130,9 @@ void DeclAttributes::print(ASTPrinter &Printer,
   // Process decl modifiers in a second pass, after the attributes.
   if (hadDeclModifier) {
     for (auto DA : orderedAttributes) {
+      if (!Options.PrintImplicitAttrs && DA->isImplicit())
+        continue;
+
       if (DA->isDeclModifier())
         DA->print(Printer);
     }
