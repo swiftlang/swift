@@ -259,11 +259,11 @@ func additionalUtf16Tests() {
   var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
   var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
 
-  u16.withUnsafeMutableStorage {
+  u16.withUnsafeMutableBufferPointer {
     (u16)->() in
     let p16 = u16.elementStorage
     
-    u8.withUnsafeMutableStorage {
+    u8.withUnsafeMutableBufferPointer {
       (u8)->() in
       let p8 = u8.elementStorage
       

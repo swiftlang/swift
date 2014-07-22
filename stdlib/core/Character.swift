@@ -111,7 +111,7 @@ extension String {
       var size = Character._smallSize(value)
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self,
-        input: UnsafeArray(
+        input: UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(
             Builtin.addressof(&value)), 
           length: size))

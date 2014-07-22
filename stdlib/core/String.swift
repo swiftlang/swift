@@ -70,7 +70,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
 
     return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
-        input: UnsafeArray(
+        input: UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
             length: Int(byteSize)))
   }
@@ -120,7 +120,7 @@ extension String : _BuiltinStringLiteralConvertible {
     else {
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
-          input: UnsafeArray(
+          input: UnsafeBufferPointer(
               start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
               length: Int(byteSize)))
     }
@@ -298,7 +298,7 @@ extension String {
   ) {
     resultStorage.initialize(
         String._fromWellFormedCodeUnitSequence(UTF8.self,
-            input: UnsafeArray(start: start, length: utf8Count)))
+            input: UnsafeBufferPointer(start: start, length: utf8Count)))
   }
 }
 

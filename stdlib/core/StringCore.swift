@@ -285,7 +285,7 @@ public struct _StringCore {
     if _fastPath(_baseAddress != .null()) {
       if _fastPath(elementWidth == 1) {
         var out = output
-        for x in UnsafeArray(
+        for x in UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
           length: count
         ) {
@@ -294,7 +294,7 @@ public struct _StringCore {
       }
       else {
         let hadError = transcode(UTF16.self, encoding,
-          UnsafeArray(
+          UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             length: count
           ).generate(),
@@ -463,7 +463,7 @@ public struct _StringCore {
       return true
     }
     return !contains(
-      UnsafeArray(start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), 
+      UnsafeBufferPointer(start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), 
                   length: count)
     ) { $0 > 0x7f }
   }

@@ -319,8 +319,9 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
 
   if true {
     let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
-    let bytes = Array(UnsafeArray(
-        start: UnsafeMutablePointer<UInt8>(data!.bytes), length: data!.length))
+    let bytes = Array(
+      UnsafeBufferPointer(
+        start: UnsafePointer<UInt8>(data!.bytes), length: data!.length))
     let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]

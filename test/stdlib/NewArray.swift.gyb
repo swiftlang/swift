@@ -436,7 +436,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 // The user has to obey certain rules when things are passed via
 // inout, but in those cases we only guarantee memory-safety, not
 // coherent semantics.  Let's try to force a memory-safety problem
-// here.  This crashes when withUnsafeMutableStorage is not
+// here.  This crashes when withUnsafeMutableBufferPointer is not
 // sufficiently careful.
 func testInoutViolation() {
   var a: [X] = [
@@ -453,7 +453,7 @@ func testInoutViolation() {
   }
 %end
   
-  // An overload of sort for Arrays uses withUnsafeMutableStorage,
+  // An overload of sort for Arrays uses withUnsafeMutableBufferPointer,
   // which disables bounds checks.
   sort(&a) { x, y in
     a = []         // Invalidate the whole array during sorting

@@ -383,10 +383,10 @@ func test_PointerPrinting() {
 
   printedIs(nullUP, expectedNull)
 
-  printedIs(UnsafeArray(start: nullUP, length: 0),
-      "UnsafeArray(start: \(expectedNull), length: 0)")
-  printedIs(UnsafeMutableArray(start: nullUP, length: 0),
-      "UnsafeMutableArray(start: \(expectedNull), length: 0)")
+  printedIs(UnsafeBufferPointer(start: nullUP, length: 0),
+      "UnsafeBufferPointer(start: \(expectedNull), length: 0)")
+  printedIs(UnsafeMutableBufferPointer(start: nullUP, length: 0),
+      "UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)")
 
   printedIs(COpaquePointer(), expectedNull)
   printedIs(CFunctionPointer<() -> ()>(), expectedNull)

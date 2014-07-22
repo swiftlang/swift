@@ -136,14 +136,14 @@ ${test('Downcast2')} {
 ${test('UnsafeLength')} {
   var a = [42, 77, 88]
   
-  if a.withUnsafeMutablePointerToElements({
-      UnsafeArray(start: $0, length: 1)[0]
+  if a.withUnsafePointerToElements({
+      UnsafeBufferPointer(start: $0, length: 1)[0]
   }) == 42 {
     println("OK")
   }
   
-  a.withUnsafeMutablePointerToElements {
-    UnsafeArray(start: $0, length: -1)
+  a.withUnsafePointerToElements {
+    UnsafeBufferPointer(start: $0, length: -1)
   }
 }
 println("BUSTED: should have crashed already")

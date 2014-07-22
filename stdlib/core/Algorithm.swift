@@ -219,7 +219,7 @@ public func sort<
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
 public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
-  return array.withUnsafeMutableStorage {
+  return array.withUnsafeMutableBufferPointer {
     a in sort(&a, predicate)
     return
   }
@@ -234,7 +234,7 @@ public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
 public func sort<T : Comparable>(inout array: [T]) {
-  return array.withUnsafeMutableStorage {
+  return array.withUnsafeMutableBufferPointer {
     a in sort(&a)
     return
   }

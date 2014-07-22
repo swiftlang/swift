@@ -1,4 +1,4 @@
-//===--- UnsafeArray.swift.gyb --------------------------------*- swift -*-===//
+//===--- UnsafeBufferPointer.swift.gyb ------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Wrapper for a contiguous array of T.  UnsafeArray is both a
+/// Wrapper for a contiguous array of T.  UnsafeBufferPointer is both a
 /// CollectionType (which is multi-pass if you use indices or call
 /// generate() on it) and a GeneratorType, which can only be assumed to be
 /// single-pass.  It's not clear how well this combination will work
 /// out, or whether all Collections should also be Streams; consider
 /// this an experiment.
 
-public struct UnsafeArrayGenerator<T>: GeneratorType, SequenceType {
+public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
   public mutating func next() -> T? {
     return position == end ? nil : (position++).memory
   }
 
-  public func generate() -> UnsafeArrayGenerator {
+  public func generate() -> UnsafeBufferPointerGenerator {
     return self
   }
   
@@ -30,7 +30,7 @@ public struct UnsafeArrayGenerator<T>: GeneratorType, SequenceType {
 }
 
 %for Mutable in ('Mutable', ''):
-public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
+public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
 
   public var startIndex: Int {
     return 0
@@ -56,13 +56,14 @@ public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
   }
   
   public init(start: Unsafe${Mutable}Pointer<T>, length: Int) {
-    _precondition(length >= 0, "Unsafe${Mutable}Array with negative length")
+    _precondition(
+      length >= 0, "Unsafe${Mutable}BufferPointer with negative length")
     _position = start
     _end = start + length
   }
 
-  public func generate() -> UnsafeArrayGenerator<T> {
-    return UnsafeArrayGenerator(position: _position, end: _end)
+  public func generate() -> UnsafeBufferPointerGenerator<T> {
+    return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }
 
   public var elementStorage: Unsafe${Mutable}Pointer<T> {
@@ -72,9 +73,10 @@ public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
   var _position, _end: Unsafe${Mutable}Pointer<T>
 }
 
-extension Unsafe${Mutable}Array : DebugPrintable {
+extension Unsafe${Mutable}BufferPointer : DebugPrintable {
   public var debugDescription: String {
-    return "Unsafe${Mutable}Array(start: \(_position), length: \(_end - _position))"
+    return "Unsafe${Mutable}BufferPointer"
+    + "(start: \(_position), length: \(_end - _position))"
   }
 }
 %end

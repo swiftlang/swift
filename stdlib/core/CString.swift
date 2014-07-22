@@ -33,7 +33,7 @@ extension String {
     }
     let len = Int(_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
-        input: UnsafeArray(start: UnsafeMutablePointer(cs), length: len))
+        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), length: len))
   }
 
   /// Creates a new `String` by copying the nul-terminated UTF-8 data
@@ -50,7 +50,7 @@ extension String {
     }
     let len = Int(_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
-        input: UnsafeArray(start: UnsafeMutablePointer(cs), length: len))
+        input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), length: len))
     return (result, hadError: hadError)
   }
 }

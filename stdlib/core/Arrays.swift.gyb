@@ -302,7 +302,7 @@ extension ${Self} : ArrayType {
   }
 
   public mutating func sort(isOrderedBefore: (T, T)->Bool) {
-    return withUnsafeMutableStorage {
+    return withUnsafeMutableBufferPointer {
       me in Swift.sort(&me, isOrderedBefore)
       return
     }
@@ -416,8 +416,8 @@ extension ${Self} {
 }
 
 extension ${Self} {
-  public mutating func withUnsafeMutableStorage<R>(
-    body: (inout UnsafeMutableArray<T>)->R
+  public mutating func withUnsafeMutableBufferPointer<R>(
+    body: (inout UnsafeMutableBufferPointer<T>)->R
   ) -> R {
     // Ensure unique storage
     _arrayReserve(&_buffer, 0)
@@ -427,8 +427,8 @@ extension ${Self} {
     var work = ${Self}()
     swap(&work, &self)
 
-    // Create an UnsafeArray over work that we can pass to body
-    var a = UnsafeMutableArray(
+    // Create an UnsafeBufferPointer over work that we can pass to body
+    var a = UnsafeMutableBufferPointer(
       start: work._buffer.elementStorage, length: work.count)
     
     // Invoke the body
@@ -449,7 +449,7 @@ extension Array {
     owner: Builtin.NativeObject,
     count: Builtin.Word
   ) -> Array {
-    let elements = UnsafeArray(
+    let elements = UnsafeBufferPointer(
       start: reinterpretCast(base) as UnsafeMutablePointer<T>,
       length: reinterpretCast(count) as Int
     )
