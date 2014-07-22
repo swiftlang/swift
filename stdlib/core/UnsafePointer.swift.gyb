@@ -271,6 +271,12 @@ public struct ${Self}<T>
   }
 }
 
+extension ${Self} : DebugPrintable {
+  public var debugDescription: String {
+    return _rawPointerToString(value)
+  }
+}
+
 ${MirrorDecl} {
   ${MirrorBoilerplate}
   
@@ -342,12 +348,6 @@ func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
 @transparent public
 func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
-}
-
-extension ${Self} : Printable {
-  public var description: String {
-    return ""
-  }
 }
 % end # for mutable
 

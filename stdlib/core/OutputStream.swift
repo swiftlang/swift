@@ -352,6 +352,15 @@ func _uint64ToString(
   }
 }
 
+func _rawPointerToString(value: Builtin.RawPointer) -> String {
+  var result = _uint64ToString(reinterpretCast(value) as UInt64,
+      radix: 16, uppercase: false)
+  for i in 0..<(2 * sizeof(Builtin.RawPointer) - countElements(result)) {
+    result = "0" + result
+  }
+  return "0x" + result
+}
+
 //===----------------------------------------------------------------------===//
 // OutputStreams
 //===----------------------------------------------------------------------===//

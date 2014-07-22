@@ -331,6 +331,12 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
   }
 }
 
+extension AutoreleasingUnsafePointer : DebugPrintable {
+  public var debugDescription: String {
+    return _rawPointerToString(value)
+  }
+}
+
 @transparent public
 func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))

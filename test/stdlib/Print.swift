@@ -1,9 +1,10 @@
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -Xlinker -dead_strip
+// RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/a.out -Xlinker -dead_strip
 // RUN: %target-run %t/a.out env | FileCheck %s
 // RUN: %target-run %t/a.out ru_RU.UTF-8 | FileCheck %s
 // REQUIRES: sdk
 
+import Swift
 import Darwin
 
 // Interpret the command line arguments.
@@ -355,6 +356,48 @@ func test_CTypesPrinting() {
 }
 test_CTypesPrinting()
 // CHECK: test_CTypesPrinting done
+
+
+func test_PointerPrinting() {
+  let nullUP = UnsafePointer<Int>()
+  let fourByteRawPointer: Builtin.RawPointer =
+      reinterpretCast(0xabcd1234)
+  var fourByteUP = nullUP
+  fourByteUP.value = fourByteRawPointer
+
+#if !(arch(i386) || arch(arm))
+  let eightByteRawPointer: Builtin.RawPointer =
+      reinterpretCast(0xabcddcba12344321 as UWord)
+  var eightByteUP = nullUP
+  eightByteUP.value = eightByteRawPointer
+#endif
+
+#if arch(i386) || arch(arm)
+  let expectedNull = "0x0000000"
+  printedIs(fourByteUP, "0xabcd1234")
+#else
+  let expectedNull = "0x0000000000000000"
+  printedIs(fourByteUP, "0x00000000abcd1234")
+  printedIs(eightByteUP, "0xabcddcba12344321")
+#endif
+
+  printedIs(nullUP, expectedNull)
+
+  printedIs(UnsafeArray(start: nullUP, length: 0),
+      "UnsafeArray(start: \(expectedNull), length: 0)")
+  printedIs(UnsafeMutableArray(start: nullUP, length: 0),
+      "UnsafeMutableArray(start: \(expectedNull), length: 0)")
+
+  printedIs(COpaquePointer(), expectedNull)
+  printedIs(CFunctionPointer<() -> ()>(), expectedNull)
+  printedIs(CVaListPointer(fromUnsafePointer: nullUP), expectedNull)
+  printedIs(AutoreleasingUnsafePointer<Int>(), expectedNull)
+
+  println("test_PointerPrinting done")
+}
+test_PointerPrinting()
+// CHECK: test_PointerPrinting done
+
 
 protocol ProtocolUnrelatedToPrinting {}
 

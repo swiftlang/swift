@@ -108,6 +108,12 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   }
 }
 
+extension COpaquePointer : DebugPrintable {
+  public var debugDescription: String {
+    return _rawPointerToString(value)
+  }
+}
+
 public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
@@ -147,6 +153,12 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   }
 }
 
+extension CFunctionPointer : DebugPrintable {
+  public var debugDescription: String {
+    return value.debugDescription
+  }
+}
+
 public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
   return lhs.value == rhs.value
 }
@@ -164,6 +176,12 @@ public struct CVaListPointer {
 
   init(fromUnsafePointer from: UnsafePointer<Void>) {
     value = from
+  }
+}
+
+extension CVaListPointer : DebugPrintable {
+  public var debugDescription: String {
+    return value.debugDescription
   }
 }
 

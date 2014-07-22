@@ -67,6 +67,12 @@ public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
   
   var _position, _end: UnsafePointer<T>
 }
+
+extension Unsafe${Mutable}Array : DebugPrintable {
+  public var debugDescription: String {
+    return "Unsafe${Mutable}Array(start: \(_position), length: \(_end - _position))"
+  }
+}
 %end
 
 // ${'Local Variables'}:
