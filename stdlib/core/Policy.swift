@@ -257,16 +257,16 @@ infix operator || { associativity left precedence 110 }
 
 // Compound
 
-infix operator  *= { associativity right precedence 90 }
-infix operator  /= { associativity right precedence 90 }
-infix operator  %= { associativity right precedence 90 }
-infix operator  += { associativity right precedence 90 }
-infix operator  -= { associativity right precedence 90 }
-infix operator <<= { associativity right precedence 90 }
-infix operator >>= { associativity right precedence 90 }
-infix operator  &= { associativity right precedence 90 }
-infix operator  ^= { associativity right precedence 90 }
-infix operator  |= { associativity right precedence 90 }
+infix operator  *= { associativity right precedence 90 assignment }
+infix operator  /= { associativity right precedence 90 assignment }
+infix operator  %= { associativity right precedence 90 assignment }
+infix operator  += { associativity right precedence 90 assignment }
+infix operator  -= { associativity right precedence 90 assignment }
+infix operator <<= { associativity right precedence 90 assignment }
+infix operator >>= { associativity right precedence 90 assignment }
+infix operator  &= { associativity right precedence 90 assignment }
+infix operator  ^= { associativity right precedence 90 assignment }
+infix operator  |= { associativity right precedence 90 assignment }
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure
