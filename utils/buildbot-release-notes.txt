@@ -15,6 +15,29 @@ Latest
 
 * The @auto_closure attribute has been renamed to @autoclosure.
 
+* There is a new 'dynamic' declaration modifier. When applied to a method,
+  property, subscript, or initializer, it guarantees that references to the
+  declaration are always dynamically dispatched and never inlined or
+  devirtualized, and that the method binding can be reliably changed at runtime.
+  The implementation currently relies on the Objective-C runtime, so 'dynamic'
+  can only be applied to @objc-compatible declarations for now. '@objc' now
+  only makes a declaration visible to Objective-C; the compiler may now use
+  vtable lookup or direct access to access (non-dynamic) @objc declarations.
+
+    class Foo {
+      // Always accessed by objc_msgSend
+      dynamic var x: Int
+
+      // Accessed by objc_msgSend from ObjC; may be accessed by vtable
+      // or by static reference in Swift
+      @objc var y: Int
+
+      // Not exposed to ObjC (unless Foo inherits NSObject)
+      var z: Int
+    }
+
+  'dynamic' enables KVO, proxying, and other advanced Cocoa features to work
+  reliably with Swift declarations.
 
 2014-07-21
 ----------
