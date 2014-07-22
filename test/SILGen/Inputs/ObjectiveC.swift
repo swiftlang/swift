@@ -6,7 +6,7 @@ public struct ObjCBool : BooleanType {
   var value : UInt8
 
   /// \brief Allow use in a Boolean context.
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
     if value == 0 { return false }
     return true
   }

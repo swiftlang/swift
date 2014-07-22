@@ -172,7 +172,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   public var hasStorage: Bool {
-    return storage.getLogicValue()
+    return storage.boolValue
   }
 
   subscript(i: Int) -> Element {

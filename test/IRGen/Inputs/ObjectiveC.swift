@@ -5,13 +5,13 @@ public struct ObjCBool : Printable {
   private var value : UInt8
 
   /// \brief Allow use in a Boolean context.
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
     return value != 0
   }
 
   public var description: String {
     // Dispatch to Bool.
-    return self.getLogicValue().description
+    return self.boolValue.description
   }
 }
 

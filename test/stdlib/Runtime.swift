@@ -215,7 +215,7 @@ protocol Q1 {}
 
 // A small struct that can be stored inline in an opaque buffer.
 struct StructConformsToP1 : BooleanType, Q1 {
-  func getLogicValue() -> Bool {
+  var boolValue: Bool {
     return true
   }
 }
@@ -225,8 +225,8 @@ struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   init(_ value: T) {
     self.value = value
   }
-  func getLogicValue() -> Bool {
-    return value.getLogicValue()
+  var boolValue: Bool {
+    return value.boolValue
   }
   var value: T
 }
@@ -277,7 +277,7 @@ struct Struct4ConformsToP2<T : Printable> : Printable, Q1 {
 struct StructDoesNotConformToP1 : Q1 {}
 
 class ClassConformsToP1 : BooleanType, Q1 {
-  func getLogicValue() -> Bool {
+  var boolValue: Bool {
     return true
   }
 }
@@ -286,8 +286,8 @@ class Class2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
   init(_ value: T) {
     self.value = [ value ]
   }
-  func getLogicValue() -> Bool {
-    return value[0].getLogicValue()
+  var boolValue: Bool {
+    return value[0].boolValue
   }
   // FIXME: should be "var value: T", but we don't support it now.
   var value: Array<T>
@@ -342,80 +342,80 @@ RuntimeBridging.test("dynamicCastToExistential1") {
   expectTrue(_stdlib_conformsToProtocol(someP1Ref2 as AnyObject, P1.self))
   expectFalse(_stdlib_conformsToProtocol(someNotP1Ref as AnyObject, P1.self))
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2, P1.self).boolValue)
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value, P2.self).description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value2, P2.self).description)
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2, P1.self).boolValue)
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Q1, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Q1, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Q1, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Q1, P1.self).boolValue)
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value as Q1, P2.self).description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value2 as Q1, P2.self).description)
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Q1, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Q1, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Q1, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Q1, P1.self).boolValue)
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Any, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Any, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Any, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Any, P1.self).boolValue)
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value as Any, P2.self).description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1Unconditional(someP2Value2 as Any, P2.self).description)
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Any, P1.self).getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Any, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Any, P1.self).boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Any, P1.self).boolValue)
 
-  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as AnyObject, P1.self).getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as AnyObject, P1.self).boolValue)
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value, P1.self))
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1(someP2Value, P2.self)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1(someP2Value2, P2.self)!.description)
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref, P1.self))
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as P1, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as P1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as P1, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as P1, P1.self)!.boolValue)
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1(someP2Value as P2, P2.self)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1(someP2Value2 as P2, P2.self)!.description)
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as P1, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as P1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as P1, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as P1, P1.self)!.boolValue)
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Q1, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Q1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Q1, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Q1, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value as Q1, P1.self))
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1(someP2Value as Q1, P2.self)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1(someP2Value2 as Q1, P2.self)!.description)
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Q1, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Q1, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Q1, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Q1, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as Q1, P1.self))
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Any, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Any, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value as Any, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Value2 as Any, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Value as Any, P1.self))
   expectEqual("10 20 30 40",
       _stdlib_dynamicCastToExistential1(someP2Value as Any, P2.self)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
       _stdlib_dynamicCastToExistential1(someP2Value2 as Any, P2.self)!.description)
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Any, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Any, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as Any, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as Any, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as Any, P1.self))
 
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as AnyObject, P1.self)!.getLogicValue())
-  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as AnyObject, P1.self)!.getLogicValue())
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref as AnyObject, P1.self)!.boolValue)
+  expectTrue(_stdlib_dynamicCastToExistential1(someP1Ref2 as AnyObject, P1.self)!.boolValue)
   expectEmpty(_stdlib_dynamicCastToExistential1(someNotP1Ref as AnyObject, P1.self))
 }
 

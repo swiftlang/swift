@@ -11,7 +11,7 @@ public struct ObjCBool : BooleanType {
   }
 
   /// \brief Allow use in a Boolean context.
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
     return value
   }
 }
@@ -30,7 +30,7 @@ public struct ObjCBool : BooleanType {
   }
 
   /// \brief Allow use in a Boolean context.
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
     if value == 0 { return false }
     return true
   }

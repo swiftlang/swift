@@ -21,7 +21,7 @@ for x in 0..<10 {
   (a.elementStorage + x).initialize(x)
 }
 
-println("buffer has storage: \(a.storage.getLogicValue())")
+println("buffer has storage: \(a.storage.boolValue)")
 // CHECK-NEXT: buffer has storage: true
 
 func testUnique() {

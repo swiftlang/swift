@@ -45,7 +45,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 #endif
 
   /// Allow use in a Boolean context.
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
     return value != 0
 #else
@@ -61,13 +61,13 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 
 extension ObjCBool : Reflectable {
   public func getMirror() -> MirrorType {
-    return reflect(getLogicValue())
+    return reflect(boolValue)
   }
 }
 
 extension ObjCBool : Printable {
   public var description: String {
-    return self.getLogicValue().description
+    return self.boolValue.description
   }
 }
 

@@ -42,11 +42,11 @@ extension Bool : BooleanType {
     return value
   }
 
-  @transparent public func getLogicValue() -> Bool { return self }
+  @transparent public var boolValue: Bool { return self }
 
   // Bool can be constructed from BooleanType
   public init(_ v : BooleanType) {
-    self = v.getLogicValue()
+    self = v.boolValue
   }
 }
 

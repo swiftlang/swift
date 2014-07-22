@@ -39,7 +39,7 @@ format._splitFirstIf({ $0.isASCII() })
 
 // Archetypes
 func doGetLogicValue<T : BooleanType>(t: T) {
-  t.getLogicValue()
+  t.boolValue
 }
 
 // Members referenced from inside the class

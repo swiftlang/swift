@@ -493,7 +493,7 @@ processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
 
 /// Devirtualize apply instructions that call witness_method instructions:
 ///
-///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+///   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
 ///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
 ///
 static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
@@ -748,7 +748,7 @@ static bool optimizeApplyInst(ApplyInst *AI) {
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
-  //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))

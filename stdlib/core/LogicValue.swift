@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 public prefix func !<T : BooleanType>(a: T) -> Bool {
-  return !a.getLogicValue()
+  return !a.boolValue
 }
 
 // Short circuiting logical operators.
@@ -29,10 +29,10 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 
 @transparent public
 func &&(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
-  return lhs.getLogicValue() ? rhs().getLogicValue() : false
+  return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent public
 func ||(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
-  return lhs.getLogicValue() ? true : rhs().getLogicValue()
+  return lhs.boolValue ? true : rhs().boolValue
 }

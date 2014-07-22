@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 struct MyLogicValue : BooleanType {
-  func getLogicValue() -> Bool {
+  var boolValue: Bool {
     return true
   }
 }

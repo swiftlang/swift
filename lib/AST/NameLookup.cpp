@@ -803,11 +803,16 @@ void NominalTypeDecl::forceDelayedMemberDecls() {
     return;
 
   // Grab the delayed members and then empty the list so we don't recurse.
-  auto delayedMembers = DelayedMembers;
+  auto OldDelayedMembers = DelayedMembers;
   DelayedMembers = {};
 
-  for (auto delayedDeclCreator : delayedMembers) {
-    addMember(delayedDeclCreator());
+  SmallVector<Decl *, 4> NewDecls;
+  for (auto DelayedDeclCreator : OldDelayedMembers) {
+    DelayedDeclCreator(NewDecls);
+    for (auto *D : NewDecls) {
+      addMember(D);
+    }
+    NewDecls.clear();
   }
 }
 

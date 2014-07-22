@@ -2435,7 +2435,7 @@ enum PointerTypeKind : unsigned {
 
 /// An implicitly created member decl, used when importing a Clang enum type.
 /// These are not added to their enclosing type unless forced.
-typedef std::function<Decl *()> DelayedDecl;
+typedef std::function<void(SmallVectorImpl<Decl *> &)> DelayedDecl;
 
 /// An implicitly created protocol decl, used when importing a Clang enum type.
 /// These are not added to their enclosing type unless forced.

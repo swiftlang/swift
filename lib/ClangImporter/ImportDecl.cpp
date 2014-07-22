@@ -596,63 +596,92 @@ getOperatorRef(ASTContext &C, Identifier name) {
 }
 
 
-// Build the 'getLogicValue' method for an option set.
-// struct NSSomeOptionSet : RawOptionSet {
-//   var value: RawType
-//   func getLogicValue() -> Bool {
-//     return self.value != 0
-//   }
-// }
-static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
-                                                  ValueDecl *valueDecl) {
+/// Build the 'boolValue' property for an option set.
+/// \code
+/// struct NSSomeOptionSet : RawOptionSet {
+///   var value: RawType
+///   var boolValue: Bool {
+///     return self.value != 0
+///   }
+/// }
+/// \endcode
+static void makeOptionSetBoolValueProperty(StructDecl *optionSetDecl,
+                                           ValueDecl *valueDecl,
+                                           SmallVectorImpl<Decl *> &NewDecls) {
   ASTContext &C = optionSetDecl->getASTContext();
-  auto boolType = C.getGetBoolDecl(nullptr)->getType()
-               ->castTo<AnyFunctionType>()->getResult();
+  auto boolType = C.getGetBoolDecl(nullptr)
+                      ->getType()
+                      ->castTo<AnyFunctionType>()
+                      ->getResult();
 
-  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*NotStaticMethod*/false);
+  // Create the getter.
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*NotStaticMethod*/ false);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(), {}, SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
-  
-  DeclName name(C, C.Id_GetLogicValue, { });
-  FuncDecl *getLVDecl = FuncDecl::create(
-      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      name, SourceLoc(), nullptr, Type(), 
-      params, TypeLoc::withoutLoc(boolType), optionSetDecl);
-  getLVDecl->setImplicit();
-  
-  auto toRawArgType = TupleType::getEmpty(C);
-  Type toRawType = FunctionType::get(toRawArgType, boolType);
-  toRawType = FunctionType::get(optionSetDecl->getDeclaredTypeInContext(),
-                                toRawType);
-  getLVDecl->setType(toRawType);
-  getLVDecl->setBodyResultType(boolType);
-  getLVDecl->setAccessibility(Accessibility::Public);
 
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
-  auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                        valueDecl, SourceLoc(),
-                                        /*implicit*/ true);
+  auto *getterDecl =
+      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+                       Identifier(), SourceLoc(), nullptr, Type(), params,
+                       TypeLoc::withoutLoc(boolType), optionSetDecl);
+  getterDecl->setImplicit();
 
-  auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(), /*implicit*/ true);
+  Type GetterType = FunctionType::get(TupleType::getEmpty(C), boolType);
+  GetterType =
+      FunctionType::get(optionSetDecl->getDeclaredTypeInContext(), GetterType);
+  getterDecl->setType(GetterType);
+  getterDecl->setBodyResultType(boolType);
+  getterDecl->setAccessibility(Accessibility::Public);
 
-  auto neRef = getOperatorRef(C, C.Id_NotEqualsOperator);
-  
-  Expr *args[] = {valueRef, zero};
-  auto argsTuple = TupleExpr::createImplicit(C, args, { });
-  auto apply = new (C) BinaryExpr(neRef, argsTuple, /*implicit*/ true);
-  auto ret = new (C) ReturnStmt(SourceLoc(), apply);
+  // Fill in the body of the getter.
+  {
+    auto selfRef =
+        new (C) DeclRefExpr(selfDecl, SourceLoc(), /*Implicit=*/true);
+    auto valueRef =
+        new (C) MemberRefExpr(selfRef, SourceLoc(), valueDecl, SourceLoc(),
+                              /*Implicit=*/true);
 
-  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret),
-                                SourceLoc(),
-                                /*implicit*/ true);
-  getLVDecl->setBody(body);
-  
+    auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(), /*Implicit=*/true);
+
+    auto neRef = getOperatorRef(C, C.Id_NotEqualsOperator);
+
+    Expr *args[] = {valueRef, zero};
+    auto argsTuple = TupleExpr::createImplicit(C, args, {});
+    auto apply = new (C) BinaryExpr(neRef, argsTuple, /*Implicit=*/true);
+    auto ret = new (C) ReturnStmt(SourceLoc(), apply);
+
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  /*Implicit=*/true);
+    getterDecl->setBody(body);
+  }
+
   // Add as an external definition.
-  C.addedExternalDecl(getLVDecl);
-  
-  return getLVDecl;
+  C.addedExternalDecl(getterDecl);
+
+  NewDecls.push_back(getterDecl);
+
+  // Create the property.
+  auto *PropertyDecl =
+      new (C) VarDecl(/*IsStatic=*/false, /*IsLet=*/false, SourceLoc(),
+                      C.Id_BoolValue, boolType, optionSetDecl);
+  PropertyDecl->setImplicit();
+  PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  PropertyDecl->setAccessibility(optionSetDecl->getAccessibility());
+  NewDecls.push_back(PropertyDecl);
+
+  Pattern *PropertyPattern =
+      new (C) NamedPattern(PropertyDecl, /*Implicit=*/true);
+  PropertyPattern->setType(boolType);
+  PropertyPattern = new (C) TypedPattern(
+      PropertyPattern, TypeLoc::withoutLoc(boolType), /*Implicit=*/true);
+  PropertyPattern->setType(boolType);
+
+  auto *PatternBinding = new (C) PatternBindingDecl(
+      SourceLoc(), StaticSpellingKind::None, SourceLoc(), PropertyPattern,
+      nullptr, /*IsConditional=*/false, optionSetDecl);
+  PatternBinding->setImplicit();
+  NewDecls.push_back(PatternBinding);
 }
 
 // Build the NilLiteralConvertible conformance:
@@ -1564,17 +1593,21 @@ namespace {
 
         // Add delayed implicit members to the type.
         DelayedDecl delayedMembers[] = {
-          [=](){return makeOptionSetFactoryMethod(structDecl, var,
-                                         OptionSetFactoryMethod::FromMask);},
-          [=](){return makeOptionSetFactoryMethod(structDecl, var,
-                                         OptionSetFactoryMethod::FromRaw);},
-          [=](){return makeOptionSetToRawMethod(structDecl, var);},
-          [=](){return makeOptionSetGetLogicValueMethod(structDecl, var);},
-          [=](){return makeNilLiteralConformance(structDecl, var);}
+          [=](SmallVectorImpl<Decl *> &NewDecls) {
+            NewDecls.push_back(
+                makeOptionSetFactoryMethod(structDecl, var,
+                                           OptionSetFactoryMethod::FromMask));
+            NewDecls.push_back(
+                makeOptionSetFactoryMethod(structDecl, var,
+                                           OptionSetFactoryMethod::FromRaw));
+            NewDecls.push_back(makeOptionSetToRawMethod(structDecl, var));
+            makeOptionSetBoolValueProperty(structDecl, var, NewDecls);
+            NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
+          }
         };
         
-        structDecl->setDelayedMemberDecls(Impl.SwiftContext.AllocateCopy(
-                                                              delayedMembers));
+        structDecl->setDelayedMemberDecls(
+            Impl.SwiftContext.AllocateCopy(delayedMembers));
         
         // Set the members of the struct.
         structDecl->addMember(defaultConstructor);

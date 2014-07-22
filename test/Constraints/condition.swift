@@ -7,7 +7,7 @@ func simpleIf(b: Bool) {
 
 // Support for non-Bool logic values
 struct OtherLogicValue : BooleanType {
-  func getLogicValue() -> Bool { return true }
+  var boolValue: Bool { return true }
 }
 
 func otherIf(b : OtherLogicValue) {

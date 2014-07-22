@@ -1,13 +1,13 @@
 // RUN: %swift -module-name=Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
 protocol BooleanType {
-  func getLogicValue() -> Bool
+  var boolValue: Bool { get }
 }
 
 struct Bool : BooleanType {
   var value: Builtin.Int1
   func _getBuiltinLogicValue() -> Builtin.Int1 { return value }
-  func getLogicValue() -> Bool { return self }
+  var boolValue: Bool { return self }
 }
 
 // CHECK-LABEL: sil  @_TFSs5test1

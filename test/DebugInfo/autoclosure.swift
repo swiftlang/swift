@@ -15,7 +15,7 @@ infix operator &&&&& {
 }
 
 func &&&&&(lhs: BooleanType, rhs: @autoclosure ()->BooleanType) -> Bool {
-  return lhs.getLogicValue() ? rhs().getLogicValue() : false
+  return lhs.boolValue ? rhs().boolValue : false
 }
 
 func call_me(var input: Int) -> Void {

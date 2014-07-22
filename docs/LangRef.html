@@ -1570,7 +1570,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <p>The subexpression to the left of the
   '?' is evaluated, and is converted to 'Bool' using the result's
-  'getLogicValue' method if it is not already 'Bool'. If the condition is
+  'boolValue' property if it is not already 'Bool'. If the condition is
   true, the subexpression to the right of '?' is evaluated, and its result
   becomes the result of the expression. If the
   condition is false, the subexpression to the right of ':' is evaluated, and
@@ -2358,9 +2358,9 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </pre>
   
   <p>'if' statements provide a simple control transfer operations that evaluates
-  the condition, invokes the 'getLogicValue' member of the result if the result
+  the condition, gets the 'boolValue' property of the result if the result
   not a 'Bool', then determines the direction of the branch based on the result.
-  (Internally, the standard library type 'Bool' has a getLogicValue member that
+  (Internally, the standard library type 'Bool' has a boolValue property that
   returns a 'Builtin.Int1'.)  It is an error if the type of the expression is
   context-dependent or some non-Bool type.
   </p>
@@ -2391,10 +2391,10 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </pre>
   
   <p>'while' statements provide simple loop construct which (on each iteration
-  of the loop) evalutes the condition, invokes the 'getLogicValue' member of
+  of the loop) evalutes the condition, gets the 'boolValue' property of
   the result if the result not a 'Bool', then determines whether to keep
-  looping. (Internally, the standard library type 'Bool' has a getLogicValue
-  member that returns a 'Builtin.Int1'.)  It is an error if the type of
+  looping. (Internally, the standard library type 'Bool' has a boolValue
+  property that yields a 'Builtin.Int1'.)  It is an error if the type of
   the expression is context-dependent or some non-Bool type.
   </p>
   
@@ -2420,9 +2420,9 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <p>'do-while' statements provide simple loop construct which (on each
   iteration of the loop) evaluates the body, then evaluates the condition,
-  invoking the 'getLogicValue' member of the result if the result not a 'Bool',
+  getting the 'boolValue' property of the result if the result not a 'Bool',
   then determines whether to keep looping. (Internally, the standard library
-  type 'Bool' has a getLogicValue member that returns a 'Builtin.Int1').  It is
+  type 'Bool' has a boolValue property that yields a 'Builtin.Int1').  It is
   an error if the type of the expression is context-dependent or some non-Bool
   type.
   </p>

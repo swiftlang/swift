@@ -91,7 +91,7 @@ func _precondition<T : BooleanType>(
       _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
-    let error = !condition().getLogicValue();
+    let error = !condition().boolValue;
     Builtin.condfail(error.value)
   }
 }

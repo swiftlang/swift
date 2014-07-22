@@ -654,7 +654,7 @@ public func lexicographicalCompare<
       }
       return false
     }
-    return e2_.getLogicValue()
+    return e2_.boolValue
   }
 }
 
@@ -685,7 +685,7 @@ public func lexicographicalCompare<
       }
       return false
     }
-    return e2_.getLogicValue()
+    return e2_.boolValue
   }
 }
 

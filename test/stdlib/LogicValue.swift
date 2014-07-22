@@ -3,7 +3,7 @@
 enum Bewl : BooleanType {
   case False, True
 
-  func getLogicValue() -> Bool {
+  var boolValue: Bool {
     switch self {
     case .False:
       return false
@@ -26,7 +26,7 @@ func falsy() -> Bewl {
 func logicValueTests() {
   // Logic values should convert to bool.
   struct X : BooleanType {
-    func getLogicValue() -> Bool { return false }
+    var boolValue: Bool { return false }
   }
   var anX = X()
   println("BooleanType Bool = \(Bool(anX))")   // CHECK: BooleanType Bool = false

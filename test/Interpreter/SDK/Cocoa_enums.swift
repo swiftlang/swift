@@ -7,4 +7,4 @@ let opts: NSBinarySearchingOptions = .FirstEqual | .InsertionIndex
 // CHECK: true
 println(opts & (.LastEqual | .InsertionIndex) == .InsertionIndex)
 // CHECK: false
-println((opts & .LastEqual).getLogicValue())
+println((opts & .LastEqual).boolValue)

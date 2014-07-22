@@ -116,7 +116,7 @@ public func XCTAssertTrue(expression: @autoclosure () -> BooleanType, _ message:
   let assertionType = _XCTAssertionType.True
   
   // evaluate the expression exactly once
-  let expressionValue = expression().getLogicValue()
+  let expressionValue = expression().boolValue
   
   if !expressionValue {
     // TODO: @auto_string expression
@@ -132,7 +132,7 @@ public func XCTAssertFalse(expression: @autoclosure () -> BooleanType, _ message
   let assertionType = _XCTAssertionType.False
   
   // evaluate the expression exactly once
-  let expressionValue = expression().getLogicValue()
+  let expressionValue = expression().boolValue
   
   if expressionValue {
     // TODO: @auto_string expression

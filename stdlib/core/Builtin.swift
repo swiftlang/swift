@@ -131,16 +131,16 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
 
 @transparent @semantics("branchhint") internal
 func _branchHint<C: BooleanType>(actual: C, expected: Bool) -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual.getLogicValue().value, expected.value))
+  return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
 }
 
 @transparent @semantics("fastpath") public
 func _fastPath<C: BooleanType>(x: C) -> Bool {
-  return _branchHint(x.getLogicValue(), true)
+  return _branchHint(x.boolValue, true)
 }
 
 @transparent @semantics("slowpath") public
 func _slowPath<C: BooleanType>(x: C) -> Bool {
-  return _branchHint(x.getLogicValue(), false)
+  return _branchHint(x.boolValue, false)
 }
 

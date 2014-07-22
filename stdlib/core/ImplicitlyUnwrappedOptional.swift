@@ -39,8 +39,8 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// Allow use in a Boolean context.
-  @transparent public
-  func getLogicValue() -> Bool {
+  @transparent
+  public var boolValue: Bool {
     switch self {
     case .Some:
       return true
@@ -83,12 +83,12 @@ extension ImplicitlyUnwrappedOptional : Printable {
 // Intrinsics for use by language features.
 @transparent internal
 func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
-  return v.getLogicValue().value
+  return v.boolValue.value
 }
 
 @transparent internal
 func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
-  _precondition(v.getLogicValue(),
+  _precondition(v.boolValue,
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 

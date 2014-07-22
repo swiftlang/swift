@@ -6,11 +6,11 @@ prefix operator !! {}
 infix operator &&& {}
 
 prefix func !!<T : BooleanType>(x: T) -> Bool {
-  return x.getLogicValue()
+  return x.boolValue
 }
 
 func &&&(x: BooleanType, y: @autoclosure () -> BooleanType) -> Bool {
-  return x.getLogicValue() ? y().getLogicValue() : false
+  return x.boolValue ? y().boolValue : false
 }
 
 println(!!true) // CHECK: true

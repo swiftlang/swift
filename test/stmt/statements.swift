@@ -86,7 +86,7 @@ func funcdecl5(a: Int, y: Int) {
 }
 
 struct infloopbool {
-  func getLogicValue() -> infloopbool {
+  var boolValue: infloopbool {
     return self
   }
 }

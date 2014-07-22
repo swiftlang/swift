@@ -43,7 +43,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
     _sanityCheck(
-      (owner as? NativeStorage).getLogicValue() == isNative
+      (owner as? NativeStorage).boolValue == isNative
     )
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)

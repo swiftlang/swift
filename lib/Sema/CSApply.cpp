@@ -157,23 +157,23 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 /// have a requirement with the given name.
 ///
 /// \returns The named witness.
-static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
-                                  Type type, ProtocolDecl *proto,
-                                  Identifier name,
-                                  Diag<> diag) {
+template <typename DeclTy>
+static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
+                                    ProtocolDecl *proto, Identifier name,
+                                    Diag<> diag) {
   // Find the named requirement.
-  FuncDecl *requirement = nullptr;
+  DeclTy *requirement = nullptr;
   for (auto member : proto->getMembers()) {
-    auto fd = dyn_cast<FuncDecl>(member);
-    if (!fd || !fd->hasName())
+    auto d = dyn_cast<DeclTy>(member);
+    if (!d || !d->hasName())
       continue;
 
-    if (fd->getName() == name) {
-      requirement = fd;
+    if (d->getName() == name) {
+      requirement = d;
       break;
     }
   }
-  
+
   if (!requirement || requirement->isInvalid()) {
     tc.diagnose(proto->getLoc(), diag);
     return nullptr;
@@ -193,7 +193,19 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 
   assert(conformance && "Missing conformance information");
   // FIXME: Dropping substitutions here.
-  return cast<FuncDecl>(conformance->getWitness(requirement, &tc).getDecl());
+  return cast<DeclTy>(conformance->getWitness(requirement, &tc).getDecl());
+}
+
+static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc, Type type,
+                                  ProtocolDecl *proto, Identifier name,
+                                  Diag<> diag) {
+  return findNamedWitnessImpl<FuncDecl>(tc, dc, type, proto, name, diag);
+}
+
+static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
+                                         Type type, ProtocolDecl *proto,
+                                         Identifier name, Diag<> diag) {
+  return findNamedWitnessImpl<VarDecl>(tc, dc, type, proto, name, diag);
 }
 
 /// Adjust the given type to become the self type when referring to
@@ -5084,9 +5096,9 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   auto witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC);
   if (!witnesses) {
     // Find the witness we need to use.
-    auto witness = findNamedWitness(tc, cs.DC, type->getRValueType(), protocol,
-                                    generalName, brokenProtocolDiag);
-
+    auto witness =
+        findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(), protocol,
+                                 generalName, brokenProtocolDiag);
     // Form a reference to this member.
     Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
                                               witness, expr->getEndLoc(),
@@ -5101,14 +5113,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
                   protocol->getType());
       return nullptr;
     }
-
-    // Call the witness.
-    Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
-                                       expr->getEndLoc(), /*Implicit=*/true);
-    expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
-    failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-    assert(!failed && "Could not call witness?");
-    (void)failed;
+    expr = memberRef;
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
@@ -5163,7 +5168,7 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
                                  KnownProtocolKind::BooleanType),
-                  tc.Context.Id_GetLogicValue,
+                  tc.Context.Id_BoolValue,
                   tc.Context.Id_GetBuiltinLogicValue,
                   diag::condition_broken_proto,
                   diag::broken_bool);
@@ -5186,9 +5191,9 @@ Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
 
   // Find the witness we need to use.
   Type type = expr->getType();
-  auto witness = findNamedWitness(tc, cs.DC, type->getRValueType(), proto,
-                                  tc.Context.Id_GetLogicValue,
-                                  diag::condition_broken_proto);
+  auto witness = findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(),
+                                          proto, tc.Context.Id_BoolValue,
+                                          diag::condition_broken_proto);
 
   // Form a reference to this member.
   auto &ctx = tc.Context;
@@ -5206,25 +5211,17 @@ Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
     return nullptr;
   }
 
-  // Call the witness.
-  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
-                                     expr->getEndLoc(), /*Implicit=*/true);
-  expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
-  failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-  assert(!failed && "Could not call witness?");
-  (void)failed;  
-  return expr;
+  return memberRef;
 }
 
 Expr *
 Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
-  // FIXME: Cache names.
   auto &tc = getConstraintSystem().getTypeChecker();
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
                                  KnownProtocolKind::ArrayBoundType),
-                  tc.Context.Id_GetArrayBoundValue,
+                  tc.Context.Id_ArrayBoundValue,
                   tc.Context.Id_GetBuiltinArrayBoundValue,
                   diag::broken_array_bound_proto,
                   diag::broken_builtin_array_bound);
@@ -5232,6 +5229,6 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
     tc.diagnose(expr->getLoc(), diag::broken_builtin_array_bound);
     return nullptr;
   }
-  
+
   return result;
 }

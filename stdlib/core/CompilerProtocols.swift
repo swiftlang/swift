@@ -15,11 +15,11 @@
 /// Protocol describing types that can be used as array bounds.
 ///
 /// Types that conform to the `ArrayBoundType` protocol can be used as
-/// array bounds by providing an operation (`getArrayBoundValue`) that
+/// array bounds by providing a property (`arrayBoundValue`) that
 /// produces an integral value.
 public protocol ArrayBoundType {
   typealias ArrayBound
-  func getArrayBoundValue() -> ArrayBound
+  var arrayBoundValue: ArrayBound { get }
 }
 
 /// Protocol describing types that can be used as logical values within
@@ -30,7 +30,7 @@ public protocol ArrayBoundType {
 /// `for`) as well as other logical value contexts (e.g., `case`
 /// statement guards).
 public protocol BooleanType {
-  func getLogicValue() -> Bool
+  var boolValue: Bool { get }
 }
 
 /// A `GeneratorType` is a `SequenceType` that is consumed when iterated.

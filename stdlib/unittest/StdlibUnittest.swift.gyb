@@ -206,7 +206,7 @@ public struct AssertionResult : Printable, BooleanType {
     self._isPass = isPass
   }
 
-  public func getLogicValue() -> Bool {
+  public var boolValue: Bool {
     return _isPass
   }
 

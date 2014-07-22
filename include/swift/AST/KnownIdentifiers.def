@@ -61,6 +61,7 @@ IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 // Built-in identifiers
 IDENTIFIER(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)
+IDENTIFIER_WITH_NAME(BoolValue, "boolValue")
 IDENTIFIER_WITH_NAME(ConvertFromNilLiteral, "convertFromNilLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,
@@ -98,9 +99,8 @@ IDENTIFIER_WITH_NAME(ConvertFromStringInterpolationSegment,
 IDENTIFIER_WITH_NAME(ConvertFromArrayLiteral, "convertFromArrayLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromDictionaryLiteral,
                      "convertFromDictionaryLiteral")
-IDENTIFIER_WITH_NAME(GetLogicValue, "getLogicValue")
 IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")
-IDENTIFIER_WITH_NAME(GetArrayBoundValue, "getArrayBoundValue")
+IDENTIFIER_WITH_NAME(ArrayBoundValue, "arrayBoundValue")
 IDENTIFIER_WITH_NAME(GetBuiltinArrayBoundValue, "_getBuiltinArrayBoundValue")
 IDENTIFIER_WITH_NAME(Conversion, "__conversion")
 

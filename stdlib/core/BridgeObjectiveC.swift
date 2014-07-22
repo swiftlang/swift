@@ -253,8 +253,8 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
     return UnsafePointer<T>(self)._isNull
   }
   
-  @transparent public
-  func getLogicValue() -> Bool {
+  @transparent
+  public var boolValue: Bool {
     return !_isNull
   }
 

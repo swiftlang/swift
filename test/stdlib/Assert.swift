@@ -17,9 +17,9 @@ import Darwin
 
 struct Truthiness : BooleanType {
   init(_ value: Bool) { self.value = value }
-  func getLogicValue() -> Bool { return value }
+  var boolValue: Bool { return value }
 
-  var value: Bool;
+  var value: Bool
 }
 var falsie = Truthiness(false)
 var truthie = Truthiness(true)

@@ -21,8 +21,8 @@ public enum Optional<T>: BooleanType, Reflectable, NilLiteralConvertible {
   public init(_ some: T) { self = .Some(some) }
 
   /// Allow use in a Boolean context.
-  @transparent public
-  func getLogicValue() -> Bool {
+  @transparent
+  public var boolValue: Bool {
     switch self {
     case .Some:
       return true
@@ -85,12 +85,12 @@ public func map<T, U>(x: T?, f: (T)->U) -> U? {
 // Intrinsics for use by language features.
 @transparent internal
 func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
-  return v.getLogicValue().value
+  return v.boolValue.value
 }
 
 @transparent internal
 func _preconditionOptionalHasValue<T>(inout v: T?) {
-  _precondition(v.getLogicValue(),
+  _precondition(v.boolValue,
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
@@ -141,7 +141,7 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
 }
 @transparent public
 func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
-  return !rhs.getLogicValue()
+  return !rhs.boolValue
 }
 
 internal struct _OptionalMirror<T> : MirrorType {

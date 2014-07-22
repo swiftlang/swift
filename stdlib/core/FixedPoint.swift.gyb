@@ -194,7 +194,7 @@ public struct ${Self}
   }
 
   public typealias ArrayBound = ${Self}
-  public func getArrayBoundValue() -> ${Self} {
+  public var arrayBoundValue: ${Self} {
     return self
   }
 
