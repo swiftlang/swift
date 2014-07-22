@@ -315,9 +315,19 @@ class alignas(8) Decl {
   enum { NumValueDeclBits = NumDeclBits + 3 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
+  class AbstractStorageDeclBitfields {
+    friend class AbstractStorageDecl;
+    unsigned : NumValueDeclBits;
+
+    /// Whether we are overridden later
+    unsigned Overridden : 1;
+  };
+  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 1 };
+  static_assert(NumAbstractStorageDeclBits <= 32, "fits in an unsigned");
+
   class VarDeclBitfields {
     friend class VarDecl;
-    unsigned : NumValueDeclBits;
+    unsigned : NumAbstractStorageDeclBits;
     
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
@@ -331,7 +341,7 @@ class alignas(8) Decl {
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
   };
-  enum { NumVarDeclBits = NumValueDeclBits + 3 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 3 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
@@ -353,7 +363,10 @@ class alignas(8) Decl {
     unsigned BodyKind : 3;
 
     /// Number of curried parameter patterns (tuples).
-    unsigned NumParamPatterns : 7;
+    unsigned NumParamPatterns : 6;
+
+    /// Whether we are overridden later
+    unsigned Overridden : 1;
   };
   enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
@@ -556,6 +569,7 @@ protected:
     DeclBitfields DeclBits;
     PatternBindingDeclBitfields PatternBindingDeclBits;
     ValueDeclBitfields ValueDeclBits;
+    AbstractStorageDeclBitfields AbstractStorageDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
     EnumElementDeclBitfields EnumElementDeclBits;
@@ -1926,6 +1940,11 @@ public:
     return getAttrs().hasAttribute<FinalAttr>();
   }
 
+  /// Is this declaration marked with 'dynamic'?
+  bool isDynamic() const {
+    return getAttrs().hasAttribute<DynamicAttr>();
+  }
+
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
 
@@ -3197,6 +3216,7 @@ protected:
                       SourceLoc NameLoc)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     OverriddenDecl.setInt(Stored);
+    AbstractStorageDeclBits.Overridden = false;
   }
 public:
 
@@ -3234,18 +3254,6 @@ public:
     }
   }
 
-  /// Determine whether this property is overridable.
-  bool isOverridable() const {
-    switch (getStorageKind()) {
-    case Computed:
-    case Observing:
-      return true;
-
-    case Stored:
-    case StoredWithTrivialAccessors:
-      return false;
-    }
-  }
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     SourceLoc RBraceLoc);
@@ -3312,7 +3320,21 @@ public:
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
     OverriddenDecl.setPointer(over);
+    over->setIsOverridden();
   }
+
+  /// The declaration has been overridden in the module
+  ///
+  /// Resolved during type checking
+  void setIsOverridden() {
+    AbstractStorageDeclBits.Overridden = true;
+  }
+
+  /// Whether the declaration is later overridden in the module
+  ///
+  /// Overriddes are resolved during type checking; only query this field after
+  /// the whole module has been checked
+  bool isOverridden() const { return AbstractStorageDeclBits.Overridden; }
 
   /// Returns the location of 'override' keyword, if any.
   SourceLoc getOverrideLoc() const;
@@ -3599,6 +3621,7 @@ protected:
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
+    AbstractFunctionDeclBits.Overridden = false;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
@@ -3777,6 +3800,17 @@ public:
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const;
+
+  /// Whether the declaration is later overridden in the module
+  ///
+  /// Overriddes are resolved during type checking; only query this field after
+  /// the whole module has been checked
+  bool isOverridden() const { return AbstractFunctionDeclBits.Overridden; }
+
+  /// The declaration has been overridden in the module
+  ///
+  /// Resolved during type checking
+  void setIsOverridden() { AbstractFunctionDeclBits.Overridden = true; }
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
@@ -4023,6 +4057,7 @@ public:
             || !OverriddenOrDerivedForDecl.is<FuncDecl*>())
            && "function cannot be both override and derived global");
     OverriddenOrDerivedForDecl = over;
+    over->setIsOverridden();
   }
   
   /// Get the type this function was implicitly generated on the behalf of for
@@ -4387,7 +4422,10 @@ public:
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(ConstructorDecl *over) { OverriddenDecl = over; }
+  void setOverriddenDecl(ConstructorDecl *over) {
+    OverriddenDecl = over;
+    over->setIsOverridden();
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
