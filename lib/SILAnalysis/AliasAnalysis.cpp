@@ -339,10 +339,10 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   if(!LTy.isAddress() || !RTy.isAddress())
     return true;
 
-  // If the types have unbound generic arguments then we don't know the possible
-  // range of the type. A type such as $Array<Int> may alias $Array<T>.
-  // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
-  // may alias.
+  // If the types have unbound generic arguments then we don't know
+  // the possible range of the type. A type such as $Array<Int> may
+  // alias $Array<T>.  Right now we are conservative and we assume
+  // that $UnsafeMutablePointer<T> and $Int may alias.
   if (LTy.hasArchetype() || RTy.hasArchetype())
     return true;
 

@@ -286,7 +286,7 @@ private:
   Type UInt8Type;
   Type NSObjectType;
 
-  /// The \c Swift.UnsafePointer<T> declaration.
+  /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
   
   /// A set of types that can be trivially mapped to Objective-C types.
@@ -840,8 +840,8 @@ public:
   /// exist.
   bool requireOptionalIntrinsics(SourceLoc loc);
 
-  /// Require that the library intrinsics for working with UnsafePointer<T>
-  /// exist.
+  /// Require that the library intrinsics for working with
+  /// UnsafeMutablePointer<T> exist.
   bool requirePointerArgumentIntrinsics(SourceLoc loc);
 
   /// \brief Retrieve the witness type with the given name.

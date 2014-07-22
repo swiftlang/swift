@@ -4,7 +4,7 @@ We have a pretty good user model for C pointer interop now, but the language
 model still needs improvement. Building the user model on top of implicit
 conversions has a number of undesirable side effects. We end up with a mess of
 pointer types—the intended user-facing, one-word pointer types
-``UnsafePointer`` and ``COpaquePointer``, which expose a full pointer-ish API
+``UnsafeMutablePointer`` and ``COpaquePointer``, which expose a full pointer-ish API
 and are naturally ABI-compatible with C pointers; and the bridging pointer
 types, ``ObjCMutablePointer``, ``CMutablePointer``, ``CConstPointer``,
 ``CMutableVoidPointer``, and ``CConstVoidPointer``, which have no real API yet
@@ -25,18 +25,18 @@ The Pointer Types
 In the standard library, we provide three pointer types:
 
 - ``ConstUnsafePointer<T>``, corresponding to ``T const *`` in C and ARC,
-- ``UnsafePointer<T>``, corresponding to ``T *`` in C, and ``T* __strong *`` in
+- ``UnsafeMutablePointer<T>``, corresponding to ``T *`` in C, and ``T* __strong *`` in
   ARC for class types, and
-- ``AutoreleasingUnsafePointer<T>`` (for all ``T: AnyObject``), corresponding
+- ``AutoreleasingUnsafeMutablePointer<T>`` (for all ``T: AnyObject``), corresponding
   to ``T* __autoreleasing *`` in ARC.
 
 These types are all one word, have no ownership semantics, and share a common
 interface. ``ConstUnsafePointer`` does not expose operations for storing to the
-referenced memory. ``UnsafePointer`` and ``AutoreleasingUnsafePointer`` differ
-in store behavior: ``UnsafePointer`` assumes that the pointed-to reference has
+referenced memory. ``UnsafeMutablePointer`` and ``AutoreleasingUnsafeMutablePointer`` differ
+in store behavior: ``UnsafeMutablePointer`` assumes that the pointed-to reference has
 ownership semantics, so ``ptr.initialize(x)`` consumes a reference to ``x``,
 and ``ptr.assign(x)`` releases the originally stored value before storing the
-new value.  ``AutoreleasingUnsafePointer`` assumes that the pointed-to
+new value.  ``AutoreleasingUnsafeMutablePointer`` assumes that the pointed-to
 reference does not have ownership semantics, so values are autoreleased before
 being stored by either initialize() or assign(), and no release is done on
 reassignment. Loading from any of the three kinds of pointer does a strong
@@ -47,31 +47,31 @@ Conversion behavior for pointer arguments
 
 The user model for pointer arguments becomes an inherent capability of function applications. The rules are:
 
-UnsafePointer<T>
-----------------
+UnsafeMutablePointer<T>
+-----------------------
 
-When a function is declared as taking an ``UnsafePointer<T>`` argument, it can
+When a function is declared as taking an ``UnsafeMutablePointer<T>`` argument, it can
 accept any of the following:
 
 - ``nil``, which is passed as a null pointer,
-- an ``UnsafePointer<T>`` value, which is passed verbatim,
+- an ``UnsafeMutablePointer<T>`` value, which is passed verbatim,
 - an inout expression whose operand is a stored lvalue of type ``T``, which is
   passed as the address of the lvalue, or
 - an inout ``Array<T>`` value, which is passed as a pointer to the start of the
   array, and lifetime-extended for the duration of the callee.
 
 As a special case, when a function is declared as taking an
-``UnsafePointer<Void>`` argument, it can accept the same operands as
-``UnsafePointer<T>`` for any type T.
+``UnsafeMutablePointer<Void>`` argument, it can accept the same operands as
+``UnsafeMutablePointer<T>`` for any type T.
 
 So if you have a function declared::
 
-  func foo(x: UnsafePointer<Float>)
+  func foo(x: UnsafeMutablePointer<Float>)
 
 You can call it as any of::
 
   var x: Float = 0.0
-  var p: UnsafePointer<Float> = nil
+  var p: UnsafeMutablePointer<Float> = nil
   var a: Float[] = [1.0, 2.0, 3.0]
   foo(nil)
   foo(p)
@@ -80,12 +80,12 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func bar(x: UnsafePointer<Void>)
+  func bar(x: UnsafeMutablePointer<Void>)
 
 You can call it as any of::
 
   var x: Float = 0.0, y: Int = 0
-  var p: UnsafePointer<Float> = nil, q: UnsafePointer<Int> = nil
+  var p: UnsafeMutablePointer<Float> = nil, q: UnsafeMutablePointer<Int> = nil
   var a: Float[] = [1.0, 2.0, 3.0], b: Int = [1, 2, 3]
   bar(nil)
   bar(p)
@@ -95,14 +95,14 @@ You can call it as any of::
   bar(&a)
   bar(&b)
 
-AutoreleasingUnsafePointer<T>
------------------------------
+AutoreleasingUnsafeMutablePointer<T>
+------------------------------------
 
-When a function is declared as taking an ``AutoreleasingUnsafePointer<T>``, it
+When a function is declared as taking an ``AutoreleasingUnsafeMutablePointer<T>``, it
 can accept any of the following:
 
 - nil, which is passed as a null pointer,
-- an ``AutoreleasingUnsafePointer<T>`` value, which is passed verbatim, or
+- an ``AutoreleasingUnsafeMutablePointer<T>`` value, which is passed verbatim, or
 - an inout expression, whose operand is primitive-copied to a temporary
   nonowning buffer. The address of that buffer is passed to the callee, and on
   return, the value in the buffer is loaded, retained, and reassigned into the
@@ -112,12 +112,12 @@ Note that the above list does not include arrays, since implicit autoreleasing-t
 
 So if you have a function declared::
 
-  func bas(x: AutoreleasingUnsafePointer<NSBas?>)
+  func bas(x: AutoreleasingUnsafeMutablePointer<NSBas?>)
 
 You can call it as any of::
 
   var x: NSBas? = nil
-  var p: AutoreleasingUnsafePointer<NSBas?> = nil
+  var p: AutoreleasingUnsafeMutablePointer<NSBas?> = nil
   bas(nil)
   bas(p)
   bas(&x)
@@ -125,12 +125,12 @@ You can call it as any of::
 ConstUnsafePointer<T>
 ---------------------
 
-When a function is declared as taking an ``UnsafePointer<T>`` argument, it can
+When a function is declared as taking an ``UnsafeMutablePointer<T>`` argument, it can
 accept any of the following:
 
 - nil, which is passed as a null pointer,
-- an ``UnsafePointer<T>``, ``ConstUnsafePointer<T>``, or
-  ``AutoreleasingUnsafePointer<T>`` value, which is converted to
+- an ``UnsafeMutablePointer<T>``, ``ConstUnsafePointer<T>``, or
+  ``AutoreleasingUnsafeMutablePointer<T>`` value, which is converted to
   ``ConstUnsafePointer<T>`` if necessary and passed verbatim,
 - an inout expression whose operand is an lvalue of type ``T``, which is passed
   as the address of (the potentially temporary writeback buffer of) the lvalue,

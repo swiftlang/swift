@@ -242,8 +242,8 @@ extension _ArrayBuffer {
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
   public
-  func _uninitializedCopy(subRange: Range<Int>, target: UnsafePointer<T>)
-         -> UnsafePointer<T> {
+  func _uninitializedCopy(subRange: Range<Int>, target: UnsafeMutablePointer<T>)
+         -> UnsafeMutablePointer<T> {
     _typeCheck(subRange)
     if _fastPath(_isNative) {
       return _native._uninitializedCopy(subRange, target: target)
@@ -255,7 +255,7 @@ extension _ArrayBuffer {
       location:subRange.startIndex,
       length: subRange.endIndex - subRange.startIndex)
 
-    let buffer = reinterpretCast(target) as UnsafePointer<AnyObject>
+    let buffer = reinterpretCast(target) as UnsafeMutablePointer<AnyObject>
     
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
@@ -287,7 +287,7 @@ extension _ArrayBuffer {
     let cocoa = _CocoaArrayWrapper(nonNative!)
     let start = cocoa.contiguousStorage(subRange)
     if start != nil {
-      return _SliceBuffer(owner: nonNative, start: UnsafePointer(start),
+      return _SliceBuffer(owner: nonNative, start: UnsafeMutablePointer(start),
           count: subRangeCount, hasNativeBuffer: false)
     }
     
@@ -297,7 +297,7 @@ extension _ArrayBuffer {
 
     // Tell Cocoa to copy the objects into our storage
     cocoa.buffer.getObjects(
-      UnsafePointer(result.elementStorage),
+      UnsafeMutablePointer(result.elementStorage),
       range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
     )
 
@@ -307,7 +307,7 @@ extension _ArrayBuffer {
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public
-  var elementStorage: UnsafePointer<T> {
+  var elementStorage: UnsafeMutablePointer<T> {
     if (_fastPath(_isNative)) {
       return _native.elementStorage
     }
@@ -357,7 +357,9 @@ extension _ArrayBuffer {
   /// Call body(p), where p is a pointer to the underlying contiguous storage
   /// Requires: such contiguous storage exists or the buffer is empty
   public
-  func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+  func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<T>)->R
+  ) -> R {
     _precondition(
       elementStorage != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"

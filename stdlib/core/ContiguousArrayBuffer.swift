@@ -56,7 +56,9 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
 
   override func bridgingGetObjects(
-    aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange, _: Void = ()) {
+    aBuffer: UnsafeMutablePointer<AnyObject>,
+    range: _SwiftNSRange, _: Void = ()
+  ) {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
       "Verbatim bridging for getObjects:range: unhandled _NSSwiftArray")
@@ -71,8 +73,9 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   }
   
   override func bridgingCountByEnumeratingWithState(
-    state: UnsafePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafePointer<AnyObject>, count bufferSize: Int, _: Void = ()
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>,
+    count bufferSize: Int, _: Void = ()
   ) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
@@ -81,7 +84,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
     var enumerationState = state.memory
     
     enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    enumerationState.itemsPtr = AutoreleasingUnsafePointer(objects)
+    enumerationState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
     
     let location = Int(enumerationState.state)
     if _fastPath(location < count) {
@@ -132,17 +135,19 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public var elementStorage: UnsafePointer<T> {
+  public var elementStorage: UnsafeMutablePointer<T> {
     return _base.hasStorage ? _base.elementStorage : nil
   }
 
   /// A pointer to the first element, assuming that the elements are stored
   /// contiguously.
-  var _unsafeElementStorage: UnsafePointer<T> {
+  var _unsafeElementStorage: UnsafeMutablePointer<T> {
     return _base.elementStorage
   }
 
-  public func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+  public func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<T>)->R
+  ) -> R {
     let p = _base.elementStorage
     return withExtendedLifetime(_base) { body(p) }
   }
@@ -251,8 +256,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// just-initialized memory.
   public
   func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafePointer<T>
-  ) -> UnsafePointer<T> {
+    subRange: Range<Int>, target: UnsafeMutablePointer<T>
+  ) -> UnsafeMutablePointer<T> {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)

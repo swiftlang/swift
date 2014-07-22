@@ -122,8 +122,8 @@ extension COpaquePointer {
   // FIXME: Make this an implicit conversion?
   // FIXME: This shouldn't have to be in an extension.
   //
-  /// Convert a typed UnsafePointer to an opaque C pointer.
-  public init<T>(_ from : UnsafePointer<T>) {
+  /// Convert a typed UnsafeMutablePointer to an opaque C pointer.
+  public init<T>(_ from : UnsafeMutablePointer<T>) {
     value = from.value;
   }
 }
@@ -172,9 +172,9 @@ extension COpaquePointer {
 
 // The C va_list type
 public struct CVaListPointer {
-  var value: UnsafePointer<Void>
+  var value: UnsafeMutablePointer<Void>
 
-  init(fromUnsafePointer from: UnsafePointer<Void>) {
+  init(fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
     value = from
   }
 }
@@ -190,10 +190,13 @@ public var C_ARGC : CInt = CInt()
 
 /// Access to the raw argv value from C. Accessing the argument vector
 /// through this pointer is unsafe.
-public var C_ARGV : UnsafePointer<UnsafePointer<Int8>> = UnsafePointer()
+public var C_ARGV: UnsafeMutablePointer<UnsafeMutablePointer<Int8>> = nil
 
-func _memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
-             #size: UInt) {
+func _memcpy(
+  #dest: UnsafeMutablePointer<Void>,
+  #src: UnsafeMutablePointer<Void>,
+  #size: UInt
+) {
   let dest = dest.value
   let src = src.value
   let size = UInt64(size).value

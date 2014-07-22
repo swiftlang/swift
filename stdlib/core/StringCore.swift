@@ -59,9 +59,9 @@ public struct _StringCore {
     else if let buffer = nativeBuffer {
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
-      _sanityCheck(UnsafePointer(_baseAddress) >= buffer.start)
-      _sanityCheck(UnsafePointer(_baseAddress) <= buffer.usedEnd)
-      _sanityCheck(UnsafePointer(_pointerToNth(count)) <= buffer.usedEnd)
+      _sanityCheck(UnsafeMutablePointer(_baseAddress) >= buffer.start)
+      _sanityCheck(UnsafeMutablePointer(_baseAddress) <= buffer.usedEnd)
+      _sanityCheck(UnsafeMutablePointer(_pointerToNth(count)) <= buffer.usedEnd)
     }
   }
 
@@ -89,7 +89,7 @@ public struct _StringCore {
   func _pointerToNth(n: Int) -> COpaquePointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return COpaquePointer(
-      UnsafePointer<RawByte>(_baseAddress) + (n << elementShift))
+      UnsafeMutablePointer<RawByte>(_baseAddress) + (n << elementShift))
   }
 
   static func _copyElements(
@@ -101,14 +101,14 @@ public struct _StringCore {
     if _fastPath(srcElementWidth == dstElementWidth) {
       // No change in storage width; we can use memcpy
       _memcpy(
-        dest: UnsafePointer(dstStart),
-        src: UnsafePointer(srcStart),
+        dest: UnsafeMutablePointer(dstStart),
+        src: UnsafeMutablePointer(srcStart),
         size: UInt(count << (srcElementWidth - 1)))
     }
     else if (srcElementWidth < dstElementWidth) {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
-      var dest = UnsafePointer<UTF16.CodeUnit>(dstStart)
-      var src = UnsafePointer<UTF8.CodeUnit>(srcStart)
+      var dest = UnsafeMutablePointer<UTF16.CodeUnit>(dstStart)
+      var src = UnsafeMutablePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
         dest++.memory = UTF16.CodeUnit(src++.memory)
@@ -116,8 +116,8 @@ public struct _StringCore {
     }
     else {
       // Narrowing UTF-16 to ASCII; we need to copy the bytes manually
-      var dest = UnsafePointer<UTF8.CodeUnit>(dstStart)
-      var src = UnsafePointer<UTF16.CodeUnit>(srcStart)
+      var dest = UnsafeMutablePointer<UTF8.CodeUnit>(dstStart)
+      var src = UnsafeMutablePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
         dest++.memory = UTF8.CodeUnit(src++.memory)
@@ -182,7 +182,7 @@ public struct _StringCore {
   }
 
   /// left shift amount to apply to an offset N so that when
-  /// added to a UnsafePointer<RawByte>, it traverses N elements
+  /// added to a UnsafeMutablePointer<RawByte>, it traverses N elements
   var elementShift: Int {
     return Int(_countAndFlags >> (UWord._sizeInBits - 1))
   }
@@ -201,16 +201,16 @@ public struct _StringCore {
     return Word((_countAndFlags << 1).value) < 0
   }
 
-  public var startASCII: UnsafePointer<UTF8.CodeUnit> {
+  public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
-    return UnsafePointer(_baseAddress)
+    return UnsafeMutablePointer(_baseAddress)
   }
 
-  public var startUTF16: UnsafePointer<UTF16.CodeUnit> {
+  public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
     _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF-16")
-    return UnsafePointer(_baseAddress)
+    return UnsafeMutablePointer(_baseAddress)
   }
 
   /// the native _StringBuffer, if any, or .None.
@@ -256,7 +256,7 @@ public struct _StringCore {
 
   /// Get the Nth UTF-16 Code Unit stored
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
-    let p = UnsafePointer<UInt8>(_pointerToNth(position).value)
+    let p = UnsafeMutablePointer<UInt8>(_pointerToNth(position).value)
       // Always dereference two bytes, but when elements are 8 bits we
       // multiply the high byte by 0.
       return UTF16.CodeUnit(p.memory)
@@ -286,7 +286,8 @@ public struct _StringCore {
       if _fastPath(elementWidth == 1) {
         var out = output
         for x in UnsafeArray(
-          start: UnsafePointer<UTF8.CodeUnit>(_baseAddress), length: count
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
+          length: count
         ) {
           Encoding.encode(UnicodeScalar(UInt32(x)), output: &out)
         }
@@ -294,7 +295,7 @@ public struct _StringCore {
       else {
         let hadError = transcode(UTF16.self, encoding,
           UnsafeArray(
-            start: UnsafePointer<UTF16.CodeUnit>(_baseAddress),
+            start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             length: count
           ).generate(),
           output,
@@ -335,7 +336,9 @@ public struct _StringCore {
 
       // Attempt to claim unused capacity in the buffer
       if _fastPath(buffer.grow(
-          UnsafePointer<RawByte>(matchUsed.value), newUsedCount: newSize)) {
+          UnsafeMutablePointer<RawByte>(matchUsed.value),
+          newUsedCount: newSize)
+      ) {
         count = newSize
         return (0, matchUsed)
       }
@@ -385,7 +388,7 @@ public struct _StringCore {
       // string is ASCII?  Do we care much about that edge case?
       _sanityCheck(newStorage.elementShift == 1)
       _cocoaStringReadAll(source: cocoaBuffer!, 
-                          destination: UnsafePointer(newStorage.start))
+                          destination: UnsafeMutablePointer(newStorage.start))
     }
     
     self = _StringCore(newStorage)
@@ -406,12 +409,15 @@ public struct _StringCore {
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
         _pointerToNth(count) 
-        == COpaquePointer(UnsafePointer<RawByte>(destination) + 1))
+        == COpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
 
-      UnsafePointer<UTF8.CodeUnit>(destination).memory = UTF8.CodeUnit(c.value)
+      UnsafeMutablePointer<UTF8.CodeUnit>(destination).memory
+        = UTF8.CodeUnit(c.value)
     }
     else {
-      let destination16 = UnsafePointer<UTF16.CodeUnit>(destination.value)
+      let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(
+        destination.value)
+      
       if _fastPath(utf16Width == 1) {
         _sanityCheck(_pointerToNth(count) == COpaquePointer(destination16 + 1))
         destination16.memory = UTF16.CodeUnit(c.value)
@@ -442,7 +448,7 @@ public struct _StringCore {
     else {
       _sanityCheck(elementWidth == 2)
       _cocoaStringReadAll(source: rhs.cocoaBuffer!, 
-                          destination: UnsafePointer(destination))
+                          destination: UnsafeMutablePointer(destination))
     }
     _invariantCheck()
   }
@@ -457,7 +463,7 @@ public struct _StringCore {
       return true
     }
     return !contains(
-      UnsafeArray(start: UnsafePointer<UTF16.CodeUnit>(_baseAddress), 
+      UnsafeArray(start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), 
                   length: count)
     ) { $0 > 0x7f }
   }
@@ -488,6 +494,6 @@ var _emptyStringStorage: UInt32 = 0
 
 var _emptyStringBase: COpaquePointer {
   return COpaquePointer(
-    UnsafePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
+    UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
 }
 

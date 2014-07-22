@@ -13,12 +13,12 @@ arguments:
 
 - Const pointer arguments ``const int *``, including const pointers to ObjC
   classes ``NSFoo * const *``, can be used as "in" array arguments, 
-  as ``inout`` scalar arguments, or as ``UnsafePointer`` arguments.
+  as ``inout`` scalar arguments, or as ``UnsafeMutablePointer`` arguments.
 - Non-const pointer arguments to C types, ``int *``, can be used as ``inout``
-  array or scalar arguments, or as ``UnsafePointer`` arguments.
+  array or scalar arguments, or as ``UnsafeMutablePointer`` arguments.
 - Non-const pointer arguments to ObjC class types, ``NSFoo **``, can be used as
   ``inout`` scalar arguments or passed ``nil``. (They cannot be used as
-  array arguments or as ``UnsafePointer`` arguments.)
+  array arguments or as ``UnsafeMutablePointer`` arguments.)
 - ``const void *`` and ``void *`` pointers can be used in the same ways as
   pointers to any C type (but not ObjC types).
 
@@ -105,7 +105,7 @@ Pointer Return Values
 ---------------------
 
 This proposal does not address the handling of return values, which should still
-be imported into Swift as ``UnsafePointer`` values.
+be imported into Swift as ``UnsafeMutablePointer`` values.
 
 
 Library Features
@@ -122,13 +122,13 @@ types are as follows:
 - ``CConstPointer<T>`` is the imported representation of a ``const T *``
   argument. It is implicitly convertible from ``inout T`` by inout address
   conversion and from ``Array<T>`` by immutable interior pointer
-  conversion. It is also implicitly convertible to and from ``UnsafePointer<T>``
+  conversion. It is also implicitly convertible to and from ``UnsafeMutablePointer<T>``
   by normal conversion.
 - ``CMutablePointer<T>`` is the imported representation of a ``T *``
   argument for a POD C type ``T``. It is implicitly convertible from
   ``inout T`` by inout address conversion and from ``inout Array<T>`` by mutating
   interior pointer conversion. It is also implicitly convertible to and from
-  ``UnsafePointer<T>`` by normal conversion.
+  ``UnsafeMutablePointer<T>`` by normal conversion.
 - ``CConstVoidPointer`` and ``CMutableVoidPointer`` are the imported
   representations of ``const void *`` and ``void *`` respectively.
   They are implicitly convertible by normal conversion from, respectively,
@@ -137,7 +137,7 @@ types are as follows:
 - ``ObjCInOut<T>`` is the imported representation of a ``T **``
   argument for an ObjC class type ``T``. It is implicitly convertible from
   ``inout T`` by inout writeback conversion and is implicitly convertible
-  from ``nil``. It cannot be converted from an array or to ``UnsafePointer``.
+  from ``nil``. It cannot be converted from an array or to ``UnsafeMutablePointer``.
 
 New Language Features
 =====================

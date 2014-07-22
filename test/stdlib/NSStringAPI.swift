@@ -148,7 +148,7 @@ NSStringAPIs.test("stringWithCString(_:encoding:)") {
 
 NSStringAPIs.test("stringWithUTF8String(_:)") {
   var s = "foo あいう"
-  var up = UnsafePointer<UInt8>.alloc(100)
+  var up = UnsafeMutablePointer<UInt8>.alloc(100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
@@ -320,7 +320,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
   if true {
     let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
     let bytes = Array(UnsafeArray(
-        start: UnsafePointer<UInt8>(data!.bytes), length: data!.length))
+        start: UnsafeMutablePointer<UInt8>(data!.bytes), length: data!.length))
     let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]
@@ -1200,48 +1200,48 @@ NSStringAPIs.run()
 
 var CStringTests = TestCase("CStringTests")
 
-func getNullCString() -> UnsafePointer<CChar> {
+func getNullCString() -> UnsafeMutablePointer<CChar> {
   return .null()
 }
 
-func getASCIICString() -> (UnsafePointer<CChar>, dealloc: ()->()) {
-  var up = UnsafePointer<CChar>.alloc(100)
+func getASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+  var up = UnsafeMutablePointer<CChar>.alloc(100)
   up[0] = 0x61
   up[1] = 0x62
   up[2] = 0
   return (up, { up.dealloc(100) })
 }
 
-func getNonASCIICString() -> (UnsafePointer<CChar>, dealloc: ()->()) {
-  var up = UnsafePointer<UInt8>.alloc(100)
+func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+  var up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0xd0
   up[1] = 0xb0
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (UnsafePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String1() -> (UnsafePointer<CChar>, dealloc: ()->()) {
-  var up = UnsafePointer<UInt8>.alloc(100)
+func getIllFormedUTF8String1() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+  var up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
   up[2] = 0xa0
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (UnsafePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String2() -> (UnsafePointer<CChar>, dealloc: ()->()) {
-  var up = UnsafePointer<UInt8>.alloc(100)
+func getIllFormedUTF8String2() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+  var up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
   up[2] = 0xa0
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (UnsafePointer(up), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
 func asCCharArray(a: [UInt8]) -> [CChar] {

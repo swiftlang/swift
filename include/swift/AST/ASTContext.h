@@ -373,14 +373,14 @@ public:
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
   
-  /// Retrieve the declaration of Swift.UnsafePointer<T>.
-  NominalTypeDecl *getUnsafePointerDecl() const;
+  /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
+  NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 
   /// Retrieve the declaration of Swift.ConstUnsafePointer<T>.
   NominalTypeDecl *getConstUnsafePointerDecl() const;
 
-  /// Retrieve the declaration of Swift.AutoreleasingUnsafePointer<T>.
-  NominalTypeDecl *getAutoreleasingUnsafePointerDecl() const;
+  /// Retrieve the declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
+  NominalTypeDecl *getAutoreleasingUnsafeMutablePointerDecl() const;
 
   /// Retrieve the declaration of Swift.CFunctionPointer<T>.
   NominalTypeDecl *getCFunctionPointerDecl() const;
@@ -422,7 +422,7 @@ public:
   bool hasOptionalIntrinsics(LazyResolver *resolver) const;
 
   /// Check whether the standary library provides all the correct
-  /// intrinsic support for UnsafePointer<T> function arguments.
+  /// intrinsic support for UnsafeMutablePointer<T> function arguments.
   ///
   /// If this is true, the methods to getConvert*ToPointerArgument
   bool hasPointerArgumentIntrinsics(LazyResolver *resolver) const;

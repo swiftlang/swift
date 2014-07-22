@@ -33,8 +33,8 @@ func repr(x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
-      ? UnsafePointer(b.start) - x.startUTF16
-      : UnsafePointer(b.start) - x.startASCII
+      ? UnsafeMutablePointer(b.start) - x.startUTF16
+      : UnsafeMutablePointer(b.start) - x.startASCII
       return "Contiguous(owner: "
       + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
       + ", capacity = \(b.capacity))"
@@ -124,7 +124,7 @@ func ascii() {
   // treating it as an opaque NSString.
   var nsASCII = NSString(UTF8String: "foobar")
   // CHECK-NEXT: has UTF-16: false
-  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafePointer<UniChar>))")
+  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafeMutablePointer<UniChar>))")
 
   // CHECK: --- ASCII basic round-tripping ---
   println("--- ASCII basic round-tripping ---")

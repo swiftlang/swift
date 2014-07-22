@@ -775,12 +775,13 @@ extension UTF16 {
   }
 
   public static func copy<T: StringElementType, U: StringElementType>(
-    source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
+    source: UnsafeMutablePointer<T>,
+    destination: UnsafeMutablePointer<U>, count: Int
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
-        dest: UnsafePointer(destination),
-        src: UnsafePointer(source),
+        dest: UnsafeMutablePointer(destination),
+        src: UnsafeMutablePointer(source),
         size: UInt(count) * UInt(strideof(U.self)))
     }
     else {

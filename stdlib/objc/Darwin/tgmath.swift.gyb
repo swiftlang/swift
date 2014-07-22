@@ -244,12 +244,12 @@ func scalbn(x: ${T}, n: Int) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 % # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
 @asmname("lgamma${f}_r") 
-func _swift_Darwin_lgamma${f}_r(${CT}, UnsafePointer<CInt>) -> ${CT}
+func _swift_Darwin_lgamma${f}_r(${CT}, UnsafeMutablePointer<CInt>) -> ${CT}
 @transparent public
 func lgamma(x: ${T}) -> (${T}, Int) {
   var sign = CInt(0)
-  let value = withUnsafePointer(&sign) { 
-    (signp: UnsafePointer<CInt>) -> ${CT} in
+  let value = withUnsafeMutablePointer(&sign) { 
+    (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
     return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
   }
   return (${T}(value), Int(sign))

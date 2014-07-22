@@ -996,38 +996,38 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_ExistentialMetatype9: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type
 
 
-  var var_UnsafePointer1: UnsafePointer<Int>
-  var var_UnsafePointer2: UnsafePointer<Bool>
-  var var_UnsafePointer3: UnsafePointer<CBool>
-  var var_UnsafePointer4: UnsafePointer<String>
-  var var_UnsafePointer5: UnsafePointer<Float>
-  var var_UnsafePointer6: UnsafePointer<Double>
-  var var_UnsafePointer7: UnsafePointer<COpaquePointer>
-  var var_UnsafePointer8: UnsafePointer<PlainClass>
-  var var_UnsafePointer9: UnsafePointer<PlainStruct>
-  var var_UnsafePointer10: UnsafePointer<PlainEnum>
-  var var_UnsafePointer11: UnsafePointer<PlainProtocol>
-  var var_UnsafePointer12: UnsafePointer<AnyObject>
-  var var_UnsafePointer13: UnsafePointer<AnyObject.Type>
-  var var_UnsafePointer100: UnsafePointer<()>
-  var var_UnsafePointer101: UnsafePointer<Void>
-  var var_UnsafePointer102: UnsafePointer<(Int, Int)>
-// CHECK-LABEL: @objc var var_UnsafePointer1: UnsafePointer<Int>
-// CHECK-LABEL: @objc var var_UnsafePointer2: UnsafePointer<Bool>
-// CHECK-LABEL: @objc var var_UnsafePointer3: UnsafePointer<CBool>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer4: UnsafePointer<String>
-// CHECK-LABEL: @objc var var_UnsafePointer5: UnsafePointer<Float>
-// CHECK-LABEL: @objc var var_UnsafePointer6: UnsafePointer<Double>
-// CHECK-LABEL: @objc var var_UnsafePointer7: UnsafePointer<COpaquePointer>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer8: UnsafePointer<PlainClass>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer9: UnsafePointer<PlainStruct>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer10: UnsafePointer<PlainEnum>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer11: UnsafePointer<PlainProtocol>
-// CHECK-LABEL: @objc var var_UnsafePointer12: UnsafePointer<AnyObject>
-// CHECK-LABEL: @objc var var_UnsafePointer13: UnsafePointer<AnyObject.Type>
-// CHECK-LABEL: {{^}} @objc var var_UnsafePointer100: UnsafePointer<()>
-// CHECK-LABEL: {{^}} @objc var var_UnsafePointer101: UnsafePointer<Void>
-// CHECK-LABEL: {{^}}  var var_UnsafePointer102: UnsafePointer<(Int, Int)>
+  var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
+  var var_UnsafeMutablePointer2: UnsafeMutablePointer<Bool>
+  var var_UnsafeMutablePointer3: UnsafeMutablePointer<CBool>
+  var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
+  var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
+  var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
+  var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
+  var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
+  var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
+  var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
+  var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
+  var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
+  var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
+  var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
+  var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
+  var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer2: UnsafeMutablePointer<Bool>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer3: UnsafeMutablePointer<CBool>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
+// CHECK-LABEL: @objc var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
+// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
+// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
+// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
 
   var var_Optional1: Class_ObjC1?
   var var_Optional2: Protocol_ObjC1?
@@ -1089,8 +1089,8 @@ class infer_instanceVar1 {
   var var_Optional_fail13: Bool?
   var var_Optional_fail14: CBool?
   var var_Optional_fail16: COpaquePointer?
-  var var_Optional_fail17: UnsafePointer<Int>?
-  var var_Optional_fail18: UnsafePointer<Class_ObjC1>?
+  var var_Optional_fail17: UnsafeMutablePointer<Int>?
+  var var_Optional_fail18: UnsafeMutablePointer<Class_ObjC1>?
   var var_Optional_fail20: AnyObject??
   var var_Optional_fail21: AnyObject.Type??
 // CHECK-NOT: @objc{{.*}}Optional_fail
@@ -1560,23 +1560,23 @@ class HasNSManaged {
 
 @objc class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
-  func constUnsafePointer(p: ConstUnsafePointer<Int>) {}
-  // CHECK-LABEL: @objc func constUnsafePointer(p: ConstUnsafePointer<Int>) {
+  func constUnsafeMutablePointer(p: ConstUnsafePointer<Int>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: ConstUnsafePointer<Int>) {
 
-  func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: @objc func constUnsafePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {
+  func constUnsafeMutablePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {
 
-  func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {}
-  // CHECK-LABEL: @objc func constUnsafePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {
+  func constUnsafeMutablePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {
 
-  func mutableUnsafePointer(p: UnsafePointer<Int>) {}
-  // CHECK-LABEL: @objc func mutableUnsafePointer(p: UnsafePointer<Int>) {
+  func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {}
+  // CHECK-LABEL: @objc func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {
 
-  func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafePointerToAnyObject(p: UnsafePointer<AnyObject>) {
+  func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {
 
-  func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafePointerToAnyObject(p: AutoreleasingUnsafePointer<AnyObject>) {
+  func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
+  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
 
   func cFunctionPointer(p: CFunctionPointer<() -> ()>) {}
   // CHECK-LABEL: {{^}} @objc func cFunctionPointer(p: CFunctionPointer<() -> ()>)

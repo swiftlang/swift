@@ -17,7 +17,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   typealias NativeStorage = _ContiguousArrayStorage<T>
   typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
-  init(owner: AnyObject?, start: UnsafePointer<T>, count: Int, 
+  init(owner: AnyObject?, start: UnsafeMutablePointer<T>, count: Int, 
        hasNativeBuffer: Bool) {
     self.owner = owner
     self.start = start
@@ -112,7 +112,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// An object that keeps the elements stored in this buffer alive
   public
   var owner: AnyObject?
-  var start: UnsafePointer<T>
+  var start: UnsafeMutablePointer<T>
   var _countAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
@@ -176,8 +176,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   public
   func _uninitializedCopy(
-    subRange: Range<Int>, var target: UnsafePointer<T>
-  ) -> UnsafePointer<T> {
+    subRange: Range<Int>, var target: UnsafeMutablePointer<T>
+  ) -> UnsafeMutablePointer<T> {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
@@ -189,7 +189,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   public
-  var elementStorage: UnsafePointer<T> {
+  var elementStorage: UnsafeMutablePointer<T> {
     return start
   }
 
@@ -276,7 +276,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   //===--- misc -----------------------------------------------------------===//
   public
-  func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+  func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<T>)->R
+  ) -> R {
     let start = self.start
     return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)
   }

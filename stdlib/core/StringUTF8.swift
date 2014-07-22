@@ -38,8 +38,8 @@ extension _StringCore {
       var result: UTF8Chunk = ~0 // start with all bits set
       
       _memcpy(
-        dest: UnsafePointer(Builtin.addressof(&result)), 
-        src: UnsafePointer(startASCII + i), 
+        dest: UnsafeMutablePointer(Builtin.addressof(&result)), 
+        src: UnsafeMutablePointer(startASCII + i), 
         size: numericCast(utf16Count))
       
       return (i + utf16Count, result)
@@ -145,7 +145,7 @@ extension String {
     return UTF8View(self.core)
   }
 
-  public var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
+  public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 

@@ -10,41 +10,45 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Invokes `body` with an `UnsafePointer` to `arg` and returns the
+/// Invokes `body` with an `UnsafeMutablePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer
-public func withUnsafePointer<T, Result>(
+public func withUnsafeMutablePointer<T, Result>(
   inout arg: T,
-  body: (UnsafePointer<T>)->Result
+  body: (UnsafeMutablePointer<T>)->Result
 ) -> Result
 {
-  return body(UnsafePointer<T>(Builtin.addressof(&arg)))
+  return body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
 }
 
-/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafePointers<A0, A1, Result>(
+/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
+public func withUnsafeMutablePointers<A0, A1, Result>(
   inout arg0: A0,
   inout arg1: A1,
-  body: (UnsafePointer<A0>, UnsafePointer<A1>)->Result
+  body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>)->Result
 ) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
+  return withUnsafeMutablePointer(&arg0) {
+    arg0 in withUnsafeMutablePointer(&arg1) {
       arg1 in body(arg0, arg1)
     }
   }
 }
 
-/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
+/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
 /// and `arg2`.
-public func withUnsafePointers<A0, A1, A2, Result>(
+public func withUnsafeMutablePointers<A0, A1, A2, Result>(
   inout arg0: A0,
   inout arg1: A1,
   inout arg2: A2,
-  body: (UnsafePointer<A0>, UnsafePointer<A1>, UnsafePointer<A2>)->Result
+  body: (
+    UnsafeMutablePointer<A0>,
+    UnsafeMutablePointer<A1>,
+    UnsafeMutablePointer<A2>
+  )->Result
 ) -> Result {
-  return withUnsafePointer(&arg0) {
-    arg0 in withUnsafePointer(&arg1) {
-      arg1 in withUnsafePointer(&arg2) {
+  return withUnsafeMutablePointer(&arg0) {
+    arg0 in withUnsafeMutablePointer(&arg1) {
+      arg1 in withUnsafeMutablePointer(&arg2) {
         arg2 in body(arg0, arg1, arg2)
       }
     }
@@ -156,7 +160,8 @@ public func _bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 ///     `T._isBridgedToObjectiveC()` returns `false`, then the result is empty;
 ///   + otherwise, if the dynamic type of `x` is not `T._getObjectiveCType()`
 ///     or a subclass of it, the result is empty;
-///   + otherwise, returns the result of `T._bridgeFromObjectiveCConditional(x)`;
+///   + otherwise, returns the result of
+///     `T._bridgeFromObjectiveCConditional(x)`;
 /// - otherwise, the result is empty.
 public func _bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -228,18 +233,19 @@ var _nilRawPointer: Builtin.RawPointer {
 /// - 'nil', which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to a writeback temporary with autoreleasing ownership semantics,
-/// - an UnsafePointer<T>, which is passed as-is.
+/// - an UnsafeMutablePointer<T>, which is passed as-is.
 ///
-/// Passing pointers to mutable arrays of ObjC class
-/// pointers is not directly supported. Unlike UnsafePointer<T>,
-/// AutoreleasingUnsafePointer must reference storage that does not own a reference
-/// count to the referenced value. UnsafePointer's operations, by contrast,
-/// assume that the referenced storage owns values loaded from or stored to it.
+/// Passing pointers to mutable arrays of ObjC class pointers is not
+/// directly supported. Unlike UnsafeMutablePointer<T>,
+/// AutoreleasingUnsafeMutablePointer must reference storage that does
+/// not own a reference count to the referenced
+/// value. UnsafeMutablePointer's operations, by contrast, assume that
+/// the referenced storage owns values loaded from or stored to it.
 ///
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-public struct AutoreleasingUnsafePointer<T /* TODO : class */>
+public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   : Equatable, BooleanType, NilLiteralConvertible, _PointerType {
   let value: Builtin.RawPointer
 
@@ -250,7 +256,7 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
 
   @transparent
   var _isNull : Bool {
-    return UnsafePointer<T>(self)._isNull
+    return UnsafeMutablePointer<T>(self)._isNull
   }
   
   @transparent
@@ -265,13 +271,14 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
     @transparent get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return UnsafePointer<T>(self).memory
+      return UnsafeMutablePointer<T>(self).memory
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
-    /// AutoreleasingUnsafePointers are assumed to reference a value with __autoreleasing
-    /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
-    /// argument before trivially storing it to the referenced memory.    
+    /// AutoreleasingUnsafeMutablePointers are assumed to reference a
+    /// value with __autoreleasing ownership semantics, like 'NSFoo**'
+    /// in ARC. This autoreleases the argument before trivially
+    /// storing it to the referenced memory.
     @transparent nonmutating set {
       _debugPrecondition(!_isNull)
       // Autorelease the object reference.
@@ -280,12 +287,13 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
       // Trivially assign it as a COpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      let p = UnsafePointer<COpaquePointer>(UnsafePointer<T>(self))
+      let p = UnsafeMutablePointer<COpaquePointer>(
+        UnsafeMutablePointer<T>(self))
       p.memory = reinterpretCast(newValue)
     }
   }
 
-  // Allow read-only subscripting through an AutoreleasingUnsafePointer.t
+  // Allow read-only subscripting through an AutoreleasingUnsafeMutablePointer.t
   public subscript(i: Int) -> T {
     @transparent
     get {
@@ -296,13 +304,13 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
   }
   
   @transparent public
-  static func convertFromNilLiteral() -> AutoreleasingUnsafePointer {
-    return AutoreleasingUnsafePointer(_nilRawPointer)
+  static func convertFromNilLiteral() -> AutoreleasingUnsafeMutablePointer {
+    return AutoreleasingUnsafeMutablePointer(_nilRawPointer)
   }
   
   @transparent public
-  static func null() -> AutoreleasingUnsafePointer {
-    return AutoreleasingUnsafePointer(_nilRawPointer)
+  static func null() -> AutoreleasingUnsafeMutablePointer {
+    return AutoreleasingUnsafeMutablePointer(_nilRawPointer)
   }
 
   /// Initialize to a null pointer.
@@ -311,13 +319,13 @@ public struct AutoreleasingUnsafePointer<T /* TODO : class */>
     self.value = _nilRawPointer
   }
   
-  /// Explicit construction from an UnsafePointer.
+  /// Explicit construction from an UnsafeMutablePointer.
   ///
-  /// This is inherently unsafe; UnsafePointer assumes the referenced memory
-  /// has +1 strong ownership semantics, whereas AutoreleasingUnsafePointer
-  /// implies +0 semantics.
+  /// This is inherently unsafe; UnsafeMutablePointer assumes the
+  /// referenced memory has +1 strong ownership semantics, whereas
+  /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
   @transparent public
-  init<U>(_ ptr: UnsafePointer<U>) {
+  init<U>(_ ptr: UnsafeMutablePointer<U>) {
     self.value = ptr.value
   }
 
@@ -338,7 +346,10 @@ extension AutoreleasingUnsafePointer : DebugPrintable {
 }
 
 @transparent public
-func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer<T>) -> Bool {
+func == <T> (
+  lhs: AutoreleasingUnsafeMutablePointer<T>, 
+  rhs: AutoreleasingUnsafeMutablePointer<T>
+) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 

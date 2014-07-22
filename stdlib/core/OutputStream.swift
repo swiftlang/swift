@@ -266,7 +266,8 @@ struct _Buffer72 {
 
 @asmname("swift_doubleToString")
 func _doubleToStringImpl(
-    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: Double
+  buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  bufferLength: UWord, value: Double
 ) -> UWord
 
 internal func _doubleToString(value: Double) -> String {
@@ -274,9 +275,9 @@ internal func _doubleToString(value: Double) -> String {
   _sanityCheck(sizeof(_Buffer72.self) == 72)
 
   var buffer = _Buffer32()
-  return withUnsafePointer(&buffer) {
+  return withUnsafeMutablePointer(&buffer) {
     (bufferPtr) in
-    let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+    let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
     let actualLength = _doubleToStringImpl(bufferUTF8Ptr, 32, value)
     return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
@@ -286,8 +287,9 @@ internal func _doubleToString(value: Double) -> String {
 
 @asmname("swift_int64ToString")
 func _int64ToStringImpl(
-    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: Int64,
-    radix: Int64, uppercase: Bool
+  buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  bufferLength: UWord, value: Int64,
+  radix: Int64, uppercase: Bool
 ) -> UWord
 
 internal func _int64ToString(
@@ -295,9 +297,9 @@ internal func _int64ToString(
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
-    return withUnsafePointer(&buffer) {
+    return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -306,9 +308,9 @@ internal func _int64ToString(
     }
   } else {
     var buffer = _Buffer72()
-    return withUnsafePointer(&buffer) {
+    return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -320,8 +322,8 @@ internal func _int64ToString(
 
 @asmname("swift_uint64ToString")
 func _uint64ToStringImpl(
-    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: UInt64,
-    radix: Int64, uppercase: Bool
+  buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  bufferLength: UWord, value: UInt64, radix: Int64, uppercase: Bool
 ) -> UWord
 
 func _uint64ToString(
@@ -329,9 +331,9 @@ func _uint64ToString(
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
-    return withUnsafePointer(&buffer) {
+    return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -340,9 +342,9 @@ func _uint64ToString(
     }
   } else {
     var buffer = _Buffer72()
-    return withUnsafePointer(&buffer) {
+    return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(

@@ -16,8 +16,8 @@
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
 % for mutable in (True, False):
-%  Self = 'UnsafePointer' if mutable else 'ConstUnsafePointer'
-%  a_Self = 'an UnsafePointer' if mutable else 'a ConstUnsafePointer'
+%  Self = 'UnsafeMutablePointer' if mutable else 'ConstUnsafePointer'
+%  a_Self = 'an UnsafeMutablePointer' if mutable else 'a ConstUnsafePointer'
 %  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
@@ -56,10 +56,10 @@ public struct ${Self}<T>
     self.value = Builtin.inttoptr_Word(value.value)
   }
 
-  /// Convert from an UnsafePointer of a different type.
+  /// Convert from an UnsafeMutablePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  public init<U>(_ from : UnsafePointer<U>) {
+  public init<U>(_ from : UnsafeMutablePointer<U>) {
     value = from.value
   }
 
@@ -241,7 +241,7 @@ public struct ${Self}<T>
   /// of a T which is written into buffer before this method returns
   @transparent public
   func _withBridgeObject<U: AnyObject, R>(
-    inout buffer: U?, body: (AutoreleasingUnsafePointer<U?>)->R
+    inout buffer: U?, body: (AutoreleasingUnsafeMutablePointer<U?>)->R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -251,7 +251,7 @@ public struct ${Self}<T>
   /// of buffer
   @transparent public
   func _withBridgeValue<U, R>(
-    inout buffer: U, body: (UnsafePointer<U>)->R
+    inout buffer: U, body: (UnsafeMutablePointer<U>)->R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)
   }
@@ -352,7 +352,7 @@ func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
 % end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with
-/// any other types; it makes a decent parameter to UnsafePointer when
+/// any other types; it makes a decent parameter to UnsafeMutablePointer when
 /// you just want to do bytewise pointer arithmetic.
 public struct RawByte {
   let _inaccessible: UInt8

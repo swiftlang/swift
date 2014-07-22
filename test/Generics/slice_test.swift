@@ -24,13 +24,13 @@ func testslice(s: Array<Int>) {
   var s3 = s[0...1]
 }
 
-@asmname("malloc") func c_malloc(size: Int) -> UnsafePointer<Void>
-@asmname("free") func c_free(p: UnsafePointer<Void>)
+@asmname("malloc") func c_malloc(size: Int) -> UnsafeMutablePointer<Void>
+@asmname("free") func c_free(p: UnsafeMutablePointer<Void>)
 
 class Vector<T> {
   var length : Int
   var capacity : Int
-  var base : UnsafePointer<T>
+  var base : UnsafeMutablePointer<T>
 
   init() {
     length = 0
@@ -42,7 +42,7 @@ class Vector<T> {
     if length == capacity {
       var newcapacity = capacity * 2 + 2
       var size = Int(Builtin.sizeof(T.self))
-      var newbase = UnsafePointer<T>(c_malloc(newcapacity * size))
+      var newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
       for i in 0..<length {
         (newbase + i).initialize((base+i).move())
       }

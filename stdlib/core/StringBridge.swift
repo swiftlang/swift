@@ -37,11 +37,11 @@ func _cocoaStringToContiguousNotInitialized(
 /// Reads the entire contents of a _CocoaStringType into contiguous
 /// storage of sufficient capacity.
 public var _cocoaStringReadAll: (
-  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>
+  source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) -> Void = _cocoaStringReadAllNotInitialized
 
 func _cocoaStringReadAllNotInitialized(
-  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>
+  source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) -> Void {
   _fatalError("_cocoaStringReadAll not initialized")
 }

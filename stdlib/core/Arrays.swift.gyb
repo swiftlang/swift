@@ -205,12 +205,12 @@ extension ${Self} : ArrayType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public var _elementStorageIfContiguous: UnsafePointer<Element> {
+  public var _elementStorageIfContiguous: UnsafeMutablePointer<Element> {
     return _buffer.elementStorage
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
-  var _elementStorage: UnsafePointer<Element> {
+  var _elementStorage: UnsafeMutablePointer<Element> {
     return _buffer.elementStorage
   }
 %end
@@ -392,10 +392,10 @@ extension ${Self} {
 %if Self != 'Array':
   /// Requires: the Array's storage is not provided by an opaque NSArray
 %end
-  public func withUnsafePointerToElements<R>(
-    body: (UnsafePointer<T>) -> R
+  public func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<T>) -> R
   ) -> R {
-    return _buffer.withUnsafePointerToElements(body)
+    return _buffer.withUnsafeMutablePointerToElements(body)
   }
 }
 
@@ -434,7 +434,7 @@ extension Array {
     count: Builtin.Word
   ) -> Array {
     let elements = UnsafeArray(
-      start: reinterpretCast(base) as UnsafePointer<T>,
+      start: reinterpretCast(base) as UnsafeMutablePointer<T>,
       length: reinterpretCast(count) as Int
     )
     let r = Array(elements)
@@ -446,7 +446,7 @@ extension Array {
 struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
-  func call(rawMemory: UnsafePointer<C.Generator.Element>) {
+  func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>) {
     var p = rawMemory
     for x in newValues {
       p++.initialize(x)
@@ -681,7 +681,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
 
 protocol _PointerFunctionType {
   typealias Element
-  func call(UnsafePointer<Element>)
+  func call(UnsafeMutablePointer<Element>)
 }
 
 /// initialize the elements of dest by copying the first headCount
@@ -753,7 +753,7 @@ func _arrayOutOfPlaceUpdate<
 }
 
 struct _InitializePointer<T> : _PointerFunctionType {
-  func call(rawMemory: UnsafePointer<T>) {
+  func call(rawMemory: UnsafeMutablePointer<T>) {
     // FIXME: maybe we should move here instead of copying?
     rawMemory.initialize(newValue)
   }
@@ -781,7 +781,7 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
 }
 
 struct _IgnorePointer<T> : _PointerFunctionType {
-  func call(_:UnsafePointer<T>) {}
+  func call(_:UnsafeMutablePointer<T>) {}
 }
 
 func _arrayReserve<_Buffer: _ArrayBufferType>(

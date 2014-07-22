@@ -148,13 +148,13 @@ ${test('Downcast2')} {
 ${test('UnsafeLength')} {
   let a = [42, 77, 88]
   
-  if a.withUnsafePointerToElements({
+  if a.withUnsafeMutablePointerToElements({
       UnsafeArray(start: $0, length: 1)[0]
   }) == 42 {
     println("OK")
   }
   
-  a.withUnsafePointerToElements {
+  a.withUnsafeMutablePointerToElements {
     UnsafeArray(start: $0, length: -1)
   }
 }

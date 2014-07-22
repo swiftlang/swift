@@ -36,7 +36,7 @@ extern "C" Mirror
 swift_reflectAny(OpaqueValue *value, const Metadata *T);
   
 /// func unsafeReflect<T>(owner: Builtin.NativeObject,
-///                       x: UnsafePointer<T>) -> Mirror
+///                       x: UnsafeMutablePointer<T>) -> Mirror
 ///
 /// Produce a mirror for any value. If the value's type conforms to Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation

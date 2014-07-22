@@ -75,26 +75,26 @@ func test_pointer() {
   var f: CFloat = 0
   var fa: [CFloat] = [1, 2, 3]
 
-  param_pointer(UnsafePointer<CInt>())
+  param_pointer(UnsafeMutablePointer<CInt>())
   param_pointer(&i)
   param_pointer(&ia)
 
-  param_const_pointer(UnsafePointer<CInt>())
+  param_const_pointer(UnsafeMutablePointer<CInt>())
   param_const_pointer(&i)
   param_const_pointer(ia)
   param_const_pointer([1, 2, 3])
 
-  param_void_pointer(UnsafePointer<Void>())
-  param_void_pointer(UnsafePointer<CInt>())
-  param_void_pointer(UnsafePointer<CFloat>())
+  param_void_pointer(UnsafeMutablePointer<Void>())
+  param_void_pointer(UnsafeMutablePointer<CInt>())
+  param_void_pointer(UnsafeMutablePointer<CFloat>())
   param_void_pointer(&i)
   param_void_pointer(&ia)
   param_void_pointer(&f)
   param_void_pointer(&fa)
 
-  param_const_void_pointer(UnsafePointer<Void>())
-  param_const_void_pointer(UnsafePointer<CInt>())
-  param_const_void_pointer(UnsafePointer<CFloat>())
+  param_const_void_pointer(UnsafeMutablePointer<Void>())
+  param_const_void_pointer(UnsafeMutablePointer<CInt>())
+  param_const_void_pointer(UnsafeMutablePointer<CFloat>())
   param_const_void_pointer(ConstUnsafePointer<Void>())
   param_const_void_pointer(ConstUnsafePointer<CInt>())
   param_const_void_pointer(ConstUnsafePointer<CFloat>())
@@ -110,12 +110,12 @@ func test_pointer() {
 }
 
 func test_decay() {
-  decay_param_array(UnsafePointer<CInt>())
+  decay_param_array(UnsafeMutablePointer<CInt>())
   var i: CInt = 0
   var a: [CInt] = [1, 2, 3]
   decay_param_array(&i)
   decay_param_array(&a)
-  decay_param_const_array(UnsafePointer<CInt>())
+  decay_param_const_array(UnsafeMutablePointer<CInt>())
   decay_param_const_array(&i)
   decay_param_const_array(a)
   decay_param_const_array([1, 2, 3])

@@ -14,6 +14,6 @@ func f(i: Int) -> Int8 {
   let j = i & 0xff_ffff_ffff_ffff
 // TBI-NOT: and
 // NO_TBI: and
-  let p = UnsafePointer<Int8>(j)
+  let p = UnsafeMutablePointer<Int8>(j)
   return p[0]
 }

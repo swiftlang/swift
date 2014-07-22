@@ -122,7 +122,7 @@ extension String {
     format(stream: { _ in ++asciiCount;() })
     var buffer = _StringBuffer(
       capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
-    var p = UnsafePointer<UTF8.CodeUnit>(buffer.start)
+    var p = UnsafeMutablePointer<UTF8.CodeUnit>(buffer.start)
     format(stream: { p++.memory = $0 })
     self = String(buffer)
   }
@@ -136,7 +136,7 @@ extension String {
     format(stream: { _ in ++asciiCount;() })
     var buffer = _StringBuffer(
       capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
-    var p = UnsafePointer<UTF8.CodeUnit>(buffer.start)
+    var p = UnsafeMutablePointer<UTF8.CodeUnit>(buffer.start)
     format(stream: { p++.memory = $0 })
     if v == 0 {
       p++.memory = UTF8.CodeUnit("0")

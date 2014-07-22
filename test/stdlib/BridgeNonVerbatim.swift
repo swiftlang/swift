@@ -103,9 +103,9 @@ func testScope() {
   // treat them as objects, or we'll get double deletion
   let objects: [Word] = [0, 0]
 
-  objects.withUnsafePointerToElements {
+  objects.withUnsafeMutablePointerToElements {
     nsx.getObjects(
-      UnsafePointer($0), // pointer cast
+      UnsafeMutablePointer($0), // pointer cast
       range: _SwiftNSRange(location: 1, length: 2))
   }
 

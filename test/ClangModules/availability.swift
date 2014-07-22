@@ -21,7 +21,7 @@ func test_unavailable_func(x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
 }
 
-func test_deprecated_imported_as_unavailable(s:UnsafePointer<CChar>) {
+func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
   let x = tmpnam(s) // expected-error {{'tmpnam' is unavailable: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 

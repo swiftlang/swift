@@ -195,12 +195,12 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
-  func test(a: UnsafePointer<Int>) -> UnsafePointer<AnyObject> { return UnsafePointer() }
+  func test(a: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<AnyObject> { return UnsafeMutablePointer() }
 
-  func testNested(a: UnsafePointer<UnsafePointer<Int>>) {}
+  func testNested(a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
-  func testBridging(a: ConstUnsafePointer<Int>, b: UnsafePointer<Int>, c: AutoreleasingUnsafePointer<Methods>) {}
-  func testBridgingVoid(a: UnsafePointer<Void>, b: ConstUnsafePointer<Void>) {}
+  func testBridging(a: ConstUnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
+  func testBridgingVoid(a: UnsafeMutablePointer<Void>, b: ConstUnsafePointer<Void>) {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject

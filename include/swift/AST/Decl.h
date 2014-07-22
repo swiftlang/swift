@@ -2428,9 +2428,9 @@ enum { NumOptionalTypeKinds = 2 };
   
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
-  PTK_UnsafePointer,
+  PTK_UnsafeMutablePointer,
   PTK_ConstUnsafePointer,
-  PTK_AutoreleasingUnsafePointer,
+  PTK_AutoreleasingUnsafeMutablePointer,
 };
 
 /// An implicitly created member decl, used when importing a Clang enum type.

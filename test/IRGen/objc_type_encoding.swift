@@ -58,10 +58,10 @@ func testId(s: AnyObject) -> AnyObject { return self }
  @objc func passSelector(aSelector : Selector) {}
 // CHECK: private unnamed_addr constant [11 x i8] c"v24@0:8:16\00"
 
-@objc func copyUnsafePointer(p: UnsafePointer<Int32>) -> UnsafePointer<Int32> { return p }
+@objc func copyUnsafeMutablePointer(p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> { return p }
 // CHECK: private unnamed_addr constant [13 x i8] c"^i24@0:8^i16\00"
 
-@objc func copyUnsafePointerInt(p: UnsafePointer<Int>) -> UnsafePointer<Int> { return p }
+@objc func copyUnsafeMutablePointerInt(p: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Int> { return p }
 // CHECK: private unnamed_addr constant [13 x i8] c"^q24@0:8^q16\00"
 
 func testArchetype(work: P3) {

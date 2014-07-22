@@ -47,17 +47,19 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
 
   /// Copies the objects contained in the array that fall within the
   /// specified `range` to `aBuffer`.
-  func getObjects(aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange) {
+  func getObjects(
+    aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
     let buffer = reinterpretCast(self) as Buffer
     
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim || count == 0) {
       // These objects are "returned" at +0, so treat them as values to
       // avoid retains.
-      var dst = UnsafePointer<Word>(aBuffer)
+      var dst = UnsafeMutablePointer<Word>(aBuffer)
       
       if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
         dst.initializeFrom(
-          UnsafePointer(buffer.elementStorage + range.location),
+          UnsafeMutablePointer(buffer.elementStorage + range.location),
           count: range.length)
       }
       
@@ -75,8 +77,8 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   }
 
   func countByEnumeratingWithState(
-    state: UnsafePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafePointer<AnyObject>, count bufferSize: Int
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>, count bufferSize: Int
   ) -> Int {
     let buffer = reinterpretCast(self) as Buffer
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
@@ -116,14 +118,17 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   /// Copies the objects contained in the array that fall within the
   /// specified range to `aBuffer`.
   func bridgingGetObjects(
-    aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange, _: Void = ()) {
+    aBuffer: UnsafeMutablePointer<AnyObject>,
+    range: _SwiftNSRange, _: Void = ()
+  ) {
     _fatalError(
       "Concrete subclasses must implement bridgingGetObjects")
   }
 
   func bridgingCountByEnumeratingWithState(
-    state: UnsafePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafePointer<AnyObject>, count bufferSize: Int, _: Void = ()
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>,
+    count bufferSize: Int, _: Void = ()
   ) -> Int {
     _fatalError(
       "Concrete subclasses must implement bridgingCountByEnumeratingWithState")

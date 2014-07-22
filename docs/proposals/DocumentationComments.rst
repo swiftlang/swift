@@ -255,7 +255,7 @@ through C interfaces.
 Proposed syntax::
 
   /// \param [out] extraResult Set to zero if...
-  func foo(extraResult: UnsafePointer<Int>) -> Int {
+  func foo(extraResult: UnsafeMutablePointer<Int>) -> Int {
   }
 
 [P4] documentation for parameters of closures that are function parameters

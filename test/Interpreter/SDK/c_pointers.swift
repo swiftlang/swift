@@ -99,7 +99,7 @@ class DumbString: NSString {
 
   override class func stringWithContentsOfFile(s: String,
                                   encoding: NSStringEncoding,
-                                  error: AutoreleasingUnsafePointer<NSError?>)
+                                  error: AutoreleasingUnsafeMutablePointer<NSError?>)
   -> DumbString? {
     error.memory = NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
     return nil

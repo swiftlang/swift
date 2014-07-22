@@ -9,7 +9,7 @@
 // CHECK-NEXT: %0 = call i8* @_TFSsa6C_ARGCVSs5Int32()
 // CHECK-NEXT: %1 = bitcast i8* %0 to i32*
 // CHECK-NEXT: store i32 %argc, i32* %1
-// CHECK-NEXT: %2 = call i8* @_TFSsa6C_ARGVGVSs13UnsafePointerGS_VSs4Int8__()
+// CHECK-NEXT: %2 = call i8* @_TFSsa6C_ARGVGVSs20UnsafeMutablePointerGS_VSs4Int8__()
 // CHECK-NEXT: %3 = bitcast i8* %2 to i8***
 // CHECK-NEXT: store i8** %argv, i8*** %3
 // CHECK-NEXT: call void @top_level_code()

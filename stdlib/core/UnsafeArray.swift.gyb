@@ -26,7 +26,7 @@ public struct UnsafeArrayGenerator<T>: GeneratorType, SequenceType {
     return self
   }
   
-  var position, end: UnsafePointer<T>
+  var position, end: UnsafeMutablePointer<T>
 }
 
 %for Mutable in ('Mutable', ''):
@@ -55,7 +55,7 @@ public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
 %end    
   }
   
-  public init(start: UnsafePointer<T>, length: Int) {
+  public init(start: UnsafeMutablePointer<T>, length: Int) {
     _precondition(length >= 0, "Unsafe${Mutable}Array with negative length")
     _position = start
     _end = start + length
@@ -65,7 +65,7 @@ public struct Unsafe${Mutable}Array<T> : ${Mutable}CollectionType {
     return UnsafeArrayGenerator(position: _position, end: _end)
   }
   
-  var _position, _end: UnsafePointer<T>
+  var _position, _end: UnsafeMutablePointer<T>
 }
 
 extension Unsafe${Mutable}Array : DebugPrintable {

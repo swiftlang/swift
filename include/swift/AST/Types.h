@@ -417,8 +417,8 @@ public:
   /// its list of protocols.
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
-  /// Determines the element type of a known *UnsafePointer variant, or returns
-  /// null if the type is not a pointer.
+  /// Determines the element type of a known *UnsafeMutablePointer
+  /// variant, or returns null if the type is not a pointer.
   Type getAnyPointerElementType(PointerTypeKind &PTK);
   Type getAnyPointerElementType() {
     PointerTypeKind Ignore;

@@ -24,8 +24,9 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(subRange: Range<Int>, target: UnsafePointer<Element>)
-    -> UnsafePointer<Element>
+  func _uninitializedCopy(
+    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element>
 
   /// Convert to an NSArray.
   /// Precondition: _isBridgedToObjectiveC(Element.self)
@@ -75,7 +76,9 @@ public protocol _ArrayBufferType : MutableCollectionType {
 
   /// Call body(p), where p is a pointer to the underlying contiguous storage
   /// Requires: such contiguous storage exists or the buffer is empty
-  func withUnsafePointerToElements<R>(body: (UnsafePointer<Element>)->R) -> R
+  func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<Element>)->R
+  ) -> R
   
   /// How many elements the buffer stores
   var count: Int {get set}
@@ -88,7 +91,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafePointer<Element> {get}
+  var elementStorage: UnsafeMutablePointer<Element> {get}
 
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers

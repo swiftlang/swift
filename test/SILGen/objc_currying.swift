@@ -45,22 +45,22 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:   strong_release %1
 // CHECK:   return {{%.*}} : $ImplicitlyUnwrappedOptional<String>
 
-func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafePointer<Void> {
+func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void> {
   return x.returnsInnerPointer
 }
-// CHECK-LABEL: sil @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GVSs13UnsafePointerT__ : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafePointer<()> {
-// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFS_FT_GVSs13UnsafePointerT__]]
+// CHECK-LABEL: sil @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GVSs20UnsafeMutablePointerT__ : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()> {
+// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFS_FT_GVSs20UnsafeMutablePointerT__]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
 
-// CHECK: sil shared [[THUNK_RETURNSINNERPOINTER]] : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafePointer<()>
-// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs13UnsafePointerT__]]
+// CHECK: sil shared [[THUNK_RETURNSINNERPOINTER]] : $@thin (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()>
+// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs20UnsafeMutablePointerT__]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs13UnsafePointerT__ : $@cc(method) @thin (@owned CurryTest) -> UnsafePointer<()>
+// CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs20UnsafeMutablePointerT__ : $@cc(method) @thin (@owned CurryTest) -> UnsafeMutablePointer<()>
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
-// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@cc(objc_method) @thin (CurryTest) -> @unowned_inner_pointer UnsafePointer<()>
+// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@cc(objc_method) @thin (CurryTest) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:   autorelease_value %0
 // CHECK:   return [[RES]]
 
@@ -116,12 +116,12 @@ func curry_returnsSelf_AnyObject(x: AnyObject) -> () -> AnyObject! {
   return x.returnsSelf!
 }
 
-// CHECK-LABEL: sil @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPSs9AnyObject_FT_GVSs13UnsafePointerT__
+// CHECK-LABEL: sil @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPSs9AnyObject_FT_GVSs20UnsafeMutablePointerT__
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $Builtin.UnknownObject, #CurryTest.returnsInnerPointer!1.foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (Builtin.UnknownObject) -> @unowned_inner_pointer UnsafePointer<()>):
+// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@cc(objc_method) @thin (Builtin.UnknownObject) -> @unowned_inner_pointer UnsafeMutablePointer<()>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
-// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> UnsafePointer<()>
+// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> UnsafeMutablePointer<()>
 
-func curry_returnsInnerPointer_AnyObject(x: AnyObject) -> () -> UnsafePointer<Void> {
+func curry_returnsInnerPointer_AnyObject(x: AnyObject) -> () -> UnsafeMutablePointer<Void> {
   return x.returnsInnerPointer!
 }

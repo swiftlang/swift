@@ -5357,19 +5357,20 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   // Get the original lvalue.
   LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr());
   
-  // If we're converting on the behalf of an AutoreleasingUnsafePointer, convert
-  // the lvalue to unowned(unsafe), so we can point at +0 storage.
+  // If we're converting on the behalf of an
+  // AutoreleasingUnsafeMutablePointer, convert the lvalue to
+  // unowned(unsafe), so we can point at +0 storage.
   PointerTypeKind pointerKind;
   Type elt = E->getType()->getAnyPointerElementType(pointerKind);
   assert(elt && "not a pointer");
   (void)elt;
   switch (pointerKind) {
-  case PTK_UnsafePointer:
+  case PTK_UnsafeMutablePointer:
   case PTK_ConstUnsafePointer:
     // +1 is fine.
     break;
 
-  case PTK_AutoreleasingUnsafePointer: {
+  case PTK_AutoreleasingUnsafeMutablePointer: {
     // Set up a writeback through a +0 buffer.
     LValueTypeData typeData = lv.getTypeData();
     LValueTypeData unownedTypeData(

@@ -51,8 +51,8 @@ public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
   var tmp = x
-  _memcpy(dest: UnsafePointer(result._elementStorageIfContiguous),
-          src: UnsafePointer(Builtin.addressof(&tmp)),
+  _memcpy(dest: UnsafeMutablePointer(result._elementStorageIfContiguous),
+          src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
   return result
 }
@@ -153,7 +153,9 @@ class VaListBuilder {
   }
   
   func va_list() -> CVaListPointer {
-    return CVaListPointer(fromUnsafePointer: UnsafePointer<Void>(storage._elementStorageIfContiguous))
+    return CVaListPointer(
+      fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
+        storage._elementStorageIfContiguous))
   }
 
   var storage = [Word]()
@@ -167,8 +169,8 @@ class VaListBuilder {
   struct Header {
     var gp_offset = CUnsignedInt(0)
     var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Word.self))
-    var overflow_arg_area: UnsafePointer<Word> = UnsafePointer<Word>.null()
-    var reg_save_area: UnsafePointer<Word> = UnsafePointer<Word>.null()
+    var overflow_arg_area: UnsafeMutablePointer<Word> = nil
+    var reg_save_area: UnsafeMutablePointer<Word> = nil
   }
   
   init() {
@@ -204,7 +206,7 @@ class VaListBuilder {
     header.overflow_arg_area
       = storage._elementStorageIfContiguous + _x86_64RegisterSaveWords
     return CVaListPointer(
-             fromUnsafePointer: UnsafePointer<Void>(
+             fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
                Builtin.addressof(&self.header)))
   }
 

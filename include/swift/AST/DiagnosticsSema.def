@@ -1306,7 +1306,7 @@ ERROR(optional_intrinsics_not_found,sema_tct,none,
       "Optional<T>", ())
 ERROR(pointer_argument_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on "
-      "UnsafePointer<T>", ())
+      "UnsafeMutablePointer<T>", ())
 ERROR(bool_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(unchecked_not_optional_type,sema_tct,none,

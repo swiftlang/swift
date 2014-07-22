@@ -101,9 +101,9 @@ func pointerProperties(obj: PointerWrapper) {
   // CHECK: load i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = UnsafePointer()
-  obj.intPtr = UnsafePointer()
-  obj.idPtr = AutoreleasingUnsafePointer()
+  obj.voidPtr = UnsafeMutablePointer()
+  obj.intPtr = UnsafeMutablePointer()
+  obj.idPtr = AutoreleasingUnsafeMutablePointer()
 }
 
 // CHECK: linkonce_odr hidden [[B]]* @_TTOFCSo1BcfMS_FT3intVSs5Int32_S_

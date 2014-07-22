@@ -18,7 +18,7 @@ println("\(UINT32_MAX)")
 // CHECK: the magic word is /* magic */
 let sourceFile = open(sourcePath, O_RDONLY)
 assert(sourceFile >= 0)
-var bytes = UnsafePointer<CChar>.alloc(11)
+var bytes = UnsafeMutablePointer<CChar>.alloc(11)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)

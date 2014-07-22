@@ -524,8 +524,8 @@ private:
     bool isConst;
     if (SD == ctx.getConstUnsafePointerDecl()) {
       isConst = true;
-    } else if (SD == ctx.getAutoreleasingUnsafePointerDecl() ||
-               SD == ctx.getUnsafePointerDecl()) {
+    } else if (SD == ctx.getAutoreleasingUnsafeMutablePointerDecl() ||
+               SD == ctx.getUnsafeMutablePointerDecl()) {
       isConst = false;
     } else {
       // Not a pointer.

@@ -71,7 +71,7 @@ extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
     return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeArray(
-            start: UnsafePointer<UTF8.CodeUnit>(start),
+            start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
             length: Int(byteSize)))
   }
 }
@@ -121,7 +121,7 @@ extension String : _BuiltinStringLiteralConvertible {
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
           input: UnsafeArray(
-              start: UnsafePointer<UTF8.CodeUnit>(start),
+              start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
               length: Int(byteSize)))
     }
   }
@@ -293,8 +293,8 @@ extension String {
   /// resultStorage containing the given UTF-8.
   @asmname("swift_stringFromUTF8InRawMemory")
   static func _fromUTF8InRawMemory(
-    resultStorage: UnsafePointer<String>,
-    start: UnsafePointer<UTF8.CodeUnit>, utf8Count: Int
+    resultStorage: UnsafeMutablePointer<String>,
+    start: UnsafeMutablePointer<UTF8.CodeUnit>, utf8Count: Int
   ) {
     resultStorage.initialize(
         String._fromWellFormedCodeUnitSequence(UTF8.self,

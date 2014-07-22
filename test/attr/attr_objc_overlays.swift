@@ -10,7 +10,7 @@ class Test {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   @objc func selector(sel: Selector) {} // no-warning
-  @objc func selectorRef(sel: UnsafePointer<Selector>) {} // no-warning
+  @objc func selectorRef(sel: UnsafeMutablePointer<Selector>) {} // no-warning
   @objc func boolean(b: ObjCBool) {} // no-warning
-  @objc func booleanRef(ref: UnsafePointer<ObjCBool>) {} // no-warning
+  @objc func booleanRef(ref: UnsafeMutablePointer<ObjCBool>) {} // no-warning
 }

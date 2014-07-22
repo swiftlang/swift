@@ -112,7 +112,8 @@ extension String {
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeArray(
-          start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&value)), 
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(
+            Builtin.addressof(&value)), 
           length: size))
     case .LargeRepresentation(var value):
       self = value._value

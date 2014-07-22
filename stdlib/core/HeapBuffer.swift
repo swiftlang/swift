@@ -23,7 +23,7 @@ func _swift_bufferAllocate(
   bufferType: HeapBufferStorageBase.Type, size: Int, alignMask: Int) -> AnyObject
 
 @asmname("malloc_size")
-func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
+func _malloc_size(heapMemory: UnsafeMutablePointer<Void>) -> Int
 
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
@@ -55,7 +55,7 @@ func _malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 }
 
 @asmname("_swift_isUniquelyReferenced")
-func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
+func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
 
 // Return true if x is the only (strong) reference to the given RawBuffer
 // 
@@ -105,22 +105,22 @@ public struct HeapBuffer<Value, Element> : Equatable {
             : (heapAlign < elementAlign ? elementAlign : heapAlign))
   }
 
-  var _address: UnsafePointer<Int8> {
-    return UnsafePointer(
+  var _address: UnsafeMutablePointer<Int8> {
+    return UnsafeMutablePointer(
       Builtin.bridgeToRawPointer(self._nativeObject))
   }
 
-  var _value: UnsafePointer<Value> {
-    return UnsafePointer(
+  var _value: UnsafeMutablePointer<Value> {
+    return UnsafeMutablePointer(
       HeapBuffer._valueOffset() + _address)
   }
 
-  var elementStorage: UnsafePointer<Element> {
-    return UnsafePointer(HeapBuffer._elementOffset() + _address)
+  var elementStorage: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(HeapBuffer._elementOffset() + _address)
   }
 
   func _allocatedSize() -> Int {
-    return _malloc_size(UnsafePointer(_address))
+    return _malloc_size(UnsafeMutablePointer(_address))
   }
 
   func _allocatedAlignMask() -> Int {

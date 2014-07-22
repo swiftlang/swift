@@ -30,11 +30,11 @@ import SwiftShims
 public protocol _CocoaArrayType {
   func objectAtIndex(index: Int) -> AnyObject
   
-  func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
+  func getObjects(UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
   
   func countByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects buffer: UnsafePointer<AnyObject>,
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects buffer: UnsafeMutablePointer<AnyObject>,
          count len: Int) -> Int
 
   func copyWithZone(COpaquePointer) -> _CocoaArrayType
@@ -69,7 +69,9 @@ internal struct _CocoaArrayWrapper : CollectionType {
   /// is sometimes conservative and may return nil even when
   /// contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumeratingWithState.
-  func contiguousStorage(subRange: Range<Int>) -> UnsafePointer<AnyObject>
+  func contiguousStorage(
+    subRange: Range<Int>
+  ) -> UnsafeMutablePointer<AnyObject>
   {
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
@@ -77,7 +79,7 @@ internal struct _CocoaArrayWrapper : CollectionType {
     // subRange.endIndex items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
-    let contiguousCount = withUnsafePointer(&enumerationState) {
+    let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
       self.buffer.countByEnumeratingWithState($0, objects: nil, count: 0)
     }
     

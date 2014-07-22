@@ -34,7 +34,7 @@ func foo() {
   NSArray().dictProperty.onlyOnDictionary()
 }
 
-func allocateMagic(zone: NSZone) -> UnsafePointer<Void> {
+func allocateMagic(zone: NSZone) -> UnsafeMutablePointer<Void> {
   return allocate(zone)
 }
 

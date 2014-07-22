@@ -18,7 +18,7 @@ struct _StringBufferIVars {
   }
 
   init(
-    usedEnd: UnsafePointer<RawByte>,
+    usedEnd: UnsafeMutablePointer<RawByte>,
     byteCapacity: Int,
     elementWidth: Int
   ) {
@@ -28,7 +28,7 @@ struct _StringBufferIVars {
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
 
-  var usedEnd: UnsafePointer<RawByte>
+  var usedEnd: UnsafeMutablePointer<RawByte>
   var capacityAndElementShift: Int
   var byteCapacity: Int {
     return capacityAndElementShift & ~0x1
@@ -92,7 +92,7 @@ public struct _StringBuffer {
           elementWidth: isAscii ? 1 : 2)
 
       if isAscii {
-        var p = UnsafePointer<UTF8.CodeUnit>(result.start)
+        var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
         let hadError = transcode(encoding, UTF32.self, input.generate(),
             SinkOf {
               (p++).memory = UTF8.CodeUnit($0)
@@ -116,12 +116,12 @@ public struct _StringBuffer {
   }
 
   /// a pointer to the start of this buffer's data area
-  public var start: UnsafePointer<RawByte> {
-    return UnsafePointer(_storage.elementStorage)
+  public var start: UnsafeMutablePointer<RawByte> {
+    return UnsafeMutablePointer(_storage.elementStorage)
   }
 
   /// a past-the-end pointer for this buffer's stored data
-  var usedEnd: UnsafePointer<RawByte> {
+  var usedEnd: UnsafeMutablePointer<RawByte> {
     get {
       return _storage.value.usedEnd
     }
@@ -135,7 +135,7 @@ public struct _StringBuffer {
   }
 
   /// a past-the-end pointer for this buffer's available storage
-  var capacityEnd: UnsafePointer<RawByte> {
+  var capacityEnd: UnsafeMutablePointer<RawByte> {
     return start + _storage.value.byteCapacity
   }
 
@@ -154,7 +154,7 @@ public struct _StringBuffer {
     return elementShift + 1
   }
 
-  mutating func grow(oldUsedEnd: UnsafePointer<RawByte>,
+  mutating func grow(oldUsedEnd: UnsafeMutablePointer<RawByte>,
                      newUsedCount: Int) -> Bool {
     if _slowPath(newUsedCount > capacity) {
       return false

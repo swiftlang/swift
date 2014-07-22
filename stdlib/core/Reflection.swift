@@ -182,7 +182,7 @@ public protocol MirrorType {
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
 @asmname("swift_getSummary")
-func _getSummary<T>(out: UnsafePointer<String>,
+func _getSummary<T>(out: UnsafeMutablePointer<String>,
                                                  x: T) {
   out.initialize(reflect(x).summary)
 }
@@ -198,7 +198,7 @@ func _getSummary<T>(out: UnsafePointer<String>,
 /// without unnecessary copying of the underlying value.
 @asmname("swift_unsafeReflectAny")func unsafeReflect<T>(
   owner: Builtin.NativeObject,
-  ptr: UnsafePointer<T>
+  ptr: UnsafeMutablePointer<T>
 ) -> MirrorType
 
 
@@ -310,7 +310,9 @@ internal struct _LeafMirror<T>: MirrorType {
 // -- Implementation details for the runtime's MirrorType implementation
 
 @asmname("swift_MagicMirrorData_summary")
-func _swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
+func _swift_MagicMirrorData_summaryImpl(
+  metadata: Any.Type, result: UnsafeMutablePointer<String>
+)
 
 public struct _MagicMirrorData {
   let owner: Builtin.NativeObject
@@ -332,7 +334,7 @@ public struct _MagicMirrorData {
   }
   
   var summary: String {
-    var resultPtr = UnsafePointer<String>.alloc(1)
+    var resultPtr = UnsafeMutablePointer<String>.alloc(1)
     _swift_MagicMirrorData_summaryImpl(metadata, resultPtr)
     let result = resultPtr.memory
     resultPtr.dealloc(1)

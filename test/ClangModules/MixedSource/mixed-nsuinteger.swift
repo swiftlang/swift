@@ -8,8 +8,8 @@ import user
 
 var ui: UInt = 5
 var i: Int = 56
-var p: UnsafePointer<NSFastEnumerationState> = nil
-var pp: AutoreleasingUnsafePointer<AnyObject?> = nil
+var p: UnsafeMutablePointer<NSFastEnumerationState> = nil
+var pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
 
 var userTypedObj = NSUIntTest()
 
@@ -21,7 +21,7 @@ ur = testFunction(ui)
 testFunctionInsideMacro(ui)
 
 // Test that nesting works.
-var pui: UnsafePointer<UInt>
+var pui: UnsafeMutablePointer<UInt>
 ur = testFunctionWithPointerParam(pui)
 
 // NSUIntTest is a user class that conforms to a system defined protocol.
@@ -38,8 +38,8 @@ var rr: UInt = userTypedObj.countByEnumeratingWithState(p, objects: pp, count: u
 // Check exercising protocol conformance.
 func gen<T:NSFastEnumeration>(t:T) {
   var i: Int = 56
-  var p: UnsafePointer<NSFastEnumerationState> = nil
-  var pp: AutoreleasingUnsafePointer<AnyObject?> = nil
+  var p: UnsafeMutablePointer<NSFastEnumerationState> = nil
+  var pp: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
   t.countByEnumeratingWithState(p, objects: pp, count: i)
 }
 

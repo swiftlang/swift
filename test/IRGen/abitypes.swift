@@ -278,8 +278,8 @@ class Foo {
     return g.negate(b)
   }
 
-  // x86_64-macosx: define internal i32* @_TToFC8abitypes3Foo17copyUnsafePointer{{.*}}(i8*, i8*, i32*) unnamed_addr {
-  dynamic func copyUnsafePointer(p: UnsafePointer<Int32>) -> UnsafePointer<Int32> {
+  // x86_64-macosx: define internal i32* @_TToFC8abitypes3Foo24copyUnsafeMutablePointer{{.*}}(i8*, i8*, i32*) unnamed_addr {
+  dynamic func copyUnsafeMutablePointer(p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
     return p
   }
 

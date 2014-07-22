@@ -19,11 +19,11 @@ func hangCanary(o: AnyObject) {
 // CHECK-LABEL: NSData:
 println("NSData:")
 autoreleasepool {
-  var bytes: UnsafePointer<UInt8>
+  var bytes: UnsafeMutablePointer<UInt8>
   do {
     let data = NSData(bytes: [2, 3, 5, 7] as [UInt8], length: 4)
     hangCanary(data)
-    bytes = UnsafePointer<UInt8>(data.bytes)
+    bytes = UnsafeMutablePointer<UInt8>(data.bytes)
   } while false // CHECK-NOT: died
   println(bytes[0]) // CHECK:      2
   println(bytes[1]) // CHECK-NEXT: 3
@@ -34,12 +34,12 @@ autoreleasepool {
 // CHECK-LABEL: AnyObject:
 println("AnyObject:")
 autoreleasepool {
-  var bytes: UnsafePointer<UInt8>
+  var bytes: UnsafeMutablePointer<UInt8>
   do {
     let data = NSData(bytes: [11, 13, 17, 19] as [UInt8], length: 4)
     hangCanary(data)
     let dataAsAny: AnyObject = data
-    bytes = UnsafePointer<UInt8>(dataAsAny.bytes!)
+    bytes = UnsafeMutablePointer<UInt8>(dataAsAny.bytes!)
   } while false // CHECK-NOT: died
   println(bytes[0]) // CHECK:      11
   println(bytes[1]) // CHECK-NEXT: 13

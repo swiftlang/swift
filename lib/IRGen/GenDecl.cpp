@@ -358,8 +358,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   for (auto varNames : {
     // global accessor for Swift.C_ARGC : CInt
     std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
-    // global accessor for Swift.C_ARGV : UnsafePointer<CString>
-    std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerGS_VSs4Int8__"),
+    // global accessor for Swift.C_ARGV : UnsafeMutablePointer<CString>
+    std::make_pair("argv", "_TFSsa6C_ARGVGVSs20UnsafeMutablePointerGS_VSs4Int8__"),
   }) {
     StringRef fnParameterName;
     StringRef accessorName;

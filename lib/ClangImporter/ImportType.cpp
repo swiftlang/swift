@@ -206,8 +206,9 @@ namespace {
         }
       }
       
-      // All other C pointers to concrete types map to UnsafePointer<T> or
-      // COpaquePointer (FIXME:, except in parameter position under the pre-
+      // All other C pointers to concrete types map to
+      // UnsafeMutablePointer<T> or COpaquePointer (FIXME:, except in
+      // parameter position under the pre-
       // intrinsic-pointer-conversion regime.)
 
       // With pointer conversions enabled, map to the normal pointer types
@@ -242,16 +243,17 @@ namespace {
                                                      pointeeType),
                 ImportHint::None};
       // Mutable pointers with __autoreleasing or __unsafe_unretained
-      // ownership map to AutoreleasingUnsafePointer<T>.
+      // ownership map to AutoreleasingUnsafeMutablePointer<T>.
       else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing
             || quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone)
-        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                "AutoreleasingUnsafePointer",
-                                                pointeeType),
-                ImportHint::None};
-      // All other mutable pointers map to UnsafePointer.
+        return {
+          Impl.getNamedSwiftTypeSpecialization(
+            Impl.getStdlibModule(), "AutoreleasingUnsafeMutablePointer",
+            pointeeType),
+            ImportHint::None};
+      // All other mutable pointers map to UnsafeMutablePointer.
       return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                   "UnsafePointer",
+                                                   "UnsafeMutablePointer",
                                                    pointeeType),
               ImportHint::None};
     }
@@ -691,11 +693,11 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   if (!importedType)
     return Type();
 
-  // Special case AutoreleasingUnsafePointer<NSError?> parameters.
+  // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
   PointerTypeKind PTK;
   if (importKind == ImportTypeKind::Parameter)
     if (auto elementType = importedType->getAnyPointerElementType(PTK))
-      if (PTK == PTK_AutoreleasingUnsafePointer)
+      if (PTK == PTK_AutoreleasingUnsafeMutablePointer)
         if (auto elementObj = elementType->getAnyOptionalObjectType())
           if (auto elementClass = elementObj->getClassOrBoundGenericClass())
             if (elementClass->getName() == impl.SwiftContext.getIdentifier("NSError")

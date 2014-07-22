@@ -2203,7 +2203,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   if (isUnknownObjectType(T))
     return true;
 
-  // TODO: maybe Optional<UnsafePointer<T>> should be okay?
+  // TODO: maybe Optional<UnsafeMutablePointer<T>> should be okay?
   if (wasOptional) return false;
 
   if (auto NTD = T->getAnyNominal()) {
@@ -2215,15 +2215,16 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     PointerTypeKind PTK;
     if (auto pointerElt = T->getAnyPointerElementType(PTK)) {
       switch (PTK) {
-      case PTK_UnsafePointer:
+      case PTK_UnsafeMutablePointer:
       case PTK_ConstUnsafePointer: {
-        // An UnsafePointer<T> or ConstUnsafePointer<T> is representable in
-        // Objective-C if T is a trivially representable type or Void.
+        // An UnsafeMutablePointer<T> or ConstUnsafePointer<T> is
+        // representable in Objective-C if T is a trivially
+        // representable type or Void.
         return pointerElt->isEqual(Context.TheEmptyTupleType)
           || isTriviallyRepresentableInObjC(DC, pointerElt);
       }
-      case PTK_AutoreleasingUnsafePointer: {
-        // An AutoreleasingUnsafePointer<T> is representable in ObjC if T
+      case PTK_AutoreleasingUnsafeMutablePointer: {
+        // An AutoreleasingUnsafeMutablePointer<T> is representable in ObjC if T
         // is a (potentially optional) ObjC pointer type.
         return isUnknownObjectOrOptionalType(pointerElt);
       }

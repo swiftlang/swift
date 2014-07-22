@@ -417,16 +417,16 @@ println("ObjC:")
 // CHECK-NEXT:  <NSObject: {{0x[0-9a-f]+}}>
 dump(NSObject())
 
-// CHECK-NEXT: UnsafePointer(nil)
-var nilUnsafePointerString: UnsafePointer<String> = UnsafePointer()
-println(reflect(nilUnsafePointerString).summary)
+// CHECK-NEXT: UnsafeMutablePointer(nil)
+var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
+println(reflect(nilUnsafeMutablePointerString).summary)
 
-// CHECK-NEXT: UnsafePointer(0x123456)
-var randomUnsafePointerString: UnsafePointer<String> = UnsafePointer(0x123456)
-println(reflect(randomUnsafePointerString).summary)
+// CHECK-NEXT: UnsafeMutablePointer(0x123456)
+var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(0x123456)
+println(reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
-var sanePointerString: UnsafePointer<String> = UnsafePointer.alloc(1)
+var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
 sanePointerString.initialize("Hello panda")
 println(reflect(sanePointerString.memory).summary)
 sanePointerString.dealloc(1)

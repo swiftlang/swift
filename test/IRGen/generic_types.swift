@@ -2,7 +2,7 @@
 
 // CHECK: [[A:%C13generic_types1A]] = type <{ [[REF:%swift.refcounted]], [[INT:%Si]] }>
 // CHECK: [[INT]] = type <{ i64 }>
-// CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%VSs13UnsafePointer]] }>
+// CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%VSs20UnsafeMutablePointer]] }>
 // CHECK: [[C:%C13generic_types1C]] = type
 // CHECK: [[D:%C13generic_types1D]] = type
 
@@ -103,7 +103,7 @@ class A<T> {
 }
 
 class B<T> {
-  var ptr : UnsafePointer<T> = nil
+  var ptr : UnsafeMutablePointer<T> = nil
   deinit {
     ptr.destroy()
   }

@@ -259,9 +259,9 @@ func additionalUtf16Tests() {
   var u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
   var u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
 
-  u16.withUnsafePointerToElements {
+  u16.withUnsafeMutablePointerToElements {
     (p16)->() in
-    u8.withUnsafePointerToElements {
+    u8.withUnsafeMutablePointerToElements {
       (p8)->() in
       // CHECK-NEXT: [ 0, 1, 2, 9, 10, 11 ]
       UTF16.copy(p8, destination: p16, count: 3)
@@ -2341,7 +2341,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
         },
         stopOnError: false)
 
-    backingStorage.withUnsafePointerToElements {
+    backingStorage.withUnsafeMutablePointerToElements {
       (ptr) -> () in
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
           ptr, backingStorage.count, kCFAllocatorNull)

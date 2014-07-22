@@ -103,7 +103,7 @@ extension NSString : StringLiteralConvertible {
   public class func convertFromStringLiteral(value: StaticString) -> Self {
     
     let immutableResult = NSString(
-      bytesNoCopy: UnsafePointer<Void>(value.start),
+      bytesNoCopy: UnsafeMutablePointer<Void>(value.start),
       length: Int(value.byteSize),
       encoding:
         Bool(value.isASCII) ? NSASCIIStringEncoding : NSUTF8StringEncoding,
@@ -145,7 +145,7 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
 // buffer copying.
 //
 func _cocoaStringReadAllImpl(
-  source: _CocoaStringType, destination: UnsafePointer<UTF16.CodeUnit>) {
+  source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>) {
   let cfSelf: CFString = reinterpretCast(source)
   CFStringGetCharacters(
   cfSelf, CFRange(location: 0, length: CFStringGetLength(cfSelf)), destination)
@@ -166,7 +166,7 @@ func _cocoaStringToContiguousImpl(
 
   CFStringGetCharacters(
     cfSelf, CFRange(location: startIndex, length: count), 
-    UnsafePointer<UniChar>(buffer.start))
+    UnsafeMutablePointer<UniChar>(buffer.start))
   
   return buffer
 }
@@ -226,25 +226,28 @@ final class _NSContiguousString : NSString {
     return value[index]
   }
 
-  override func getCharacters(buffer: UnsafePointer<unichar>,
+  override func getCharacters(buffer: UnsafeMutablePointer<unichar>,
                               range aRange: NSRange) {
     _precondition(aRange.location + aRange.length <= Int(value.count))
 
     if value.elementWidth == 2 {
       UTF16.copy(
-        value.startUTF16 + aRange.location, destination: UnsafePointer<unichar>(buffer),
+        value.startUTF16 + aRange.location,
+        destination: UnsafeMutablePointer<unichar>(buffer),
         count: aRange.length)
     }
     else {
       UTF16.copy(
-        value.startASCII + aRange.location, destination: UnsafePointer<unichar>(buffer),
+        value.startASCII + aRange.location,
+        destination: UnsafeMutablePointer<unichar>(buffer),
         count: aRange.length)
     }
   }
 
   @objc
-  func _fastCharacterContents() -> UnsafePointer<unichar> {
-    return value.elementWidth == 2 ? UnsafePointer(value.startUTF16) : nil
+  func _fastCharacterContents() -> UnsafeMutablePointer<unichar> {
+    return value.elementWidth == 2
+      ? UnsafeMutablePointer(value.startUTF16) : nil
   }
 
   //
@@ -283,7 +286,7 @@ final class _NSOpaqueString : NSString {
     return owner.characterAtIndex(index + subRange.location)
   }
 
-  override func getCharacters(buffer: UnsafePointer<unichar>,
+  override func getCharacters(buffer: UnsafeMutablePointer<unichar>,
                               range aRange: NSRange) {
 
     owner.getCharacters(
@@ -362,10 +365,10 @@ extension String {
 
     // start will hold the base pointer of contiguous storage, if it
     // is found.
-    var start = UnsafePointer<RawByte>(nulTerminatedASCII)
+    var start = UnsafeMutablePointer<RawByte>(nulTerminatedASCII)
     let isUTF16 = nulTerminatedASCII._isNull
     if (isUTF16) {
-      start = UnsafePointer(CFStringGetCharactersPtr(cfImmutableValue))
+      start = UnsafeMutablePointer(CFStringGetCharactersPtr(cfImmutableValue))
     }
 
     self.core = _StringCore(
@@ -543,7 +546,8 @@ extension NSArray : ArrayLiteralConvertible {
   public class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    let result = self(objects: UnsafePointer(x.elementStorage), count: x.count)
+    let result = self(
+      objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
     return result
   }
@@ -709,7 +713,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
       (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
-       stop: UnsafePointer<ObjCBool>) in
+       stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
           key: Swift._bridgeFromObjectiveC(anyObjectKey, Key.self),
           value: Swift._bridgeFromObjectiveC(anyObjectValue, Value.self))
@@ -797,7 +801,7 @@ final public class NSFastGenerator : GeneratorType {
     n = 0
     count = enumerable.countByEnumeratingWithState(
       state._elementStorageIfContiguous,
-      objects: AutoreleasingUnsafePointer(
+      objects: AutoreleasingUnsafeMutablePointer(
         objects._elementStorageIfContiguous),
       count: STACK_BUF_SIZE)
   }
@@ -1008,7 +1012,7 @@ public func NSLog(format: String, args: CVarArgType...) {
 // NSError (as an out parameter).
 //===----------------------------------------------------------------------===//
 
-public typealias NSErrorPointer = AutoreleasingUnsafePointer<NSError?>
+public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
@@ -1088,7 +1092,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1119,7 +1123,7 @@ extension NSOrderedSet {
     // @objc(initWithObjects:count:)
     // init(withObjects objects: ConstUnsafePointer<AnyObject?>,
     //      count cnt: Int)
-    self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1133,7 +1137,7 @@ extension NSSet {
     // Imported as:
     // @objc(initWithObjects:count:)
     // init(withObjects objects: ConstUnsafePointer<AnyObject?>, count cnt: Int)
-    self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }
 }

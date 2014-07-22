@@ -289,7 +289,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   @transparent
-  var elements: UnsafePointer<Element?> {
+  var elements: UnsafeMutablePointer<Element?> {
     return buffer.elementStorage
   }
 
@@ -614,8 +614,8 @@ class _NativeDictionaryStorageOwnerBase
   }
 
   func bridgingCountByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
     _fatalError("'countByEnumeratingWithState' should be overridden")
   }
@@ -663,8 +663,8 @@ class _NativeDictionaryStorageOwnerBase
 
   @objc
   func countByEnumeratingWithState(
-      state: UnsafePointer<_SwiftNSFastEnumerationState>,
-      objects: UnsafePointer<AnyObject>, count: Int
+      state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+      objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
         state, objects: objects, count: count, dummy: ())
@@ -727,13 +727,13 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
   }
 
   override func bridgingCountByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
     var theState = state.memory
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafePointer(objects)
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       theState.extra.0 = CUnsignedLong(nativeStorage.startIndex.offset)
     }
@@ -1546,7 +1546,7 @@ struct _CocoaFastEnumerationStackBuf {
   }
 
   init() {
-    item0 = UnsafePointer<RawByte>.null().value
+    item0 = UnsafeMutablePointer<RawByte>.null().value
     item1 = item0
     item2 = item0
     item3 = item0
@@ -1595,7 +1595,7 @@ class _CocoaDictionaryGenerator : GeneratorType {
     let cocoaDictionary = self.cocoaDictionary
     if itemIndex == itemCount {
       let stackBufLength = fastEnumerationStackBuf.length
-      itemCount = withUnsafePointers(
+      itemCount = withUnsafeMutablePointers(
           &fastEnumerationState, &fastEnumerationStackBuf) {
         (statePtr, bufPtr) -> Int in
         cocoaDictionary.countByEnumeratingWithState(
@@ -1608,8 +1608,8 @@ class _CocoaDictionaryGenerator : GeneratorType {
       }
       itemIndex = 0
     }
-    let itemsPtrUP: UnsafePointer<AnyObject> =
-        UnsafePointer(fastEnumerationState.itemsPtr)
+    let itemsPtrUP: UnsafeMutablePointer<AnyObject> =
+        UnsafeMutablePointer(fastEnumerationState.itemsPtr)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     ++itemIndex
@@ -2119,8 +2119,8 @@ import SwiftShims
 @objc
 public protocol _SwiftNSFastEnumerationType {
   func countByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
 
@@ -2143,11 +2143,11 @@ public protocol _SwiftNSArrayRequiredOverridesType :
 
   func objectAtIndex(index: Int) -> AnyObject
 
-  func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
+  func getObjects(UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   func countByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
@@ -2182,16 +2182,16 @@ public protocol _SwiftNSDictionaryRequiredOverridesType :
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 
   func countByEnumeratingWithState(
-         state: UnsafePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafePointer<AnyObject>, count: Int
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
 
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _SwiftNSDictionaryType :
     _SwiftNSDictionaryRequiredOverridesType {
-  func getObjects(objects: UnsafePointer<AnyObject>,
-      andKeys keys: UnsafePointer<AnyObject>)
+  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
+      andKeys keys: UnsafeMutablePointer<AnyObject>)
 }
 
 /// Call `[lhs isEqual: rhs]`.
@@ -2497,18 +2497,18 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 
 //===--- Hacks and workarounds --------------------------------------------===//
 
-/// Like `UnsafePointer<Unmanaged<AnyObject>>`, or `id __unsafe_unretained *` in
-/// Objective-C ARC.
+/// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
+/// __unsafe_unretained *` in Objective-C ARC.
 struct _UnmanagedAnyObjectArray {
-  // `UnsafePointer<Unmanaged<AnyObject>>` fails because of:
+  // `UnsafeMutablePointer<Unmanaged<AnyObject>>` fails because of:
   // <rdar://problem/16836348> IRGen: Couldn't find conformance
 
   /// Underlying pointer, typed as an integer to escape from reference
   /// counting.
-  var value: UnsafePointer<Word>
+  var value: UnsafeMutablePointer<Word>
 
-  init(_ up: UnsafePointer<AnyObject>) {
-    self.value = UnsafePointer(up)
+  init(_ up: UnsafeMutablePointer<AnyObject>) {
+    self.value = UnsafeMutablePointer(up)
   }
 
   subscript(i: Int) -> AnyObject {

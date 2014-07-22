@@ -15,7 +15,7 @@
 // building library abstractions without fear of infinite recursion.
 //
 // FIXME: We could go farther with this simplification, e.g. avoiding
-// UnsafePointer
+// UnsafeMutablePointer
 
 @transparent internal
 func _isDebugAssertConfiguration() -> Bool {

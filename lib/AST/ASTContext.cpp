@@ -83,14 +83,14 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
   
-  /// The declaration of Swift.UnsafePointer<T>.
-  NominalTypeDecl *UnsafePointerDecl = nullptr;
+  /// The declaration of Swift.UnsafeMutablePointer<T>.
+  NominalTypeDecl *UnsafeMutablePointerDecl = nullptr;
   
   /// The declaration of Swift.ConstUnsafePointer<T>.
   NominalTypeDecl *ConstUnsafePointerDecl = nullptr;
   
-  /// The declaration of Swift.AutoreleasingUnsafePointer<T>.
-  NominalTypeDecl *AutoreleasingUnsafePointerDecl = nullptr;
+  /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
+  NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
 
   /// The declaration of Swift.CFunctionPointer<T -> U>.
   NominalTypeDecl *CFunctionPointerDecl = nullptr;
@@ -533,11 +533,12 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
-NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
-  if (!Impl.UnsafePointerDecl)
-    Impl.UnsafePointerDecl = findSyntaxSugarImpl(*this, "UnsafePointer");
+NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
+  if (!Impl.UnsafeMutablePointerDecl)
+    Impl.UnsafeMutablePointerDecl = findSyntaxSugarImpl(
+      *this, "UnsafeMutablePointer");
   
-  return Impl.UnsafePointerDecl;
+  return Impl.UnsafeMutablePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getConstUnsafePointerDecl() const {
@@ -548,12 +549,12 @@ NominalTypeDecl *ASTContext::getConstUnsafePointerDecl() const {
   return Impl.ConstUnsafePointerDecl;
 }
 
-NominalTypeDecl *ASTContext::getAutoreleasingUnsafePointerDecl() const {
-  if (!Impl.AutoreleasingUnsafePointerDecl)
-    Impl.AutoreleasingUnsafePointerDecl
-      = findSyntaxSugarImpl(*this, "AutoreleasingUnsafePointer");
+NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
+  if (!Impl.AutoreleasingUnsafeMutablePointerDecl)
+    Impl.AutoreleasingUnsafeMutablePointerDecl
+      = findSyntaxSugarImpl(*this, "AutoreleasingUnsafeMutablePointer");
   
-  return Impl.AutoreleasingUnsafePointerDecl;
+  return Impl.AutoreleasingUnsafeMutablePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
@@ -884,9 +885,9 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
 }
 
 bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
-  return getUnsafePointerDecl()
+  return getUnsafeMutablePointerDecl()
     && getConstUnsafePointerDecl()
-    && getAutoreleasingUnsafePointerDecl()
+    && getAutoreleasingUnsafeMutablePointerDecl()
     && getConvertPointerToPointerArgument(resolver)
     && getConvertMutableArrayToPointerArgument(resolver)
     && getConvertConstArrayToPointerArgument(resolver)

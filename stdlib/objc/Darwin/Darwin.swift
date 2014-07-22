@@ -36,7 +36,7 @@ public var errno : Int32 {
 // stdio.h
 //===----------------------------------------------------------------------===//
 
-public var stdin : UnsafePointer<FILE> {
+public var stdin : UnsafeMutablePointer<FILE> {
   get {
     return __stdinp
   }
@@ -45,7 +45,7 @@ public var stdin : UnsafePointer<FILE> {
   }   
 }
 
-public var stdout : UnsafePointer<FILE> {
+public var stdout : UnsafeMutablePointer<FILE> {
   get {
     return __stdoutp
   }
@@ -54,7 +54,7 @@ public var stdout : UnsafePointer<FILE> {
   }   
 }
 
-public var stderr : UnsafePointer<FILE> {
+public var stderr : UnsafeMutablePointer<FILE> {
   get {
     return __stderrp
   }

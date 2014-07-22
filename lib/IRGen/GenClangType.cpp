@@ -236,17 +236,19 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   
   enum class StructKind {
     Invalid,
-    UnsafePointer,
+    UnsafeMutablePointer,
     ConstUnsafePointer,
-    AutoreleasingUnsafePointer,
+    AutoreleasingUnsafeMutablePointer,
     Array,
     Dictionary,
     Unmanaged,
     CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
-    .Case("UnsafePointer", StructKind::UnsafePointer)
+    .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
     .Case("ConstUnsafePointer", StructKind::ConstUnsafePointer)
-    .Case("AutoreleasingUnsafePointer", StructKind::AutoreleasingUnsafePointer)
+    .Case(
+      "AutoreleasingUnsafeMutablePointer",
+        StructKind::AutoreleasingUnsafeMutablePointer)
     .Case("Array", StructKind::Array)
     .Case("Dictionary", StructKind::Dictionary)
     .Case("Unmanaged", StructKind::Unmanaged)
@@ -260,9 +262,9 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
                      " Clang module!");
       
-  case StructKind::UnsafePointer: // Assume UnsafePointer is mutable
+  case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
-  case StructKind::AutoreleasingUnsafePointer: {
+  case StructKind::AutoreleasingUnsafeMutablePointer: {
     assert(args.size() == 1 &&
            "*Pointer<T> should have a single generic argument!");
     auto clangCanTy = Converter.convert(IGM, args.front());

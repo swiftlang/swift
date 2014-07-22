@@ -53,7 +53,7 @@ func testBitfieldMembers() {
 func testArrays() {
   var fes: NSFastEnumerationState
   var ulong: CUnsignedLong
-  var pulong: UnsafePointer<CUnsignedLong>
+  var pulong: UnsafeMutablePointer<CUnsignedLong>
 
   ulong = fes.state
   pulong = fes.mutationsPtr
@@ -238,7 +238,10 @@ func testFunctionPointersAsOpaquePointers() {
   useFunctionPointer(wrapper.a)
   let _: CFunctionPointer<(CInt) -> CInt> = wrapper.b
 
-  var anotherFP: CFunctionPointer<(CInt, CLong, UnsafePointer<Void>) -> Void> = getFunctionPointer2()
+  var anotherFP: CFunctionPointer<
+    (CInt, CLong, UnsafeMutablePointer<Void>) -> Void
+  > = getFunctionPointer2()
+
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{'(CInt, CLong, UnsafePointer<Void>)' is not identical to 'Int32'}}
+  anotherFP = fp // expected-error {{'(CInt, CLong, UnsafeMutablePointer<Void>)' is not identical to 'Int32'}}
 }

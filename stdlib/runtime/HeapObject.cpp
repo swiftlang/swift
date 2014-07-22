@@ -532,7 +532,7 @@ extern "C" bool _swift_isUniquelyReferenced(std::uintptr_t bits) {
     bits & ~heap_object_abi::SwiftSpareBitsMask);
 
   // Sometimes we have a NULL "owner" object, e.g. because the data
-  // being referenced (usually via UnsafePointer<T>) has infinite
+  // being referenced (usually via UnsafeMutablePointer<T>) has infinite
   // lifetime, or lifetime managed outside the Swift object system.
   // In these cases we have to assume the data is shared among
   // multiple references, and needs to be copied before modification.
