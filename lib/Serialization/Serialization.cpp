@@ -25,7 +25,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCRecordLayout.h"
+
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -400,8 +403,23 @@ removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
 using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const Module::ImportedModule &import,
                               ImportPathBlob &out) {
-  // FIXME: Submodules?
-  out.append(import.second->Name.str());
+  ArrayRef<FileUnit *> files = import.second->getFiles();
+  if (auto clangModule = dyn_cast<ClangModuleUnit>(files.front())) {
+    // FIXME: This is an awful hack to handle Clang submodules.
+    // Once Swift has a native notion of submodules, this can go away.
+    const clang::Module *submodule = clangModule->getClangModule();
+    SmallVector<StringRef, 4> submoduleNames;
+    do {
+      submoduleNames.push_back(submodule->Name);
+      submodule = submodule->Parent;
+    } while (submodule);
+    std::reverse(submoduleNames.begin(), submoduleNames.end());
+    interleave(submoduleNames,
+               [&out](StringRef next) { out.append(next); },
+               [&out] { out.push_back('\0'); });
+  } else {
+    out.append(import.second->Name.str());
+  }
 
   if (import.first.empty())
     return;
@@ -474,7 +492,7 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
     ImportPathBlob importPath;
     flattenImportPath(import, importPath);
     ImportedModule.emit(ScratchRecord, publicImportSet.count(import),
-                        importPath);
+                        !import.first.empty(), importPath);
   }
 
   if (!moduleLinkName.empty()) {

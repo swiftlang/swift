@@ -81,16 +81,18 @@ public:
   private:
     const unsigned IsExported : 1;
     const unsigned IsHeader : 1;
+    const unsigned IsScoped : 1;
 
-    Dependency(StringRef path, bool exported, bool isHeader)
-      : RawPath(path), IsExported(exported), IsHeader(isHeader){}
+    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
+      : RawPath(path), IsExported(exported), IsHeader(isHeader),
+        IsScoped(isScoped) {}
 
   public:
-    Dependency(StringRef path, bool exported)
-      : Dependency(path, exported, false) {}
+    Dependency(StringRef path, bool exported, bool isScoped)
+      : Dependency(path, false, exported, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(headerPath, exported, true);
+      return Dependency(headerPath, true, exported, false);
     }
 
     bool isLoaded() const {
@@ -99,6 +101,9 @@ public:
 
     bool isExported() const { return IsExported; }
     bool isHeader() const { return IsHeader; }
+    bool isScoped() const { return IsScoped; }
+
+    std::string getPrettyPrintedPath() const;
   };
 
 private:
@@ -505,7 +510,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  Module *getModule(Identifier name);
+  Module *getModule(ArrayRef<Identifier> name);
 
   /// Reads a substitution record from \c DeclTypeCursor.
   ///

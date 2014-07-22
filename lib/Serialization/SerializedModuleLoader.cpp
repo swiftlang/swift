@@ -243,13 +243,13 @@ FileUnit *SerializedModuleLoader::loadAST(
   assert(!missing.empty() && "unknown missing dependency?");
   if (missing.size() == 1) {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_single_dependency,
-                       missing.begin()->RawPath);
+                       missing.front().getPrettyPrintedPath());
   } else {
     llvm::SmallString<64> missingNames;
     missingNames += '\'';
     interleave(missing,
                [&](const ModuleFile::Dependency &next) {
-                 missingNames += next.RawPath;
+                 missingNames += next.getPrettyPrintedPath();
                },
                [&] { missingNames += "', '"; });
     missingNames += '\'';

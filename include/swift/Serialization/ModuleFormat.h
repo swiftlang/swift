@@ -355,7 +355,10 @@ namespace input_block {
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
     BCFixed<1>, // exported?
-    BCBlob // module name, optionally followed by a null and then an import path
+    BCFixed<1>, // scoped?
+    BCBlob // module name, with submodule path pieces separated by \0s.
+           // If the 'scoped' flag is set, the final path piece is an access
+           // path within the module.
   >;
 
   using LinkLibraryLayout = BCRecordLayout<

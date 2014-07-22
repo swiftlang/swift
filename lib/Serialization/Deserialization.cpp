@@ -1347,25 +1347,27 @@ Module *ModuleFile::getModule(ModuleID MID) {
   return getModule(getIdentifier(MID));
 }
 
-Module *ModuleFile::getModule(Identifier name) {
-  if (name.empty())
+Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
+  if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from NameBinder::getModule
-  // FIXME: provide a real source location.
-  if (name == FileContext->getParentModule()->Name) {
+  if (name.size() == 1 &&
+      name.front() == FileContext->getParentModule()->Name) {
     if (!ShadowedModule) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
-                                            std::make_pair(name, SourceLoc()));
+                                            { { name.front(), SourceLoc() } });
     }
 
     return ShadowedModule;
   }
 
-  // FIXME: provide a real source location.
-  return getContext().getModule(std::make_pair(name, SourceLoc()));
+  SmallVector<ImportDecl::AccessPathElement, 4> importPath;
+  for (auto pathElem : name)
+    importPath.push_back({ pathElem, SourceLoc() });
+  return getContext().getModule(importPath);
 }
 
 

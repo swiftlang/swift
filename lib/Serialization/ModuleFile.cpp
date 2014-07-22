@@ -181,6 +181,12 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
   return result;
 }
 
+std::string ModuleFile::Dependency::getPrettyPrintedPath() const {
+  std::string output = RawPath.str();
+  std::replace(output.begin(), output.end(), '\0', '.');
+  return output;
+}
+
 namespace {
   class PrettyModuleFileDeserialization : public llvm::PrettyStackTraceEntry {
     const ModuleFile &File;
@@ -579,9 +585,10 @@ ModuleFile::ModuleFile(
           SourcePaths.push_back(blobData);
           break;
         case input_block::IMPORTED_MODULE: {
-          bool exported;
-          input_block::ImportedModuleLayout::readRecord(scratch, exported);
-          Dependencies.push_back({blobData, exported});
+          bool exported, scoped;
+          input_block::ImportedModuleLayout::readRecord(scratch,
+                                                        exported, scoped);
+          Dependencies.push_back({blobData, exported, scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -803,16 +810,28 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
       continue;
     }
 
-    StringRef modulePath, scopePath;
-    std::tie(modulePath, scopePath) = dependency.RawPath.split('\0');
+    StringRef modulePathStr = dependency.RawPath;
+    StringRef scopePath;
+    if (dependency.isScoped()) {
+      auto splitPoint = modulePathStr.find_last_of('\0');
+      assert(splitPoint != StringRef::npos);
+      scopePath = modulePathStr.substr(splitPoint+1);
+      modulePathStr = modulePathStr.slice(0, splitPoint);
+    }
 
-    auto moduleID = ctx.getIdentifier(modulePath);
-    assert(!moduleID.empty() &&
-           "invalid module name (submodules not yet supported)");
-    auto module = getModule(moduleID);
+    SmallVector<Identifier, 4> modulePath;
+    while (!modulePathStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, modulePathStr) = modulePathStr.split('\0');
+      modulePath.push_back(ctx.getIdentifier(nextComponent));
+      assert(!modulePath.back().empty() &&
+             "invalid module name (submodules not yet supported)");
+    }
+    auto module = getModule(modulePath);
     if (!module) {
       // If we're missing the module we're shadowing, treat that specially.
-      if (moduleID == file->getParentModule()->Name) {
+      if (modulePath.size() == 1 &&
+          modulePath.front() == file->getParentModule()->Name) {
         error(ModuleStatus::MissingShadowedModule);
         return false;
       }
