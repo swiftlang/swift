@@ -487,8 +487,11 @@ func testIsEmptyFirstLast${A}() {
   println(${A}<Int>().isEmpty)          // CHECK-NEXT: true
   println(${A}(42...42).isEmpty)   // CHECK-NEXT: false
 
-  println("<\(${A}(3...42).first())>")  // CHECK-NEXT: <3>
-  println("<\(${A}(3...42).last())>")   // CHECK-NEXT: <42>
+  println("<\(${A}(3...42).first!)>")  // CHECK-NEXT: <3>
+  println("<\(${A}(3...42).last!)>")   // CHECK-NEXT: <42>
+
+  println("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
+  println("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
   
   var a = ${A}(X(0)..<10)
   println(a.removeLast().value)     // CHECK-NEXT: 9

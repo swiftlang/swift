@@ -43,16 +43,14 @@ struct ${Self}<S: CollectionType ${whereClause}> : CollectionType {
     return startIndex == endIndex
   }
 
-  /// Returns the first element.  Requires: `!isEmpty`
-  public
-  func first() -> S.Generator.Element {
+  /// The first element, or `nil` if `self` is empty
+  public var first: S.Generator.Element? {
     return Swift.first(self)
   }
 
 %  if traversal != 'Forward':
-  /// Returns the last element.  Requires: `!isEmpty`
-  public
-  func last() -> S.Generator.Element {
+  /// The last element, or `nil` if `self` is empty
+  public var last: S.Generator.Element? {
     return Swift.last(self)
   }
 %  end

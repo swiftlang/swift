@@ -72,18 +72,16 @@ public func isEmpty<C: CollectionType>(x: C) -> Bool {
   return x.startIndex == x.endIndex
 }
 
-/// Returns the first element of `x`.  Requires: `!isEmpty(x)`
-public func first<C: CollectionType>(x: C) -> C.Generator.Element {
-  _precondition(!isEmpty(x), "Can't access first element of empty CollectionType")
-  return x[x.startIndex]
+/// Returns the first element of `x`, or `nil` if `x` is empty.
+public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
+  return isEmpty(x) ? nil : x[x.startIndex]
 }
 
-/// Returns the last element of `x`.  Requires: `!isEmpty(x)`
+/// Returns the last element of `x`, or `nil` if `x` is empty.
 public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   x: C
-) -> C.Generator.Element {
-  _precondition(!isEmpty(x), "Can't access last element of empty CollectionType")
-  return x[x.endIndex.predecessor()]
+) -> C.Generator.Element? {
+  return isEmpty(x) ? nil : x[x.endIndex.predecessor()]
 }
 
 public protocol MutableCollectionType : CollectionType {

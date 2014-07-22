@@ -187,13 +187,13 @@ extension ${Self} : ArrayType {
     return count == 0
   }
   
-  /// Returns the first element.  Requires: `!isEmpty`
-  public func first() -> Element {
+  /// The first element, or `nil` if the array is empty
+  public var first: Element? {
     return Swift.first(self)
   }
   
-  /// Returns the last element.  Requires: `!isEmpty`
-  public func last() -> Element {
+  /// The last element, or `nil` if the array is empty
+  public var last: Element? {
     return Swift.last(self)
   }
   

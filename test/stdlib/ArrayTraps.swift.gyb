@@ -67,18 +67,6 @@ ${test('PopFromEmpty')} {
   a.removeLast()
 }
 
-${test('FirstOfEmpty')} {
-  var a: ${Array}<Int> = []
-  println("OK")
-  a.first()
-}
-
-${test('LastOfEmpty')} {
-  var a: ${Array}<Int> = []
-  println("OK")
-  a.last()
-}
-
 ${test('SliceBounds0')} {
   var a = ${Array}<Int>()
   ${boundsTrap('-1..<1','Slice()')}

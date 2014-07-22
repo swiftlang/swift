@@ -20,8 +20,10 @@ LazyTestCase.test("isEmpty") {
 }
 
 LazyTestCase.test("firstLast") {
-  expectEqual(7, lazy(7..<42).first())
-  expectEqual(41, lazy(7..<42).last())
+  expectEqual(7, lazy(7..<42).first!)
+  expectEqual(41, lazy(7..<42).last!)
+  expectEqual("empty", lazy(7..<7).first ? "nonEmpty" : "empty")
+  expectEqual("empty", lazy(7..<7).last ? "nonEmpty" : "empty")
 }
 
 LazyTestCase.run()
