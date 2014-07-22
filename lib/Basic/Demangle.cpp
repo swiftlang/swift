@@ -18,11 +18,10 @@
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
-#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 #include <functional>
-#include <tuple>
+#include <ostream>
+#include <sstream>
 #include <vector>
 #include <cstdlib>
 
@@ -33,6 +32,44 @@ using namespace Demangle;
 static void unreachable(const char *Message) {
   fprintf(stderr, "fatal error: %s\n", Message);
   std::abort();
+}
+
+namespace {
+struct QuotedString {
+  std::string Value;
+
+  QuotedString(std::string Value) : Value(Value) {}
+};
+} // end unnamed namespace
+
+std::ostream &operator<<(std::ostream &OS, const QuotedString &QS) {
+  OS << '"';
+  for (auto C : QS.Value) {
+    switch (C) {
+    case '\\': OS << "\\\\"; break;
+    case '\t': OS << "\\t"; break;
+    case '\n': OS << "\\n"; break;
+    case '\r': OS << "\\r"; break;
+    case '"': OS << "\\\""; break;
+    case '\'': OS << '\''; break; // no need to escape these
+    case '\0': OS << "\\0"; break;
+    default:
+      auto c = static_cast<unsigned char>(C);
+      // Other ASCII control characters should get escaped.
+      if (c < 0x20 || c == 0x7F) {
+        static const char Hexdigit[] = {
+          '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+          'A', 'B', 'C', 'D', 'E', 'F'
+        };
+        OS << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
+      } else {
+        OS << c;
+      }
+      break;
+    }
+  }
+  OS << '"';
+  return OS;
 }
 
 namespace swift {
@@ -80,11 +117,15 @@ namespace {
 /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
-  DemanglerPrinter() : Stream(Buffer) {}
+  DemanglerPrinter() {}
 
-  template <class T>
-  DemanglerPrinter &operator<<(T &&value) {
-    Stream << std::forward<T>(value);
+  template <class T> DemanglerPrinter &operator<<(T &&Value) {
+    Stream << std::forward<T>(Value);
+    return *this;
+  }
+
+  DemanglerPrinter &operator<<(StringRef Value) {
+    Stream.write(Value.data(), Value.size());
     return *this;
   }
 
@@ -92,8 +133,7 @@ public:
   std::string str() { return std::move(Stream.str()); }
 
 private:
-  std::string Buffer;
-  llvm::raw_string_ostream Stream;
+  std::stringstream Stream;
 };
 } // end anonymous namespace
 
@@ -1160,15 +1200,11 @@ private:
         return nullptr;
     }
     
-    std::string name = "T_";
-    {
-      llvm::raw_string_ostream os(name);
-      os << depth << '_' << index;
-      os.flush();
-    }
-    
+    DemanglerPrinter Name;
+    Name << "T_" << depth << '_' << index;
+
     auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
-                                       std::move(name));
+                                       std::move(Name.str()));
     return paramTy;
   }
   
