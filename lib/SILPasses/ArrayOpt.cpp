@@ -328,7 +328,7 @@ bool SILArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
       // no uses of the Array value, or projections of it can lead to mutation
       // (they are only for retains/releases).
       bool FoundRelease = false;
-      for (SILBasicBlock::iterator II = UseInst,
+      for (auto II = std::next(SILBasicBlock::iterator(UseInst)),
              IE = UseInst->getParent()->end(); II != IE; ++II) {
         if (isRelease(II, ArrayVal)) {
           FoundRelease = true;
