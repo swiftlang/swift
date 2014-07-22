@@ -34,7 +34,7 @@ struct DemangleOptions {
 class Node;
 typedef std::shared_ptr<Node> NodePointer;
 
-class Node {
+class Node : public std::enable_shared_from_this<Node> {
 public:
   enum class Kind : uint16_t {
 #define NODE(ID) ID,
