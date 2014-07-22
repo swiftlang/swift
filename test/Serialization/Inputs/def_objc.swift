@@ -3,20 +3,20 @@
 }
 
 @objc public class ObjCClass {
-  public class func classMethod() {}
-  public func implicitlyObjC() {}
+  public dynamic class func classMethod() {}
+  public dynamic func implicitlyObjC() {}
 
   @IBOutlet public var outlet : ObjCClass! = ObjCClass()
   @IBAction public func performAction(_: AnyObject?) {}
 }
 
 public class NonObjCClass : ObjCProto {
-  public func doSomething() {}
+  public dynamic func doSomething() {}
 
-  @objc public func objcMethod() {}
-  @objc public var objcProp : ObjCClass = ObjCClass()
+  dynamic public func objcMethod() {}
+  dynamic public var objcProp : ObjCClass = ObjCClass()
 
-  @objc public subscript (i : Int) -> Int {
+  dynamic public subscript (i : Int) -> Int {
     return 5
   }
 

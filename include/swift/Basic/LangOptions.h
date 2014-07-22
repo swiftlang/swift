@@ -79,7 +79,7 @@ namespace swift {
     
     /// Enables use of the 'dynamic' attribute to control ObjC method dispatch
     /// codegen.
-    bool EnableDynamic = false;
+    bool EnableDynamic = true;
     
     /// Enables lvalue propagation through optional operations.
     bool EnableOptionalLValues = true;

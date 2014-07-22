@@ -10,7 +10,7 @@ import Foundation
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3foo{{.*}} : $@cc(method) @thin (@owned @callee_owned (Int) -> Int, Int, @owned Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], %1, %2)
-  @objc func foo(f: Int -> Int, x: Int) -> Int {
+  dynamic func foo(f: Int -> Int, x: Int) -> Int {
     return f(x)
   }
 
@@ -20,7 +20,7 @@ import Foundation
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bar{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned String) -> @owned String, @owned String, @owned Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
-  @objc func bar(f: String -> String, x: String) -> String {
+  dynamic func bar(f: String -> String, x: String) -> String {
     return f(x)
   }
 
@@ -30,7 +30,7 @@ import Foundation
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bas{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @owned Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
-  @objc func bas(f: String? -> String?, x: String?) -> String? {
+  dynamic func bas(f: String? -> String?, x: String?) -> String? {
     return f(x)
   }
 
@@ -50,7 +50,7 @@ import Foundation
   // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[BRIDGED]])
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@cc(method) @thin (@owned Optional<String -> String>, @owned String, @owned Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
-  @objc func optFunc(f: (String -> String)?, x: String) -> String? {
+  dynamic func optFunc(f: (String -> String)?, x: String) -> String? {
     return f?(x)
   }
 }

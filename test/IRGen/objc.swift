@@ -42,7 +42,7 @@ class Test2 : Gizmo {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
-  func bar() {}
+  dynamic func bar() {}
 }
 
 // CHECK:    define %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
@@ -104,6 +104,6 @@ class WeakObjC {
 
   init() {
     var foo = obj
-    var bar = id
+    var bar: AnyObject? = id
   }
 }

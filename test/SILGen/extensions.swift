@@ -12,8 +12,8 @@ extension Foo {
   // CHECK-LABEL: sil  @_TFC10extensions3Foog7zippitySi
   var zippity: Int { return 0 }
 
-  @objc func kay() {}
-  @objc var cox: Int { return 0 }
+  dynamic func kay() {}
+  dynamic var cox: Int { return 0 }
 }
 
 struct Bar {
@@ -34,9 +34,7 @@ func extensionReferences(x: Foo) {
   // CHECK: function_ref @_TFC10extensions3Foog7zippitySi
   let _ = x.zippity
 
-  // @objc extension methods are still dynamically dispatched.
-  // TODO: objc dispatch should only be required for methods with 'dynamic'
-  // visibility.
+  // dynamic extension methods are still dynamically dispatched.
   // CHECK: class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
   x.kay()
   // CHECK: class_method [volatile] %0 : $Foo, #Foo.cox!getter.1.foreign

@@ -108,7 +108,7 @@ func testAnyObjectDispatch(o: AnyObject) {
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
 class ObjCInit {
-  @objc required init() { }
+  dynamic required init() { }
 }
 
 // CHECK: sil @_TF12dynamic_self12testObjCInit{{.*}} : $@thin (@thick ObjCInit.Type) -> ()

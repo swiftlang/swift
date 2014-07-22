@@ -258,7 +258,7 @@ class Wotsit<T> : Gizmo {
 // Extension initializers, properties and methods need thunks too.
 extension Hoozit {
   // CHECK-LABEL: sil @_TToFC11objc_thunks6HoozitcfMS0_FT3intSi_S0_ : $@cc(objc_method) @thin (Int, @owned Hoozit) -> @owned Hoozit
-  convenience init(int i: Int) { self.init(bellsOn: i) }
+  dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
   // CHECK-LABEL: sil @_TFC11objc_thunks6HoozitcfMS0_FT6doubleSd_S0_ : $@cc(method) @thin (Double, @owned Hoozit) -> @owned Hoozit
   convenience init(double d: Double) { 
@@ -294,29 +294,26 @@ extension Hoozit {
   // CHECK-LABEL: sil  @_TFC11objc_thunks6Hoozitg17extensionPropertySi : $@cc(method) @thin (@owned Hoozit) -> Int
 }
 
-// Calling objc methods of subclass should go through objc entry points
+// Calling objc methods of subclass should go through native entry points
 func useHoozit(h: Hoozit) {
 // sil @_TF11objc_thunks9useHoozitFT1hC11objc_thunks6Hoozit_T_
+  // In the class decl, gets dynamically dispatched
   h.fork()
-  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.fork!1.foreign
+  // CHECK: class_method {{%.*}} : {{.*}}, #Hoozit.fork!1 :
 
+  // In an extension, gets statically dispatched
   h.foof()
-  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
-
-  // Generic doesn't have an objc entry point
-  h.generic(1)
-  // CHECK-NOT: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.generic!1.foreign
+  // CHECK: function_ref @_TFC11objc_thunks6Hoozit4fooffS0_FT_T_
 }
 
-// Wotsit<T> is generic and doesn't have objc entry points for its methods
 func useWotsit(w: Wotsit<String>) {
 // sil @_TF11objc_thunks9useWotsitFT1wGCSo6WotsitSS__T_
   w.plain()
-  // CHECK-NOT: class_method [volatile] {{%.*}} : {{.*}}, #Wotsit.plain!1.foreign
+  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.plain!1 :
   w.generic(2)
-  // CHECK-NOT: class_method [volatile] {{%.*}} : {{.*}}, #Wotsit.generic!1.foreign
+  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.generic!1 :
 
-  // Inherited methods do have objc entry points
+  // Inherited methods only have objc entry points
   w.clone()
   // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Gizmo.clone!1.foreign
 }

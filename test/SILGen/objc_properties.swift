@@ -5,8 +5,8 @@ import Foundation
 
 
 class A {
-  @objc var prop: Int
-  @objc var computedProp: Int {
+  dynamic var prop: Int
+  dynamic var computedProp: Int {
     get {
       return 5
     }

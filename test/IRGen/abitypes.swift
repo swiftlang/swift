@@ -23,7 +23,7 @@ class Foo {
   // armv7-ios: define internal void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {
   // arm64-ios: define { float, float, float, float } @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%C8abitypes3Foo*) {
   // arm64-ios: define internal [[ARM64MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {
-  @objc func bar() -> MyRect {
+  dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
 
@@ -32,7 +32,7 @@ class Foo {
   // x86_64-macosx: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, %VSC6CGRect* byval align 8) unnamed_addr {
   // armv7-ios: define double @_TFC8abitypes3Foo14getXFromNSRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal double @_TToFC8abitypes3Foo14getXFromNSRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
-  @objc func getXFromNSRect(r: NSRect) -> Double {
+  dynamic func getXFromNSRect(r: NSRect) -> Double {
     return Double(r.origin.x)
   }
 
@@ -40,7 +40,7 @@ class Foo {
   // x86_64-macosx: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, { <2 x float>, <2 x float> }) unnamed_addr {
   // armv7-ios: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
-  @objc func getXFromRect(r: MyRect) -> Float {
+  dynamic func getXFromRect(r: MyRect) -> Float {
     return r.x
   }
 
@@ -66,7 +66,7 @@ class Foo {
 
   // Ensure that MyRect is passed as an indirect-byval on x86-64 because we run out of registers for direct arguments
   // x86_64-macosx: define internal float @_TToFC8abitypes3Foo25getXFromRectIndirectByVal{{.*}}(i8*, i8*, float, float, float, float, float, float, float, %VSC6MyRect* byval align 4) unnamed_addr {
-  @objc func getXFromRectIndirectByVal(_: Float, second _: Float, 
+  dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
                                        seventh _: Float, withRect r: MyRect)
@@ -107,7 +107,7 @@ class Foo {
 
   // x86_64-macosx: define { double, double, double } @_TFC8abitypes3Foo3baz{{.*}}(%C8abitypes3Foo*) {
   // x86_64-macosx: define internal void @_TToFC8abitypes3Foo3baz{{.*}}(%VSC4Trio* noalias sret, i8*, i8*) unnamed_addr {
-  @objc func baz() -> Trio {
+  dynamic func baz() -> Trio {
     return Trio(i: 1.0, j: 2.0, k: 3.0)
   }
 
@@ -130,7 +130,7 @@ class Foo {
   }
 
   // x86_64-macosx:      define internal i64 @_TToFC8abitypes3Foo8takepair{{.*}}(i8*, i8*, i64) unnamed_addr {
-  @objc func takepair(p: IntPair) -> IntPair {
+  dynamic func takepair(p: IntPair) -> IntPair {
     return p
   }
 
@@ -150,7 +150,7 @@ class Foo {
   // x86_64-macosx:      [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[OBJC:%objc_class]]*
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[OBJC]]* [[T1]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  @objc func copyClass(a: AnyClass) -> AnyClass {
+  dynamic func copyClass(a: AnyClass) -> AnyClass {
     return a
   }
 
@@ -158,7 +158,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo9copyProt
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  @objc func copyProto(a: AnyObject) -> AnyObject {
+  dynamic func copyProto(a: AnyObject) -> AnyObject {
     return a
   }
 
@@ -166,7 +166,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo13copyProtoComp
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  @objc func copyProtoComp(a: protocol<P1, P2>) -> protocol<P1, P2> {
+  dynamic func copyProtoComp(a: protocol<P1, P2>) -> protocol<P1, P2> {
     return a
   }
 
@@ -204,7 +204,7 @@ class Foo {
   // i386-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // i386-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]]
   // i386-ios-fixme:     ret i8 [[R3]]
-  @objc func negate(b: Bool) -> Bool {
+  dynamic func negate(b: Bool) -> Bool {
     return !b
   }
 
@@ -273,23 +273,23 @@ class Foo {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // i386-ios: ret i8 [[TOOBJCBOOL]]
   //
-  @objc func negate2(b: Bool) -> Bool {
+  dynamic func negate2(b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
   }
 
   // x86_64-macosx: define internal i32* @_TToFC8abitypes3Foo17copyUnsafePointer{{.*}}(i8*, i8*, i32*) unnamed_addr {
-  @objc func copyUnsafePointer(p: UnsafePointer<Int32>) -> UnsafePointer<Int32> {
+  dynamic func copyUnsafePointer(p: UnsafePointer<Int32>) -> UnsafePointer<Int32> {
     return p
   }
 
   // x86_64-macosx: define internal i64 @_TToFC8abitypes3Foo17returnNSEnumValue{{.*}}(i8*, i8*) unnamed_addr {
-  @objc func returnNSEnumValue() -> NSByteCountFormatterCountStyle {
+  dynamic func returnNSEnumValue() -> NSByteCountFormatterCountStyle {
     return .File
   }
 
   // x86_64-macosx: define internal zeroext i16 @_TToFC8abitypes3Foo20returnOtherEnumValue{{.*}}(i8*, i8*, i16 zeroext) unnamed_addr {
-  @objc func returnOtherEnumValue(choice: ChooseTo) -> ChooseTo {
+  dynamic func returnOtherEnumValue(choice: ChooseTo) -> ChooseTo {
     switch choice {
       case .TakeIt: return .LeaveIt
       case .LeaveIt: return .TakeIt
@@ -298,7 +298,7 @@ class Foo {
 
   // x86_64-macosx: define i32 @_TFC8abitypes3Foo10getRawEnum{{.*}}(%C8abitypes3Foo*) {
   // x86_64-macosx: define internal i32 @_TToFC8abitypes3Foo10getRawEnum{{.*}}(i8*, i8*) unnamed_addr {
-  @objc func getRawEnum() -> RawEnum {
+  dynamic func getRawEnum() -> RawEnum {
     return Intergalactic
   }
 
@@ -308,7 +308,7 @@ class Foo {
   }
 
   // x86_64-macosx: define internal void @_TToFC8abitypes3Foo13testArchetypef{{.*}}(i8*, i8*, i8*) unnamed_addr {
-  @objc func testArchetype(work: Work) {
+  dynamic func testArchetype(work: Work) {
     work.doStuff(1)
     // x86_64-macosx: [[PROTOCOL:%.*]] = alloca i8*, align 8
     // x86_64-macosx: store i8* %2, i8** [[PROTOCOL]]
@@ -318,7 +318,7 @@ class Foo {
     // x86_64-macosx: call void @_TFC8abitypes3Foo13testArchetype{{.*}}(%objc_object* [[OBJCPTR]], %C8abitypes3Foo* %{{.*}})
   }
 
-  @objc func foo(x: @objc_block (Int) -> Int) -> Int {
+  dynamic func foo(x: @objc_block (Int) -> Int) -> Int {
     // FIXME: calling blocks is currently unimplemented
     // return x(5)
     return 1
@@ -333,7 +333,7 @@ class Foo {
 
   // arm64-ios: define void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias sret, %CSo13StructReturns*, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, %C8abitypes3Foo*) {
   // arm64-ios: define internal void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {
-  @objc func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
+  dynamic func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
 

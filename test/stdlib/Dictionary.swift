@@ -3959,28 +3959,28 @@ DictionaryDerivedAPIs.run()
 var ObjCThunks = TestCase("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
-  @objc func acceptArrayBridgedVerbatim(array: [TestObjCValueTy]) {
+  dynamic func acceptArrayBridgedVerbatim(array: [TestObjCValueTy]) {
     expectEqual(10, array[0].value)
     expectEqual(20, array[1].value)
     expectEqual(30, array[2].value)
   }
 
-  @objc func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
+  dynamic func acceptArrayBridgedNonverbatim(array: [TestBridgedValueTy]) {
     // Can not check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
 
-  @objc func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
+  dynamic func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
     return [ TestObjCValueTy(10), TestObjCValueTy(20),
         TestObjCValueTy(30) ]
   }
 
-  @objc func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
+  dynamic func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
     return [ TestBridgedValueTy(10), TestBridgedValueTy(20),
         TestBridgedValueTy(30) ]
   }
 
-  @objc func acceptDictionaryBridgedVerbatim(
+  dynamic func acceptDictionaryBridgedVerbatim(
       d: [TestObjCKeyTy : TestObjCValueTy]) {
     expectEqual(3, d.count)
     expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
@@ -3988,13 +3988,13 @@ class ObjCThunksHelper : NSObject {
     expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
   }
 
-  @objc func acceptDictionaryBridgedNonverbatim(
+  dynamic func acceptDictionaryBridgedNonverbatim(
       d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
     // Can not check elements because doing so would bridge them.
   }
 
-  @objc func returnDictionaryBridgedVerbatim() ->
+  dynamic func returnDictionaryBridgedVerbatim() ->
       [TestObjCKeyTy : TestObjCValueTy] {
     return [
         TestObjCKeyTy(10): TestObjCValueTy(1010),
@@ -4003,7 +4003,7 @@ class ObjCThunksHelper : NSObject {
     ]
   }
 
-  @objc func returnDictionaryBridgedNonverbatim() ->
+  dynamic func returnDictionaryBridgedNonverbatim() ->
       [TestBridgedKeyTy : TestBridgedValueTy] {
     return [
         TestBridgedKeyTy(10): TestBridgedValueTy(1010),

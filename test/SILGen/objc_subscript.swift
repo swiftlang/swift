@@ -3,7 +3,7 @@
 @objc class ObjCClass {}
 
 class A {
-  @objc subscript (i: Int) -> ObjCClass {
+  dynamic subscript (i: Int) -> ObjCClass {
     get {
       return ObjCClass()
     }
