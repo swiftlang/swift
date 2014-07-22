@@ -31,12 +31,12 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
   this->CalleeFunction = CalleeFunction;
 
   // Do not attempt to inline an apply into its parent function.
-  if (AI->getParent()->getParent() == CalleeFunction)
+  if (AI->getFunction() == CalleeFunction)
     return false;
 
   SILFunction &F = getBuilder().getFunction();
 
-  assert(AI->getParent()->getParent() && AI->getParent()->getParent() == &F &&
+  assert(AI->getFunction() && AI->getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
   assert(((CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
            CalleeFunction->getAbstractCC() != AbstractCC::C) ||
@@ -61,7 +61,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
   auto AIScope = AI->getDebugScope();
   // FIXME: Turn this into an assertion instead.
   if (!AIScope)
-    AIScope = AI->getParent()->getParent()->getDebugScope();
+    AIScope = AI->getFunction()->getDebugScope();
 
   CallSiteScope = new (F.getModule())
         SILDebugScope(AI->getLoc(), F, AIScope);
@@ -180,7 +180,7 @@ SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
   auto CalleeScope = Orig->getDebugScope();
   // We need to fake a scope to add the inline info to it.
   if (!CalleeScope)
-    CalleeScope = Orig->getParent()->getParent()->getDebugScope();
+    CalleeScope = Orig->getFunction()->getDebugScope();
 
   auto it = InlinedScopeCache.find(CalleeScope);
   if (it != InlinedScopeCache.end())
