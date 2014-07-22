@@ -719,7 +719,7 @@ public:
   }
 };
 
-/// Get the 'Self' type of a AnyObject operand to use as the result type of
+/// Get the 'Self' type of an AnyObject operand to use as the result type of
 /// projecting the object instance handle.
 SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
                                     SILValue existential) {
@@ -1357,12 +1357,6 @@ public:
     auto arg = ignoreParensAndImpConversions(e->getSubExpr());
     auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
     if (!dynamicMemberRef)
-      return false;
-
-    // objc_msgSend() already contains the dynamic method lookup check, which
-    // allows us to avoid emitting a specific test for the dynamic method.
-    // Bail out early if we aren't using Objective-C dispatch.
-    if (!gen.SGM.requiresObjCDispatch(dynamicMemberRef->getMember().getDecl()))
       return false;
 
     // Since we'll be collapsing this call site, make sure there's another
