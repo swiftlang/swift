@@ -1,11 +1,17 @@
 // RUN: %target-build-swift -parse %s -Xfrontend -verify
 
-import OpenGL.GL3
+#if os(iOS)
+// FIXME: iOS submodule test
 
+#elseif os(OSX)
+import OpenGL.GL3
 let _ = glGetString
 let _ = OpenGL.glGetString
 
+#endif
+
 let _ = glVertexPointer // expected-error{{use of unresolved identifier 'glVertexPointer'}}
+
 
 #if os(iOS)
 import UIKit.UIGestureRecognizerSubclass
