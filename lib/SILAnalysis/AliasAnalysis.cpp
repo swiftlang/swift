@@ -235,6 +235,27 @@ static bool projectionListsEqual(llvm::SmallVectorImpl<Projection> &V1Path,
   return true;
 }
 
+/// Returns true if we are accessing different fields of the same object.
+static bool projectionListsNoAlias(llvm::SmallVectorImpl<Projection> &V1Path,
+                                 llvm::SmallVectorImpl<Projection> &V2Path) {
+  if (V1Path.empty() || V2Path.empty())
+    return false;
+
+  // We reverse the projection path to scan from the common object.
+  std::reverse(V1Path.begin(), V1Path.end());
+  std::reverse(V2Path.begin(), V2Path.end());
+  // We scan up to the minimum path size.
+  unsigned e = V1Path.size() > V2Path.size() ? V2Path.size() : V1Path.size();
+  for (unsigned i = 0; i != e; ++i) {
+    // If we are accessing different fields of a common object, return true.
+    if (V1Path[i] != V2Path[i]) {
+      DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Uses a bunch of ad-hoc rules to disambiguate a GEP instruction against
 /// another pointer. We know that V1 is a GEP, but we don't know anything about
 /// V2. O1, O2 are getUnderlyingObject of V1, V2 respectively.
@@ -278,6 +299,12 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // If all of the projections are equal, the two GEPs must be the same.
     if (projectionListsEqual(V1Path, V2Path))
       return AliasAnalysis::AliasResult::MustAlias;
+
+    // The two GEPs do not alias if they are accessing different fields of
+    // the same object, since different fields of the same object should not
+    // overlap.
+    if (projectionListsNoAlias(V1Path, V2Path))
+      return AliasAnalysis::AliasResult::NoAlias;
   }
 
   // We failed to prove anything. Be conservative and return MayAlias.

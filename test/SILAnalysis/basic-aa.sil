@@ -2,6 +2,7 @@
 // REQUIRES: asserts
 
 import Builtin
+import Swift
 
 // Address Arguments don't alias if they are arguments to the first BB.
 //
@@ -118,7 +119,7 @@ struct StructLvl1 {
 // CHECK: PAIR #55.
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
 // CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.x
-// CHECK-NEXT: MayAlias
+// CHECK-NEXT: NoAlias
 // CHECK: PAIR #56.
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
 // CHECK-NEXT: (0):   %4 = struct_element_addr %2 : $*StructLvl2, #StructLvl2.tup
@@ -434,4 +435,36 @@ sil @globals_dont_alias : $@thin () -> () {
   %3 = sil_global_addr @sil_global2 : $*Builtin.Int32
   %4 = tuple()
   return %4 : $()
+}
+
+class HalfOpenRange {
+  final var current: Int
+  final let end: Int
+  init(start: Int, end: Int)
+}
+// CHECK-LABEL: @different_fields
+// CHECK: PAIR #51.
+// CHECK-NEXT: (0):   %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
+// CHECK-NEXT: (0):   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #64.
+// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int, #Int.value
+// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int, #Int.value
+// CHECK-NEXT: NoAlias
+sil @different_fields : $@thin () -> () {
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = struct $Int (%0 : $Builtin.Word)
+  %2 = integer_literal $Builtin.Word, 10
+  %3 = struct $Int (%2 : $Builtin.Word)
+  %4 = alloc_ref $HalfOpenRange
+  %5 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.current
+  store %1 to %5 : $*Int
+  %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
+  store %3 to %7 : $*Int 
+  %9 = struct_element_addr %5 : $*Int, #Int.value 
+  %10 = struct_element_addr %7 : $*Int, #Int.value
+  %11 = load %9 : $*Builtin.Word
+  %12 = load %10 : $*Builtin.Word
+  %13 = tuple() 
+  return %13 : $() 
 }
