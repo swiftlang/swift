@@ -39,7 +39,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// If this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
-  /// Otherwise, returns nil.  Note: the result's elementStorage may
+  /// Otherwise, returns nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
   ///
   /// Note: this function must remain mutating; otherwise the buffer
@@ -57,7 +57,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   mutating func isMutableAndUniquelyReferenced() -> Bool
 
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
   
@@ -97,7 +97,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafeMutablePointer<Element> {get}
+  var baseAddress: UnsafeMutablePointer<Element> {get}
 
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers

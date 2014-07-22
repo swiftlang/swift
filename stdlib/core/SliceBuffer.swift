@@ -35,7 +35,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   public
   init(_ buffer: NativeBuffer) {
     owner = buffer._storage
-    start = buffer.elementStorage
+    start = buffer.baseAddress
     _countAndFlags = (UInt(buffer.count) << 1) | (owner ? 1 : 0)
     _invariantCheck()
   }
@@ -83,7 +83,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
     
     var native = reinterpretCast(owner) as NativeBuffer
-    let offset = start - native.elementStorage
+    let offset = start - native.baseAddress
     let eraseCount = countElements(subRange)
     let growth = insertCount - eraseCount
     
@@ -140,7 +140,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
         // function isn't called for subscripting, this won't slow
         // down that case.
         var backing = reinterpretCast(owner) as NativeBuffer
-        let offset = self.elementStorage - backing.elementStorage
+        let offset = self.baseAddress - backing.baseAddress
         let backingCount = backing.count
         let myCount = count
 
@@ -163,7 +163,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, since we are a _SliceBuffer.
   public
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
@@ -189,7 +189,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   public
-  var elementStorage: UnsafeMutablePointer<T> {
+  var baseAddress: UnsafeMutablePointer<T> {
     return start
   }
 
@@ -223,7 +223,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       return count
     }
     let n = nativeBuffer
-    if (count + start) == (n.count + n.elementStorage) {
+    if (count + start) == (n.count + n.baseAddress) {
       return count + (n.capacity - n.count)
     }
     return count

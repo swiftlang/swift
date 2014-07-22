@@ -49,9 +49,9 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._elementStorageIfContiguous != nil || a.count == 0)
+  _debugPrecondition(a._baseAddressIfContiguous != nil || a.count == 0)
 
-  return (a._owner, ToPointer(a._elementStorageIfContiguous.value))
+  return (a._owner, ToPointer(a._baseAddressIfContiguous.value))
 }
 
 /// Derive a pointer argument from a value array parameter.

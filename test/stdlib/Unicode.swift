@@ -261,11 +261,11 @@ func additionalUtf16Tests() {
 
   u16.withUnsafeMutableBufferPointer {
     (u16)->() in
-    let p16 = u16.elementStorage
+    let p16 = u16.baseAddress
     
     u8.withUnsafeMutableBufferPointer {
       (u8)->() in
-      let p8 = u8.elementStorage
+      let p8 = u8.baseAddress
       
       // CHECK-NEXT: [ 0, 1, 2, 9, 10, 11 ]
       UTF16.copy(p8, destination: p16, count: 3)

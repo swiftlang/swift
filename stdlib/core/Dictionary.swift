@@ -260,7 +260,7 @@ final class _NativeDictionaryStorageImpl<Key : Hashable, Value> :
         reinterpretCast(self) as DictionaryHeapBuffer.Storage)
     let body = buffer.value
     buffer._value.destroy()
-    buffer.elementStorage.destroy(body.capacity)
+    buffer.baseAddress.destroy(body.capacity)
   }
   final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     let buffer = DictionaryHeapBuffer(
@@ -290,7 +290,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
 
   @transparent
   var elements: UnsafeMutablePointer<Element?> {
-    return buffer.elementStorage
+    return buffer.baseAddress
   }
 
   init(capacity: Int) {
@@ -2208,7 +2208,7 @@ func _stdlib_NSDictionary_allKeys(nsd: _SwiftNSDictionaryType)
   let count = nsd.count
   var buffer = HeapBuffer<Int, AnyObject>(
       HeapBufferStorage<Int, AnyObject>.self, count, count)
-  nsd.getObjects(nil, andKeys: buffer.elementStorage)
+  nsd.getObjects(nil, andKeys: buffer.baseAddress)
   return buffer
 }
 

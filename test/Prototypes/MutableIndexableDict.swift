@@ -106,7 +106,7 @@ class FixedSizedRefArrayOfOptionalStorage<T> : HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
     for i in 0..<buffer.value {
-      (buffer.elementStorage + i).destroy()
+      (buffer.baseAddress + i).destroy()
     }
   }
   override func __getInstanceSizeAndAlignMask() -> (Int,Int) {
@@ -123,7 +123,7 @@ struct FixedSizedRefArrayOfOptional<T>
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
     for var i = 0; i < capacity; ++i {
-      (buffer.elementStorage + i).initialize(.None)
+      (buffer.baseAddress + i).initialize(.None)
     }
 
     buffer.value = capacity
@@ -132,12 +132,12 @@ struct FixedSizedRefArrayOfOptional<T>
   subscript(i: Int) -> T? {
     get {
       assert(i >= 0 && i < buffer.value)
-      return (buffer.elementStorage + i).memory
+      return (buffer.baseAddress + i).memory
     }
     nonmutating
     set {
       assert(i >= 0 && i < buffer.value)
-      (buffer.elementStorage + i).memory = newValue
+      (buffer.baseAddress + i).memory = newValue
     }
   }
 

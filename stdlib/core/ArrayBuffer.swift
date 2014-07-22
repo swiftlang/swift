@@ -193,7 +193,7 @@ extension _ArrayBuffer {
   }
   
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
   public
   func requestNativeBuffer() -> NativeBuffer? {
@@ -297,7 +297,7 @@ extension _ArrayBuffer {
 
     // Tell Cocoa to copy the objects into our storage
     cocoa.buffer.getObjects(
-      UnsafeMutablePointer(result.elementStorage),
+      UnsafeMutablePointer(result.baseAddress),
       range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
     )
 
@@ -307,9 +307,9 @@ extension _ArrayBuffer {
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public
-  var elementStorage: UnsafeMutablePointer<T> {
+  var baseAddress: UnsafeMutablePointer<T> {
     if (_fastPath(_isNative)) {
-      return _native.elementStorage
+      return _native.baseAddress
     }
     return nil
   }
@@ -366,7 +366,7 @@ extension _ArrayBuffer {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }
-    let ret = body(self.elementStorage)
+    let ret = body(self.baseAddress)
     _fixLifetime(self)
     return ret
   }
@@ -378,10 +378,10 @@ extension _ArrayBuffer {
     body: (UnsafeMutablePointer<T>)->R
   ) -> R {
     _sanityCheck(
-      elementStorage != nil || count == 0,
+      baseAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
-    let ret = body(elementStorage)
+    let ret = body(baseAddress)
     _fixLifetime(self)
     return ret
   }
@@ -397,7 +397,7 @@ extension _ArrayBuffer {
   /// have the same identity and count.
   public
   var identity: Word {
-    let p = elementStorage
+    let p = baseAddress
     return p != nil ? reinterpretCast(p) : reinterpretCast(owner)
   }
   

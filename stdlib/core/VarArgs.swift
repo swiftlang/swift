@@ -51,7 +51,7 @@ public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
   var tmp = x
-  _memcpy(dest: UnsafeMutablePointer(result._elementStorageIfContiguous),
+  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
           size: UInt(sizeof(T.self)))
   return result
@@ -155,7 +155,7 @@ class VaListBuilder {
   func va_list() -> CVaListPointer {
     return CVaListPointer(
       fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
-        storage._elementStorageIfContiguous))
+        storage._baseAddressIfContiguous))
   }
 
   var storage = [Word]()
@@ -202,9 +202,9 @@ class VaListBuilder {
   }
 
   func va_list() -> CVaListPointer {
-    header.reg_save_area = storage._elementStorageIfContiguous
+    header.reg_save_area = storage._baseAddressIfContiguous
     header.overflow_arg_area
-      = storage._elementStorageIfContiguous + _x86_64RegisterSaveWords
+      = storage._baseAddressIfContiguous + _x86_64RegisterSaveWords
     return CVaListPointer(
              fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
                Builtin.addressof(&self.header)))

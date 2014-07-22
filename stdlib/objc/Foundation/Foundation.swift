@@ -547,7 +547,7 @@ extension NSArray : ArrayLiteralConvertible {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     let result = self(
-      objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
+      objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
     return result
   }
@@ -800,9 +800,9 @@ final public class NSFastGenerator : GeneratorType {
   func refresh() {
     n = 0
     count = enumerable.countByEnumeratingWithState(
-      state._elementStorageIfContiguous,
+      state._baseAddressIfContiguous,
       objects: AutoreleasingUnsafeMutablePointer(
-        objects._elementStorageIfContiguous),
+        objects._baseAddressIfContiguous),
       count: STACK_BUF_SIZE)
   }
 
@@ -1092,7 +1092,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1123,7 +1123,7 @@ extension NSOrderedSet {
     // @objc(initWithObjects:count:)
     // init(withObjects objects: UnsafePointer<AnyObject?>,
     //      count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1137,7 +1137,7 @@ extension NSSet {
     // Imported as:
     // @objc(initWithObjects:count:)
     // init(withObjects objects: UnsafePointer<AnyObject?>, count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }

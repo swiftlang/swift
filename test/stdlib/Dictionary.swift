@@ -1592,7 +1592,7 @@ func slurpFastEnumeration(
   var pairs = Array<(Int, Int)>()
   while true {
     var returnedCount = fe.countByEnumeratingWithState(
-        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.elementStorage),
+        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
         count: stackBufLength)
     assert(state.state != 0)
     assert(state.mutationsPtr != .null())
@@ -1609,7 +1609,7 @@ func slurpFastEnumeration(
 
   for i in 0..<3 {
     let returnedCount = fe.countByEnumeratingWithState(
-        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.elementStorage),
+        &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
         count: stackBufLength)
     assert(returnedCount == 0)
   }
@@ -1760,7 +1760,7 @@ class ParallelArrayDictionary : NSDictionary {
     var theState = state.memory
     if theState.state == 0 {
       theState.state = 1
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(keys._elementStorageIfContiguous)
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(keys._baseAddressIfContiguous)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       state.memory = theState
       return 4

@@ -34,7 +34,7 @@ func _malloc_size(heapMemory: UnsafeMutablePointer<Void>) -> Int
 ///   template <class Value, class Element>
 ///   struct HeapBuffer {
 ///     Value value;
-///     Element elementStorage[];        // length determined at creation time
+///     Element baseAddress[];        // length determined at creation time
 ///
 ///     HeapBuffer() = delete
 ///     static shared_ptr<HeapBuffer> create(Value init, int capacity);
@@ -115,7 +115,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
       HeapBuffer._valueOffset() + _address)
   }
 
-  var elementStorage: UnsafeMutablePointer<Element> {
+  var baseAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(HeapBuffer._elementOffset() + _address)
   }
 
@@ -177,10 +177,10 @@ public struct HeapBuffer<Value, Element> : Equatable {
 
   subscript(i: Int) -> Element {
     get {
-      return elementStorage[i]
+      return baseAddress[i]
     }
     nonmutating set(newValue) {
-      elementStorage[i] = newValue
+      baseAddress[i] = newValue
     }
   }
 

@@ -102,7 +102,7 @@ public struct _StringBuffer {
         return (result, hadError)
       }
       else {
-        var p = result._storage.elementStorage
+        var p = result._storage.baseAddress
         let hadError = transcode(encoding, UTF16.self, input.generate(),
             SinkOf {
               (p++).memory = $0
@@ -117,7 +117,7 @@ public struct _StringBuffer {
 
   /// a pointer to the start of this buffer's data area
   public var start: UnsafeMutablePointer<RawByte> {
-    return UnsafeMutablePointer(_storage.elementStorage)
+    return UnsafeMutablePointer(_storage.baseAddress)
   }
 
   /// a past-the-end pointer for this buffer's stored data

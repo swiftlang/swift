@@ -23,7 +23,7 @@ final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
   
   deinit {
     let b = Buffer(self)
-    b.elementStorage.destroy(b.count)
+    b.baseAddress.destroy(b.count)
     b._base._value.destroy()
   }
 
@@ -108,7 +108,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
-  /// result's .elementStorage or set the result's .count to zero.
+  /// result's .baseAddress or set the result's .count to zero.
   public init(count: Int, minimumCapacity: Int)
   {
     _base = HeapBuffer(
@@ -135,27 +135,27 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public var elementStorage: UnsafeMutablePointer<T> {
-    return _base.hasStorage ? _base.elementStorage : nil
+  public var baseAddress: UnsafeMutablePointer<T> {
+    return _base.hasStorage ? _base.baseAddress : nil
   }
 
   /// A pointer to the first element, assuming that the elements are stored
   /// contiguously.
   var _unsafeElementStorage: UnsafeMutablePointer<T> {
-    return _base.elementStorage
+    return _base.baseAddress
   }
 
   public func withUnsafePointerToElements<R>(
     body: (UnsafePointer<T>)->R
   ) -> R {
-    let p = _base.elementStorage
+    let p = _base.baseAddress
     return withExtendedLifetime(_base) { body(p) }
   }
 
   public mutating func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<T>)->R
   ) -> R {
-    let p = _base.elementStorage
+    let p = _base.baseAddress
     return withExtendedLifetime(_base) { body(p) }
   }
 
@@ -194,7 +194,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
   
   /// If this buffer is backed by a _ContiguousArrayBuffer, return it.
-  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// Otherwise, return nil.  Note: the result's baseAddress may
   /// not match ours, if we are a _SliceBuffer.
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     return self
@@ -270,7 +270,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _sanityCheck(subRange.endIndex <= count)
     
     var dst = target
-    var src = elementStorage + subRange.startIndex
+    var src = baseAddress + subRange.startIndex
     for i in subRange {
       dst++.initialize(src++.memory)
     }
@@ -284,7 +284,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   {
     return _SliceBuffer(
       owner: _base.storage,
-      start: elementStorage + subRange.startIndex,
+      start: baseAddress + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
   }
@@ -328,7 +328,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// have the same identity and count.
   public
   var identity: Word {
-    return reinterpretCast(elementStorage)
+    return reinterpretCast(baseAddress)
   }
 
   /// Return true iff we have storage for elements of the given
@@ -384,7 +384,7 @@ public func += <
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
-    (lhs.elementStorage + oldCount).initializeFrom(rhs)
+    (lhs.baseAddress + oldCount).initializeFrom(rhs)
   }
   else {
     let newLHS = _ContiguousArrayBuffer<T>(
@@ -392,12 +392,12 @@ public func += <
       minimumCapacity: _growArrayCapacity(lhs.capacity))
     
     if lhs._base.hasStorage {
-      newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
+      newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, 
                                                count: oldCount)
       lhs._base.value.count = 0
     }
     lhs._base = newLHS._base
-    (lhs._base.elementStorage + oldCount).initializeFrom(rhs)
+    (lhs._base.baseAddress + oldCount).initializeFrom(rhs)
   }
 }
 
@@ -469,7 +469,7 @@ internal func _copyCollectionToNativeArrayBuffer<
     minimumCapacity: 0
   )
 
-  var p = result.elementStorage
+  var p = result.baseAddress
   for x in GeneratorSequence(source.generate()) {
     (p++).initialize(x)
   }

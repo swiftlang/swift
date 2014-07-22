@@ -59,7 +59,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
       
       if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
         dst.initializeFrom(
-          UnsafeMutablePointer(buffer.elementStorage + range.location),
+          UnsafeMutablePointer(buffer.baseAddress + range.location),
           count: range.length)
       }
       
@@ -88,7 +88,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
         return 0
       }
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      enumerationState.itemsPtr = reinterpretCast(buffer.elementStorage)
+      enumerationState.itemsPtr = reinterpretCast(buffer.baseAddress)
       enumerationState.state = 1
       state.memory = enumerationState
       return buffer.value.count

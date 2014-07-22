@@ -86,7 +86,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
     var newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     let target = buffer._uninitializedCopy(
-      0..<count, target: newBuffer.elementStorage)
+      0..<count, target: newBuffer.baseAddress)
     buffer = _Buffer(newBuffer)
   }
 
@@ -165,7 +165,7 @@ extension ${Self} : ArrayType {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
     reserveCapacity(count)
-    var p = _buffer.elementStorage
+    var p = _buffer.baseAddress
     for _ in 0..<count {
       p++.initialize(repeatedValue)
     }
@@ -205,13 +205,13 @@ extension ${Self} : ArrayType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public var _elementStorageIfContiguous: UnsafeMutablePointer<Element> {
-    return _buffer.elementStorage
+  public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
+    return _buffer.baseAddress
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
-  var _elementStorage: UnsafeMutablePointer<Element> {
-    return _buffer.elementStorage
+  var _baseAddress: UnsafeMutablePointer<Element> {
+    return _buffer.baseAddress
   }
 %end
   //===--- basic mutations ------------------------------------------------===//
@@ -227,7 +227,7 @@ extension ${Self} : ArrayType {
       var newBuffer = _ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
       
-      _buffer._uninitializedCopy(0..<count, target: newBuffer.elementStorage)
+      _buffer._uninitializedCopy(0..<count, target: newBuffer.baseAddress)
       _buffer = _Buffer(newBuffer)
     }
     _sanityCheck(capacity >= minimumCapacity)
@@ -377,12 +377,12 @@ extension ${Self} : Printable, DebugPrintable {
 extension ${Self} {
   @transparent
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
-    let p = _elementStorageIfContiguous
+    let p = _baseAddressIfContiguous
     if _fastPath(p != nil || count == 0) {
       return (_owner, p.value)
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
-    return (n.owner, n.elementStorage.value)
+    return (n.owner, n.baseAddress.value)
   }
   
 }
@@ -429,7 +429,7 @@ extension ${Self} {
 
     // Create an UnsafeBufferPointer over work that we can pass to body
     var a = UnsafeMutableBufferPointer(
-      start: work._buffer.elementStorage, length: work.count)
+      start: work._buffer.baseAddress, length: work.count)
     
     // Invoke the body
     let ret = body(&a)
@@ -505,7 +505,7 @@ func _arrayNonSliceInPlaceReplace<
   let growth = insertCount - eraseCount
   target.count = oldCount + growth
   
-  let elements = target.elementStorage
+  let elements = target.baseAddress
   _sanityCheck(elements != nil)
   
   let oldTailIndex = subRange.endIndex
@@ -644,7 +644,7 @@ where C.Generator.Element == T
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
   
-  var p = lhs._buffer.elementStorage + oldCount
+  var p = lhs._buffer.baseAddress + oldCount
   for x in rhs {
     (p++).initialize(x)
   }
@@ -726,18 +726,18 @@ func _arrayOutOfPlaceUpdate<
   
   let sourceCount = source.count
   let oldCount = sourceCount - headCount - tailCount
-  let destStart = dest!.elementStorage
+  let destStart = dest!.baseAddress
   let newStart = destStart + headCount
   let newEnd = newStart + newCount
   
   // Check to see if we have storage we can move from
   if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
-    let sourceStart = source.elementStorage
+    let sourceStart = source.baseAddress
     let oldStart = sourceStart + headCount
     
     // Destroy any items that may be lurking in a _SliceBuffer before
     // its real first element
-    let backingStart = backing.elementStorage
+    let backingStart = backing.baseAddress
     let sourceOffset = sourceStart - backingStart
     backingStart.destroy(sourceOffset)
 
@@ -788,7 +788,7 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
   let oldCount = buffer.count
   var newBuffer = _createUniqueMutableBuffer(&buffer, oldCount + 1)
   if _fastPath(!newBuffer) {
-    (buffer.elementStorage + oldCount).initialize(newValue)
+    (buffer.baseAddress + oldCount).initialize(newValue)
   }
   else {
     _arrayOutOfPlaceUpdate(
@@ -843,7 +843,7 @@ func _arrayAppendSequence<
   nextItem = stream.next()
   while nextItem {
     let capacity = buffer.capacity
-    let base = buffer.elementStorage
+    let base = buffer.baseAddress
     
     while nextItem && count < capacity {
       (base + count++).initialize(nextItem!)

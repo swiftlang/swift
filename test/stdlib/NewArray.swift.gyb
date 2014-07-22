@@ -73,7 +73,7 @@ func printSequence<T: SequenceType>(x: T) {
 }
 
 func bufferID<T : ArrayType>(x: T) -> Int {
-  return reinterpretCast(x._buffer.elementStorage) as Int
+  return reinterpretCast(x._buffer.baseAddress) as Int
 }
 
 func checkReallocation<T : ArrayType>(

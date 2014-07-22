@@ -18,7 +18,7 @@ a.value.name = "DaveA"
 a.value.locations.append("Princeton")
 a.value.locations.append("San Jose")
 for x in 0..<10 {
-  (a.elementStorage + x).initialize(x)
+  (a.baseAddress + x).initialize(x)
 }
 
 println("buffer has storage: \(a.storage.boolValue)")
@@ -55,7 +55,7 @@ println("locations[1]=\(a.value.locations[1])")
 // CHECK-NEXT: locations[1]=San Jose
 
 for x in 0..<10 {
-  print(a.elementStorage[x])
+  print(a.baseAddress[x])
 }
 println("")
 // CHECK-NEXT: 0123456789
