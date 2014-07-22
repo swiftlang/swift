@@ -419,6 +419,105 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 #endif
 }
 
+namespace {
+/// Add the 'final' property to decls when permitted
+class TryAddFinal : ASTWalker {
+  friend ASTWalker;
+
+  Module *M;
+  bool WholeModComp;
+
+public:
+  TryAddFinal(Module *Mod, bool WholeModuleCompilation)
+    : M(Mod), WholeModComp(WholeModuleCompilation) {}
+
+  void operator()(Decl *D) {
+    D->walk(*this);
+  }
+
+private:
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    return { false, S };
+  }
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    // ASTWalker skips VarDecls, picking them up in Patterns.
+    return { true, P };
+  }
+  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+
+  bool walkToDeclPre(Decl *D) override {
+    auto ValD = dyn_cast<ValueDecl>(D);
+    if (!ValD)
+      return true;
+
+    // Constructors don't accept final as an attribute
+    if (isa<ConstructorDecl>(ValD) || isa<DestructorDecl>(ValD))
+      return true;
+
+    // Already final (or invalid / not type checked)
+    if (ValD->isFinal() || ValD->isInvalid() || !ValD->hasAccessibility())
+      return false;
+
+    // final cannot apply to dynamic functions
+    if (ValD->isDynamic())
+      return false;
+
+    // final can only be applied to private or internal. For internal, only if
+    // we can see the entire module
+    auto Access = ValD->getAccessibility();
+    if (Access == Accessibility::Public)
+      return false;
+    if (Access == Accessibility::Internal && !WholeModComp)
+      return true;
+
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(ValD)) {
+      // We can add final if we're overridden and we're in a class
+      if (!ASD->isOverridden() && isInClass(ASD->getDeclContext()))
+        addFinal(ASD);
+      return true;
+    }
+
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(ValD)) {
+      // We can add final if we're overridden and we're in a class
+      if (!AFD->isOverridden() && isInClass(AFD->getDeclContext()))
+        addFinal(AFD);
+      return true;
+    }
+
+    // @objc on classes means that it can be arbitrarily subclassed, so we
+    // can't do anything.
+    if (auto CD = dyn_cast<ClassDecl>(ValD)) {
+      if (CD->isObjC())
+        return false;
+      return true;
+    }
+    // TODO: Also add final to classes
+
+    return true;
+  }
+
+  /// Add the final attribute to a decl
+  void addFinal(ValueDecl *ValD) {
+    ValD->getAttrs().add(new (M->Ctx) FinalAttr(/*IsImplicit=*/true));
+  }
+
+  /// Whether we're a decl inside a class
+  bool isInClass(DeclContext *DC) {
+    auto DTIC = DC->getDeclaredTypeInContext();
+    return DTIC && DTIC->getClassOrBoundGenericClass();
+  }
+
+};
+} // end namespace
+
+void swift::performWholeModuleChecks(Module *M, bool WholeModuleComp) {
+  TryAddFinal tryFinal(M, WholeModuleComp);
+  for (auto File : M->getFiles())
+    if (auto SF = dyn_cast<SourceFile>(File))
+      for (auto D : SF->Decls)
+        tryFinal(D);
+}
+
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
