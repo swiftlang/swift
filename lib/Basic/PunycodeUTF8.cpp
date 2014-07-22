@@ -30,24 +30,3 @@ bool Punycode::encodePunycodeUTF8(StringRef InputUTF8,
   return encodePunycode(InputCodePoints, OutPunycode);
 }
 
-bool Punycode::decodePunycodeUTF8(StringRef InputPunycode,
-                                  std::string &OutUTF8) {
-  std::vector<uint32_t> OutCodePoints;
-  if (!decodePunycode(InputPunycode, OutCodePoints))
-    return false;
-
-  const size_t SizeUpperBound = OutCodePoints.size() * 4;
-  std::vector<UTF8> Result(SizeUpperBound);
-  const UTF32 *SourceStart = OutCodePoints.data();
-  UTF8 *TargetStart = Result.data();
-  auto ConvStatus = ConvertUTF32toUTF8(
-      &SourceStart, SourceStart + OutCodePoints.size(), &TargetStart,
-      Result.data() + Result.size(), strictConversion);
-  if (ConvStatus != conversionOK) {
-    OutUTF8.clear();
-    return false;
-  }
-  OutUTF8 = std::string(Result.data(), TargetStart);
-  return true;
-}
-

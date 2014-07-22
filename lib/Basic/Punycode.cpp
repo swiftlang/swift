@@ -46,6 +46,10 @@ static int digit_index(char value) {
   return -1;
 }
 
+static bool isValidUnicodeScalar(uint32_t S) {
+  return (S < 0xD800) || (S >= 0xE000 && S <= 0x1FFFFF);
+}
+
 // Section 6.1: Bias adaptation function
 
 static int adapt(int delta, int numpoints, bool firsttime) {
@@ -145,7 +149,7 @@ bool Punycode::encodePunycode(const std::vector<uint32_t> &InputCodePoints,
       ++h;
       OutPunycode.push_back(C);
     }
-    if (C >= 0xD800 && C <= 0xDFFF) {
+    if (!isValidUnicodeScalar(C)) {
       OutPunycode.clear();
       return false;
     }
@@ -187,5 +191,74 @@ bool Punycode::encodePunycode(const std::vector<uint32_t> &InputCodePoints,
     ++delta; ++n;
   }
   return true;
+}
+
+static bool encodeToUTF8(const std::vector<uint32_t> &Scalars,
+                         std::string &OutUTF8) {
+  for (auto S : Scalars) {
+    if (!isValidUnicodeScalar(S)) {
+      OutUTF8.clear();
+      return false;
+    }
+
+    unsigned Bytes = 0;
+    if (S < 0x80)
+      Bytes = 1;
+    else if (S < 0x800)
+      Bytes = 2;
+    else if (S < 0x10000)
+      Bytes = 3;
+    else
+      Bytes = 4;
+
+    switch (Bytes) {
+    case 1:
+      OutUTF8.push_back(S);
+      break;
+    case 2: {
+      uint8_t Byte2 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte1 = S | 0xC0;
+      OutUTF8.push_back(Byte1);
+      OutUTF8.push_back(Byte2);
+      break;
+    }
+    case 3: {
+      uint8_t Byte3 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte2 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte1 = S | 0xE0;
+      OutUTF8.push_back(Byte1);
+      OutUTF8.push_back(Byte2);
+      OutUTF8.push_back(Byte3);
+      break;
+    }
+    case 4: {
+      uint8_t Byte4 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte3 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte2 = (S | 0x80) & 0xBF;
+      S >>= 6;
+      uint8_t Byte1 = S | 0xF0;
+      OutUTF8.push_back(Byte1);
+      OutUTF8.push_back(Byte2);
+      OutUTF8.push_back(Byte3);
+      OutUTF8.push_back(Byte4);
+      break;
+    }
+    }
+  }
+  return true;
+}
+
+bool Punycode::decodePunycodeUTF8(StringRef InputPunycode,
+                                  std::string &OutUTF8) {
+  std::vector<uint32_t> OutCodePoints;
+  if (!decodePunycode(InputPunycode, OutCodePoints))
+    return false;
+
+  return encodeToUTF8(OutCodePoints, OutUTF8);
 }
 
