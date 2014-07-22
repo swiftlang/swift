@@ -17,9 +17,11 @@
 #ifndef SWIFT_API_NOTES_YAML_COMPILER_H
 #define SWIFT_API_NOTES_YAML_COMPILER_H
 #include "llvm/ADT/StringRef.h"
+#include <memory>
 
 namespace llvm {
   class raw_ostream;
+  class MemoryBuffer;
 }
 
 namespace swift {
@@ -28,6 +30,7 @@ namespace api_notes {
   enum class ActionType {
     None,
     YAMLToBinary,
+    BinaryToYAML,
     Dump,
   };
 
@@ -36,6 +39,9 @@ namespace api_notes {
 
   bool parseAndDumpAPINotes(llvm::StringRef yamlInput);
 
+  /// Converts API notes from the compiled binary format to the YAML format.
+  bool decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
+                         llvm::raw_ostream &os);
 } // end namespace api_notes
 } // end namespace swift
 

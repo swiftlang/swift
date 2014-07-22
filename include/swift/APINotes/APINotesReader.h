@@ -86,6 +86,34 @@ public:
   Optional<ObjCMethodInfo> lookupObjCMethod(ContextID contextID,
                                             ObjCSelectorRef selector,
                                             bool isInstanceMethod);
+
+  /// Visitor used when walking the contents of the API notes file.
+  class Visitor {
+  public:
+    virtual ~Visitor();
+
+    /// Visit an Objective-C class.
+    virtual void visitObjCClass(ContextID contextID, StringRef name,
+                                const ObjCContextInfo &info);
+
+    /// Visit an Objective-C protocol.
+    virtual void visitObjCProtocol(ContextID contextID, StringRef name,
+                                   const ObjCContextInfo &info);
+
+    /// Visit an Objective-C method.
+    virtual void visitObjCMethod(ContextID contextID, StringRef selector,
+                                 bool isInstanceMethod,
+                                 const ObjCMethodInfo &info);
+
+    /// Visit an Objective-C property.
+    virtual void visitObjCProperty(ContextID contextID, StringRef name,
+                                   const ObjCPropertyInfo &info);
+  };
+
+
+  /// Visit the contents of the API notes file, passing each entity to the
+  /// given visitor.
+  void visit(Visitor &visitor);
 };
 
 } // end namespace api_notes

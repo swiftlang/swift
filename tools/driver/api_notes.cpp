@@ -37,6 +37,9 @@ int apinotes_main(ArrayRef<const char *> Args) {
          cl::values(
                     clEnumValN(swift::api_notes::ActionType::YAMLToBinary,
                             "yaml-to-binary", "Convert YAML to binary format"),
+                    clEnumValN(swift::api_notes::ActionType::BinaryToYAML,
+                               "binary-to-yaml",
+                               "Convert binary format to YAML"),
                     clEnumValN(swift::api_notes::ActionType::Dump,
                             "dump", "Parse and dump the output"),
                     clEnumValEnd),
@@ -75,9 +78,13 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::errs() << "\n Could not open input file: " + EC.message() << '\n';
     return true;
   }
-  StringRef yamlInput = fileBufOrErr.get()->getBuffer();
+  StringRef input = fileBufOrErr.get()->getBuffer();
 
-  if (Action == swift::api_notes::ActionType::YAMLToBinary) {
+  switch (Action) {
+  case swift::api_notes::ActionType::None:
+    llvm_unreachable("handled above");
+
+  case swift::api_notes::ActionType::YAMLToBinary: {
     if (OutputFilename.empty()) {
       errs() << "output file required\n";
       cl::PrintHelpMessage();
@@ -88,7 +95,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (swift::api_notes::compileAPINotes(yamlInput, os))
+    if (swift::api_notes::compileAPINotes(input, os))
       return 1;
     
     os.flush();
@@ -96,8 +103,27 @@ int apinotes_main(ArrayRef<const char *> Args) {
     return os.has_error();
   }
 
-  if (Action == swift::api_notes::ActionType::Dump) {
-    return swift::api_notes::parseAndDumpAPINotes(yamlInput);
+  case swift::api_notes::ActionType::BinaryToYAML: {
+    if (OutputFilename.empty()) {
+      errs() << "output file required\n";
+      cl::PrintHelpMessage();
+      return 1;
+    }
+
+    std::string errorInfo;
+    llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
+                            llvm::sys::fs::OpenFlags::F_None);
+
+    if (swift::api_notes::decompileAPINotes(std::move(fileBufOrErr.get()), os))
+      return 1;
+    
+    os.flush();
+
+    return os.has_error();
+  }
+
+  case swift::api_notes::ActionType::Dump:
+    return swift::api_notes::parseAndDumpAPINotes(input);
   }
 
   return 1;

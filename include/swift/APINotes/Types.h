@@ -55,12 +55,10 @@ enum class FactoryAsInitKind {
 
 /// Opaque context ID used to refer to an Objective-C class or protocol.
 class ContextID {
+public:
   unsigned Value;
 
   explicit ContextID(unsigned value) : Value(value) { }
-
-  friend class APINotesReader;
-  friend class APINotesWriter;
 };
 
 /// Describes API notes data for any entity.
@@ -282,7 +280,7 @@ public:
   }
 
 private:
-  NullableKind getTypeInfo(unsigned index) {
+  NullableKind getTypeInfo(unsigned index) const {
     assert(NullabilityAudited &&
            "Checking the type adjustment on non-audited method.");
     // If we don't have info about this parameter, return the default.
@@ -294,11 +292,11 @@ private:
   }
 
 public:
-  NullableKind getParamTypeInfo(unsigned index) {
+  NullableKind getParamTypeInfo(unsigned index) const {
     return getTypeInfo(index + 1);
   }
   
-  NullableKind getReturnTypeInfo() {
+  NullableKind getReturnTypeInfo() const {
     return getTypeInfo(0);
   }
 

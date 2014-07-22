@@ -21,6 +21,7 @@
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringExtras.h"
 
@@ -52,7 +53,11 @@ namespace {
     internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
-    
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
     hash_value_type ComputeHash(internal_key_type key) {
       return llvm::HashString(key);
     }
@@ -91,7 +96,11 @@ namespace {
     internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
-    
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
     hash_value_type ComputeHash(internal_key_type key) {
       return static_cast<size_t>(llvm::hash_value(key));
     }
@@ -131,7 +140,7 @@ namespace {
   /// Used to deserialize the on-disk Objective-C class table.
   class ObjCPropertyTableInfo {
   public:
-    // (class ID, name ID)
+    // (context ID, name ID)
     using internal_key_type = std::pair<unsigned, unsigned>; 
     using external_key_type = internal_key_type;
     using data_type = ObjCPropertyInfo;
@@ -141,7 +150,11 @@ namespace {
     internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
-    
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
     hash_value_type ComputeHash(internal_key_type key) {
       return static_cast<size_t>(llvm::hash_value(key));
     }
@@ -189,7 +202,11 @@ namespace {
     internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
-    
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
     hash_value_type ComputeHash(internal_key_type key) {
       return llvm::hash_combine(std::get<0>(key), 
                                 std::get<1>(key), 
@@ -242,7 +259,11 @@ namespace {
     internal_key_type GetInternalKey(external_key_type key) {
       return key;
     }
-    
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
     hash_value_type ComputeHash(internal_key_type key) {
       return llvm::DenseMapInfo<StoredObjCSelector>::getHashValue(key);
     }
@@ -876,3 +897,93 @@ Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
 
   return *known;
 }
+
+APINotesReader::Visitor::~Visitor() { }
+
+void APINotesReader::Visitor::visitObjCClass(ContextID contextID,
+                                             StringRef name,
+                                             const ObjCContextInfo &info) { }
+
+void APINotesReader::Visitor::visitObjCProtocol(ContextID contextID,
+                                                StringRef name,
+                                                const ObjCContextInfo &info) { }
+
+void APINotesReader::Visitor::visitObjCMethod(ContextID contextID,
+                                              StringRef selector,
+                                              bool isInstanceMethod,
+                                              const ObjCMethodInfo &info) { }
+
+void APINotesReader::Visitor::visitObjCProperty(ContextID contextID,
+                                                StringRef name,
+                                                const ObjCPropertyInfo &info) { }
+
+void APINotesReader::visit(Visitor &visitor) {
+  // FIXME: All of these iterations would be significantly more efficient if we
+  // could get the keys and data together, but OnDiskIterableHashTable doesn't
+  // support that.
+
+  // Build an identifier ID -> string mapping, which we'll need when visiting
+  // any of the tables.
+  llvm::DenseMap<unsigned, StringRef> identifiers;
+  if (Impl.IdentifierTable) {
+    for (auto key : Impl.IdentifierTable->keys()) {
+      unsigned ID = *Impl.IdentifierTable->find(key);
+      assert(identifiers.count(ID) == 0);
+      identifiers[ID] = key;
+    }
+  }
+
+  // Visit classes and protocols.
+  if (Impl.ObjCContextTable) {
+    for (auto key : Impl.ObjCContextTable->keys()) {
+      auto name = identifiers[key.first];
+      auto info = *Impl.ObjCContextTable->find(key);
+
+      if (key.second)
+        visitor.visitObjCProtocol(ContextID(info.first), name, info.second);
+      else
+        visitor.visitObjCClass(ContextID(info.first), name, info.second);
+    }
+  }
+
+  // Build a selector ID -> stored Objective-C selector mapping, which we need
+  // when visiting the method tables.
+  llvm::DenseMap<unsigned, std::string> selectors;
+  if (Impl.ObjCSelectorTable) {
+    for (auto key : Impl.ObjCSelectorTable->keys()) {
+      std::string selector;
+      if (key.NumPieces == 0)
+        selector = identifiers[key.Identifiers[0]];
+      else {
+        for (auto identID : key.Identifiers) {
+          selector += identifiers[identID];
+          selector += ':';
+        }
+      }
+
+      unsigned selectorID = *Impl.ObjCSelectorTable->find(key);
+      selectors[selectorID] = selector;
+    }
+  }
+
+  // Visit methods.
+  if (Impl.ObjCMethodTable) {
+    for (auto key : Impl.ObjCMethodTable->keys()) {
+      ContextID contextID(std::get<0>(key));
+      const auto &selector = selectors[std::get<1>(key)];
+      auto info = *Impl.ObjCMethodTable->find(key);
+      visitor.visitObjCMethod(contextID, selector, std::get<2>(key), info);
+    }
+  }
+
+  // Visit properties.
+  if (Impl.ObjCPropertyTable) {
+    for (auto key : Impl.ObjCPropertyTable->keys()) {
+      ContextID contextID(key.first);
+      auto name = identifiers[key.second];
+      auto info = *Impl.ObjCPropertyTable->find(key);
+      visitor.visitObjCProperty(contextID, name, info);
+    }
+  }
+}
+

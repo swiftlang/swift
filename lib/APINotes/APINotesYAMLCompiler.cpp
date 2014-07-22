@@ -14,11 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/APINotes/APINotesYAMLCompiler.h"
+#include "swift/APINotes/APINotesReader.h"
 #include "swift/APINotes/Types.h"
 #include "swift/APINotes/APINotesWriter.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <algorithm>
 
 /*
  
@@ -137,7 +139,7 @@ namespace {
   };
 
   struct AvailabilityItem {
-    APIAvailability Mode;
+    APIAvailability Mode = APIAvailability::Available;
     StringRef Msg;
     AvailabilityItem() : Mode(APIAvailability::Available), Msg("") {}
   };
@@ -152,23 +154,23 @@ namespace {
     StringRef Selector;
     MethodKind Kind;
     NullabilitySeq Nullability;
-    swift::api_notes::NullableKind NullabilityOfRet;
+    api_notes::NullableKind NullabilityOfRet = api_notes::NullableKind::Unknown;
     AvailabilityItem Availability;
-    bool FactoryAsInit;
-    bool DesignatedInit;
+    bool FactoryAsInit = false;
+    bool DesignatedInit = false;
   };
   typedef std::vector<Method> MethodsSeq;
 
   struct Property {
     StringRef Name;
-    swift::api_notes::NullableKind Nullability;
+    api_notes::NullableKind Nullability = api_notes::NullableKind::Unknown;
     AvailabilityItem Availability;
   };
   typedef std::vector<Property> PropertiesSeq;
 
   struct Class {
     StringRef Name;
-    bool AuditedForNullability;
+    bool AuditedForNullability = false;
     AvailabilityItem Availability;
     MethodsSeq Methods;
     PropertiesSeq Properties;
@@ -178,14 +180,14 @@ namespace {
   struct Function {
     StringRef Name;
     NullabilitySeq Nullability;
-    swift::api_notes::NullableKind NullabilityOfRet;
+    api_notes::NullableKind NullabilityOfRet = api_notes::NullableKind::Unknown;
     AvailabilityItem Availability;
   };
   typedef std::vector<Function> FunctionsSeq;
 
   struct GlobalVariable {
     StringRef Name;
-    swift::api_notes::NullableKind Nullability;
+    api_notes::NullableKind Nullability = api_notes::NullableKind::Unknown;
     AvailabilityItem Availability;
   };
   typedef std::vector<GlobalVariable> GlobalVariablesSeq;
@@ -469,3 +471,182 @@ bool api_notes::compileAPINotes(StringRef yamlInput,
 
   return compile(module, os);
 }
+
+bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
+                                  llvm::raw_ostream &os) {
+  // Try to read the file.
+  auto reader = APINotesReader::get(std::move(input));
+  if (!reader) {
+    llvm::errs() << "not a well-formed API notes binary file\n";
+    return true;
+  }
+
+  // Deserialize the API notes file into a module.
+  class DecompileVisitor : public APINotesReader::Visitor {
+    /// Allocator used to clone those strings that need it.
+    llvm::BumpPtrAllocator Allocator;
+
+    /// The module we're building.
+    Module TheModule;
+
+    /// A mapping from context ID to a pair (index, is-protocol) that indicates
+    /// the index of that class or protocol in the global "classes" or
+    /// "protocols" list.
+    llvm::DenseMap<unsigned, std::pair<unsigned, bool>> knownContexts;
+
+    /// Copy a string into allocated memory so it does disappear on us.
+    StringRef copyString(StringRef string) {
+      if (string.empty()) return StringRef();
+
+      void *ptr = Allocator.Allocate(string.size(), 1);
+      memcpy(ptr, string.data(), string.size());
+      return StringRef(reinterpret_cast<const char *>(ptr), string.size());
+    }
+
+    /// Map Objective-C context info.
+    void handleObjCContext(Class &record, StringRef name,
+                           const ObjCContextInfo &info) {
+      record.Name = name;
+
+      // Handle class information.
+      handleAvailability(record.Availability, info);
+      if (info.getDefaultNullability()) {
+        record.AuditedForNullability = true;
+      }
+    }
+
+    /// Map availability information, if present.
+    void handleAvailability(AvailabilityItem &availability,
+                            const CommonEntityInfo &info) {
+      if (info.Unavailable) {
+        availability.Mode = APIAvailability::None;
+        availability.Msg = copyString(info.UnavailableMsg);
+      }
+    }
+
+  public:
+    virtual void visitObjCClass(ContextID contextID, StringRef name,
+                                const ObjCContextInfo &info) {
+      // Record this known context.
+      knownContexts[contextID.Value] = { TheModule.Classes.size(), false };
+
+      // Add the class.
+      TheModule.Classes.push_back(Class());
+      handleObjCContext(TheModule.Classes.back(), name, info);
+    }
+
+    virtual void visitObjCProtocol(ContextID contextID, StringRef name,
+                                   const ObjCContextInfo &info) {
+      // Record this known context.
+      knownContexts[contextID.Value] = { TheModule.Protocols.size(), false };
+
+      // Add the protocol.
+      TheModule.Protocols.push_back(Class());
+      handleObjCContext(TheModule.Protocols.back(), name, info);
+    }
+
+    virtual void visitObjCMethod(ContextID contextID, StringRef selector,
+                                 bool isInstanceMethod,
+                                 const ObjCMethodInfo &info) {
+      Method method;
+      method.Selector = copyString(selector);
+      method.Kind = isInstanceMethod ? MethodKind::Instance : MethodKind::Class;
+
+      if (info.NullabilityAudited) {
+        method.NullabilityOfRet = info.getReturnTypeInfo();
+
+        // Figure out the number of parameters from the selector.
+        for (unsigned i = 0, n = selector.count(':'); i != n; ++i)
+          method.Nullability.push_back(info.getParamTypeInfo(i));
+      }
+
+      handleAvailability(method.Availability, info);
+      method.FactoryAsInit = info.FactoryAsInit;
+      method.DesignatedInit = info.DesignatedInit;
+
+      auto known = knownContexts[contextID.Value];
+      if (known.second)
+        TheModule.Protocols[known.first].Methods.push_back(method);
+      else
+        TheModule.Classes[known.first].Methods.push_back(method);
+    }
+
+    virtual void visitObjCProperty(ContextID contextID, StringRef name,
+                                   const ObjCPropertyInfo &info) {
+      Property property;
+      property.Name = name;
+      handleAvailability(property.Availability, info);
+
+      // FIXME: No way to represent "not audited for nullability.
+      if (auto nullability = info.getNullability()) {
+        property.Nullability = *nullability;
+      }
+
+      auto known = knownContexts[contextID.Value];
+      if (known.second)
+        TheModule.Protocols[known.first].Properties.push_back(property);
+      else
+        TheModule.Classes[known.first].Properties.push_back(property);
+    }
+
+    /// Retrieve the module.
+    Module &getModule() { return TheModule; }
+  } decompileVisitor;
+
+  reader->visit(decompileVisitor);
+
+  // Sort the data in the module, because the API notes reader doesn't preserve
+  // order.
+  auto &module = decompileVisitor.getModule();
+
+  // Sort classes.
+  std::sort(module.Classes.begin(), module.Classes.end(),
+            [](const Class &lhs, const Class &rhs) -> bool {
+              return lhs.Name < rhs.Name;
+            });
+
+  // Sort protocols.
+  std::sort(module.Protocols.begin(), module.Protocols.end(),
+            [](const Class &lhs, const Class &rhs) -> bool {
+              return lhs.Name < rhs.Name;
+            });
+
+  // Sort methods and properties within each class and protocol.
+  auto sortMembers = [](Class &record) {
+    // Sort properties.
+    std::sort(record.Properties.begin(), record.Properties.end(),
+              [](const Property &lhs, const Property &rhs) -> bool {
+                return lhs.Name < rhs.Name;
+              });
+
+    // Sort methods.
+    std::sort(record.Methods.begin(), record.Methods.end(),
+              [](const Method &lhs, const Method &rhs) -> bool {
+                return lhs.Selector < rhs.Selector ||
+                       (lhs.Selector == rhs.Selector &&
+                        static_cast<unsigned>(lhs.Kind)
+                          < static_cast<unsigned>(rhs.Kind));
+              });
+  };
+  std::for_each(module.Classes.begin(), module.Classes.end(), sortMembers);
+  std::for_each(module.Protocols.begin(), module.Protocols.end(), sortMembers);
+
+  // Sort functions.
+  std::sort(module.Functions.begin(), module.Functions.end(),
+            [](const Function &lhs, const Function &rhs) -> bool {
+              return lhs.Name < rhs.Name;
+            });
+
+  // Sort global variables.
+  std::sort(module.Globals.begin(), module.Globals.end(),
+            [](const GlobalVariable &lhs, const GlobalVariable &rhs) -> bool {
+              return lhs.Name < rhs.Name;
+            });
+
+  // Output the YAML representation.
+  Output yout(os);
+  yout << module;
+
+  return false;
+}
+

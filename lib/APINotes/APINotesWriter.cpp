@@ -52,6 +52,9 @@ public:
   llvm::DenseMap<std::pair<unsigned, char>,
                  std::pair<unsigned, ObjCContextInfo>> ObjCContexts;
 
+  /// Mapping from context IDs to the identifier ID holding the name.
+  llvm::DenseMap<unsigned, unsigned> ObjCContextNames;
+
   /// Information about Objective-C properties.
   ///
   /// Indexed by the context ID and property name.
@@ -168,7 +171,8 @@ void APINotesWriter::Implementation::writeBlockInfoBlock(
 #undef BLOCK_RECORD
 }
 
-void APINotesWriter::Implementation::writeControlBlock(llvm::BitstreamWriter &writer) {
+void APINotesWriter::Implementation::writeControlBlock(
+       llvm::BitstreamWriter &writer) {
   BCBlockRAII restoreBlock(writer, CONTROL_BLOCK_ID, 3);
   control_block::MetadataLayout metadata(writer);
   metadata.emit(ScratchRecord, VERSION_MAJOR, VERSION_MINOR);
@@ -593,8 +597,8 @@ void APINotesWriter::writeToStream(raw_ostream &os) {
   Impl.writeToStream(os);
 }
 
-auto APINotesWriter::addObjCClass(StringRef name, const ObjCContextInfo &info)
-       -> ContextID {
+ContextID APINotesWriter::addObjCClass(StringRef name,
+                                       const ObjCContextInfo &info) {
   IdentifierID classID = Impl.getIdentifier(name);
 
   std::pair<unsigned, char> key(classID, 0);
@@ -607,13 +611,15 @@ auto APINotesWriter::addObjCClass(StringRef name, const ObjCContextInfo &info)
     known = Impl.ObjCContexts.insert(
               std::make_pair(key, std::make_pair(nextID, info)))
               .first;
+
+    Impl.ObjCContextNames[nextID] = classID;
   }
 
   return ContextID(known->second.first);
 }
 
-auto APINotesWriter::addObjCProtocol(StringRef name, const ObjCContextInfo &info)
-       -> ContextID {
+ContextID APINotesWriter::addObjCProtocol(StringRef name,
+                                          const ObjCContextInfo &info) {
   IdentifierID protocolID = Impl.getIdentifier(name);
 
   std::pair<unsigned, char> key(protocolID, 1);
@@ -626,6 +632,8 @@ auto APINotesWriter::addObjCProtocol(StringRef name, const ObjCContextInfo &info
     known = Impl.ObjCContexts.insert(
               std::make_pair(key, std::make_pair(nextID, info)))
               .first;
+
+    Impl.ObjCContextNames[nextID] = protocolID;
   }
 
   return ContextID(known->second.first);
@@ -649,7 +657,10 @@ void APINotesWriter::addObjCMethod(ContextID contextID,
   // If this method is a designated initializer, update the class to note that
   // it has designated initializers.
   if (info.DesignatedInit) {
-    Impl.ObjCContexts[{contextID.Value, '\0'}].second.setHasDesignatedInits(true);
+    assert(Impl.ObjCContexts.count({Impl.ObjCContextNames[contextID.Value],
+                                    (char)0}));
+    Impl.ObjCContexts[{Impl.ObjCContextNames[contextID.Value], (char)0}]
+      .second.setHasDesignatedInits(true);
   }
 }
 
