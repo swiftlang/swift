@@ -125,7 +125,6 @@ findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
   // Otherwise see if V2 can be projection extracted from V1. First see if
   // V2 is a projection at all.
   auto Iter = V2;
-  Iter = Iter.stripCasts();
   while (Projection::isAddressProjection(Iter) && V1 != Iter) {
     if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter))
       Path.push_back(Projection(SEA));
@@ -136,7 +135,6 @@ findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
     else
       Path.push_back(Projection(cast<UncheckedTakeEnumDataAddrInst>(Iter)));
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
-    Iter = Iter.stripCasts();
   }
 
   // Return true if we have a non-empty projection list and if V1 == Iter.

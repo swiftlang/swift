@@ -1,6 +1,4 @@
 // RUN: %sil-opt %s -global-load-store-opts -verify | FileCheck %s
-// Make sure we can move load of end out of loop even though we have store of start inside loop.
-// RUN: %sil-opt %s -licm -verify | FileCheck %s --check-prefix=LICM
 // Verifies that we can correctly handle self cycles in control flow.
 
 import Builtin
@@ -19,7 +17,6 @@ final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
 }
 
 // CHECK-LABEL: sil @test
-// LICM-LABEL: sil @test
 sil @test : $@thin () -> () {
 bb0:
   // CHECK: [[ID1:%[0-9]+]] = integer_literal $Builtin.Word, 0
@@ -29,10 +26,6 @@ bb0:
   // CHECK: struct_extract [[ID2]]
   // CHECK: struct_extract [[ID4]]
   // CHECK: cond_br
-  // LICM: [[REFStart:%[0-9]+]] = ref_element_addr %{{[0-9]+}} : $NewRangeGenerator1, #NewRangeGenerator1.current
-  // LICM: [[REFEnd:%[0-9]+]] = ref_element_addr %{{[0-9]+}} : $NewRangeGenerator1, #NewRangeGenerator1.end
-  // LICM: [[IDStart:%[0-9]+]] = struct_element_addr [[REFStart]]
-  // LICM: [[IDEnd:%[0-9]+]] = struct_element_addr [[REFEnd]]
   %0 = global_addr #total : $*Int
   %1 = integer_literal $Builtin.Word, 0
   %2 = struct $Int (%1 : $Builtin.Word)
@@ -53,12 +46,10 @@ bb0:
   %17 = apply %14(%15, %16) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   cond_br %17, bb3, bb1
 
-// LICM: [[ID1:bb[0-9]+]](
 bb2(%20 : $Builtin.Word):
   // We should not forward the value in bb0 directly to the load since we store
   // to the address inside the loop.
   // CHECK: load
-  // LICM: load
   %21 = load %12 : $*Builtin.Word
   %22 = integer_literal $Builtin.Word, 1
   %23 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
@@ -72,7 +63,6 @@ bb2(%20 : $Builtin.Word):
   store %29 to %8 : $*Int
   %31 = struct_element_addr %0 : $*Int, #Int.value
   // CHECK: load
-  // LICM: load
   %32 = load %31 : $*Builtin.Word
   %33 = apply %23(%32, %21, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %34 = tuple_extract %33 : $(Builtin.Word, Builtin.Int1), 0
@@ -81,17 +71,11 @@ bb2(%20 : $Builtin.Word):
   %37 = struct $Int (%34 : $Builtin.Word)
   store %37 to %0 : $*Int
   // CHECK: struct_extract [[ID5]]
-  // LICM: load [[IDStart]]
   %39 = load %12 : $*Builtin.Word
   // CHECK: load
   %40 = load %13 : $*Builtin.Word
-  // LICM-NEXT: apply
   %41 = apply %14(%39, %40) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   cond_br %41, bb3, bb2(%39 : $Builtin.Word)
-
-// LICM: bb{{[0-9]+}}:
-// Load of end is moved out of loop.
-// LICM: load [[IDEnd]]
 
 // bb1 is after bb2 to make sure the first predecessor of bb2 is not bb2 to
 // expose the bug.
