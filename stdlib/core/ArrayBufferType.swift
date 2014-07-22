@@ -76,7 +76,13 @@ public protocol _ArrayBufferType : MutableCollectionType {
 
   /// Call body(p), where p is a pointer to the underlying contiguous storage
   /// Requires: such contiguous storage exists or the buffer is empty
-  func withUnsafeMutablePointerToElements<R>(
+  func withUnsafePointerToElements<R>(
+    body: (UnsafePointer<Element>)->R
+  ) -> R
+  
+  /// Call body(p), where p is a pointer to the underlying contiguous storage
+  /// Requires: such contiguous storage exists or the buffer is empty
+  mutating func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R
   

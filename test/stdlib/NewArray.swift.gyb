@@ -208,8 +208,8 @@ import Foundation
 func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
-  return src.withUnsafeMutablePointerToElements {
-    let ns =  NSArray(objects: UnsafeMutablePointer($0), count: src.count)
+  return src.withUnsafePointerToElements {
+    let ns =  NSArray(objects: UnsafePointer($0), count: src.count)
     return Array(_ArrayBuffer(reinterpretCast(ns) as _CocoaArrayType))
   }
 }

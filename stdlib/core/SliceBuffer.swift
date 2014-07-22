@@ -276,6 +276,14 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   //===--- misc -----------------------------------------------------------===//
   public
+  func withUnsafePointerToElements<R>(
+    body: (UnsafePointer<T>)->R
+  ) -> R {
+    let start = self.start
+    return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)
+  }
+  
+  public mutating
   func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<T>)->R
   ) -> R {

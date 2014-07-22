@@ -392,7 +392,13 @@ extension ${Self} {
 %if Self != 'Array':
   /// Requires: the Array's storage is not provided by an opaque NSArray
 %end
-  public func withUnsafeMutablePointerToElements<R>(
+  public func withUnsafePointerToElements<R>(
+    body: (UnsafePointer<T>) -> R
+  ) -> R {
+    return _buffer.withUnsafePointerToElements(body)
+  }
+  
+  public mutating func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<T>) -> R
   ) -> R {
     return _buffer.withUnsafeMutablePointerToElements(body)

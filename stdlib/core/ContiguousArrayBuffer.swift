@@ -145,7 +145,14 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return _base.elementStorage
   }
 
-  public func withUnsafeMutablePointerToElements<R>(
+  public func withUnsafePointerToElements<R>(
+    body: (UnsafePointer<T>)->R
+  ) -> R {
+    let p = _base.elementStorage
+    return withExtendedLifetime(_base) { body(p) }
+  }
+
+  public mutating func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<T>)->R
   ) -> R {
     let p = _base.elementStorage
