@@ -51,7 +51,8 @@ namespace {
       return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
     
-    Optional<std::pair<ImportedModule, bool>> addImport(ImportDecl *ID);
+    void addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
+                   ImportDecl *ID);
 
     /// Load a module referenced by an import statement.
     ///
@@ -68,7 +69,7 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
   if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
-      moduleID.first.str() == "Builtin")
+      moduleID.first == Context.TheBuiltinModule->Name)
     return Context.TheBuiltinModule;
 
   // If the imported module name is the same as the current module,
@@ -128,7 +129,9 @@ static const char *getImportKindString(ImportKind kind) {
   }
 }
 
-Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) {
+void
+NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
+                      ImportDecl *ID) {
   Module *M = getModule(ID->getModulePath());
   if (M == 0) {
     // FIXME: print entire path regardless.
@@ -142,16 +145,25 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }
-    return Nothing;
+    return;
   }
 
   ID->setModule(M);
+  imports.push_back({ { ID->getDeclPath(), M }, ID->isExported() });
 
-  auto result = std::make_pair(ImportedModule(ID->getDeclPath(), M),
-                               ID->isExported());
-
-  // If we're importing a specific decl, validate the import kind.
-  if (ID->getImportKind() != ImportKind::Module) {
+  if (ID->getImportKind() == ImportKind::Module) {
+    // If we imported a submodule, import the top-level module as well.
+    if (ID->getModulePath().size() > 1) {
+      StringRef topLevelName = ID->getModulePath().front().first.str();
+      Module *topLevelModule = Context.LoadedModules[topLevelName];
+      assert(topLevelModule && "top-level module missing");
+      imports.push_back({
+        { ID->getDeclPath(), topLevelModule },
+        ID->isExported()
+      });
+    }
+  } else {
+    // If we're importing a specific decl, validate the import kind.
     using namespace namelookup;
     auto declPath = ID->getDeclPath();
 
@@ -165,7 +177,7 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
       diagnose(ID, diag::no_decl_in_module)
         .highlight(SourceRange(declPath.front().second,
                                declPath.back().second));
-      return result;
+      return;
     }
 
     ID->setDecls(Context.AllocateCopy(decls));
@@ -191,8 +203,6 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
                  decls.front()->getName());
     }
   }
-
-  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -243,9 +253,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // and map operator decls.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
-      if (auto import = Binder.addImport(ID))
-        ImportedModules.push_back(*import);
-
+      Binder.addImport(ImportedModules, ID);
     } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {
       insertOperatorDecl(Binder, SF.PrefixOperators, OD);
     } else if (auto *OD = dyn_cast<PostfixOperatorDecl>(D)) {

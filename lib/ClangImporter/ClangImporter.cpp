@@ -625,6 +625,14 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   // Try to load the API notes for this module.
   (void)getAPINotesForModule(clangModule->getTopLevelModule());
 
+  if (clangModule->isSubModule()) {
+    finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
+  } else {
+    Module *&loaded = SwiftContext.LoadedModules[result->Name.str()];
+    if (!loaded)
+      loaded = result;
+  }
+
   return result;
 }
 
