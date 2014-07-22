@@ -247,8 +247,6 @@ public struct UTF8 : UnicodeCodecType {
     if (cu0 == 0xe0) {
       return (cu1 >= 0xa0 && cu1 <= 0xbf) ? 2 : 1
     }
-    // FIXME: this should be cu0!
-    // construct a test
     if (cu0 >= 0xe1 && cu0 <= 0xec) {
       return (cu1 >= 0x80 && cu1 <= 0xbf) ? 2 : 1
     }
