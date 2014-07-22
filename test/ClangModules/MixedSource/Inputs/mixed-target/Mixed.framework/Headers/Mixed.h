@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 
 @class ForwardClass;
 void doSomething(ForwardClass *arg);

@@ -275,8 +275,7 @@ func ivars(hive: Hive) {
 }
 
 class NSObjectable : NSObjectProtocol {
-  // FIXME: returning a string literal crashes the type checker.
-  @objc var description : AnyObject { return self }
+  @objc var description : String { return "" }
 }
 
 

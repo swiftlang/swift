@@ -254,7 +254,7 @@ func ivars(hive: Hive) {
 }
 
 class NSObjectable : NSObjectProtocol {
-  @objc var description : AnyObject { return self }
+  @objc var description : String { return "" }
 }
 
 

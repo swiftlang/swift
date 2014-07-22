@@ -3,8 +3,10 @@
 
 #include <objc/objc.h>
 
+@class NSString;
+
 @protocol NSObject
-- description;
+@property (readonly, copy) NSString *description;
 - (instancetype)retain OBJC_ARC_UNAVAILABLE;
 - (Class)class;
 @end

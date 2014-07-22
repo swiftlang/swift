@@ -6,5 +6,5 @@
 + (NSObject*) new;
 + (void) load;
 
-- (NSString*) description;
+@property (copy) NSString *description;
 @end

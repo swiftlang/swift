@@ -3515,31 +3515,6 @@ namespace {
       return result;
     }
 
-    /// Map known methods that should be properties (and will be in the future)
-    /// to read-only properties.
-    Decl *getMappedReadOnlyProperty(const clang::ObjCMethodDecl *MD,
-                                    Decl *opaqueGetter,
-                                    DeclContext *DC) {
-      if (MD->isClassMethod() || MD->isPropertyAccessor())
-        return nullptr;
-
-      auto Sel = MD->getSelector();
-      if (Sel.getNumArgs() != 0)
-        return nullptr;
-
-      auto Name = Sel.getNameForSlot(0);
-      auto ShouldMakeProperty = llvm::StringSwitch<bool>(Name)
-        .Case("description", true)
-        .Case("debugDescription", true)
-        .Case("hash", true)
-        .Default(false);
-
-      if (!ShouldMakeProperty)
-        return nullptr;
-
-      return makeImplicitPropertyDecl(opaqueGetter, nullptr, DC);
-    }
-
     /// Import members of the given Objective-C container and add them to the
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
@@ -3615,13 +3590,6 @@ namespace {
             // if we've failed to import a new property.
             if (cast<FuncDecl>(member)->isAccessor())
               continue;
-          } else if (auto mappedProp =
-                     getMappedReadOnlyProperty(objcMethod, member,
-                                               swiftContext)) {
-            // Consult the list of auto-mapped read-only properties,
-            // and if one can be constructed add the property here.
-            members.push_back(mappedProp);
-            continue;
           } else if (Impl.InferImplicitProperties) {
             // Try to infer properties for matched getter/setter pairs.
             // Be careful to only do this once per matched pair.
@@ -3704,28 +3672,8 @@ namespace {
           if (auto prop = dyn_cast<VarDecl>(member)) {
             auto objcProp =
               dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
-            if (!objcProp) {
-              // Look at the getter and see if *it* has a clang node.  If so,
-              // this means it is an auto-mapped property.  We need
-              // to mirror the getter as well as the property.
-              if (auto getter = prop->getGetter()) {
-                auto getterCl = getter->getClangDecl();
-                if (auto MD = dyn_cast_or_null<clang::ObjCMethodDecl>(getterCl))
-                {
-                  if (MD->isClassMethod())
-                    continue;
-                  clang::Selector sel = MD->getSelector();
-                  if (decl->getMethod(sel, /*instance=*/true))
-                    continue;
-                  if (auto importedGetter = Impl.importMirroredDecl(MD, dc))
-                    if (auto importedProp =
-                        getMappedReadOnlyProperty(MD, importedGetter, dc)) {
-                      members.push_back(importedProp);
-                    }
-                }
-              }
+            if (!objcProp)
               continue;
-            }
 
             // We can't import a property if there's already a method with this
             // name. (This also covers other properties with that same name.)
