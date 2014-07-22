@@ -11,7 +11,7 @@ typedef __typeof__(__objc_yes) BOOL;
 + (NSObject*) new;
 + (void) load;
 
-@property (copy) NSString *description;
+@property (readonly, copy) NSString *description;
 
 @property NSString *stringProperty;
 
