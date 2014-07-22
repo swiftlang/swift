@@ -26,6 +26,7 @@ endif()
 
 add_swift_library(swiftRuntime 
   Casting.cpp
+  Demangle.cpp
   FastEntryPoints.s
   HeapObject.cpp
   KnownMetadata.cpp
