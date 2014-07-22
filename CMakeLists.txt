@@ -310,16 +310,18 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
-#     [API_NOTES module_name]            # Generate API notes for the given module
+#     [API_NOTES module_name]           # Generate API notes for the given module
 #     [DEPENDS cmake_target...]         # CMake targets on which the object 
 #                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
-#     [IS_STDLIB_CORE])                 # This is the core standard library
-#     [OPT_FLAGS])                      # Optimization flags (overrides SWIFT_OPTIMIZE)
+#     [IS_STDLIB_CORE]                  # This is the core standard library
+#     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
+#     [STATIC]                          # This is a static library
+#     )
 function(compile_swift_files)
   parse_arguments(SWIFTFILE
     "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
-    "IS_MAIN;IS_STDLIB_CORE"
+    "IS_MAIN;IS_STDLIB_CORE;STATIC"
     ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
@@ -463,6 +465,9 @@ function(compile_swift_files)
     get_filename_component(module_name ${objfile} NAME_WE)
 
     set(module_dir "${SWIFTLIB_DIR}/${SWIFTFILE_LIBRARY_SUBDIR}")
+    if(SWIFTFILE_STATIC)
+      set(module_dir "${module_dir}/static")
+    endif()
 
     set(module_file ${module_dir}/${module_name}.swiftmodule)
     set(module_doc_file ${module_dir}/${module_name}.swiftdoc)
@@ -551,7 +556,7 @@ endfunction(compute_library_subdir)
 function(handle_swift_sources sourcesvar externalvar name)
   parse_arguments(SWIFTSOURCES  
     "DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
-    "IS_MAIN;IS_STDLIB_CORE"
+    "IS_MAIN;IS_STDLIB_CORE;STATIC"
     ${ARGN})
 
   set(result)
@@ -577,6 +582,10 @@ function(handle_swift_sources sourcesvar externalvar name)
   if(SWIFTSOURCES_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
+  set(STATIC_arg)
+  if(SWIFTSOURCES_STATIC)
+    set(STATIC_arg STATIC)
+  endif()
 
   if(swift_sources)
     # Special-case hack to create swift.o for the swift_stdlib_* targets
@@ -597,6 +606,10 @@ function(handle_swift_sources sourcesvar externalvar name)
       set(objsubdir "/${SWIFTSOURCES_LIBRARY_SUBDIR}")
     endif()
 
+    if(SWIFTSOURCES_STATIC)
+      set(objsubdir "${objsubdir}/static")
+    endif()
+
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
     set(swift_obj 
@@ -609,7 +622,8 @@ function(handle_swift_sources sourcesvar externalvar name)
       SDK ${SWIFTSOURCES_SDK}
       ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
       API_NOTES ${SWIFTSOURCES_API_NOTES}
-      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
+      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} ${STATIC_arg}
+      OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
     list(APPEND result ${swift_obj})
   endif()
 
@@ -768,6 +782,9 @@ macro(add_swift_library_single target name)
   if(SWIFTLIB_SINGLE_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
+
+  # Copy the sources now before they may get modified.
+  set(SWIFTLIB_SINGLE_STATIC_SOURCES ${SWIFTLIB_SINGLE_SOURCES})
   
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
   # just any swiftmodule files that are associated with them.
@@ -910,11 +927,20 @@ macro(add_swift_library_single target name)
   if (SWIFT_BUILD_STATIC AND SWIFTLIB_SINGLE_INSTALL)
     set(target_static "${target}-static")
 
+    handle_swift_sources(SWIFTLIB_SINGLE_STATIC_SOURCES
+      SWIFTLIB_SINGLE_STATIC_EXTERNAL_SOURCES ${name}
+      DEPENDS ${SWIFTLIB_SINGLE_FILE_DEPENDS} ${SWIFTLIB_SINGLE_DEPENDS}
+      SDK ${SWIFTLIB_SINGLE_SDK}
+      ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
+      API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
+      ${IS_STDLIB_CORE_arg}
+      STATIC)
+
     # Note: the dummy.c source file provides no definitions. However,
     # it forces Xcode to properly link the static library.
     add_library( ${target_static} STATIC
-      ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
+      ${SWIFTLIB_SINGLE_STATIC_SOURCES}
+      ${SWIFTLIB_SINGLE_STATIC_EXTERNAL_SOURCES}
       ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
     set_target_properties(${target_static} PROPERTIES OUTPUT_NAME ${name})
 
