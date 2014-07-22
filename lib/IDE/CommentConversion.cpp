@@ -275,7 +275,12 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
     OS << "<Declaration>";
-    D->print(OS, PO);
+    llvm::SmallString<32> DeclSS;
+    {
+      llvm::raw_svector_ostream DeclOS(DeclSS);
+      D->print(DeclOS, PO);
+    }
+    appendWithXMLEscaping(OS, DeclSS);
     OS << "</Declaration>";
   }
 

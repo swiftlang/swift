@@ -15,7 +15,7 @@
 
   /// Aaa.  subscript(i: Int).
   subscript(i: Int) -> Int {
-// CHECK: swift:[[@LINE-1]]:3: Subscript/A010_AttachToEntities.subscript {{.*}} FullCommentAsXML=[<Other file="{{[^"]+}}swift" line="[[@LINE-1]]" column="3"><Name>subscript(_:)</Name><USR>s:sC14swift_ide_test21A010_AttachToEntities9subscriptFSiSi</USR><Declaration>subscript (i: Int) -> Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
+// CHECK: swift:[[@LINE-1]]:3: Subscript/A010_AttachToEntities.subscript {{.*}} FullCommentAsXML=[<Other file="{{[^"]+}}swift" line="[[@LINE-1]]" column="3"><Name>subscript(_:)</Name><USR>s:sC14swift_ide_test21A010_AttachToEntities9subscriptFSiSi</USR><Declaration>subscript (i: Int) -&gt; Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
     get {
 // CHECK: swift:[[@LINE-1]]:5: Func/A010_AttachToEntities.<getter for A010_AttachToEntities.subscript> {{.*}} FullCommentAsXML=none
       return 0
