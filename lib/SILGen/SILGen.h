@@ -258,15 +258,15 @@ public:
   
   /// Report a diagnostic.
   template<typename...T, typename...U>
-  void diagnose(SourceLoc loc, Diag<T...> diag,
+  InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
                 U &&...args) {
-    M.getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+    return M.getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
 
   template<typename...T, typename...U>
-  void diagnose(SILLocation loc, Diag<T...> diag,
+  InFlightDiagnostic diagnose(SILLocation loc, Diag<T...> diag,
                 U &&...args) {
-    M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
+    return M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
                                      diag, std::forward<U>(args)...);
   }
 };
