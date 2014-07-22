@@ -349,6 +349,49 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   return FunctionType::get(selfTy, type);
 }
 
+// Given two generic function declarations, signal if the first is more
+// "constrained" than the second by comparing the number of constraints
+// applied to each type parameter.
+// Note that this is not a subtype or conversion check - that takes place
+// in isDeclAsSpecializedAs.
+static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
+  
+  if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
+    return false;
+  
+  auto func1 = dyn_cast<FuncDecl>(decl1);
+  auto func2 = dyn_cast<FuncDecl>(decl2);
+  
+  if (func1 && func2) {
+    
+    auto gp1 = func1->getGenericParams();
+    auto gp2 = func2->getGenericParams();
+    
+    if (gp1 && gp2) {
+      auto params1 = gp1->getParams();
+      auto params2 = gp2->getParams();
+      
+      if (params1.size() == params2.size()) {
+        for (size_t i = 0; i < params1.size(); i++) {
+          auto p1 = params1[i];
+          auto p2 = params2[i];
+          
+          int np1 = static_cast<int>
+          (p1->getArchetype()->getConformsTo().size());
+          int np2 = static_cast<int>
+          (p2->getArchetype()->getConformsTo().size());
+          int aDelta = np1 - np2;
+          
+          if (aDelta)
+            return aDelta > 0;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -499,8 +542,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   }
 
   case CheckResult: {
-    // Check whether the first function type's input is a subtype of the second
-    // type's inputs, i.e., can we forward the arguments?
+    // Check whether the first function type's input is a subtype of the second.
     auto funcTy1 = openedType1->castTo<FunctionType>();
     auto funcTy2 = openedType2->castTo<FunctionType>();
     cs.addConstraint(ConstraintKind::Subtype,
@@ -547,6 +589,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
+  
+  auto foundRefinement1 = false;
+  auto foundRefinement2 = false;
 
   // Compare overload sets.
   for (auto &overload : diff.overloads) {
@@ -663,6 +708,19 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
         ++score2;
+      
+      // If we haven't found a refinement, record whether one overload is in
+      // any way more constrained than another. We'll only utilize this
+      // information in the case of a potential ambiguity.
+      if (!(foundRefinement1 && foundRefinement2)) {
+        if (isDeclMoreConstrainedThan(decl1, decl2)) {
+          foundRefinement1 = true;
+        }
+        
+        if (isDeclMoreConstrainedThan(decl2, decl1)) {
+          foundRefinement2 = true;
+        }
+      }
 
       break;
     }
@@ -770,7 +828,39 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       continue;
     }
-
+    
+    // FIXME:
+    // This terrible hack is in place to support equality comparisons of non-
+    // equatable option types to 'nil'. Until we have a way to constrain a type
+    // variable on "!Equatable", if all other aspects of the overload choices
+    // are equal, favor the overload that does not require an implicit literal
+    // argument conversion to 'nil'.
+    // Post-1.0, we'll need to remove this hack in favor of richer constraint
+    // declarations.
+    if (!(score1 || score2)) {
+      if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
+        if ((nominalType2->getName() ==
+             cs.TC.Context.Id_OptionalNilComparisonType)) {
+          ++score1;
+        }
+      } else if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+        if ((nominalType1->getName() ==
+             cs.TC.Context.Id_OptionalNilComparisonType)) {
+          ++score2;
+        }
+      }
+    }
+  }
+  
+  // All other things considered equal, if any overload choice is more
+  // more constrained than the other, increment the score.
+  if (score1 == score2) {
+    if (foundRefinement1) {
+      ++score1;
+    }
+    if (foundRefinement2) {
+      ++score2;
+    }
   }
 
   // FIXME: There are type variables and overloads not common to both solutions

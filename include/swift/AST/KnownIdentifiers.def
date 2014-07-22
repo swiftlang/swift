@@ -105,6 +105,7 @@ IDENTIFIER_WITH_NAME(GetBuiltinArrayBoundValue, "_getBuiltinArrayBoundValue")
 IDENTIFIER_WITH_NAME(Conversion, "__conversion")
 
 IDENTIFIER_WITH_NAME(CVarArgType, "CVarArgType")
+IDENTIFIER_WITH_NAME(OptionalNilComparisonType, "_OptionalNilComparisonType")
 
 #undef IDENTIFIER
 #undef IDENTIFIER_WITH_NAME

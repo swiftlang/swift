@@ -144,6 +144,44 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   return !rhs.boolValue
 }
 
+// Enable equality comparisons against the nil literal, even if the
+// element type isn't equatable
+public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
+  switch lhs {
+  case .Some(_) : 
+    return false
+  case .None :
+    return true
+  }
+}
+
+public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
+  switch lhs {
+  case .Some(_) :
+    return true
+  case .None :
+    return false
+  }
+}
+
+public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
+  switch rhs {
+  case .Some(_) :
+    return false
+  case .None :
+    return true
+  }
+}
+
+public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
+  switch rhs {
+  case .Some(_) :
+    return true
+  case .None :
+    return false
+  }
+}
+
 internal struct _OptionalMirror<T> : MirrorType {
   let _value : Optional<T>
 

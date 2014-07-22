@@ -116,3 +116,34 @@ switch z {
   default: println("Broken")
 }
 // CHECK: z is nil
+
+// Validate nil equality comparisons with non-equatable optional types
+class C {}
+var c: C? = nil
+
+println(c == nil)
+// CHECK: true
+
+println(nil == c)
+// CHECK: true
+
+println(c != nil)
+// CHECK: false
+
+println(nil != c)
+// CHECK: false
+
+var c2: C? = C()
+
+println(c2 == nil)
+// CHECK: false
+
+println(nil == c2)
+// CHECK: false
+
+println(c2 != nil)
+// CHECK: true
+
+println(nil != c2)
+// CHECK: true
+
