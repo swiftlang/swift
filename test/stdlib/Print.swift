@@ -373,7 +373,7 @@ func test_PointerPrinting() {
 #endif
 
 #if arch(i386) || arch(arm)
-  let expectedNull = "0x0000000"
+  let expectedNull = "0x00000000"
   printedIs(fourByteUP, "0xabcd1234")
 #else
   let expectedNull = "0x0000000000000000"
