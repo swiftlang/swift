@@ -92,7 +92,7 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
 
   if (isNonAscii(str)) {
     Buffer << 'X';
-    Punycode::encodePunycode(str, punycodeBuf);
+    Punycode::encodePunycodeUTF8(str, punycodeBuf);
     str = punycodeBuf;
   }
   
