@@ -359,7 +359,7 @@ test_CTypesPrinting()
 
 
 func test_PointerPrinting() {
-  let nullUP = UnsafePointer<Int>()
+  let nullUP = UnsafeMutablePointer<Int>()
   let fourByteRawPointer: Builtin.RawPointer =
       reinterpretCast(0xabcd1234)
   var fourByteUP = nullUP
@@ -390,8 +390,8 @@ func test_PointerPrinting() {
 
   printedIs(COpaquePointer(), expectedNull)
   printedIs(CFunctionPointer<() -> ()>(), expectedNull)
-  printedIs(CVaListPointer(fromUnsafePointer: nullUP), expectedNull)
-  printedIs(AutoreleasingUnsafePointer<Int>(), expectedNull)
+  printedIs(CVaListPointer(fromUnsafeMutablePointer: nullUP), expectedNull)
+  printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
 
   println("test_PointerPrinting done")
 }

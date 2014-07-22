@@ -339,7 +339,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   }
 }
 
-extension AutoreleasingUnsafePointer : DebugPrintable {
+extension AutoreleasingUnsafeMutablePointer : DebugPrintable {
   public var debugDescription: String {
     return _rawPointerToString(value)
   }
