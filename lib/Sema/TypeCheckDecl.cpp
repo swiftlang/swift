@@ -2959,8 +2959,13 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     validatePatternBindingDecl(TC, PBD);
-    if (PBD->isInvalid())
+    if (PBD->isInvalid()) {
+      PBD->getPattern()->forEachVariable([this] (VarDecl *VD) {
+        TC.validateDecl(VD);
+      });
+
       return;
+    }
     
     if (!IsFirstPass) {
       if (PBD->getInit() && !PBD->wasInitChecked()) {
