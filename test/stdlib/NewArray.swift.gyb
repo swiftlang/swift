@@ -252,6 +252,13 @@ func testCocoa() {
   
   println(a.capacity >= 30)
   // CHECK-NEXT: true
+
+  // Prove that we create contiguous storage for an opaque NSArray
+  a.withUnsafePointerToElements {
+    (p)->() in
+    println(p.memory)
+    // CHECK-NEXT: foo
+  }
 }
 testCocoa()
 
