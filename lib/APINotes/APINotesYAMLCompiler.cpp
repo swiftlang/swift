@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/APINotes/APINotesYAMLCompiler.h"
 #include "swift/APINotes/Types.h"
+#include "swift/APINotes/APINotesWriter.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -138,8 +139,13 @@ namespace {
   struct AvailabilityItem {
     APIAvailability Mode;
     StringRef Msg;
+    AvailabilityItem() : Mode(APIAvailability::Available), Msg("") {}
   };
 
+  static api_notes::NullableKind UnknownNullability =
+    api_notes::NullableKind::Unknown;
+  static api_notes::NullableKind DefaultNullability =
+    api_notes::NullableKind::NonNullable;
   typedef std::vector<swift::api_notes::NullableKind> NullabilitySeq;
 
   struct Method {
@@ -192,6 +198,7 @@ namespace {
     FunctionsSeq Functions;
     GlobalVariablesSeq Globals;
   };
+
 };
 
 LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(swift::api_notes::NullableKind);
@@ -205,14 +212,14 @@ namespace llvm {
   namespace yaml {
 
     template <>
-    struct ScalarEnumerationTraits<swift::api_notes::NullableKind > {
-      static void enumeration(IO &io, swift::api_notes::NullableKind  &value) {
-        io.enumCase(value, "N", swift::api_notes::NullableKind::NonNullable);
-        io.enumCase(value, "O", swift::api_notes::NullableKind::Nullable);
-        io.enumCase(value, "U", swift::api_notes::NullableKind::Unknown);
+    struct ScalarEnumerationTraits<api_notes::NullableKind > {
+      static void enumeration(IO &io, api_notes::NullableKind  &value) {
+        io.enumCase(value, "N", api_notes::NullableKind::NonNullable);
+        io.enumCase(value, "O", api_notes::NullableKind::Nullable);
+        io.enumCase(value, "U", api_notes::NullableKind::Unknown);
         // TODO: Mapping this to it's own value would allow for better cross
         // checking. Also the default should be Unknown.
-        io.enumCase(value, "S", swift::api_notes::NullableKind::Unknown);
+        io.enumCase(value, "S", api_notes::NullableKind::Unknown);
       }
     };
 
@@ -238,7 +245,8 @@ namespace llvm {
     struct MappingTraits<Property> {
       static void mapping(IO &io, Property& p) {
         io.mapRequired("Name",            p.Name);
-        io.mapOptional("Nullability",     p.Nullability);
+        io.mapOptional("Nullability",     p.Nullability,
+                                          UnknownNullability);
         io.mapOptional("Availability",    p.Availability.Mode);
         io.mapOptional("AvailabilityMsg", p.Availability.Msg);
       }
@@ -250,11 +258,12 @@ namespace llvm {
         io.mapRequired("Selector",        m.Selector);
         io.mapRequired("MethodKind",      m.Kind);
         io.mapOptional("Nullability",     m.Nullability);
-        io.mapOptional("NullabilityOfRet",  m.NullabilityOfRet);
+        io.mapOptional("NullabilityOfRet",  m.NullabilityOfRet,
+                                            UnknownNullability);
         io.mapOptional("Availability",    m.Availability.Mode);
         io.mapOptional("AvailabilityMsg", m.Availability.Msg);
-        io.mapOptional("FactoryAsInit",   m.FactoryAsInit);
-        io.mapOptional("DesignatedInit",  m.DesignatedInit);
+        io.mapOptional("FactoryAsInit",   m.FactoryAsInit, false);
+        io.mapOptional("DesignatedInit",  m.DesignatedInit, false);
       }
     };
 
@@ -262,7 +271,7 @@ namespace llvm {
     struct MappingTraits<Class> {
       static void mapping(IO &io, Class& c) {
         io.mapRequired("Name",                  c.Name);
-        io.mapOptional("AuditedForNullability", c.AuditedForNullability);
+        io.mapOptional("AuditedForNullability", c.AuditedForNullability, false);
         io.mapOptional("Availability",          c.Availability.Mode);
         io.mapOptional("AvailabilityMsg",       c.Availability.Msg);
         io.mapOptional("Methods",               c.Methods);
@@ -275,7 +284,8 @@ namespace llvm {
       static void mapping(IO &io, Function& f) {
         io.mapRequired("Name",             f.Name);
         io.mapOptional("Nullability",      f.Nullability);
-        io.mapOptional("NullabilityOfRet", f.NullabilityOfRet);
+        io.mapOptional("NullabilityOfRet", f.NullabilityOfRet,
+                                           UnknownNullability);
         io.mapOptional("Availability",     f.Availability.Mode);
         io.mapOptional("AvailabilityMsg",  f.Availability.Msg);
       }
@@ -285,7 +295,8 @@ namespace llvm {
     struct MappingTraits<GlobalVariable> {
       static void mapping(IO &io, GlobalVariable& v) {
         io.mapRequired("Name",            v.Name);
-        io.mapOptional("Nullability",     v.Nullability);
+        io.mapOptional("Nullability",     v.Nullability,
+                                          UnknownNullability);
         io.mapOptional("Availability",    v.Availability.Mode);
         io.mapOptional("AvailabilityMsg", v.Availability.Msg);
       }
@@ -321,6 +332,122 @@ static bool parseAPINotes(StringRef yamlInput, Module &module) {
   return false;
 }
 
+static bool translateAvailability(const AvailabilityItem &in,
+                                  api_notes::CommonEntityInfo &outInfo,
+                                  llvm::StringRef apiName) {
+  using namespace api_notes;
+  // TODO: handle more availability kinds here.
+  outInfo.Unavailable = (in.Mode == APIAvailability::None);
+  if (in.Mode != APIAvailability::Available) {
+    outInfo.UnavailableMsg = in.Msg;
+  } else {
+    if (!in.Msg.empty()) {
+      llvm::errs() << "Availability message for available class '" << apiName
+                   << "' will not be used.";
+      return true;
+    }
+  }
+  return false;
+}
+
+// Translate from Method into ObjCMethodInfo and write it out.
+static bool writeMethod(api_notes::APINotesWriter &writer,
+                        const Method &meth,
+                        api_notes::ContextID classID, StringRef className) {
+  using namespace api_notes;
+  ObjCMethodInfo mInfo;
+
+  // Check if the selector ends with ':' to determine if it takes arguments.
+  bool takesArguments = meth.Selector.endswith(":");
+
+  // Split the selector into pieces.
+  llvm::SmallVector<StringRef, 4> a;
+  meth.Selector.split(a, ":", /*MaxSplit*/ -1, /*KeepEmpty*/ false);
+  if (!takesArguments && a.size() > 1 ) {
+    llvm::errs() << "Selector " << meth.Selector
+                 << "is missing a ':' at the end\n";
+    return true;
+  }
+
+  // Construct ObjCSelectorRef.
+  api_notes::ObjCSelectorRef selectorRef;
+  selectorRef.NumPieces = !takesArguments ? 0 : a.size();
+  selectorRef.Identifiers = llvm::ArrayRef<StringRef>(a);
+
+  // Translate the initializer info.
+  mInfo.DesignatedInit = meth.DesignatedInit;
+  // TODO: We should be able to express more in the YAML and/or need to
+  // rename the yaml entry.
+  if (meth.FactoryAsInit)
+    mInfo.setFactoryAsInitKind(FactoryAsInitKind::AsClassMethod);
+
+  // Translate availability info.
+  if (translateAvailability(meth.Availability, mInfo, meth.Selector))
+    return true;
+
+  // Translate nullability info.
+  if (meth.NullabilityOfRet != UnknownNullability) {
+    mInfo.addTypeInfo(0, meth.NullabilityOfRet);
+  }
+  if (meth.Nullability.size() > ObjCMethodInfo::getMaxNullabilityIndex()) {
+    llvm::errs() << "Nullability info for "
+                 << className << meth.Selector << " does not fit.";
+    return true;
+  }
+  unsigned int idx = 1;
+  for (auto i = meth.Nullability.begin(),
+       e = meth.Nullability.end(); i != e; ++i, ++idx) {
+    mInfo.addTypeInfo(idx, *i);
+  }
+
+  // Write it.
+  writer.addObjCMethod(classID, selectorRef,
+                       meth.Kind == MethodKind::Instance,
+                       mInfo);
+  return false;
+}
+
+static bool compile(const Module &module, llvm::raw_ostream &os){
+  using namespace api_notes;
+  APINotesWriter writer;
+
+  // Write all classes.
+  for (auto iCl = module.Classes.begin(), eCl = module.Classes.end();
+       iCl != eCl; ++iCl) {
+    Class cl = *iCl;
+
+    // Write the class.
+    ObjCContextInfo cInfo;
+    if (cl.AuditedForNullability)
+      cInfo.setDefaultNullability(DefaultNullability);
+    if (translateAvailability(cl.Availability, cInfo, cl.Name))
+      return true;
+    ContextID clID = writer.addObjCClass(cl.Name, cInfo);
+
+    // Write all methods.
+    for (auto iMeth = cl.Methods.begin(), eMeth = cl.Methods.end();
+         iMeth != eMeth; ++iMeth) {
+      writeMethod(writer, *iMeth, clID, cl.Name);
+    }
+
+    // Write all properties.
+    for (auto iProp = cl.Properties.begin(), eProp = cl.Properties.end();
+         iProp != eProp; ++iProp) {
+      // Translate from Property into ObjCPropertyInfo.
+      Property prop = *iProp;
+      ObjCPropertyInfo pInfo;
+      pInfo.setNullabilityAudited(prop.Nullability);
+      if (translateAvailability(cl.Availability, cInfo, cl.Name))
+        return true;
+      writer.addObjCProperty(clID, prop.Name, pInfo);
+    }
+  }
+
+  writer.writeToStream(os);
+
+  return false;
+}
+
 bool api_notes::parseAndDumpAPINotes(StringRef yamlInput)  {
   Module module;
 
@@ -340,5 +467,5 @@ bool api_notes::compileAPINotes(StringRef yamlInput,
   if (parseAPINotes(yamlInput, module))
     return true;
 
-  return false;
+  return compile(module, os);
 }

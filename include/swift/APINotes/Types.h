@@ -19,6 +19,7 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <climits>
 #include <initializer_list>
@@ -267,11 +268,14 @@ public:
     FactoryAsInit = static_cast<unsigned>(kind);
   }
 
+  static unsigned getMaxNullabilityIndex() {
+    return ((sizeof(NullabilityPayload) * CHAR_BIT)/NullableKindSize);
+  }
+
   void addTypeInfo(unsigned index, NullableKind kind) {
-    assert(index <=
-           (sizeof(NullabilityPayload) * CHAR_BIT)/NullableKindSize);
+    assert(index <= getMaxNullabilityIndex());
     assert(static_cast<unsigned>(kind) < NullableKindMask);
-    assert(NullabilityAudited);
+    NullabilityAudited = true;
     unsigned kindValue =
     (static_cast<unsigned>(kind)) << (index * NullableKindSize);
     NullabilityPayload |= kindValue;
@@ -325,6 +329,11 @@ public:
     }
 
     return lhs;
+  }
+  void dump(llvm::raw_ostream &os) {
+    os << DesignatedInit << " " << FactoryAsInit << " " << Unavailable << " "
+       << NullabilityAudited << " " << NumAdjustedNullable << " "
+       << NullabilityPayload << " " << UnavailableMsg << "\n";
   }
 };
 

@@ -5,7 +5,6 @@ Availability:    iOS
 AvailabilityMsg: iOSOnly
 Classes:
   - Name:            UIFont
-    AuditedForNullability: false
     Availability:    iOS
     AvailabilityMsg: iOSOnly
     Methods:
@@ -15,7 +14,6 @@ Classes:
         NullabilityOfRet: O
         Availability:    iOS
         AvailabilityMsg: iOSOnly
-        FactoryAsInit:   false
         DesignatedInit:  true
     Properties:
       - Name:            familyName
@@ -54,7 +52,6 @@ Globals:
 # CHECK: AvailabilityMsg: iOSOnly
 # CHECK: Classes:
 # CHECK:   - Name:            UIFont
-# CHECK:     AuditedForNullability: false
 # CHECK:     Availability:    iOS
 # CHECK:     AvailabilityMsg: iOSOnly
 # CHECK:     Methods:
@@ -64,7 +61,6 @@ Globals:
 # CHECK:         NullabilityOfRet: O
 # CHECK:         Availability:    iOS
 # CHECK:         AvailabilityMsg: iOSOnly
-# CHECK:         FactoryAsInit:   false
 # CHECK:         DesignatedInit:  true
 # CHECK:     Properties:
 # CHECK:       - Name:            familyName

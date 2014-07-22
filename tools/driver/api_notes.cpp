@@ -70,13 +70,12 @@ int apinotes_main(ArrayRef<const char *> Args) {
     return 1;
   }
 
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileBufOrErr =
-    MemoryBuffer::getFile(InputFilename);
-  if (std::error_code EC = FileBufOrErr.getError()) {
+  auto fileBufOrErr = MemoryBuffer::getFile(InputFilename);
+  if (std::error_code EC = fileBufOrErr.getError()) {
     llvm::errs() << "\n Could not open input file: " + EC.message() << '\n';
     return true;
   }
-  StringRef yamlInput = FileBufOrErr.get()->getBuffer();
+  StringRef yamlInput = fileBufOrErr.get()->getBuffer();
 
   if (Action == swift::api_notes::ActionType::YAMLToBinary) {
     if (OutputFilename.empty()) {
