@@ -472,6 +472,10 @@ void DiagnosticEngine::flushActiveDiagnostic() {
           else
             options = PrintOptions::printEverything();
 
+          // Never print the @transparent attribute, it doesn't affect overload
+          // resolution and we don't want users to see it.
+          options.PrintAttrTransparent = false;
+
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out);
