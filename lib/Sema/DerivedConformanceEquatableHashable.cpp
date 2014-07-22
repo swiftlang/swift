@@ -488,7 +488,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   auto patDecl = new (C) PatternBindingDecl(SourceLoc(),
                               StaticSpellingKind::None,
                               SourceLoc(), hashValuePat, nullptr,
-                              /*conditional*/true, enumDecl);
+                              /*conditional*/false, enumDecl);
   patDecl->setImplicit();
   
   enumDecl->addMember(getterDecl);
