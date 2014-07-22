@@ -27,27 +27,17 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include <vector>
-#include <cstdint>
 
 namespace swift {
 namespace Punycode {
 
-/// Encodes a sequence of code points into Punycode.
+/// Encodes a UTF-8-encoded Unicode string into Punycode.
+void encodePunycode(StringRef InputUTF8, std::string &OutPunycode);
+
+/// Decodes a Punycode string into a UTF-8-encoded Unicode string.
 ///
-/// Returns false if input contains surrogate code points.
-bool encodePunycode(const std::vector<uint32_t> &InputCodePoints,
-                    std::string &OutPunycode);
-
-/// Decodes a Punycode string into a sequence of Unicode scalars.
-///
-/// Returns false if decoding failed.
-bool decodePunycode(StringRef InputPunycode,
-                    std::vector<uint32_t> &OutCodePoints);
-
-bool encodePunycodeUTF8(StringRef InputUTF8, std::string &OutPunycode);
-
-bool decodePunycodeUTF8(StringRef InputPunycode, std::string &OutUTF8);
+/// Returns true if the encoding failed, false if it succeeded.
+bool decodePunycode(StringRef InputPunycode, std::string &OutUTF8);
 
 } // end namespace Punycode
 } // end namespace swift

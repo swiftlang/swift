@@ -12,7 +12,6 @@ add_swift_library(swiftBasic
   PrimitiveParsing.cpp
   Program.cpp
   Punycode.cpp
-  PunycodeUTF8.cpp
   QuotedString.cpp
   SourceLoc.cpp
   StringExtras.cpp

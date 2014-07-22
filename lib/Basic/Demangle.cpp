@@ -718,7 +718,7 @@ private:
     auto decode = [&](StringRef s) -> StringRef {
       if (!isPunycoded)
         return s;
-      if (!Punycode::decodePunycodeUTF8(s, decodeBuffer))
+      if (Punycode::decodePunycode(s, decodeBuffer))
         return {};
       return decodeBuffer;
     };

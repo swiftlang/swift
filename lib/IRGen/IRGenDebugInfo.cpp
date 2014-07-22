@@ -84,7 +84,7 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
   std::string PunycodeBuf;
   if (isNonAscii(Id)) {
     OS << 'X';
-    Punycode::encodePunycodeUTF8(Id, PunycodeBuf);
+    Punycode::encodePunycode(Id, PunycodeBuf);
     Id = PunycodeBuf;
   }
   OS << Id.size() << Id;
