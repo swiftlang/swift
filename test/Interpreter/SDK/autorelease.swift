@@ -8,7 +8,7 @@ import Foundation
 
 class PrintOnDeinit: NSObject {
   // Result should get autoreleased.
-  @objc class func create() -> PrintOnDeinit {
+  dynamic class func create() -> PrintOnDeinit {
     return PrintOnDeinit()
   }
 
