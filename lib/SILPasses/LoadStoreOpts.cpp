@@ -659,48 +659,7 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
   StringRef getName() override { return "SIL Load Store Opts"; }
 };
 
-class LoadStoreOpts : public SILFunctionTransform {
-
-  /// The entry point to the transformation.
-  void run() {
-    SILFunction *F = getFunction();
-
-    DEBUG(llvm::dbgs() << "***** Load Store Elimination on function: "
-          << F->getName() << " *****\n");
-
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
-
-    // Remove dead stores, merge duplicate loads, and forward stores to loads.
-    bool Changed = false;
-    for (auto &BB : *F) {
-      LSBBForwarder Forwarder;
-      Forwarder.init(&BB, AA, NULL);
-      while (Forwarder.optimize()) {
-        Forwarder.clear();
-        Changed = true;
-      }
-    }
-
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-  }
-
-  StringRef getName() override { return "SIL Load Store Opts"; }
-};
-
 } // end anonymous namespace
-
-llvm::cl::opt<bool>
-EnableGlobalLoadStoreOpts("enable-global-load-store-opts",
-                          llvm::cl::init(false));
-
-SILTransform *swift::createLoadStoreOpts() {
-  if (EnableGlobalLoadStoreOpts) {
-    return new GlobalLoadStoreOpts();
-  }
-
-  return new LoadStoreOpts();
-}
 
 SILTransform *swift::createGlobalLoadStoreOpts() {
   return new GlobalLoadStoreOpts();

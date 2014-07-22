@@ -67,7 +67,6 @@ enum class PassKind {
   DeadObjectElimination,
   InstCount,
   AADumper,
-  LoadStoreOpts,
   SILLinker,
   GlobalARCOpts,
   DCE,
@@ -225,10 +224,6 @@ Passes(llvm::cl::desc("Passes:"),
                                    "aa-dump",
                                    "Dump AA result for all pairs of ValueKinds"
                                    " in all functions."),
-                        clEnumValN(PassKind::LoadStoreOpts,
-                                   "load-store-opts",
-                                   "Remove duplicate loads, dead stores, and "
-                                   "perform load forwarding."),
                         clEnumValN(PassKind::SILLinker,
                                    "linker",
                                    "Link in all serialized SIL referenced by "
@@ -428,9 +423,6 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::AADumper:
       PM.add(createSILAADumper());
-      break;
-    case PassKind::LoadStoreOpts:
-      PM.add(createLoadStoreOpts());
       break;
     case PassKind::SILLinker:
       PM.add(createSILLinker());

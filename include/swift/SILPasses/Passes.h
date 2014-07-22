@@ -78,7 +78,6 @@ namespace swift {
   SILTransform *createInlineCaches();
   SILTransform *createAllocBoxToStack();
   SILTransform *createDeadObjectElimination();
-  SILTransform *createLoadStoreOpts();
   SILTransform *createGlobalLoadStoreOpts();
   SILTransform *createPerformanceConstantPropagation();
   SILTransform *createGlobalARCOpts();
