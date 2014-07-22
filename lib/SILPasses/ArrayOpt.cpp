@@ -193,6 +193,17 @@ namespace {
 /// mutation can occur between the retain and release. To accomplish this it
 /// relies on knowledge of all array operations within the loop. If the array
 /// escapes in some way that cannot be tracked, the analysis must fail.
+///
+/// TODO: Handle this pattern:
+///   retain(array)
+///   call(array)
+///   release(array)
+/// Whenever the call is readonly, has balanced retain/release for the array,
+/// and does not capture the array. Under these conditions, the call can neither
+/// mutate the array nor save an alias for later mutation.
+///
+/// TODO: Handle array's that are loaded or returned from a function call. (This
+/// is not very common because it implies a copy).
 class SILArrayOpt {
   SILFunction *Function;
   SILLoop *Loop;
