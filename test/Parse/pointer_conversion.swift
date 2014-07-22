@@ -7,14 +7,14 @@ func takesMutablePointer(x: UnsafeMutablePointer<Int>) {} // expected-note{{}}ex
 func takesMutableVoidPointer(x: UnsafeMutablePointer<Void>) {}  // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 func takesMutableInt8Pointer(x: UnsafeMutablePointer<Int8>) {}  // expected-note{{}}expected-note{{}}
 func takesMutableArrayPointer(x: UnsafeMutablePointer<[Int]>) {} // expected-note{{}}
-func takesConstPointer(x: ConstUnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}expected-note{{}}
-func takesConstInt8Pointer(x: ConstUnsafePointer<Int8>) {}
-func takesConstUInt8Pointer(x: ConstUnsafePointer<UInt8>) {}
-func takesConstVoidPointer(x: ConstUnsafePointer<Void>) {}
+func takesConstPointer(x: UnsafePointer<Int>) -> Character { return "x" } // expected-note{{}}expected-note{{}}expected-note{{}}
+func takesConstInt8Pointer(x: UnsafePointer<Int8>) {}
+func takesConstUInt8Pointer(x: UnsafePointer<UInt8>) {}
+func takesConstVoidPointer(x: UnsafePointer<Void>) {}
 func takesAutoreleasingPointer(x: AutoreleasingUnsafeMutablePointer<C>) {} // expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}expected-note{{}}
 
 func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
-                             cp: ConstUnsafePointer<Int>,
+                             cp: UnsafePointer<Int>,
                              ap: AutoreleasingUnsafeMutablePointer<Int>) {
   takesMutablePointer(nil)
   takesMutablePointer(p)
@@ -42,7 +42,7 @@ func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
 }
 
 func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
-                                 cp: ConstUnsafePointer<Int>,
+                                 cp: UnsafePointer<Int>,
                                  ap: AutoreleasingUnsafeMutablePointer<Int>,
                                  fp: UnsafeMutablePointer<Float>) {
   takesMutableVoidPointer(nil)
@@ -72,7 +72,7 @@ func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
 }
 
 func constPointerArguments(p: UnsafeMutablePointer<Int>,
-                           cp: ConstUnsafePointer<Int>,
+                           cp: UnsafePointer<Int>,
                            ap: AutoreleasingUnsafeMutablePointer<Int>) {
   takesConstPointer(nil)
   takesConstPointer(p)
@@ -93,7 +93,7 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: ConstUnsafePointer<Int> = &i // expected-error{{}}
+  var x: UnsafePointer<Int> = &i // expected-error{{}}
   x = ii // expected-error{{}}
   x = p // expected-error{{}}
   x = ap // expected-error{{}}
@@ -101,8 +101,8 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
 
 func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
                                fp: UnsafeMutablePointer<Float>,
-                               cp: ConstUnsafePointer<Int>,
-                               cfp: ConstUnsafePointer<Float>,
+                               cp: UnsafePointer<Int>,
+                               cfp: UnsafePointer<Float>,
                                ap: AutoreleasingUnsafeMutablePointer<Int>,
                                afp: AutoreleasingUnsafeMutablePointer<Float>) {
   takesConstVoidPointer(nil)
@@ -127,7 +127,7 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   // TODO: takesConstVoidPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
-  var x: ConstUnsafePointer<Void> = &i // expected-error{{}}
+  var x: UnsafePointer<Void> = &i // expected-error{{}}
   x = ii // expected-error{{}}
   x = p // expected-error{{}}
   x = fp // expected-error{{}}
@@ -151,7 +151,7 @@ func stringArguments(var s: String) {
 }
 
 func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
-                                   cp: ConstUnsafePointer<Int>,
+                                   cp: UnsafePointer<Int>,
                                    ap: AutoreleasingUnsafeMutablePointer<C>) {
   takesAutoreleasingPointer(nil)
   takesAutoreleasingPointer(p) // expected-error{{}}

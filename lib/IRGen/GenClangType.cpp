@@ -237,7 +237,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   enum class StructKind {
     Invalid,
     UnsafeMutablePointer,
-    ConstUnsafePointer,
+    UnsafePointer,
     AutoreleasingUnsafeMutablePointer,
     Array,
     Dictionary,
@@ -245,7 +245,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
-    .Case("ConstUnsafePointer", StructKind::ConstUnsafePointer)
+    .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case(
       "AutoreleasingUnsafeMutablePointer",
         StructKind::AutoreleasingUnsafeMutablePointer)
@@ -271,7 +271,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     if (!clangCanTy) return clang::CanQualType();
     return getClangASTContext().getPointerType(clangCanTy);
   }
-  case StructKind::ConstUnsafePointer: {
+  case StructKind::UnsafePointer: {
     assert(args.size() == 1 &&
            "*Pointer<T> should have a single generic argument!");
     clang::QualType clangTy

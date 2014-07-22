@@ -16,8 +16,8 @@
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
 % for mutable in (True, False):
-%  Self = 'UnsafeMutablePointer' if mutable else 'ConstUnsafePointer'
-%  a_Self = 'an UnsafeMutablePointer' if mutable else 'a ConstUnsafePointer'
+%  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
+%  a_Self = 'an UnsafeMutablePointer' if mutable else 'a UnsafePointer'
 %  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
@@ -63,10 +63,10 @@ public struct ${Self}<T>
     value = from.value
   }
 
-  /// Convert from a ConstUnsafePointer of a different type.
+  /// Convert from a UnsafePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
-  public init<U>(_ from : ConstUnsafePointer<U>) {
+  public init<U>(_ from : UnsafePointer<U>) {
     value = from.value
   }
 

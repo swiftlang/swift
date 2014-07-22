@@ -452,8 +452,8 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK)  {
     auto &C = getASTContext();
     if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
       PTK = PTK_UnsafeMutablePointer;
-    } else if (boundTy->getDecl() == C.getConstUnsafePointerDecl()) {
-      PTK = PTK_ConstUnsafePointer;
+    } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
+      PTK = PTK_UnsafePointer;
     } else if (
       boundTy->getDecl() == C.getAutoreleasingUnsafeMutablePointerDecl()
     ) {

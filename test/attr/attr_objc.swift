@@ -1560,14 +1560,14 @@ class HasNSManaged {
 
 @objc class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
-  func constUnsafeMutablePointer(p: ConstUnsafePointer<Int>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: ConstUnsafePointer<Int>) {
+  func constUnsafeMutablePointer(p: UnsafePointer<Int>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: UnsafePointer<Int>) {
 
-  func constUnsafeMutablePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(p: ConstUnsafePointer<AnyObject>) {
+  func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {
 
-  func constUnsafeMutablePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(p: ConstUnsafePointer<TakesCPointers>) {
+  func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {}
+  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {
 
   func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {}
   // CHECK-LABEL: @objc func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {

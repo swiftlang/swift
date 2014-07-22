@@ -8,7 +8,7 @@
 import Swift
 
 @asmname("vprintf")
-func c_vprintf(format: ConstUnsafePointer<Int8>, args: CVaListPointer)
+func c_vprintf(format: UnsafePointer<Int8>, args: CVaListPointer)
 
 func printf(format: String, arguments: CVarArgType...) {
   withVaList(arguments) {

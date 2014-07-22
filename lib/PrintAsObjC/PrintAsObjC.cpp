@@ -522,7 +522,7 @@ private:
 
     // Everything from here on is some kind of pointer type.
     bool isConst;
-    if (SD == ctx.getConstUnsafePointerDecl()) {
+    if (SD == ctx.getUnsafePointerDecl()) {
       isConst = true;
     } else if (SD == ctx.getAutoreleasingUnsafeMutablePointerDecl() ||
                SD == ctx.getUnsafeMutablePointerDecl()) {

@@ -5366,7 +5366,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   (void)elt;
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
-  case PTK_ConstUnsafePointer:
+  case PTK_UnsafePointer:
     // +1 is fine.
     break;
 

@@ -915,7 +915,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      if (PTK != PTK_ConstUnsafePointer) {
+      if (PTK != PTK_UnsafePointer) {
         Out << "StringToPointer converts to non-const pointer:\n";
         E->print(Out);
         Out << "\n";

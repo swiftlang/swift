@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
-/// UnsafeMutablePointer, ConstUnsafePointer, and
+/// UnsafeMutablePointer, UnsafePointer, and
 /// AutoreleasingUnsafeMutablePointer.
 protocol _PointerType {
   /// The underlying raw pointer value.

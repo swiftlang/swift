@@ -2429,7 +2429,7 @@ enum { NumOptionalTypeKinds = 2 };
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
   PTK_UnsafeMutablePointer,
-  PTK_ConstUnsafePointer,
+  PTK_UnsafePointer,
   PTK_AutoreleasingUnsafeMutablePointer,
 };
 

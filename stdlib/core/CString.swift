@@ -13,12 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 @asmname("strlen")
-func _strlen(arg : ConstUnsafePointer<CChar>) -> Int
+func _strlen(arg : UnsafePointer<CChar>) -> Int
 @asmname("strcpy")
-func _strcpy(dest: ConstUnsafePointer<CChar>, src: ConstUnsafePointer<CChar>)
-  -> ConstUnsafePointer<CChar>
+func _strcpy(dest: UnsafePointer<CChar>, src: UnsafePointer<CChar>)
+  -> UnsafePointer<CChar>
 @asmname("strcmp")
-func _strcmp(dest: ConstUnsafePointer<CChar>, src: ConstUnsafePointer<CChar>)
+func _strcmp(dest: UnsafePointer<CChar>, src: UnsafePointer<CChar>)
   -> CInt
 
 extension String {
@@ -27,7 +27,7 @@ extension String {
   ///
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
   /// UTF-8 code unit sequences.
-  public static func fromCString(cs: ConstUnsafePointer<CChar>) -> String? {
+  public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
       return .None
     }
@@ -43,7 +43,7 @@ extension String {
   /// ill-formed UTF-8 code unit sequences, replaces them with replacement
   /// characters (U+FFFD).
   public static func fromCStringRepairingIllFormedUTF8(
-    cs: ConstUnsafePointer<CChar>)
+    cs: UnsafePointer<CChar>)
       -> (String?, hadError: Bool) {
     if cs._isNull {
       return (.None, hadError: false)
@@ -55,10 +55,10 @@ extension String {
   }
 }
 
-/// From a non-`nil` `ConstUnsafePointer` to a null-terminated string
+/// From a non-`nil` `UnsafePointer` to a null-terminated string
 /// with possibly-transient lifetime, create a nul-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
-public func _persistCString(s: ConstUnsafePointer<CChar>) -> [CChar]? {
+public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return .None
   }

@@ -120,7 +120,7 @@ func rdar16786220(var let c: Int) -> () { // expected-error {{expected ',' separ
 infix operator !!! {}
 
 func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }  // expected-note {{found this candidate}}
-func !!!<T>(lhs: ConstUnsafePointer<T>, rhs: ConstUnsafePointer<T>) -> Bool { return false } // expected-note {{found this candidate}}
+func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false } // expected-note {{found this candidate}}
 [1] !!! [1]  // expected-error {{ambiguous use of operator '!!!'}}
 
 

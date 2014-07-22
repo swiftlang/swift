@@ -629,8 +629,8 @@ class _NativeDictionaryStorageOwnerBase
 
   @objc
   init(
-    objects: ConstUnsafePointer<AnyObject?>,
-    forKeys: ConstUnsafePointer<Void>,
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafePointer<Void>,
     count: Int
   ) {
     _fatalError("don't call this designated initializer")
@@ -2170,8 +2170,8 @@ public protocol _SwiftNSDictionaryRequiredOverridesType :
 
   // The designated initializer of `NSDictionary`.
   init(
-    objects: ConstUnsafePointer<AnyObject?>,
-    forKeys: ConstUnsafePointer<Void>, count: Int)
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafePointer<Void>, count: Int)
 
   var count: Int { get }
   func objectForKey(aKey: AnyObject?) -> AnyObject?

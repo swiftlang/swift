@@ -239,7 +239,7 @@ namespace {
       
       if (quals.hasConst())
         return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                     "ConstUnsafePointer",
+                                                     "UnsafePointer",
                                                      pointeeType),
                 ImportHint::None};
       // Mutable pointers with __autoreleasing or __unsafe_unretained

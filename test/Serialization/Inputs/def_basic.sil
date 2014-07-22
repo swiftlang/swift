@@ -981,28 +981,28 @@ entry(%f : $@thin (@out Int, Int) -> (), %x : $Int):
 
 // Make sure we serialize the body of closure even without -sil-serialize-all.
 // CHECK_DECL-LABEL:  @partial_apply_with_closure
-sil [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, ConstUnsafePointer<Int8>, Int64) -> () {
-bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $ConstUnsafePointer<Int8>, %3 : $Int64):
-  %17 = function_ref @closure_body : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> ()
+sil [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
+bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $UnsafePointer<Int8>, %3 : $Int64):
+  %17 = function_ref @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 // CHECK_DECL: function_ref @closure_body
-  %18 = partial_apply %17(%2, %3) : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> ()
+  %18 = partial_apply %17(%2, %3) : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 // CHECK_DECL: partial_apply
   %30 = tuple ()
   return %30 : $()
 }
 
-sil shared @closure_body : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> () {
-bb0(%0 : $ConstUnsafePointer<Int8>, %1 : $ConstUnsafePointer<Int8>, %2 : $Int64):
-  %3 = function_ref @assert_fail : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> ()
-  %4 = apply %3(%0, %1, %2) : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> ()
+sil shared @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
+bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
+  %3 = function_ref @assert_fail : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
+  %4 = apply %3(%0, %1, %2) : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
   %5 = tuple ()
   return %5 : $()
 }
 
-// CHECK_DECL-LABEL: @closure_body : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> () {
+// CHECK_DECL-LABEL: @closure_body : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
 // CHECK_DECL: function_ref @assert_fail
 
-sil @assert_fail : $@thin (ConstUnsafePointer<Int8>, ConstUnsafePointer<Int8>, Int64) -> ()
+sil @assert_fail : $@thin (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 
 // rdar: 15893086 
 struct GenericStruct<T> {
@@ -1210,7 +1210,7 @@ bb0:
   %126 = function_ref @protocol_conversion : $@thin () -> @owned Protocol
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
-  %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, ConstUnsafePointer<Int8>, Int64) -> ()
+  %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
   %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
 
   %119 = tuple ()

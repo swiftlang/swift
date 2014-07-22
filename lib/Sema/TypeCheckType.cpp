@@ -2216,8 +2216,8 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     if (auto pointerElt = T->getAnyPointerElementType(PTK)) {
       switch (PTK) {
       case PTK_UnsafeMutablePointer:
-      case PTK_ConstUnsafePointer: {
-        // An UnsafeMutablePointer<T> or ConstUnsafePointer<T> is
+      case PTK_UnsafePointer: {
+        // An UnsafeMutablePointer<T> or UnsafePointer<T> is
         // representable in Objective-C if T is a trivially
         // representable type or Void.
         return pointerElt->isEqual(Context.TheEmptyTupleType)

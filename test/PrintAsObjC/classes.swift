@@ -199,8 +199,8 @@ typealias AliasForNSRect = NSRect
 
   func testNested(a: UnsafeMutablePointer<UnsafeMutablePointer<Int>>) {}
 
-  func testBridging(a: ConstUnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
-  func testBridgingVoid(a: UnsafeMutablePointer<Void>, b: ConstUnsafePointer<Void>) {}
+  func testBridging(a: UnsafePointer<Int>, b: UnsafeMutablePointer<Int>, c: AutoreleasingUnsafeMutablePointer<Methods>) {}
+  func testBridgingVoid(a: UnsafeMutablePointer<Void>, b: UnsafePointer<Void>) {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject

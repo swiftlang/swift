@@ -251,7 +251,7 @@ extension String {
   /// Returns a string containing the bytes in a given C array,
   /// interpreted according to a given encoding.
   public static func stringWithCString(
-    cString: ConstUnsafePointer<CChar>,
+    cString: UnsafePointer<CChar>,
     encoding enc: NSStringEncoding
   ) -> String? {
     return NSString.stringWithCString(cString, encoding: enc)
@@ -267,7 +267,7 @@ extension String {
   /// Returns a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
   public static func stringWithUTF8String(
-    bytes: ConstUnsafePointer<CChar>
+    bytes: UnsafePointer<CChar>
   ) -> String? {
     return NSString.stringWithUTF8String(bytes)
   }
@@ -766,7 +766,7 @@ extension String {
   /// given number of characters from a given array of Unicode
   /// characters.
   public init(
-    utf16CodeUnits: ConstUnsafePointer<unichar>,
+    utf16CodeUnits: UnsafePointer<unichar>,
     count: Int
   ) {
     self = NSString(characters: utf16CodeUnits, length: count)
@@ -780,7 +780,7 @@ extension String {
   /// Returns an initialized `String` object that contains a given
   /// number of characters from a given array of UTF-16 Code Units
   public init(
-    utf16CodeUnitsNoCopy: ConstUnsafePointer<unichar>,
+    utf16CodeUnitsNoCopy: UnsafePointer<unichar>,
     count: Int, 
     freeWhenDone flag: Bool
   ) {

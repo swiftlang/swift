@@ -1090,7 +1090,7 @@ extension NSArray {
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // Use Imported:
     // @objc(initWithObjects:count:)
-    //    init(withObjects objects: ConstUnsafePointer<AnyObject?>,
+    //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
     self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
@@ -1121,7 +1121,7 @@ extension NSOrderedSet {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)
-    // init(withObjects objects: ConstUnsafePointer<AnyObject?>,
+    // init(withObjects objects: UnsafePointer<AnyObject?>,
     //      count cnt: Int)
     self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
@@ -1136,7 +1136,7 @@ extension NSSet {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)
-    // init(withObjects objects: ConstUnsafePointer<AnyObject?>, count cnt: Int)
+    // init(withObjects objects: UnsafePointer<AnyObject?>, count cnt: Int)
     self.init(objects: UnsafeMutablePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }

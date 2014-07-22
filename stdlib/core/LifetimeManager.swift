@@ -36,10 +36,10 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
-    f: (ConstUnsafePointer<Int8>)->Result
+    f: (UnsafePointer<Int8>)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafeMutablePointerToElements {
-      f(ConstUnsafePointer($0))
+      f(UnsafePointer($0))
     }
   }
 

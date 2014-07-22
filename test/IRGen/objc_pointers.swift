@@ -4,9 +4,9 @@
 import Foundation
 
 @objc class Foo {
-  // CHECK: define internal void @_TToFC13objc_pointers3Foo16pointerArgumentsfS0_FTGVSs20UnsafeMutablePointerSi_1yGS1_T__1zGVSs18ConstUnsafePointerSi_1wGVSs33AutoreleasingUnsafeMutablePointerGSqS0____T_(%0*, i8*, i64*, i8*, i64*, %0**)
+  // CHECK: define internal void @_TToFC13objc_pointers3Foo16pointerArgumentsfS0_FTGVSs20UnsafeMutablePointerSi_1yGS1_T__1zGVSs13UnsafePointerSi_1wGVSs33AutoreleasingUnsafeMutablePointerGSqS0____T_(%0*, i8*, i64*, i8*, i64*, %0**)
   @objc func pointerArguments(x: UnsafeMutablePointer<Int>,
                               y: UnsafeMutablePointer<Void>,
-                              z: ConstUnsafePointer<Int>,
+                              z: UnsafePointer<Int>,
                               w: AutoreleasingUnsafeMutablePointer<Foo?>) {}
 }

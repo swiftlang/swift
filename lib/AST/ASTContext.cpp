@@ -86,8 +86,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *UnsafeMutablePointerDecl = nullptr;
   
-  /// The declaration of Swift.ConstUnsafePointer<T>.
-  NominalTypeDecl *ConstUnsafePointerDecl = nullptr;
+  /// The declaration of Swift.UnsafePointer<T>.
+  NominalTypeDecl *UnsafePointerDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
@@ -541,12 +541,12 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   return Impl.UnsafeMutablePointerDecl;
 }
 
-NominalTypeDecl *ASTContext::getConstUnsafePointerDecl() const {
-  if (!Impl.ConstUnsafePointerDecl)
-    Impl.ConstUnsafePointerDecl
-      = findSyntaxSugarImpl(*this, "ConstUnsafePointer");
+NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
+  if (!Impl.UnsafePointerDecl)
+    Impl.UnsafePointerDecl
+      = findSyntaxSugarImpl(*this, "UnsafePointer");
   
-  return Impl.ConstUnsafePointerDecl;
+  return Impl.UnsafePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
@@ -886,7 +886,7 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
 
 bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
   return getUnsafeMutablePointerDecl()
-    && getConstUnsafePointerDecl()
+    && getUnsafePointerDecl()
     && getAutoreleasingUnsafeMutablePointerDecl()
     && getConvertPointerToPointerArgument(resolver)
     && getConvertMutableArrayToPointerArgument(resolver)

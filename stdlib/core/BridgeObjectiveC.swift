@@ -299,7 +299,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return (ConstUnsafePointer<T>(self) + i).memory
+      return (UnsafePointer<T>(self) + i).memory
     }
   }
   
@@ -329,12 +329,12 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     self.value = ptr.value
   }
 
-  /// Explicit construction from a ConstUnsafePointer.
+  /// Explicit construction from a UnsafePointer.
   ///
-  /// This is inherently unsafe because ConstUnsafePointers do not imply
+  /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
   @transparent
-  init<U>(_ ptr: ConstUnsafePointer<U>) {
+  init<U>(_ ptr: UnsafePointer<U>) {
     self.value = ptr.value
   }
 }

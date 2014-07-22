@@ -24,14 +24,14 @@ The Pointer Types
 
 In the standard library, we provide three pointer types:
 
-- ``ConstUnsafePointer<T>``, corresponding to ``T const *`` in C and ARC,
+- ``UnsafePointer<T>``, corresponding to ``T const *`` in C and ARC,
 - ``UnsafeMutablePointer<T>``, corresponding to ``T *`` in C, and ``T* __strong *`` in
   ARC for class types, and
 - ``AutoreleasingUnsafeMutablePointer<T>`` (for all ``T: AnyObject``), corresponding
   to ``T* __autoreleasing *`` in ARC.
 
 These types are all one word, have no ownership semantics, and share a common
-interface. ``ConstUnsafePointer`` does not expose operations for storing to the
+interface. ``UnsafePointer`` does not expose operations for storing to the
 referenced memory. ``UnsafeMutablePointer`` and ``AutoreleasingUnsafeMutablePointer`` differ
 in store behavior: ``UnsafeMutablePointer`` assumes that the pointed-to reference has
 ownership semantics, so ``ptr.initialize(x)`` consumes a reference to ``x``,
@@ -40,7 +40,7 @@ new value.  ``AutoreleasingUnsafeMutablePointer`` assumes that the pointed-to
 reference does not have ownership semantics, so values are autoreleased before
 being stored by either initialize() or assign(), and no release is done on
 reassignment. Loading from any of the three kinds of pointer does a strong
-load, so there is no need for a separate ``AutoreleasingConstUnsafePointer``.
+load, so there is no need for a separate ``AutoreleasingUnsafePointer``.
 
 Conversion behavior for pointer arguments
 =========================================
@@ -122,16 +122,16 @@ You can call it as any of::
   bas(p)
   bas(&x)
 
-ConstUnsafePointer<T>
+UnsafePointer<T>
 ---------------------
 
 When a function is declared as taking an ``UnsafeMutablePointer<T>`` argument, it can
 accept any of the following:
 
 - nil, which is passed as a null pointer,
-- an ``UnsafeMutablePointer<T>``, ``ConstUnsafePointer<T>``, or
+- an ``UnsafeMutablePointer<T>``, ``UnsafePointer<T>``, or
   ``AutoreleasingUnsafeMutablePointer<T>`` value, which is converted to
-  ``ConstUnsafePointer<T>`` if necessary and passed verbatim,
+  ``UnsafePointer<T>`` if necessary and passed verbatim,
 - an inout expression whose operand is an lvalue of type ``T``, which is passed
   as the address of (the potentially temporary writeback buffer of) the lvalue,
   or
@@ -139,18 +139,18 @@ accept any of the following:
   array, and lifetime-extended for the duration of the callee.
 
 As a special case, when a function is declared as taking an
-``ConstUnsafePointer<Void>`` argument, it can accept the same operands as
-``ConstUnsafePointer<T>`` for any type ``T``. Pointers to certain integer
+``UnsafePointer<Void>`` argument, it can accept the same operands as
+``UnsafePointer<T>`` for any type ``T``. Pointers to certain integer
 types can furthermore interoperate with strings; see `Strings`_ below.
 
 So if you have a function declared::
 
-  func zim(x: ConstUnsafePointer<Float>)
+  func zim(x: UnsafePointer<Float>)
 
 You can call it as any of::
 
   var x: Float = 0.0
-  var p: ConstUnsafePointer<Float> = nil
+  var p: UnsafePointer<Float> = nil
   zim(nil)
   zim(p)
   zim(&x)
@@ -158,12 +158,12 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func zang(x: ConstUnsafePointer<Void>)
+  func zang(x: UnsafePointer<Void>)
 
 You can call it as any of::
 
   var x: Float = 0.0, y: Int = 0
-  var p: ConstUnsafePointer<Float> = nil, q: ConstUnsafePointer<Int> = nil
+  var p: UnsafePointer<Float> = nil, q: UnsafePointer<Int> = nil
   zang(nil)
   zang(p)
   zang(q)
@@ -175,7 +175,7 @@ You can call it as any of::
   zang(ints)
 
 A type checker limitation prevents array literals from being passed directly
-to ``ConstUnsafePointer<Void>`` arguments without type annotation. As a
+to ``UnsafePointer<Void>`` arguments without type annotation. As a
 workaround, you can bind the array literal to a constant, as above, or 
 specify the array type with ``as``::
 
@@ -197,7 +197,7 @@ Swift ``String`` values and string literals:
 - (not implemented yet) ``CInt``, ``CUnsignedInt``, ``CWideChar``, and ``CChar32``, which interoperate
   with ``String`` as a UTF-32 code unit array.
 
-A ``ConstUnsafePointer`` parameter with any of the above element types may take
+A ``UnsafePointer`` parameter with any of the above element types may take
 a ``String`` value as an argument. The string is transcoded to a null-terminated
 buffer of the appropriate encoding, if necessary, and a pointer to the buffer
 is passed to the function.  The callee may not mutate through the array, and

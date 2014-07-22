@@ -376,8 +376,8 @@ public:
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 
-  /// Retrieve the declaration of Swift.ConstUnsafePointer<T>.
-  NominalTypeDecl *getConstUnsafePointerDecl() const;
+  /// Retrieve the declaration of Swift.UnsafePointer<T>.
+  NominalTypeDecl *getUnsafePointerDecl() const;
 
   /// Retrieve the declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *getAutoreleasingUnsafeMutablePointerDecl() const;

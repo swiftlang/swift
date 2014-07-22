@@ -133,34 +133,34 @@ internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
     _sanityCheck(metadata.SuppDataBytesOffset == ${SuppDataBytesOffset})
   }
 
-  let _trieData: ConstUnsafePointer<UInt8>
+  let _trieData: UnsafePointer<UInt8>
 
 % if BMPLookupBytesPerEntry == 1:
-  @transparent var _BMPLookup: ConstUnsafePointer<UInt8> {
+  @transparent var _BMPLookup: UnsafePointer<UInt8> {
     return _trieData + ${BMPLookupBytesOffset}
   }
 % end
 
 % if BMPDataBytesPerEntry == 1:
-  @transparent var _BMPData: ConstUnsafePointer<UInt8> {
+  @transparent var _BMPData: UnsafePointer<UInt8> {
     return _trieData + ${BMPDataBytesOffset}
   }
 % end
 
 % if SuppLookup1BytesPerEntry == 1:
-  @transparent var _SuppLookup1: ConstUnsafePointer<UInt8> {
+  @transparent var _SuppLookup1: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup1BytesOffset}
   }
 % end
 
 % if SuppLookup2BytesPerEntry == 1:
-  @transparent var _SuppLookup2: ConstUnsafePointer<UInt8> {
+  @transparent var _SuppLookup2: UnsafePointer<UInt8> {
     return _trieData + ${SuppLookup2BytesOffset}
   }
 % end
 
 % if SuppDataBytesPerEntry == 1:
-  @transparent var _SuppData: ConstUnsafePointer<UInt8> {
+  @transparent var _SuppData: UnsafePointer<UInt8> {
     return _trieData + ${SuppDataBytesOffset}
   }
 % end
@@ -232,7 +232,7 @@ internal struct _UnicodeGraphemeClusterBreakPropertyTrie {
 }
 
 internal struct _UnicodeExtendedGraphemeClusterSegmenter {
-  let _noBoundaryRulesMatrix: ConstUnsafePointer<UInt16>
+  let _noBoundaryRulesMatrix: UnsafePointer<UInt16>
 
   init() {
     _noBoundaryRulesMatrix =

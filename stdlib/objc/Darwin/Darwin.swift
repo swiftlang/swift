@@ -87,28 +87,28 @@ extension stat {
 //===----------------------------------------------------------------------===//
 
 @asmname("_swift_Darwin_open") 
-func _swift_Darwin_open(path: ConstUnsafePointer<CChar>,
+func _swift_Darwin_open(path: UnsafePointer<CChar>,
   oflag: CInt, mode: mode_t) -> CInt
 @asmname("_swift_Darwin_openat")
 func _swift_Darwin_openat(fd: CInt,
-  path: ConstUnsafePointer<CChar>,
+  path: UnsafePointer<CChar>,
   oflag: CInt, mode: mode_t) -> CInt
 
-public func open(path: ConstUnsafePointer<CChar>, oflag: CInt) -> CInt {
+public func open(path: UnsafePointer<CChar>, oflag: CInt) -> CInt {
   return _swift_Darwin_open(path, oflag, 0)
 }
 
-public func open(path: ConstUnsafePointer<CChar>, oflag: CInt,
+public func open(path: UnsafePointer<CChar>, oflag: CInt,
   mode: mode_t) -> CInt {
   return _swift_Darwin_open(path, oflag, mode)
 }
 
-public func openat(fd: CInt, path: ConstUnsafePointer<CChar>,
+public func openat(fd: CInt, path: UnsafePointer<CChar>,
   oflag: CInt) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, 0)
 }
 
-public func openat(fd: CInt, path: ConstUnsafePointer<CChar>,
+public func openat(fd: CInt, path: UnsafePointer<CChar>,
   oflag: CInt, mode: mode_t) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, mode)
 }

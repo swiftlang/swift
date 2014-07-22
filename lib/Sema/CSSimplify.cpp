@@ -1738,7 +1738,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     if (kind >= TypeMatchKind::ArgumentConversion) {
       if (auto bgt2 = type2->getAs<BoundGenericType>()) {
         if (bgt2->getDecl() == getASTContext().getUnsafeMutablePointerDecl()
-            || bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()) {
+            || bgt2->getDecl() == getASTContext().getUnsafePointerDecl()) {
           // UnsafeMutablePointer can be converted from an inout reference to a
           // scalar or array.
           if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
@@ -1779,10 +1779,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                    ConversionRestrictionKind::PointerToPointer);
             }
             
-            // ConstUnsafePointer can also be converted from an array
-            // or string value, or a ConstUnsafePointer or
+            // UnsafePointer can also be converted from an array
+            // or string value, or a UnsafePointer or
             // AutoreleasingUnsafeMutablePointer.
-            if (bgt2->getDecl() == getASTContext().getConstUnsafePointerDecl()){
+            if (bgt2->getDecl() == getASTContext().getUnsafePointerDecl()){
               if (isArrayType(type1)) {
                 conversionsOrFixes.push_back(
                                      ConversionRestrictionKind::ArrayToPointer);
@@ -1801,7 +1801,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
               }
               
               if (bgt1 && bgt1->getDecl()
-                               == getASTContext().getConstUnsafePointerDecl()) {
+                               == getASTContext().getUnsafePointerDecl()) {
                 conversionsOrFixes.push_back(
                                    ConversionRestrictionKind::PointerToPointer);
               }
@@ -3264,7 +3264,7 @@ Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
   auto bgt = type->castTo<BoundGenericType>();
   assert((bgt->getDecl() == cs.getASTContext().getUnsafeMutablePointerDecl()
-          || bgt->getDecl() == cs.getASTContext().getConstUnsafePointerDecl()
+          || bgt->getDecl() == cs.getASTContext().getUnsafePointerDecl()
           || bgt->getDecl()
           == cs.getASTContext().getAutoreleasingUnsafeMutablePointerDecl())
          && "conversion is not to a pointer type");
@@ -3422,7 +3422,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       subFlags, locator);
   }
       
-  // String ===> ConstUnsafePointer<[U]Int8>
+  // String ===> UnsafePointer<[U]Int8>
   case ConversionRestrictionKind::StringToPointer: {
     addContextualScore();
 
