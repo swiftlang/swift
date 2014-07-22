@@ -3,6 +3,7 @@ set(GENERATED_TESTS UnicodeGraphemeBreakTest.cpp.gyb)
 handle_gyb_sources(${CMAKE_SIZEOF_VOID_P} GENERATED_TESTS)
 
 add_swift_unittest(SwiftBasicTests
+  Demangle.cpp
   SourceManager.cpp
   TreeScopedHashTableTests.cpp
   StringExtrasTest.cpp
