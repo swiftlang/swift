@@ -143,7 +143,7 @@ func passGeneric() {
 struct SomeType {
   func identity<T>(x: T) -> T { return x }
 
-  func identity2<T>(x: T) -> T { return x } // expected-note 3{{found this candidate}}
+  func identity2<T>(x: T) -> T { return x } // expected-note 2{{found this candidate}}
   func identity2<T>(x: T) -> Float { } // expected-note 2{{found this candidate}}
 
   func returnAs<T>() -> T {}

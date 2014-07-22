@@ -115,3 +115,13 @@ func rdar16786220(var let c: Int) -> () { // expected-error {{expected ',' separ
   c = 42 // expected-error {{cannot assign to 'let' value 'c'}}
 }
 
+
+// <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
+infix operator !!! {}
+
+func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }  // expected-note {{found this candidate}}
+func !!!<T>(lhs: ConstUnsafePointer<T>, rhs: ConstUnsafePointer<T>) -> Bool { return false } // expected-note {{found this candidate}}
+[1] !!! [1]  // expected-error {{ambiguous use of operator '!!!'}}
+
+
+

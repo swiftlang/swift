@@ -899,7 +899,10 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    // Emit candidates.
+    // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
+    // candidate once.  FIXME: Why is one candidate getting into the overload
+    // set multiple times?
+    SmallPtrSet<Decl*, 8> EmittedDecls;
     for (auto choice : overload.choices) {
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
@@ -908,7 +911,8 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         // FIXME: show deduced types, etc, etc.
-        tc.diagnose(choice.getDecl(), diag::found_candidate);
+        if (EmittedDecls.insert(choice.getDecl()))
+          tc.diagnose(choice.getDecl(), diag::found_candidate);
         break;
 
       case OverloadChoiceKind::BaseType:
