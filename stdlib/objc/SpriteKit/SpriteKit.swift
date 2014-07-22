@@ -8,7 +8,6 @@ public typealias SKColor = NSColor
 public typealias SKColor = UIColor
 #endif
 
-#if os(OSX)
 // this class only exists to allow AnyObject lookup of _copyImageData
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
@@ -16,9 +15,6 @@ public typealias SKColor = UIColor
   init() { _fatalError("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
-#elseif os(iOS)
-// FIXME: we want to interop nicely with SpriteKit on iOS as well
-#endif
 
 extension SKNode {
   public subscript (name: String) -> [SKNode] {
