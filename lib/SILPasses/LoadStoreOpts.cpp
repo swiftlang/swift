@@ -618,6 +618,9 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     auto ReversePostOrder = POTA->getReversePostOrder(F);
     int PostOrderSize = std::distance(ReversePostOrder.begin(),
                                       ReversePostOrder.end());
+
+    // TODO: Look into ways to decrease the number of LSBBForwarder items that
+    // we create.
     llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
     std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
 
