@@ -206,14 +206,102 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
+
+typedef std::function<void(InputArgList &, unsigned)> RemainingArgsHandler;
+
+static InputArgList *parseArgsUntil(const llvm::opt::OptTable& Opts,
+                                    const char *const *ArgBegin,
+                                    const char *const *ArgEnd,
+                                    unsigned &MissingArgIndex,
+                                    unsigned &MissingArgCount,
+                                    unsigned FlagsToInclude,
+                                    unsigned FlagsToExclude,
+                                    llvm::opt::OptSpecifier UntilOption,
+                                    RemainingArgsHandler RemainingHandler) {
+  InputArgList *Args = new InputArgList(ArgBegin, ArgEnd);
+
+  // FIXME: Handle '@' args (or at least error on them).
+
+  bool CheckUntil = UntilOption != options::OPT_INVALID;
+  MissingArgIndex = MissingArgCount = 0;
+  unsigned Index = 0, End = ArgEnd - ArgBegin;
+  while (Index < End) {
+    // Ignore empty arguments (other things may still take them as arguments).
+    StringRef Str = Args->getArgString(Index);
+    if (Str == "") {
+      ++Index;
+      continue;
+    }
+
+    unsigned Prev = Index;
+    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
+    assert(Index > Prev && "Parser failed to consume argument.");
+
+    // Check for missing argument error.
+    if (!A) {
+      assert(Index >= End && "Unexpected parser error.");
+      assert(Index - Prev - 1 && "No missing arguments!");
+      MissingArgIndex = Prev;
+      MissingArgCount = Index - Prev - 1;
+      break;
+    }
+
+    Args->append(A);
+
+    if (CheckUntil && A->getOption().matches(UntilOption)) {
+      if (Index < End)
+        RemainingHandler(*Args, Index);
+      return Args;
+    }
+  }
+
+  return Args;
+}
+
+// Parse all args until we see an input, and then collect the remaining
+// arguments into a synthesized "--" option.
+static InputArgList *
+parseArgStringsForInteractiveDriver(const llvm::opt::OptTable& Opts,
+                                    ArrayRef<const char *> Args,
+                                    unsigned &MissingArgIndex,
+                                    unsigned &MissingArgCount,
+                                    unsigned FlagsToInclude,
+                                    unsigned FlagsToExclude) {
+  return parseArgsUntil(Opts, Args.begin(), Args.end(), MissingArgIndex,
+                        MissingArgCount, FlagsToInclude, FlagsToExclude,
+                        options::OPT_INPUT,
+                        [&](InputArgList &Args, unsigned NextIndex) {
+    assert(NextIndex < Args.getNumInputArgStrings());
+    // Synthesize -- remaining args...
+    Arg *Remaining =
+        new Arg(Opts.getOption(options::OPT__DASH_DASH), "--", NextIndex);
+    for (unsigned N = Args.getNumInputArgStrings(); NextIndex != N;
+         ++NextIndex) {
+      Remaining->getValues().push_back(Args.getArgString(NextIndex));
+    }
+    Args.append(Remaining);
+  });
+}
+
 InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
   unsigned IncludedFlagsBitmask = 0;
   unsigned ExcludedFlagsBitmask = options::NoDriverOption;
   unsigned MissingArgIndex, MissingArgCount;
-  InputArgList *ArgList = getOpts().ParseArgs(Args.begin(), Args.end(),
-                                              MissingArgIndex, MissingArgCount,
-                                              IncludedFlagsBitmask,
-                                              ExcludedFlagsBitmask);
+  InputArgList *ArgList = nullptr;
+
+  if (driverKind == DriverKind::Interactive) {
+    ArgList = parseArgStringsForInteractiveDriver(getOpts(), Args,
+        MissingArgIndex, MissingArgCount, IncludedFlagsBitmask,
+        ExcludedFlagsBitmask);
+
+  } else {
+    ArgList = getOpts().ParseArgs(Args.begin(), Args.end(),
+                                  MissingArgIndex, MissingArgCount,
+                                  IncludedFlagsBitmask,
+                                  ExcludedFlagsBitmask);
+  }
+
+  assert(ArgList && "no argument list");
 
   // Check for missing argument error.
   if (MissingArgCount) {
@@ -235,12 +323,12 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
 DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
   DerivedArgList *DAL = new DerivedArgList(ArgList);
 
-  bool ImmediateMode = ArgList.hasArgNoClaim(options::OPT_i);
+  bool ImmediateMode = driverKind == DriverKind::Interactive ||
+                       ArgList.hasArgNoClaim(options::OPT_i);
 
   for (Arg *A : ArgList) {
     // If we're not in immediate mode, pick up inputs via the -- option.
-    if (A->getOption().matches(options::OPT__DASH_DASH)) {
-      assert(!ImmediateMode && "-i and -- are both KIND_REMAINING_ARGS");
+    if (!ImmediateMode && A->getOption().matches(options::OPT__DASH_DASH)) {
       A->claim();
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         DAL->append(makeInputArg(*DAL, *Opts, A->getValue(i)));

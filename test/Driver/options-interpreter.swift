@@ -9,7 +9,9 @@
 // NO-FILE: expected input file after '-i'
 
 // RUN: %swift_driver -### -i %s | FileCheck -check-prefix INTERPRET %s
+// RUN: %swifti_driver -### %s | FileCheck -check-prefix INTERPRET %s
 // INTERPRET: -interpret
 
 // RUN: %swift_driver -### -i %s a b c | FileCheck -check-prefix ARGS %s
+// RUN: %swifti_driver -### %s a b c | FileCheck -check-prefix ARGS %s
 // ARGS: -- a b c

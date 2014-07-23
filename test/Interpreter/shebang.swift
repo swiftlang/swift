@@ -6,6 +6,14 @@
 // RUN: %t.shebang.swift | FileCheck -check-prefix=NONE %s
 // RUN: %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
 
+// RUN: rm -rf %t.mcp
+// RUN: echo '#!%swifti_driver_plain -module-cache-path %t.mcp' > %t.shebang.swifti
+// RUN: cat %s >> %t.shebang.swifti
+// RUN: chmod u+x %t.shebang.swifti
+
+// RUN: %t.shebang.swifti | FileCheck -check-prefix=NONE %s
+// RUN: %t.shebang.swifti a b c | FileCheck -check-prefix=THREE-ARGS %s
+
 println("Begin")
 for arg in Process.arguments {
   println(arg)
