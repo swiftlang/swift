@@ -225,32 +225,35 @@ category replacing an existing method implementation is "rude"
 
 
 
-It's arguable whether we should
-even support that at all.  If we do, I think that restricting it to
-require some sort of ``@dynamic`` annotation on the replaceable method
-(or its lexical context) is much of a problem.
+.. The rest of this doesn't seem to be coherent and isn't parseable as
+   ReST, which breaks the build
 
- is a I don't think that restricting this is
-actually a serious problem, if we .  We can have some sort of
-``@dynamic`` annotation for
+    It's arguable whether we should
+    even support that at all.  If we do, I think that restricting it to
+    require some sort of ``@dynamic`` annotation on the replaceable method
+    (or its lexical context) is much of a problem.
 
-I don't think that requiring some sort of ``@dynamic`` 
+     is a I don't think that restricting this is
+    actually a serious problem, if we .  We can have some sort of
+    ``@dynamic`` annotation for
 
-That one, central restriction is that we must remove or constrain the
-ability to dynamically add and replace method implementations on
-existing classes.  It's reasonable to request some sort of ``@dynamic``
-annotation for cases where this is absolutely required.
+    I don't think that requiring some sort of ``@dynamic`` 
 
-One interesting corner case 
+    That one, central restriction is that we must remove or constrain the
+    ability to dynamically add and replace method implementations on
+    existing classes.  It's reasonable to request some sort of ``@dynamic``
+    annotation for cases where this is absolutely required.
 
-don't think anybody will weep too heavily if we scale back those ObjC
-runtime functions to say that either you can't use them on Swift classes
-or 
+    One interesting corner case 
 
-restriction: removing the general ability to dynamically add and
-replace method implementations on an existing class.
+    don't think anybody will weep too heavily if we scale back those ObjC
+    runtime functions to say that either you can't use them on Swift classes
+    or 
 
-There's a tension here.  
+    restriction: removing the general ability to dynamically add and
+    replace method implementations on an existing class.
+
+    There's a tension here.  
 
 Point of Allocation
 ~~~~~~~~~~~~~~~~~~~
@@ -427,11 +430,13 @@ In Objective-C, every object has a class and every class has a
 collection of methods.  The high-level semantics are essentially
 those 
 
- class is essentially a hashtable of selectors to 
-We propose a new attribute, ``@public``, that can adorn any
-declaration not local to a function.  For the purpose of standard
-library development, even just parsing this attribute without
-implementing semantics would be extremely useful in the near term.
+.. nonsense ReST
+
+     class is essentially a hashtable of selectors to 
+    We propose a new attribute, ``@public``, that can adorn any
+    declaration not local to a function.  For the purpose of standard
+    library development, even just parsing this attribute without
+    implementing semantics would be extremely useful in the near term.
 
 Basic Semantics
 ===============
