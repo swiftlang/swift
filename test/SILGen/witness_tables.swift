@@ -523,7 +523,7 @@ struct HasInitializerStruct : Initializer {
 // TABLE-NEXT: }
 // SYMBOL: sil @_TTWC14witness_tables19HasInitializerClassS_11InitializerFS1_CUS1___fMQPS1_FT3argVS_3Arg_S2_ : $@cc(witness_method) @thin (@out HasInitializerClass, Arg, @thick HasInitializerClass.Type) -> ()
 class HasInitializerClass : Initializer {
-  init(arg: Arg) { }
+  required init(arg: Arg) { }
 }
 
 // TABLE-LABEL: sil_witness_table HasInitializerEnum: Initializer module witness_tables {

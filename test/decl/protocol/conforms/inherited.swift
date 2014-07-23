@@ -91,7 +91,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f7() -> Int { return 5 }
 
   // P8
-  init(int: Int) { }
+  required init(int: Int) { }
 
   // P10
   func f10(arr: [A]) { }
@@ -104,7 +104,9 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
 func ==(x: A, y: A) -> Bool { return true }
 
 // Class B inherits A; gets all of its inheritable conformances.
-class B : A { }
+class B : A { 
+  required init(int: Int) { }
+}
 
 func testB(b: B) {
   var p1: P1 = b // expected-error{{has Self or associated type requirements}}
@@ -114,7 +116,7 @@ func testB(b: B) {
   var p5: P5 = b // expected-error{{type 'B' does not conform to protocol 'P5'}}
   var p6: P6 = b
   var p7: P7 = b // expected-error{{has Self or associated type requirements}}
-  var p8: P8 = b // expected-error{{type 'B' does not conform to protocol 'P8'}}
+  var p8: P8 = b // okay
   var p9: P9 = b // expected-error{{has Self or associated type requirements}}
   var p10: P10 = b // expected-error{{type 'B' does not conform to protocol 'P10'}} // expected-error{{has Self or associated type requirements}}
   var p11: P11 = b // expected-error{{type 'B' does not conform to protocol 'P11'}}

@@ -544,7 +544,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   //
 
   @objc
-  init() {
+  required init() {
     _fatalError("don't call this designated initializer")
   }
 
@@ -560,6 +560,10 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
   typealias Index = _NativeDictionaryIndex<Key, Value>
+
+  required init() {
+    _fatalError("don't call this designated initializer")
+  }
 
   init(_ nativeStorage: NativeStorage) {
     nextIndex = nativeStorage.startIndex
@@ -628,7 +632,7 @@ class _NativeDictionaryStorageOwnerBase
   //
 
   @objc
-  init(
+  required init(
     objects: UnsafePointer<AnyObject?>,
     forKeys: UnsafePointer<Void>,
     count: Int
@@ -687,6 +691,14 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     : _NativeDictionaryStorageOwnerBase {
 
   typealias NativeStorage = _NativeDictionaryStorage<Key, Value>
+
+  required init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafePointer<Void>,
+    count: Int
+  ) {
+    _fatalError("don't call this designated initializer")
+  }
 
   init(minimumCapacity: Int = 2) {
     nativeStorage = NativeStorage(minimumCapacity: minimumCapacity)

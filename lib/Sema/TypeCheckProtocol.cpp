@@ -1126,6 +1126,22 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            shouldDiagnoseSetter);
       }
 
+      // If we have an initializer requirement and the conforming type
+      // is a non-final class, the witness must be 'required'.
+      ClassDecl *classDecl = nullptr;
+      if (isa<ConstructorDecl>(requirement) &&
+          ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
+           !classDecl->isFinal()) &&
+          !cast<ConstructorDecl>(best.Witness)->isRequired()) {
+        bool inExtension = isa<ExtensionDecl>(best.Witness->getDeclContext());
+        auto diag = TC.diagnose(best.Witness->getLoc(), 
+                                diag::witness_initializer_not_required,
+                                requirement->getFullName(), inExtension,
+                                Adoptee);
+        if (!best.Witness->isImplicit() && !inExtension)
+          diag.fixItInsert(best.Witness->getStartLoc(), "required ");
+      }
+
       // Record the match.
       recordWitness(requirement, best);
       return ResolveWitnessResult::Success;

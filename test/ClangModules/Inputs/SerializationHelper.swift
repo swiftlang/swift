@@ -2,7 +2,7 @@
 @exported import TypeAndValue
 
 public class Impl : InitProto {
-  public init(int i: CInt) {}
+  public required init(int i: CInt) {}
 
   public func takeStruct(input: testStruct) {
     testStruct(input)

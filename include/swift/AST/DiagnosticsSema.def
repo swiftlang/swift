@@ -539,6 +539,11 @@ ERROR(protocol_has_missing_requirements,sema_tcd,none,
 ERROR(witness_argument_name_mismatch,sema_tcd,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
+ERROR(witness_initializer_not_required,sema_tcd,none,
+      "initializer requirement %0 can only be satisfied by a `required` "
+      "initializer in%select{| the definition of}1 non-final class %2", 
+      (DeclName, bool, Type))
+
 ERROR(witness_not_accessible_proto,sema_tcd,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "

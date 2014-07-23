@@ -603,16 +603,6 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
     if (isa<FuncDecl>(req) && cast<FuncDecl>(req)->isAccessor())
       continue;
 
-    // A non-abstract initializer witness makes the conformance non-inheritable.
-    if (isa<ConstructorDecl>(req)) {
-      auto ctorWitness = cast_or_null<ConstructorDecl>(
-                           getWitness(req, resolver).getDecl());
-      if (ctorWitness && !ctorWitness->isRequired()) {
-        DCAndInheritable.setInt(IsInheritableKind::NotInheritable);
-        return false;
-      }
-    }
-
     // Check the kinds of references to Self that show up in the given
     // requirement.
     switch (findSelfReferences(req)) {

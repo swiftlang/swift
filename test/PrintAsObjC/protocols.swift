@@ -46,7 +46,7 @@ import Foundation
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
 class MyObject : NSObject, NSCoding {
-  init(coder aCoder: NSCoder) {
+  required init(coder aCoder: NSCoder) {
     super.init()
   }
 }

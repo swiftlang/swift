@@ -198,7 +198,7 @@ class InitializableConformer: Initializable {
 }
 // CHECK-LABEL: sil @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
 
-class InitializableConformerByExtension {
+final class InitializableConformerByExtension {
   init() {}
 }
 

@@ -163,7 +163,7 @@ class BaseB : BaseA {
 // WITH_BB: End completions
 
 class BaseE : ProtocolE {
-  init(fromProtocolE: Int) {}
+  required init(fromProtocolE: Int) {}
 
   func protoEFunc() {}
 
