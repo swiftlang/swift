@@ -147,3 +147,30 @@ println(c2 != nil)
 println(nil != c2)
 // CHECK: true
 
+var c3: C! = nil
+
+println(c3 == nil)
+// CHECK: true
+
+println(nil == c3)
+// CHECK: true
+
+println(c3 != nil)
+// CHECK: false
+
+println(nil != c3)
+// CHECK: false
+
+var c4: C! = C()
+
+println(c4 == nil)
+// CHECK: false
+
+println(nil == c4)
+// CHECK: false
+
+println(c4 != nil)
+// CHECK: true
+
+println(nil != c4)
+// CHECK: true

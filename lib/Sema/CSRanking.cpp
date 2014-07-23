@@ -349,11 +349,11 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   return FunctionType::get(selfTy, type);
 }
 
-// Given two generic function declarations, signal if the first is more
-// "constrained" than the second by comparing the number of constraints
-// applied to each type parameter.
-// Note that this is not a subtype or conversion check - that takes place
-// in isDeclAsSpecializedAs.
+/// \brief Given two generic function declarations, signal if the first is more
+/// "constrained" than the second by comparing the number of constraints
+/// applied to each type parameter.
+/// Note that this is not a subtype or conversion check - that takes place
+/// in isDeclAsSpecializedAs.
 static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
