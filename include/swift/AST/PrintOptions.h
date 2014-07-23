@@ -106,7 +106,7 @@ struct PrintOptions {
   /// Whether to print accessibility information on all value decls.
   bool PrintAccessibility = false;
 
-  /// Print all decls that have this or less restricted access.
+  /// Print all decls that have at least this level of access.
   Accessibility AccessibilityFilter = Accessibility::Private;
 
   /// Whether we are printing for sil.
