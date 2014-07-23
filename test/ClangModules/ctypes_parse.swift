@@ -12,11 +12,13 @@ var cgPointVar: CGPoint
 func testColor() {
   var c: Color = red
   c = blue
+  let _ = c.value
 }
 
 func testTribool() {
   var b = Indeterminate
   b = True
+  let _ = b.value
 }
 
 func testAnonEnum() {
