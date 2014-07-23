@@ -512,6 +512,24 @@ static bool compile(const Module &module, llvm::raw_ostream &os){
       invalid = true;
   }
 
+  // Write all global variables.
+  llvm::StringSet<> knownGlobals;
+  for (const auto &global : module.Globals) {
+    // Check for duplicate global variables.
+    if (!knownGlobals.insert(global.Name)) {
+      llvm::errs() << "Multiple definitions of global variable '" << global.Name
+                   << "'\n";
+      invalid = true;
+      continue;
+    }
+
+    GlobalVariableInfo info;
+    if (translateAvailability(global.Availability, info, global.Name))
+      invalid = true;
+    info.setNullabilityAudited(global.Nullability);
+    writer.addGlobalVariable(global.Name, info);
+  }
+
   writer.writeToStream(os);
 
   return invalid;
@@ -644,7 +662,7 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
       property.Name = name;
       handleAvailability(property.Availability, info);
 
-      // FIXME: No way to represent "not audited for nullability.
+      // FIXME: No way to represent "not audited for nullability".
       if (auto nullability = info.getNullability()) {
         property.Nullability = *nullability;
       }
@@ -654,6 +672,20 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
         TheModule.Protocols[known.first].Properties.push_back(property);
       else
         TheModule.Classes[known.first].Properties.push_back(property);
+    }
+
+    virtual void visitGlobalVariable(StringRef name,
+                                     const GlobalVariableInfo &info) {
+      GlobalVariable global;
+      global.Name = name;
+      handleAvailability(global.Availability, info);
+
+      // FIXME: No way to represent "not audited for nullability".
+      if (auto nullability = info.getNullability()) {
+        global.Nullability = *nullability;
+      }
+
+      TheModule.Globals.push_back(global);
     }
 
     /// Retrieve the module.

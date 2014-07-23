@@ -38,7 +38,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// API notes file minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 2;
+const uint16_t VERSION_MINOR = 3;
 
 using IdentifierID = Fixnum<31>;
 using IdentifierIDField = BCVBR<16>;
@@ -80,6 +80,10 @@ enum BlockID {
   /// selector names (# of pieces, identifier IDs) to the selector ID
   /// used in other tables.
   OBJC_SELECTOR_BLOCK_ID,
+
+  /// The global variables data block, which maps global variable names to
+  /// information about the global variable.
+  GLOBAL_VARIABLE_BLOCK_ID
 };
 
 namespace control_block {
@@ -161,6 +165,18 @@ namespace objc_selector_block {
     OBJC_SELECTOR_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from (# pieces, identifier IDs) to Objective-C selector ID.
+  >;
+}
+
+namespace global_variable_block {
+  enum {
+    GLOBAL_VARIABLE_DATA = 1
+  };
+
+  using GlobalVariableDataLayout = BCRecordLayout<
+    GLOBAL_VARIABLE_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from name to global variable information
   >;
 }
 

@@ -146,7 +146,7 @@ namespace {
     ++data;
   }
 
-  /// Used to deserialize the on-disk Objective-C class table.
+  /// Used to deserialize the on-disk Objective-C property table.
   class ObjCPropertyTableInfo {
   public:
     // (context ID, name ID)
@@ -299,6 +299,52 @@ namespace {
       return endian::readNext<SelectorID, little, unaligned>(data);
     }
   };
+
+  /// Used to deserialize the on-disk global variable table.
+  class GlobalVariableTableInfo {
+  public:
+    // (context ID, name ID)
+    using internal_key_type = unsigned;
+    using external_key_type = internal_key_type;
+    using data_type = GlobalVariableInfo;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    internal_key_type GetInternalKey(external_key_type key) {
+      return key;
+    }
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
+    hash_value_type ComputeHash(internal_key_type key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+    
+    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+      return lhs == rhs;
+    }
+    
+    static std::pair<unsigned, unsigned> 
+    ReadKeyDataLength(const uint8_t *&data) {
+      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      return { keyLength, dataLength };
+    }
+    
+    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+      auto nameID = endian::readNext<IdentifierID, little, unaligned>(data);
+      return nameID;
+    }
+    
+    static data_type ReadData(internal_key_type key, const uint8_t *data,
+                              unsigned length) {
+      GlobalVariableInfo info;
+      readVariableInfo(data, info);
+      return info;
+    }
+  };
 } // end anonymous namespace
 
 class APINotesReader::Implementation {
@@ -342,6 +388,12 @@ public:
   /// The Objective-C selector table.
   std::unique_ptr<SerializedObjCSelectorTable> ObjCSelectorTable;
 
+  using SerializedGlobalVariableTable =
+      llvm::OnDiskIterableChainedHashTable<GlobalVariableTableInfo>;
+
+  /// The global variable table.
+  std::unique_ptr<SerializedGlobalVariableTable> GlobalVariableTable;
+
   /// Retrieve the identifier ID for the given string, or an empty
   /// optional if the string is unknown.
   Optional<IdentifierID> getIdentifier(StringRef str);
@@ -362,6 +414,8 @@ public:
                              SmallVectorImpl<uint64_t> &scratch);
   bool readObjCSelectorBlock(llvm::BitstreamCursor &cursor, 
                              SmallVectorImpl<uint64_t> &scratch);
+  bool readGlobalVariableBlock(llvm::BitstreamCursor &cursor,
+                               SmallVectorImpl<uint64_t> &scratch);
 };
 
 Optional<IdentifierID> APINotesReader::Implementation::getIdentifier(
@@ -724,6 +778,60 @@ bool APINotesReader::Implementation::readObjCSelectorBlock(
   return false;
 }
 
+bool APINotesReader::Implementation::readGlobalVariableBlock(
+       llvm::BitstreamCursor &cursor, 
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(GLOBAL_VARIABLE_BLOCK_ID))
+    return true;
+
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown sub-block, possibly for use by a future version of the
+      // API notes format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case global_variable_block::GLOBAL_VARIABLE_DATA: {
+      // Already saw global variable table.
+      if (GlobalVariableTable)
+        return true;
+
+      uint32_t tableOffset;
+      global_variable_block::GlobalVariableDataLayout::readRecord(scratch,
+                                                                  tableOffset);
+      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+      GlobalVariableTable.reset(
+        SerializedGlobalVariableTable::Create(base + tableOffset,
+                                              base + sizeof(uint32_t),
+                                              base));
+      break;
+    }
+
+    default:
+      // Unknown record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return false;
+}
+
 APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, 
                              bool &failed) 
   : Impl(*new Implementation)
@@ -805,6 +913,15 @@ APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
         return;
       }
       break;
+
+    case GLOBAL_VARIABLE_BLOCK_ID:
+      if (!hasValidControlBlock || 
+          Impl.readGlobalVariableBlock(cursor, scratch)) {
+        failed = true;
+        return;
+      }
+      break;
+
 
     default:
       // Unknown top-level block, possibly for use by a future version of the
@@ -913,6 +1030,22 @@ Optional<ObjCMethodInfo> APINotesReader::lookupObjCMethod(
   return *known;
 }
 
+Optional<GlobalVariableInfo> APINotesReader::lookupGlobalVariable(
+                               StringRef name) {
+  if (!Impl.GlobalVariableTable)
+    return Nothing;
+
+  Optional<IdentifierID> nameID = Impl.getIdentifier(name);
+  if (!nameID)
+    return Nothing;
+
+  auto known = Impl.GlobalVariableTable->find(*nameID);
+  if (known == Impl.GlobalVariableTable->end())
+    return Nothing;
+
+  return *known;
+}
+
 APINotesReader::Visitor::~Visitor() { }
 
 void APINotesReader::Visitor::visitObjCClass(ContextID contextID,
@@ -931,6 +1064,10 @@ void APINotesReader::Visitor::visitObjCMethod(ContextID contextID,
 void APINotesReader::Visitor::visitObjCProperty(ContextID contextID,
                                                 StringRef name,
                                                 const ObjCPropertyInfo &info) { }
+
+void APINotesReader::Visitor::visitGlobalVariable(
+       StringRef name,
+       const GlobalVariableInfo &info) { }
 
 void APINotesReader::visit(Visitor &visitor) {
   // FIXME: All of these iterations would be significantly more efficient if we
@@ -998,6 +1135,15 @@ void APINotesReader::visit(Visitor &visitor) {
       auto name = identifiers[key.second];
       auto info = *Impl.ObjCPropertyTable->find(key);
       visitor.visitObjCProperty(contextID, name, info);
+    }
+  }
+
+  // Visit global variables.
+  if (Impl.GlobalVariableTable) {
+    for (auto key : Impl.GlobalVariableTable->keys()) {
+      auto name = identifiers[key];
+      auto info = *Impl.GlobalVariableTable->find(key);
+      visitor.visitGlobalVariable(name, info);
     }
   }
 }

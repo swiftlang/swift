@@ -80,6 +80,12 @@ public:
   /// \param info Information about this method.
   void addObjCMethod(ContextID contextID, ObjCSelectorRef selector,
                      bool isInstanceMethod, const ObjCMethodInfo &info);
+
+  /// Add information about a global variable.
+  ///
+  /// \param name The name of this global variable.
+  /// \param info Information about this global variable.
+  void addGlobalVariable(StringRef name, const GlobalVariableInfo &info);
 };
 
 } // end namespace api_notes

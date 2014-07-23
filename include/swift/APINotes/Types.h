@@ -339,6 +339,12 @@ public:
   void dump(llvm::raw_ostream &os);
 };
 
+/// Describes API notes data for a global variable.
+class GlobalVariableInfo : public VariableInfo {
+public:
+  GlobalVariableInfo() : VariableInfo() { }
+};
+
 } // end namespace api_notes
 } // end namespace swift
 

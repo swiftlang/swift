@@ -91,6 +91,13 @@ public:
                                             ObjCSelectorRef selector,
                                             bool isInstanceMethod);
 
+  /// Look for information regarding the given global variable.
+  ///
+  /// \param name The name of the global variable.
+  ///
+  /// \returns information about the global variable, if known.
+  Optional<GlobalVariableInfo> lookupGlobalVariable(StringRef name);
+
   /// Visitor used when walking the contents of the API notes file.
   class Visitor {
   public:
@@ -112,6 +119,10 @@ public:
     /// Visit an Objective-C property.
     virtual void visitObjCProperty(ContextID contextID, StringRef name,
                                    const ObjCPropertyInfo &info);
+
+    /// Visit a global variable.
+    virtual void visitGlobalVariable(StringRef name,
+                                     const GlobalVariableInfo &info);
   };
 
 

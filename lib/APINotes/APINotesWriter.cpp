@@ -71,6 +71,11 @@ public:
   llvm::DenseMap<std::tuple<unsigned, unsigned, char>, ObjCMethodInfo> 
     ObjCMethods;
 
+  /// Information about global variables.
+  ///
+  /// Indexed by the identifier ID.
+  llvm::DenseMap<unsigned, GlobalVariableInfo> GlobalVariables;
+
   /// Retrieve the ID for the given identifier.
   IdentifierID getIdentifier(StringRef identifier) {
     if (identifier.empty())
@@ -115,6 +120,7 @@ private:
   void writeObjCPropertyBlock(llvm::BitstreamWriter &writer);
   void writeObjCMethodBlock(llvm::BitstreamWriter &writer);
   void writeObjCSelectorBlock(llvm::BitstreamWriter &writer);
+  void writeGlobalVariableBlock(llvm::BitstreamWriter &writer);
 };
 
 /// Record the name of a block.
@@ -170,6 +176,9 @@ void APINotesWriter::Implementation::writeBlockInfoBlock(
 
   BLOCK(OBJC_SELECTOR_BLOCK);
   BLOCK_RECORD(objc_selector_block, OBJC_SELECTOR_DATA);
+
+  BLOCK(GLOBAL_VARIABLE_BLOCK);
+  BLOCK_RECORD(global_variable_block, GLOBAL_VARIABLE_DATA);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -575,6 +584,68 @@ void APINotesWriter::Implementation::writeObjCSelectorBlock(
   layout.emit(ScratchRecord, tableOffset, hashTableBlob);
 }
 
+namespace {
+  /// Used to serialize the on-disk global variable table.
+  class GlobalVariableTableInfo {
+  public:
+    using key_type = unsigned; // name ID
+    using key_type_ref = key_type;
+    using data_type = GlobalVariableInfo;
+    using data_type_ref = const data_type &;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = sizeof(IdentifierID);
+      uint32_t dataLength = getVariableInfoSize(data);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      endian::Writer<little> writer(out);
+      writer.write<IdentifierID>(key);
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      emitVariableInfo(out, data);
+    }
+  };
+} // end anonymous namespace
+
+void APINotesWriter::Implementation::writeGlobalVariableBlock(
+       llvm::BitstreamWriter &writer) {
+  BCBlockRAII restoreBlock(writer, GLOBAL_VARIABLE_BLOCK_ID, 3);
+
+  if (GlobalVariables.empty())
+    return;  
+
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<GlobalVariableTableInfo> generator;
+    for (auto &entry : GlobalVariables)
+      generator.insert(entry.first, entry.second);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream);
+  }
+
+  global_variable_block::GlobalVariableDataLayout layout(writer);
+  layout.emit(ScratchRecord, tableOffset, hashTableBlob);
+}
+
 void APINotesWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   // Write the API notes file into a buffer.
   SmallVector<char, 0> buffer;
@@ -593,6 +664,7 @@ void APINotesWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
     writeObjCPropertyBlock(writer);
     writeObjCMethodBlock(writer);
     writeObjCSelectorBlock(writer);
+    writeGlobalVariableBlock(writer);
   }
 
   // Write the buffer to the stream.
@@ -682,4 +754,9 @@ void APINotesWriter::addObjCMethod(ContextID contextID,
   }
 }
 
-
+void APINotesWriter::addGlobalVariable(llvm::StringRef name,
+                                       const GlobalVariableInfo &info) {
+  IdentifierID variableID = Impl.getIdentifier(name);
+  assert(!Impl.GlobalVariables.count(variableID));
+  Impl.GlobalVariables[variableID] = info;
+}

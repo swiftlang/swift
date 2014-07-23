@@ -66,3 +66,8 @@ Classes:
         Nullability:     N
         Availability:    available
         AvailabilityMsg: ''
+Globals:         
+  - Name:            NSCalibratedWhiteColorSpace
+    Nullability:     N
+    Availability:    available
+    AvailabilityMsg: ''
