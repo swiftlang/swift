@@ -31,7 +31,11 @@ public struct CGFloat {
   var value: UnderlyingType
 }
 
-public extension CGFloat : IntegerLiteralConvertible {
+public func ==(lhs: CGFloat, rhs: CGFloat) -> Bool {
+  return lhs.value == rhs.value
+}
+
+extension CGFloat : IntegerLiteralConvertible, Equatable {
   public static func convertFromIntegerLiteral(x: UnderlyingType) -> CGFloat {
     return CGFloat(x)
   }
@@ -39,6 +43,6 @@ public extension CGFloat : IntegerLiteralConvertible {
 
 public extension Double {
   init(_ value: CGFloat) {
-    self.value = CGFloat.UnderlyingType(value)
+    self = Double(value.value)
   }
 }

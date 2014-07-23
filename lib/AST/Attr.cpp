@@ -97,7 +97,9 @@ void DeclAttributes::print(ASTPrinter &Printer,
   SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());
   std::reverse(orderedAttributes.begin(), orderedAttributes.end());
 
-  bool hadDeclModifier = false;
+  // Process decl modifiers in a second pass, after the attributes.
+  SmallVector<const DeclAttribute *, 8> modifiers;
+
   for (auto DA : orderedAttributes) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
@@ -112,28 +114,16 @@ void DeclAttributes::print(ASTPrinter &Printer,
         continue;
     }
     
-    // Process decl modifiers in a second pass, after the attributes.
     if (DA->isDeclModifier()) {
-      hadDeclModifier = true;
+      modifiers.push_back(DA);
       continue;
     }
 
     DA->print(Printer);
   }
 
-  if (!Options.ExclusiveAttrList.empty())
-    return;
-
-  // Process decl modifiers in a second pass, after the attributes.
-  if (hadDeclModifier) {
-    for (auto DA : orderedAttributes) {
-      if (!Options.PrintImplicitAttrs && DA->isImplicit())
-        continue;
-
-      if (DA->isDeclModifier())
-        DA->print(Printer);
-    }
-  }
+  for (auto DA : modifiers)
+    DA->print(Printer);
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {

@@ -322,8 +322,7 @@ void SILType::print(raw_ostream &OS) const {
   }
 
   // Print other types as their Swift representation.
-  PrintOptions SubPrinter;
-  SubPrinter.PrintForSIL = true;
+  PrintOptions SubPrinter = PrintOptions::printSIL();
   getSwiftRValueType().print(OS, SubPrinter);
 }
 
@@ -605,8 +604,7 @@ public:
     if (Subs.empty())
       return;
     
-    PrintOptions SubPrinter;
-    SubPrinter.PrintForSIL = true;
+    PrintOptions SubPrinter = PrintOptions::printSIL();
     OS << '<';
     interleave(Subs,
                [&](const Substitution &s) {
@@ -1330,7 +1328,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   // Print the type by substituting our context parameters for the dependent
   // parameters.
   {
-    PrintOptions withContextGenericParams;
+    PrintOptions withContextGenericParams = PrintOptions::printSIL();
     withContextGenericParams.ContextGenericParams = ContextGenericParams;
     LoweredType->print(OS, withContextGenericParams);
   }
@@ -1359,7 +1357,7 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   printName(OS);
   OS << " : " << LoweredType;
-  
+
   OS << "\n\n";
 }
 
@@ -1492,14 +1490,13 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
 
   // Print the declarations and types from the origin module.
   if (M) {
-    PrintOptions Options;
-    Options.FunctionDefinitions = false;
+    PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
-    Options.SkipImplicit = false;
+    // FIXME: ExplodePatternBindingDecls is incompatible with VarInitializers!
     Options.ExplodePatternBindingDecls = true;
+    Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
-    Options.PrintForSIL = true;
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
@@ -1576,7 +1573,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       auto &assocWitness = witness.getAssociatedTypeWitness();
       OS << "associated_type ";
       OS << assocWitness.Requirement->getName() << ": ";
-      assocWitness.Witness->print(OS);
+      assocWitness.Witness->print(OS, PrintOptions::printSIL());
       break;
     }
     case AssociatedTypeProtocol: {

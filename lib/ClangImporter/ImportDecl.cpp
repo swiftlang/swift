@@ -4236,6 +4236,32 @@ namespace {
       return VisitObjCPropertyDecl(decl, dc);
     }
 
+    void applyPropertyOwnership(
+        VarDecl *prop, clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
+      Type ty = prop->getType();
+      if (auto innerTy = ty->getAnyOptionalObjectType())
+        ty = innerTy;
+      if (!ty->isAnyClassReferenceType())
+        return;
+
+      ASTContext &ctx = prop->getASTContext();
+      if (attrs & clang::ObjCPropertyDecl::OBJC_PR_copy) {
+        prop->getAttrs().add(new (ctx) NSCopyingAttr(false));
+        return;
+      }
+      if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
+        prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Weak));
+        prop->overwriteType(WeakStorageType::get(prop->getType(), ctx));
+        return;
+      }
+      if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
+          (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
+        prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Unmanaged));
+        prop->overwriteType(UnmanagedStorageType::get(prop->getType(), ctx));
+        return;
+      }
+    }
+
     /// Hack: Handle the case where a property is declared \c readonly in the
     /// main class interface (either explicitly or because of an adopted
     /// protocol) and then \c readwrite in a category/extension.
@@ -4252,13 +4278,19 @@ namespace {
           !isa<clang::ObjCProtocolDecl>(redecl->getDeclContext()))
         original->setImplicit(false);
 
-      // The only other transformation we know how to do safely is add a
-      // setter. If the property is already settable, we're done.
-      if (original->isSettable(nullptr))
-        return;
+      if (!original->getAttrs().hasAttribute<OwnershipAttr>() &&
+          !original->getAttrs().hasAttribute<NSCopyingAttr>()) {
+        applyPropertyOwnership(original,
+                               redecl->getPropertyAttributesAsWritten());
+      }
 
       auto clangSetter = redecl->getSetterMethodDecl();
       if (!clangSetter)
+        return;
+
+      // The only other transformation we know how to do safely is add a
+      // setter. If the property is already settable, we're done.
+      if (original->isSettable(nullptr))
         return;
 
       auto setter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangSetter));
@@ -4339,6 +4371,7 @@ namespace {
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
       addObjCAttribute(result, Nothing);
+      applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())

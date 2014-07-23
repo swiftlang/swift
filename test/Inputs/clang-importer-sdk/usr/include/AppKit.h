@@ -96,3 +96,17 @@
 @interface NSView(NSKeyboardUI)
 @property (assign) NSView *nextKeyView;
 @end
+
+@interface NSMenu : NSObject <NSCopying, NSCoding>
+@end
+
+@interface NSMenuItem : NSObject <NSCopying, NSCoding>
+// Setter is only for subclassers.
+@property (assign) NSMenu *menu;
+
+@property (copy) NSString *title;
+@property (copy) NSAttributedString *attributedTitle;
+
+@property (weak) id target;
+@property SEL action;
+@end

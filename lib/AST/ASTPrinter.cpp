@@ -2291,17 +2291,20 @@ public:
   }
 
   void visitUnownedStorageType(UnownedStorageType *T) {
-    Printer << "@sil_unowned ";
+    if (Options.PrintStorageRepresentationAttrs)
+      Printer << "@sil_unowned ";
     visit(T->getReferentType());
   }
 
   void visitUnmanagedStorageType(UnmanagedStorageType *T) {
-    Printer << "@sil_unmanaged ";
+    if (Options.PrintStorageRepresentationAttrs)
+      Printer << "@sil_unmanaged ";
     visit(T->getReferentType());
   }
 
   void visitWeakStorageType(WeakStorageType *T) {
-    Printer << "@sil_weak ";
+    if (Options.PrintStorageRepresentationAttrs)
+      Printer << "@sil_weak ";
     visit(T->getReferentType());
   }
 

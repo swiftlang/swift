@@ -225,4 +225,14 @@ struct _InternalStruct {
 @interface ClassWithInternalProt<_InternalProt>
 @end
 
+@interface FooClassPropertyOwnership : FooClassBase
+@property (assign) id assignable;
+@property (unsafe_unretained) id unsafeAssignable;
+@property (retain) id retainable;
+@property (strong) id strongRef;
+@property (copy) id copyable;
+@property (weak) id weakRef;
+@property (assign) int scalar;
+@end
+
 #endif /* ! __FOO_H__ */

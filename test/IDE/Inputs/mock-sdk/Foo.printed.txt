@@ -246,3 +246,15 @@ protocol _InternalProt {
 
 class ClassWithInternalProt : _InternalProt {
 }
+
+class FooClassPropertyOwnership : FooClassBase {
+  unowned(unsafe) var assignable: @sil_unmanaged AnyObject!
+  unowned(unsafe) var unsafeAssignable: @sil_unmanaged AnyObject!
+  var retainable: AnyObject!
+  var strongRef: AnyObject!
+  @NSCopying var copyable: AnyObject!
+  weak var weakRef: @sil_weak AnyObject!
+  var scalar: Int32
+  init()
+  convenience init(withFloat f: Float)
+}

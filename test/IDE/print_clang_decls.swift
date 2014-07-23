@@ -5,6 +5,7 @@
 // wants to use them.
 
 // RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN: %swift -emit-module -o %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN: %swift -emit-module -o %t -I %t %clang-importer-sdk -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
@@ -57,17 +58,17 @@
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
-// FOUNDATION:      {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
 // FOUNDATION-NEXT  func objectAtIndex(index: Int) -> AnyObject!
 
-// FOUNDATION:      {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  case Mince{{$}}
 // FOUNDATION-NEXT: {{^}}  case Quince{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// FOUNDATION:      {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : RawOptionSetType {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(){{$}}
 // FOUNDATION-NEXT: {{^}}  init(_ value: UInt){{$}}
@@ -81,12 +82,20 @@
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// APPKIT:      {{^}}class NSView : NSObject {{{$}}
+// APPKIT-LABEL: {{^}}class NSView : NSObject {{{$}}
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]
-// APPKIT:      extension NSView {
-// APPKIT-NEXT:   var nextKeyView: NSView?
+// APPKIT-LABEL:      extension NSView {
+// APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
+
+// APPKIT-LABEL: {{^}}class NSMenuItem : NSObject, NSCopying, NSCoding {
+// APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu!
+// APPKIT-NEXT: var title: String!
+// APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString!
+// APPKIT-NEXT: weak var target: @sil_weak AnyObject!
+// APPKIT-NEXT: var action: Selector
+// APPKIT: {{^}}}{{$}}

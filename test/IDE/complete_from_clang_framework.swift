@@ -147,11 +147,12 @@ func testCompleteModuleQualifiedFoo2() {
   Foo#^CLANG_QUAL_FOO_2^#
 // If the number of results below changes, then you need to add a result to the
 // list below.
-// CLANG_QUAL_FOO_2: Begin completions, 58 items
+// CLANG_QUAL_FOO_2: Begin completions, 59 items
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassBase[#FooClassBase#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassDerived[#FooClassDerived#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .ClassWithInternalProt[#ClassWithInternalProt#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule:       ._InternalStruct[#_InternalStruct#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule:        .FooClassPropertyOwnership[#FooClassPropertyOwnership#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: ._internalTopLevelFunc()[#Void#]
 // CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule:         .FooComparisonResult[#FooComparisonResult#]{{$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule: .fooFunc1({#(a): Int32#})[#Int32#]{{$}}

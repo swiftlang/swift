@@ -100,6 +100,10 @@ struct PrintOptions {
   /// '@thin' or '@objc_block'.
   bool PrintFunctionRepresentationAttrs = true;
 
+  /// Whether to print storage representation attributes on types, e.g.
+  /// '@sil_weak', '@sil_unmanaged'.
+  bool PrintStorageRepresentationAttrs = false;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
@@ -145,12 +149,21 @@ struct PrintOptions {
     return result;
   }
 
+  /// Retrieve the set of options suitable for printing SIL functions.
+  static PrintOptions printSIL() {
+    PrintOptions result;
+    result.PrintStorageRepresentationAttrs = true;
+    result.PrintForSIL = true;
+    return result;
+  }
+
   /// \brief Retrieve the set of options that prints everything.
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
+    result.PrintStorageRepresentationAttrs = true;
     result.PrintAccessibility = true;
     return result;
   }
