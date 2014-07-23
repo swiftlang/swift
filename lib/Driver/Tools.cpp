@@ -79,8 +79,6 @@ static void configureDefaultCPU(const llvm::Triple &triple,
   switch (triple.getArch()) {
   case llvm::Triple::aarch64:
   case llvm::Triple::aarch64_be:
-  case llvm::Triple::arm64:
-  case llvm::Triple::arm64_be:
     if (!triple.isOSDarwin())
       return;
     args.push_back("-target-cpu");
@@ -127,7 +125,7 @@ static void configureDefaultABI(const llvm::Triple &triple,
   const char *ABIName = nullptr;
 
   switch (triple.getArch()) {
-  case llvm::Triple::arm64:
+  case llvm::Triple::aarch64:
     ABIName = "darwinpcs";
     break;
   case llvm::Triple::arm:
@@ -162,8 +160,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   const llvm::Triple &Triple = TC.getTriple();
 
   // Enable address top-byte ignored in the ARM64 backend.
-  if (Triple.getArch() == llvm::Triple::arm64 ||
-      Triple.getArch() == llvm::Triple::aarch64) {
+  if (Triple.getArch() == llvm::Triple::aarch64) {
     arguments.push_back("-Xllvm");
     arguments.push_back("-aarch64-use-tbi");
   }
@@ -515,7 +512,7 @@ llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
 
     .Case("x86_64", llvm::Triple::x86_64)
 
-    .Case("arm64", llvm::Triple::arm64)
+    .Case("arm64", llvm::Triple::aarch64)
 
     .Cases("arm", "armv4t", "armv5", "armv6", "armv6m", llvm::Triple::arm)
     .Cases("armv7", "armv7em", "armv7f", "armv7k", "armv7m", llvm::Triple::arm)

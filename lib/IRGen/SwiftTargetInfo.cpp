@@ -135,7 +135,7 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     configureARM(IGM, triple, target);
     break;
 
-  case llvm::Triple::arm64:
+  case llvm::Triple::aarch64:
     configureARM64(IGM, triple, target);
     break;
 

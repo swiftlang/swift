@@ -69,7 +69,7 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   case llvm::Triple::ArchType::arm:
     LangOpts.addTargetConfigOption("arch", "arm");
     break;
-  case llvm::Triple::ArchType::arm64:
+  case llvm::Triple::ArchType::aarch64:
     LangOpts.addTargetConfigOption("arch", "arm64");
     break;
   case llvm::Triple::ArchType::x86:
