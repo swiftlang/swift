@@ -161,18 +161,33 @@ extension ${Self} : ArrayType {
     self = ${Self}(_Buffer(s~>_copyToNativeArrayBuffer()))
   }
 
-  /// Construct an array of `count` elements, each initialized to
+  /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
   @semantics("array.init")
   public init(count: Int, repeatedValue: T) {
+    var p: UnsafeMutablePointer<T>
+    (self, p) = ${Self}._allocateUninitialized(count)
+    for _ in 0..<count {
+      p.initialize(repeatedValue)
+      ++p
+    }
+  }
+
+  /// Construct a ${Self} of `count` uninitialized elements
+  internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
     reserveCapacity(count)
-    var p = _buffer.baseAddress
-    for _ in 0..<count {
-      p++.initialize(repeatedValue)
-    }
     _buffer.count = count
+  }
+  
+  /// Entry point for `Array` literal construction; builds and returns
+  /// a ${Self} of `count` uninitialized elements
+  internal static func _allocateUninitialized(
+    count: Int
+  ) -> (${Self}, UnsafeMutablePointer<T>) {
+    var result = ${Self}(_uninitializedCount: count)
+    return (result, result._buffer.baseAddress)
   }
   
   /// How many elements the ${Self} stores
