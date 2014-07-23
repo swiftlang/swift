@@ -440,6 +440,22 @@ void APINotesWriter::Implementation::writeObjCPropertyBlock(
 }
 
 namespace {
+  /// Retrieve the serialized size of the given FunctionInfo, for use in
+  /// on-disk hash tables.
+  static unsigned getFunctionInfoSize(const FunctionInfo &info) {
+    return 2 + sizeof(uint64_t) + getCommonEntityInfoSize(info);
+  }
+
+  /// Emit a serialized representation of the function information.
+  static void emitFunctionInfo(raw_ostream &out, const FunctionInfo &info) {
+    emitCommonEntityInfo(out, info);
+
+    endian::Writer<little> writer(out);
+    writer.write<uint8_t>(info.NullabilityAudited);
+    writer.write<uint8_t>(info.NumAdjustedNullable);
+    writer.write<uint64_t>(info.NullabilityPayload);
+  }
+
   /// Used to serialize the on-disk Objective-C method table.
   class ObjCMethodTableInfo {
   public:
@@ -461,8 +477,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(SelectorID) + 1;
-      uint32_t dataLength = getCommonEntityInfoSize(data)
-                          + 4 + sizeof(uint64_t);
+      uint32_t dataLength = getFunctionInfoSize(data) + 2;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -478,16 +493,13 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      emitCommonEntityInfo(out, data);
+      emitFunctionInfo(out, data);
 
       endian::Writer<little> writer(out);
 
       // FIXME: Inefficient representation
       writer.write<uint8_t>(data.DesignatedInit);
       writer.write<uint8_t>(data.FactoryAsInit);
-      writer.write<uint8_t>(data.NullabilityAudited);
-      writer.write<uint8_t>(data.NumAdjustedNullable);
-      writer.write<uint64_t>(data.NullabilityPayload);
     }
   };
 } // end anonymous namespace

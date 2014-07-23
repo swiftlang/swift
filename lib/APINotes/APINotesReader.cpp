@@ -193,6 +193,17 @@ namespace {
     }
   };
 
+  /// Read serialized FunctionInfo.
+  void readFunctionInfo(const uint8_t *&data, FunctionInfo &info) {
+    readCommonEntityInfo(data, info);
+    info.NullabilityAudited
+      = endian::readNext<uint8_t, little, unaligned>(data);
+    info.NumAdjustedNullable
+      = endian::readNext<uint8_t, little, unaligned>(data);
+    info.NullabilityPayload
+      = endian::readNext<uint64_t, little, unaligned>(data);
+  }
+
   /// Used to deserialize the on-disk Objective-C method table.
   class ObjCMethodTableInfo {
   public:
@@ -238,15 +249,9 @@ namespace {
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
       ObjCMethodInfo info;
-      readCommonEntityInfo(data, info);
+      readFunctionInfo(data, info);
       info.DesignatedInit = endian::readNext<uint8_t, little, unaligned>(data);
       info.FactoryAsInit = endian::readNext<uint8_t, little, unaligned>(data);
-      info.NullabilityAudited
-        = endian::readNext<uint8_t, little, unaligned>(data);
-      info.NumAdjustedNullable
-        = endian::readNext<uint8_t, little, unaligned>(data);
-      info.NullabilityPayload
-        = endian::readNext<uint64_t, little, unaligned>(data);
       return info;
     }
   };

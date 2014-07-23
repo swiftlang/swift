@@ -230,19 +230,13 @@ struct ObjCSelectorRef {
   llvm::ArrayRef<StringRef> Identifiers;
 };
 
-/// Describes API notes data for an Objective-C method.
-class ObjCMethodInfo : public CommonEntityInfo {
+/// API notes for a function or method.
+class FunctionInfo : public CommonEntityInfo {
 private:
   static unsigned const NullableKindMask = 0x3;
   static unsigned const NullableKindSize = 2;
 
 public:
-  /// Whether this is a designated initializer of its class.
-  unsigned DesignatedInit : 1;
-
-  /// Whether to treat this method as a factory or initializer.
-  unsigned FactoryAsInit : 2;
-
   /// Whether the signature has been audited with respect to nullability.
   /// If yes, we consider all types to be non-nullable unless otherwise noted.
   /// If this flag is not set, the pointer types are considered to have
@@ -258,20 +252,10 @@ public:
   //  of the parameters.
   uint64_t NullabilityPayload = 0;
 
-  ObjCMethodInfo()
+  FunctionInfo()
     : CommonEntityInfo(),
-      DesignatedInit(false),
-      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
       NullabilityAudited(false),
       NumAdjustedNullable(0) { }
-
-  FactoryAsInitKind getFactoryAsInitKind() const {
-    return static_cast<FactoryAsInitKind>(FactoryAsInit);
-  }
-
-  void setFactoryAsInitKind(FactoryAsInitKind kind) {
-    FactoryAsInit = static_cast<unsigned>(kind);
-  }
 
   static unsigned getMaxNullabilityIndex() {
     return ((sizeof(NullabilityPayload) * CHAR_BIT)/NullableKindSize);
@@ -307,15 +291,45 @@ public:
     return getTypeInfo(0);
   }
 
-  friend bool operator==(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
+  friend bool operator==(const FunctionInfo &lhs, const FunctionInfo &rhs) {
     return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
-           lhs.DesignatedInit == rhs.DesignatedInit &&
-           lhs.FactoryAsInit == rhs.FactoryAsInit &&
-           lhs.Unavailable == rhs.Unavailable &&
            lhs.NullabilityAudited == rhs.NullabilityAudited &&
            lhs.NumAdjustedNullable == rhs.NumAdjustedNullable &&
-           lhs.NullabilityPayload == rhs.NullabilityPayload &&
-           lhs.UnavailableMsg == rhs.UnavailableMsg;
+           lhs.NullabilityPayload == rhs.NullabilityPayload;
+  }
+
+  friend bool operator!=(const FunctionInfo &lhs, const FunctionInfo &rhs) {
+    return !(lhs == rhs);
+  }
+
+};
+
+/// Describes API notes data for an Objective-C method.
+class ObjCMethodInfo : public FunctionInfo {
+public:
+  /// Whether this is a designated initializer of its class.
+  unsigned DesignatedInit : 1;
+
+  /// Whether to treat this method as a factory or initializer.
+  unsigned FactoryAsInit : 2;
+
+  ObjCMethodInfo()
+    : FunctionInfo(),
+      DesignatedInit(false),
+      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)) { }
+
+  FactoryAsInitKind getFactoryAsInitKind() const {
+    return static_cast<FactoryAsInitKind>(FactoryAsInit);
+  }
+
+  void setFactoryAsInitKind(FactoryAsInitKind kind) {
+    FactoryAsInit = static_cast<unsigned>(kind);
+  }
+
+  friend bool operator==(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
+    return static_cast<const FunctionInfo &>(lhs) == rhs &&
+           lhs.DesignatedInit == rhs.DesignatedInit &&
+           lhs.FactoryAsInit == rhs.FactoryAsInit;
   }
 
   friend bool operator!=(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
