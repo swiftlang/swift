@@ -151,25 +151,29 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
   ID->setModule(M);
   imports.push_back({ { ID->getDeclPath(), M }, ID->isExported() });
 
-  if (ID->getImportKind() == ImportKind::Module) {
-    // If we imported a submodule, import the top-level module as well.
-    if (ID->getModulePath().size() > 1) {
-      StringRef topLevelName = ID->getModulePath().front().first.str();
-      Module *topLevelModule = Context.LoadedModules[topLevelName];
-      assert(topLevelModule && "top-level module missing");
-      imports.push_back({
-        { ID->getDeclPath(), topLevelModule },
-        ID->isExported()
-      });
-    }
+  Module *topLevelModule;
+
+  if (ID->getModulePath().size() == 1) {
+    topLevelModule = M;
   } else {
+    // If we imported a submodule, import the top-level module as well.
+    StringRef topLevelName = ID->getModulePath().front().first.str();
+    topLevelModule = Context.LoadedModules[topLevelName];
+    assert(topLevelModule && "top-level module missing");
+    imports.push_back({
+      { ID->getDeclPath(), topLevelModule },
+      ID->isExported()
+    });
+  }
+
+  if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.
     using namespace namelookup;
     auto declPath = ID->getDeclPath();
 
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(M, declPath, declPath.front().first, decls,
+    lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                    /*resolver*/nullptr);
 

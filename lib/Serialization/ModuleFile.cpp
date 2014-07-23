@@ -182,7 +182,12 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
 }
 
 std::string ModuleFile::Dependency::getPrettyPrintedPath() const {
-  std::string output = RawPath.str();
+  StringRef pathWithoutScope = RawPath;
+  if (isScoped()) {
+    size_t splitPoint = pathWithoutScope.find_last_of('\0');
+    pathWithoutScope = pathWithoutScope.slice(0, splitPoint);
+  }
+  std::string output = pathWithoutScope.str();
   std::replace(output.begin(), output.end(), '\0', '.');
   return output;
 }
