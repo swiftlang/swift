@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 
-// Interfaces with a questionable future that are needed in order to
-// be a drop-in replacement for String
-//
 extension String {
   public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
@@ -68,125 +65,34 @@ extension String {
   func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 
-/// Represent a positive integer value in the given radix,
-/// writing each ASCII character into stream.  The value of `ten'
-/// should be either "A" or "a", depending on whether you want upper-
-/// or lower-case letters when radix > 10
-func _formatPositiveInteger( 
-  value: UInt64,
-  radix: UInt64,
-  ten: UnicodeScalar = "a") (  stream: (UTF8.CodeUnit)->Void )
-{
-
-  if value == 0 {
-    return
-  }
-
-  _formatPositiveInteger(value / radix, radix, ten: ten)(stream: stream)
-  var digit = UInt32(value % radix)
-  var baseCharOrd: UInt32 =
-      digit <= 9
-          ? _asUnicodeScalar("0").value
-          : _asUnicodeScalar(ten).value - 10
-  stream(UTF8.CodeUnit(baseCharOrd + digit))
-}
-
-func _formatSignedInteger(
-  value: Int64,
-  radix: UInt64,
-  ten: UnicodeScalar = "a") (  stream: (UTF8.CodeUnit)->Void ) {
-  
-  if value == 0 {
-    stream(UTF8.CodeUnit(_asUnicodeScalar("0").value))
-  }
-  else {
-    if (value < 0) {
-      let minusCharacter: UnicodeScalar = "-"
-      stream(UTF8.CodeUnit(_asUnicodeScalar("-").value))
-    }
-    // Compute the absolute value without causing overflow when value
-    // == Int64.min
-    let absValue = value < 0 ? UInt64(~value) + 1 : UInt64(value)
-    _formatPositiveInteger(absValue, radix, ten: ten)(stream: stream)
-  }
-}
 
 // Conversions to string from other types.
 extension String {
 
-  public init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
-    _precondition(radix > 1, "Radix must be greater than 1")
-    var format = _formatSignedInteger(v, UInt64(radix), 
-                                      ten: _uppercase ? "A" : "a")
-    var asciiCount = 0
-    format(stream: { _ in ++asciiCount;() })
-    var buffer = _StringBuffer(
-      capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
-    var p = UnsafeMutablePointer<UTF8.CodeUnit>(buffer.start)
-    format(stream: { p++.memory = $0 })
-    self = String(buffer)
+  // FIXME: can't just use a default arg for radix below; instead we
+  // need these single-arg overloads <rdar://problem/17775455>
+  public init<T: _SignedIntegerType>(_ v: T) {
+    self = _int64ToString(v.toIntMax())
   }
-
-  // FIXME: This function assumes UTF-16
-  public init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
-    _precondition(radix > 1, "Radix must be greater than 1")
-    var format = _formatPositiveInteger(v, UInt64(radix), 
-                                        ten: _uppercase ? "A" : "a")
-    var asciiCount = v == 0 ? 1 : 0
-    format(stream: { _ in ++asciiCount;() })
-    var buffer = _StringBuffer(
-      capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
-    var p = UnsafeMutablePointer<UTF8.CodeUnit>(buffer.start)
-    format(stream: { p++.memory = $0 })
-    if v == 0 {
-      p++.memory = UTF8.CodeUnit("0")
-    }
-    self = String(buffer)
-  }
-
-  public init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
-  }
-  public init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
-  }
-
-  typealias _Double = Double
-  typealias _Float = Float
-  typealias _Bool = Bool
   
-  init(_ v : _Double) {
-    self = _doubleToString(v)
+  public init<T: _UnsignedIntegerType>(_ v: T)  {
+    self = _uint64ToString(v.toUIntMax())
   }
 
-  init(_ v : _Float) {
-    self = String(Double(v))
+  public init<T: _SignedIntegerType>(
+    _ v: T, radix: Int, uppercase: Bool = false
+  ) {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _int64ToString(
+      v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
-
-  init(_ b : _Bool) {
-    if b {
-      self = "true"
-    } else {
-      self = "false"
-    }
+  
+  public init<T: _UnsignedIntegerType>(
+    _ v: T, radix: Int, uppercase: Bool = false
+  )  {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _uint64ToString(
+      v.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
 }
 

@@ -4124,9 +4124,9 @@ print("\"Swift\" => " + String(dict["Swift"]!) + "\n")
 // CHECK-NEXT: "World" => 2
 print("\"World\" => " + String(dict["World"]!) + "\n")
 // CHECK-NEXT: "World" => true
-print("\"World\" => " + String(dict["World"].boolValue) + "\n")
+print("\"World\" => " + toString(dict["World"].boolValue) + "\n")
 // CHECK-NEXT: "Universe" => false
-print("\"Universe\" => " + String(dict["Universe"].boolValue) + "\n")
+print("\"Universe\" => " + toString(dict["Universe"].boolValue) + "\n")
 
 // Overwriting existing value
 dict["Hello"] = 0
