@@ -427,13 +427,13 @@ public func += <T> (inout lhs: _ContiguousArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
 
-public func === <T>(
+func === <T>(
   lhs: _ContiguousArrayBuffer<T>, rhs: _ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base == rhs._base
 }
 
-public func !== <T>(
+func !== <T>(
   lhs: _ContiguousArrayBuffer<T>, rhs: _ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs._base != rhs._base
