@@ -48,6 +48,10 @@ Latest
   'dynamic' enables KVO, proxying, and other advanced Cocoa features to work
   reliably with Swift declarations.
 
+* Clang submodules can now be imported:
+
+    import UIKit.UIGestureRecognizerSubclass
+
 2014-07-21
 ----------
 
