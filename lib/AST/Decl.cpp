@@ -361,8 +361,7 @@ bool Decl::isPrivateStdlibDecl() const {
     bool hasInternalParameter = false;
     for (auto Pat : AFD->getBodyParamPatterns()) {
       Pat->forEachVariable([&](VarDecl *Param) {
-        if ((Param->hasName() && Param->getNameStr().startswith("_")) ||
-            Param->getType().isPrivateStdlibType()) {
+        if (Param->hasName() && Param->getNameStr().startswith("_")) {
           hasInternalParameter = true;
         }
       });
