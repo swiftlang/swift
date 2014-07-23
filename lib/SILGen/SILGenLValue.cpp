@@ -343,7 +343,9 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-  
+} // end anonymous namespace.
+
+namespace {
   class TupleElementComponent : public PhysicalPathComponent {
     unsigned ElementIndex;
   public:
@@ -360,7 +362,9 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-  
+} // end anonymous namespace.
+
+namespace {
   class StructElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
     SILType SubstFieldType;
@@ -378,7 +382,9 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-  
+} // end anonymous namespace.
+
+namespace {
   class OptionalObjectComponent : public PhysicalPathComponent {
     SILType SubstFieldType;
   public:
@@ -408,7 +414,9 @@ namespace {
       return ManagedValue::forLValue(someAddr);
     }
   };
+} // end anonymous namespace.
 
+namespace {
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
   public:
@@ -423,7 +431,76 @@ namespace {
       return Value;
     }
   };
+} // end anonymous namespace.
 
+static bool isReadNoneFunction(const Expr *e) {
+  // If this is a curried call to an integer literal conversion operations, then
+  // we can "safely" assume it is readnone (btw, yes this is totally gross).
+  // This is better to be attribute driven, ala rdar://15587352.
+  if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
+    StringRef name = dre->getDecl()->getName().str();
+    return name == "_convertFromBuiltinIntegerLiteral" ||
+           name == "convertFromIntegerLiteral";
+  }
+  
+  // Look through DotSyntaxCallExpr, since the literal functions are curried.
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(e))
+    return isReadNoneFunction(DSCE->getFn());
+  
+  return false;
+}
+
+
+/// Given two expressions used as indexes to the same SubscriptDecl (and thus
+/// are guaranteed to have the same AST type) check to see if they are going to
+/// produce the same value.
+static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
+  if (e1->getKind() != e2->getKind()) return false;
+  
+  // Look through ParenExpr's.
+  if (auto *pe1 = dyn_cast<ParenExpr>(e1)) {
+    auto *pe2 = cast<ParenExpr>(e2);
+    return areCertainlyEqualIndices(pe1->getSubExpr(), pe2->getSubExpr());
+  }
+  
+  // Calls are identical if the callee and operands are identical and we know
+  // that the call is something that is "readnone".
+  if (auto *ae1 = dyn_cast<ApplyExpr>(e1)) {
+    auto *ae2 = cast<ApplyExpr>(e2);
+    return areCertainlyEqualIndices(ae1->getFn(), ae2->getFn()) &&
+           areCertainlyEqualIndices(ae1->getArg(), ae2->getArg()) &&
+           isReadNoneFunction(ae1->getFn());
+  }
+  
+  // TypeExpr's that produce the same metatype type are identical.
+  if (isa<TypeExpr>(e1))
+    return true;
+  
+  if (auto *dre1 = dyn_cast<DeclRefExpr>(e1)) {
+    auto *dre2 = cast<DeclRefExpr>(e2);
+    return dre1->getDecl() == dre2->getDecl() &&
+           dre1->getGenericArgs() == dre2->getGenericArgs();
+  }
+
+  // Compare a variety of literals.
+  if (auto *il1 = dyn_cast<IntegerLiteralExpr>(e1))
+    return il1->getValue() == cast<IntegerLiteralExpr>(e2)->getValue();
+  if (auto *il1 = dyn_cast<FloatLiteralExpr>(e1))
+    return il1->getValue().bitwiseIsEqual(
+                                        cast<FloatLiteralExpr>(e2)->getValue());
+  if (auto *bl1 = dyn_cast<BooleanLiteralExpr>(e1))
+    return bl1->getValue() == cast<BooleanLiteralExpr>(e2)->getValue();
+  if (auto *sl1 = dyn_cast<StringLiteralExpr>(e1))
+    return sl1->getValue() == cast<StringLiteralExpr>(e2)->getValue();
+  if (auto *cl1 = dyn_cast<CharacterLiteralExpr>(e1))
+    return cl1->getValue() == cast<CharacterLiteralExpr>(e2)->getValue();
+  
+  
+  // Otherwise, we have no idea if they are identical.
+  return false;
+}
+
+namespace {
   class GetterSetterComponent : public LogicalPathComponent {
     // The VarDecl or SubscriptDecl being get/set.
     AbstractStorageDecl *decl;
@@ -539,8 +616,8 @@ namespace {
       // If we haven't emitted the lvalue for some reason, just ignore this.
       if (!origSubscripts || !rhs.origSubscripts) return;
 
-      // If the indices are literally identical, then there is clearly a
-      // conflict.
+      // If the indices are literally identical SILValue's, then there is
+      // clearly a conflict.
       SmallVector<ManagedValue, 4> elts1, elts2;
       origSubscripts.copy(gen, loc1).getAll(elts1);
       rhs.origSubscripts.copy(gen, loc2).getAll(elts2);
@@ -548,7 +625,11 @@ namespace {
              [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
                return lhs.getValue() == rhs.getValue();
              })) {
-        return;
+        // If the index value doesn't lower to literally the same SILValue's,
+        // do some fuzzy matching to catch the common case.
+        if (!areCertainlyEqualIndices(subscriptIndexExpr,
+                                      rhs.subscriptIndexExpr))
+          return;
       }
       
       // The locations for the subscripts are almost certainly SubscriptExprs.
@@ -582,7 +663,9 @@ namespace {
     }
 
   };
-  
+} // end anonymous namespace.
+
+namespace {
   /// Remap an lvalue referencing a generic type to an lvalue of its substituted
   /// type in a concrete context.
   class OrigToSubstComponent : public LogicalPathComponent {
@@ -636,7 +719,9 @@ namespace {
 
     }
   };
+} // end anonymous namespace.
 
+namespace {
   /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
   class OwnershipComponent : public LogicalPathComponent {
   public:
@@ -683,7 +768,7 @@ namespace {
 
     }
   };
-}
+} // end anonymous namespace.
 
 LValue SILGenFunction::emitLValue(Expr *e) {
   LValue r = SILGenLValue(*this).visit(e);
