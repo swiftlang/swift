@@ -11,7 +11,8 @@
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
 // CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: return
+// CHECK: [[VOID:%[^ ]+]] = tuple ()
+// CHECK: return [[VOID]]
 // CHECK-NEXT: {{^[}]}}
 func inoutarr(inout a: [Int]) {
   for i in 0..<a.count {
@@ -29,7 +30,8 @@ struct S {
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
 // CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: return
+// CHECK: [[VOID:%[^ ]+]] = tuple ()
+// CHECK: return [[VOID]]
 // CHECK-NEXT: {{^[}]}}
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
