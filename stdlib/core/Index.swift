@@ -85,7 +85,7 @@ public protocol _Incrementable : Equatable {
 // ambiguity indexing Range<T> outside a generic context.  See the
 // implementation of Range for details.
 public struct _DisabledRangeIndex_ {
-  private init() {
+  init() {
     _fatalError("Nobody should ever create one.")
   }
 }
