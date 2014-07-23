@@ -25,9 +25,8 @@ f1(identity(1))
 f0(x) // expected-error{{'X' is not convertible to 'Float'}}
 
 f + 1
-// FIXME: <rdar://problem/17507421>
-//f2(i)
-//f2(i, f)
+f2(i)
+f2((i, f))
 
 class A { 
   init() {} 

@@ -120,7 +120,7 @@ ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
                                                           TupleTypeElt &scalar){
   switch (type->getKind()) {
   case TypeKind::Tuple:
-      return cast<TupleType>(type.getPointer())->getFields();
+    return cast<TupleType>(type.getPointer())->getFields();
 
   case TypeKind::Paren:
     scalar = cast<ParenType>(type.getPointer())->getUnderlyingType();
@@ -1345,7 +1345,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
         if (!typeVar1->getImpl().canBindToLValue()) {
-          if (type2->is<LValueType>()) {
+          if (type2->isLValueType()) {
             if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(locator),
                             Failure::IsForbiddenLValue, type1, type2);
@@ -1365,7 +1365,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         type1 = type1->getRValueType();
 
       if (!typeVar2->getImpl().canBindToLValue()) {
-        if (type1->is<LValueType>()) {
+        if (type1->isLValueType()) {
           if (shouldRecordFailures()) {
             recordFailure(getConstraintLocator(locator),
                           Failure::IsForbiddenLValue, type1, type2);
@@ -1411,7 +1411,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   bool concrete = !typeVar1 && !typeVar2;
 
   // If this is an argument conversion, handle it directly. The rules are
-  // different than for normal conversions.
+  // different from normal conversions.
   if (kind == TypeMatchKind::ArgumentTupleConversion ||
       kind == TypeMatchKind::OperatorArgumentTupleConversion) {
     if (concrete) {

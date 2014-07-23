@@ -128,7 +128,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
 // FIXME: Poor diagnostic.
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot convert the expression's type '$T8' to type 'IntegerLiteralConvertible'}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot convert the expression's type '$T16' to type 'IntegerLiteralConvertible'}}
 
 func variadics2(#x: Int, y: Int = 2, #z: Int...) { }
 

@@ -3604,16 +3604,6 @@ inline Type TypeBase::getInOutObjectType() {
   return this;
 }
 
-inline Type TypeBase::getRValueType() {
-  Type type = this;
-
-  // Look through lvalue type.
-  if (auto lv = type->getAs<LValueType>())
-    type = lv->getObjectType();
-
-  return type;
-}
-
 inline Type TypeBase::getRValueObjectType() {
   Type type = this;
 

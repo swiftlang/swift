@@ -79,7 +79,7 @@ func test_global_properties(x: X) {
   a4 = x
   a5 = x
 
-  accept_x_inout(&a1) // expected-error {{'X' is not convertible to '@lvalue inout $T2'}}
+  accept_x_inout(&a1) // expected-error {{'X' is not convertible to '@lvalue inout $T4'}}
   accept_x_inout(&a2)
   accept_x_inout(&a3)
   accept_x_inout(&a4)
@@ -197,7 +197,7 @@ func disambiguateGetSet4Attr() {
 }
 
 // Disambiguated as stored property with a trailing closure in the initializer.
-var disambiguateImplicitGet1: Int = 0 { // expected-error {{'(() -> () -> $T1) -> $T2' is not identical to 'Int'}}
+var disambiguateImplicitGet1: Int = 0 { // expected-error {{'(() -> () -> $T2) -> $T4' is not identical to 'Int'}}
   return 42
 }
 var disambiguateImplicitGet2: Int = takeIntTrailingClosure {
@@ -438,9 +438,9 @@ func test_extension_properties(inout s: S, inout x: X) {
   getS().x2 = x // expected-error{{cannot assign to the result of this expression}}
   getS().x3 = x // expected-error{{cannot assign to the result of this expression}}
 
-  accept_x_inout(&getS().x) // expected-error{{'X' is not convertible to '@lvalue inout $T4'}}
-  accept_x_inout(&getS().x2) // expected-error{{'X' is not convertible to '@lvalue inout $T4'}}
-  accept_x_inout(&getS().x3) // expected-error{{'X' is not convertible to '@lvalue inout $T4'}}
+  accept_x_inout(&getS().x) // expected-error{{'X' is not convertible to '@lvalue inout $T8'}}
+  accept_x_inout(&getS().x2) // expected-error{{'X' is not convertible to '@lvalue inout $T8'}}
+  accept_x_inout(&getS().x3) // expected-error{{'X' is not convertible to '@lvalue inout $T8'}}
 
   x = getS().x
   x = getS().x2
@@ -448,7 +448,7 @@ func test_extension_properties(inout s: S, inout x: X) {
 
   accept_x_inout(&s.x)
   accept_x_inout(&s.x2)
-  accept_x_inout(&s.x3) // expected-error{{'X' is not convertible to '@lvalue inout $T3'}}
+  accept_x_inout(&s.x3) // expected-error{{'X' is not convertible to '@lvalue inout $T6'}}
 }
 
 extension S {
@@ -486,7 +486,7 @@ func test_settable_of_nonsettable(a: Aleph) {
   var x:Int = a.b.c
 
   accept_int(a.b.c) // expected-FIXME-error {{not settable}}
-  accept_int_inout(&a.b.c) // expected-error {{'Int' is not convertible to '@lvalue inout $T4'}}
+  accept_int_inout(&a.b.c) // expected-error {{'Int' is not convertible to '@lvalue inout $T8'}}
 }
 
 // TODO: Static properties are only implemented for nongeneric structs yet.
