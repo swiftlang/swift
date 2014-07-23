@@ -3744,11 +3744,9 @@ public:
               diagnosed = true;
             }
 
-            // FIXME: Using the type here is awful. We want to use the selector
-            // name and provide a nice Fix-It with that declaration.
             TC.diagnose(superclassCtor,
                         diag::required_initializer_not_overridden,
-                        superclassCtor->getArgumentType());
+                        superclassCtor->getFullName());
             continue;
           }
 

@@ -104,7 +104,7 @@ class Ab2 : Ab1 {
 
   // Subclasses can use this to satisfy the required initializer
   // requirement.
-  required convenience init() { // expected-note{{'required' initializer with type '()' not overridden}}
+  required convenience init() { // expected-note{{'required' initializer 'init()' not overridden}}
     self.init(string: "default")
   }
 

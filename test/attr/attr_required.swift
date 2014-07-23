@@ -6,7 +6,7 @@
 required class AC { } // expected-error{{'required' may only be used on 'init' declarations}}
 
 class C {
-  required init(string s: String) { } // expected-note{{'required' initializer with type '(string: String)' not overridden}}
+  required init(string s: String) { } // expected-note{{'required' initializer 'init(string:)' not overridden}}
 
   required var s: String // expected-error{{'required' may only be used on 'init' declarations}}
 
@@ -41,7 +41,7 @@ class C3 : C {
 
 class C4 : C3 {
   // implicitly required
-  init(string s: String) { } // expected-note{{'required' initializer with type '(string: String)' not overridden}}
+  init(string s: String) { } // expected-note{{'required' initializer 'init(string:)' not overridden}}
 }
 
 class C5 : C4 {
