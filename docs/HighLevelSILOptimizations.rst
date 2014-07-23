@@ -128,6 +128,16 @@ control dependent because it may trap. Some operations are *guarded*
 by others. A guarded operation can never be executed before its
 guard.
 
+array.init
+
+  Initialize an array with new storage. This currently applies to any
+  initializer that does not get its storage from an argument. This
+  semantically writes to every array element and the array's storage
+  descriptor. ``init`` also implies the guarding semantics of
+  ``make_mutable``. It is not itself guarded by ``make_mutable`` and
+  may act as a guard to other mutating operations, such as
+  ``set_element``.
+
 array.get_element(index: Int) -> Element
 
    Read an element from the array at the specified index. No other
@@ -176,7 +186,7 @@ array.make_mutable()
   executed safely on any array at any point. i.e. the optimizer can
   freely insert calls to make_mutable.
 
-array.mutate_unknown()
+array.mutate_unknown
 
   This operation may mutate the array in any way, so it semantically
   writes to the entire array state and is naturally control

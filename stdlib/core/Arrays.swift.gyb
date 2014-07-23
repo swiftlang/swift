@@ -125,6 +125,8 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   public
   typealias _Buffer = _${Self}Buffer<T>
 
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
   public
   init(_ buffer: _Buffer) {
     self._buffer = buffer
@@ -148,6 +150,7 @@ extension ${Self} {
 
 extension ${Self} : ArrayType {
   /// Construct an empty ${Self}
+  @semantics("array.init")
   public init() {
     _buffer = _Buffer()
   }
@@ -160,6 +163,7 @@ extension ${Self} : ArrayType {
 
   /// Construct an array of `count` elements, each initialized to
   /// `repeatedValue`.
+  @semantics("array.init")
   public init(count: Int, repeatedValue: T) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
