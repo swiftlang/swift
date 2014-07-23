@@ -44,6 +44,9 @@ class APINotesWriter::Implementation {
   SmallVector<uint64_t, 64> ScratchRecord;
 
 public:
+  /// The name of the module
+  std::string ModuleName;
+
   /// Information about Objective-C contexts (classes or protocols).
   ///
   /// Indexed by the identifier ID and a bit indication whether we're looking
@@ -151,6 +154,7 @@ void APINotesWriter::Implementation::writeBlockInfoBlock(
 
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
+  BLOCK_RECORD(control_block, MODULE_NAME);
 
   BLOCK(IDENTIFIER_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
@@ -176,6 +180,9 @@ void APINotesWriter::Implementation::writeControlBlock(
   BCBlockRAII restoreBlock(writer, CONTROL_BLOCK_ID, 3);
   control_block::MetadataLayout metadata(writer);
   metadata.emit(ScratchRecord, VERSION_MAJOR, VERSION_MINOR);
+
+  control_block::ModuleNameLayout moduleName(writer);
+  moduleName.emit(ScratchRecord, ModuleName);
 }
 
 namespace {
@@ -583,9 +590,10 @@ void APINotesWriter::Implementation::writeToStream(llvm::raw_ostream &os) {
   os.flush();
 }
 
-APINotesWriter::APINotesWriter()
+APINotesWriter::APINotesWriter(StringRef moduleName)
   : Impl(*new Implementation)
 {
+  Impl.ModuleName = moduleName;
 }
 
 APINotesWriter::~APINotesWriter() {

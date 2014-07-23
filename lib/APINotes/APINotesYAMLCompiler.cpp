@@ -480,7 +480,7 @@ static bool writeContext(api_notes::APINotesWriter &writer,
 
 static bool compile(const Module &module, llvm::raw_ostream &os){
   using namespace api_notes;
-  APINotesWriter writer;
+  APINotesWriter writer(module.Name);
 
   bool invalid = false;
 
@@ -665,6 +665,9 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
   // Sort the data in the module, because the API notes reader doesn't preserve
   // order.
   auto &module = decompileVisitor.getModule();
+
+  // Set module name.
+  module.Name = reader->getModuleName();
 
   // Sort classes.
   std::sort(module.Classes.begin(), module.Classes.end(),

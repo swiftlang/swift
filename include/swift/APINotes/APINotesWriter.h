@@ -35,7 +35,8 @@ class APINotesWriter {
   Implementation &Impl;
 
 public:
-  APINotesWriter();
+  /// Create a new API notes writer with the given module name.
+  APINotesWriter(StringRef moduleName);
   ~APINotesWriter();
 
   APINotesWriter(const APINotesWriter &) = delete;

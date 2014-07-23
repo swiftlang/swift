@@ -49,6 +49,10 @@ public:
   APINotesReader(const APINotesReader &) = delete;
   APINotesReader &operator=(const APINotesReader &) = delete;
 
+  /// Retrieve the name of the module for which this reader is providing API
+  /// notes.
+  StringRef getModuleName() const;
+
   /// Look for information regarding the given Objective-C class.
   ///
   /// \param name The name of the class we're looking for.

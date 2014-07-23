@@ -87,12 +87,18 @@ namespace control_block {
   // VERSION_MAJOR.
   enum {
     METADATA = 1,
+    MODULE_NAME = 2
   };
 
   using MetadataLayout = BCRecordLayout<
     METADATA, // ID
     BCFixed<16>, // Module format major version
     BCFixed<16>  // Module format minor version
+  >;
+
+  using ModuleNameLayout = BCRecordLayout<
+    MODULE_NAME,
+    BCBlob       // Module name
   >;
 }
 

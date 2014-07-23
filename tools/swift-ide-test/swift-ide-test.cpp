@@ -1708,7 +1708,7 @@ namespace {
 /// FIXME: This is a horrible, horrible hack.
 bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
   using namespace api_notes;
-  APINotesWriter writer;
+  APINotesWriter writer(moduleName);
 
   // Constants used to map from KnownObjCMethods.def.
   const auto OTK_None = api_notes::NullableKind::NonNullable;

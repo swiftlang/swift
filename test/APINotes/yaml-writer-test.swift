@@ -3,6 +3,7 @@
 # RUN: %swift_driver_plain -apinotes -binary-to-yaml -o %t-AppKit.yaml %t-AppKit.apinotes 
 # RUN: FileCheck %s < %t-AppKit.yaml
 
+// CHECK: Name: AppKit
 // CHECK: Classes:         
 // CHECK:   - Name:            NSCell
 // CHECK:     Availability:    available
