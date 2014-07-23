@@ -66,6 +66,11 @@ Classes:
         Nullability:     N
         Availability:    available
         AvailabilityMsg: ''
+Functions:       
+  - Name:            NSAvailableWindowDepths
+    NullabilityOfRet: N
+    Availability:    available
+    AvailabilityMsg: ''
 Globals:         
   - Name:            NSCalibratedWhiteColorSpace
     Nullability:     N

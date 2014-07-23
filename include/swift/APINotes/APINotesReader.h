@@ -98,6 +98,13 @@ public:
   /// \returns information about the global variable, if known.
   Optional<GlobalVariableInfo> lookupGlobalVariable(StringRef name);
 
+  /// Look for information regarding the given global function.
+  ///
+  /// \param name The name of the global function.
+  ///
+  /// \returns information about the global function, if known.
+  Optional<GlobalFunctionInfo> lookupGlobalFunction(StringRef name);
+
   /// Visitor used when walking the contents of the API notes file.
   class Visitor {
   public:
@@ -123,8 +130,11 @@ public:
     /// Visit a global variable.
     virtual void visitGlobalVariable(StringRef name,
                                      const GlobalVariableInfo &info);
-  };
 
+    /// Visit a global function.
+    virtual void visitGlobalFunction(StringRef name,
+                                     const GlobalFunctionInfo &info);
+  };
 
   /// Visit the contents of the API notes file, passing each entity to the
   /// given visitor.

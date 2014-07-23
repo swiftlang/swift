@@ -308,8 +308,7 @@ namespace {
   /// Used to deserialize the on-disk global variable table.
   class GlobalVariableTableInfo {
   public:
-    // (context ID, name ID)
-    using internal_key_type = unsigned;
+    using internal_key_type = unsigned; // name ID
     using external_key_type = internal_key_type;
     using data_type = GlobalVariableInfo;
     using hash_value_type = size_t;
@@ -347,6 +346,51 @@ namespace {
                               unsigned length) {
       GlobalVariableInfo info;
       readVariableInfo(data, info);
+      return info;
+    }
+  };
+
+  /// Used to deserialize the on-disk global function table.
+  class GlobalFunctionTableInfo {
+  public:
+    using internal_key_type = unsigned; // name ID
+    using external_key_type = internal_key_type;
+    using data_type = GlobalFunctionInfo;
+    using hash_value_type = size_t;
+    using offset_type = unsigned;
+
+    internal_key_type GetInternalKey(external_key_type key) {
+      return key;
+    }
+
+    external_key_type GetExternalKey(internal_key_type key) {
+      return key;
+    }
+
+    hash_value_type ComputeHash(internal_key_type key) {
+      return static_cast<size_t>(llvm::hash_value(key));
+    }
+    
+    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+      return lhs == rhs;
+    }
+    
+    static std::pair<unsigned, unsigned> 
+    ReadKeyDataLength(const uint8_t *&data) {
+      unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      return { keyLength, dataLength };
+    }
+    
+    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+      auto nameID = endian::readNext<IdentifierID, little, unaligned>(data);
+      return nameID;
+    }
+    
+    static data_type ReadData(internal_key_type key, const uint8_t *data,
+                              unsigned length) {
+      GlobalFunctionInfo info;
+      readFunctionInfo(data, info);
       return info;
     }
   };
@@ -399,6 +443,12 @@ public:
   /// The global variable table.
   std::unique_ptr<SerializedGlobalVariableTable> GlobalVariableTable;
 
+  using SerializedGlobalFunctionTable =
+      llvm::OnDiskIterableChainedHashTable<GlobalFunctionTableInfo>;
+
+  /// The global function table.
+  std::unique_ptr<SerializedGlobalFunctionTable> GlobalFunctionTable;
+
   /// Retrieve the identifier ID for the given string, or an empty
   /// optional if the string is unknown.
   Optional<IdentifierID> getIdentifier(StringRef str);
@@ -420,6 +470,8 @@ public:
   bool readObjCSelectorBlock(llvm::BitstreamCursor &cursor, 
                              SmallVectorImpl<uint64_t> &scratch);
   bool readGlobalVariableBlock(llvm::BitstreamCursor &cursor,
+                               SmallVectorImpl<uint64_t> &scratch);
+  bool readGlobalFunctionBlock(llvm::BitstreamCursor &cursor,
                                SmallVectorImpl<uint64_t> &scratch);
 };
 
@@ -837,6 +889,60 @@ bool APINotesReader::Implementation::readGlobalVariableBlock(
   return false;
 }
 
+bool APINotesReader::Implementation::readGlobalFunctionBlock(
+       llvm::BitstreamCursor &cursor, 
+       SmallVectorImpl<uint64_t> &scratch) {
+  if (cursor.EnterSubBlock(GLOBAL_FUNCTION_BLOCK_ID))
+    return true;
+
+  auto next = cursor.advance();
+  while (next.Kind != llvm::BitstreamEntry::EndBlock) {
+    if (next.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    if (next.Kind == llvm::BitstreamEntry::SubBlock) {
+      // Unknown sub-block, possibly for use by a future version of the
+      // API notes format.
+      if (cursor.SkipBlock())
+        return true;
+      
+      next = cursor.advance();
+      continue;
+    }
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    switch (kind) {
+    case global_function_block::GLOBAL_FUNCTION_DATA: {
+      // Already saw global function table.
+      if (GlobalFunctionTable)
+        return true;
+
+      uint32_t tableOffset;
+      global_function_block::GlobalFunctionDataLayout::readRecord(scratch,
+                                                                  tableOffset);
+      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+      GlobalFunctionTable.reset(
+        SerializedGlobalFunctionTable::Create(base + tableOffset,
+                                              base + sizeof(uint32_t),
+                                              base));
+      break;
+    }
+
+    default:
+      // Unknown record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+
+    next = cursor.advance();
+  }
+
+  return false;
+}
+
 APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer, 
                              bool &failed) 
   : Impl(*new Implementation)
@@ -927,6 +1033,13 @@ APINotesReader::APINotesReader(std::unique_ptr<llvm::MemoryBuffer> inputBuffer,
       }
       break;
 
+    case GLOBAL_FUNCTION_BLOCK_ID:
+      if (!hasValidControlBlock || 
+          Impl.readGlobalFunctionBlock(cursor, scratch)) {
+        failed = true;
+        return;
+      }
+      break;
 
     default:
       // Unknown top-level block, possibly for use by a future version of the
@@ -1051,6 +1164,21 @@ Optional<GlobalVariableInfo> APINotesReader::lookupGlobalVariable(
   return *known;
 }
 
+Optional<GlobalFunctionInfo> APINotesReader::lookupGlobalFunction(
+                               StringRef name) {
+  if (!Impl.GlobalFunctionTable)
+    return Nothing;
+
+  Optional<IdentifierID> nameID = Impl.getIdentifier(name);
+  if (!nameID)
+    return Nothing;
+
+  auto known = Impl.GlobalFunctionTable->find(*nameID);
+  if (known == Impl.GlobalFunctionTable->end())
+    return Nothing;
+
+  return *known;
+}
 APINotesReader::Visitor::~Visitor() { }
 
 void APINotesReader::Visitor::visitObjCClass(ContextID contextID,
@@ -1073,6 +1201,10 @@ void APINotesReader::Visitor::visitObjCProperty(ContextID contextID,
 void APINotesReader::Visitor::visitGlobalVariable(
        StringRef name,
        const GlobalVariableInfo &info) { }
+
+void APINotesReader::Visitor::visitGlobalFunction(
+       StringRef name,
+       const GlobalFunctionInfo &info) { }
 
 void APINotesReader::visit(Visitor &visitor) {
   // FIXME: All of these iterations would be significantly more efficient if we
@@ -1140,6 +1272,15 @@ void APINotesReader::visit(Visitor &visitor) {
       auto name = identifiers[key.second];
       auto info = *Impl.ObjCPropertyTable->find(key);
       visitor.visitObjCProperty(contextID, name, info);
+    }
+  }
+
+  // Visit global functions.
+  if (Impl.GlobalFunctionTable) {
+    for (auto key : Impl.GlobalFunctionTable->keys()) {
+      auto name = identifiers[key];
+      auto info = *Impl.GlobalFunctionTable->find(key);
+      visitor.visitGlobalFunction(name, info);
     }
   }
 

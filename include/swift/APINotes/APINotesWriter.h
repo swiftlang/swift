@@ -86,6 +86,12 @@ public:
   /// \param name The name of this global variable.
   /// \param info Information about this global variable.
   void addGlobalVariable(StringRef name, const GlobalVariableInfo &info);
+
+  /// Add information about a global function.
+  ///
+  /// \param name The name of this global function.
+  /// \param info Information about this global function.
+  void addGlobalFunction(StringRef name, const GlobalFunctionInfo &info);
 };
 
 } // end namespace api_notes

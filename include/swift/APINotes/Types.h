@@ -359,6 +359,11 @@ public:
   GlobalVariableInfo() : VariableInfo() { }
 };
 
+/// Describes API notes data for a global function.
+class GlobalFunctionInfo : public FunctionInfo {
+public:
+  GlobalFunctionInfo() : FunctionInfo() { }
+};
 } // end namespace api_notes
 } // end namespace swift
 

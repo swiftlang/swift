@@ -354,6 +354,35 @@ static bool translateAvailability(const AvailabilityItem &in,
   return false;
 }
 
+static bool translateNullability(const NullabilitySeq &nullability,
+                                 api_notes::NullableKind nullabilityOfRet,
+                                 api_notes::FunctionInfo &outInfo,
+                                 llvm::StringRef apiName) {
+  if (nullability.size() > api_notes::FunctionInfo::getMaxNullabilityIndex()) {
+    llvm::errs() << "Nullability info for " << apiName << " does not fit.";
+    return true;
+  }
+
+  bool audited = false;
+  unsigned int idx = 1;
+  for (auto i = nullability.begin(), e = nullability.end(); i != e; ++i, ++idx){
+    outInfo.addTypeInfo(idx, *i);
+    audited = true;
+  }
+  if (nullabilityOfRet != AbsentNullability) {
+    outInfo.addTypeInfo(0, nullabilityOfRet);
+    audited = true;
+  } else if (audited) {
+    outInfo.addTypeInfo(0, DefaultNullability);
+  }
+  if (audited) {
+    outInfo.NullabilityAudited = audited;
+    outInfo.NumAdjustedNullable = idx;
+  }
+
+  return false;
+}
+
 // Translate from Method into ObjCMethodInfo and write it out.
 static bool writeMethod(api_notes::APINotesWriter &writer,
                         const Method &meth,
@@ -391,28 +420,9 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
     invalid = true;
 
   // Translate nullability info.
-  if (meth.Nullability.size() > ObjCMethodInfo::getMaxNullabilityIndex()) {
-    llvm::errs() << "Nullability info for "
-                 << className << meth.Selector << " does not fit.";
-    return true;
-  }
-  bool audited = false;
-  unsigned int idx = 1;
-  for (auto i = meth.Nullability.begin(),
-       e = meth.Nullability.end(); i != e; ++i, ++idx) {
-    mInfo.addTypeInfo(idx, *i);
-    audited = true;
-  }
-  if (meth.NullabilityOfRet != AbsentNullability) {
-    mInfo.addTypeInfo(0, meth.NullabilityOfRet);
-    audited = true;
-  } else if (audited) {
-    mInfo.addTypeInfo(0, DefaultNullability);
-  }
-  if (audited) {
-    mInfo.NullabilityAudited = audited;
-    mInfo.NumAdjustedNullable = idx;
-  }
+  if (translateNullability(meth.Nullability, meth.NullabilityOfRet, mInfo,
+                           meth.Selector))
+    invalid = true;
 
   // Write it.
   writer.addObjCMethod(classID, selectorRef,
@@ -530,6 +540,27 @@ static bool compile(const Module &module, llvm::raw_ostream &os){
     writer.addGlobalVariable(global.Name, info);
   }
 
+  // Write all global functions.
+  llvm::StringSet<> knownFunctions;
+  for (const auto &function : module.Functions) {
+    // Check for duplicate global functions.
+    if (!knownFunctions.insert(function.Name)) {
+      llvm::errs() << "Multiple definitions of global function '"
+                   << function.Name << "'\n";
+      invalid = true;
+      continue;
+    }
+
+    GlobalFunctionInfo info;
+    if (translateAvailability(function.Availability, info, function.Name))
+      invalid = true;
+    if (translateNullability(function.Nullability, function.NullabilityOfRet,
+                             info, function.Name))
+      invalid = true;
+
+    writer.addGlobalFunction(function.Name, info);
+  }
+
   writer.writeToStream(os);
 
   return invalid;
@@ -609,6 +640,20 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
       }
     }
 
+    /// Map nullability information for a function.
+    void handleNullability(NullabilitySeq &nullability,
+                           NullableKind &nullabilityOfRet,
+                           const FunctionInfo &info,
+                           unsigned numParams) {
+      if (info.NullabilityAudited) {
+        nullabilityOfRet = info.getReturnTypeInfo();
+
+        // Figure out the number of parameters from the selector.
+        for (unsigned i = 0; i != numParams; ++i)
+          nullability.push_back(info.getParamTypeInfo(i));
+      }
+    }
+
   public:
     virtual void visitObjCClass(ContextID contextID, StringRef name,
                                 const ObjCContextInfo &info) {
@@ -637,14 +682,8 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
       method.Selector = copyString(selector);
       method.Kind = isInstanceMethod ? MethodKind::Instance : MethodKind::Class;
 
-      if (info.NullabilityAudited) {
-        method.NullabilityOfRet = info.getReturnTypeInfo();
-
-        // Figure out the number of parameters from the selector.
-        for (unsigned i = 0, n = selector.count(':'); i != n; ++i)
-          method.Nullability.push_back(info.getParamTypeInfo(i));
-      }
-
+      handleNullability(method.Nullability, method.NullabilityOfRet, info,
+                        selector.count(':'));
       handleAvailability(method.Availability, info);
       method.FactoryAsInit = info.FactoryAsInit;
       method.DesignatedInit = info.DesignatedInit;
@@ -672,6 +711,18 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
         TheModule.Protocols[known.first].Properties.push_back(property);
       else
         TheModule.Classes[known.first].Properties.push_back(property);
+    }
+
+    virtual void visitGlobalFunction(StringRef name,
+                                     const GlobalFunctionInfo &info) {
+      Function function;
+      function.Name = name;
+      handleAvailability(function.Availability, info);
+      if (info.NumAdjustedNullable > 0)
+        handleNullability(function.Nullability, function.NullabilityOfRet,
+                          info, info.NumAdjustedNullable-1);
+
+      TheModule.Functions.push_back(function);
     }
 
     virtual void visitGlobalVariable(StringRef name,

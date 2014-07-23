@@ -38,7 +38,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// API notes file minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 4;
+const uint16_t VERSION_MINOR = 5;
 
 using IdentifierID = Fixnum<31>;
 using IdentifierIDField = BCVBR<16>;
@@ -83,7 +83,11 @@ enum BlockID {
 
   /// The global variables data block, which maps global variable names to
   /// information about the global variable.
-  GLOBAL_VARIABLE_BLOCK_ID
+  GLOBAL_VARIABLE_BLOCK_ID,
+
+  /// The (global) functions data block, which maps global function names to
+  /// information about the global function.
+  GLOBAL_FUNCTION_BLOCK_ID
 };
 
 namespace control_block {
@@ -177,6 +181,18 @@ namespace global_variable_block {
     GLOBAL_VARIABLE_DATA,  // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from name to global variable information
+  >;
+}
+
+namespace global_function_block {
+  enum {
+    GLOBAL_FUNCTION_DATA = 1
+  };
+
+  using GlobalFunctionDataLayout = BCRecordLayout<
+    GLOBAL_FUNCTION_DATA,  // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from name to global function information
   >;
 }
 
