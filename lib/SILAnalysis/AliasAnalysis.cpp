@@ -235,6 +235,16 @@ static bool projectionListsEqual(llvm::SmallVectorImpl<Projection> &V1Path,
   return true;
 }
 
+/// Returns true if we are accessing different fields.
+static bool areProjectionsToDifferentFields(Projection &P1, Projection &P2) {
+  // If operands have the same type and we are accessing different fields,
+  // returns true. Operand's type is not saved in Projection. Instead we check
+  // Decl's context.
+  return P1.getDecl() && P2.getDecl() &&
+         P1.getDecl()->getDeclContext() == P2.getDecl()->getDeclContext() &&
+         P1 != P2;
+}
+
 /// Returns true if we are accessing different fields of the same object.
 static bool projectionListsNoAlias(llvm::SmallVectorImpl<Projection> &V1Path,
                                  llvm::SmallVectorImpl<Projection> &V2Path) {
@@ -248,10 +258,13 @@ static bool projectionListsNoAlias(llvm::SmallVectorImpl<Projection> &V1Path,
   unsigned e = V1Path.size() > V2Path.size() ? V2Path.size() : V1Path.size();
   for (unsigned i = 0; i != e; ++i) {
     // If we are accessing different fields of a common object, return true.
-    if (V1Path[i] != V2Path[i]) {
+    if (areProjectionsToDifferentFields(V1Path[i], V2Path[i])) {
       DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
       return true;
     }
+    if (V1Path[i] != V2Path[i])
+      return false;
+    // Continue if we are accessing the same field.
   }
   return false;
 }
@@ -280,8 +293,10 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // other exactly, see if computing offsets from the common pointer tells us
     // about the relation of the resulting pointer.
     llvm::SmallVector<Projection, 4> V1Path, V2Path;
-    bool Result = findAddressProjectionPathBetweenValues(O1, V1, V1Path);
-    Result &= findAddressProjectionPathBetweenValues(O1, V2, V2Path);
+    bool Result = findAddressProjectionPathBetweenValues(O1, V1, V1Path,
+                                                         true/*IgnoreCasts*/);
+    Result &= findAddressProjectionPathBetweenValues(O1, V2, V2Path,
+                                                     true/*IgnoreCasts*/);
 
     // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
     // what the base pointer of the two values are. Be conservative and return
