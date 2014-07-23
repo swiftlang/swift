@@ -63,6 +63,8 @@ func testComputedStructWithProperty() {
 var global_array : [[Int]]
 
 func testMultiArray(i : Int, j : Int, var array : [[Int]]) {
+  swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
+       &array[i][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
   // FIXME: Handle subscripts.
   swap(&array[0][j], &array[0][i])
   swap(&global_array[0][j], &global_array[0][i])

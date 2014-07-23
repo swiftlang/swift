@@ -522,21 +522,63 @@ namespace {
       // If the decls match, then this could conflict.
       if (decl != rhs.decl || IsSuper != rhs.IsSuper) return;
 
-      // NOTE: This completely ignores subscript indices.  This can produce
-      // false negatives!  We should probably at least handle literal cases in
-      // the fullness of time and assume that variable indices can alias.
-      if (subscriptIndexExpr) return;
-
-      if (isa<VarDecl>(decl))
+      // If this is a simple property access, then we must have a conflict.
+      if (!subscriptIndexExpr) {
+        assert(isa<VarDecl>(decl));
         gen.SGM.diagnose(loc1, diag::writeback_overlap_property,
                          decl->getName())
           .highlight(loc1.getSourceRange());
-      else
-        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
-          .highlight(loc1.getSourceRange());
-      
-      gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+        
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
         .highlight(loc2.getSourceRange());
+        return;
+      }
+      
+      
+      // Otherwise, it is a subscript, check the index values.
+      // If we haven't emitted the lvalue for some reason, just ignore this.
+      if (!origSubscripts || !rhs.origSubscripts) return;
+
+      // If the indices are literally identical, then there is clearly a
+      // conflict.
+      SmallVector<ManagedValue, 4> elts1, elts2;
+      origSubscripts.copy(gen, loc1).getAll(elts1);
+      rhs.origSubscripts.copy(gen, loc2).getAll(elts2);
+      if (!std::equal(elts1.begin(), elts1.end(), elts2.begin(),
+             [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
+               return lhs.getValue() == rhs.getValue();
+             })) {
+        return;
+      }
+      
+      // The locations for the subscripts are almost certainly SubscriptExprs.
+      // If so, dig into them to produce better location info in the
+      // diagnostics and be able to do more precise analysis.
+      auto expr1 = loc1.getAsASTNode<SubscriptExpr>();
+      auto expr2 = loc2.getAsASTNode<SubscriptExpr>();
+      
+      if (expr1 && expr2) {
+        // Try to remove a single level of ParenExpr so we don't include the
+        // []'s in the range.
+        auto index1 = expr1->getIndex();
+        auto index2 = expr2->getIndex();
+        if (auto *pe1 = dyn_cast<ParenExpr>(index1)) index1 = pe1->getSubExpr();
+        if (auto *pe2 = dyn_cast<ParenExpr>(index2)) index2 = pe2->getSubExpr();
+        
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
+           .highlight(expr1->getBase()->getSourceRange())
+           .highlight(index1->getSourceRange());
+
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+           .highlight(expr2->getBase()->getSourceRange())
+           .highlight(index2->getSourceRange());
+       
+      } else {
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
+           .highlight(loc1.getSourceRange());
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+           .highlight(loc2.getSourceRange());
+      }
     }
 
   };
