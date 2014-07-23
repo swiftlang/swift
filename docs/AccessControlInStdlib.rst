@@ -54,9 +54,9 @@ the following cases:
 
 * `private` and `internal` symbols nested within `public` types::
 
-  public struct Dictionary {
-    var _representation: _DictionaryRepresentation
-  }
+    public struct Dictionary {
+      var _representation: _DictionaryRepresentation
+    }
 
 `private` modifier
 ==================
