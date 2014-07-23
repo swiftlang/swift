@@ -261,6 +261,37 @@ bb3:
   return %5 : $FakeOptional
 }
 
+// Sink the struct instruction
+// CHECK-LABEL: sil @sink_struct : $@thin (FakeOptional) -> Bool {
+// CHECK: bb0({{.*}}):
+// CHECK: switch_enum
+// CHECK: bb1:
+// CHECK: integer_literal $Builtin.Int1, -1
+// CHECK: br bb3({{.*}} : $Builtin.Int1)
+// CHECK: bb2:
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: br bb3({{.*}} : $Builtin.Int1)
+// CHECK: bb3({{.*}} : $Builtin.Int1):
+// CHECK: struct $Bool
+// CHECK: return
+sil @sink_struct : $@thin (FakeOptional) -> Bool {
+bb0(%0 : $FakeOptional):
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = struct $Bool (%6 : $Builtin.Int1)
+  br bb3(%7 : $Bool)
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = struct $Bool (%9 : $Builtin.Int1)
+  br bb3(%10 : $Bool)
+
+bb3(%12 : $Bool):
+  return %12 : $Bool
+}
+
 // Sink retain down the successors so we can pair up retain with release on the
 // fast path.
 class Test {

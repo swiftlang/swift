@@ -90,6 +90,49 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
   return nullptr;
 }
 
+/// The 2 instructions given are not identical, but are passed as arguments
+/// to a common successor.  It may be cheaper to pass one of their operands
+/// to the successor instead of the whole instruction.
+/// Return ~0U if no such operand could be found, otherwise return the index
+/// of a suitable operand.
+static unsigned cheaperToPassOperandsAsArguments(SILInstruction *First,
+                                                 SILInstruction *Second) {
+  // TODO: Add more cases than Struct
+  StructInst *FirstStruct = dyn_cast<StructInst>(First);
+  StructInst *SecondStruct = dyn_cast<StructInst>(Second);
+
+  if (!FirstStruct || !SecondStruct)
+    return ~0U;
+
+  assert(First->getNumOperands() == Second->getNumOperands() &&
+         First->getNumTypes() == Second->getNumTypes() &&
+         "Types should be identical");
+
+  unsigned DifferentOperandIndex = ~0U;
+
+  // Check operands.
+  for (unsigned i = 0, e = First->getNumOperands(); i != e; ++i) {
+    if (First->getOperand(i) != Second->getOperand(i)) {
+      // Only track one different operand for now
+      if (DifferentOperandIndex != ~0U)
+        return ~0U;
+      DifferentOperandIndex = i;
+    }
+  }
+
+  if (DifferentOperandIndex == ~0U)
+    return ~0U;
+
+  // Found a different operand, now check to see if its type is something
+  // cheap enough to sink.
+  // TODO: Sink more than just integers.
+  const auto &ArgTy = First->getOperand(DifferentOperandIndex).getType();
+  if (!ArgTy.is<BuiltinIntegerType>())
+    return ~0U;
+
+  return DifferentOperandIndex;
+}
+
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
@@ -112,6 +155,10 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   if (FSI->mayHaveSideEffects())
     return false;
 
+  // If the instructions are different, but only in terms of a cheap operand
+  // then we can still sink it, and create new arguments for this operand.
+  unsigned DifferentOperandIndex = ~0U;
+
   // Check if the Nth argument in all predecessors is identical.
   for (auto P : BB->getPreds()) {
     if (P == FirstPred)
@@ -125,19 +172,68 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // Find the Nth argument passed to BB.
     SILValue Arg = TI->getOperand(ArgNum);
     SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
-    if (SI && SI->hasOneUse() && SI->isIdenticalTo(FSI)) {
+    if (!SI || !SI->hasOneUse())
+      return false;
+    if (SI->isIdenticalTo(FSI)) {
       Clones.push_back(SI);
       continue;
     }
 
-    // Arguments are different.
-    return false;
+    // If the instructions are close enough, then we should sink them anyway.
+    // For example, we should sink 'struct S(%0)' if %0 is small, eg, an integer
+    unsigned DifferentOp = cheaperToPassOperandsAsArguments(FSI, SI);
+    // Couldn't find a suitable operand, so bail.
+    if (DifferentOp == ~0U)
+      return false;
+    // Make sure we found the same operand as prior iterations.
+    if (DifferentOperandIndex == ~0U)
+      DifferentOperandIndex = DifferentOp;
+    else if (DifferentOp != DifferentOperandIndex)
+      return false;
+
+    Clones.push_back(SI);
   }
 
   if (!FSI)
     return false;
 
   SILValue Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
+
+  if (DifferentOperandIndex != ~0U) {
+    // Sink one of the instructions to BB
+    FSI->moveBefore(BB->begin());
+
+    // The instruction we are lowering has an argument which is different
+    // for each predecessor.  We need to sink the instruction, then add
+    // arguments for each predecessor.
+    SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FSI);
+
+    const auto &ArgType = FSI->getOperand(DifferentOperandIndex).getType();
+    BB->replaceBBArg(ArgNum, ArgType);
+
+    // Update all branch instructions in the predecessors to pass the new
+    // argument to this BB.
+    auto CloneIt = Clones.begin();
+    for (auto P : BB->getPreds()) {
+      // Only handle branch or conditional branch instructions.
+      TermInst *TI = P->getTerminator();
+      assert((isa<BranchInst>(TI) || isa<CondBranchInst>(TI)) &&
+             "Branch instruction required");
+
+      SILInstruction *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
+      TI->setOperand(ArgNum, CloneInst->getOperand(DifferentOperandIndex));
+      // Now delete the clone as we only needed it operand.
+      if (CloneInst != FSI)
+        recursivelyDeleteTriviallyDeadInstructions(CloneInst);
+      ++CloneIt;
+    }
+    assert(CloneIt == Clones.end() && "Clone/pred mismatch");
+
+    // The sunk instruction should now read from the argument of the BB it
+    // was moved to.
+    FSI->setOperand(DifferentOperandIndex, BB->getBBArg(ArgNum));
+    return true;
+  }
 
   // Sink one of the copies of the instruction.
   FirstPredArg.replaceAllUsesWith(Undef);
