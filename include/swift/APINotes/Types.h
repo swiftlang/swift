@@ -224,7 +224,7 @@ struct ObjCSelectorRef {
 };
 
 /// Describes API notes data for an Objective-C method.
-  class ObjCMethodInfo : public CommonEntityInfo {
+class ObjCMethodInfo : public CommonEntityInfo {
 private:
   static unsigned const NullableKindMask = 0x3;
   static unsigned const NullableKindSize = 2;
@@ -328,11 +328,8 @@ public:
 
     return lhs;
   }
-  void dump(llvm::raw_ostream &os) {
-    os << DesignatedInit << " " << FactoryAsInit << " " << Unavailable << " "
-       << NullabilityAudited << " " << NumAdjustedNullable << " "
-       << NullabilityPayload << " " << UnavailableMsg << "\n";
-  }
+
+  void dump(llvm::raw_ostream &os);
 };
 
 } // end namespace api_notes
