@@ -1055,11 +1055,11 @@ extension NSString {
   }
 
   public
-  class func localizedStringWithFormat(format: NSString,
-                                       _ args: CVarArgType...) -> NSString {
+  class func localizedStringWithFormat(
+    format: NSString, _ args: CVarArgType...
+  ) -> Self {
     return withVaList(args) {
-      NSString(format: format, locale: NSLocale.currentLocale(),
-               arguments: $0)
+      self(format: format, locale: NSLocale.currentLocale(), arguments: $0)
     }
   }
 

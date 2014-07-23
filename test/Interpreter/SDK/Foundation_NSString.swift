@@ -152,3 +152,9 @@ let s = NSMutableString(string: "a ")
 s.appendFormat("%@ %@", "b", "c")
 println(s)
 
+let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q", "r")
+// CHECK-NEXT: <q r>
+println(m)
+m.appendString(" lever")
+// CHECK-NEXT: <q r> lever
+println(m)
