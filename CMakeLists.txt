@@ -192,8 +192,11 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 
-set(SWIFT_API_NOTES_PATH "${CMAKE_CURRENT_SOURCE_DIR}/apinotes")
-option(SWIFT_BUILD_API_NOTES "Build API notes from YAML input" OFF)
+set(SWIFT_API_NOTES_PATH "${CMAKE_CURRENT_SOURCE_DIR}/apinotes" CACHE PATH
+  "Path that provides the sources for API notes")
+if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
+  message(ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
+endif()
 
 option(SWIFT_SPLIT_OBJC_SELECTORS 
        "Split Objective-C selectors when building the standard library" NO)
@@ -482,17 +485,11 @@ function(compile_swift_files)
     # If we're supposed to generate API notes, do so.
     foreach(apinote_module ${SWIFTFILE_API_NOTES})
       set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
-      
-      if (SWIFT_BUILD_API_NOTES)
-        set(apinote_input_file
-          "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
-        list(APPEND create_apinotes
-          COMMAND ${SWIFT_COMPILER} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_input_file}
-          DEPENDS ${apinote_input_file})
-      else()
-        list(APPEND create_apinotes
-          COMMAND ${SWIFT_IDE_TEST} -generate-api-annotation -o ${apinote_file} ${apinote_module})
-      endif()
+      set(apinote_input_file
+        "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
+      list(APPEND create_apinotes
+        COMMAND ${SWIFT_COMPILER} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_input_file}
+        DEPENDS ${apinote_input_file})
 
       list(APPEND apinote_files ${apinote_file})
       install(FILES ${apinote_file}
