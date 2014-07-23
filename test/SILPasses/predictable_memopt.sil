@@ -343,3 +343,34 @@ sil @init_existential_crash : $() -> () {
   return undef : $()
 }
 
+// <rdar://problem/17755462> Predictable memory opts removes refcount operation
+// CHECK-LABEL: sil @dead_allocation_1
+sil @dead_allocation_1 : $@thin (Optional<AnyObject>) -> () {
+  bb0(%0 : $Optional<AnyObject>):
+// CHECK: retain_value %0
+  %1 = alloc_stack $Optional<AnyObject>
+  %2 = alloc_stack $Optional<AnyObject>
+  store %0 to %2#1 : $*Optional<AnyObject>
+// CHECK-NOT: copy_addr
+  copy_addr %2#1 to [initialization] %1#1 : $*Optional<AnyObject>
+  dealloc_stack %2#0 : $*@local_storage Optional<AnyObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<AnyObject>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @dead_allocation_2
+sil @dead_allocation_2 : $@thin (Optional<AnyObject>) -> () {
+  bb0(%0 : $Optional<AnyObject>):
+// CHECK: retain_value %0
+// CHECK-NOT: alloc_stack
+  %1 = alloc_stack $Optional<AnyObject>
+  %2 = alloc_stack $Optional<AnyObject>
+  store %0 to %1#1 : $*Optional<AnyObject>
+// CHECK-NOT: copy_addr
+  copy_addr %1#1 to [initialization] %2#1 : $*Optional<AnyObject>
+  dealloc_stack %2#0 : $*@local_storage Optional<AnyObject>
+  dealloc_stack %1#0 : $*@local_storage Optional<AnyObject>
+  %3 = tuple ()
+  return %3 : $()
+}

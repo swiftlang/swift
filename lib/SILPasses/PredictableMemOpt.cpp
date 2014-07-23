@@ -865,7 +865,11 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     case DIUseKind::InitOrAssign:
       break;    // These don't prevent removal.
     case DIUseKind::Initialization:
-      if (!isa<ApplyInst>(U.Inst))
+      if (!isa<ApplyInst>(U.Inst) &&
+          // A copy_addr that is not a take affects the retain count
+          // of the source.
+          (!isa<CopyAddrInst>(U.Inst) ||
+           cast<CopyAddrInst>(U.Inst)->isTakeOfSrc()))
         break;
       // FALL THROUGH.
      SWIFT_FALLTHROUGH;
