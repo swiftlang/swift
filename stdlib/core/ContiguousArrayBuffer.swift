@@ -224,7 +224,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      _sanityCheck(i >= 0 && i < count, "Array index out of range")
+      _sanityCheck(_isValidSubscript(i), "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
       return _unsafeElementStorage[i]
     }
@@ -260,6 +260,18 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
         _base.value.count = newValue
       }
     }
+  }
+
+  /// Return whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`
+  internal func _isValidSubscript(index : Int) -> Bool {
+    /// Instead of returning 0 for no storage, we explicitly check
+    /// for the existance of storage.
+    /// Note that this is better than folding hasStorage in to
+    /// the return from this function, as this implementation generates
+    /// no shortcircuiting blocks.
+    _precondition(_base.hasStorage, "Cannot index empty buffer")
+    return (index >= 0) & (index < _base.value.count)
   }
 
   /// How many elements the buffer can store without reallocation

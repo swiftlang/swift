@@ -101,8 +101,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
   /// ≤ index < count`
   @semantics("array.check_subscript")
   func _checkSubscript(index: Int) {
-    _precondition(index < count, "${Self} index out of range")
-    _precondition(index >= 0, "Negative ${Self} index is out of range")
+    _precondition(_buffer._isValidSubscript(index), "${Self} index out of range")
   }
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`

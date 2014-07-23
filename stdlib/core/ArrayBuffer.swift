@@ -326,6 +326,17 @@ extension _ArrayBuffer {
     }
   }
   
+  /// Return whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`
+  internal func _isValidSubscript(index : Int) -> Bool {
+    if _fastPath(_isNative) {
+      /// Note we call through to the native buffer here as it has a more
+      /// optimal implementation than just doing 'index < count'
+      return _native._isValidSubscript(index)
+    }
+    return index >= 0 && index < count
+  }
+
   /// How many elements the buffer can store without reallocation
   public
   var capacity: Int {

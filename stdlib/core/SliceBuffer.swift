@@ -208,6 +208,12 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     }
   }
 
+  /// Return whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`
+  internal func _isValidSubscript(index : Int) -> Bool {
+    return index >= 0 && index < count
+  }
+
   /// Modify the count in this buffer without a corresponding change
   /// in the underlying nativeBuffer.  The implementation of replace()
   /// uses this, because it does a wholesale replace in the underlying
