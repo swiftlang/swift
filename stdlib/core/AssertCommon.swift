@@ -46,27 +46,27 @@ func _isFastAssertConfiguration() -> Bool {
 
 @asmname("swift_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
-  prefix: Builtin.RawPointer, prefixLength: Builtin.Word,
-  message: Builtin.RawPointer, messageLength: Builtin.Word,
-  file: Builtin.RawPointer, fileLength: Builtin.Word,
+  prefix: UnsafePointer<UInt8>, prefixLength: UWord,
+  message: UnsafePointer<UInt8>, messageLength: UWord,
+  file: UnsafePointer<UInt8>, fileLength: UWord,
   line: UWord)
 
 @asmname("swift_reportFatalError")
 func _reportFatalError(
-  prefix: Builtin.RawPointer, prefixLength: Builtin.Word,
-  message: Builtin.RawPointer, messageLength: Builtin.Word)
+  prefix: UnsafePointer<UInt8>, prefixLength: UWord,
+  message: UnsafePointer<UInt8>, messageLength: UWord)
 
 @asmname("swift_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
-  className: Builtin.RawPointer, classNameLength: Builtin.Word,
-  initName: Builtin.RawPointer, initNameLength: Builtin.Word,
-  file: Builtin.RawPointer, fileLength: Builtin.Word,
+  className: UnsafePointer<UInt8>, classNameLength: UWord,
+  initName: UnsafePointer<UInt8>, initNameLength: UWord,
+  file: UnsafePointer<UInt8>, fileLength: UWord,
   line: UWord, column: UWord)
 
 @asmname("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
-  className: Builtin.RawPointer, classNameLength: Builtin.Word,
-  initName: Builtin.RawPointer, initNameLength: Builtin.Word)
+  className: UnsafePointer<UInt8>, classNameLength: UWord,
+  initName: UnsafePointer<UInt8>, initNameLength: UWord)
 
 /// This function should be used only in the implementation of user-level
 /// assertions.

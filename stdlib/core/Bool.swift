@@ -20,7 +20,7 @@ public struct Bool {
   @transparent public 
   init() { value = Builtin.trunc_Word_Int1(0.value) }
 
-  @transparent public
+  @transparent
   init(_ v : Builtin.Int1) { value = v }
 }
 

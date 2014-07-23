@@ -23,9 +23,21 @@ public struct StaticString
   : _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible, StringLiteralConvertible {
-  public var start: Builtin.RawPointer
-  public var byteSize: Builtin.Word
-  public var isASCII: Builtin.Int1
+  var _start: Builtin.RawPointer
+  var _byteSize: Builtin.Word
+  var _isASCII: Builtin.Int1
+
+  public var start: UnsafePointer<UInt8> {
+    return UnsafePointer(_start)
+  }
+
+  public var byteSize: UWord {
+    return UWord(_byteSize)
+  }
+
+  public var isASCII: Bool {
+    return Bool(_isASCII)
+  }
 
   public init() {
     self = ""
@@ -34,9 +46,9 @@ public struct StaticString
   init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
-    self.start = start
-    self.byteSize = byteSize
-    self.isASCII = isASCII
+    self._start = start
+    self._byteSize = byteSize
+    self._isASCII = isASCII
   }
 
   public

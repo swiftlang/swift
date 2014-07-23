@@ -105,8 +105,7 @@ extension NSString : StringLiteralConvertible {
     let immutableResult = NSString(
       bytesNoCopy: UnsafeMutablePointer<Void>(value.start),
       length: Int(value.byteSize),
-      encoding:
-        Bool(value.isASCII) ? NSASCIIStringEncoding : NSUTF8StringEncoding,
+      encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
       freeWhenDone: false)
     
     return self(string: immutableResult)
