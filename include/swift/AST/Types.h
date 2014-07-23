@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 4 };
+  enum { BitWidth = 5 };
 
   /// A single property.
   ///
@@ -97,7 +97,7 @@ public:
     IsNotMaterializable = 0x08,
     
     /// This type expression contains an LValueType and can be loaded to convert
-    /// to a pure rvalue.
+    /// to an rvalue.
     IsLValue = 0x10,
   };
 

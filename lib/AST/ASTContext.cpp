@@ -1759,13 +1759,32 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   return result;
 }
 
+static void checkFunctionRecursiveProperties(Type Input,
+                                             Type Result) {
+  // TODO: Would be nice to be able to assert these, but they trip during
+  // constraint solving:
+  //assert(!Input->getRecursiveProperties().isLValue()
+  //       && "function should not take lvalues directly as parameters");
+  //assert(Result->getRecursiveProperties().isMaterializable()
+  //       && "function return should be materializable");
+}
+
+static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
+                                                              Type Result) {
+  checkFunctionRecursiveProperties(Input, Result);
+
+  auto properties = Input->getRecursiveProperties()
+    + Result->getRecursiveProperties()
+    - RecursiveTypeProperties::IsNotMaterializable
+    - RecursiveTypeProperties::IsLValue;
+  return properties;
+}
+
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 const ExtInfo &Info) {
-  auto properties = Input->getRecursiveProperties()
-                    + Result->getRecursiveProperties()
-                    - RecursiveTypeProperties::IsNotMaterializable;
+  auto properties = getFunctionRecursiveProperties(Input, Result);
   auto arena = getArena(properties);
   char attrKey = Info.getFuncAttrKey();
 
@@ -1798,10 +1817,7 @@ FunctionType::FunctionType(Type input, Type output,
 PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
                                                       const ExtInfo &Info) {
-  // FIXME: one day we should do canonicalization properly.
-  auto properties = input->getRecursiveProperties()
-                    + output->getRecursiveProperties()
-                    - RecursiveTypeProperties::IsNotMaterializable;
+  auto properties = getFunctionRecursiveProperties(input, output);
   auto arena = getArena(properties);
 
   const ASTContext &C = input->getASTContext();
@@ -1867,8 +1883,9 @@ GenericFunctionType::get(GenericSignature *sig,
   // For now, generic function types cannot be dependent (in fact,
   // they erase dependence) or contain type variables, and they're
   // always materializable.
+  checkFunctionRecursiveProperties(input, output);
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 4,
+  static_assert(RecursiveTypeProperties::BitWidth == 5,
                 "revisit this if you add new recursive type properties");
 
   auto result = new (mem) GenericFunctionType(sig, input, output, info,
@@ -2007,7 +2024,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 4,
+  static_assert(RecursiveTypeProperties::BitWidth == 5,
                 "revisit this if you add new recursive type properties");
   if (!genericSig) {
     // Nongeneric SIL functions are dependent if they have dependent argument

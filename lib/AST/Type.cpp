@@ -395,7 +395,7 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 }
 
 static bool isLegalSILType(CanType type) {
-  if (isa<LValueType>(type) || isa<InOutType>(type)) return false;
+  if (!type->isMaterializable()) return false;
   if (isa<AnyFunctionType>(type)) return false;
   if (auto meta = dyn_cast<AnyMetatypeType>(type))
     return meta->hasRepresentation();
