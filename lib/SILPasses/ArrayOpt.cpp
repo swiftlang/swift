@@ -21,15 +21,10 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
-
-namespace {
-typedef SmallPtrSetImpl<SILInstruction*> VisitedSet;
-typedef SmallVectorImpl<SILInstruction*> UserList;
-}
 
 /// Given a SIL value, capture its element index and the value of the aggregate
 /// that immeditely contains it. (This is a simple projection over a value.)
@@ -78,6 +73,7 @@ static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
   return UnderlyingObject;
 }
 
+namespace {
 /// Collect all uses of the address of an element at the given underlying object
 /// and access path. Uses of the address of an aggregate that contains the
 /// element are also recorded in AggregateAddressUsers. If the use is a Load,
@@ -85,64 +81,109 @@ static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
 ///
 /// bb0(%arg : $*S)
 /// apply %f(%arg)        // <--- Aggregate Address User
-/// %elt_addr = struct_element_addr %arg : $*S, #S.element
-/// apply %g(%elt_addr)   // <--- Element Address User
-/// %val = load %elt_addr // <--- Load
-/// apply %h(%val)        // <--- Value User
-///
-/// This assumes that an instruction will not use both the address of an element
-/// and the address of an aggregate. If it does, then only one is recorded,
-/// which is fine for SILArrayOpt's purpose.
-static void collectElementUses(ValueBase *V,
-                               ArrayRef<unsigned> AccessPath,
-                               UserList &Loads,
-                               UserList &ElementAddressUsers,
-                               UserList &AggregateAddressUsers,
-                               VisitedSet &Visited) {
+/// %struct_addr = struct_element_addr %arg : $*S, #S.element
+/// apply %g(%struct_addr)   // <--- Struct Address User
+/// %val = load %struct_addr // <--- Struct Load
+/// apply %h(%sval)          // <--- Value User
+/// %elt_addr = struct_element_addr %struct_addr : $*A, #A.element
+/// apply %i(%elt_addr)      // <--- Element Address User
+/// %elt = load %elt_addr    // <--- Element Load
+/// apply %j(%elt)           // <--- Element User
+class StructUseCollector {
+public:
+  typedef SmallPtrSet<Operand*, 16> VisitedSet;
+  typedef SmallVector<SILInstruction*, 16> UserList;
 
-  for (auto UI : V->getUses()) {
-    SILInstruction *UseInst = UI->getUser();
-    if (!Visited.insert(UseInst))
-      continue;
+  /// Map a user of a value or an element within that value to the operand that
+  /// directly uses the value.
+  typedef llvm::MapVector<SILInstruction*, Operand*> UserMap;
 
-    if (AccessPath.empty()) {
-      // Found a use of the element at the given access path.
-      if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
-        Loads.push_back(LoadI);
-      else
-        ElementAddressUsers.push_back(UseInst);
-      continue;
+  UserList AggregateAddressUsers;
+  UserList StructAddressUsers;
+  UserList StructLoads;
+  UserList StructValueUsers;
+  UserMap ElementAddressUsers;
+  UserMap ElementLoads;
+  UserMap ElementValueUsers;
+  VisitedSet Visited;
+
+  /// Collect all uses of the value at the given address.
+  void collectUses(ValueBase *V, ArrayRef<unsigned> AccessPath) {
+    // Collect all users of the address and loads.
+    collectAddressUses(V, AccessPath, nullptr);
+
+    // Collect all uses of the Struct value.
+    for (auto *DefInst : StructLoads) {
+      for (auto DefUI : DefInst->getUses()) {
+        if (!Visited.insert(&*DefUI))
+          continue;
+        StructValueUsers.push_back(DefUI->getUser());
+      }
     }
-    AccessPathComponent APC(UseInst);
-    if (!APC.isValid()) {
-      // Found a use of an aggregate containing the given element.
-      AggregateAddressUsers.push_back(UseInst);
-      continue;
+    // Collect all users of element values.
+    for (auto &Pair : ElementLoads) {
+      for (auto DefUI : Pair.first->getUses()) {
+        if (!Visited.insert(&*DefUI))
+          continue;
+        ElementValueUsers[DefUI->getUser()] = Pair.second;
+      }
     }
-    if (APC.Index != AccessPath[0]) {
-      // Ignore uses of disjoint elements.
-      continue;
-    }
-    assert(APC.Aggregate == V && "Expected unary element addr inst.");
-    // Recursively check for users after stripping this component from the
-    // access path.
-    collectElementUses(UseInst, AccessPath.slice(1), Loads, ElementAddressUsers,
-                       AggregateAddressUsers, Visited);
   }
-}
 
-/// Collect all uses of a set of Defs.
-static void collectValueUses(const UserList &Defs, UserList &ValueUsers,
-                            VisitedSet &Visited) {
-  for (auto *DefInst : Defs) {
-    for (auto DefUI : DefInst->getUses()) {
-      SILInstruction *UseInst = DefUI->getUser();
-      if (!Visited.insert(UseInst))
+protected:
+  /// If AccessPathSuffix is non-empty, then the value is the address of an
+  /// aggregate containing the Struct. If AccessPathSuffix is empty and
+  /// StructVal is invalid, then the value is the address of the Struct. If
+  /// StructVal is valid, the value is the address of an element within the
+  /// Struct.
+  void collectAddressUses(ValueBase *V, ArrayRef<unsigned> AccessPathSuffix,
+                          Operand *StructVal) {
+    for (auto UI : V->getUses()) {
+      // Keep the operand, not the instruction in the visited set. The same
+      // instruction may theoretically have different types of uses.
+      if (!Visited.insert(&*UI))
         continue;
-      ValueUsers.push_back(UseInst);
+
+      SILInstruction *UseInst = UI->getUser();
+      if (StructVal) {
+        // Found a use of an element.
+        assert(AccessPathSuffix.empty() && "should have accessed struct");
+        if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
+          ElementLoads[LoadI] = StructVal;
+        else if (isa<StructElementAddrInst>(UseInst))
+          collectAddressUses(UseInst, AccessPathSuffix, StructVal);
+        else
+          ElementAddressUsers[UseInst] = StructVal;
+        continue;
+
+      } else if (AccessPathSuffix.empty()) {
+        // Found a use of the struct at the given access path.
+        if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
+          StructLoads.push_back(LoadI);
+        else if (isa<StructElementAddrInst>(UseInst))
+          collectAddressUses(UseInst, AccessPathSuffix, &*UI);
+        else
+          StructAddressUsers.push_back(UseInst);
+        continue;
+      }
+      AccessPathComponent APC(UseInst);
+      if (!APC.isValid()) {
+        // Found a use of an aggregate containing the given element.
+        AggregateAddressUsers.push_back(UseInst);
+        continue;
+      }
+      if (APC.Index != AccessPathSuffix[0]) {
+        // Ignore uses of disjoint elements.
+        continue;
+      }
+      assert(APC.Aggregate == V && "Expected unary element addr inst.");
+      // Recursively check for users after stripping this component from the
+      // access path.
+      collectAddressUses(UseInst, AccessPathSuffix.slice(1), nullptr);
     }
   }
-}
+};
+} // namespace
 
 /// \return true if the callee is tagged with array semantics.
 static bool isArraySemanticCall(ApplyInst *AI) {
@@ -202,9 +243,12 @@ namespace {
 /// and does not capture the array. Under these conditions, the call can neither
 /// mutate the array nor save an alias for later mutation.
 ///
-/// TODO: Handle array's that are loaded or returned from a function call. (This
-/// is not very common because it implies a copy).
+/// TODO: Completely eliminate make_mutable calls if all operations that the
+/// guard are already guarded by either "init" or "mutate_unknown".
 class SILArrayOpt {
+  typedef StructUseCollector::UserList UserList;
+  typedef StructUseCollector::UserMap UserMap;
+
   SILFunction *Function;
   SILLoop *Loop;
   SILBasicBlock *Preheader;
@@ -240,14 +284,52 @@ public:
   bool run();
 
 protected:
+  bool checkUniqueArrayContainer(SILValue ArrayContainer);
   SmallPtrSetImpl<SILBasicBlock*> &getReachingBlocks();
   bool checkSafeArrayAddressUses(UserList &AddressUsers);
   bool checkSafeArrayElementUses(SILValue ArrayVal,
                                  StructExtractInst *SEI);
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
+  bool checkSafeElementValueUses(UserMap &ElementValueUsers);
   bool hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array);
 };
 } // namespace
+
+/// \return true of the given container is known to be a unique copy of the
+/// array with no aliases. Cases we check:
+///
+/// (1) An @inout argument.
+///
+/// (2) A local variable, which may be copied from a by-val argument,
+/// initialized directly, or copied from a function return value. We don't
+/// need to check how it is initialized here, because that will show up as a
+/// store to the local's address. checkSafeArrayAddressUses will check that the
+/// store is a simple initialization outside the loop.
+bool SILArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
+  if (SILArgument *Arg = dyn_cast<SILArgument>(ArrayContainer)) {
+    // Check that the argument is passed as an inout type. This means there are
+    // no aliases accessible within this function scope.
+    auto Params = Function->getLoweredFunctionType()->getParameters();
+    ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
+    for (unsigned ArgIdx = 0, ArgEnd = Params.size();
+         ArgIdx != ArgEnd; ++ArgIdx) {
+      if (FunctionArgs[ArgIdx] != Arg)
+        continue;
+
+      if (!Params[ArgIdx].isIndirectInOut()) {
+        DEBUG(llvm::dbgs() << "    Skipping Array: Not an inout argument!\n");
+        return false;
+      }
+    }
+    return true;
+  }
+  else if (isa<AllocStackInst>(ArrayContainer))
+    return true;
+
+  DEBUG(llvm::dbgs()
+        << "    Skipping Array: Not an argument or local variable!\n");
+  return false;
+}
 
 /// Lazilly compute blocks that may reach the loop.
 SmallPtrSetImpl<SILBasicBlock*> &SILArrayOpt::getReachingBlocks() {
@@ -275,8 +357,9 @@ SmallPtrSetImpl<SILBasicBlock*> &SILArrayOpt::getReachingBlocks() {
 /// The same logic currently applies to both uses of the array itself and uses
 /// of an aggregate containing the array.
 ///
-/// If an address user is also a value user, we will not see the value users. So
-/// the address user must be safe for both kinds of uses.
+/// This does not apply to addresses of elements within the array. e.g. it is
+/// not safe to store to an element in the array because we may be storing an
+/// alias to the array storage.
 bool SILArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
@@ -291,6 +374,23 @@ bool SILArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       }
       DEBUG(llvm::dbgs() << "    Skipping Array: may escape through call!\n    "
             << *UseInst);
+    } else if (StoreInst *StInst = dyn_cast<StoreInst>(UseInst)) {
+      // Allow a local array to be initialized outside the loop via a by-value
+      // argument or return value. The array value may be returned by its
+      // initializer or some other factory function.
+      if (Loop->contains(StInst->getParent())) {
+        DEBUG(llvm::dbgs() << "    Skipping Array: store inside loop!\n    "
+              << *StInst);
+        return false;
+      }
+      SILValue InitArray = StInst->getSrc();
+      if (isa<SILArgument>(InitArray) || isa<ApplyInst>(InitArray))
+        continue;
+
+    } else if (isa<DeallocStackInst>(UseInst)) {
+      // Handle destruction of a local array.
+      continue;
+
     } else {
       DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
             << *UseInst);
@@ -301,14 +401,15 @@ bool SILArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
   return true;
 }
 
-/// Recursively check that uses of elements within the array are safe.
+/// Given an array value, recursively check that uses of elements within the
+/// array are safe.
 ///
 /// After the lower aggregates pass, SIL contains chains of struct_extract and
 /// retain_value instructions. e.g.
-///   %8 = load %0 : $*Array<Int>
-///   %9 = struct_extract %8 : $Array<Int>, #Array._buffer
-///   %10 = struct_extract %9 : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
-///  retain_value %10 : $Optional<Builtin.NativeObject>
+///   %a = load %0 : $*Array<Int>
+///   %b = struct_extract %a : $Array<Int>, #Array._buffer
+///   %s = struct_extract %b : $_ArrayBuffer<Int>, #_ArrayBuffer.storage
+///  retain_value %s : $Optional<Builtin.NativeObject>
 ///
 /// Since this does not recurse through multi-operand instructions, no visited
 /// set is necessary.
@@ -358,9 +459,10 @@ bool SILArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
   return true;
 }
 
-/// Check that the use of an Array value, or the value of an aggregate
-/// containing an array is safe w.r.t make_mutable hoisting. Retains are safe as
-/// long as they are not inside the Loop.
+/// Check that the use of an Array value, the value of an aggregate containing
+/// an array, or the value of an element within the array, is safe w.r.t
+/// make_mutable hoisting. Retains are safe as long as they are not inside the
+/// Loop.
 bool SILArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
   for (auto *UseInst : ArrayValueUsers) {
     if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
@@ -373,11 +475,40 @@ bool SILArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       if (checkSafeArrayElementUses(SEI->getOperand(), SEI))
         continue;
 
+    } else if (isa<ReleaseValueInst>(UseInst)) {
+      // Releases are always safe. This case handles the release of an array
+      // buffer that is loaded from a local array struct.
+      continue;
+
     } else {
       DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n"
             << *UseInst);
     }
     // Found an unsafe or unknown user. The Array may escape here.
+    return false;
+  }
+  return true;
+}
+
+/// Check that the use of an Array element is safe w.r.t. make_mutable hoisting.
+bool SILArrayOpt::checkSafeElementValueUses(UserMap &ElementValueUsers) {
+  for (auto &Pair : ElementValueUsers) {
+    SILInstruction *UseInst = Pair.first;
+    Operand *ArrayValOper = Pair.second;
+    if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(UseInst)) {
+      if (checkSafeArrayElementUses(ArrayValOper->get(), SEI))
+        continue;
+
+    } else if (isa<ReleaseValueInst>(UseInst)) {
+      // Releases are always safe. This case handles the release of an array
+      // buffer that is loaded from a local array struct.
+      continue;
+
+    } else {
+      DEBUG(llvm::dbgs() << "    Skipping Array: unknown Element use!\n"
+            << *UseInst);
+    }
+    // Found an unsafe or unknown user. The Array element may escape here.
     return false;
   }
   return true;
@@ -405,44 +536,20 @@ bool SILArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
   SmallVector<unsigned, 4> AccessPath;
   SILValue ArrayContainer = getAccessPath(Array, AccessPath);
 
-  // Check that the array is a member of an inout argument.
-  SILArgument *Arg = dyn_cast<SILArgument>(ArrayContainer);
-  if (!Arg) {
-    DEBUG(llvm::dbgs() << "    Skipping Array: Not a function argument!\n");
+  // Check that the array is a member of an inout argument or return value.
+  if (!checkUniqueArrayContainer(ArrayContainer))
     return false;
-  }
-  // Check that the argument is passed as an inout type. This means there are no
-  // aliases accessible within this function scope.
-  auto Params = Function->getLoweredFunctionType()->getParameters();
-  ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
-  for (unsigned ArgIdx = 0, ArgEnd = Params.size();
-       ArgIdx != ArgEnd; ++ArgIdx) {
-    if (FunctionArgs[ArgIdx] != Arg)
-      continue;
 
-    if (!Params[ArgIdx].isIndirectInOut()) {
-      DEBUG(llvm::dbgs() << "    Skipping Array: Not an inout argument!\n");
-      return false;
-    }
-  }
   // Check that the Array is not retained with this loop and it's address does
   // not escape within this function.
-  ArrayUserSet.clear();
-  SmallVector<SILInstruction*, 8> ArrayLoads;
-  SmallVector<SILInstruction*, 8> ArrayAddressUsers;
-  SmallVector<SILInstruction*, 8> AggregateAddressUsers;
-  collectElementUses(Arg, AccessPath, ArrayLoads, ArrayAddressUsers,
-                     AggregateAddressUsers, ArrayUserSet);
+  StructUseCollector StructUses;
+  StructUses.collectUses(ArrayContainer.getDef(), AccessPath);
 
-  // Using the same ArrayUserSet as the visited set here means that
-  // checkSafeArrayValueUses will not see any value user that is also an
-  // address user.
-  SmallVector<SILInstruction*, 8> ArrayValueUsers;
-  collectValueUses(ArrayLoads, ArrayValueUsers, ArrayUserSet);
-
-  if (!checkSafeArrayAddressUses(ArrayAddressUsers) ||
-      !checkSafeArrayAddressUses(AggregateAddressUsers) ||
-      !checkSafeArrayValueUses(ArrayValueUsers))
+  if (!checkSafeArrayAddressUses(StructUses.AggregateAddressUsers) ||
+      !checkSafeArrayAddressUses(StructUses.StructAddressUsers) ||
+      !StructUses.ElementAddressUsers.empty() ||
+      !checkSafeArrayValueUses(StructUses.StructValueUsers) ||
+      !checkSafeElementValueUses(StructUses.ElementValueUsers))
     return false;
 
   // Hoist this call to make_mutable.
