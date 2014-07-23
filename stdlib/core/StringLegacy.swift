@@ -14,9 +14,10 @@
 extension String {
   public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
-    self = String(_StringBuffer(capacity: s.core.count * sz, 
-                                initialSize: 0, 
-                                elementWidth: s.core.elementWidth))
+    self = String(_storage: _StringBuffer(
+        capacity: s.core.count * sz,
+        initialSize: 0,
+        elementWidth: s.core.elementWidth))
     for i in 0..<sz {
       self += s
     }

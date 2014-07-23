@@ -42,7 +42,7 @@ extension String {
         _StringBuffer.fromCodeUnits(encoding, input: input,
             repairIllFormedSequences: false)
     if let stringBuffer = stringBufferOptional {
-      return String(stringBuffer)
+      return String(_storage: stringBuffer)
     } else {
       return .None
     }
@@ -57,7 +57,7 @@ extension String {
     let (stringBuffer, hadError) =
         _StringBuffer.fromCodeUnits(encoding, input: input,
             repairIllFormedSequences: true)
-    return (String(stringBuffer!), hadError)
+    return (String(_storage: stringBuffer!), hadError)
   }
 }
 
@@ -210,8 +210,8 @@ extension String {
     return core.count
   }
 
-  init(_ storage: _StringBuffer) {
-    core = _StringCore(storage)
+  init(_storage: _StringBuffer) {
+    core = _StringCore(_storage)
   }
 }
 
