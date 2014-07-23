@@ -1105,6 +1105,13 @@ public:
       if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
         goto not_overridden;
 
+      // If we overrode a non-required initializer, there won't be a vtable
+      // slot for the allocator.
+      if (overridden.kind == SILDeclRef::Kind::Allocator &&
+          !cast<ConstructorDecl>(overridden.getDecl())->isRequired()) {
+        goto not_overridden;
+      }
+
       for (SILVTable::Pair &entry : vtableEntries) {
         SILDeclRef ref = overridden;
         

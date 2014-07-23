@@ -123,3 +123,15 @@ class Derived : Base {
     return 1
   }
 }
+
+
+// CHECK: sil_vtable RequiredInitDerived {
+// CHECK-NEXT: #SimpleInitBase.init!initializer.1: _TFC7vtables19RequiredInitDerivedcfMS0_FT_S0_     // vtables.RequiredInitDerived.init (vtables.RequiredInitDerived.Type)() -> vtables.RequiredInitDerived
+// CHECK-NEXT  #RequiredInitDerived.init!allocator.1: _TFC7vtables19RequiredInitDerivedCfMS0_FT_S0_  // vtables.RequiredInitDerived.__allocating_init (vtables.RequiredInitDerived.Type)() -> vtables.RequiredInitDerived
+// CHECK-NEXT}
+
+class SimpleInitBase { }
+
+class RequiredInitDerived : SimpleInitBase {
+  required init() { }
+}
