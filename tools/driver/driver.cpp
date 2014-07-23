@@ -85,7 +85,7 @@ int main(int argc_, const char **argv_) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  Driver TheDriver(Path, Diags);
+  Driver TheDriver(Path, llvm::sys::path::stem(argv[0]), Diags);
 
   llvm::InitializeAllTargets();
 

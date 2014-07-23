@@ -401,8 +401,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // In immediate mode, pass through any arguments following -i INPUT after --.
   if (OI.CompilerMode == OutputInfo::Mode::Immediate) {
     Arg *A = Args.getLastArg(options::OPT_i);
-    assert(A && "expected -i option in immediate mode");
-    if (A->getNumValues() > 1) {
+    // FIXME: pass through arguments with swifti
+    if (A && A->getNumValues() > 1) {
       Arguments.push_back("--");
       Arguments.append(A->getValues().begin() + 1, A->getValues().end());
     }

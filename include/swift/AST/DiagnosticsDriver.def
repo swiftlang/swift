@@ -77,6 +77,16 @@ ERROR(error_invalid_arch,driver,none,
 ERROR(error_framework_bridging_header,driver,none,
       "using bridging headers with framework targets is unsupported", ())
 
+WARNING(warning_unnecessary_i_mode,driver,none,
+        "unnecessary option '%0'; this is the default for '%1 input-filename'",
+        (StringRef, StringRef))
+WARNING(warning_unnecessary_repl_mode,driver,none,
+        "unnecessary option '%0'; this is the default for '%1' "
+        "with no input files", (StringRef, StringRef))
+ERROR(error_non_interactive_mode,driver,none,
+      "invalid mode '%0' for '%1'; use 'swiftc'",
+      (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

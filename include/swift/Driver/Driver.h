@@ -109,11 +109,18 @@ class Driver {
   /// The name the driver was invoked as.
   std::string Name;
 
-  /// The path the driver executable was in, as invoked from the command line.
-  std::string Dir;
-
   /// The original path to the executable.
   std::string DriverExecutable;
+
+  /// DriverKind determines how later arguments are parsed, as well as the
+  /// allowable OutputInfo::Mode values.
+  enum class DriverKind {
+    Interactive, // swifti (will be 'swift' after staging)
+    Batch,       // swiftc
+    Legacy       // swift (will disappear after staging)
+  };
+
+  DriverKind driverKind;
 
   /// Default target triple.
   std::string DefaultTargetTriple;
@@ -135,7 +142,7 @@ public:
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   typedef SmallVector<InputPair, 16> InputList;
 
-  Driver(StringRef DriverExecutable, DiagnosticEngine &Diags);
+  Driver(StringRef DriverExecutable, StringRef Name, DiagnosticEngine &Diags);
   ~Driver();
 
   const llvm::opt::OptTable &getOpts() const { return *Opts; }

@@ -56,12 +56,20 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 Driver::Driver(StringRef DriverExecutable,
+               StringRef Name,
                DiagnosticEngine &Diags)
   : Opts(createSwiftOptTable()), Diags(Diags),
-    DriverExecutable(DriverExecutable),
+    Name(Name), DriverExecutable(DriverExecutable),
     DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
-  Name = llvm::sys::path::stem(DriverExecutable);
-  Dir  = llvm::sys::path::parent_path(DriverExecutable);
+
+  // The default driver kind is determined by Name.
+  if (Name.find("swiftc") != std::string::npos) {
+    driverKind = DriverKind::Batch;
+  } else if (Name.find("swifti") != std::string::npos) { // TODO: remove
+    driverKind = DriverKind::Interactive;
+  } else {
+    driverKind = DriverKind::Legacy; // TODO: interactive
+  }
 }
 
 Driver::~Driver() {
@@ -332,15 +340,70 @@ static bool maybeBuildingExecutable(const OutputInfo &OI,
   return Inputs.size() == 1;
 }
 
+static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
+                                  bool hasInputs, const DerivedArgList &args,
+                                  bool isInteractiveDriver,
+                                  StringRef driverName) {
+  if (isInteractiveDriver) {
+    switch (arg->getOption().getID()) {
+
+    case options::OPT_i:
+      if (hasInputs)
+        diags.diagnose(SourceLoc(), diag::warning_unnecessary_i_mode,
+                       args.getArgString(arg->getIndex()), driverName);
+      break;
+
+    case options::OPT_repl:
+      if (!hasInputs)
+        diags.diagnose(SourceLoc(), diag::warning_unnecessary_repl_mode,
+                       args.getArgString(arg->getIndex()), driverName);
+      break;
+
+    // No warning, as these are not quite the same as -repl.
+    case options::OPT_integrated_repl:
+    case options::OPT_lldb_repl:
+      break;
+
+    default:
+      diags.diagnose(SourceLoc(), diag::error_non_interactive_mode,
+                     args.getArgString(arg->getIndex()), driverName);
+      break;
+    }
+
+  // swiftc
+  } else {
+    // TODO
+  }
+}
+
 void Driver::buildOutputInfo(const DerivedArgList &Args,
                              const InputList &Inputs, OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropariately below if linking is required.
 
-  if (Args.hasArg(options::OPT_force_single_frontend_invocation))
-    OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+  switch (driverKind) {
+  case DriverKind::Batch:
+  case DriverKind::Legacy:
+    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
+    if (Args.hasArg(options::OPT_force_single_frontend_invocation))
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+    OI.CompilerOutputType = types::TY_Object;
+    break;
+  case DriverKind::Interactive:
+    OI.CompilerMode = OutputInfo::Mode::Immediate;
+    if (Inputs.empty())
+      OI.CompilerMode = OutputInfo::Mode::REPL;
+    OI.CompilerOutputType = types::TY_Nothing;
+    break;
+  }
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
+
+  if (driverKind != DriverKind::Legacy && OutputModeArg) {
+    diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
+                          driverKind == DriverKind::Interactive, Name);
+  }
+
   if (!OutputModeArg) {
     if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
       OI.CompilerOutputType = types::TY_SwiftModuleFile;
@@ -350,9 +413,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       // "print the version and exit".)
       OI.CompilerOutputType = types::TY_Nothing;
       OI.CompilerMode = OutputInfo::Mode::REPL;
-    } else {
+    } else if (driverKind != DriverKind::Interactive) {
       OI.LinkAction = LinkKind::Executable;
-      OI.CompilerOutputType = types::TY_Object;
     }
   } else {
     switch (OutputModeArg->getOption().getID()) {

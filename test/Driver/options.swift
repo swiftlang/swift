@@ -69,3 +69,34 @@
 
 // RUN: %swift_driver -target x86_64-apple-ios7 -### | FileCheck -check-prefix=SIMULATOR64_CPU %s
 // SIMULATOR64_CPU: -target-cpu core2
+
+// RUN: %swifti_driver -### | FileCheck -check-prefix=DEFAULT_REPL %s
+// DEFAULT_REPL: -repl
+
+// RUN: %swifti_driver -repl -### 2>&1 | FileCheck -check-prefix=REPL %s
+// REPL: warning: unnecessary option '-repl'
+
+// RUN: %swifti_driver -lldb-repl -### 2>&1 | FileCheck -check-prefix=LLDB_REPL %s
+// LLDB_REPL-NOT: warning
+// LLDB_REPL: lldb
+// LLDB_REPL-NOT: warning
+
+// RUN: %swifti_driver -integrated-repl -### 2>&1 | FileCheck -check-prefix=INTEGRATED_REPL %s
+// INTEGRATED_REPL-NOT: warning
+// INTEGRATED_REPL: -repl
+// INTEGRATED_REPL-NOT: warning
+
+// RUN: %swifti_driver -### %s | FileCheck -check-prefix=DEFAULT_I %s
+// DEFAULT_I: -interpret
+
+// RUN: %swifti_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE %s
+// I_MODE: warning: unnecessary option '-i'
+// I_MODE: -interpret
+
+// RUN: not %swifti_driver -### -c %s 2>&1 | FileCheck -check-prefix=C_MODE %s
+// C_MODE: error: invalid mode '-c'
+// RUN: not %swifti_driver -### -emit-executable %s 2>&1 | FileCheck -check-prefix=EXEC_MODE %s
+// EXEC_MODE: error: invalid mode '-emit-executable'
+
+// RUN: %swifti_driver -g -O -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
+// OPTIONS_BEFORE_FILE: -g -O
