@@ -352,11 +352,11 @@ bool Decl::isPrivateStdlibDecl() const {
   if (VD->getNameStr().startswith("_"))
     return true;
 
-  // If it's a function with a parameter with leading underscore, it's a private
-  // function.
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+  // If it's a constructor with a parameter with leading underscore, it's a
+  // private function.
+  if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
     bool hasInternalParameter = false;
-    for (auto Pat : AFD->getBodyParamPatterns()) {
+    for (auto Pat : CD->getBodyParamPatterns()) {
       Pat->forEachVariable([&](VarDecl *Param) {
         if (Param->hasName() && Param->getNameStr().startswith("_")) {
           hasInternalParameter = true;
