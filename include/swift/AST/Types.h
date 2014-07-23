@@ -95,6 +95,10 @@ public:
     /// This type expression contains an LValueType or InOutType,
     /// other than as a function input.
     IsNotMaterializable = 0x08,
+    
+    /// This type expression contains an LValueType and can be loaded to convert
+    /// to a pure rvalue.
+    IsLValue = 0x10,
   };
 
 private:
@@ -125,6 +129,9 @@ public:
   /// first-class value type?
   bool isMaterializable() const { return !(Bits & IsNotMaterializable); }
 
+  /// Is a type with these properties an lvalue?
+  bool isLValue() const { return Bits & IsLValue; }
+  
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
     return RecursiveTypeProperties(lhs | rhs);
@@ -374,6 +381,12 @@ public:
   /// as X<T>, where T is a generic parameter, are not considered "dependent".
   bool isDependentType() {
     return getRecursiveProperties().isDependent();
+  }
+  
+  /// Determines whether this type is an lvalue. This includes both straight
+  /// lvalue types as well as tuples or optionals of lvalues.
+  bool isLValueType() {
+    return getRecursiveProperties().isLValue();
   }
 
   /// isExistentialType - Determines whether this type is an existential type,

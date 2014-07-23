@@ -2113,7 +2113,8 @@ LValueType *LValueType::get(Type objectTy) {
          "can not have 'inout' or @lvalue wrapped inside an @lvalue");
 
   auto properties = objectTy->getRecursiveProperties()
-                    + RecursiveTypeProperties::IsNotMaterializable;
+                    + RecursiveTypeProperties::IsNotMaterializable
+                    + RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
@@ -2133,7 +2134,8 @@ InOutType *InOutType::get(Type objectTy) {
          "can not have 'inout' or @lvalue wrapped inside an 'inout'");
 
   auto properties = objectTy->getRecursiveProperties()
-                    + RecursiveTypeProperties::IsNotMaterializable;
+                    + RecursiveTypeProperties::IsNotMaterializable
+                    - RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
