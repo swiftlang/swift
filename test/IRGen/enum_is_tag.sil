@@ -1,0 +1,29 @@
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -O3 | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+public enum MyOptional<T> {
+  case None
+  case Some(T)
+}
+
+// Checking for nil/not-nil here just involves checking the bit to say if we are
+// the payload case or not.
+
+// CHECK-LABEL: define i1 @is_nil(i64, i1)
+sil @is_nil : $@thin (MyOptional<Builtin.Int64>) -> Builtin.Int1 {
+bb0(%0 : $MyOptional<Builtin.Int64>):
+// CHECK: xor i1 %1, true
+  %1 = enum_is_tag $Builtin.Int1, %0 : $MyOptional<Builtin.Int64>, #MyOptional.Some!enumelt
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: define i1 @is_not_nil(i64, i1)
+sil @is_not_nil : $@thin (MyOptional<Builtin.Int64>) -> Builtin.Int1 {
+bb0(%0 : $MyOptional<Builtin.Int64>):
+// CHECK: ret i1 %1
+  %1 = enum_is_tag $Builtin.Int1, %0 : $MyOptional<Builtin.Int64>, #MyOptional.None!enumelt
+  return %1 : $Builtin.Int1
+}
