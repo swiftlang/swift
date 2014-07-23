@@ -17,6 +17,8 @@
 #include "swift/APINotes/APINotesReader.h"
 #include "swift/APINotes/Types.h"
 #include "swift/APINotes/APINotesWriter.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -358,6 +360,7 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
                         api_notes::ContextID classID, StringRef className) {
   using namespace api_notes;
   ObjCMethodInfo mInfo;
+  bool invalid = false;
 
   // Check if the selector ends with ':' to determine if it takes arguments.
   bool takesArguments = meth.Selector.endswith(":");
@@ -374,7 +377,7 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
   // Construct ObjCSelectorRef.
   api_notes::ObjCSelectorRef selectorRef;
   selectorRef.NumPieces = !takesArguments ? 0 : a.size();
-  selectorRef.Identifiers = llvm::ArrayRef<StringRef>(a);
+  selectorRef.Identifiers = a;
 
   // Translate the initializer info.
   mInfo.DesignatedInit = meth.DesignatedInit;
@@ -385,7 +388,7 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
 
   // Translate availability info.
   if (translateAvailability(meth.Availability, mInfo, meth.Selector))
-    return true;
+    invalid = true;
 
   // Translate nullability info.
   if (meth.Nullability.size() > ObjCMethodInfo::getMaxNullabilityIndex()) {
@@ -415,64 +418,103 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
   writer.addObjCMethod(classID, selectorRef,
                        meth.Kind == MethodKind::Instance,
                        mInfo);
-  return false;
+  return invalid;
 }
 
 static bool writeContext(api_notes::APINotesWriter &writer,
                          const Class &cl, bool isClass) {
   using namespace api_notes;
+  bool invalid = false;
 
   // Write the class.
   ObjCContextInfo cInfo;
   if (cl.AuditedForNullability)
     cInfo.setDefaultNullability(DefaultNullability);
   if (translateAvailability(cl.Availability, cInfo, cl.Name))
-    return true;
+    invalid = true;
 
   ContextID clID = isClass ? writer.addObjCClass(cl.Name, cInfo) :
                              writer.addObjCProtocol(cl.Name, cInfo);
 
   // Write all methods.
-  for (auto iMeth = cl.Methods.begin(), eMeth = cl.Methods.end();
-       iMeth != eMeth; ++iMeth) {
-    writeMethod(writer, *iMeth, clID, cl.Name);
+  llvm::StringMap<std::pair<bool, bool>> knownMethods;
+  for (const auto &method : cl.Methods) {
+    // Check for duplicate method definitions.
+    bool isInstanceMethod = method.Kind == MethodKind::Instance;
+    bool &known = isInstanceMethod ? knownMethods[method.Selector].first
+                                   : knownMethods[method.Selector].second;
+    if (known) {
+      llvm::errs() << "Duplicate definition of method '"
+                   << (isInstanceMethod? '-' : '+')
+                   << "[" << cl.Name << " " << method.Selector << "]'\n";
+      invalid = true;
+      continue;
+    }
+    known = true;
+
+    if (writeMethod(writer, method, clID, cl.Name))
+      invalid = true;
   }
 
   // Write all properties.
-  for (auto iProp = cl.Properties.begin(), eProp = cl.Properties.end();
-       iProp != eProp; ++iProp) {
+  llvm::StringSet<> knownProperties;
+  for (const auto &prop : cl.Properties) {
+    // Check for duplicate property definitions.
+    if (!knownProperties.insert(prop.Name)) {
+      llvm::errs() << "Duplicate definition of property '" << cl.Name << "."
+                   << prop.Name << "'\n";
+      invalid = true;
+      continue;
+    }
+
     // Translate from Property into ObjCPropertyInfo.
-    Property prop = *iProp;
     ObjCPropertyInfo pInfo;
     pInfo.setNullabilityAudited(prop.Nullability);
     if (translateAvailability(cl.Availability, cInfo, cl.Name))
-      return true;
+      invalid = true;
     writer.addObjCProperty(clID, prop.Name, pInfo);
   }
-  return false;
+
+  return invalid;
 }
 
 static bool compile(const Module &module, llvm::raw_ostream &os){
   using namespace api_notes;
   APINotesWriter writer;
 
+  bool invalid = false;
+
   // Write all classes.
-  for (auto iCl = module.Classes.begin(), eCl = module.Classes.end();
-       iCl != eCl; ++iCl) {
-    if (writeContext(writer, *iCl, /*isClass*/ true))
-      return true;
+  llvm::StringSet<> knownClasses;
+  for (const auto &cl : module.Classes) {
+    // Check for duplicate class definitions.
+    if (!knownClasses.insert(cl.Name)) {
+      llvm::errs() << "Multiple definitions of class '" << cl.Name << "'\n";
+      invalid = true;
+      continue;
+    }
+
+    if (writeContext(writer, cl, /*isClass*/ true))
+      invalid = true;
   }
 
   // Write all protocols.
-  for (auto iPr = module.Protocols.begin(), ePr = module.Protocols.end();
-       iPr != ePr; ++iPr) {
-    if (writeContext(writer, *iPr, /*isClass*/ false))
-      return true;
+  llvm::StringSet<> knownProtocols;
+  for (const auto &pr : module.Protocols) {
+    // Check for duplicate protocol definitions.
+    if (!knownProtocols.insert(pr.Name)) {
+      llvm::errs() << "Multiple definitions of protocol '" << pr.Name << "'\n";
+      invalid = true;
+      continue;
+    }
+
+    if (writeContext(writer, pr, /*isClass*/ false))
+      invalid = true;
   }
 
   writer.writeToStream(os);
 
-  return false;
+  return invalid;
 }
 
 bool api_notes::parseAndDumpAPINotes(StringRef yamlInput)  {
