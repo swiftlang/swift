@@ -236,7 +236,7 @@ bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
 bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
-    if (sub.Replacement->getCanonicalType()->hasArchetype())
+    if (sub.getReplacement()->getCanonicalType()->hasArchetype())
       return true;
   return false;
 }
@@ -244,7 +244,7 @@ bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
 bool swift::hasAnyExistentialTypes(ArrayRef<Substitution> Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
-    if (sub.Replacement->getCanonicalType()->isAnyExistentialType())
+    if (sub.getReplacement()->getCanonicalType()->isAnyExistentialType())
       return true;
   return false;
 }

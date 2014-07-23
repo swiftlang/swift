@@ -3630,7 +3630,7 @@ namespace {
 
       for (unsigned i = 0, e = substitutions.size(); i != e; ++i) {
         auto sub = substitutions[i];
-        CanType arg = sub.Replacement->getCanonicalType();
+        CanType arg = sub.getReplacement()->getCanonicalType();
 
         // Right now, we can only pull things out of the direct
         // arguments, not out of nested metadata.  For example, this
@@ -4062,11 +4062,11 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
                                  const Substitution &sub,
                                  SmallVectorImpl<llvm::Value*> &out) {
   // We don't need to do anything if we have no protocols to conform to.
-  auto archetypeProtos = sub.Archetype->getConformsTo();
+  auto archetypeProtos = sub.getArchetype()->getConformsTo();
   if (archetypeProtos.empty()) return;
 
   // Look at the replacement type.
-  CanType replType = sub.Replacement->getCanonicalType();
+  CanType replType = sub.getReplacement()->getCanonicalType();
 
   // If it's an archetype, we'll need to grab from the local context.
   if (auto archetype = dyn_cast<ArchetypeType>(replType)) {
@@ -4090,7 +4090,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   // conformances.
   auto &replTI = IGF.getTypeInfoForUnlowered(replType);
 
-  assert(archetypeProtos.size() == sub.Conformance.size());
+  assert(archetypeProtos.size() == sub.getConformances().size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
     auto proto = archetypeProtos[j];
     if (!requiresProtocolWitnessTable(proto))
@@ -4098,7 +4098,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
     
     auto &protoI = IGF.IGM.getProtocolInfo(proto);
     auto &confI = protoI.getConformance(IGF.IGM, replType, replTI, proto,
-                                        *sub.Conformance[j]);
+                                        *sub.getConformances()[j]);
 
     llvm::Value *wtable = confI.getTable(IGF);
     out.push_back(wtable);
@@ -4189,7 +4189,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     const Substitution &sub = subs.front();
     subs = subs.slice(1);
     
-    CanType argType = sub.Replacement->getCanonicalType();
+    CanType argType = sub.getReplacement()->getCanonicalType();
     
     // If same-type constraints have eliminated the genericity of this
     // parameter, it doesn't need an independent metadata parameter.
@@ -4239,7 +4239,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       // Otherwise, go to the conformances.
       auto &protoI = IGF.IGM.getProtocolInfo(protocol);
       auto &confI = protoI.getConformance(IGF.IGM, argType, argTI, protocol,
-                                          *sub.Conformance[i]);
+                                          *sub.getConformances()[i]);
       llvm::Value *wtable = confI.getTable(IGF);
       out.add(wtable);
     }

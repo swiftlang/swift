@@ -305,10 +305,11 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       Mangle::Mangler mangle(buffer);
 
       for (auto &Sub : Bucket[0]->getSubstitutions()) {
-        DEBUG(llvm::dbgs() << "  Replacement Type: "; Sub.Replacement->getCanonicalType().dump());
-        mangle.mangleType(Sub.Replacement->getCanonicalType(),
+        DEBUG(llvm::dbgs() << "  Replacement Type: ";
+              Sub.getReplacement()->getCanonicalType().dump());
+        mangle.mangleType(Sub.getReplacement()->getCanonicalType(),
                           ResilienceExpansion::Minimal, 0);
-        for (auto C : Sub.Conformance) {
+        for (auto C : Sub.getConformances()) {
           if (!C)
             goto null_conformances;
           mangle.mangleProtocolConformance(C);

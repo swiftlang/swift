@@ -552,9 +552,8 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     }
 
     // Record this substitution.
-    resultSubstitutions[index].Archetype = archetype;
-    resultSubstitutions[index].Replacement = type;
-    resultSubstitutions[index].Conformance = ctx.AllocateCopy(conformances);
+    resultSubstitutions[index] = {archetype, type,
+                                  ctx.AllocateCopy(conformances)};
     ++index;
   }
 

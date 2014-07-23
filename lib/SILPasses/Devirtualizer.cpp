@@ -382,7 +382,7 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
 
   // Add the non-self-derived substitutions from the original application.
   for (auto &origSub : AI->getSubstitutionsWithoutSelfSubstitution()) {
-    if (!origSub.Archetype->isSelfDerived())
+    if (!origSub.getArchetype()->isSelfDerived())
       NewSubstList.push_back(origSub);
   }
 
@@ -414,7 +414,7 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
 
   SmallVector<Substitution, 16> SelfDerivedSubstitutions;
   for (auto &origSub : AI->getSubstitutions())
-    if (origSub.Archetype->isSelfDerived())
+    if (origSub.getArchetype()->isSelfDerived())
       SelfDerivedSubstitutions.push_back(origSub);
 
   // If we have more than 1 substitution on AI that is self derived, that means
@@ -429,8 +429,11 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   // non-generic callee type.
   assert(SelfDerivedSubstitutions.size() == 1 &&
          "Must have a substitution for self.");
-  Substitution NewSelfSub = AI->getSelfSubstitution();
-  NewSelfSub.Replacement = Ty;
+  Substitution NewSelfSub{
+    AI->getSelfSubstitution().getArchetype(),
+    Ty,
+    AI->getSelfSubstitution().getConformances(),
+  };
 
   CanSILFunctionType OrigType = AI->getOrigCalleeType();
   CanSILFunctionType SubstCalleeType = OrigType->substGenericArgs(
@@ -627,7 +630,7 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
 
 static bool substitutionListHasUnboundGenerics(ArrayRef<Substitution> Subs) {
   for (auto &Sub : Subs)
-    if (Sub.Replacement->getCanonicalType()->hasArchetype())
+    if (Sub.getReplacement()->getCanonicalType()->hasArchetype())
       return true;
   return false;
 }

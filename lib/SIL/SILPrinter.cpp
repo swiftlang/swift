@@ -610,7 +610,7 @@ public:
     OS << '<';
     interleave(Subs,
                [&](const Substitution &s) {
-                 s.Replacement->print(OS, SubPrinter);
+                 s.getReplacement()->print(OS, SubPrinter);
                },
                [&] { OS << ", "; });
     OS << '>';

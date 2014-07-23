@@ -938,7 +938,7 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     SmallVector<DeclID, 16> conformanceData;
     SmallVector<const ProtocolConformance *, 8> conformancesToWrite;
 
-    for (const ProtocolConformance *conformance : sub.Conformance) {
+    for (const ProtocolConformance *conformance : sub.getConformances()) {
       DeclID typeID;
       ModuleID moduleID;
       if (!conformance) {
@@ -953,8 +953,8 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
     }
 
     BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                               addTypeRef(sub.Archetype),
-                                               addTypeRef(sub.Replacement),
+                                               addTypeRef(sub.getArchetype()),
+                                               addTypeRef(sub.getReplacement()),
                                                conformanceData);
 
     for (const ProtocolConformance *conformance : conformancesToWrite) {

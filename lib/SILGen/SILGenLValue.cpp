@@ -1116,7 +1116,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   // Materialize the r-value into a temporary.
   FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));
   auto valueAddr = std::move(value).materialize(*this,
-                                  AbstractionPattern(CanType(sub.Archetype)));
+                              AbstractionPattern(CanType(sub.getArchetype())));
 
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
   auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, valueAddr,

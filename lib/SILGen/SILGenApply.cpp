@@ -1050,7 +1050,7 @@ public:
   ArrayRef<Substitution> getNonSelfSubstitutions(ArrayRef<Substitution> subs) {
     unsigned innerIdx = 0, n = subs.size();
     for (; innerIdx != n; ++innerIdx) {
-      auto archetype = subs[innerIdx].Archetype;
+      auto archetype = subs[innerIdx].getArchetype();
       while (archetype->getParent())
         archetype = archetype->getParent();
       if (!archetype->getSelfProtocol()) {
@@ -2248,7 +2248,7 @@ namespace {
     // The substitution gives the type of the load.  This is always a
     // first-class type; there is no way to e.g. produce a @weak load
     // with this builtin.
-    auto &rvalueTL = gen.getTypeLowering(substitutions[0].Replacement);
+    auto &rvalueTL = gen.getTypeLowering(substitutions[0].getReplacement());
     SILType loadedType = rvalueTL.getLoweredType();
 
     // Convert the pointer argument to a SIL address.
@@ -2284,7 +2284,7 @@ namespace {
     assert(substitutions.size() == 1 &&
            "destroy should have a single substitution");
     // The substitution determines the type of the thing we're destroying.
-    auto &ti = gen.getTypeLowering(substitutions[0].Replacement);
+    auto &ti = gen.getTypeLowering(substitutions[0].getReplacement());
     
     // Destroy is a no-op for trivial types.
     if (ti.isTrivial())
@@ -2316,7 +2316,7 @@ namespace {
            "assign should have a single substitution");
 
     // The substitution determines the type of the thing we're destroying.
-    CanType assignFormalType = substitutions[0].Replacement->getCanonicalType();
+    CanType assignFormalType = substitutions[0].getReplacement()->getCanonicalType();
     SILType assignType = gen.getLoweredType(assignFormalType);
     
     // Convert the destination pointer argument to a SIL address.
@@ -2375,8 +2375,8 @@ namespace {
     assert(substitutions.size() == 1 && "cast should have a type substitution");
     
     // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].Replacement->mayHaveSuperclass() &&
-        !substitutions[0].Replacement->isClassExistentialType()) {
+    if (!substitutions[0].getReplacement()->mayHaveSuperclass() &&
+        !substitutions[0].getReplacement()->isClassExistentialType()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castToNativeObject source must be a class");
       // FIXME: Recovery?
@@ -2392,9 +2392,9 @@ namespace {
     SILValue arg = args[0].getValue();
 
     // If the argument is existential, project it.
-    if (substitutions[0].Replacement->isClassExistentialType()) {
+    if (substitutions[0].getReplacement()->isClassExistentialType()) {
       SmallVector<ProtocolDecl *, 4> protocols;
-      substitutions[0].Replacement->getAnyExistentialTypeProtocols(protocols);
+      substitutions[0].getReplacement()->getAnyExistentialTypeProtocols(protocols);
       ProtocolDecl *proto = *std::find_if(protocols.begin(), protocols.end(),
                                           [](ProtocolDecl *proto) {
                                             return proto->requiresClass();
@@ -2420,7 +2420,7 @@ namespace {
            "cast should have a single substitution");
 
     // Bail if the source type is not a class reference of some kind.
-    if (!substitutions[0].Replacement->mayHaveSuperclass()) {
+    if (!substitutions[0].getReplacement()->mayHaveSuperclass()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castFromNativeObject dest must be a class");
       // FIXME: Recovery?
@@ -2433,7 +2433,7 @@ namespace {
 
     // The substitution determines the destination type.
     // FIXME: Archetype destination type?
-    SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
+    SILType destType = gen.getLoweredLoadableType(substitutions[0].getReplacement());
     
     // Take the reference type argument and cast it.
     SILValue result = gen.B.createUncheckedRefCast(loc, args[0].getValue(),
@@ -2471,7 +2471,7 @@ namespace {
     
     // The substitution determines the destination type.
     // FIXME: Archetype destination type?
-    auto &destLowering = gen.getTypeLowering(substitutions[0].Replacement);
+    auto &destLowering = gen.getTypeLowering(substitutions[0].getReplacement());
     assert(destLowering.isLoadable());
     SILType destType = destLowering.getLoweredType();
 
@@ -2546,8 +2546,8 @@ namespace {
     assert(args.size() == 1 && "reinterpretCast should be given one argument");
     assert(substitutions.size() == 2 && "reinterpretCast should have two subs");
     
-    auto &fromTL = gen.getTypeLowering(substitutions[0].Replacement);
-    auto &toTL = gen.getTypeLowering(substitutions[1].Replacement);
+    auto &fromTL = gen.getTypeLowering(substitutions[0].getReplacement());
+    auto &toTL = gen.getTypeLowering(substitutions[1].getReplacement());
     
     // If casting between address-only types, cast the address.
     if (!fromTL.isLoadable() || !toTL.isLoadable()) {
@@ -2633,7 +2633,7 @@ namespace {
     
     bool result;
     
-    auto traitTy = substitutions[0].Replacement->getCanonicalType();
+    auto traitTy = substitutions[0].getReplacement()->getCanonicalType();
     
     switch ((traitTy.getPointer()->*Trait)()) {
     // If the type obviously has or lacks the trait, emit a constant result.

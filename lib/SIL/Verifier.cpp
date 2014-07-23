@@ -417,7 +417,7 @@ public:
     for (auto &Sub : AI->getSubstitutions()) {
       // If Sub's replacement is not an archetype type or is from an opened
       // existential type, skip it...
-      auto A = Sub.Replacement->getAs<ArchetypeType>();
+      auto A = Sub.getReplacement()->getAs<ArchetypeType>();
       if (!A)
         continue;
       require(isArchetypeValidInFunction(A, AI->getFunction()),
@@ -464,7 +464,7 @@ public:
     for (auto &Sub : PAI->getSubstitutions()) {
       // If Sub's replacement is not an archetype type or is from an opened
       // existential type, skip it...
-      Sub.Replacement.visit([&](Type t) {
+      Sub.getReplacement().visit([&](Type t) {
         auto *A = t->getAs<ArchetypeType>();
         if (!A)
           return;

@@ -173,10 +173,10 @@ protected:
                                         Original.getContextGenericParams(),
                                         ApplySubs);
 
-    assert(sub.Conformance.size() == 1 &&
+    assert(sub.getConformances().size() == 1 &&
            "didn't get conformance from substitution?!");
 
-    auto Conformance = sub.Conformance[0];
+    auto Conformance = sub.getConformances()[0];
 
     // If we don't have a witness table for this conformance, create a witness
     // table declaration for it.

@@ -61,6 +61,8 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
               });
 
   auto currentModule = getConstraintSystem().DC->getParentModule();
+  ArchetypeType *currentArchetype = nullptr;
+  Type currentReplacement;
   SmallVector<ProtocolConformance *, 4> currentConformances;
 
   ArrayRef<Requirement> requirements;
@@ -85,10 +87,10 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
       // If this is a protocol conformance requirement, get the conformance
       // and record it.
       if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-        assert(firstArchetype
-               == substitutions.back().Archetype && "Archetype out-of-sync");
+        assert(firstArchetype == currentArchetype
+               && "Archetype out-of-sync");
         ProtocolConformance *conformance = nullptr;
-        Type replacement = substitutions.back().Replacement;
+        Type replacement = currentReplacement;
         bool conforms = tc.conformsToProtocol(replacement,
                                               protoType->getDecl(),
                                               getConstraintSystem().DC,
@@ -115,25 +117,30 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 
     case RequirementKind::WitnessMarker:
       // Flush the current conformances.
-      if (!substitutions.empty()) {
-        substitutions.back().Conformance
-          = ctx.AllocateCopy(currentConformances);
+      if (currentArchetype) {
+        substitutions.push_back({
+          currentArchetype,
+          currentReplacement,
+          ctx.AllocateCopy(currentConformances)
+        });
         currentConformances.clear();
       }
 
-      // Each value witness marker starts a new substitution.
-      substitutions.push_back(Substitution());
-      substitutions.back().Archetype = firstArchetype;
-      substitutions.back().Replacement =
-      tc.substType(currentModule, substitutions.back().Archetype,
-                   typeSubstitutions);
+      // Each witness marker starts a new substitution.
+      currentArchetype = firstArchetype;
+      currentReplacement = tc.substType(currentModule, currentArchetype,
+                                        typeSubstitutions);
       break;
     }
   }
   
   // Flush the final conformances.
-  if (!substitutions.empty()) {
-    substitutions.back().Conformance = ctx.AllocateCopy(currentConformances);
+  if (currentArchetype) {
+    substitutions.push_back({
+      currentArchetype,
+      currentReplacement,
+      ctx.AllocateCopy(currentConformances),
+    });
     currentConformances.clear();
   }
 
@@ -595,14 +602,17 @@ namespace {
                                            oldSubstitutions.begin(),
                                            oldSubstitutions.end());
             auto &selfSubst = newSubstitutions.front();
-            assert(selfSubst.Archetype->getSelfProtocol() &&
+            assert(selfSubst.getArchetype()->getSelfProtocol() &&
                    "Not the Self archetype for a protocol?");
-            selfSubst.Replacement = baseTy;
-            unsigned numConformances = selfSubst.Conformance.size();
+            unsigned numConformances = selfSubst.getConformances().size();
             auto newConformances
               = context.Allocate<ProtocolConformance *>(numConformances);
             std::fill(newConformances.begin(), newConformances.end(), nullptr);
-            selfSubst.Conformance = newConformances;
+            selfSubst = {
+              selfSubst.getArchetype(),
+              baseTy,
+              newConformances,
+            };
             memberRef = ConcreteDeclRef(context, memberRef.getDecl(),
                                         newSubstitutions);
           }

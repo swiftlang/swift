@@ -45,7 +45,8 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
         os << ", ";
       }
 
-      os << sub.Archetype->getFullName() << "=" << sub.Replacement.getString();
+      os << sub.getArchetype()->getFullName()
+         << "=" << sub.getReplacement().getString();
     }
     os << ']';
   }

@@ -42,12 +42,28 @@ getSubstitutionMaps(GenericParamList *context,
 
     // Save the conformances from the substitution so that we can substitute
     // them into substitutions that map between archetypes.
-    conformanceMap[arch] = sub.Conformance;
+    conformanceMap[arch] = sub.getConformances();
 
     if (arch->isPrimary())
-      typeMap[arch] = sub.Replacement;
+      typeMap[arch] = sub.getReplacement();
   }
   assert(subs.empty() && "did not use all substitutions?!");
+}
+
+Substitution::Substitution(ArchetypeType *Archetype,
+                           Type Replacement,
+                           ArrayRef<ProtocolConformance*> Conformance)
+  : Archetype(Archetype), Replacement(Replacement), Conformance(Conformance)
+{
+  // The replacement type must be materializable.
+  assert(Replacement->isMaterializable()
+         && "cannot substitute with a non-materializable type");
+  
+  // The conformance list must match the archetype conformances.
+  if (Archetype && !Replacement->is<ArchetypeType>()) {
+    assert(Conformance.size() == Archetype->getConformsTo().size()
+           && "substitution conformances don't match archetype");
+  }
 }
 
 Substitution Substitution::subst(Module *module,

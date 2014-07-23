@@ -909,7 +909,7 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   // archetypes.
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
   for (Substitution S : Subs)
-    if (S.Replacement->getCanonicalType()->hasArchetype())
+    if (S.getReplacement()->getCanonicalType()->hasArchetype())
       return nullptr;
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
@@ -961,7 +961,7 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
   assert((Subs.size() == 1) &&
          "Expected one substitution in call to canBeClass");
 
-  auto Ty = Subs[0].Replacement->getCanonicalType();
+  auto Ty = Subs[0].getReplacement()->getCanonicalType();
   switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
     return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),

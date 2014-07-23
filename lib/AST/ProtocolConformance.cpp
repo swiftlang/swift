@@ -264,20 +264,20 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   auto conformingDC = getDeclContext();
   auto conformingModule = conformingDC->getParentModule();
   auto specializedType
-    = genericWitness.Replacement.subst(conformingModule,
+    = genericWitness.getReplacement().subst(conformingModule,
                                        substitutionMap,
                                        /*ignoreMissing=*/false,
                                        resolver);
 
   // If the type witness was unchanged, just copy it directly.
-  if (specializedType.getPointer() == genericWitness.Replacement.getPointer()) {
+  if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
     TypeWitnesses[assocType] = genericWitness;
     return TypeWitnesses[assocType];
   }
 
   // Gather the conformances for the type witness. These should never fail.
   SmallVector<ProtocolConformance *, 4> conformances;
-  auto archetype = genericWitness.Archetype;
+  auto archetype = genericWitness.getArchetype();
   for (auto proto : archetype->getConformsTo()) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);

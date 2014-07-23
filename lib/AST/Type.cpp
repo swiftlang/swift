@@ -1835,7 +1835,7 @@ GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
     auto sub = Subs.front();
     Subs = Subs.slice(1);
     
-    map.insert({arch, sub.Replacement});
+    map.insert({arch, sub.getReplacement()});
   }
   
   assert(Subs.empty() && "did not use all substitutions?!");
@@ -1950,11 +1950,11 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   
   // Seed the type map with pre-existing substitutions.
   for (auto sub : args) {
-    subs[sub.Archetype] = sub.Replacement;
+    subs[sub.getArchetype()] = sub.getReplacement();
   }
   
   for (auto depTy : getAllDependentTypes()) {
-    auto replacement = args.front().Replacement;
+    auto replacement = args.front().getReplacement();
     args = args.slice(1);
     
     if (auto subTy = depTy->getAs<SubstitutableType>()) {
@@ -2040,7 +2040,7 @@ static Type getMemberForBaseType(Module *module,
       case ProtocolConformanceState::Incomplete:
       case ProtocolConformanceState::Complete:
         return conformance.getPointer()->getTypeWitness(assocType,
-                                                        resolver).Replacement;
+                                                     resolver).getReplacement();
       }
     }
   }

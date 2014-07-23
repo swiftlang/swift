@@ -1139,7 +1139,7 @@ public:
       Conformance->forEachTypeWitness(TypeResolver.get(),
                                       [&](const AssociatedTypeDecl *ATD,
                                           const Substitution &Subst) -> bool {
-        Types[ATD] = Subst.Replacement;
+        Types[ATD] = Subst.getReplacement();
         return false;
       });
       for (auto It : Conformance->getInheritedConformances())

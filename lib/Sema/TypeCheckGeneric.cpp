@@ -940,5 +940,5 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   }
 
   assert(conformance && "Missing conformance information");
-  return conformance->getTypeWitness(requirement, this).Replacement;
+  return conformance->getTypeWitness(requirement, this).getReplacement();
 }

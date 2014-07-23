@@ -375,7 +375,7 @@ namespace {
         // replacement type. Otherwise, record it.
         if (Conformance->hasTypeWitness(assocType))
           replacementType = Conformance->getTypeWitness(assocType, nullptr)
-                              .Replacement;
+                              .getReplacement();
         else
           OpenedAssocTypes[memberTypeVar] = assocType;
 
@@ -781,7 +781,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
         // FIXME: Could handle inherited conformances here.
         if (conformance->hasTypeWitness(member->getAssocType()))
           return conformance->getTypeWitness(member->getAssocType(), nullptr)
-                   .Replacement;
+                   .getReplacement();
       }
     }
 
@@ -809,7 +809,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
       if (conformance->usesDefaultDefinition(assocType)) {
         auto &witness = conformance->getTypeWitness(assocType, nullptr);
         addAssocTypeDeductionString(withAssocTypes, assocType,
-                                    witness.Replacement);
+                                    witness.getReplacement());
       }
     }
   }
@@ -885,10 +885,9 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              DeclContext *dc,
                                              ArchetypeType *archetype,
                                              Type replacement) {
-  Substitution result;
-  result.Archetype = archetype;
-  result.Replacement = replacement;
-  assert(!result.Replacement->isDependentType() && "Can't be dependent");
+  ArchetypeType *resultArchetype = archetype;
+  Type resultReplacement = replacement;
+  assert(!resultReplacement->isDependentType() && "Can't be dependent");
   SmallVector<ProtocolConformance *, 4> conformances;
 
   for (auto proto : archetype->getConformsTo()) {
@@ -899,8 +898,11 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
     conformances.push_back(conformance);
   }
 
-  result.Conformance = tc.Context.AllocateCopy(conformances);
-  return result;
+  return Substitution{
+    resultArchetype,
+    resultReplacement,
+    tc.Context.AllocateCopy(conformances),
+  };
 }
 
 void ConformanceChecker::recordWitness(ValueDecl *requirement,
@@ -958,7 +960,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            bool wasDeducedOrDefaulted) {
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType, nullptr).Replacement
+    assert(Conformance->getTypeWitness(assocType, nullptr).getReplacement()
              ->isEqual(type) && "Conflicting type witness deductions");
     return;
   }
@@ -1389,7 +1391,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       if (Conformance->hasTypeWitness(assocType))
         substitutions[assocType->getArchetype()]
-          = Conformance->getTypeWitness(assocType, nullptr).Replacement;
+          = Conformance->getTypeWitness(assocType, nullptr).getReplacement();
     }
   }
   auto defaultType = TC.substType(DC->getParentModule(),
@@ -1606,7 +1608,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
           // If the type witness is an error, just fail quietly.
           if (Conformance->hasTypeWitness(assocType) &&
-              Conformance->getTypeWitness(assocType, nullptr).Replacement
+              Conformance->getTypeWitness(assocType, nullptr).getReplacement()
                 ->is<ErrorType>())
             return true;
         }

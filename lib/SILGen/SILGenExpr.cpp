@@ -1003,10 +1003,12 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
   for (auto sub: fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+                                sub.getConformances()});
   }
   for (auto sub: toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+                                sub.getConformances()});
   }
 
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
@@ -1058,10 +1060,12 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
   for (auto sub: fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+                                sub.getConformances()});
   }
   for (auto sub: toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
-    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+    subs.push_back(Substitution{nullptr, sub.getReplacement(),
+                                sub.getConformances()});
   }
   
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);

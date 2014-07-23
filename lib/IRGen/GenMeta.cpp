@@ -118,7 +118,7 @@ namespace {
       // TODO: not archetypes from outer contexts
       // TODO: but we are partially determined by the outer context!
       for (auto &sub : type->getSubstitutions(/*FIXME:*/nullptr, nullptr)) {
-        CanType subbed = sub.Replacement->getCanonicalType();
+        CanType subbed = sub.getReplacement()->getCanonicalType();
         Values.push_back(IGF.emitTypeMetadataRef(subbed));
       }
 

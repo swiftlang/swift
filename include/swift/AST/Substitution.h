@@ -35,6 +35,10 @@ using ArchetypeConformanceMap
   
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
+  ArchetypeType * Archetype = nullptr;
+  Type Replacement;
+  ArrayRef<ProtocolConformance *> Conformance;
+
 public:
   /// FIXME: An archetype that looks like the archetype or dependent generic
   /// parameter type that should be substituted by this substitution, but
@@ -54,14 +58,22 @@ public:
   ///   protocol context.
   ///
   /// You really shouldn't use the value of this field for anything new.
-  ArchetypeType *Archetype;
+  ArchetypeType *getArchetype() const { return Archetype; }
   
   /// The replacement type.
-  Type Replacement;
+  Type getReplacement() const { return Replacement; }
   
   /// The protocol conformances for the replacement. These appear in the same
-  /// order as Archetype->getConformsTo().
-  ArrayRef<ProtocolConformance *> Conformance;
+  /// order as Archetype->getConformsTo() for the substituted archetype.
+  const ArrayRef<ProtocolConformance *> getConformances() const {
+    return Conformance;
+  }
+  
+  Substitution() {}
+  
+  Substitution(ArchetypeType *Archetype,
+               Type Replacement,
+               ArrayRef<ProtocolConformance*> Conformance);
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;

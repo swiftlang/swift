@@ -2116,22 +2116,22 @@ public:
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
-                                      witness.Replacement->getCanonicalType()});
+                                witness.getReplacement()->getCanonicalType()});
     
     // Emit records for the protocol requirements on the type.
-    assert(td->getProtocols().size() == witness.Conformance.size()
+    assert(td->getProtocols().size() == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
     // The conformances should be all null or all nonnull.
-    assert(witness.Conformance.empty()
-           || (witness.Conformance[0]
-                 ? std::all_of(witness.Conformance.begin(),
-                               witness.Conformance.end(),
+    assert(witness.getConformances().empty()
+           || (witness.getConformances()[0]
+                 ? std::all_of(witness.getConformances().begin(),
+                               witness.getConformances().end(),
                                [&](const ProtocolConformance *C) -> bool {
                                  return C;
                                })
-                 : std::all_of(witness.Conformance.begin(),
-                               witness.Conformance.end(),
+                 : std::all_of(witness.getConformances().begin(),
+                               witness.getConformances().end(),
                                [&](const ProtocolConformance *C) -> bool {
                                  return !C;
                                })));
@@ -2146,13 +2146,13 @@ public:
       ProtocolConformance *conformance = nullptr;
       // If the associated type requirement is satisfied by an associated type,
       // these will all be null.
-      if (witness.Conformance[0]) {
-        auto foundConformance = std::find_if(witness.Conformance.begin(),
-                                        witness.Conformance.end(),
+      if (witness.getConformances()[0]) {
+        auto foundConformance = std::find_if(witness.getConformances().begin(),
+                                        witness.getConformances().end(),
                                         [&](ProtocolConformance *c) {
                                           return c->getProtocol() == protocol;
                                         });
-        assert(foundConformance != witness.Conformance.end());
+        assert(foundConformance != witness.getConformances().end());
         conformance = *foundConformance;
       }
       

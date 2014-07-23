@@ -3300,19 +3300,20 @@ static bool getSpecConformanceSubstitutionsFromParsed(
                              SmallVectorImpl<Substitution> &subs) {
   ArrayRef<ArchetypeType *> allArchetypes = gp->getAllArchetypes();
   for (auto &parsed : parses) {
-    Substitution sub;
+    ArchetypeType *subArchetype = nullptr;
+    Type subReplacement;
     // Find the corresponding ArchetypeType.
     for (auto archetype : allArchetypes)
       if (archetype->getName() == parsed.name) {
-        sub.Archetype = archetype;
+        subArchetype = archetype;
         break;
       }
-    if (!sub.Archetype) {
+    if (!subArchetype) {
       P.diagnose(parsed.loc, diag::sil_witness_archetype_not_found);
       return true;
     }
-    sub.Replacement = parsed.replacement;
-    subs.push_back(sub);
+    subReplacement = parsed.replacement;
+    subs.push_back({subArchetype, subReplacement, {}});
   }
   return false;
 }

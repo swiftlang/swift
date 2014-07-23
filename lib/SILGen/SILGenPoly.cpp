@@ -854,8 +854,9 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto generics = F.getContextGenericParams();
   auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
-    for (auto archetype : generics->getAllNestedArchetypes())
-      subs.push_back({ archetype, archetype, { }});
+    for (auto archetype : generics->getAllNestedArchetypes()) {
+      subs.push_back({ archetype, archetype, { } });
+    }
   }
 
   // Add the function type as the parameter.
