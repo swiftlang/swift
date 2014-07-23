@@ -541,7 +541,9 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  llvm::Value *metadata = emitClassHeapMetadataRef(IGF, selfType);
+  llvm::Value *metadata =
+    emitClassHeapMetadataRef(IGF, selfType.getSwiftRValueType(),
+                             /*allow uninitialized*/ objc);
 
   // If we need to use Objective-C allocation, do so.
   // If the root class isn't known to use the Swift allocator, we need

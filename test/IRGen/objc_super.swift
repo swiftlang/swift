@@ -13,7 +13,9 @@ import gizmo
 class Hoozit : Gizmo {
   // CHECK: define void @_TFC10objc_super6Hoozit4frobfS0_FT_T_([[HOOZIT]]*) {
   override func frob() {
-    // CHECK: store [[CLASS]]* bitcast ([[TYPE]]* getelementptr {{.*}} @_TMdC10objc_super6Hoozit {{.*}} to [[CLASS]]*), [[CLASS]]** {{.*}}, align 8
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
+    // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
+    // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8** @"\01L_selector(frob)"
     // CHECK: call void bitcast (void ()* @objc_msgSendSuper2 to void ([[SUPER]]*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
     super.frob()
@@ -31,7 +33,9 @@ class Hoozit : Gizmo {
 
   // CHECK: define void @_TFC10objc_super6Hoozit5framefS0_FT_VSC6NSRect(%VSC6NSRect* noalias sret, %C10objc_super6Hoozit*) {
   override func frame() -> NSRect {
-    // CHECK: store [[CLASS]]* bitcast ([[TYPE]]* getelementptr {{.*}} @_TMdC10objc_super6Hoozit {{.*}} to [[CLASS]]*), [[CLASS]]** {{.*}}, align 8
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
+    // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
+    // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8** @"\01L_selector(frame)"
     // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias sret {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
     return NSInsetRect(super.frame(), 2.0, 2.0)

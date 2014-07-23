@@ -170,7 +170,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // Otherwise, use the ObjC-specific entrypoint.
   } else {
-    metadataRef = IGF.IGM.getAddrOfObjCClass(destClass, NotForDefinition);
+    metadataRef = emitObjCHeapMetadataRef(IGF, destClass);
 
     switch (mode) {
     case CheckedCastMode::Unconditional:

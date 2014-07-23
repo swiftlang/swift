@@ -97,7 +97,7 @@ llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
 static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
                                         ClassDecl *theClass) {
   // Derive a pointer to the Objective-C class.
-  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
+  auto classPtr = emitObjCHeapMetadataRef(IGF, theClass);
   
   return emitObjCMetadataRefForMetadata(IGF, classPtr);
 }
@@ -165,6 +165,24 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
   return IGM.getAddrOfTypeMetadata(type, false, false);
 }
 
+/// Emit a reference to an ObjC class.  In general, the only things
+/// you're allowed to do with the address of an ObjC class symbol are
+/// (1) send ObjC messages to it (in which case the message will be
+/// forwarded to the real class, if one exists) or (2) put it in
+/// various data sections where the ObjC runtime will properly arrange
+/// things.  Therefore, we must typically force the initialization of
+/// a class when emitting a reference to it.
+llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
+                                            ClassDecl *theClass,
+                                            bool allowUninitialized) {
+  auto classObject = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
+  if (allowUninitialized) return classObject;
+
+  // TODO: memoize this the same way that we memoize Swift type metadata?
+  return IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+                                classObject);
+}
+
 /// Emit a reference to the type metadata for a foreign type.
 static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
                                                CanType type) {
@@ -226,6 +244,15 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   // If we don't have generic parameters, that's all we need.
   if (!generics) {
     assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+
+    // If this is a class, we need to force ObjC initialization.
+    if (isa<ClassDecl>(theDecl)) {
+      metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+      metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+                                        metadata);
+      metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+    }
+
     return metadata;
   }
 
@@ -846,7 +873,8 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(SILType type) {
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class
 /// object.
-llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type) {
+llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
+                                             bool allowUninitialized) {
   assert(isa<ClassType>(type) || isa<BoundGenericClassType>(type));
 
   // ObjC-defined classes will always be top-level non-generic classes.
@@ -854,17 +882,13 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type) {
   if (auto classType = dyn_cast<ClassType>(type)) {
     auto theClass = classType->getDecl();
     if (hasKnownSwiftMetadata(IGF.IGM, theClass))
-      return EmitTypeMetadataRef(IGF).visitClassType(classType);
-    return IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
+      return IGF.emitTypeMetadataRef(classType);
+    return emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
   }
 
   auto classType = cast<BoundGenericClassType>(type);
   assert(hasKnownSwiftMetadata(IGF.IGM, classType->getDecl()));
-  return EmitTypeMetadataRef(IGF).visitBoundGenericClassType(classType);
-}
-
-llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, SILType type) {
-  return emitClassHeapMetadataRef(IGF, type.getSwiftRValueType());
+  return IGF.emitTypeMetadataRef(classType);
 }
 
 namespace {

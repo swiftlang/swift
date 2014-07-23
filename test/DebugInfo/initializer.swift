@@ -11,7 +11,7 @@ protocol Named {
 
 // initializer.Person.__allocating_init (initializer.Person.Type)() -> initializer.Person
 // CHECK: define %C11initializer6Person* @_TFC11initializer6PersonCfMS0_FT_S0_(%swift.type*) {
-// CHECK:  call %C11initializer6Person* @_TFC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person* %2), !dbg ![[ALLOCATING_INIT:.*]]
+// CHECK:  call %C11initializer6Person* @_TFC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person* %3), !dbg ![[ALLOCATING_INIT:.*]]
 
 // CHECK-DAG: ![[ALLOCATING_INIT]] = metadata !{i32 0, i32 0
 class Person : Named {

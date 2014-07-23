@@ -67,9 +67,12 @@ namespace irgen {
                                                  CanType type);
 
   /// Emit a reference to the heap metadata for a class.
-  llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type);
+  llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
+                                        bool allowUninitialized = false);
 
-  llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, SILType type);
+  /// Emit a reference to the (initialized) ObjC heap metadata for a class.
+  llvm::Value *emitObjCHeapMetadataRef(IRGenFunction &IGF, ClassDecl *theClass,
+                                       bool allowUninitialized = false);
 
   /// Given a class metadata reference, produce the appropriate heap
   /// metadata reference for it.

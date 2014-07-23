@@ -475,7 +475,8 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   // Generate the search class object reference.
   llvm::Value *searchValue;
   if (isInstanceMethod) {
-    searchValue = emitClassHeapMetadataRef(IGF, searchClass);
+    searchValue = emitClassHeapMetadataRef(IGF, searchClass.getSwiftRValueType(),
+                                           /*allow uninitialized*/ true);
   } else {
     ClassDecl *searchClassDecl =
       searchClass.castTo<MetatypeType>().getInstanceType()
