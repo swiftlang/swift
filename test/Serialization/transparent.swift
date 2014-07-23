@@ -76,6 +76,6 @@ func test_open_existentials(p: P, cp: CP) {
   open_existentials(p: p, cp: cp)
 }
 
-// SIL-LABEL: sil shared [transparent] @_TF15def_transparent16curried_functionFT1xSi_FT1ySi_Si : $@thin (Int) -> @owned @callee_owned (Int) -> Int {
+// SIL-LABEL: sil shared_external [transparent] @_TF15def_transparent16curried_functionFT1xSi_FT1ySi_Si : $@thin (Int) -> @owned @callee_owned (Int) -> Int {
 // SIL: function_ref @_TF15def_transparent16curried_functionfT1xSi_FT1ySi_Si : $@thin (Int, Int) -> Int
 // SIL: partial_apply %1(%0) : $@thin (Int, Int) -> Int

@@ -635,6 +635,9 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
   } else if (P.Tok.getText() == "hidden_external") {
     Result = SILLinkage::HiddenExternal;
     P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "shared_external") {
+    Result = SILLinkage::SharedExternal;
+    P.consumeToken(tok::identifier);
   } else {
     Result = Nothing;
   }

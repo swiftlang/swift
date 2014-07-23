@@ -2,6 +2,7 @@
 
 // CHECK-NOT: sil public_external @pe : $@thin () -> () {
 // CHECK-NOT: sil hidden_external @he : $@thin () -> () {
+// CHECK-NOT: sil shared_external @se : $@thin () -> () {
 
 import Builtin
 
@@ -11,6 +12,11 @@ sil public_external @pe : $@thin () -> () {
 }
 
 sil hidden_external @he : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil shared_external @se : $@thin () -> () {
   %0 = tuple()
   return %0 : $()
 }

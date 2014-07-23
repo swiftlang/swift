@@ -1118,6 +1118,17 @@ bb0:
   return %0 : $() 
 }
 
+// CHECK-LABEL: sil shared_external @test_shared_external_definition : $@thin () -> () {
+sil shared_external @test_shared_external_definition : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil shared_external @test_shared_external_declaration : $@thin () -> ()
+// CHECK-NOT: bb0:
+sil shared_external @test_shared_external_declaration : $@thin () -> ()
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
@@ -1126,3 +1137,4 @@ sil_vtable Foo {
   #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
   #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
 }
+

@@ -546,6 +546,7 @@ public:
     case SILLinkage::Public:
     case SILLinkage::PublicExternal:
     case SILLinkage::Shared:
+    case SILLinkage::SharedExternal:
       return true;
 
     }

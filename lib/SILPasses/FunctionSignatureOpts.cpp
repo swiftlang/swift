@@ -210,6 +210,7 @@ static SILLinkage getOptimizedLinkage(SILLinkage L) {
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
   case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
     // Specializations of public or hidden symbols can be shared by all TUs

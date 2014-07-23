@@ -77,11 +77,12 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
     case SILLinkage::Shared:
-      decl->setLinkage(SILLinkage::Shared);
+      decl->setLinkage(SILLinkage::SharedExternal);
       return;
     case SILLinkage::Private: // ?
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
+    case SILLinkage::SharedExternal:
       return;
     }
   }
@@ -439,7 +440,7 @@ public:
     // If the linking mode is not link all, AI is not transparent, and the
     // callee is not shared, we don't want to perform any linking.
     if (!isLinkAll() && !AI->isTransparent() &&
-        Callee->getLinkage() != SILLinkage::Shared)
+        !hasSharedVisibility(Callee->getLinkage()))
       return false;
 
     // Otherwise we want to try and link in the callee... Add it to the callee
@@ -455,7 +456,7 @@ public:
 
     SILFunction *Callee = FRI->getReferencedFunction();
     if (!isLinkAll() && !Callee->isTransparent() &&
-        Callee->getLinkage() != SILLinkage::Shared)
+        !hasSharedVisibility(Callee->getLinkage()))
       return false;
 
     addFunctionToWorklist(Callee);
@@ -468,7 +469,7 @@ public:
     // an inconsistent state.
     SILFunction *Callee = FRI->getReferencedFunction();
     if (!isLinkAll() && !Callee->isTransparent() &&
-        Callee->getLinkage() != SILLinkage::Shared)
+        !hasSharedVisibility(Callee->getLinkage()))
       return false;
 
     addFunctionToWorklist(FRI->getReferencedFunction());

@@ -46,6 +46,7 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   case SILLinkage::Private: return SIL_LINKAGE_PRIVATE;
   case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
   case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
+  case SILLinkage::SharedExternal: return SIL_LINKAGE_SHARED_EXTERNAL;
   }
   llvm_unreachable("bad linkage");
 }
@@ -1430,6 +1431,7 @@ static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
   // We always serialize shared linkage items since we leave elimination of them
   // as a responsibility of the optimizer.
   case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
     return true;
   // We never serialize anything with private linkage.
   case SILLinkage::Private:

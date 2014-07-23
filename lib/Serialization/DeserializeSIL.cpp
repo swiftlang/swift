@@ -51,6 +51,7 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
+  case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
   default: return Nothing;
   }
 }

@@ -744,6 +744,7 @@ getIRLinkage(IRGenModule &IGM,
 
   case SILLinkage::Public: return RESULT(External, Default);
   case SILLinkage::Shared: return RESULT(LinkOnceODR, Hidden);
+  case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::Hidden: return RESULT(External, Hidden);
   case SILLinkage::Private: return RESULT(Internal, Default);
   case SILLinkage::PublicExternal:

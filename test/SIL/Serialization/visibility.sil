@@ -29,13 +29,15 @@ import Builtin
 // CHECK: sil @references_public_global : $@thin () -> () {
 // CHECK: sil @references_shared_global : $@thin () -> () {
 // CHECK: sil @references_hidden_global : $@thin () -> () {
-// CHECK-NOT: // CHECK: sil public @references_private_global : $@thin () -> () {
+// CHECK-NOT: sil public @references_private_global : $@thin () -> () {
 // CHECK: sil public @references_private_global : $@thin () -> ()
 // CHECK-NOT: sil hidden_external @hidden_external_function_test : $@thin () -> () {
 // CHECK: sil hidden_external @hidden_external_function_test : $@thin () -> ()
 // CHECK: sil @public_function_test : $@thin () -> () {
 // CHECK: sil @public_function : $@thin () -> () {
 // CHECK: sil hidden @hidden_function : $@thin () -> () {
+// CHECK-NOT: sil shared_external @shared_external_function_test : $@thin () -> () {
+// CHECK: sil shared_external @shared_external_function_test : $@thin () -> ()
 
 sil_global private @private_global : $Builtin.Word
 sil_global @public_global : $Builtin.Word
@@ -213,6 +215,27 @@ sil hidden_external @hidden_external_function_test : $@thin () -> () {
 }
 
 sil public_external @public_external_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil shared_external @shared_external_function_test : $@thin () -> () {
   %0 = function_ref @references_public_function : $@thin () -> ()
   %1 = function_ref @references_shared_function : $@thin () -> ()
   %2 = function_ref @references_hidden_function : $@thin () -> ()

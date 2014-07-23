@@ -216,6 +216,7 @@ static bool isValidLinkageForTransparentRef(SILLinkage linkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
   case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
     return true;
 
   case SILLinkage::Private:

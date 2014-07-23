@@ -61,6 +61,12 @@ enum class SILLinkage : unsigned char {
   /// definition.
   HiddenExternal,
 
+  /// This Shared definition was imported from another module. It is not
+  /// necessary to serialize it since it can be deserialized from the original
+  /// module. Besides that caveat this should be treated exactly the same as
+  /// shared.
+  SharedExternal,
+
   /// The default linkage for a definition.
   DefaultForDefinition = Public,
 
@@ -80,6 +86,8 @@ inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
     return SILLinkage::Public;
   if (linkage == SILLinkage::HiddenExternal)
     return SILLinkage::Hidden;
+  if (linkage == SILLinkage::SharedExternal)
+    return SILLinkage::Shared;
   return linkage;
 }
 
@@ -102,9 +110,24 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
       return true;
     case SILLinkage::Hidden:
     case SILLinkage::Shared:
+    case SILLinkage::SharedExternal:
     case SILLinkage::Private:
     case SILLinkage::HiddenExternal:
       return false;
+  }
+}
+
+inline bool hasSharedVisibility(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
+    return true;
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::Private:
+    return false;
   }
 }
 
@@ -116,12 +139,16 @@ inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
     l1 = SILLinkage::Hidden;
   else if (l1 == SILLinkage::Shared)
     l1 = SILLinkage::Public;
+  else if (l1 == SILLinkage::SharedExternal)
+    l1 = SILLinkage::Public;
 
   if (l2 == SILLinkage::PublicExternal)
     l2 = SILLinkage::Public;
   else if (l2 == SILLinkage::HiddenExternal)
     l2 = SILLinkage::Hidden;
   else if (l2 == SILLinkage::Shared)
+    l2 = SILLinkage::Public;
+  else if (l2 == SILLinkage::SharedExternal)
     l2 = SILLinkage::Public;
 
   return unsigned(l1) > unsigned(l2);
