@@ -1330,6 +1330,9 @@ OptionalTypeKind ClangImporter::Implementation::translateNullability(
 
   case api_notes::NullableKind::Unknown:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
+
+  case api_notes::NullableKind::Absent:
+    return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
   }
 }
 

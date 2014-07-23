@@ -144,8 +144,8 @@ namespace {
     AvailabilityItem() : Mode(APIAvailability::Available), Msg("") {}
   };
 
-  static api_notes::NullableKind UnknownNullability =
-    api_notes::NullableKind::Unknown;
+  static api_notes::NullableKind AbsentNullability =
+    api_notes::NullableKind::Absent;
   static api_notes::NullableKind DefaultNullability =
     api_notes::NullableKind::NonNullable;
   typedef std::vector<swift::api_notes::NullableKind> NullabilitySeq;
@@ -248,7 +248,7 @@ namespace llvm {
       static void mapping(IO &io, Property& p) {
         io.mapRequired("Name",            p.Name);
         io.mapOptional("Nullability",     p.Nullability,
-                                          UnknownNullability);
+                                          AbsentNullability);
         io.mapOptional("Availability",    p.Availability.Mode);
         io.mapOptional("AvailabilityMsg", p.Availability.Msg);
       }
@@ -261,7 +261,7 @@ namespace llvm {
         io.mapRequired("MethodKind",      m.Kind);
         io.mapOptional("Nullability",     m.Nullability);
         io.mapOptional("NullabilityOfRet",  m.NullabilityOfRet,
-                                            UnknownNullability);
+                                            AbsentNullability);
         io.mapOptional("Availability",    m.Availability.Mode);
         io.mapOptional("AvailabilityMsg", m.Availability.Msg);
         io.mapOptional("FactoryAsInit",   m.FactoryAsInit, false);
@@ -287,7 +287,7 @@ namespace llvm {
         io.mapRequired("Name",             f.Name);
         io.mapOptional("Nullability",      f.Nullability);
         io.mapOptional("NullabilityOfRet", f.NullabilityOfRet,
-                                           UnknownNullability);
+                                           AbsentNullability);
         io.mapOptional("Availability",     f.Availability.Mode);
         io.mapOptional("AvailabilityMsg",  f.Availability.Msg);
       }
@@ -298,7 +298,7 @@ namespace llvm {
       static void mapping(IO &io, GlobalVariable& v) {
         io.mapRequired("Name",            v.Name);
         io.mapOptional("Nullability",     v.Nullability,
-                                          UnknownNullability);
+                                          AbsentNullability);
         io.mapOptional("Availability",    v.Availability.Mode);
         io.mapOptional("AvailabilityMsg", v.Availability.Msg);
       }
@@ -388,18 +388,27 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
     return true;
 
   // Translate nullability info.
-  if (meth.NullabilityOfRet != UnknownNullability) {
-    mInfo.addTypeInfo(0, meth.NullabilityOfRet);
-  }
   if (meth.Nullability.size() > ObjCMethodInfo::getMaxNullabilityIndex()) {
     llvm::errs() << "Nullability info for "
                  << className << meth.Selector << " does not fit.";
     return true;
   }
+  bool audited = false;
   unsigned int idx = 1;
   for (auto i = meth.Nullability.begin(),
        e = meth.Nullability.end(); i != e; ++i, ++idx) {
     mInfo.addTypeInfo(idx, *i);
+    audited = true;
+  }
+  if (meth.NullabilityOfRet != AbsentNullability) {
+    mInfo.addTypeInfo(0, meth.NullabilityOfRet);
+    audited = true;
+  } else if (audited) {
+    mInfo.addTypeInfo(0, DefaultNullability);
+  }
+  if (audited) {
+    mInfo.NullabilityAudited = audited;
+    mInfo.NumAdjustedNullable = idx;
   }
 
   // Write it.

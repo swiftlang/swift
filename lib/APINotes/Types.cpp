@@ -21,3 +21,8 @@ void swift::api_notes::ObjCMethodInfo::dump(llvm::raw_ostream &os) {
        << NullabilityAudited << " " << NumAdjustedNullable << " "
        << NullabilityPayload << " " << UnavailableMsg << "\n";
 }
+
+void swift::api_notes::ObjCContextInfo::dump(llvm::raw_ostream &os) {
+  os << HasDefaultNullability << " " << DefaultNullability << " "
+     << HasDesignatedInits << "\n";
+}

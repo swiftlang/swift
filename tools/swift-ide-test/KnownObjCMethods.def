@@ -442,7 +442,7 @@ OBJC_PROPERTY(UIFont, fontName, OTK_None)
 
 // Consider all parameter types in NSView methods to be non-optional and the
 // return optional.
-OBJC_PROTOCOL(UIApplicationDelegate, OptionalTypeAdjustment(1, OTK_Optional))
+OBJC_PROTOCOL(UIApplicationDelegate, OptionalTypeAdjustment(1, OTK_None))
 PROTOCOL_INSTANCE_METHOD(UIApplicationDelegate,
                 (2, "application", "willFinishLaunchingWithOptions"),
                 OptionalTypeAdjustment(3, OTK_None, OTK_None,
@@ -463,6 +463,12 @@ PROTOCOL_INSTANCE_METHOD(UIApplicationDelegate,
                 (4, "application", "handleActionWithIdentifier",
                     "forRemoteNotification", "completionHandler"),
                 OptionalTypeAdjustment(3, OTK_None, OTK_None, OTK_Optional));
+PROTOCOL_INSTANCE_METHOD(UIApplicationDelegate,
+                (3, "application",
+                    "viewControllerWithRestorationIdentifierPath",
+                    "coder"),
+                OptionalTypeAdjustment(4, OTK_Optional,
+                                          OTK_None, OTK_None, OTK_None));
 OBJC_PROTOCOL_PROPERTY(UIApplicationDelegate, window, OTK_Optional)
 
 #undef INSTANCE_METHOD

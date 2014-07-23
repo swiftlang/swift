@@ -9,3 +9,7 @@
 // NotificationCenter
 // RUN: %swift_driver_plain -apinotes -yaml-to-binary %S/Inputs/NotificationCenter.yaml -o %t-NotificationCenter.apinotes
 // RUN: %swift-ide-test -check-api-annotation NotificationCenter %t-NotificationCenter.apinotes
+
+// UIKit
+// RUN: %swift_driver_plain -apinotes -yaml-to-binary %S/Inputs/UIKit.yaml -o %t-UIKit.apinotes
+// RUN: %swift-ide-test -check-api-annotation UIKit %t-UIKit.apinotes

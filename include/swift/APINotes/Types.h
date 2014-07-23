@@ -40,7 +40,9 @@ enum class NullableKind : unsigned {
   /// The parameter is nullable.
   Nullable,
   /// The nullability of the parameter is unknown.
-  Unknown
+  Unknown,
+  /// The nullability of the parameter has not been entered.
+  Absent
 };
 
 /// Describes whether to classify a factory method as an initializer.
@@ -155,6 +157,8 @@ public:
     lhs.HasDesignatedInits |= rhs.HasDesignatedInits;
     return lhs;
   }
+  
+  void dump(llvm::raw_ostream &os);
 };
 
 /// Describes API notes data for an Objective-C property.
