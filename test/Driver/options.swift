@@ -98,5 +98,5 @@
 // RUN: not %swifti_driver -### -emit-executable %s 2>&1 | FileCheck -check-prefix=EXEC_MODE %s
 // EXEC_MODE: error: invalid mode '-emit-executable'
 
-// RUN: %swifti_driver -g -O -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
-// OPTIONS_BEFORE_FILE: -g -O
+// RUN: %swifti_driver -g -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
+// OPTIONS_BEFORE_FILE: -g
