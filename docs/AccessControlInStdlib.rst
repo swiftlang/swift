@@ -1,3 +1,5 @@
+:orphan:
+
 Scope and introduction
 ======================
 
