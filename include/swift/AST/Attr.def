@@ -134,7 +134,7 @@ SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
                  OnProtocol, 19)
 
-DECL_ATTR(inline, Inline, OnFunc, 20)
+DECL_ATTR(inline, Inline, OnFunc | OnConstructor, 20)
 
 DECL_ATTR(semantics, Semantics,
           OnFunc | OnConstructor | OnDestructor | OnSubscript, 21)

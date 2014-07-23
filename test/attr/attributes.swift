@@ -186,12 +186,12 @@ var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
-@inline(never) var noinlineVar : Int // expected-error {{'inline(never)' may only be used on 'func' declarations}}
-@inline(never) class FooClass { // expected-error {{'inline(never)' may only be used on 'func' declarations}}
+@inline(never) var noinlineVar : Int // expected-error {{'inline(never)' attribute cannot be applied to this declaration}}
+@inline(never) class FooClass { // expected-error {{'inline(never)' attribute cannot be applied to this declaration}}
 }
 
 class A {
-  @inline(never) init(a : Int) {} // expected-error {{'inline(never)' may only be used on 'func' declarations}}
+  @inline(never) init(a : Int) {}
   var b : Int {
     @inline(never) get {
       return 42
