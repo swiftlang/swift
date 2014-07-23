@@ -339,7 +339,7 @@ final class _NSOpaqueString : NSString {
 extension String {
   public init(_ value: NSString) {
     if let wrapped = value as? _NSContiguousString {
-      self.core = wrapped.value
+      self._core = wrapped.value
       return
     }
     
@@ -370,7 +370,7 @@ extension String {
       start = UnsafeMutablePointer(CFStringGetCharactersPtr(cfImmutableValue))
     }
 
-    self.core = _StringCore(
+    self._core = _StringCore(
       baseAddress: reinterpretCast(start),
       count: length,
       elementShift: isUTF16 ? 1 : 0,
@@ -385,13 +385,13 @@ extension String : _BridgedToObjectiveCType {
   }
 
   public func _bridgeToObjectiveC() -> NSString {
-    if let ns = core.cocoaBuffer {
-      if _cocoaStringLength(source: ns) == core.count {
+    if let ns = _core.cocoaBuffer {
+      if _cocoaStringLength(source: ns) == _core.count {
         return ns as NSString
       }
     }
-    _sanityCheck(core.hasContiguousStorage)
-    return _NSContiguousString(core)
+    _sanityCheck(_core.hasContiguousStorage)
+    return _NSContiguousString(_core)
   }
 
   public static func _bridgeFromObjectiveC(x: NSString) -> String {

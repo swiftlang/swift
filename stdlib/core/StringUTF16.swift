@@ -95,6 +95,6 @@ extension String {
   }
 
   public var utf16: UTF16View {
-    return UTF16View(core)
+    return UTF16View(_core)
   }
 }

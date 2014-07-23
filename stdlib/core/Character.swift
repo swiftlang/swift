@@ -69,14 +69,14 @@ public enum Character :
     // starting a code point in the last byte, and assuming that its
     // high bit is 1.
     _precondition(
-      s.core.count != 0, "Can't form a Character from an empty String")
+      s._core.count != 0, "Can't form a Character from an empty String")
 
-    var (count, initialUTF8) = s.core._encodeSomeUTF8(0)
+    var (count, initialUTF8) = s._core._encodeSomeUTF8(0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
-      count == s.core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
+      count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
       self = SmallRepresentation(Builtin.trunc_Int64_Int63(initialUTF8.value))
     }
     else {

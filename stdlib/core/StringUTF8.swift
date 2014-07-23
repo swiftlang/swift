@@ -142,11 +142,11 @@ extension String {
   }
 
   public var utf8: UTF8View {
-    return UTF8View(self.core)
+    return UTF8View(self._core)
   }
 
   public var _contiguousUTF8: UnsafeMutablePointer<UTF8.CodeUnit> {
-    return core.elementWidth == 1 ? core.startASCII : nil
+    return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {

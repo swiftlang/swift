@@ -48,7 +48,7 @@ func repr(x: _StringCore) -> String {
 }
 
 func repr(x: String) -> String {
-  return "String(\(repr(x.core))) = \"\(x)\""
+  return "String(\(repr(x._core))) = \"\(x)\""
 }
 
 // CHECK: Testing

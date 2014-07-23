@@ -10,10 +10,10 @@ func testReallocation() {
   var reallocations = 0
   for i in 0..<laps {
     for s in x {
-      var lastBase = story.core._baseAddress
+      var lastBase = story._core._baseAddress
       story += " "
       story += s
-      if lastBase != story.core._baseAddress {
+      if lastBase != story._core._baseAddress {
         ++reallocations
         
         // To avoid dumping a vast string here, just write the first

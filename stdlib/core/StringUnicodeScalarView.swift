@@ -223,9 +223,9 @@ extension String {
   }
 
   public func compare(other : String) -> Int {
-    return(UnicodeScalarView(core).compare(UnicodeScalarView(other.core)))
+    return(UnicodeScalarView(_core).compare(UnicodeScalarView(other._core)))
   }
   public var unicodeScalars : UnicodeScalarView {
-    return UnicodeScalarView(core)
+    return UnicodeScalarView(_core)
   }
 }

@@ -250,7 +250,7 @@ func testGrowth() {
     s2 = s
   }
   // CHECK-NEXT: true
-  println(s.core.nativeBuffer!.capacity <= 34)
+  println(s._core.nativeBuffer!.capacity <= 34)
 }
 
 testStringToInt()

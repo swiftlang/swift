@@ -15,9 +15,9 @@ extension String {
   public init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_storage: _StringBuffer(
-        capacity: s.core.count * sz,
+        capacity: s._core.count * sz,
         initialSize: 0,
-        elementWidth: s.core.elementWidth))
+        elementWidth: s._core.elementWidth))
     for i in 0..<sz {
       self += s
     }
@@ -38,7 +38,7 @@ extension String {
   }
   
   public var isEmpty : Bool {
-    return core.count == 0
+    return _core.count == 0
   }
 }
 

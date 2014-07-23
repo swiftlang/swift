@@ -12,14 +12,14 @@
 
 public struct String {
   public init() {
-    core = _StringCore()
+    _core = _StringCore()
   }
 
   public init(_ _core: _StringCore) {
-    self.core = _core
+    self._core = _core
   }
 
-  public var core: _StringCore
+  public var _core: _StringCore
 }
 
 extension String {
@@ -169,7 +169,7 @@ extension String {
     where Encoding.CodeUnit == Output.Element
   >(encoding: Encoding.Type, output: Output)
   {
-    return core.encode(encoding, output: output)
+    return _core.encode(encoding, output: output)
   }
 }
 
@@ -199,19 +199,19 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   mutating func _append(rhs: String) {
-    core.append(rhs.core)
+    _core.append(rhs._core)
   }
 
   mutating func _append(x: UnicodeScalar) {
-    core.append(x)
+    _core.append(x)
   }
 
   var _utf16Count: Int {
-    return core.count
+    return _core.count
   }
 
   init(_storage: _StringBuffer) {
-    core = _StringCore(_storage)
+    _core = _StringCore(_storage)
   }
 }
 
