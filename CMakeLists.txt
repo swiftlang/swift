@@ -192,8 +192,7 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 
-set(SWIFT_API_NOTES_PATH "${CMAKE_CURRENT_SOURCE_DIR}/apinotes" CACHE PATH
-  "Path that provides the sources for API notes")
+set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
@@ -316,7 +315,6 @@ endif()
 #     FLAGS -module-name foo            # Flags to add to the compilation
 #     [SDK sdk]                         # SDK to build for
 #     [ARCHITECTURE architecture]       # Architecture to build for
-#     [API_NOTES module_name]           # Generate API notes for the given module
 #     [DEPENDS cmake_target...]         # CMake targets on which the object 
 #                                       # file depends.
 #     [IS_MAIN]                         # This is an executable, not a library
@@ -737,7 +735,8 @@ endfunction()
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
-#     [API_NOTES module_name]         # Generate API notes for the given module
+#     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed 
+#                                    # modules with this target.
 #     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
@@ -745,8 +744,8 @@ endfunction()
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library_single target name)
   parse_arguments(SWIFTLIB_SINGLE
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;API_NOTES;FILE_DEPENDS;SDK;ARCHITECTURE" 
-    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;COMPILE_FLAGS;LINK_FLAGS;FILE_DEPENDS;SDK;ARCHITECTURE" 
+    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;API_NOTES_NON_OVERLAY"
     ${ARGN})
 
   set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_DEFAULT_ARGS})
@@ -796,6 +795,30 @@ macro(add_swift_library_single target name)
   # Copy the sources now before they may get modified.
   set(SWIFTLIB_SINGLE_STATIC_SOURCES ${SWIFTLIB_SINGLE_SOURCES})
   
+  # Figure out whether and which API notes to create.
+  set(SWIFTLIB_SINGLE_API_NOTES)
+  if (SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
+    # Adopt all of the non-overlay API notes.
+    list(APPEND SWIFTLIB_SINGLE_API_NOTES 
+      ${SWIFT_API_NOTES_NON_OVERLAY_MODULES})
+  endif()
+
+  # Remove the "swift" prefix from the name to determine the module
+  # name.
+  string(REPLACE swift "" module_name ${name})
+  list(FIND SWIFT_API_NOTES_OVERLAY_MODULES ${module_name} overlay_index)
+  if (${overlay_index} GREATER -1)
+    set(SWIFTLIB_SINGLE_API_NOTES ${module_name})
+  endif()
+
+  # Make sure that this module name isn't listed in the "non-overlay"
+  # list. This is a sanity check.
+  list(FIND SWIFT_API_NOTES_NON_OVERLAY_MODULES ${module_name} 
+    non_overlay_index)
+  if (${non_overlay_index} GREATER -1)
+    message(SEND_ERROR "${module_name} module has an SDK overlay, so it should be listed in SWIFT_API_NOTES_OVERLAY_MODULES rather than SWIFT_API_NOTES_NON_OVERLAY_MODULES")
+  endif()
+
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(SWIFTLIB_SINGLE_SOURCES 
@@ -1059,7 +1082,8 @@ endmacro(translate_flag)
 #                                    # included in all SDKs.
 #     [COMPILE_FLAGS flag1...]       # Extra compile flags (C/C++/ObjC)
 #     [LINK_FLAGS flag1...]          # Extra linker flags
-#     [API_NOTES module_name]         # Generate API notes for the given module
+#     [API_NOTES_NON_OVERLAY]        # Generate API notes for non-overlayed 
+#                                    # modules with this target.
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
@@ -1067,8 +1091,8 @@ endmacro(translate_flag)
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
   parse_arguments(SWIFTLIB 
-    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS;API_NOTES" 
-    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY"
+    "DEPENDS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;COMPILE_FLAGS;LINK_FLAGS" 
+    "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS;TARGET_LIBRARY;API_NOTES_NON_OVERLAY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS}) 
 
@@ -1078,6 +1102,9 @@ macro(add_swift_library name)
                  SWIFTLIB_IS_STDLIB_CORE_FLAG)
   translate_flag(${SWIFTLIB_NO_LLVM_COMMON_LIBS} "NO_LLVM_COMMON_LIBS" 
                  SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG)
+  translate_flag(${SWIFTLIB_API_NOTES_NON_OVERLAY}
+                 "API_NOTES_NON_OVERLAY" 
+                 SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG)
 
   set(SWIFTLIB_DEFAULT_COMPILE_FLAGS)
   if (SWIFT_OPTIMIZED AND SWIFTLIB_TARGET_LIBRARY)
@@ -1115,8 +1142,8 @@ macro(add_swift_library name)
         COMPILE_FLAGS
           "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
         LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
-        API_NOTES ${SWIFTLIB_API_NOTES}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
+        ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
         ${SWIFTLIB_INSTALL_FLAG}
         ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
         ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
@@ -1176,7 +1203,7 @@ macro(add_swift_library name)
             COMPILE_FLAGS
               "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_COMPILE_FLAGS}"
             LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
-            API_NOTES ${SWIFTLIB_API_NOTES}
+            ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
             ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
@@ -1246,7 +1273,7 @@ macro(add_swift_library name)
       COMPILE_FLAGS
         "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
       LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
-      API_NOTES ${SWIFTLIB_API_NOTES}
+      ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
       ${SWIFTLIB_NO_LLVM_COMMON_LIBS_FLAG})
@@ -1539,6 +1566,7 @@ include_directories(BEFORE
   )
 
 # Add all of the subdirectories, where we actually do work.
+add_subdirectory(apinotes)
 if (SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)

@@ -8,6 +8,4 @@ add_swift_library(swiftFoundation INSTALL TARGET_LIBRARY
   NSStringAPI.swift
   NSValue.swift
   DEPENDS swiftCore swiftObjectiveC swiftCoreGraphics swiftDispatch
-  FRAMEWORK_DEPENDS Foundation
-  # FIXME: NotificationCenter arbitrarily attached here; there is no overlay.
-  API_NOTES Foundation NotificationCenter)
+  FRAMEWORK_DEPENDS Foundation)
