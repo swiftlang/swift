@@ -33,11 +33,13 @@ public struct ${Self}<T>
   var value : Builtin.RawPointer
 
   /// Construct a null pointer.
+  @transparent
   public init() {
     self.value = Builtin.inttoptr_Word(0.value)
   }
 
   /// Construct ${a_Self} from a builtin raw pointer.
+  @transparent
   public init(_ value : Builtin.RawPointer) {
     self.value = value
   }
@@ -45,6 +47,7 @@ public struct ${Self}<T>
   /// Convert from an opaque C pointer to a typed pointer
   ///
   /// This is a fundamentally unsafe conversion.
+  @transparent
   public init(_ other : COpaquePointer) {
     value = other.value
   }
@@ -52,6 +55,7 @@ public struct ${Self}<T>
   /// Construct ${a_Self} from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
+  @transparent
   public init(_ value : Int) {
     self.value = Builtin.inttoptr_Word(value.value)
   }
@@ -59,6 +63,7 @@ public struct ${Self}<T>
   /// Convert from an UnsafeMutablePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
+  @transparent
   public init<U>(_ from : UnsafeMutablePointer<U>) {
     value = from.value
   }
@@ -66,6 +71,7 @@ public struct ${Self}<T>
   /// Convert from a UnsafePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
+  @transparent
   public init<U>(_ from : UnsafePointer<U>) {
     value = from.value
   }
@@ -76,6 +82,7 @@ public struct ${Self}<T>
     return .null()
   }
 
+  @transparent
   public static func null() -> ${Self} {
     return ${Self}()
   }

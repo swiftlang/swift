@@ -27,18 +27,22 @@ public struct StaticString
   var _byteSize: Builtin.Word
   var _isASCII: Builtin.Int1
 
+  @transparent
   public var start: UnsafePointer<UInt8> {
     return UnsafePointer(_start)
   }
 
+  @transparent
   public var byteSize: UWord {
     return UWord(_byteSize)
   }
 
+  @transparent
   public var isASCII: Bool {
     return Bool(_isASCII)
   }
 
+  @transparent
   public init() {
     self = ""
   }
