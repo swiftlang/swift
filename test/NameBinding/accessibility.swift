@@ -49,3 +49,16 @@ class Sub : Base {
     super.method() // expected-error {{'Base' does not have a member named 'method'}}
   }
 }
+
+class ObservingOverrider : Base { // expected-error {{class 'ObservingOverrider' has no initializers}}
+  override var value: Int { // expected-error {{cannot observe read-only property 'value'; it can't change}} expected-note {{stored property 'value' without initial value prevents synthesized initializers}}
+    willSet { println(newValue) }
+  }
+}
+
+class ReplacingOverrider : Base {
+  override var value: Int {
+    get { return super.value }
+    set { super.value = newValue } // expected-error {{cannot assign to the result of this expression}}
+  }
+}

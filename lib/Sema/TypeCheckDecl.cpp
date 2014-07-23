@@ -4840,9 +4840,13 @@ public:
       // Make sure that an observing property isn't observing something
       // read-only.  Observing properties look at change, read-only properties
       // have nothing to observe!
-      // FIXME: What happens with properties with private setters?
+      bool baseIsSettable = baseASD->isSettable(baseASD->getDeclContext());
+      if (baseIsSettable && TC.Context.LangOpts.EnableAccessControl) {
+        baseIsSettable =
+           baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
+      }
       if (overrideASD->getStorageKind() == VarDecl::Observing &&
-          !baseASD->isSettable(baseASD->getDeclContext())) {
+          !baseIsSettable) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
                     overrideASD->getName());
         TC.diagnose(baseASD, diag::property_override_here);
@@ -4852,8 +4856,7 @@ public:
       // Make sure we're not overriding a settable property with a non-settable
       // one.  The only reasonable semantics for this would be to inherit the
       // setter but override the getter, and that would be surprising at best.
-      if (baseASD->isSettable(baseASD->getDeclContext()) &&
-          !override->isSettable(override->getDeclContext())) {
+      if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
         TC.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
                     overrideASD->getName());
         TC.diagnose(baseASD, diag::property_override_here);
