@@ -467,6 +467,11 @@ public:
     return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
   
+  EnumIsTagInst *createEnumIsTag(SILLocation Loc, SILValue Operand,
+                                 EnumElementDecl *Element, SILType Ty) {
+    return insert(new (F.getModule()) EnumIsTagInst(Loc, Operand, Element, Ty));
+  }
+
   InitEnumDataAddrInst *createInitEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(

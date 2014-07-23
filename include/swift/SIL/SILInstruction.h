@@ -1625,7 +1625,21 @@ public:
     return V->getKind() == ValueKind::EnumInst;
   }
 };
-  
+
+/// Returns true if the given enum is currently of the given tag.
+class EnumIsTagInst
+  : public UnaryInstructionBase<ValueKind::EnumIsTagInst>
+{
+  EnumElementDecl *Element;
+public:
+  EnumIsTagInst(SILLocation Loc, SILValue Operand,
+                EnumElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy),
+      Element(Element) {}
+
+  EnumElementDecl *getElement() const { return Element; }
+};
+
 /// Unsafely project the data for an enum case out of an enum without checking
 /// the tag.
 class UncheckedEnumDataInst

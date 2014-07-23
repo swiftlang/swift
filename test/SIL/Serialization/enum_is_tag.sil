@@ -1,0 +1,21 @@
+// RUN: %swift %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %sil-opt -verify -module-name Swift | FileCheck %s
+
+import Builtin
+
+enum X {
+  case A
+  case B((Builtin.Int32, Builtin.Int32))
+  case C(Builtin.Int32)
+}
+
+// CHECK-LABEL: sil @simplify_switch_to_enum_is_tag : $@thin (X) -> Builtin.Int1 {
+// CHECK: bb0(%0 : $X):
+// CHECK:   %1 = enum_is_tag $Builtin.Int1, %0 : $X, #X.A!enumelt // user: %2
+// CHECK:   return %1 : $Builtin.Int1                       // id: %2
+// CHECK: }
+
+sil @simplify_switch_to_enum_is_tag : $@thin (X) -> Builtin.Int1 {
+bb0(%0 : $X):
+  %1 = enum_is_tag $Builtin.Int1, %0 : $X, #X.A!enumelt
+  return %1 : $Builtin.Int1
+}

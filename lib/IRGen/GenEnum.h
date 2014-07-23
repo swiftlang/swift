@@ -305,6 +305,13 @@ public:
   virtual Address projectDataForStore(IRGenFunction &IGF,
                                       EnumElementDecl *elt,
                                       Address enumAddr) const = 0;
+
+  /// Return an i1 which is true if the enum is of the given element tag
+  virtual void emitIsTag(IRGenFunction &IGF,
+                         Explosion &data,
+                         EnumElementDecl *elt,
+                         Explosion &out,
+                         SILType ty) const = 0;
   
   /// Overlay the tag value for a case onto a data value in memory.
   /// Corresponds to the SIL 'inject_enum_addr' instruction.
