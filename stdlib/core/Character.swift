@@ -44,8 +44,7 @@ public enum Character :
     self = SmallRepresentation(Builtin.trunc_Int64_Int63(IE.asInt.value))
   }
 
-  public
-  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
+  public static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
       start: Builtin.RawPointer,
       byteSize: Builtin.Word,
       isASCII: Builtin.Int1) -> Character {

@@ -165,8 +165,8 @@ public prefix func ~ <T: RawOptionSetType>(a: T) -> T {
 //===----------------------------------------------------------------------===//
 
 // Equatable types can be matched in patterns by value equality.
-@transparent public
-func ~= <T : Equatable> (a: T, b: T) -> Bool {
+@transparent
+public func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b
 }
 

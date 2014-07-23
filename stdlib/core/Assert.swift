@@ -21,8 +21,8 @@
 /// execution in a debuggable state after printing a message.  When
 /// assertions are disabled in release and fast builds, `condition` is not even
 /// evaluated.
-@transparent public
-func assert(
+@transparent
+public func assert(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -33,8 +33,9 @@ func assert(
     }
   }
 }
-@transparent public
-func assert<T : BooleanType>(
+
+@transparent
+public func assert<T : BooleanType>(
   condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -48,8 +49,8 @@ func assert<T : BooleanType>(
 
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
-@transparent @noreturn public
-func fatalError(
+@transparent @noreturn
+public func fatalError(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -65,8 +66,8 @@ func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@transparent public
-func _precondition(
+@transparent
+public func _precondition(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -80,8 +81,8 @@ func _precondition(
     Builtin.condfail(error.value)
   }
 }
-@transparent public
-func _precondition<T : BooleanType>(
+@transparent
+public func _precondition<T : BooleanType>(
   condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -96,8 +97,8 @@ func _precondition<T : BooleanType>(
   }
 }
 
-@transparent @noreturn public
-func _preconditionFailure(
+@transparent @noreturn
+public func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
 
@@ -109,8 +110,8 @@ func _preconditionFailure(
 /// If `error` is true, prints an error message in debug mode, traps in release
 /// mode, and returns an undefined error otherwise.
 /// Otherwise returns `result`.
-@transparent public
-func _overflowChecked<T>(
+@transparent
+public func _overflowChecked<T>(
   args: (T, Bool),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) -> T {
@@ -133,8 +134,8 @@ func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@transparent public
-func _debugPrecondition(
+@transparent
+public func _debugPrecondition(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -146,8 +147,8 @@ func _debugPrecondition(
   }
 }
 
-@transparent public
-func _debugPrecondition<T : BooleanType>(
+@transparent
+public func _debugPrecondition<T : BooleanType>(
   condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -159,8 +160,8 @@ func _debugPrecondition<T : BooleanType>(
   }
 }
 
-@transparent @noreturn public
-func _debugPreconditionFailure(
+@transparent @noreturn
+public func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
   if _isDebugAssertConfiguration() {
@@ -175,8 +176,8 @@ func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@transparent public
-func _sanityCheck(
+@transparent
+public func _sanityCheck(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -187,8 +188,8 @@ func _sanityCheck(
 #endif
 }
 
-@transparent public
-func _sanityCheck<T : BooleanType>(
+@transparent
+public func _sanityCheck<T : BooleanType>(
   condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -199,8 +200,8 @@ func _sanityCheck<T : BooleanType>(
 #endif
 }
 
-@transparent @noreturn public
-func _fatalError(
+@transparent @noreturn
+public func _fatalError(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {

@@ -17,8 +17,8 @@ public struct Bool {
   var value: Builtin.Int1
 
   /// Default-initialize Boolean value to `false`.
-  @transparent public 
-  init() { value = Builtin.trunc_Word_Int1(0.value) }
+  @transparent
+  public init() { value = Builtin.trunc_Word_Int1(0.value) }
 
   @transparent
   init(_ v : Builtin.Int1) { value = v }
@@ -64,19 +64,19 @@ extension Bool : Printable {
 //===----------------------------------------------------------------------===//
 
 // Unary bitwise complement.
-@transparent prefix public
-func ~(a: Bool) -> Bool {
+@transparent prefix
+public func ~(a: Bool) -> Bool {
   return a ^ true
 }
 
 // Unary logical complement.
-@transparent prefix public
-func !(a: Bool) -> Bool {
+@transparent prefix
+public func !(a: Bool) -> Bool {
   return ~a
 }
 
-@transparent public
-func ==(lhs: Bool, rhs: Bool) -> Bool {
+@transparent
+public func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
 }
 
@@ -103,20 +103,20 @@ extension Bool : Equatable, Hashable {
 }
 
 // Compound assignment (with bitwise and)
-@transparent public
-func &= (inout lhs: Bool, rhs: Bool) {
+@transparent
+public func &= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs & rhs
 }
 
 // Compound assignment (with bitwise or)
-@transparent public
-func |= (inout lhs: Bool, rhs: Bool) {
+@transparent
+public func |= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs | rhs
 }
 
 // Compound assignment (with bitwise xor)
-@transparent public
-func ^= (inout lhs: Bool, rhs: Bool) {
+@transparent
+public func ^= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs ^ rhs
 }
 
