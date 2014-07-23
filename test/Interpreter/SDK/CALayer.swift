@@ -29,6 +29,11 @@ class FooLayer: CALayer {
     hangCanary(self)
   }
 
+  init(coder: NSCoder) {
+    black = coder.decodeObjectForKey("black") as CGColor
+    super.init(coder: coder)
+  }
+
   override var description: String {
     return "FooLayer"
   }

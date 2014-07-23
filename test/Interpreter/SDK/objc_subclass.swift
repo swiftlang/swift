@@ -100,6 +100,10 @@ class MyNSData : NSData {
                options:NSDataBase64DecodingOptions(0))
     println("MyNSData code should not be executed")
   }
+
+  init(coder: NSCoder) {
+    super.init(coder: coder)
+  }
 }
 
 // CHECK-NOT: should not be executed

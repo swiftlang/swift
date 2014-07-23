@@ -3739,14 +3739,13 @@ namespace {
             continue;
 
           // When mirroring an initializer, make it designated.
-          // FIXME: Should it be required?
           if (objcMethod->getMethodFamily() == clang::OMF_init &&
               isReallyInitMethod(objcMethod)) {
             // Import the constructor.
             if (auto imported = importConstructor(
                                   objcMethod, dc, /*implicit=*/true,
                                   CtorInitializerKind::Designated,
-                                  /*required=*/false)){
+                                  /*required=*/true)){
               members.push_back(imported);
             }
 

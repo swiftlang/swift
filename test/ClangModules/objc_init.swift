@@ -79,9 +79,19 @@ class MyViewController : NSViewController {
 class MyTableViewController : NSTableViewController {
 }
 
-class MyOtherTableViewController : NSTableViewController {
+class MyOtherTableViewController : NSTableViewController { // expected-error{{class 'MyOtherTableViewController' does not implement its superclass's required members}}
   init(int i: Int)  {
     super.init(int: i)
+  }
+}
+
+class MyThirdTableViewController : NSTableViewController {
+  init(int i: Int)  {
+    super.init(int: i)
+  }
+
+  init(coder: NSCoder) {
+    super.init(coder: coder)
   }
 }
 
@@ -90,7 +100,8 @@ func checkInitWithCoder(coder: NSCoder) {
   NSTableViewController(coder: coder)
   MyViewController(coder: coder)
   MyTableViewController(coder: coder)
-  MyOtherTableViewController(coder: coder)
+  MyOtherTableViewController(coder: coder) // expected-error{{cannot convert the expression's type 'MyOtherTableViewController' to type '(int: Int)'}}
+  MyThirdTableViewController(coder: coder)
 }
 
 // <rdar://problem/16838409>
