@@ -1,3 +1,7 @@
+// ObjectiveC
+// RUN: %swift_driver_plain -apinotes -yaml-to-binary %S/Inputs/ObjectiveC.yaml -o %t-ObjectiveC.apinotes
+// RUN: %swift-ide-test -check-api-annotation ObjectiveC %t-ObjectiveC.apinotes
+
 // Foundation
 // RUN: %swift_driver_plain -apinotes -yaml-to-binary %S/Inputs/Foundation.yaml -o %t-Foundation.apinotes
 // RUN: %swift-ide-test -check-api-annotation Foundation %t-Foundation.apinotes

@@ -409,6 +409,40 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
   return false;
 }
 
+static bool writeContext(api_notes::APINotesWriter &writer,
+                         const Class &cl, bool isClass) {
+  using namespace api_notes;
+
+  // Write the class.
+  ObjCContextInfo cInfo;
+  if (cl.AuditedForNullability)
+    cInfo.setDefaultNullability(DefaultNullability);
+  if (translateAvailability(cl.Availability, cInfo, cl.Name))
+    return true;
+
+  ContextID clID = isClass ? writer.addObjCClass(cl.Name, cInfo) :
+                             writer.addObjCProtocol(cl.Name, cInfo);
+
+  // Write all methods.
+  for (auto iMeth = cl.Methods.begin(), eMeth = cl.Methods.end();
+       iMeth != eMeth; ++iMeth) {
+    writeMethod(writer, *iMeth, clID, cl.Name);
+  }
+
+  // Write all properties.
+  for (auto iProp = cl.Properties.begin(), eProp = cl.Properties.end();
+       iProp != eProp; ++iProp) {
+    // Translate from Property into ObjCPropertyInfo.
+    Property prop = *iProp;
+    ObjCPropertyInfo pInfo;
+    pInfo.setNullabilityAudited(prop.Nullability);
+    if (translateAvailability(cl.Availability, cInfo, cl.Name))
+      return true;
+    writer.addObjCProperty(clID, prop.Name, pInfo);
+  }
+  return false;
+}
+
 static bool compile(const Module &module, llvm::raw_ostream &os){
   using namespace api_notes;
   APINotesWriter writer;
@@ -416,33 +450,15 @@ static bool compile(const Module &module, llvm::raw_ostream &os){
   // Write all classes.
   for (auto iCl = module.Classes.begin(), eCl = module.Classes.end();
        iCl != eCl; ++iCl) {
-    Class cl = *iCl;
-
-    // Write the class.
-    ObjCContextInfo cInfo;
-    if (cl.AuditedForNullability)
-      cInfo.setDefaultNullability(DefaultNullability);
-    if (translateAvailability(cl.Availability, cInfo, cl.Name))
+    if (writeContext(writer, *iCl, /*isClass*/ true))
       return true;
-    ContextID clID = writer.addObjCClass(cl.Name, cInfo);
+  }
 
-    // Write all methods.
-    for (auto iMeth = cl.Methods.begin(), eMeth = cl.Methods.end();
-         iMeth != eMeth; ++iMeth) {
-      writeMethod(writer, *iMeth, clID, cl.Name);
-    }
-
-    // Write all properties.
-    for (auto iProp = cl.Properties.begin(), eProp = cl.Properties.end();
-         iProp != eProp; ++iProp) {
-      // Translate from Property into ObjCPropertyInfo.
-      Property prop = *iProp;
-      ObjCPropertyInfo pInfo;
-      pInfo.setNullabilityAudited(prop.Nullability);
-      if (translateAvailability(cl.Availability, cInfo, cl.Name))
-        return true;
-      writer.addObjCProperty(clID, prop.Name, pInfo);
-    }
+  // Write all protocols.
+  for (auto iPr = module.Protocols.begin(), ePr = module.Protocols.end();
+       iPr != ePr; ++iPr) {
+    if (writeContext(writer, *iPr, /*isClass*/ false))
+      return true;
   }
 
   writer.writeToStream(os);
