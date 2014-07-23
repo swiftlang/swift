@@ -639,20 +639,11 @@ namespace {
       auto expr2 = loc2.getAsASTNode<SubscriptExpr>();
       
       if (expr1 && expr2) {
-        // Try to remove a single level of ParenExpr so we don't include the
-        // []'s in the range.
-        auto index1 = expr1->getIndex();
-        auto index2 = expr2->getIndex();
-        if (auto *pe1 = dyn_cast<ParenExpr>(index1)) index1 = pe1->getSubExpr();
-        if (auto *pe2 = dyn_cast<ParenExpr>(index2)) index2 = pe2->getSubExpr();
-        
         gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
-           .highlight(expr1->getBase()->getSourceRange())
-           .highlight(index1->getSourceRange());
+           .highlight(expr1->getBase()->getSourceRange());
 
         gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
-           .highlight(expr2->getBase()->getSourceRange())
-           .highlight(index2->getSourceRange());
+           .highlight(expr2->getBase()->getSourceRange());
        
       } else {
         gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
