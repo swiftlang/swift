@@ -545,6 +545,17 @@ private:
         DEMANGLE_CHILD_OR_RETURN(pattern, Type);
         return pattern;
       }
+      if (Mangled.nextIf('a')) {
+        auto accessor =
+          NodeFactory::create(Node::Kind::TypeMetadataAccessFunction);
+        DEMANGLE_CHILD_OR_RETURN(accessor, Type);
+        return accessor;
+      }
+      if (Mangled.nextIf('L')) {
+        auto cache = NodeFactory::create(Node::Kind::TypeMetadataLazyCache);
+        DEMANGLE_CHILD_OR_RETURN(cache, Type);
+        return cache;
+      }
       if (Mangled.nextIf('m')) {
         auto metaclass = NodeFactory::create(Node::Kind::Metaclass);
         DEMANGLE_CHILD_OR_RETURN(metaclass, Type);
@@ -2014,6 +2025,8 @@ private:
     case Node::Kind::Suffix:
     case Node::Kind::TupleElement:
     case Node::Kind::TypeMetadata:
+    case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::Unknown:
     case Node::Kind::Unmanaged:
@@ -2481,6 +2494,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getChild(0)); // directness
     Printer << "type metadata for ";
     print(pointer->getChild(1));
+    return;
+  case Node::Kind::TypeMetadataAccessFunction:
+    Printer << "type metadata accessor for ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::TypeMetadataLazyCache:
+    Printer << "lazy cache variable for type metadata for ";
+    print(pointer->getChild(0));
     return;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";

@@ -208,6 +208,27 @@ namespace irgen {
       None = 0,
     };
   }
+
+  enum class TypeMetadataAccessStrategy {
+    /// There is a unique public accessor function for the given type metadata.
+    PublicUniqueAccessor,
+
+    /// There is a unique hidden accessor function for the given type metadata.
+    HiddenUniqueAccessor,
+
+    /// There is a unique private accessor function for the given type metadata.
+    PrivateAccessor,
+
+    /// There is no unique accessor function for the given type metadata, but
+    /// one should be made automatically.
+    NonUniqueAccessor,
+
+    /// The given type metadata should be accessed directly.
+    Direct,
+  };
+
+  /// Determine how the given type metadata should be accessed.
+  TypeMetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
   
 } // end namespace irgen
 } // end namespace swift

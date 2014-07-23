@@ -24,6 +24,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -330,6 +331,53 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
   return hasKnownSwiftImplementation(IGM, theClass);
 }
 
+/// Return the standard access strategy for getting a non-dependent
+/// type metadata object.
+TypeMetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
+  assert(!type->hasArchetype());
+
+  // Non-generic structs, enums, and classes are special cases.
+  auto nominal = dyn_cast<NominalType>(type);
+  if (nominal && !isa<ProtocolType>(nominal) &&
+      !nominal->getDecl()->isGenericContext()) {
+
+    // Struct and enum metadata can be accessed directly.
+    if (!isa<ClassType>(nominal))
+      return TypeMetadataAccessStrategy::Direct;
+
+    // Classes require accessors.
+    switch (getDeclLinkage(nominal->getDecl())) {
+    case FormalLinkage::PublicUnique:
+      return TypeMetadataAccessStrategy::PublicUniqueAccessor;
+    case FormalLinkage::HiddenUnique:
+      return TypeMetadataAccessStrategy::HiddenUniqueAccessor;
+    case FormalLinkage::Private:
+      return TypeMetadataAccessStrategy::PrivateAccessor;
+
+    case FormalLinkage::PublicNonUnique:
+    case FormalLinkage::HiddenNonUnique:
+      return TypeMetadataAccessStrategy::NonUniqueAccessor;
+    }
+    llvm_unreachable("bad formal linkage");
+  }
+
+  // Builtin types are assumed to be implemented with metadata in the runtime.
+  if (isa<BuiltinType>(type))
+    return TypeMetadataAccessStrategy::Direct;
+
+  // DynamicSelfType is actually local.
+  if (isa<DynamicSelfType>(type))
+    return TypeMetadataAccessStrategy::Direct;
+
+  // The zero-element tuple has special metadata in the runtime.
+  if (auto tuple = dyn_cast<TupleType>(type))
+    if (tuple->getNumElements() == 0)
+      return TypeMetadataAccessStrategy::Direct;
+
+  // Everything else requires a shared accessor function.
+  return TypeMetadataAccessStrategy::NonUniqueAccessor;
+}
+
 /// Emit a string encoding the labels in the given tuple type.
 static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
                                             CanTupleType type) {
@@ -357,6 +405,8 @@ static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
 
 namespace {
   /// A visitor class for emitting a reference to a metatype object.
+  /// This implements a "raw" access, useful for implementing cache
+  /// functions or for implementing dependent accesses.
   class EmitTypeMetadataRef
     : public CanTypeVisitor<EmitTypeMetadataRef, llvm::Value *> {
   private:
@@ -439,12 +489,12 @@ namespace {
       case 1:
           // For metadata purposes, we consider a singleton tuple to be
           // isomorphic to its element type.
-        return visit(type.getElementType(0));
+        return IGF.emitTypeMetadataRef(type.getElementType(0));
 
       case 2: {
         // Find the metadata pointer for this element.
-        llvm::Value *elt0Metadata = visit(type.getElementType(0));
-        llvm::Value *elt1Metadata = visit(type.getElementType(1));
+        auto elt0Metadata = IGF.emitTypeMetadataRef(type.getElementType(0));
+        auto elt1Metadata = IGF.emitTypeMetadataRef(type.getElementType(1));
 
         llvm::Value *args[] = {
           elt0Metadata, elt1Metadata,
@@ -461,9 +511,9 @@ namespace {
 
       case 3: {
         // Find the metadata pointer for this element.
-        llvm::Value *elt0Metadata = visit(type.getElementType(0));
-        llvm::Value *elt1Metadata = visit(type.getElementType(1));
-        llvm::Value *elt2Metadata = visit(type.getElementType(2));
+        auto elt0Metadata = IGF.emitTypeMetadataRef(type.getElementType(0));
+        auto elt1Metadata = IGF.emitTypeMetadataRef(type.getElementType(1));
+        auto elt2Metadata = IGF.emitTypeMetadataRef(type.getElementType(2));
 
         llvm::Value *args[] = {
           elt0Metadata, elt1Metadata, elt2Metadata,
@@ -490,7 +540,7 @@ namespace {
                                           "tuple-elements");
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
-          llvm::Value *eltMetadata = visit(elements[i]);
+          llvm::Value *eltMetadata = IGF.emitTypeMetadataRef(elements[i]);
 
           // GEP to the appropriate element and store.
           Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
@@ -533,11 +583,8 @@ namespace {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      // TODO: use a caching entrypoint (with all information
-      // out-of-line) for non-dependent functions.
-
-      auto argMetadata = visit(type.getInput());
-      auto resultMetadata = visit(type.getResult());
+      auto argMetadata = IGF.emitTypeMetadataRef(type.getInput());
+      auto resultMetadata = IGF.emitTypeMetadataRef(type.getResult());
 
       llvm::Constant *getMetadataFn;
       switch (type->getRepresentation()) {
@@ -565,7 +612,7 @@ namespace {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto instMetadata = visit(type.getInstanceType());
+      auto instMetadata = IGF.emitTypeMetadataRef(type.getInstanceType());
       auto fn = isa<MetatypeType>(type)
                   ? IGF.IGM.getGetMetatypeMetadataFn()
                   : IGF.IGM.getGetExistentialMetatypeMetadataFn();
@@ -669,9 +716,126 @@ namespace {
   };
 }
 
+/// Emit a type metadata reference without using an accessor function.
+static llvm::Value *emitDirectTypeMetadataRef(IRGenFunction &IGF,
+                                              CanType type) {
+  return EmitTypeMetadataRef(IGF).visit(type);
+}
+
+/// Get or create an accessor function to the given non-dependent type.
+static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                     CanType type,
+                                               ForDefinition_t shouldDefine) {
+  assert(!type->hasArchetype());
+  llvm::Function *accessor =
+    IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
+
+  // If we're not supposed to define the accessor, or if we already
+  // have defined it, just return the pointer.
+  if (!shouldDefine || !accessor->empty())
+    return accessor;
+
+  // Okay, define the accessor.
+
+  llvm::Constant *nullMetadata =
+    llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy);
+
+  accessor->setDoesNotThrow();
+
+  // This function is logically 'readnone': the caller does not need
+  // to reason about any side effects or stores it might perform.
+  accessor->setDoesNotAccessMemory();
+
+  // Set up the cache variable.
+  auto cacheVariable = cast<llvm::GlobalVariable>(
+             IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+  cacheVariable->setInitializer(nullMetadata);
+  cacheVariable->setAlignment(IGM.getPointerAlignment().getValue());
+  Address cache(cacheVariable, IGM.getPointerAlignment());
+
+  IRGenFunction IGF(IGM, accessor);
+
+  // Okay, first thing, check the cache variable.
+  //
+  // Conceptually, this needs to establish memory ordering with the
+  // store we do later in the function: if the metadata value is
+  // non-null, we must be able to see any stores performed by the
+  // initialization of the metadata.  However, any attempt to read
+  // from the metadata will be address-dependent on the loaded
+  // metadata pointer, which is sufficient to provide adequate
+  // memory ordering guarantees on all the platforms we care about:
+  // ARM has special rules about address dependencies, and x86's
+  // memory ordering is strong enough to guarantee the visibility
+  // even without the address dependency.
+  //
+  // And we do not need to worry about the compiler because the
+  // address dependency naturally forces an order to the memory
+  // accesses.
+  //
+  // Therefore, we can perform a completely naked load here.
+  auto load = IGF.Builder.CreateLoad(cache);
+
+  // Compare the load result against null.
+  auto isNullBB = IGF.createBasicBlock("cacheIsNull");
+  auto contBB = IGF.createBasicBlock("cont");
+  llvm::Value *comparison = IGF.Builder.CreateICmpEQ(load, nullMetadata);
+  IGF.Builder.CreateCondBr(comparison, isNullBB, contBB);
+  auto loadBB = IGF.Builder.GetInsertBlock();
+
+  // If the load yielded null, emit the type metadata.
+  IGF.Builder.emitBlock(isNullBB);
+  llvm::Value *directResult = emitDirectTypeMetadataRef(IGF, type);
+
+  // Store it back to the cache variable.  This does require a
+  // barrier on ARM; a 'dmb st' is sufficient.  x86 does not require
+  // a barrier here.
+  auto store = IGF.Builder.CreateStore(directResult, cache);
+  store->setAtomic(llvm::Release);
+
+  IGF.Builder.CreateBr(contBB);
+  auto storeBB = IGF.Builder.GetInsertBlock();
+
+  // Emit the continuation block.
+  IGF.Builder.emitBlock(contBB);
+  auto phi = IGF.Builder.CreatePHI(IGM.TypeMetadataPtrTy, 2);
+  phi->addIncoming(load, loadBB);
+  phi->addIncoming(directResult, storeBB);
+
+  IGF.Builder.CreateRet(phi);
+
+  return accessor;
+}
+
+/// Emit a call to the type metadata accessor for the given function.
+static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
+                                                         CanType type,
+                                                 ForDefinition_t shouldDefine) {
+  llvm::Constant *accessor =
+    getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);
+  llvm::CallInst *call = IGF.Builder.CreateCall(accessor);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotAccessMemory();
+  call->setDoesNotThrow();
+  return call;
+}
+
 /// Produce the type metadata pointer for the given type.
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
-  return EmitTypeMetadataRef(*this).visit(type);
+  if (!type->hasArchetype()) {
+    switch (getTypeMetadataAccessStrategy(type)) {
+    case TypeMetadataAccessStrategy::Direct:
+      return emitDirectTypeMetadataRef(*this, type);
+    case TypeMetadataAccessStrategy::PublicUniqueAccessor:
+    case TypeMetadataAccessStrategy::HiddenUniqueAccessor:
+    case TypeMetadataAccessStrategy::PrivateAccessor:
+      return emitCallToTypeMetadataAccessFunction(*this, type, NotForDefinition);
+    case TypeMetadataAccessStrategy::NonUniqueAccessor:
+      return emitCallToTypeMetadataAccessFunction(*this, type, ForDefinition);
+    }
+    llvm_unreachable("bad type metadata access strategy");
+  }
+
+  return emitDirectTypeMetadataRef(*this, type);
 }
 
 llvm::Value *IRGenFunction::emitTypeMetadataRef(SILType type) {
@@ -2455,6 +2619,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const StructLayout &layout) {
   assert(!classDecl->isForeign());
 
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
@@ -2468,12 +2634,14 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     builder.layout();
     init = builder.getInit();
     isPattern = false;
+
+    // Force the type metadata access function into existence.
+    (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
   }
 
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
 
-  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
   auto var = cast<llvm::GlobalVariable>(
                      IGM.getAddrOfTypeMetadata(declaredType,
                                                isIndirect, isPattern,

@@ -153,6 +153,14 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadata,
 
+    /// An access function for type metadata.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadataAccessFunction,
+
+    /// A lazy cache variable for type metadata.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadataLazyCacheVariable,
+
     /// A foreign type metadata candidate.
     /// The pointer is a canonical TypeBase*.
     ForeignTypeMetadataCandidate,
@@ -268,6 +276,18 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect))
                 | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataAccessFunction(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataAccessFunction, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataLazyCacheVariable(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataLazyCacheVariable, type);
     return entity;
   }
 

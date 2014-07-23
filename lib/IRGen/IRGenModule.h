@@ -448,6 +448,10 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
+  llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
+                                               ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
+                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                         llvm::Type *definitionType);

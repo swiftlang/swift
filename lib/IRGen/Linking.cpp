@@ -96,6 +96,18 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
+  //   global ::= 'Ma' type               // type metadata access function
+  case Kind::TypeMetadataAccessFunction:
+    buffer << "_TMa";
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    return;
+
+  //   global ::= 'ML' type               // type metadata lazy cache variable
+  case Kind::TypeMetadataLazyCacheVariable:
+    buffer << "_TML";
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    return;
+
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata: {

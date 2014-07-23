@@ -15,7 +15,7 @@
 // FIXME: Come up with an invocation of clang-extract that can eliminate
 // available_externally functions, so we can retire this hackfest:
 // REQUIRES: OS=macosx
-// RUN: cat %t.ll | grep -E '^define (available_externally|internal %%swift.type\*\*) ' | wc -l >%t.external_count
+// RUN: cat %t.ll | grep -E '^define .*(\@get_field_types|\@_TMa)' | wc -l >%t.external_count
 // This test assumes that the '!' can only appear as part of a !dbg annotation.
 // RUN: cat %t.ll | grep -E '^ *ret [^!]+$' | count `cat %t.external_count`
 

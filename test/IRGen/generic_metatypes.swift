@@ -18,7 +18,8 @@ func remapToSubstitutedMetatypes(x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
   // CHECK: call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* undef, %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}})
-  // CHECK: [[BAR_META:%.*]] = call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* {{%.*}}, %swift.type* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}})
+  // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+  // CHECK: [[BAR_META:%.*]] = call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* {{%.*}}, %swift.type* [[T0]])
   // CHECK: ret %swift.type* [[BAR_META]]
   return (genericTypeof(x), genericTypeof(y))
 }
@@ -26,7 +27,9 @@ func remapToSubstitutedMetatypes(x: Foo, y: Bar)
 
 // CHECK: define void @_TF17generic_metatypes23remapToGenericMetatypesFT_T_()
 func remapToGenericMetatypes() {
-  // CHECK: call void @_TF17generic_metatypes16genericMetatypes{{.*}}(%swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}}, %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}})
+  // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+  // CHECK: [[T1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+  // CHECK: call void @_TF17generic_metatypes16genericMetatypes{{.*}}(%swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T1]])
   genericMetatypes(Foo.self, Bar.self)
 }
 
@@ -80,15 +83,55 @@ func genericMetatype<A>(x: A.Type) {}
 
 // CHECK-LABEL: define void @_TF17generic_metatypes20makeGenericMetatypesFT_T_() {
 func makeGenericMetatypes() {
-  // CHECK: call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes6OneArg {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+  // CHECK: call %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE:#[0-9]+]]
   genericMetatype(OneArg<Foo>.self)
-  // CHECK: call %swift.type* @swift_getGenericMetadata2(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes7TwoArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}}) [[NOUNWIND_READNONE]]
+  
+  // CHECK: call %swift.type* @_TMaGV17generic_metatypes7TwoArgsVS_3FooCS_3Bar_() [[NOUNWIND_READNONE]]
   genericMetatype(TwoArgs<Foo, Bar>.self)
-  // CHECK: call %swift.type* @swift_getGenericMetadata3(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes9ThreeArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}) [[NOUNWIND_READNONE]]
+
+  // CHECK: call %swift.type* @_TMaGV17generic_metatypes9ThreeArgsVS_3FooCS_3BarS1__() [[NOUNWIND_READNONE]]
   genericMetatype(ThreeArgs<Foo, Bar, Foo>.self)
-  // CHECK: call %swift.type* @swift_getGenericMetadata4(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes8FourArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* {{.*}} @_TMdC17generic_metatypes3Bar {{.*}}) [[NOUNWIND_READNONE]]
+
+  // CHECK: call %swift.type* @_TMaGV17generic_metatypes8FourArgsVS_3FooCS_3BarS1_S2__() [[NOUNWIND_READNONE]]
   genericMetatype(FourArgs<Foo, Bar, Foo, Bar>.self)
+
+  // CHECK: call %swift.type* @_TMaGV17generic_metatypes8FiveArgsVS_3FooCS_3BarS1_S2_S1__() [[NOUNWIND_READNONE]]
   genericMetatype(FiveArgs<Foo, Bar, Foo, Bar, Foo>.self)
 }
+
+// CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE]]
+// CHECK:   call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes6OneArg {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+
+// CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes7TwoArgsVS_3FooCS_3Bar_() [[NOUNWIND_READNONE]]
+// CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
+// CHECK: call %swift.type* @swift_getGenericMetadata2(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes7TwoArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T1]]) [[NOUNWIND_READNONE]]
+
+// CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes9ThreeArgsVS_3FooCS_3BarS1__() [[NOUNWIND_READNONE]]
+// CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
+// CHECK: call %swift.type* @swift_getGenericMetadata3(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes9ThreeArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T1]], i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}) [[NOUNWIND_READNONE]]
+
+// CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FourArgsVS_3FooCS_3BarS1_S2__() [[NOUNWIND_READNONE]]
+// CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK: [[T1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK: [[T2:%.*]] = bitcast %swift.type* [[T0]] to i8*
+// CHECK: [[T3:%.*]] = bitcast %swift.type* [[T1]] to i8*
+// CHECK: call %swift.type* @swift_getGenericMetadata4(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes8FourArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T2]], i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T3]]) [[NOUNWIND_READNONE]]
+
+// CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FiveArgsVS_3FooCS_3BarS1_S2_S1__() [[NOUNWIND_READNONE]]
+// CHECK:   [[BUFFER:%.*]] = alloca [[BUFFER_T:.*]], align
+// CHECK:   [[BAR0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK:   [[BAR1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 0
+// CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 1
+// CHECK:   store %swift.type* [[BAR0]], %swift.type** [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 2
+// CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 3
+// CHECK:   store %swift.type* [[BAR1]], %swift.type** [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]]* [[BUFFER]], i32 0, i32 4
+// CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }

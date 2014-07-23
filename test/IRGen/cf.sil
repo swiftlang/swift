@@ -26,6 +26,9 @@ bb0(%0 : $CCRefrigerator):
 
 // CHECK:    define void @call_generic([[REFRIGERATOR]]*) {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i64 8) to [[TYPE]]*))
+// CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @_TMaCSo14CCRefrigerator()
 // CHECK-NEXT: call void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
 // CHECK-NEXT: ret void
+
+// CHECK:    define linkonce_odr hidden [[TYPE]]* @_TMaCSo14CCRefrigerator()
+// CHECK:      call [[TYPE]]* @swift_getForeignTypeMetadata([[TYPE]]* bitcast (i8* getelementptr inbounds (i8* bitcast ({{.*}}* @_TMdCSo14CCRefrigerator to i8*), i64 8) to [[TYPE]]*))

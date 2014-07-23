@@ -704,6 +704,22 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ForeignTypeMetadataCandidate:
     return SILLinkage::Shared;
 
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+    switch (getTypeMetadataAccessStrategy(getType())) {
+    case TypeMetadataAccessStrategy::PublicUniqueAccessor:
+      return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    case TypeMetadataAccessStrategy::HiddenUniqueAccessor:
+      return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
+    case TypeMetadataAccessStrategy::PrivateAccessor:
+      return getSILLinkage(FormalLinkage::Private, forDefinition);
+    case TypeMetadataAccessStrategy::NonUniqueAccessor:
+      return SILLinkage::Shared;
+    case TypeMetadataAccessStrategy::Direct:
+      llvm_unreachable("metadata accessor for type with direct access?");
+    }
+    llvm_unreachable("bad metadata access kind");
+
   case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Other:
@@ -1240,6 +1256,44 @@ llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
   } else {
     return getAddrOfSwiftMetaclassStub(decl, forDefinition);
   }
+}
+
+/// Fetch the type metadata access function for a non-generic type.
+llvm::Function *
+IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
+                                              ForDefinition_t forDefinition) {
+  assert(!type->hasArchetype() && !type->isDependentType());
+  LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = link.createFunction(*this, fnType, RuntimeCC, llvm::AttributeSet());
+  return entry;
+}
+
+/// Get or create a type metadata cache variable.  These are an
+/// implementation detail of type metadata access functions.
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
+                                              ForDefinition_t forDefinition) {
+  assert(!type->hasArchetype() && !type->isDependentType());
+  LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
+  llvm::Constant *&entry = GlobalVars[entity];
+  if (entry) {
+    if (forDefinition)
+      updateLinkageForDefinition(*this, cast<llvm::GlobalVariable>(entry),
+                                 entity);
+    return entry;
+  }
+
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = link.createVariable(*this, TypeMetadataPtrTy);
+  return entry;
 }
 
 /// Fetch the declaration of the metadata (or metadata template) for a

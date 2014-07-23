@@ -159,7 +159,9 @@ func class_bounded_protocol_method(x: ClassBound) {
 func class_bounded_archetype_cast<T : ClassBound>(x: T) -> ConcreteClass {
   return x as ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* bitcast (%swift.type* {{.*}} @_TMdC22class_bounded_generics13ConcreteClass {{.*}})
+  // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC22class_bounded_generics13ConcreteClass()
+  // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
+  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %C22class_bounded_generics13ConcreteClass*
   // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
 }
@@ -179,7 +181,9 @@ func class_bounded_archetype_archetype_cast
 func class_bounded_protocol_cast(x: ClassBound) -> ConcreteClass {
   return x as ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* bitcast (%swift.type* {{.*}} @_TMdC22class_bounded_generics13ConcreteClass {{.*}})
+  // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC22class_bounded_generics13ConcreteClass()
+  // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
+  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %C22class_bounded_generics13ConcreteClass*
   // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
 }
