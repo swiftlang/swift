@@ -30,32 +30,32 @@ var c_global_struct_property : StructWithProperty { get {} set {} }
 func testWriteback() {
   var a = StructWithProperty()
   a.computed_struct .        // expected-note {{concurrent writeback occurred here}}
-     f(&a.computed_struct)  // expected-error {{inout writeback aliasing conflict detected on computed property 'computed_struct'}}
+     f(&a.computed_struct)  // expected-error {{inout writeback to computed property 'computed_struct' occurs in multiple arguments to call, introducing invalid aliasing}}
   
   swap(&global_struct_property.stored_int,
        &global_struct_property.stored_int) // ok
   swap(&global_struct_property.computed_int,  // expected-note {{concurrent writeback occurred here}}
-       &global_struct_property.computed_int)  // expected-error {{inout writeback aliasing conflict detected on computed property 'computed_int'}}
+       &global_struct_property.computed_int)  // expected-error {{inout writeback to computed property 'computed_int' occurs in multiple arguments to call, introducing invalid aliasing}}
   
   
   
   swap(&a.computed_int,   // expected-note {{concurrent writeback occurred here}}
-       &a.computed_int)   // expected-error {{inout writeback aliasing conflict detected on computed property 'computed_int'}}
+       &a.computed_int)   // expected-error {{inout writeback to computed property 'computed_int' occurs in multiple arguments to call, introducing invalid aliasing}}
   
   
   var stored_local = 42
   swap(&stored_local, &stored_local)  // ok, physical lvalue.
   
-  global_property.f(&global_property) // expected-error {{inout writeback aliasing conflict detected on computed property 'global_property'}} expected-note {{concurrent writeback occurred here}}
+  global_property.f(&global_property) // expected-error {{inout writeback to computed property 'global_property' occurs in multiple arguments to call, introducing invalid aliasing}} expected-note {{concurrent writeback occurred here}}
   
-  a.computed_struct.f(&a.computed_struct)  // expected-error {{inout writeback aliasing conflict detected on computed property 'computed_struct'}} expected-note {{concurrent writeback occurred here}}
+  a.computed_struct.f(&a.computed_struct)  // expected-error {{inout writeback to computed property 'computed_struct' occurs in multiple arguments to call, introducing invalid aliasing}} expected-note {{concurrent writeback occurred here}}
 }
 
 func testComputedStructWithProperty() {
-  swap(&c_global_struct_property.stored_int, &c_global_struct_property.stored_int)   // expected-error {{inout writeback aliasing conflict detected on computed property 'c_global_struct_property'}} expected-note {{concurrent writeback occurred here}}
+  swap(&c_global_struct_property.stored_int, &c_global_struct_property.stored_int)   // expected-error {{inout writeback to computed property 'c_global_struct_property' occurs in multiple arguments to call, introducing invalid aliasing}} expected-note {{concurrent writeback occurred here}}
   
   var c_local_struct_property : StructWithProperty { get {} set {} }
-  swap(&c_local_struct_property.stored_int, &c_local_struct_property.stored_int)    // expected-error {{inout writeback aliasing conflict detected on computed property 'c_local_struct_property'}} expected-note {{concurrent writeback occurred here}}
+  swap(&c_local_struct_property.stored_int, &c_local_struct_property.stored_int)    // expected-error {{inout writeback to computed property 'c_local_struct_property' occurs in multiple arguments to call, introducing invalid aliasing}} expected-note {{concurrent writeback occurred here}}
   swap(&c_local_struct_property.stored_int, &c_global_struct_property.stored_int) // ok
 }
 
