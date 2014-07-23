@@ -619,8 +619,8 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     int PostOrderSize = std::distance(ReversePostOrder.begin(),
                                       ReversePostOrder.end());
 
-    // TODO: Look into ways to decrease the number of LSBBForwarder items that
-    // we create.
+    // TODO: Each block does not need its own LSBBForwarder instance. Only
+    // the set of reaching loads and stores is specific to the block.
     llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
     std::vector<LSBBForwarder> BBIDToForwarderMap(PostOrderSize);
 
