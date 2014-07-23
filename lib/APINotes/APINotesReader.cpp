@@ -137,6 +137,15 @@ namespace {
     }
   };
 
+  /// Read serialized VariableInfo.
+  void readVariableInfo(const uint8_t *&data, VariableInfo &info) {
+    readCommonEntityInfo(data, info);
+    if (*data++) {
+      info.setNullabilityAudited(static_cast<NullableKind>(*data));
+    }
+    ++data;
+  }
+
   /// Used to deserialize the on-disk Objective-C class table.
   class ObjCPropertyTableInfo {
   public:
@@ -179,12 +188,7 @@ namespace {
     static data_type ReadData(internal_key_type key, const uint8_t *data,
                               unsigned length) {
       ObjCPropertyInfo info;
-      readCommonEntityInfo(data, info);
-      if (*data++) {
-        info.setNullabilityAudited(static_cast<NullableKind>(*data));
-      }
-      ++data;
-
+      readVariableInfo(data, info);
       return info;
     }
   };

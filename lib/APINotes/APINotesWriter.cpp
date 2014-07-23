@@ -347,6 +347,27 @@ void APINotesWriter::Implementation::writeObjCContextBlock(
 }
 
 namespace {
+  /// Retrieve the serialized size of the given VariableInfo, for use in
+  /// on-disk hash tables.
+  static unsigned getVariableInfoSize(const VariableInfo &info) {
+    return 2 + getCommonEntityInfoSize(info);
+  }
+
+  /// Emit a serialized representation of the variable information.
+  static void emitVariableInfo(raw_ostream &out, const VariableInfo &info) {
+    emitCommonEntityInfo(out, info);
+
+    uint8_t bytes[2] = { 0, 0 };
+    if (auto nullable = info.getNullability()) {
+      bytes[0] = 1;
+      bytes[1] = static_cast<uint8_t>(*nullable);
+    } else {
+      // Nothing to do.
+    }
+
+    out.write(reinterpret_cast<const char *>(bytes), 2);
+  }
+
   /// Used to serialize the on-disk Objective-C property table.
   class ObjCPropertyTableInfo {
   public:
@@ -365,7 +386,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(IdentifierID);
-      uint32_t dataLength = getCommonEntityInfoSize(data) + 2;
+      uint32_t dataLength = getVariableInfoSize(data);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -380,18 +401,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      emitCommonEntityInfo(out, data);
-
-      // FIXME: Terrible solution. This needs abstraction.
-      uint8_t bytes[2] = { 0, 0 };
-      if (auto nullable = data.getNullability()) {
-        bytes[0] = 1;
-        bytes[1] = static_cast<uint8_t>(*nullable);
-      } else {
-        // Nothing to do.
-      }
-      
-      out.write(reinterpret_cast<const char *>(bytes), 2);
+      emitVariableInfo(out, data);
     }
   };
 } // end anonymous namespace

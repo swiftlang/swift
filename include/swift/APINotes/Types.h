@@ -161,8 +161,8 @@ public:
   void dump(llvm::raw_ostream &os);
 };
 
-/// Describes API notes data for an Objective-C property.
-class ObjCPropertyInfo : public CommonEntityInfo {
+/// API notes for a variable/property.
+class VariableInfo : public CommonEntityInfo {
   /// Whether this property has been audited for nullability.
   unsigned NullabilityAudited : 1;
 
@@ -171,7 +171,7 @@ class ObjCPropertyInfo : public CommonEntityInfo {
   unsigned Nullable : 2;
 
 public:
-  ObjCPropertyInfo()
+  VariableInfo()
     : CommonEntityInfo(),
       NullabilityAudited(false),
       Nullable(0) { }
@@ -189,26 +189,29 @@ public:
   }
 
 
-  friend bool operator==(const ObjCPropertyInfo &lhs, 
-                         const ObjCPropertyInfo &rhs) {
+  friend bool operator==(const VariableInfo &lhs, const VariableInfo &rhs) {
     return static_cast<const CommonEntityInfo &>(lhs) == rhs &&
            lhs.NullabilityAudited == rhs.NullabilityAudited &&
            lhs.Nullable == rhs.Nullable;
   }
 
-  friend bool operator!=(const ObjCPropertyInfo &lhs, 
-                         const ObjCPropertyInfo &rhs) {
+  friend bool operator!=(const VariableInfo &lhs, const VariableInfo &rhs) {
     return !(lhs == rhs);
   }
+};
 
-  /// Merge class-wide information into the given method.
+/// Describes API notes data for an Objective-C property.
+class ObjCPropertyInfo : public VariableInfo {
+public:
+  ObjCPropertyInfo() : VariableInfo() { }
+
+  /// Merge class-wide information into the given property.
   friend ObjCPropertyInfo &operator|=(ObjCPropertyInfo &lhs,
                                       const ObjCContextInfo &rhs) {
     // Merge nullability.
-    if (!lhs.NullabilityAudited) {
+    if (!lhs.getNullability()) {
       if (auto nullable = rhs.getDefaultNullability()) {
-        lhs.NullabilityAudited = true;
-        lhs.Nullable = static_cast<unsigned>(*nullable);
+        lhs.setNullabilityAudited(*nullable);
       }
     }
 

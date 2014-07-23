@@ -100,7 +100,7 @@
 
  The protocol definition format is the same as the class definition.
 
- Each functuon definition is of the following form:
+ Each function definition is of the following form:
 
  - Name: "myGlobalFunction"           # Full name
 
