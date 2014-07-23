@@ -1,13 +1,14 @@
 Latest
 ------
 
-* UnsafePointer<T> has been renamed UnsafeMutablePointer<T>.
-  AutoreleasingUnsafePointer<T> has been renamed
+* To better follow Cocoa naming conventions and to encourage 
+  immutability, UnsafePointer<T> has been renamed 
+  UnsafeMutablePointer<T>.  AutoreleasingUnsafePointer<T> has been renamed
   AutoreleasingUnsafeMutablePointer<T>.  ConstUnsafePointer<T> has
   been renamed UnsafePointer<T>.  As a result, some of your code may
   fail to compile when assigning to an UnsafePointer's ".memory"
   property.  The fix is to change your UnsafePointer<T> into an
-  UnsafeMutablePointer<T>
+  UnsafeMutablePointer<T>.
 
 * The optional unwrapping operator 'x!' can now be assigned through, and
   mutating methods and operators can be applied through it:
