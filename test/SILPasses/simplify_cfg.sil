@@ -51,10 +51,10 @@ enum BoolLike { case true_, false_ }
 //   if a { return 42 } else { return 17 } }
 //
 /// CHECK-LABEL: sil @testThread
-sil @testThread : $@thin (BoolLike) -> Int64 {
-bb0(%0 : $BoolLike):
-  // CHECK: switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
-  switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
+sil @testThread : $@thin (@in BoolLike) -> Int64 {
+bb0(%0 : $*BoolLike):
+  // CHECK: switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
+  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
 
 bb1:                                              // Preds: bb0
   %4 = integer_literal $Builtin.Int1, -1          // user: %5

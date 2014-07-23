@@ -1256,12 +1256,105 @@ static SILValue getInsertedValue(SILInstruction *Aggregate,
   return Tuple->getElementValue(TEI->getFieldNo());
 }
 
+/// Given a boolean argument, see if its it ultimately matching whether
+/// a given enum is of a given tag.  If so, create a new enum_is_tag instruction
+/// to do the match.
+bool simplifySwitchEnumToEnumIsTag(SILBasicBlock *BB,
+                                   unsigned ArgNum,
+                                   SILArgument* BoolArg) {
+  auto IntTy = BoolArg->getType().getAs<BuiltinIntegerType>();
+  if (!IntTy->isFixedWidth(1))
+    return false;
+
+  // Keep track of which predecessors map to true and which to false
+  // If we have only a single predecessor as either true or false then we
+  // can create an [!]enum_is_tag
+  SmallVector<SILBasicBlock*, 4> TrueBBs;
+  SmallVector<SILBasicBlock*, 4> FalseBBs;
+
+  SwitchEnumInst *SWI = nullptr;
+
+  for (auto P : BB->getPreds()) {
+    // Only handle branch or conditional branch instructions.
+    TermInst *TI = P->getTerminator();
+    if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
+      return false;
+
+    // Find the Nth argument passed to BB.
+    SILValue Arg = TI->getOperand(ArgNum);
+    SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
+    if (!SI)
+      return false;
+    IntegerLiteralInst *IntLit = dyn_cast<IntegerLiteralInst>(SI);
+    if (!IntLit)
+      return false;
+    if (IntLit->getValue() == 0)
+      FalseBBs.push_back(P);
+    else
+      TrueBBs.push_back(P);
+
+    // Look for a single predecessor which terminates with a switch_enum
+    SILBasicBlock *SinglePred = P->getSinglePredecessor();
+    if (!SinglePred)
+      return false;
+    auto *PredSwi = dyn_cast<SwitchEnumInst>(SinglePred->getTerminator());
+    if (!PredSwi)
+      return false;
+    if (SWI) {
+      if (SWI != PredSwi)
+        return false;
+    } else {
+      SWI = PredSwi;
+      // TODO: Handle default
+      if (SWI->hasDefault())
+        return false;
+      // switch_enum is required to be fully covered, If there is no default,
+      // then we must have one enum case for each of our predecessors.
+    }
+  }
+  // See if we are covering all enumerations.
+  if (SWI->getNumCases() != (TrueBBs.size() + FalseBBs.size()))
+    return false;
+
+  if (TrueBBs.size() == 1) {
+    // Only a single BB has a true value.  We can create enum_is_addr for this
+    // single case.
+    SILBasicBlock *TrueBB = TrueBBs[0];
+    EnumElementDecl* Elt = nullptr;
+    for (unsigned i = 0, e = SWI->getNumCases(); i != e; ++i) {
+      std::pair<EnumElementDecl*, SILBasicBlock*> Pair = SWI->getCase(i);
+      if (Pair.second == TrueBB) {
+        if (Elt) {
+          // A case already jumped to this BB.  We need to bail out as multiple
+          // cases are true.
+          return false;
+        }
+        Elt = Pair.first;
+      }
+    }
+    EnumIsTagInst *EITI = SILBuilder(SWI).createEnumIsTag(SWI->getLoc(),
+                                                          SWI->getOperand(),
+                                                          Elt,
+                                                          BoolArg->getType());
+    BoolArg->replaceAllUsesWith(EITI);
+    return true;
+  }
+  // TODO: Handle single false BB case.  Here we need to xor the enum_is_tag.
+  return false;
+}
+
 // Attempt to simplify the ith argument of BB.  We simplify cases
 // where there is a single use of the argument that is an extract from
 // a struct or tuple and where the predecessors all build the struct
 // or tuple and pass it directly.
 bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *A = BB->getBBArg(i);
+
+  // If we are reading an i1, then check to see if it comes from
+  // a switch_enum.  If so, we may be able to lower this sequence to
+  // en enum_is_tag
+  if (A->getType().is<BuiltinIntegerType>())
+    return simplifySwitchEnumToEnumIsTag(BB, i, A);
 
   // For now, just focus on cases where there is a single use.
   if (!A->hasOneUse())
