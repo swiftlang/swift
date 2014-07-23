@@ -557,14 +557,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   if (OI.ShouldGenerateDebugInfo) {
-    Arguments.push_back("-sectalign");
-    Arguments.push_back(MachOASTSegmentName);
-    Arguments.push_back(MachOASTSectionName);
-    Arguments.push_back("4");
-
-    Arguments.push_back("-sectcreate");
-    Arguments.push_back(MachOASTSegmentName);
-    Arguments.push_back(MachOASTSectionName);
+    Arguments.push_back("-add_ast_path");
 
     size_t argCount = Arguments.size();
     if (OI.CompilerMode == OutputInfo::Mode::SingleCompile)

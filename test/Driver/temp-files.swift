@@ -1,3 +1,5 @@
+// REQUIRES: ld-add_ast_path
+
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: env TMPDIR=%t/tmp/ %swift_driver -emit-executable %s -o %t/main
 // RUN: ls %t/main

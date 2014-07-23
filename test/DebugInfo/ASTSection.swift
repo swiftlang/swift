@@ -1,14 +1,16 @@
 // RUN: rm -rf %t && mkdir %t
 
-// RUN: %target-build-swift %s -g -o %t/ASTSection
+// RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
 // RUN: lldb-moduleimport-test %t/ASTSection | FileCheck %s
 
 // RUN: cp %S/Inputs/serialized-objc-header.h %t
-// RUN: %target-build-swift %s -g -o %t/ASTSection-with-ObjC -import-objc-header %t/serialized-objc-header.h -DOBJC -module-name ASTSection
+// RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection-with-ObjC -import-objc-header %t/serialized-objc-header.h -DOBJC -module-name ASTSection -emit-module
 // RUN: lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
 
 // RUN: rm %t/serialized-objc-header.h
 // RUN: lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
+
+// REQUIRES: ld-add_ast_path
 
 // FIXME: lldb-moduleimport-test does not support 32-bit executables
 // rdar://16244944

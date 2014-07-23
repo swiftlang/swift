@@ -44,6 +44,5 @@
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
 // DEBUG-NEXT: bin/ld{{ }}
-// DEBUG: -sectalign __SWIFT __ast 4
-// DEBUG: -sectcreate __SWIFT __ast {{.*}}/{{[^/]+}}.swiftmodule
+// DEBUG: -add_ast_path {{.*}}/{{[^/]+}}.swiftmodule
 // DEBUG: -o linker

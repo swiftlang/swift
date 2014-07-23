@@ -28,8 +28,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MachO.h"
-#include <stdint.h>
 #include <fstream>
+#include <sstream>
 
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
@@ -109,8 +109,48 @@ int main(int argc, char **argv) {
     for (uint32_t i = 0; i < h.ncmds; ++i) {
       struct load_command lc;
       macho.read((char*)&lc, sizeof(lc));
-      // Segment command.
-      if (lc.cmd == LC_SEGMENT_64) {
+      if (lc.cmd == LC_SYMTAB) {
+        macho.seekg(-sizeof(lc), macho.cur);
+        symtab_command symtab;
+        macho.read((char*)&symtab, sizeof(symtab));
+        macho.seekg(symtab.symoff);
+
+        for (auto i = symtab.nsyms; i != 0; --i) {
+          nlist_64 nlistEntry;
+          macho.read((char *)&nlistEntry, sizeof(nlistEntry));
+          if (nlistEntry.n_type != N_AST)
+            continue;
+
+          assert(nlistEntry.n_strx);
+          assert(nlistEntry.n_strx < symtab.strsize);
+          auto currentOffset = macho.tellg();
+          macho.seekg(symtab.stroff + nlistEntry.n_strx);
+
+          std::stringbuf pathBuf;
+          macho.get(pathBuf, '\0');
+
+          auto fileBuf = llvm::MemoryBuffer::getFile(pathBuf.str());
+          if (!fileBuf) {
+            llvm::outs() << "Cannot read from '" << pathBuf.str() << "': "
+                         << fileBuf.getError().message();
+            exit(1);
+          }
+
+          if (!parseASTSection(CI.getSerializedModuleLoader(),
+                               fileBuf.get()->getBuffer(),
+                               modules)) {
+            exit(1);
+          }
+          // Deliberately leak the llvm::MemoryBuffer. We can't delete it
+          // while it's in use anyway.
+          fileBuf.get().release();
+
+          for (auto path : modules)
+            llvm::outs() << "Loaded module " << path << " from " << name
+                         << "\n";
+          macho.seekg(currentOffset);
+        }
+      } else if (lc.cmd == LC_SEGMENT_64) {
         macho.seekg(-sizeof(lc), macho.cur);
         struct segment_command_64 sc;
         macho.read((char*)&sc, sizeof(sc));

@@ -9,6 +9,8 @@
 // RUN: FileCheck %s < %t.txt
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
+// REQUIRES: ld-add_ast_path
+
 import Darwin
 import StdlibUnittest
 import Foundation
