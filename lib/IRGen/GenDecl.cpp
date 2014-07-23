@@ -1112,6 +1112,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   auto cc = expandAbstractCC(*this, f->getAbstractCC());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
+  if (f->isNoinline()) {
+    attrs = attrs.addAttribute(fnType->getContext(),
+                llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
+  }
   fn = link.createFunction(*this, fnType, cc, attrs, insertBefore);
 
   // If we have an order number for this function, set it up as appropriate.
