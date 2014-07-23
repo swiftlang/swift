@@ -623,7 +623,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(PotentialArchetype *T,
     auto witness = conformances[assocType->getProtocol()]
           ->getTypeWitness(assocType, nullptr);
     addSameTypeRequirementToConcrete(nested.second, EqualLoc,
-                                     witness.Replacement->getDesugaredType());
+                                 witness.getReplacement()->getDesugaredType());
   }
   
   return false;
@@ -988,7 +988,7 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
         
     case ConformanceKind::Conforms:
       return conformance.getPointer()->getTypeWitness(assocType, nullptr)
-          .Replacement;
+          .getReplacement();
     }
   }
   

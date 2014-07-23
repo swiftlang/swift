@@ -1362,7 +1362,7 @@ static void emitTypeTraitBuiltin(IRGenFunction &IGF,
   // Lower away the trait to false if it's never true, or to true if it can
   // possibly be true.
   bool result;
-  switch ((substitutions[0].Replacement.getPointer()->*trait)()) {
+  switch ((substitutions[0].getReplacement().getPointer()->*trait)()) {
   case TypeTraitResult::IsNot:
     result = false;
     break;
@@ -1390,7 +1390,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     out->add(valueTI.getSize(IGF, valueTy));
     return;
@@ -1398,7 +1398,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     out->add(valueTI.getStride(IGF, valueTy));
     return;
@@ -1406,7 +1406,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     args.claimAll();
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     // The alignof value is one greater than the alignment mask.
     out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF, valueTy),
@@ -1800,7 +1800,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *ptr = args.claimNext();
     llvm::Value *count = args.claimNext();
     
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     
     ptr = IGF.Builder.CreateBitCast(ptr, valueTI.getStorageType()->getPointerTo());
@@ -1818,7 +1818,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
     
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
     const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
     
     dest = IGF.Builder.CreateBitCast(dest, valueTI.getStorageType()->getPointerTo());
