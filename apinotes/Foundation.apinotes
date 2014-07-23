@@ -1,0 +1,231 @@
+Name:            Foundation
+Classes:
+  - Name:            NSArray
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:count:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSCountedSet
+    Methods:
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSDate
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithTimeIntervalSinceReferenceDate:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSDecimalNumber
+    Methods:
+      - Selector:        'initWithDecimal:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSDictionary
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:forKeys:count:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSDistributedNotificationCenter
+    Methods:
+      - Selector:        'notificationCenterForType:'
+        MethodKind:      Class
+        FactoryAsInit:   true
+  - Name:            NSError
+    Methods:
+      - Selector:        'initWithDomain:code:userInfo:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSException
+    Methods:
+      - Selector:        'initWithName:reason:userInfo:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSExpression
+    Methods:
+      - Selector:        'initWithExpressionType:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSExtensionContext
+    Methods:
+      - Selector:        'openURL:completion:'
+        MethodKind:      Instance
+        Availability:    none
+        AvailabilityMsg: "call openURL:completionHandler:"
+  - Name:            NSFileWrapper
+    Methods:
+      - Selector:        'initWithURL:options:error:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initDirectoryWithFileWrappers:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initRegularFileWithContents:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initSymbolicLinkWithDestinationURL:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithSerializedRepresentation:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSIndexPath
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithIndexes:length:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSIndexSet
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithIndexesInRange:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithIndexSet:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSInvocation
+    Availability:    none
+  - Name:            NSInvocationOperation
+    Methods:
+      - Selector:        'initWithInvocation:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSMachPort
+    Methods:
+      - Selector:        'initWithMachPort:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSMutableArray
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSMutableDictionary
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSMutableOrderedSet
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSMutableSet
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSNetService
+    Methods:
+      - Selector:        'initWithDomain:type:name:port:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSNotificationQueue
+    Methods:
+      - Selector:        'initWithNotificationCenter:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSOrderedSet
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:count:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSPortMessage
+    Methods:
+      - Selector:        'initWithSendPort:receivePort:components:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSProcessInfo
+    Methods:
+      - Selector:        'processInfo'
+        MethodKind:      Class
+        FactoryAsInit:   true
+  - Name:            NSScriptObjectSpecifier
+    Methods:
+      - Selector:        'initWithContainerClassDescription:containerSpecifier:key:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSSet
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:count:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSThread
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSURL
+    Methods:
+      - Selector:        'initWithString:relativeToURL:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSURLProtocol
+    Methods:
+      - Selector:        'initWithRequest:cachedResponse:client:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSURLRequest
+    Methods:
+      - Selector:        'initWithURL:cachePolicy:timeoutInterval:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSURLResponse
+    Methods:
+      - Selector:        'initWithURL:MIMEType:expectedContentLength:textEncodingName:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSValue
+    Methods:
+      - Selector:        'initWithBytes:objCType:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSXMLDocument
+    Methods:
+      - Selector:        'initWithData:options:error:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSXMLDTD
+    Methods:
+      - Selector:        'initWithData:options:error:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSXMLParser
+    Methods:
+      - Selector:        'initWithData:'
+        MethodKind:      Instance
+        DesignatedInit:  true

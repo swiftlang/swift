@@ -563,7 +563,7 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
     virtual void visitObjCProtocol(ContextID contextID, StringRef name,
                                    const ObjCContextInfo &info) {
       // Record this known context.
-      knownContexts[contextID.Value] = { TheModule.Protocols.size(), false };
+      knownContexts[contextID.Value] = { TheModule.Protocols.size(), true };
 
       // Add the protocol.
       TheModule.Protocols.push_back(Class());
