@@ -25,9 +25,8 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(ApplyInst *AI,
-                                SILFunction *CalleeFunction,
-                                ArrayRef<SILValue> Args) {
+bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
+  SILFunction *CalleeFunction = &Original;
   this->CalleeFunction = CalleeFunction;
 
   // Do not attempt to inline an apply into its parent function.
@@ -43,9 +42,6 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
           IKind == InlineKind::PerformanceInline) &&    
          "Cannot inline Objective-C methods or C functions in mandatory "
          "inlining");
-
-  if (AI->hasSubstitutions())
-    return false;
 
   CalleeEntryBB = CalleeFunction->begin();
 

@@ -233,6 +233,22 @@ bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
   return false;
 }
 
+bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
+  // Check whether any of the substitutions are dependent.
+  for (auto &sub : Subs)
+    if (sub.Replacement->getCanonicalType()->hasArchetype())
+      return true;
+  return false;
+}
+
+bool swift::hasAnyExistentialTypes(ArrayRef<Substitution> Subs) {
+  // Check whether any of the substitutions are dependent.
+  for (auto &sub : Subs)
+    if (sub.Replacement->getCanonicalType()->isAnyExistentialType())
+      return true;
+  return false;
+}
+
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
 /// use. Not that FuncionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {

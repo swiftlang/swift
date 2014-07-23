@@ -590,3 +590,82 @@ bb0(%0 : $CP, %1 : $CP):
   %12 = tuple ()                                  // user: %13
   return %12 : $()                                // id: %13
 }
+
+class C : CP {
+  func f() -> Self
+}
+
+sil [transparent] @transparent_generic : $@thin <T where T : CP> (@owned T, @owned C) -> () {
+bb0(%0 : $T, %1 : $C):
+  debug_value %0 : $T
+  debug_value %1 : $C
+  strong_release %1 : $C
+  strong_release %0 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @fully_concrete_call : $@thin (@owned C) -> () {
+sil @fully_concrete_call : $@thin (@owned C) -> () {
+bb0(%0 : $C):
+  debug_value %0 : $C
+  // CHECK-NOT: function_ref @transparent_generic
+  %2 = function_ref @transparent_generic : $@thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0, @owned C) -> ()
+  strong_retain %0 : $C
+  strong_retain %0 : $C
+  // CHECK-NOT: apply
+  %5 = apply [transparent] %2<C>(%0, %0) : $@thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0, @owned C) -> ()
+  strong_release %0 : $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @inner : $@thin <T1, T2> (@out T2, @in T1, @in T2) -> () {
+sil [transparent] @inner : $@thin <T1, T2> (@out T2, @in T1, @in T2) -> () {
+bb0(%0 : $*T2, %1 : $*T1, %2 : $*T2):
+  debug_value_addr %1 : $*T1
+  debug_value_addr %2 : $*T2
+  copy_addr [take] %2 to [initialization] %0 : $*T2
+  destroy_addr %1 : $*T1
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// FIXME: We currently do not inline generics unless we have concrete types
+//        for all substitutions.
+// CHECK-LABEL: sil [transparent] @middle : $@thin <T> (@out T, Int, @in T) -> () {
+sil [transparent] @middle : $@thin <T> (@out T, Int, @in T) -> () {
+bb0(%0 : $*T, %1 : $Int, %2 : $*T):
+  debug_value %1 : $Int
+  debug_value_addr %2 : $*T
+  // CHECK: [[REF:%[a-zA-Z0-9]+]] = function_ref @inner
+  %5 = function_ref @inner : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+  %6 = alloc_stack $Int
+  store %1 to %6#1 : $*Int
+  %8 = alloc_stack $T
+  copy_addr %2 to [initialization] %8#1 : $*T
+  // CHECK: apply [transparent] [[REF]]
+  %10 = apply [transparent] %5<Int, T>(%0, %6#1, %8#1) : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %8#0 : $*@local_storage T
+  dealloc_stack %6#0 : $*@local_storage Int
+  destroy_addr %2 : $*T
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @outer : $@thin (Int) -> Int {
+sil [transparent] @outer : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  debug_value %0 : $Int
+  // CHECK-NOT: function_ref @middle
+  %2 = function_ref @middle : $@thin <τ_0_0> (@out τ_0_0, Int, @in τ_0_0) -> ()
+  %7 = alloc_stack $Int
+  store %0 to %7#1 : $*Int
+  %9 = alloc_stack $Int
+  // CHECK-NOT: apply [transparent]
+  %10 = apply [transparent] %2<Int>(%9#1, %0, %7#1) : $@thin <τ_0_0> (@out τ_0_0, Int, @in τ_0_0) -> ()
+  %11 = load %9#1 : $*Int
+  dealloc_stack %9#0 : $*@local_storage Int
+  dealloc_stack %7#0 : $*@local_storage Int
+  return %11 : $Int
+}

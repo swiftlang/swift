@@ -3,17 +3,24 @@
 // FIXME: Not a SIL test because we can't parse dynamic Self in SIL.
 // <rdar://problem/16931299>
 
+// CHECK: [[TYPE:[%a-zA-Z0-9]+]] = type <{ [8 x i8] }>
+
 class C {
   class func fromMetatype() -> Self? { return nil }
   // CHECK-LABEL: define i64 @_TFC21dynamic_self_metadata1C12fromMetatypefMDS0_FT_GSqDS0__(%swift.type*)
-  // CHECK:         call void @_TFSq21convertFromNilLiteralU__fMGSqQ__FT_GSqQ__(%Sq.16* noalias sret {{%.*}}, %swift.type* %0)
+  // CHECK: [[ALLOCA:%[a-zA-Z0-9]+]] = alloca [[TYPE]], align 8
+  // CHECK: [[CAST1:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
+  // CHECK: store i64 0, i64* [[CAST1]], align 8
+  // CHECK: [[CAST2:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
+  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64* [[CAST2]], align 8
+  // CHECK: ret i64 [[LOAD]]
 
   func fromInstance() -> Self? { return nil }
-  // CHECK-LABEL: define i64 @_TFC21dynamic_self_metadata1C12fromInstancefDS0_FT_GSqDS0__(%C21dynamic_self_metadata1C*)
-  // CHECK:         [[OBJECT:%.*]] = bitcast %C21dynamic_self_metadata1C* %0 to %objc_object*
-  // CHECK:         [[TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[OBJECT]])
-  // CHECK:         call void @_TFSq21convertFromNilLiteralU__fMGSqQ__FT_GSqQ__(%Sq.16* noalias sret {{%.*}}, %swift.type* [[TYPE]]
+  // CHECK: [[ALLOCA:%[a-zA-Z0-9]+]] = alloca [[TYPE]], align 8
+  // CHECK: [[CAST1:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
+  // CHECK: store i64 0, i64* [[CAST1]], align 8
+  // CHECK: [[CAST2:%[a-zA-Z0-9]+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
+  // CHECK: [[LOAD:%[a-zA-Z0-9]+]] = load i64* [[CAST2]], align 8
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C21dynamic_self_metadata1C*)*)(%C21dynamic_self_metadata1C* %0)
+  // CHECK: ret i64 [[LOAD]]
 }
-
-
-

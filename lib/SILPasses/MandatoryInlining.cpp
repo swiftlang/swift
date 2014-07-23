@@ -202,10 +202,12 @@ static SILFunction *
 getCalleeFunction(ApplyInst* AI, bool &IsThick,
                   SmallVectorImpl<SILValue>& CaptureArgs,
                   SmallVectorImpl<SILValue>& FullArgs,
+                  PartialApplyInst *&PartialApply,
                   SILModule::LinkingMode Mode) {
   assert(AI->isTransparent() && "Expected an apply of a transparent function!");
 
   IsThick = false;
+  PartialApply = nullptr;
   CaptureArgs.clear();
   FullArgs.clear();
 
@@ -265,6 +267,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
 
     CalleeValue = PAI->getCallee();
     IsThick = true;
+    PartialApply = PAI;
   } else if (ThinToThickFunctionInst *TTTFI =
                dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -273,6 +276,9 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   }
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
+  assert((FRI || !isa<SILInstruction>(CalleeValue)) &&
+         "Unable to find function_ref for transparent apply!");
+
   if (!FRI)
     return nullptr;
 
@@ -331,7 +337,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
   SmallVector<SILValue, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
-  SILInliner Inliner(*F, SILInliner::InlineKind::MandatoryInline);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
@@ -341,8 +346,10 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       SILLocation Loc = InnerAI->getLoc();
       SILValue CalleeValue = InnerAI->getCallee();
       bool IsThick;
+      PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
                                                       CaptureArgs, FullArgs,
+                                                      PAI,
                                                       Mode);
       if (!CalleeFunction)
         continue;
@@ -383,7 +390,37 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         --I;
       else
         I = ApplyBlock->end();
-      if (!Inliner.inlineFunction(InnerAI, CalleeFunction, FullArgs)) {
+
+      TypeSubstitutionMap ContextSubs;
+      std::vector<Substitution> ApplySubs(InnerAI->getSubstitutions());
+
+      // FIXME: Check for unbound generic types *before* adding the
+      //        substitutions from the partial apply. We currently
+      //        have code in the stdlib that appears to rely on
+      //        inlining apply of a partial_apply where the
+      //        partial_apply takes unbound generics.
+      if (hasUnboundGenericTypes(ApplySubs)) {
+        I = InnerAI;
+        continue;
+      }
+
+      if (PAI) {
+        auto PAISubs = PAI->getSubstitutions();
+        ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
+      }
+
+      if (hasAnyExistentialTypes(ApplySubs)) {
+        I = InnerAI;
+        continue;
+      }
+
+      ContextSubs.copyFrom(CalleeFunction->getContextGenericParams()
+                                         ->getSubstitutionMap(ApplySubs));
+
+      SILInliner Inliner(*F, *CalleeFunction,
+                         SILInliner::InlineKind::MandatoryInline,
+                         ContextSubs, ApplySubs);
+      if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
         I = InnerAI;
         continue;
       }

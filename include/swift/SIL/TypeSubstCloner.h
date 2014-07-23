@@ -35,21 +35,22 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   typedef SILClonerWithScopes<ImplClass> super;
 
 public:
-  using SILCloner<ImplClass>::asImpl;
-  using SILCloner<ImplClass>::getBuilder;
-  using SILCloner<ImplClass>::getOpLocation;
-  using SILCloner<ImplClass>::getOpValue;
-  using SILCloner<ImplClass>::getOpASTType;
-  using SILCloner<ImplClass>::getOpType;
-  using SILCloner<ImplClass>::getOpBasicBlock;
-  using SILCloner<ImplClass>::doPostProcess;
-  using SILCloner<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::asImpl;
+  using SILClonerWithScopes<ImplClass>::getBuilder;
+  using SILClonerWithScopes<ImplClass>::getOpLocation;
+  using SILClonerWithScopes<ImplClass>::getOpValue;
+  using SILClonerWithScopes<ImplClass>::getOpASTType;
+  using SILClonerWithScopes<ImplClass>::getOpType;
+  using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
+  using SILClonerWithScopes<ImplClass>::doPostProcess;
+  using SILClonerWithScopes<ImplClass>::ValueMap;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
                   TypeSubstitutionMap &ContextSubs,
-                  ArrayRef<Substitution> ApplySubs)
-    : SILClonerWithScopes<ImplClass>(To),
+                  ArrayRef<Substitution> ApplySubs,
+                  bool Inlining =false)
+    : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
       Original(From),
@@ -175,23 +176,24 @@ protected:
     assert(sub.Conformance.size() == 1 &&
            "didn't get conformance from substitution?!");
 
+    auto Conformance = sub.Conformance[0];
+
     // If we don't have a witness table for this conformance, create a witness
     // table declaration for it.
     SILFunction &Cloned = getBuilder().getFunction();
     SILModule &OtherMod = Cloned.getModule();
-    if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first) {
-      auto normal = sub.Conformance[0]->getRootNormalConformance();
+    if (Conformance && !OtherMod.lookUpWitnessTable(Conformance).first) {
+      auto normal = Conformance->getRootNormalConformance();
       auto linkage = Lowering::TypeConverter
                   ::getLinkageForProtocolConformance(normal, NotForDefinition);
-      OtherMod.createWitnessTableDeclaration(sub.Conformance[0],
-                                             linkage);
+      OtherMod.createWitnessTableDeclaration(Conformance, linkage);
     }
     // We already subst so getOpConformance is not needed.
     SILBuilder &Builder = getBuilder();
     doPostProcess(Inst, Builder.createWitnessMethod(
                             getOpLocation(Inst->getLoc()),
                             getOpType(Inst->getLookupType()),
-                            sub.Conformance[0], Inst->getMember(),
+                            Conformance, Inst->getMember(),
                             getOpType(Inst->getType()), Inst->isVolatile()));
   }
 

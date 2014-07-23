@@ -10,11 +10,9 @@
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
+// CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: return
-// CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: store
-// CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: {{^[}]}}
+// CHECK-NEXT: {{^[}]}}
 func inoutarr(inout a: [Int]) {
   for i in 0..<a.count {
     a[i] = 0
@@ -30,11 +28,9 @@ struct S {
 // CHECK-NOT: {{^bb}}
 // CHECK: apply %[[FR]]
 // CHECK: {{^bb}}
+// CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: return
-// CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: store
-// CHECK-NOT: _swift_isUniquelyReferenced
-// CHECK: {{^[}]}}
+// CHECK-NEXT: {{^[}]}}
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
     s.a[i] = 0

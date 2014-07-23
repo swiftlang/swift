@@ -80,6 +80,14 @@ namespace swift {
   /// substitution that is an unbound generic type.
   bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
 
+  /// Return true if the substitution list contains a substitution
+  /// that is an unbound generic.
+  bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
+
+  /// Return true if the substitution list contains a substitution
+  /// that is any existential type.
+  bool hasAnyExistentialTypes(ArrayRef<Substitution> Subs);
+
   /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
   void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 } // end namespace swift

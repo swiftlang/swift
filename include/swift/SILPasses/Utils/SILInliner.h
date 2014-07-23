@@ -19,7 +19,7 @@
 #define SWIFT_SIL_SILINLINER_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/TypeSubstCloner.h"
 
 namespace swift {
 
@@ -27,7 +27,7 @@ namespace swift {
 /// passes that want to compare against a threshold.
 unsigned getFunctionCost(SILFunction *F, SILFunction *Callee, unsigned Cutoff);
 
-class SILInliner : public SILCloner<SILInliner> {
+class SILInliner : public TypeSubstCloner<SILInliner> {
 public:
   friend class SILVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
@@ -37,8 +37,10 @@ public:
     PerformanceInline
   };
 
-  explicit SILInliner(SILFunction &F, InlineKind IKind)
-    : SILCloner<SILInliner>(F), IKind(IKind),
+  SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
+             TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs)
+    : TypeSubstCloner<SILInliner>(To, From, ContextSubs, ApplySubs, true),
+      IKind(IKind),
     CalleeEntryBB(nullptr), CallSiteScope(nullptr) {
   }
 
@@ -53,9 +55,7 @@ public:
   /// (for any reason). If successful, I now points to the first inlined
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
-  bool inlineFunction(ApplyInst *AI,
-                      SILFunction *CalleeFunction,
-                      ArrayRef<SILValue> Args);
+  bool inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args);
 
 private:
   void visitDebugValueInst(DebugValueInst *Inst);
@@ -72,6 +72,9 @@ private:
       // Create an inlined version of the scope.
       Cloned->setDebugScope(getOrCreateInlineScope(Orig));
 
+    // We intentionally do not call
+    // SILClonerWithScopes<SILInliner>::postProcess() here as it does
+    // the wrong thing for inlined functions.
     SILCloner<SILInliner>::postProcess(Orig, Cloned);
   }
 

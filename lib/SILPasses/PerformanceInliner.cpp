@@ -184,8 +184,6 @@ bool SILPerformanceInliner::isProfitableToInline(SILFunction *Caller,
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                                                     DominanceAnalysis *DA) {
   bool Changed = false;
-  SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
-
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   llvm::SmallVector<ApplyInst*, 8> CallSites;
@@ -238,6 +236,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     if (Callee->isNoinline())
       continue;
 
+    if (AI->hasSubstitutions()) {
+      DEBUG(llvm::dbgs() << "         FAIL! Generic substitutions present!");
+      continue;
+    }
+
     DEBUG(llvm::dbgs() << "        Found callee:" <<  Callee->getName()
           << ".\n");
 
@@ -257,7 +260,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     // will be erased by the inliner. Notice that we will skip all of the
     // newly inlined ApplyInsts. That's okay because we will visit them in
     // our next invocation of the inliner.
-    Inliner.inlineFunction(AI, Callee, Args);
+    TypeSubstitutionMap ContextSubs;
+    SILInliner Inliner(*Caller, *Callee,
+                       SILInliner::InlineKind::PerformanceInline,
+                       ContextSubs, AI->getSubstitutions());
+    Inliner.inlineFunction(AI, Args);
     DT->reset();
     NumFunctionsInlined++;
     Changed = true;

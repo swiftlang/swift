@@ -92,7 +92,6 @@ autoreleasepool {
 }
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
-
 class DumbString: NSString {
   override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }

@@ -145,7 +145,19 @@ template<typename ImplClass>
 class SILClonerWithScopes : public SILCloner<ImplClass> {
   friend class SILCloner<ImplClass>;
 public:
-  SILClonerWithScopes(SILFunction &To) : SILCloner<ImplClass>(To) {
+  SILClonerWithScopes(SILFunction &To, bool Inlining =false)
+    : SILCloner<ImplClass>(To) {
+
+    // We only want to do this when we generate cloned functions, not
+    // when we inline.
+
+    // FIXME: This is due to having TypeSubstCloner inherit from
+    //        SILClonerWithScopes, and having TypeSubstCloner be used
+    //        both by passes that clone whole functions and ones that
+    //        inline functions.
+    if (Inlining)
+      return;
+
     auto OrigScope = To.getDebugScope();
     assert(OrigScope && "function without scope");
     if (!OrigScope || OrigScope->SILFn == &To)
