@@ -5160,7 +5160,6 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 
   // If the subexpression is a monadic optional operation, peephole
   // the emission of the operation.
-  // force down into the operation.
   if (auto eval = dyn_cast<OptionalEvaluationExpr>(E)) {
     CleanupLocation cleanupLoc = CleanupLocation::getCleanupLocation(loc);
     SILBasicBlock *failureBB;
@@ -5181,14 +5180,16 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
                                    numOptionalEvaluations + 1, C);
 
     // Emit the failure destination, but only if actually used.
-    if (failureBB->pred_empty()) {
-      failureBB->eraseFromParent();
-    } else {
-      SILBuilder failureBuilder(failureBB);
-      auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
-      auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
-      failureBuilder.createCondFail(loc, trueV);
-      failureBuilder.createUnreachable(loc);
+    if (failureBB) {
+      if (failureBB->pred_empty()) {
+        failureBB->eraseFromParent();
+      } else {
+        SILBuilder failureBuilder(failureBB);
+        auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+        auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
+        failureBuilder.createCondFail(loc, trueV);
+        failureBuilder.createUnreachable(loc);
+      }
     }
 
     return result;
