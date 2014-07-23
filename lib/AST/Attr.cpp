@@ -83,8 +83,8 @@ const AvailabilityAttr *DeclAttributes::getUnavailable() const {
   return nullptr;
 }
 
-void DeclAttributes::print(llvm::raw_ostream &OS) const {
-  StreamPrinter P(OS);
+void DeclAttributes::dump() const {
+  StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printEverything();
   print(P, PO);
 }
@@ -117,9 +117,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
       hadDeclModifier = true;
       continue;
     }
-    
-    if (!Options.PrintAttrTransparent && isa<TransparentAttr>(DA))
-      continue;
 
     DA->print(Printer);
   }

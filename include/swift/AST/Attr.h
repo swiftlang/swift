@@ -895,7 +895,7 @@ public:
   // FIXME: eventually take a platform argument.
   const AvailabilityAttr *getUnavailable() const;
 
-  void print(llvm::raw_ostream &OS) const;
+  void dump() const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   template <typename T, typename DERIVED>

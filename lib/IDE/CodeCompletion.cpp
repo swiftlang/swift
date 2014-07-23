@@ -2000,11 +2000,9 @@ public:
       if (Reason == DeclVisibilityKind::MemberOfSuper)
         Builder.addOverrideKeyword();
       PrintOptions Options;
-      Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);
-      Options.PrintAttrTransparent = false;
       Options.PrintOverrideKeyword = false;
       FD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
@@ -2026,9 +2024,7 @@ public:
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
-      Options.PrintAttrTransparent = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);
-      Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }

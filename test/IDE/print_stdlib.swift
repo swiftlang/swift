@@ -10,7 +10,6 @@
 // CHECK-ARGC: var C_ARGC: CInt
 
 // CHECK-NOT: {{^}}import
-// CHECK-NOT: @transparent
 // CHECK-NOT: _Double
 // CHECK-NOT: _StringBuffer
 // CHECK-NOT: _StringCore

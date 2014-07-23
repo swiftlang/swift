@@ -20,6 +20,10 @@ namespace swift {
 class GenericParamList;
 enum DeclAttrKind : unsigned;
 
+/// Options for printing AST nodes.
+///
+/// A default-constructed PrintOptions is suitable for printing to users;
+/// there are also factory methods for specific use cases.
 struct PrintOptions {
   /// \brief The indentation width.
   unsigned Indent = 2;
@@ -86,15 +90,11 @@ struct PrintOptions {
   bool PrintImplicitAttrs = true;
 
   /// List of attribute kinds that should not be printed.
-  std::vector<DeclAttrKind> ExcludeAttrList;
+  std::vector<DeclAttrKind> ExcludeAttrList = { DAK_Transparent };
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
   std::vector<DeclAttrKind> ExclusiveAttrList;
-
-  /// Whether to print '@transparent'.
-  /// FIXME: Remove this once this attribute becomes a DeclAttr.
-  bool PrintAttrTransparent = true;
 
   /// Whether to print function representation attributes on function types:
   /// '@thin' or '@objc_block'.
@@ -134,21 +134,24 @@ struct PrintOptions {
   /// list.
   GenericParamList *ContextGenericParams = nullptr;
 
-  /// \brief Retrieve the set of options that prints everything.
-  static PrintOptions printEverything() {
+  /// Retrieve the set of options for verbose printing to users.
+  static PrintOptions printVerbose() {
     PrintOptions result;
-    result.FunctionDefinitions = true;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDefaultParameterPlaceholder = true;
-    result.SkipImplicit = false;
-    result.SkipPrivateStdlibDecls = false;
-    result.PrintImplicitAttrs = true;
-    result.PrintAttrTransparent = true;
-    result.PrintAccessibility = true;
-    result.AccessibilityFilter = Accessibility::Private;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
+    return result;
+  }
+
+  /// \brief Retrieve the set of options that prints everything.
+  ///
+  /// This is only intended for debug output.
+  static PrintOptions printEverything() {
+    PrintOptions result = printVerbose();
+    result.ExcludeAttrList.clear();
+    result.PrintAccessibility = true;
     return result;
   }
 };
