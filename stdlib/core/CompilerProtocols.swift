@@ -178,7 +178,7 @@ public protocol NilLiteralConvertible {
 
 public protocol _BuiltinIntegerLiteralConvertible {
   class func _convertFromBuiltinIntegerLiteral(
-                value: MaxBuiltinIntegerType) -> Self
+      value: _MaxBuiltinIntegerType) -> Self
 }
 
 public protocol IntegerLiteralConvertible {
@@ -188,7 +188,7 @@ public protocol IntegerLiteralConvertible {
 
 public protocol _BuiltinFloatLiteralConvertible {
   class func _convertFromBuiltinFloatLiteral(
-                value: MaxBuiltinFloatType) -> Self
+      value: _MaxBuiltinFloatType) -> Self
 }
 
 public protocol FloatLiteralConvertible {

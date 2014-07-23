@@ -59,14 +59,14 @@ IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 
 // Built-in identifiers
-IDENTIFIER(MaxBuiltinIntegerType)
+IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "_MaxBuiltinIntegerType")
 IDENTIFIER(IntegerLiteralType)
 IDENTIFIER_WITH_NAME(BoolValue, "boolValue")
 IDENTIFIER_WITH_NAME(ConvertFromNilLiteral, "convertFromNilLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,
                      "_convertFromBuiltinIntegerLiteral")
-IDENTIFIER(MaxBuiltinFloatType)
+IDENTIFIER_WITH_NAME(MaxBuiltinFloatType, "_MaxBuiltinFloatType")
 IDENTIFIER(FloatLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromFloatLiteral, "convertFromFloatLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinFloatLiteral,
