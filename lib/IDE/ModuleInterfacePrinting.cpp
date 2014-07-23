@@ -203,6 +203,14 @@ void swift::ide::printSubmoduleInterface(
     if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
       continue;
 
+    // Skip declarations that are not accessible.
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (Options.AccessibilityFilter > Accessibility::Private &&
+          VD->hasAccessibility() &&
+          VD->getAccessibility() < Options.AccessibilityFilter)
+        continue;
+    }
+
     auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
       if (!InterestingClangModule)
         return true;

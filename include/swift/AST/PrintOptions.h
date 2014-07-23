@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
+#include "swift/AST/Attr.h"
 #include <vector>
 
 namespace swift {
@@ -105,6 +106,9 @@ struct PrintOptions {
   /// Whether to print accessibility information on all value decls.
   bool PrintAccessibility = false;
 
+  /// Print all decls that have this or less restricted access.
+  Accessibility AccessibilityFilter = Accessibility::Private;
+
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
@@ -142,6 +146,7 @@ struct PrintOptions {
     result.PrintImplicitAttrs = true;
     result.PrintAttrTransparent = true;
     result.PrintAccessibility = true;
+    result.AccessibilityFilter = Accessibility::Private;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     return result;

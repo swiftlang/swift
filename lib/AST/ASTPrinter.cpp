@@ -549,6 +549,14 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
     return false;
 
+  // Skip declarations that are not accessible.
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (Options.AccessibilityFilter > Accessibility::Private &&
+        VD->hasAccessibility() &&
+        VD->getAccessibility() < Options.AccessibilityFilter)
+      return false;
+  }
+
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
       return false;
 

@@ -292,6 +292,19 @@ SkipUnavailable("skip-unavailable",
                 llvm::cl::desc("Don't print unavailable declarations"),
                 llvm::cl::init(false));
 
+static llvm::cl::opt<Accessibility>
+AccessibilityFilter(
+    llvm::cl::desc("Accessibility filter:"),
+    llvm::cl::init(Accessibility::Private),
+    llvm::cl::values(
+        clEnumValN(Accessibility::Private, "accessibility-filter-private",
+            "Print all declarations"),
+        clEnumValN(Accessibility::Internal, "accessibility-filter-internal",
+            "Print internal and public declarations"),
+        clEnumValN(Accessibility::Public, "accessibility-filter-public",
+            "Print public declarations"),
+        clEnumValEnd));
+
 static llvm::cl::opt<bool>
 SkipPrivateStdlibDecls("skip-private-stdlib-decls",
                 llvm::cl::desc("Don't print declarations that start with '_'"),
@@ -988,7 +1001,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
                       bool ExplodePatternBindingDecls,
                       bool PrintImplicitAttrs,
                       bool PrintAccessibility,
-                      bool PrintUnavailableDecls) {
+                      bool PrintUnavailableDecls,
+                      Accessibility AccessibilityFilter) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
 
@@ -1010,6 +1024,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   Options.ExplodePatternBindingDecls = ExplodePatternBindingDecls;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
   Options.PrintAccessibility = PrintAccessibility;
+  Options.AccessibilityFilter = AccessibilityFilter;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
   Module *M = CI.getMainModule();
@@ -1075,6 +1090,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool PrintAccessibility,
                           bool PrintUnavailableDecls,
                           bool PrintRegularComments,
+                          Accessibility AccessibilityFilter,
                           bool PrintPrivateStdlibDecls) {
   CompilerInvocation Invocation(InitInvok);
 
@@ -1099,6 +1115,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   Options.SynthesizeSugarOnTypes = SynthesizeSugarOnTypes;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
   Options.PrintAccessibility = PrintAccessibility;
+  Options.AccessibilityFilter = AccessibilityFilter;
   Options.PrintRegularClangComments = PrintRegularComments;
   Options.SkipPrivateStdlibDecls = !PrintPrivateStdlibDecls;
   Options.SkipUnavailable = !PrintUnavailableDecls;
@@ -2125,7 +2142,8 @@ int main(int argc, char *argv[]) {
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
                           options::PrintAccessibility,
-                          !options::SkipUnavailable);
+                          !options::SkipUnavailable,
+                          options::AccessibilityFilter);
     break;
 
   case ActionType::PrintASTTypeChecked:
@@ -2137,7 +2155,8 @@ int main(int argc, char *argv[]) {
                           options::ExplodePatternBindingDecls,
                           options::PrintImplicitAttrs,
                           options::PrintAccessibility,
-                          !options::SkipUnavailable);
+                          !options::SkipUnavailable,
+                          options::AccessibilityFilter);
     break;
 
   case ActionType::PrintModule: {
@@ -2158,6 +2177,7 @@ int main(int argc, char *argv[]) {
         options::PrintAccessibility,
         !options::SkipUnavailable,
         options::PrintRegularComments,
+        options::AccessibilityFilter,
         !options::SkipPrivateStdlibDecls);
     break;
   }
