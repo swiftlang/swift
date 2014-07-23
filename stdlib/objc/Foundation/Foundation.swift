@@ -217,6 +217,10 @@ final class _NSContiguousString : NSString {
     super.init()
   }
 
+  init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented for _NSContiguousString")
+  }
+
   func length() -> Int {
     return value.count
   }
@@ -321,6 +325,10 @@ final class _NSOpaqueString : NSString {
     self.owner = owner
     self.subRange = subRange
     super.init()
+  }
+
+  init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented for _NSOpaqueString")
   }
 
   //
