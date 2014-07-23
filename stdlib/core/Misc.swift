@@ -67,3 +67,20 @@ public func _stdlib_getTypeName<T>(value: T) -> String {
   return result
 }
 
+@asmname("swift_stdlib_demangleName")
+func _stdlib_demangleNameImpl(
+    mangledName: UnsafePointer<UInt8>,
+    mangledNameLength: UWord,
+    demangledName: UnsafeMutablePointer<String>)
+
+public func _stdlib_demangleName(mangledName: String) -> String {
+  var resultPtr = UnsafeMutablePointer<String>.alloc(1)
+  var mangledNameUTF8 = Array(mangledName.utf8)
+  mangledNameUTF8.withUnsafeBufferPointer {
+    _stdlib_demangleNameImpl($0.baseAddress, UWord($0.endIndex), resultPtr)
+  }
+  let result = resultPtr.memory
+  resultPtr.dealloc(1)
+  return result
+}
+

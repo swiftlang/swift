@@ -127,9 +127,9 @@ struct ConditionallyBridgedValueType<T>
 
 class BridgedVerbatimRefType {}
 
-var RuntimeBridging = TestCase("RuntimeBridging")
+var Runtime = TestCase("Runtime")
 
-RuntimeBridging.test("bridgeToObjectiveC") {
+Runtime.test("bridgeToObjectiveC") {
   expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
 
   expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA).value)
@@ -144,7 +144,7 @@ RuntimeBridging.test("bridgeToObjectiveC") {
   expectTrue(_bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
 }
 
-RuntimeBridging.test("bridgeFromObjectiveC") {
+Runtime.test("bridgeFromObjectiveC") {
   // Bridge back using NotBridgedValueType.
   expectEmpty(_bridgeFromObjectiveCConditional(
       ClassA(value: 21), NotBridgedValueType.self))
@@ -193,13 +193,13 @@ RuntimeBridging.test("bridgeFromObjectiveC") {
       bridgedVerbatimRef, BridgedVerbatimRefType.self)! === bridgedVerbatimRef)
 }
 
-RuntimeBridging.test("isBridgedToObjectiveC") {
+Runtime.test("isBridgedToObjectiveC") {
   expectFalse(_isBridgedToObjectiveC(NotBridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
 }
 
-RuntimeBridging.test("isBridgedVerbatimToObjectiveC") {
+Runtime.test("isBridgedVerbatimToObjectiveC") {
   expectFalse(_isBridgedVerbatimToObjectiveC(NotBridgedValueType))
   expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
@@ -295,7 +295,7 @@ class Class2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
 
 class ClassDoesNotConformToP1 : Q1 {}
 
-RuntimeBridging.test("dynamicCastToExistential1") {
+Runtime.test("dynamicCastToExistential1") {
   var someP1Value = StructConformsToP1()
   var someP1Value2 = Struct2ConformsToP1(true)
   var someNotP1Value = StructDoesNotConformToP1()
@@ -428,33 +428,42 @@ enum SomeEnum {
   init() { self = .A }
 }
 
-RuntimeBridging.test("getTypeName") {
-  expectEqual("C1a9SomeClass", _stdlib_getTypeName(SomeClass()))
-  expectEqual("C1a13SomeObjCClass", _stdlib_getTypeName(SomeObjCClass()))
-  expectEqual("C1a20SomeNSObjectSubclass", _stdlib_getTypeName(SomeNSObjectSubclass()))
+Runtime.test("getTypeName") {
+  expectEqual("_TtC1a9SomeClass", _stdlib_getTypeName(SomeClass()))
+  expectEqual("_TtC1a13SomeObjCClass", _stdlib_getTypeName(SomeObjCClass()))
+  expectEqual("_TtC1a20SomeNSObjectSubclass", _stdlib_getTypeName(SomeNSObjectSubclass()))
   expectEqual("NSObject", _stdlib_getTypeName(NSObject()))
-  expectEqual("V1a10SomeStruct", _stdlib_getTypeName(SomeStruct()))
-  expectEqual("O1a8SomeEnum", _stdlib_getTypeName(SomeEnum()))
+  expectEqual("_TtV1a10SomeStruct", _stdlib_getTypeName(SomeStruct()))
+  expectEqual("_TtO1a8SomeEnum", _stdlib_getTypeName(SomeEnum()))
 
   var a: Any = SomeClass()
-  expectEqual("C1a9SomeClass", _stdlib_getTypeName(a))
+  expectEqual("_TtC1a9SomeClass", _stdlib_getTypeName(a))
 
   a = SomeObjCClass()
-  expectEqual("C1a13SomeObjCClass", _stdlib_getTypeName(a))
+  expectEqual("_TtC1a13SomeObjCClass", _stdlib_getTypeName(a))
 
   a = SomeNSObjectSubclass()
-  expectEqual("C1a20SomeNSObjectSubclass", _stdlib_getTypeName(a))
+  expectEqual("_TtC1a20SomeNSObjectSubclass", _stdlib_getTypeName(a))
 
   a = NSObject()
   expectEqual("NSObject", _stdlib_getTypeName(a))
 
   a = SomeStruct()
-  expectEqual("V1a10SomeStruct", _stdlib_getTypeName(a))
+  expectEqual("_TtV1a10SomeStruct", _stdlib_getTypeName(a))
 
   a = SomeEnum()
-  expectEqual("O1a8SomeEnum", _stdlib_getTypeName(a))
+  expectEqual("_TtO1a8SomeEnum", _stdlib_getTypeName(a))
 }
 
-RuntimeBridging.run()
-// CHECK: {{^}}RuntimeBridging: All tests passed
+Runtime.test("demangleName") {
+  expectEqual("", _stdlib_demangleName(""))
+  expectEqual("abc", _stdlib_demangleName("abc"))
+  expectEqual("\0", _stdlib_demangleName("\0"))
+  expectEqual("Swift.Double", _stdlib_demangleName("_TtSd"))
+  expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
+      _stdlib_demangleName("_Tv1x1aGCS_3FooGS0_GS0_SiSi_GS0_SiSi__GS0_GS0_SiSi_GS0_SiSi___"))
+}
+
+Runtime.run()
+// CHECK: {{^}}Runtime: All tests passed
 

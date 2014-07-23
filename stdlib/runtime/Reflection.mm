@@ -15,6 +15,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Basic/Demangle.h"
 #include "Debug.h"
 #include <cassert>
 #include <cstring>
@@ -77,6 +78,17 @@ struct String {
   explicit String(const char *ptr)
     : String(ptr, strlen(ptr))
   {}
+
+  /// Create a Swift String from two concatenated nul-terminated strings.
+  explicit String(const char *ptr1, const char *ptr2) {
+    size_t len1 = strlen(ptr1);
+    size_t len2 = strlen(ptr2);
+    char *concatenated = static_cast<char *>(malloc(len1 + len2));
+    memcpy(concatenated, ptr1, len1);
+    memcpy(concatenated + len1, ptr2, len2);
+    swift_stringFromUTF8InRawMemory(this, concatenated, len1 + len2);
+    free(concatenated);
+  }
   
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
@@ -1068,7 +1080,7 @@ static void swift_stdlib_getTypeNameImpl(OpaqueValue *value,
       new (result) String("");
       return;
     }
-    new (result) String(descriptor->Name);
+    new (result) String("_Tt", descriptor->Name);
     return;
   }
 
@@ -1122,5 +1134,13 @@ extern "C" void swift_stdlib_getTypeName(OpaqueValue *value, String *result,
                                          const Metadata *T) {
   swift_stdlib_getTypeNameImpl(value, T, T, result);
   T->vw_destroy(value);
+}
+
+extern "C" void swift_stdlib_demangleName(const char *mangledName,
+                                          size_t mangledNameLength,
+                                          String *demangledName) {
+  auto result =
+      Demangle::demangleSymbolAsString(mangledName, mangledNameLength);
+  new (demangledName) String(result.data(), result.size());
 }
 

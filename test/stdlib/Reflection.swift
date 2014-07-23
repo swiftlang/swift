@@ -35,10 +35,10 @@ struct Matte {
 println("Matte:")
 // Build a String around an interpolation as a way of smoke-testing that
 // the internal MirrorType implementation gets memory management right.
-// CHECK-NEXT:    _TtV10Reflection5Matte
+// CHECK-NEXT:    Reflection.Matte
 // CHECK-NEXT:      s: 123
 dump(Matte("\(123)"))
-// CHECK-NEXT:    _TtV10Reflection5Matte
+// CHECK-NEXT:    Reflection.Matte
 // CHECK-NEXT:      s: 456
 dump(Matte("456"))
 
@@ -57,19 +57,19 @@ struct Complex<T> {
 }
 // CHECK-LABEL: Complex:
 println("Complex:")
-// CHECK-NEXT:    _TtV10Reflection7Complex
+// CHECK-NEXT:    Reflection.Complex
 // CHECK-NEXT:      real: 1.5
 // CHECK-NEXT:      imag: 0.75
 dump(Complex<Double>(real: 1.5, imag: 0.75))
-// CHECK-NEXT:    _TtV10Reflection7Complex
+// CHECK-NEXT:    Reflection.Complex
 // CHECK-NEXT:      real: -1.5
 // CHECK-NEXT:      imag: -0.75
 dump(Complex<Double>(real: -1.5, imag: -0.75))
-// CHECK-NEXT:    _TtV10Reflection7Complex
+// CHECK-NEXT:    Reflection.Complex
 // CHECK-NEXT:      real: 22
 // CHECK-NEXT:      imag: 44
 dump(Complex<Int>(real: 22, imag: 44))
-// CHECK-NEXT:    _TtV10Reflection7Complex
+// CHECK-NEXT:    Reflection.Complex
 // CHECK-NEXT:      real: is this the real life?
 // CHECK-NEXT:      imag: is it just fantasy?
 dump(Complex<String>(real: "is this the real life?", 
@@ -175,7 +175,7 @@ println("Tuple:")
 // CHECK-NEXT:        first: 384
 // CHECK-NEXT:        second: seven six eight
 // CHECK-NEXT:        self: Brilliant(384, seven six eight) #0
-// CHECK-NEXT:     .1: _TtV10Reflection5Matte
+// CHECK-NEXT:     .1: Reflection.Matte
 // CHECK-NEXT:        s: nine
 dump(tuple)
 // CHECK-NEXT: false
@@ -247,16 +247,16 @@ class Best: Better {
 }
 
 // CHECK-LABEL: Root class:
-// CHECK-NEXT:    _TtC10Reflection4Good #0
+// CHECK-NEXT:    Reflection.Good #0
 // CHECK-NEXT:      x: 11
 // CHECK-NEXT:      y: 222
 println("Root class:")
 dump(Good())
 
 // CHECK-LABEL: Subclass:
-// CHECK-NEXT:    _TtC10Reflection4Best #0
-// CHECK-NEXT:      super: _TtC10Reflection6Better
-// CHECK-NEXT:        super: _TtC10Reflection4Good
+// CHECK-NEXT:    Reflection.Best #0
+// CHECK-NEXT:      super: Reflection.Better
+// CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -272,9 +272,9 @@ var any: Any = 1
 dump(any)
 
 // CHECK-LABEL: Any class:
-// CHECK-NEXT:    _TtC10Reflection4Best #0
-// CHECK-NEXT:      super: _TtC10Reflection6Better
-// CHECK-NEXT:        super: _TtC10Reflection4Good
+// CHECK-NEXT:    Reflection.Best #0
+// CHECK-NEXT:      super: Reflection.Better
+// CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -283,7 +283,7 @@ println("Any class:")
 any = Best()
 dump(any)
 // CHECK-LABEL: second verse
-// CHECK-NEXT:    _TtC10Reflection4Best #0
+// CHECK-NEXT:    Reflection.Best #0
 println("second verse same as the first:")
 dump(any)
 
@@ -324,9 +324,9 @@ protocol Barrable : class {}
 extension Best: Barrable {}
 
 // CHECK-LABEL: Barrable class:
-// CHECK-NEXT:    _TtC10Reflection4Best #0
-// CHECK-NEXT:      super: _TtC10Reflection6Better
-// CHECK-NEXT:        super: _TtC10Reflection4Good
+// CHECK-NEXT:    Reflection.Best #0
+// CHECK-NEXT:      super: Reflection.Better
+// CHECK-NEXT:        super: Reflection.Good
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -335,7 +335,7 @@ println("Barrable class:")
 var barrable: Barrable = Best()
 dump(barrable)
 // CHECK-LABEL: second verse
-// CHECK-NEXT:    _TtC10Reflection4Best #0
+// CHECK-NEXT:    Reflection.Best #0
 println("second verse same as the first:")
 dump(barrable)
 
@@ -453,8 +453,8 @@ class NSBetter: NSGood {
 }
 
 // CHECK-LABEL: Swift ObjC subclass:
-// CHECK-NEXT:    _TtC10Reflection8NSBetter #0
-// CHECK-NEXT:      super: _TtC10Reflection6NSGood
+// CHECK-NEXT:    Reflection.NSBetter #0
+// CHECK-NEXT:      super: Reflection.NSGood
 // CHECK-NEXT:        super: <Reflection.NSBetter: {{0x[0-9a-f]+}}>
 println("Swift ObjC subclass:")
 dump(NSBetter())

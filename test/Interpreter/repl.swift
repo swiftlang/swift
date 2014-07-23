@@ -158,17 +158,17 @@ var b = a.slice[3..<5]
 
 struct Inner<T> {}
 struct Outer<T> { var inner : Inner<T> }
-Outer<Int>(inner: Inner()) // CHECK: Outer<Int> = _TtV4REPL5Outer
+Outer<Int>(inner: Inner()) // CHECK: Outer<Int> = REPL.Outer
 
 struct ContainsSlice { var slice : [Int] }
-ContainsSlice(slice: [1, 2, 3]) // CHECK: ContainsSlice = _TtV4REPL13ContainsSlice
+ContainsSlice(slice: [1, 2, 3]) // CHECK: ContainsSlice = REPL.ContainsSlice
 
 struct ContainsGenericSlice<T> { var slice : [T] }
-ContainsGenericSlice(slice: [1, 2, 3]) // CHECK: ContainsGenericSlice<Int> = _TtV4REPL20ContainsGenericSlice
-ContainsGenericSlice(slice: [(1, 2), (3, 4)]) // CHECK: ContainsGenericSlice<(Int, Int)> = _TtV4REPL20ContainsGenericSlice
+ContainsGenericSlice(slice: [1, 2, 3]) // CHECK: ContainsGenericSlice<Int> = REPL.ContainsGenericSlice
+ContainsGenericSlice(slice: [(1, 2), (3, 4)]) // CHECK: ContainsGenericSlice<(Int, Int)> = REPL.ContainsGenericSlice
 
 struct ContainsContainsSlice { var containsSlice : ContainsSlice }
-ContainsContainsSlice(containsSlice: ContainsSlice(slice: [1, 2, 3])) // CHECK: ContainsContainsSlice = _TtV4REPL21ContainsContainsSlice
+ContainsContainsSlice(containsSlice: ContainsSlice(slice: [1, 2, 3])) // CHECK: ContainsContainsSlice = REPL.ContainsContainsSlice
 
 protocol Proto {
   func foo()
