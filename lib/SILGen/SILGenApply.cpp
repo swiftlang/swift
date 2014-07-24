@@ -1778,6 +1778,9 @@ namespace {
     AbstractCC CC;
     ArrayRef<SILParameterInfo> ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
+
+    /// This keeps track of any inout arguments that are emitted.
+    SmallVector<std::pair<SILValue, SILLocation>, 2> InOutArguments;
   public:
     ArgEmitter(SILGenFunction &SGF, AbstractCC cc,
                ArrayRef<SILParameterInfo> paramInfos,
@@ -1926,6 +1929,28 @@ namespace {
         abort();
       }
 
+      
+      // We know that the rvalue has a single ManagedValue.  Check to see if we
+      // have an obvious alias with a previously emitted argument.  Note that we
+      // could do this in a later SILDiagnostics pass as well: this would be
+      // stronger (more equivalences exposed) but would have worse source
+      // location information.
+      
+      // TODO: This uses exact SILValue equivalence to detect aliases, we could
+      // do something stronger here to catch other obvious cases.
+      SILValue pointer = rvalue.peekScalarValue();
+
+      for (auto prev : InOutArguments) {
+        if (prev.first == pointer) {
+          SGF.SGM.diagnose(loc, diag::inout_argument_alias)
+            .highlight(loc.getSourceRange());
+          SGF.SGM.diagnose(prev.second, diag::previous_inout_alias)
+            .highlight(prev.second.getSourceRange());
+        }
+      }
+      
+      InOutArguments.push_back({pointer, loc});
+      
       std::move(rvalue).getAll(Args);
       return;
     }

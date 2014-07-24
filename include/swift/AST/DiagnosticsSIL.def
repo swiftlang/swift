@@ -71,6 +71,12 @@ ERROR(writeback_overlap_subscript,sil_gen,none,
 NOTE(writebackoverlap_note,sil_gen,none,
       "concurrent writeback occurred here", ())
 
+ERROR(inout_argument_alias,sil_gen,none,
+      "inout arguments are not allowed to alias each other", ())
+NOTE(previous_inout_alias,sil_gen,none,
+      "previous aliasing argument", ())
+
+
 
 
 // Definite initialization diagnostics.

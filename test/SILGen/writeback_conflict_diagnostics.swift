@@ -27,6 +27,14 @@ struct StructWithProperty {
 var global_struct_property : StructWithProperty
 var c_global_struct_property : StructWithProperty { get {} set {} }
 
+func testInOutAlias() {
+  var x = 42
+  swap(&x,  // expected-note {{previous aliasing argument}}
+       &x)  // expected-error {{inout arguments are not allowed to alias each other}}
+  swap(&global_struct_property,  // expected-note {{previous aliasing argument}}
+       &global_struct_property)  // expected-error {{inout arguments are not allowed to alias each other}}
+}
+
 func testWriteback() {
   var a = StructWithProperty()
   a.computed_struct .        // expected-note {{concurrent writeback occurred here}}
@@ -42,9 +50,6 @@ func testWriteback() {
   swap(&a.computed_int,   // expected-note {{concurrent writeback occurred here}}
        &a.computed_int)   // expected-error {{inout writeback to computed property 'computed_int' occurs in multiple arguments to call, introducing invalid aliasing}}
   
-  
-  var stored_local = 42
-  swap(&stored_local, &stored_local)  // ok, physical lvalue.
   
   global_property.f(&global_property) // expected-error {{inout writeback to computed property 'global_property' occurs in multiple arguments to call, introducing invalid aliasing}} expected-note {{concurrent writeback occurred here}}
   
@@ -69,7 +74,7 @@ func testMultiArray(i : Int, j : Int, var array : [[Int]]) {
        &array[0][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
   swap(&global_array[0][j],   // expected-note  {{concurrent writeback occurred here}}
        &global_array[0][i])   // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
-    
+  
   // TODO: This is obviously the same writeback problem, but isn't detectable
   // with the current level of sophisitication in SILGen.
   swap(&array[1+0][j], &array[1+0][i])
