@@ -393,6 +393,7 @@ extension ${Self} {
   /// occurs, and the resulting `${Self}` may not have the same numeric
   /// value as `bitPattern`—it is only guaranteed to use the same
   /// pattern of bits.
+  @transparent
   public init(bitPattern: ${OtherSelf}) {
     value = bitPattern.value
   }
