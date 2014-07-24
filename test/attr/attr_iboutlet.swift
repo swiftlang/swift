@@ -181,6 +181,9 @@ class SwiftGizmo {
 
   @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}
 
+  @IBOutlet var dup: C! // expected-note{{'dup' previously declared here}}
+  @IBOutlet var dup: C! // expected-error{{invalid redeclaration of 'dup'}}
+
   init() {}
 }
 

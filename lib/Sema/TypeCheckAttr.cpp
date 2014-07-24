@@ -234,6 +234,9 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Verify that the field type is valid as an outlet.
   auto type = VD->getType();
 
+  if (VD->isInvalid())
+    return;
+
   // Look through ownership types, and optionals.
   type = type->getReferenceStorageReferent();
   bool wasOptional = false;
@@ -241,7 +244,6 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     type = underlying;
     wasOptional = true;
   }
-
 
   bool isArray = false;
   if (auto isError = isAcceptableOutletType(type, isArray, TC))

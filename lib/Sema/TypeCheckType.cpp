@@ -2062,6 +2062,9 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
 bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
+  if (VD->isInvalid())
+    return false;
+
   Type T = VD->getType();
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
