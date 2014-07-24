@@ -39,7 +39,7 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [2 x i8*] }* } {
+// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [4 x i8*] }* } {
 // CHECK:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // CHECK:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // CHECK:   i32 80, i32 1

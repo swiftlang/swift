@@ -851,8 +851,10 @@ namespace {
     SmallVector<llvm::Constant*, 16> OptClassMethods;
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
-    SmallVector<llvm::Constant*, 16> MethodTypesExt;
-    SmallVector<llvm::Constant*, 16> OptMethodTypesExt;
+    SmallVector<llvm::Constant*, 8> InstanceMethodTypesExt;
+    SmallVector<llvm::Constant*, 8> ClassMethodTypesExt;
+    SmallVector<llvm::Constant*, 8> OptInstanceMethodTypesExt;
+    SmallVector<llvm::Constant*, 8> OptClassMethodTypesExt;
     
     llvm::Constant *Name = nullptr;
     /// Index of the first non-inherited field in the layout.
@@ -1203,28 +1205,35 @@ namespace {
       if (method->isAccessor()) return;
       
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
+      // This pointer will be set if we need to store the extended method type
+      // encoding.
+      SmallVectorImpl<llvm::Constant *> *ExtMethodTypesList = nullptr;
       if (!method->isStatic()) {
         if (method->getAttrs().hasAttribute<OptionalAttr>()) {
           OptInstanceMethods.push_back(entry);
           if (isBuildingProtocol())
-            OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+            ExtMethodTypesList = &OptInstanceMethodTypesExt;
         }
         else {
           InstanceMethods.push_back(entry);
           if (isBuildingProtocol())
-            MethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+            ExtMethodTypesList = &InstanceMethodTypesExt;
         }
       } else {
         if (method->getAttrs().hasAttribute<OptionalAttr>()) {
           OptClassMethods.push_back(entry);
           if (isBuildingProtocol())
-            OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+            ExtMethodTypesList = &OptClassMethodTypesExt;
         }
         else {
           ClassMethods.push_back(entry);
           if (isBuildingProtocol())
-            MethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+            ExtMethodTypesList = &ClassMethodTypesExt;
         }
+      }
+      if (ExtMethodTypesList) {
+        ExtMethodTypesList->push_back(
+                                getMethodTypeExtendedEncoding(IGM, method));
       }
     }
 
@@ -1233,10 +1242,17 @@ namespace {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, constructor);
-      if (constructor->getAttrs().hasAttribute<OptionalAttr>())
+      if (constructor->getAttrs().hasAttribute<OptionalAttr>()) {
         OptInstanceMethods.push_back(entry);
-      else
+        if (isBuildingProtocol())
+          OptInstanceMethodTypesExt.push_back(
+                              getMethodTypeExtendedEncoding(IGM, constructor));
+      } else {
         InstanceMethods.push_back(entry);
+        if (isBuildingProtocol())
+          InstanceMethodTypesExt.push_back(
+                              getMethodTypeExtendedEncoding(IGM, constructor));
+      }
     }
 
     /// Determine whether the given destructor has an Objective-C
@@ -1330,9 +1346,24 @@ namespace {
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
-      MethodTypesExt.insert(MethodTypesExt.end(),
-                            OptMethodTypesExt.begin(), OptMethodTypesExt.end());
-      return buildMethodList(MethodTypesExt,
+      SmallVector<llvm::Constant*, 16> AllMethodTypesExt;
+      assert(InstanceMethodTypesExt.size() == InstanceMethods.size()
+             && "number of instance methods does not match extended types");
+      assert(ClassMethodTypesExt.size() == ClassMethods.size()
+             && "number of class methods does not match extended types");
+      assert(OptInstanceMethodTypesExt.size() == OptInstanceMethods.size()
+             && "number of optional instance methods does not match extended types");
+      assert(OptClassMethodTypesExt.size() == OptClassMethods.size()
+             && "number of optional class methods does not match extended types");
+      AllMethodTypesExt.insert(AllMethodTypesExt.end(),
+                 InstanceMethodTypesExt.begin(), InstanceMethodTypesExt.end());
+      AllMethodTypesExt.insert(AllMethodTypesExt.end(),
+                 ClassMethodTypesExt.begin(), ClassMethodTypesExt.end());
+      AllMethodTypesExt.insert(AllMethodTypesExt.end(),
+           OptInstanceMethodTypesExt.begin(), OptInstanceMethodTypesExt.end());
+      AllMethodTypesExt.insert(AllMethodTypesExt.end(),
+           OptClassMethodTypesExt.begin(), OptClassMethodTypesExt.end());
+      return buildMethodList(AllMethodTypesExt,
                              "_PROTOCOL_METHOD_TYPES_");
     }
 
@@ -1496,16 +1527,27 @@ namespace {
           return;
         
         SmallVectorImpl<llvm::Constant *> *methods;
+        SmallVectorImpl<llvm::Constant *> *extMethodTypes = nullptr;
         if (var->getAttrs().hasAttribute<OptionalAttr>()) {
-          if (var->isStatic())
+          if (var->isStatic()) {
             methods = &OptClassMethods;
-          else
+            if (isBuildingProtocol())
+              extMethodTypes = &OptClassMethodTypesExt;
+          } else {
             methods = &OptInstanceMethods;
+            if (isBuildingProtocol())
+              extMethodTypes = &OptInstanceMethodTypesExt;
+          }
         } else {
-          if (var->isStatic())
+          if (var->isStatic()) {
             methods = &ClassMethods;
-          else
+            if (isBuildingProtocol())
+              extMethodTypes = &ClassMethodTypesExt;
+          } else {
             methods = &InstanceMethods;
+            if (isBuildingProtocol())
+              extMethodTypes = &InstanceMethodTypesExt;
+          }
         }
 
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
@@ -1513,6 +1555,15 @@ namespace {
 
         if (getter_setter.second)
           methods->push_back(getter_setter.second);
+        
+        // Get the getter and setter extended encodings, if needed.
+        if (extMethodTypes) {
+          extMethodTypes->push_back(
+                          getMethodTypeExtendedEncoding(IGM, var->getGetter()));
+          if (auto setter = var->getSetter())
+            extMethodTypes->push_back(
+                          getMethodTypeExtendedEncoding(IGM, setter));
+        }
       }
     }
     
@@ -1689,16 +1740,30 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
       auto getter_setter = emitObjCSubscriptMethodDescriptors(IGM, subscript);
-      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>()) {
         OptInstanceMethods.push_back(getter_setter.first);
-      else
+        if (isBuildingProtocol())
+          OptInstanceMethodTypesExt.push_back(
+                    getMethodTypeExtendedEncoding(IGM, subscript->getGetter()));
+      } else {
         InstanceMethods.push_back(getter_setter.first);
+        if (isBuildingProtocol())
+          InstanceMethodTypesExt.push_back(
+                    getMethodTypeExtendedEncoding(IGM, subscript->getGetter()));
+      }
 
       if (getter_setter.second) {
-        if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+        if (subscript->getAttrs().hasAttribute<OptionalAttr>()) {
           OptInstanceMethods.push_back(getter_setter.second);
-        else
+          if (isBuildingProtocol())
+            OptInstanceMethodTypesExt.push_back(
+                    getMethodTypeExtendedEncoding(IGM, subscript->getSetter()));
+        } else {
           InstanceMethods.push_back(getter_setter.second);
+          if (isBuildingProtocol())
+            InstanceMethodTypesExt.push_back(
+                    getMethodTypeExtendedEncoding(IGM, subscript->getSetter()));
+        }
       }
     }
   };

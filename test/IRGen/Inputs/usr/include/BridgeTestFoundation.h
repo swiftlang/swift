@@ -4,6 +4,18 @@
 - (NSString*)uppercaseString;
 @end
 
+@interface NSMutableString : NSString
+@end
+
+@interface NSArray : NSObject
+@end
+
+@interface NSMutableArray : NSObject
+@end
+
+@interface NSNumber : NSObject
+@end
+
 @interface Foo
 
 - (NSString*) foo;
