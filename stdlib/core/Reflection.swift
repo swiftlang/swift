@@ -392,7 +392,7 @@ struct _StructMirror: MirrorType {
   }
 
   var summary: String {
-    return _stdlib_demangleName(_stdlib_getTypeName(value))
+    return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Struct }
@@ -421,7 +421,7 @@ struct _ClassMirror: MirrorType {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return _stdlib_demangleName(_stdlib_getTypeName(value))
+    return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: QuickLookObject? {
     return _getClassQuickLookObject(data)
@@ -446,7 +446,7 @@ struct _ClassSuperMirror: MirrorType {
     return _getClassChild(i, data)
   }
   var summary: String {
-    return _stdlib_demangleName(_stdlib_getTypeName(value))
+    return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Class }

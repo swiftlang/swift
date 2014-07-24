@@ -67,6 +67,11 @@ public func _stdlib_getTypeName<T>(value: T) -> String {
   return result
 }
 
+/// Returns the human-readable type name for the given value.
+public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
+  return _stdlib_demangleName(_stdlib_getTypeName(value))
+}
+
 @asmname("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
     mangledName: UnsafePointer<UInt8>,

@@ -98,8 +98,8 @@ public func expectEqual<T>(
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
     if collectMoreInfo { println(collectMoreInfo!()) }
     println()
   }
@@ -112,7 +112,7 @@ public func expectNotEqual<T : Equatable>(
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
   }
 }
@@ -126,8 +126,8 @@ public func expectOptionalEqual<T : Equatable>(
   if !actual || expected != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
   }
 }
@@ -164,7 +164,7 @@ func _expectNotEqual${Generic}(
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
   }
 }
@@ -480,7 +480,7 @@ public func expectEqualSequence<
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
     println("expected elements: \"\(expected)\"")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     if collectMoreInfo { println(collectMoreInfo!()) }
     println()
   }
