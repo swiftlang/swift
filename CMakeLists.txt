@@ -214,10 +214,10 @@ set(SWIFT_EXTRA_FLAGS "" CACHE STRING
 
 set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
 if ( PATH_TO_SWIFT_BUILD STREQUAL "" )
-   set(SWIFT_COMPILER "swift")
+   set(SWIFT_EXEC "swift")
    set(SWIFT_IDE_TEST "swift-ide-test")
 else()
-   set(SWIFT_COMPILER "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
+   set(SWIFT_EXEC "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
    set(SWIFT_IDE_TEST "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift-ide-test")
 endif()
 
@@ -486,7 +486,7 @@ function(compile_swift_files)
       set(apinote_input_file
         "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
       list(APPEND create_apinotes
-        COMMAND ${SWIFT_COMPILER} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_input_file}
+        COMMAND ${SWIFT_EXEC} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_input_file}
         DEPENDS ${apinote_input_file})
 
       list(APPEND apinote_files ${apinote_file})
@@ -506,10 +506,11 @@ function(compile_swift_files)
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
 
-  if (TARGET "${SWIFT_COMPILER}")
-    set(swift_compiler_path "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${SWIFT_COMPILER}")
+  # swiftc
+  if (TARGET "${SWIFT_EXEC}")
+    set(swift_compiler_path "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${SWIFT_EXEC}c")
   else()
-    set(swift_compiler_path "${SWIFT_COMPILER}")
+    set(swift_compiler_path "${SWIFT_EXEC}c")
   endif()
   
   if (apinote_files AND SWIFT_IDE_TEST STREQUAL "swift-ide-test")
@@ -526,7 +527,7 @@ function(compile_swift_files)
     ${create_apinotes}
     COMMAND "${line_directive_tool}" ${source_files} -- 
       "${swift_compiler_path}" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS "${SWIFT_COMPILER}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS} ${swift_ide_test_dependency}
+    DEPENDS "${SWIFT_EXEC}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS} ${swift_ide_test_dependency}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
