@@ -95,6 +95,34 @@ Latest
       override init() { super.init() }
     }
 
+* Required initializers are now more prominent in several ways. First,
+  a (non-final) class that conforms to a protocol that contains an
+  initializer requirement must provide a required initializer to
+  satisfy that requirement. This ensures that subclasses will also
+  conform to the protocol, and will be most visible with classes that
+  conform to NSCoding:
+
+    class MyClass : NSObject, NSCoding {
+      required init(coder aDecoder: NSCoder!) { /*... */ }
+      func encodeWithCoder(aCoder: NSCoder!) { /* ... */ }
+    }
+
+  Second, because 'required' places a significant requirement on all
+  subclasses, the 'required' keyword must be placed on overrides of a
+  required initializer:
+
+    class MySubClass : MyClass {
+      var title: String = "Untitled"
+
+      required init(coder aDecoder: NSCoder!) { /*... */ }
+      override func encodeWithCoder(aCoder: NSCoder!) { /* ... */ }
+    }
+
+  Finally, required initializers can now be inherited like any other
+  initializer:
+
+    class MySimpleSubClass : MyClass { } // inherits the required init(coder:).
+
 2014-07-21
 ----------
 
