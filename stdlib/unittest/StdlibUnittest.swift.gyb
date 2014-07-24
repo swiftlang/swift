@@ -98,8 +98,8 @@ public func expectEqual<T>(
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected)))")
     if collectMoreInfo { println(collectMoreInfo!()) }
     println()
   }
@@ -107,14 +107,12 @@ public func expectEqual<T>(
 
 public func expectNotEqual<T : Equatable>(
     expected: T, actual: T,
-    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -128,8 +126,8 @@ public func expectOptionalEqual<T : Equatable>(
   if !actual || expected != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -166,7 +164,7 @@ func _expectNotEqual${Generic}(
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     println()
   }
 }
@@ -482,7 +480,7 @@ public func expectEqualSequence<
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
     println("expected elements: \"\(expected)\"")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual)))")
     if collectMoreInfo { println(collectMoreInfo!()) }
     println()
   }

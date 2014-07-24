@@ -121,8 +121,15 @@ extension String {
 }
 
 public func ==(lhs: Character, rhs: Character) -> Bool {
-  // FIXME(performance): constructing two temporary strings is extremely
-  // wasteful and inefficient.
-  return String(lhs) == String(rhs)
+  switch (lhs, rhs) {
+  case (.LargeRepresentation(let lhsValue), .LargeRepresentation(let rhsValue)):
+    return lhsValue._value == rhsValue._value
+
+  case (.SmallRepresentation(let lhsValue), .SmallRepresentation(let rhsValue)):
+    return Character._smallValue(lhsValue) == Character._smallValue(rhsValue)
+
+  default:
+    return false
+  }
 }
 

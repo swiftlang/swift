@@ -173,26 +173,19 @@ extension String {
   }
 }
 
-/// Compare two strings, normalizing them to NFD first.
-///
-/// The behavior is equivalent to `NSString.compare()` with default options.
-///
-/// :returns:
-///   * -1 if `lhs < rhs`,
-///   * 0 if `lhs == rhs`,
-///   * 1 if `lhs > rhs`.
-@asmname("swift_stdlib_compareNSStringNormalizingToNFD")
-func _stdlib_compareNSStringNormalizingToNFD(lhs: AnyObject, rhs: AnyObject)
-    -> Int
-
 extension String: Equatable {
 }
 
 public func ==(lhs: String, rhs: String) -> Bool {
-  // Note: this operation should be consistent with equality comparison of
-  // Character.
-  return _stdlib_compareNSStringNormalizingToNFD(
-    lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
+  // FIXME: Compares UnicodeScalars, but should eventually do proper
+  // Unicode string comparison. This is above the level of the
+  // standard equal algorithm because even the largest units
+  // (Characters/a.k.a. grapheme clusters) don't have a 1-for-1
+  // correspondence.  For example, "SS" == "ß" should be true.
+  //
+  // NOTE: if this algorithm is changed, consider updating equality comparison
+  // of Character.
+  return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)
 }
 
 public func <(lhs: String, rhs: String) -> Bool {
