@@ -177,3 +177,14 @@ func testSubDefArg() -> SubDefArg {
 }
 
 // CHECK-NOT: sil @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@thin () -> Int
+
+// <rdar://problem/17379550>
+func takeDefaultArgUnnamed(_ x: Int = 5) { }
+
+// CHECK-LABEL: il @_TF17default_arguments25testTakeDefaultArgUnnamed
+func testTakeDefaultArgUnnamed(i: Int) {
+  // CHECK: bb0([[I:%[0-9]+]] : $Int):
+  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@thin (Int) -> ()
+  // CHECK:   apply [[FN]]([[I]]) : $@thin (Int) -> ()
+  takeDefaultArgUnnamed(i)
+}

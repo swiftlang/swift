@@ -3851,16 +3851,16 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     arg->setType(anythingShuffled? argTupleType : paramType);
   }
 
-  // If we don't have to shuffle anything, we're done.
-  if (!anythingShuffled)
-    return arg;
-
   // If we came from a scalar, create a scalar-to-tuple conversion.
-  if (!argTuple) {
+  if (!argTuple && isa<TupleType>(paramType.getPointer())) {
     auto elements = tc.Context.AllocateCopy(scalarToTupleElements);
     return new (tc.Context) ScalarToTupleExpr(arg, paramType, elements,
                                               injectionFn);
   }
+
+  // If we don't have to shuffle anything, we're done.
+  if (!anythingShuffled)
+    return arg;
 
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
