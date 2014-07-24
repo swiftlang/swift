@@ -604,9 +604,8 @@ NSStringAPIs.test("hash") {
 
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
   var s: String = "abc あかさた"
-  var bytes: [UInt8] = Array(s.utf8)
-  expectOptionalEqual(s, String.stringWithBytes(bytes, length: bytes.count,
-      encoding: NSUTF8StringEncoding))
+  expectOptionalEqual(
+    s, String.stringWithBytes(s.utf8, encoding: NSUTF8StringEncoding))
 
   /*
   FIXME: Test disabled because the NSString documentation is unclear about

@@ -723,17 +723,16 @@ extension String {
   //     length:(NSUInteger)length
   //     encoding:(NSStringEncoding)encoding
 
-  /// Returns an initialized NSString object containing a given
-  /// number of bytes from a given buffer of bytes interpreted in a
-  /// given encoding.  Note: will store a maximum of
-  /// `min(bytes.count, length)` bytes.
-  public static func stringWithBytes(
-    var bytes: [UInt8], 
-    length: Int, 
-    encoding: NSStringEncoding
+  /// Returns an initialized `NSString` object equivalent to the given
+  /// `bytes` interpreted in the given `encoding`.
+  public static func stringWithBytes<
+    S: SequenceType where S.Generator.Element == UInt8
+  >(
+    bytes: S, encoding: NSStringEncoding
   ) -> String? {
+    let byteArray = Array(bytes)
     return NSString(
-      bytes: bytes, length: min(bytes.count, length), encoding: encoding
+      bytes: byteArray, length: byteArray.count, encoding: encoding
     ) as NSString? // HACK: FIXME: coerce to optional NSString to handle nil
   }
 
