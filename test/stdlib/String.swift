@@ -260,27 +260,27 @@ func testCompare() {
   // CHECK: testCompare
   println("testCompare")
   // CHECK: 1
-  println("hi".compare("bye"))
+  println("hi".unicodeScalars.compare("bye".unicodeScalars))
   // CHECK: -1
-  println("bye".compare("hi"))
+  println("bye".unicodeScalars.compare("hi".unicodeScalars))
   // CHECK: 0
-  println("swift".compare("swift"))
+  println("swift".unicodeScalars.compare("swift".unicodeScalars))
   // CHECK: 1
-  println("a".compare(""))
+  println("a".unicodeScalars.compare("".unicodeScalars))
   // CHECK: 0
-  println("a".compare("a"))
+  println("a".unicodeScalars.compare("a".unicodeScalars))
   // CHECK: -1
-  println("a".compare("z"))
+  println("a".unicodeScalars.compare("z".unicodeScalars))
   // CHECK: 1
-  println("aa".compare("a"))
+  println("aa".unicodeScalars.compare("a".unicodeScalars))
   // CHECK: -1
-  println("a".compare("aa"))
+  println("a".unicodeScalars.compare("aa".unicodeScalars))
   // CHECK: 0
-  println("".compare(""))
+  println("".unicodeScalars.compare("".unicodeScalars))
   // CHECK: -1
-  println("a".compare("b"))
+  println("a".unicodeScalars.compare("b".unicodeScalars))
   // CHECK: 1
-  println("b".compare("a"))
+  println("b".unicodeScalars.compare("a".unicodeScalars))
   println("testCompare done")
   // CHECK: testCompare done
 }
@@ -290,27 +290,27 @@ func testCompareUnicode() {
   // CHECK: testCompareUnicode
   println("testCompareUnicode")
   // CHECK: 1
-  println("hi".compare("bye"))
+  println("hi".unicodeScalars.compare("bye".unicodeScalars))
   // CHECK: -1
-  println("bye".compare("hi"))
+  println("bye".unicodeScalars.compare("hi".unicodeScalars))
   // CHECK: 0
-  println("ראשון".compare("ראשון"))
+  println("ראשון".unicodeScalars.compare("ראשון".unicodeScalars))
   // CHECK: 1
-  println("א".compare(""))
+  println("א".unicodeScalars.compare("".unicodeScalars))
   // CHECK: 0
-  println("א".compare("א"))
+  println("א".unicodeScalars.compare("א".unicodeScalars))
   // CHECK: -1
-  println("א".compare("ת"))
+  println("א".unicodeScalars.compare("ת".unicodeScalars))
   // CHECK: 1
-  println("אא".compare("א"))
+  println("אא".unicodeScalars.compare("א".unicodeScalars))
   // CHECK: -1
-  println("א".compare("אא"))
+  println("א".unicodeScalars.compare("אא".unicodeScalars))
   // CHECK: 0
-  println("".compare(""))
+  println("".unicodeScalars.compare("".unicodeScalars))
   // CHECK: -1
-  println("א".compare("ב"))
+  println("א".unicodeScalars.compare("ב".unicodeScalars))
   // CHECK: 1
-  println("ב".compare("א"))
+  println("ב".unicodeScalars.compare("א".unicodeScalars))
   println("testCompareUnicode done")
   // CHECK: testCompareUnicode done
 }
