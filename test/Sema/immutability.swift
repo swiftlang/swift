@@ -321,7 +321,7 @@ class LetClassMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T6'}}
+    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T3'}}
   }
 }
 struct LetStructMembers {
@@ -337,7 +337,7 @@ struct LetStructMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T6'}}
+    updateInt(&a)   // expected-error {{'Int' is not convertible to '@lvalue inout $T3'}}
   }
 }
 

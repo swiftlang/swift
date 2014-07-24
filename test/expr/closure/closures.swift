@@ -66,7 +66,7 @@ func funcdecl5(a: Int, y: Int) {
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{'(($T0, ($T0, $T2) -> Int) -> Int, (($T0, $T2) -> Int, $T2) -> Int) -> Int' is not convertible to 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{'(($T0, ($T0, $T1) -> Int) -> Int, (($T0, $T1) -> Int, $T1) -> Int) -> Int' is not convertible to 'Int'}}
   
   
 }

@@ -1912,6 +1912,7 @@ namespace {
       enum : unsigned {
         Struct,
         Enum,
+        EnumCase,
         Archetype,
         Protocol
       };
@@ -1983,8 +1984,10 @@ namespace {
                                      selected.openedType,
                                      cs.getConstraintLocator(expr),
                                      implicit, /*direct ivar*/false);
-        // If this is an application of a value type method, arrange for us to
-        // check that it gets fully applied.
+        
+        // If this is an application of a value type method or enum constructor,
+        // arrange for us to check that it gets fully applied.
+        EnumElementDecl *eed = nullptr;
         FuncDecl *fn = nullptr;
         Optional<unsigned> kind;
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
@@ -1997,7 +2000,13 @@ namespace {
             kind = MemberPartialApplication::Struct;
           else if (selfTy->getEnumOrBoundGenericEnum())
             kind = MemberPartialApplication::Enum;
-          else
+          else if (auto theCase = dyn_cast<EnumElementDecl>(fnDeclRef->getDecl())) {
+            if (theCase->hasArgumentType()) {
+              eed = theCase;
+              kind = MemberPartialApplication::EnumCase;
+            } else
+              goto not_value_type_member;
+          } else
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
           auto baseTy = pmRef->getBase()->getType();
@@ -2011,14 +2020,19 @@ namespace {
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
         }
-        if (!fn)
-          goto not_value_type_member;
-        if (fn->isInstanceMember())
+        if (fn && fn->isInstanceMember())
           InvalidPartialApplications.insert({
             member,
             // We need to apply all of the non-self argument clauses.
             {fn->getNaturalArgumentCount() - 1, kind.getValue() },
           });
+        else if (eed) {
+          InvalidPartialApplications.insert({
+            member,
+            // Enum elements need to have the constructor applied.
+            { 1, kind.getValue() },
+          });
+        }
 
       not_value_type_member:
         return member;

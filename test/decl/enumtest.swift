@@ -47,7 +47,7 @@ enum MaybeInt {
 
 func test2(a: Int, b: Int, c: MaybeInt) {
   var c = MaybeInt.Some(4)
-  var d = MaybeInt.Some  // Bind the function itself.
+  var d = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
   var e = MaybeInt.Some(b)
 
   test2(1, 2, .None)
@@ -215,7 +215,7 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'($T0) -> $T6' is not identical to 'ZeroOneTwoThree'}}
+  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'($T0) -> $T3' is not identical to 'ZeroOneTwoThree'}}
   var t2 : ZeroOneTwoThree = .One // expected-error {{'(Int) -> ZeroOneTwoThree' is not convertible to 'ZeroOneTwoThree'}}
   var t3 : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
   var t4 : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}

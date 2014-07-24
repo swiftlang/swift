@@ -35,7 +35,7 @@ f4(1, 2, 3)
 
 f2(f2xy)
 f2(f2ab)
-f2(f2yx) // expected-error{{cannot convert the expression's type '$T4' to type '((x: Int, y: Int) -> Int) -> ()'}}
+f2(f2yx) // expected-error{{cannot convert the expression's type '$T2' to type '((x: Int, y: Int) -> Int) -> ()'}}
 
 f3(f3a)
 f3(f3b) // expected-error{{'(x: Int, y: Int)' is not a subtype of 'Int'}}

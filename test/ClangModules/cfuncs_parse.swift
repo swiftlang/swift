@@ -8,14 +8,14 @@ import cfuncs
 
 func test_cfunc1(i: Int) {
   cfunc1() // okay
-  cfunc1(i) // expected-error{{cannot convert the expression's type '$T4' to type '() -> Void'}}
+  cfunc1(i) // expected-error{{cannot convert the expression's type '$T2' to type '() -> Void'}}
 }
 
 func test_cfunc2(i: Int) {
   var f = cfunc2(i, 17)
   var f2 : Float = f
   // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
-  cfunc2(b:17, a:i) // expected-error{{cannot convert the expression's type '$T6' to type 'IntegerLiteralConvertible'}}
+  cfunc2(b:17, a:i) // expected-error{{cannot convert the expression's type '$T3' to type 'IntegerLiteralConvertible'}}
 }
 
 func test_cfunc3_a() {
