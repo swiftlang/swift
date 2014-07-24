@@ -88,6 +88,27 @@
 // RUN: %target-run %t/a.out_Debug 78 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Debug 79 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Debug 80 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 81 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 82 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 83 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 84 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 85 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 86 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 87 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 88 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 89 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 90 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 90 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 91 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 92 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 93 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 94 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 95 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 96 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 97 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 98 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 99 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug 100 2>&1 | FileCheck %s -check-prefix=CHECK
 //
 // RUN: %target-run %t/a.out_Release 1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Release 2 2>&1 | FileCheck %s -check-prefix=CHECK
@@ -169,6 +190,27 @@
 // RUN: %target-run %t/a.out_Release 78 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Release 79 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Release 80 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 81 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 82 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 83 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 84 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 85 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 86 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 87 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 88 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 89 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 90 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 90 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 91 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 92 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 93 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 94 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 95 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 96 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 97 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 98 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 99 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Release 100 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
