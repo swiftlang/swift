@@ -328,7 +328,7 @@ An example of a conformance for ``ObjCInOut``::
                                  value: Builtin.RawPointer) {
       // The reference is autoreleased on return from the caller, so retain it
       // by loading it back as a T?.
-      ref = unsafeBitCast((value, T!.self)
+      ref = unsafeBitCast(value, T!.self)
     }
 
     @transparent
