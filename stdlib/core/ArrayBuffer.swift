@@ -78,12 +78,12 @@ class _IndirectArrayBuffer {
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
     return _ContiguousArrayBuffer(
-      buffer ? reinterpretCast(buffer) as _ContiguousArrayStorage<T> : nil)
+      buffer ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
   }
 
   func getCocoa() -> _CocoaArrayType {
     _sanityCheck(isCocoa)
-    return reinterpretCast(buffer!) as _CocoaArrayType
+    return unsafeBitCast(buffer!, _CocoaArrayType.self)
   }
 }
 
@@ -222,7 +222,7 @@ extension _ArrayBuffer {
       if _fastPath(_isNative) {
         for x in _native[subRange] {
           _precondition(
-            reinterpretCast(x) as AnyObject is T,
+            unsafeBitCast(x, AnyObject.self) is T,
             "NSArray element failed to match the Swift Array Element type")
         }
       }
@@ -255,7 +255,7 @@ extension _ArrayBuffer {
       location:subRange.startIndex,
       length: subRange.endIndex - subRange.startIndex)
 
-    let buffer = reinterpretCast(target) as UnsafeMutablePointer<AnyObject>
+    let buffer = unsafeBitCast(target, UnsafeMutablePointer<AnyObject>.self)
     
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
@@ -351,7 +351,7 @@ extension _ArrayBuffer {
       if _fastPath(_isNative) {
         return _native[i]
       }
-      return reinterpretCast(_nonNative!.objectAtIndex(i))
+      return unsafeBitCast(_nonNative!.objectAtIndex(i), T.self)
     }
     
     nonmutating set {
@@ -411,7 +411,8 @@ extension _ArrayBuffer {
   public
   var identity: Word {
     let p = baseAddress
-    return p != nil ? reinterpretCast(p) : reinterpretCast(owner)
+    return p != nil
+      ? unsafeBitCast(p, Word.self) : unsafeBitCast(owner, Word.self)
   }
   
   //===--- CollectionType conformance -------------------------------------===//
@@ -451,8 +452,9 @@ extension _ArrayBuffer {
   /// representation, the result is an empty buffer.
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
+      typealias OptStorage = _ContiguousArrayStorage<T>?
       return NativeBuffer(
-        reinterpretCast(storage) as _ContiguousArrayStorage<T>?)
+        unsafeBitCast(storage, OptStorage.self))
     }
     else {
       let i = indirect

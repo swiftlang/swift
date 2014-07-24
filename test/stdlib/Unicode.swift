@@ -2379,7 +2379,7 @@ func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
   // itself and its copies should be resilient to CF's fast path functions,
   // because Swift bridging may copy the string to ensure that it is not
   // mutated.
-  let cfstring: CFString = reinterpretCast(nss)
+  let cfstring = unsafeBitCast(nss, CFString.self)
   assert(
     CFStringGetCStringPtr(
       cfstring, CFStringBuiltInEncodings.ASCII.toRaw()) == nil)

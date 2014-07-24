@@ -38,7 +38,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
 
   /// Returns the object located at the specified `index`.
   func objectAtIndex(index: Int) -> AnyObject {
-    let buffer = reinterpretCast(self) as Buffer
+    let buffer = unsafeBitCast(self, Buffer.self)
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       return buffer[index]
     }
@@ -50,7 +50,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   func getObjects(
     aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
-    let buffer = reinterpretCast(self) as Buffer
+    let buffer = unsafeBitCast(self, Buffer.self)
     
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim || count == 0) {
       // These objects are "returned" at +0, so treat them as values to
@@ -64,7 +64,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
       }
       
       for i in range.location..<range.location + range.length {
-        dst++.initialize(reinterpretCast(buffer[i]))
+        dst++.initialize(unsafeBitCast(buffer[i], Word.self))
       }
     }
     else {
@@ -80,7 +80,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>, count bufferSize: Int
   ) -> Int {
-    let buffer = reinterpretCast(self) as Buffer
+    let buffer = unsafeBitCast(self, Buffer.self)
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       var enumerationState = state.memory
       
@@ -88,7 +88,8 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
         return 0
       }
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      enumerationState.itemsPtr = reinterpretCast(buffer.baseAddress)
+      enumerationState.itemsPtr = unsafeBitCast(
+        buffer.baseAddress, AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
       state.memory = enumerationState
       return buffer.value.count
@@ -100,7 +101,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   }
   
   var count: Int {
-    return (reinterpretCast(self) as Buffer).value.count
+    return (unsafeBitCast(self, Buffer.self)).value.count
   }
 
   //===--- Support for bridging arrays non-verbatim-bridged types ---------===//

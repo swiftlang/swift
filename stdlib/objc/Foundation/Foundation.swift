@@ -145,7 +145,7 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
 //
 func _cocoaStringReadAllImpl(
   source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>) {
-  let cfSelf: CFString = reinterpretCast(source)
+  let cfSelf = unsafeBitCast(source, CFString.self)
   CFStringGetCharacters(
   cfSelf, CFRange(location: 0, length: CFStringGetLength(cfSelf)), destination)
 }
@@ -153,7 +153,7 @@ func _cocoaStringReadAllImpl(
 func _cocoaStringToContiguousImpl(
   source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  let cfSelf: CFString = reinterpretCast(source)
+  let cfSelf = unsafeBitCast(source, CFString.self)
   _sanityCheck(CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
 
@@ -194,7 +194,7 @@ func _cocoaStringSliceImpl(
 
 func _cocoaStringSubscriptImpl(
   target: _StringCore, position: Int) -> UTF16.CodeUnit {
-  let cfSelf: CFString = reinterpretCast(target.cocoaBuffer!)
+  let cfSelf = unsafeBitCast(target.cocoaBuffer!, CFString.self)
   _sanityCheck(CFStringGetCharactersPtr(cfSelf)._isNull,
     "Known contiguously-stored strings should already be converted to Swift")
 
@@ -285,7 +285,7 @@ extension String {
     // Treat it as a CF object because presumably that's what these
     // things tend to be, and CF has a fast path that avoids
     // objc_msgSend
-    let cfValue: CFString = reinterpretCast(_cocoaString)
+    let cfValue = unsafeBitCast(_cocoaString, CFString.self)
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
@@ -310,11 +310,11 @@ extension String {
     }
 
     self._core = _StringCore(
-      baseAddress: reinterpretCast(start),
+      baseAddress: unsafeBitCast(start, COpaquePointer.self),
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
-      owner: reinterpretCast(cfImmutableValue))
+      owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self))
   }
 }
 
@@ -327,11 +327,11 @@ extension String : _BridgedToObjectiveCType {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return reinterpretCast(_bridgeToObjectiveCImpl())
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSString.self)
   }
 
   public static func _bridgeFromObjectiveC(x: NSString) -> String {
-    return String(_cocoaString: reinterpretCast(x))
+    return String(_cocoaString: unsafeBitCast(x, NSString.self))
   }
 }
 
@@ -519,7 +519,7 @@ extension Array : _ConditionallyBridgedToObjectiveCType {
   }
 
   public func _bridgeToObjectiveC() -> NSArray {
-    return reinterpretCast(self._buffer._asCocoaArray())
+    return unsafeBitCast(self._buffer._asCocoaArray(), NSArray.self)
   }
 
   public static func _bridgeFromObjectiveC(source: NSArray) -> Array {
@@ -534,11 +534,11 @@ extension Array : _ConditionallyBridgedToObjectiveCType {
     
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
-      return Array(_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
+      return Array(_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
     }
 
     var anyObjectArr: [AnyObject]
-      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
+    = [AnyObject](_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
     return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
@@ -546,7 +546,7 @@ extension Array : _ConditionallyBridgedToObjectiveCType {
       -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr 
-      = [AnyObject](_ArrayBuffer(reinterpretCast(source) as _CocoaArrayType))
+    = [AnyObject](_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
     if _isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }
@@ -576,9 +576,11 @@ extension Dictionary {
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaDictionary: _SwiftNSDictionaryType) {
-    let cfValue: CFDictionary = reinterpretCast(_cocoaDictionary)
+    let cfValue = unsafeBitCast(_cocoaDictionary, CFDictionary.self)
     let copy = CFDictionaryCreateCopy(nil, cfValue)
-    self = Dictionary(_immutableCocoaDictionary: reinterpretCast(copy))
+    self = Dictionary(
+      _immutableCocoaDictionary:
+        unsafeBitCast(copy, _SwiftNSDictionaryType.self))
   }
 }
 
@@ -629,7 +631,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
   }
 
   public func _bridgeToObjectiveC() -> NSDictionary {
-    return reinterpretCast(_bridgeToObjectiveCImpl())
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), NSDictionary.self)
   }
 
   public static func _bridgeFromObjectiveC(d: NSDictionary) -> Dictionary {
@@ -640,7 +642,8 @@ extension Dictionary : _ConditionallyBridgedToObjectiveCType {
 
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
-      return [Key : Value](_cocoaDictionary: reinterpretCast(d))
+      return [Key : Value](
+        _cocoaDictionary: unsafeBitCast(d, _SwiftNSDictionaryType.self))
     }
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
@@ -883,7 +886,7 @@ func _getObjCChild(Int, _MagicMirrorData) -> (String, MirrorType)
 func _getObjCSummary(data: _MagicMirrorData) -> String {
   // FIXME: Trying to call debugDescription on AnyObject crashes.
   // <rdar://problem/16349526>
-  // Work around by reinterpretCasting to NSObject and hoping for the best.
+  // Work around by unsafeBitCast'ing to NSObject and hoping for the best.
   return (data._loadValue() as NSObject).debugDescription
 }
 

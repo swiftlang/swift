@@ -447,8 +447,8 @@ extension Array {
     count: Builtin.Word
   ) -> Array {
     let elements = UnsafeBufferPointer(
-      start: reinterpretCast(base) as UnsafeMutablePointer<T>,
-      length: reinterpretCast(count) as Int
+      start: unsafeBitCast(base, UnsafeMutablePointer<T>.self),
+      length: unsafeBitCast(count, Int.self)
     )
     let r = Array(elements)
     _fixLifetime(owner)
@@ -965,8 +965,8 @@ public func _arrayDownCastConditional<Base, Derived>(
     // We can skip the check if Derived happens to be AnyObject
     if !(AnyObject.self is Derived.Type) {
       for element in a {
-        // FIXME: reinterpretCast works around <rdar://problem/16953026>
-        if !(reinterpretCast(element) as AnyObject is Derived) {
+        // FIXME: unsafeBitCast works around <rdar://problem/16953026>
+        if !(unsafeBitCast(element, AnyObject.self) is Derived) {
           return nil
         }
       }
@@ -989,7 +989,7 @@ public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   for value in source {
     let bridged: AnyObject? = _bridgeToObjectiveC(value)
     _precondition(bridged, "array element cannot be bridged to Objective-C")
-    p++.initialize(reinterpretCast(bridged!))
+    p++.initialize(unsafeBitCast(bridged!, Base.self))
   }
   return Array(_ArrayBuffer(buf))
 }
@@ -1030,7 +1030,7 @@ ElementwiseBridging:
   do {
     for object: Base in source {
       let value = Swift._bridgeFromObjectiveCConditional(
-        reinterpretCast(object), BridgesToDerived.self)
+        unsafeBitCast(object, AnyObject.self), BridgesToDerived.self)
       if _slowPath(!value) {
         break ElementwiseBridging
       }

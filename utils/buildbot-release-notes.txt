@@ -1,6 +1,16 @@
 Latest
 ------
 
+* For greater clarity and explicitness when bypassing the type system,
+  reinterpretCast has been renamed unsafeBitCast, and it has acquired
+  a (required) explicit type parameter.  So
+
+    let x: T = reinterpretCast(y)
+
+  becomes
+
+    let x = unsafeBitCast(y, T.self)
+
 * Because their semantics were unclear, the methods "toUnsigned" (on
   the signed integer types) and "toSigned" (on the unsigned integer
   types) have been replaced.  The new idiom is explicit construction

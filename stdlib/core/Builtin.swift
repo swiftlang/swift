@@ -56,7 +56,7 @@ func _canBeClass<T>(_: T.Type) -> Bool {
   return Bool(Builtin.canBeClass(T.self))
 }
 
-/// A brutal bit-cast of something to anything of the same size
+@availability(*,unavailable,message="it has been renamed 'unsafeBitCast' and has acquired an explicit target type parameter")
 @transparent public
 func reinterpretCast<T, U>(var x: T) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
@@ -64,30 +64,38 @@ func reinterpretCast<T, U>(var x: T) -> U {
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
-/// `reinterpretCast` something to `AnyObject`
+/// A brutal bit-cast of something to anything of the same size
+@transparent public
+func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
+  _precondition(sizeof(T.self) == sizeof(U.self),
+    "can't unsafeBitCast between types of different sizes")
+  return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
+}
+
+/// `unsafeBitCast` something to `AnyObject`
 @transparent public
 func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
-  return reinterpretCast(x)
+  return unsafeBitCast(x, AnyObject.self)
 }
 
 @transparent
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
-  return (reinterpretCast(lhs) as Int) == (reinterpretCast(rhs) as Int)
+  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
 }
 
 @transparent
 func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
-  return (reinterpretCast(lhs) as Int) != (reinterpretCast(rhs) as Int)
+  return !(lhs == rhs)
 }
 
 @transparent
 func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
-  return (reinterpretCast(lhs) as Int) == (reinterpretCast(rhs) as Int)
+  return unsafeBitCast(lhs, Int.self) == unsafeBitCast(rhs, Int.self)
 }
 
 @transparent
 func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
-  return (reinterpretCast(lhs) as Int) != (reinterpretCast(rhs) as Int)
+  return !(lhs == rhs)
 }
 
 /// Tell the optimizer that this code is unreachable if condition is

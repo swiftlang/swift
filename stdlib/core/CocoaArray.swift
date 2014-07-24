@@ -25,7 +25,7 @@ import SwiftShims
 /// getObjects:range: below).  Array<T> is backed by one of these, and
 /// when _isBridgedToObjectiveC(T.self), it can be used directly as an
 /// NSArray.  It is safe to convert between NSArray and _CocoaArrayType via
-/// reinterpretCast.
+/// unsafeBitCast.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _CocoaArrayType {
   func objectAtIndex(index: Int) -> AnyObject
@@ -84,7 +84,10 @@ internal struct _CocoaArrayWrapper : CollectionType {
     }
     
     return contiguousCount >= subRange.endIndex
-    ? reinterpretCast(enumerationState.itemsPtr) + subRange.startIndex : nil
+    ? unsafeBitCast(
+      enumerationState.itemsPtr, UnsafeMutablePointer<AnyObject>.self
+      ) + subRange.startIndex
+    : nil
   }
 
   @transparent

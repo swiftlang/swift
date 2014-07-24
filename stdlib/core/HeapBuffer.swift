@@ -76,10 +76,11 @@ func _swift_isUniquelyReferenced(_: UnsafeMutablePointer<HeapObject>) -> Bool
 // getting a class pointer out of some other types, such as an enum
 // whose first case is a native Swift object and is statically known
 // to be in that case, without affecting its reference count.  Instead
-// we accept everything; reinterpretCast will at least catch
+// we accept everything; unsafeBitCast will at least catch
 // inappropriately-sized things at runtime.
 public func _isUniquelyReferenced<T>(inout x: T) -> Bool {
-  return _swift_isUniquelyReferenced(reinterpretCast(x))
+  return _swift_isUniquelyReferenced(
+    unsafeBitCast(x, UnsafeMutablePointer<HeapObject>.self))
 }
 
 public struct HeapBuffer<Value, Element> : Equatable {
@@ -157,8 +158,8 @@ public struct HeapBuffer<Value, Element> : Equatable {
         capacity * strideof(Element.self)
     let alignMask = HeapBuffer._requiredAlignMask()
 
-    self.storage = reinterpretCast(
-      _swift_bufferAllocate(storageClass, totalSize, alignMask))
+    self.storage = unsafeBitCast(
+      _swift_bufferAllocate(storageClass, totalSize, alignMask), Storage.self)
     self._value.initialize(initializer)
   }
 
@@ -185,7 +186,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   var _nativeObject: Builtin.NativeObject {
-    return reinterpretCast(storage)
+    return unsafeBitCast(storage, Builtin.NativeObject.self)
   }
 
   static func fromNativeObject(x: Builtin.NativeObject) -> HeapBuffer {
@@ -196,7 +197,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
     if !storage {
       return false
     }
-    var workaroundForRadar16119895 = reinterpretCast(storage) as COpaquePointer
+    var workaroundForRadar16119895 = unsafeBitCast(storage, COpaquePointer.self)
     return Swift._isUniquelyReferenced(&workaroundForRadar16119895)
   }
 }

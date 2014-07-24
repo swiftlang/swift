@@ -360,14 +360,13 @@ test_CTypesPrinting()
 
 func test_PointerPrinting() {
   let nullUP = UnsafeMutablePointer<Int>()
-  let fourByteRawPointer: Builtin.RawPointer =
-      reinterpretCast(0xabcd1234)
+  let fourByteRawPointer = unsafeBitCast(0xabcd1234, Builtin.RawPointer)
   var fourByteUP = nullUP
   fourByteUP.value = fourByteRawPointer
 
 #if !(arch(i386) || arch(arm))
-  let eightByteRawPointer: Builtin.RawPointer =
-      reinterpretCast(0xabcddcba12344321 as UWord)
+  let eightByteRawPointer
+    = unsafeBitCast(0xabcddcba12344321 as UWord, Builtin.RawPointer.self)
   var eightByteUP = nullUP
   eightByteUP.value = eightByteRawPointer
 #endif

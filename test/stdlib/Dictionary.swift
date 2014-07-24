@@ -186,7 +186,7 @@ assert(valueCount == 0, "value leak")
 
 func testCOW_Smoke() {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
-  var identity1: Word = reinterpretCast(d1)
+  var identity1 = unsafeBitCast(d1, Word.self)
 
   d1[TestKeyTy(10)] = TestValueTy(1010)
   d1[TestKeyTy(20)] = TestValueTy(1020)
@@ -194,13 +194,13 @@ func testCOW_Smoke() {
 
   var d2 = d1
   acceptsAnyDictionary(d2)
-  assert(identity1 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d2, Word.self))
 
   d2[TestKeyTy(40)] = TestValueTy(2040)
-  assert(identity1 != reinterpretCast(d2))
+  assert(identity1 != unsafeBitCast(d2, Word.self))
 
   d1[TestKeyTy(50)] = TestValueTy(1050)
-  assert(identity1 == reinterpretCast(d1))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
 
   // Keep variables alive.
   acceptsAnyDictionary(d1)
@@ -242,7 +242,7 @@ func getCOWSlowEquatableDictionary()
 
 func testCOW_Fast_IndexesDontAffectUniquenessCheck() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var startIndex = d.startIndex
   var endIndex = d.endIndex
@@ -252,10 +252,10 @@ func testCOW_Fast_IndexesDontAffectUniquenessCheck() {
   assert(!(startIndex >= endIndex))
   assert(!(startIndex > endIndex))
   
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   d[40] = 2040
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -268,7 +268,7 @@ testCOW_Fast_IndexesDontAffectUniquenessCheck()
 
 func testCOW_Slow_IndexesDontAffectUniquenessCheck() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var startIndex = d.startIndex
   var endIndex = d.endIndex
@@ -277,10 +277,10 @@ func testCOW_Slow_IndexesDontAffectUniquenessCheck() {
   assert(startIndex <= endIndex)
   assert(!(startIndex >= endIndex))
   assert(!(startIndex > endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   d[TestKeyTy(40)] = TestValueTy(2040)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -294,7 +294,7 @@ testCOW_Slow_IndexesDontAffectUniquenessCheck()
 
 func testCOW_Fast_SubscriptWithIndexDoesNotReallocate() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var startIndex = d.startIndex
   let empty = startIndex == d.endIndex
@@ -302,10 +302,10 @@ func testCOW_Fast_SubscriptWithIndexDoesNotReallocate() {
   assert(d.startIndex <= d.endIndex)
   assert((d.startIndex >= d.endIndex) == empty)
   assert(!(d.startIndex > d.endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   assert(d[startIndex].1 != 0)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Fast_SubscriptWithIndexDoesNotReallocate done")
 }
@@ -314,7 +314,7 @@ testCOW_Fast_SubscriptWithIndexDoesNotReallocate()
 
 func testCOW_Slow_SubscriptWithIndexDoesNotReallocate() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var startIndex = d.startIndex
   let empty = startIndex == d.endIndex
@@ -322,10 +322,10 @@ func testCOW_Slow_SubscriptWithIndexDoesNotReallocate() {
   assert(d.startIndex <= d.endIndex)
   assert((d.startIndex >= d.endIndex) == empty)
   assert(!(d.startIndex > d.endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   assert(d[startIndex].1.value != 0)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Slow_SubscriptWithIndexDoesNotReallocate done")
 }
@@ -335,14 +335,14 @@ testCOW_Slow_SubscriptWithIndexDoesNotReallocate()
 
 func testCOW_Fast_SubscriptWithKeyDoesNotReallocate() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   assert(d[10]! == 1010)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Insert a new key-value pair.
   d[40] = 2040
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 4)
   assert(d[10]! == 1010)
   assert(d[20]! == 1020)
@@ -351,7 +351,7 @@ func testCOW_Fast_SubscriptWithKeyDoesNotReallocate() {
 
   // Overwrite a value in existing binding.
   d[10] = 2010
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 4)
   assert(d[10]! == 2010)
   assert(d[20]! == 1020)
@@ -360,7 +360,7 @@ func testCOW_Fast_SubscriptWithKeyDoesNotReallocate() {
 
   // Delete an existing key.
   d[10] = nil
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 3)
   assert(d[20]! == 1020)
   assert(d[30]! == 1030)
@@ -368,7 +368,7 @@ func testCOW_Fast_SubscriptWithKeyDoesNotReallocate() {
 
   // Try to delete a key that does not exist.
   d[42] = nil
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 3)
   assert(d[20]! == 1020)
   assert(d[30]! == 1030)
@@ -381,14 +381,14 @@ testCOW_Fast_SubscriptWithKeyDoesNotReallocate()
 
 func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   assert(d[TestKeyTy(10)]!.value == 1010)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Insert a new key-value pair.
   d[TestKeyTy(40)] = TestValueTy(2040)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 4)
   assert(d[TestKeyTy(10)]!.value == 1010)
   assert(d[TestKeyTy(20)]!.value == 1020)
@@ -397,7 +397,7 @@ func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
 
   // Overwrite a value in existing binding.
   d[TestKeyTy(10)] = TestValueTy(2010)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 4)
   assert(d[TestKeyTy(10)]!.value == 2010)
   assert(d[TestKeyTy(20)]!.value == 1020)
@@ -406,7 +406,7 @@ func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
 
   // Delete an existing key.
   d[TestKeyTy(10)] = nil
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 3)
   assert(d[TestKeyTy(20)]!.value == 1020)
   assert(d[TestKeyTy(30)]!.value == 1030)
@@ -414,7 +414,7 @@ func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
 
   // Try to delete a key that does not exist.
   d[TestKeyTy(42)] = nil
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(d.count == 3)
   assert(d[TestKeyTy(20)]!.value == 1020)
   assert(d[TestKeyTy(30)]!.value == 1030)
@@ -428,31 +428,31 @@ testCOW_Slow_SubscriptWithKeyDoesNotReallocate()
 func testCOW_Fast_UpdateValueForKeyDoesNotReallocate() {
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     // Insert a new key-value pair.
     assert(d1.updateValue(2040, forKey: 40) == .None)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(d1[40]! == 2040)
 
     // Overwrite a value in existing binding.
     assert(d1.updateValue(2010, forKey: 10)! == 1010)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(d1[10]! == 2010)
   }
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     // Insert a new key-value pair.
     d2.updateValue(2040, forKey: 40)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
@@ -473,16 +473,16 @@ func testCOW_Fast_UpdateValueForKeyDoesNotReallocate() {
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     // Overwrite a value in existing binding.
     d2.updateValue(2010, forKey: 10)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
@@ -507,33 +507,33 @@ testCOW_Fast_UpdateValueForKeyDoesNotReallocate()
 func testCOW_Slow_AddDoesNotReallocate() {
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     // Insert a new key-value pair.
     assert(!d1.updateValue(TestValueTy(2040), forKey: TestKeyTy(40)))
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(d1.count == 4)
     assert(d1[TestKeyTy(40)]!.value == 2040)
 
     // Overwrite a value in existing binding.
     assert(d1.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))!.value == 1010)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(d1.count == 4)
     assert(d1[TestKeyTy(10)]!.value == 2010)
   }
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     // Insert a new key-value pair.
     d2.updateValue(TestValueTy(2040), forKey: TestKeyTy(40))
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
@@ -554,16 +554,16 @@ func testCOW_Slow_AddDoesNotReallocate() {
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     // Overwrite a value in existing binding.
     d2.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
@@ -588,26 +588,26 @@ testCOW_Slow_AddDoesNotReallocate()
 
 func testCOW_Fast_IndexForKeyDoesNotReallocate() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   // Find an existing key.
   if true {
     var foundIndex1 = d.indexForKey(10)!
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
 
     var foundIndex2 = d.indexForKey(10)!
     assert(foundIndex1 == foundIndex2)
 
     assert(d[foundIndex1].0 == 10)
     assert(d[foundIndex1].1 == 1010)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
   }
 
   // Try to find a key that is not present.
   if true {
     var foundIndex1 = d.indexForKey(1111)
     assert(!foundIndex1)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
   }
 
   println("testCOW_Fast_IndexForKeyDoesNotReallocate done")
@@ -617,26 +617,26 @@ testCOW_Fast_IndexForKeyDoesNotReallocate()
 
 func testCOW_Slow_IndexForKeyDoesNotReallocate() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   // Find an existing key.
   if true {
     var foundIndex1 = d.indexForKey(TestKeyTy(10))!
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
 
     var foundIndex2 = d.indexForKey(TestKeyTy(10))!
     assert(foundIndex1 == foundIndex2)
 
     assert(d[foundIndex1].0 == TestKeyTy(10))
     assert(d[foundIndex1].1.value == 1010)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
   }
 
   // Try to find a key that is not present.
   if true {
     var foundIndex1 = d.indexForKey(TestKeyTy(1111))
     assert(!foundIndex1)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
   }
 
   println("testCOW_Slow_IndexForKeyDoesNotReallocate done")
@@ -648,36 +648,36 @@ testCOW_Slow_IndexForKeyDoesNotReallocate()
 func testCOW_Fast_RemoveAtIndexDoesNotReallocate() {
   if true {
     var d = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
 
     let foundIndex1 = d.indexForKey(10)!
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
 
     assert(d[foundIndex1].0 == 10)
     assert(d[foundIndex1].1 == 1010)
 
     d.removeAtIndex(foundIndex1)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(!d.indexForKey(10))
   }
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     var foundIndex1 = d2.indexForKey(10)!
     assert(d2[foundIndex1].0 == 10)
     assert(d2[foundIndex1].1 == 1010)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     d2.removeAtIndex(foundIndex1)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
     assert(!d2.indexForKey(10))
   }
 
@@ -689,34 +689,34 @@ testCOW_Fast_RemoveAtIndexDoesNotReallocate()
 func testCOW_Slow_RemoveAtIndexDoesNotReallocate() {
   if true {
     var d = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
 
     var foundIndex1 = d.indexForKey(TestKeyTy(10))!
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
 
     assert(d[foundIndex1].0 == TestKeyTy(10))
     assert(d[foundIndex1].1.value == 1010)
 
     d.removeAtIndex(foundIndex1)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(!d.indexForKey(TestKeyTy(10)))
   }
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     var foundIndex1 = d2.indexForKey(TestKeyTy(10))!
     assert(d2[foundIndex1].0 == TestKeyTy(10))
     assert(d2[foundIndex1].1.value == 1010)
 
     d2.removeAtIndex(foundIndex1)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
     assert(!d2.indexForKey(TestKeyTy(10)))
   }
 
@@ -729,15 +729,15 @@ testCOW_Slow_RemoveAtIndexDoesNotReallocate()
 func testCOW_Fast_RemoveValueForKeyDoesNotReallocate() {
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var deleted = d1.removeValueForKey(0)
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     deleted = d1.removeValueForKey(10)
     assert(deleted! == 1010)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     // Keep variables alive.
     acceptsAnyDictionary(d1)
@@ -745,18 +745,18 @@ func testCOW_Fast_RemoveValueForKeyDoesNotReallocate() {
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
     var deleted = d2.removeValueForKey(0)
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     deleted = d2.removeValueForKey(10)
     assert(deleted! == 1010)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     // Keep variables alive.
     acceptsAnyDictionary(d1)
@@ -771,15 +771,15 @@ testCOW_Fast_RemoveValueForKeyDoesNotReallocate()
 func testCOW_Slow_RemoveValueForKeyDoesNotReallocate() {
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var deleted = d1.removeValueForKey(TestKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     deleted = d1.removeValueForKey(TestKeyTy(10))
     assert(deleted!.value == 1010)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     // Keep variables alive.
     acceptsAnyDictionary(d1)
@@ -787,18 +787,18 @@ func testCOW_Slow_RemoveValueForKeyDoesNotReallocate() {
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
     var deleted = d2.removeValueForKey(TestKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
 
     deleted = d2.removeValueForKey(TestKeyTy(10))
     assert(deleted!.value == 1010)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 != reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 != unsafeBitCast(d2, Word.self))
 
     // Keep variables alive.
     acceptsAnyDictionary(d1)
@@ -821,32 +821,32 @@ func testCOW_Fast_RemoveAllDoesNotReallocate() {
     d.removeAll()
     // We can not assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
     assert(d.count == 0)
     assert(!d[10])
 
     d.removeAll()
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d.count == 0)
     assert(!d[10])
   }
 
   if true {
     var d = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     let originalCapacity = d._variantStorage.native.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(!d[10])
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(!d[10])
@@ -854,14 +854,14 @@ func testCOW_Fast_RemoveAllDoesNotReallocate() {
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
 
     var d2 = d1
     d2.removeAll()
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
@@ -875,15 +875,15 @@ func testCOW_Fast_RemoveAllDoesNotReallocate() {
 
   if true {
     var d1 = getCOWFastDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     let originalCapacity = d1._variantStorage.native.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
     var d2 = d1
     d2.removeAll(keepCapacity: true)
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
@@ -911,32 +911,32 @@ func testCOW_Slow_RemoveAllDoesNotReallocate() {
     d.removeAll()
     // We can not assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(d._variantStorage.native.capacity < originalCapacity)
     assert(d.count == 0)
     assert(!d[TestKeyTy(10)])
 
     d.removeAll()
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d.count == 0)
     assert(!d[TestKeyTy(10)])
   }
 
   if true {
     var d = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     let originalCapacity = d._variantStorage.native.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(!d[TestKeyTy(10)])
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity == originalCapacity)
     assert(d.count == 0)
     assert(!d[TestKeyTy(10)])
@@ -944,14 +944,14 @@ func testCOW_Slow_RemoveAllDoesNotReallocate() {
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
     d2.removeAll()
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
@@ -965,15 +965,15 @@ func testCOW_Slow_RemoveAllDoesNotReallocate() {
 
   if true {
     var d1 = getCOWSlowDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     let originalCapacity = d1._variantStorage.native.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
     d2.removeAll(keepCapacity: true)
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
@@ -994,10 +994,10 @@ testCOW_Slow_RemoveAllDoesNotReallocate()
 
 func testCOW_Fast_CountDoesNotReallocate() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   assert(d.count == 3)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Fast_CountDoesNotReallocate done")
 }
@@ -1006,10 +1006,10 @@ testCOW_Fast_CountDoesNotReallocate()
 
 func testCOW_Slow_CountDoesNotReallocate() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   assert(d.count == 3)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Slow_CountDoesNotReallocate done")
 }
@@ -1019,7 +1019,7 @@ testCOW_Slow_CountDoesNotReallocate()
 
 func testCOW_Fast_GenerateDoesNotReallocate() {
   var d = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
@@ -1027,7 +1027,7 @@ func testCOW_Fast_GenerateDoesNotReallocate() {
     pairs += [(key, value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Fast_GenerateDoesNotReallocate done")
 }
@@ -1036,7 +1036,7 @@ testCOW_Fast_GenerateDoesNotReallocate()
 
 func testCOW_Slow_GenerateDoesNotReallocate() {
   var d = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
@@ -1055,7 +1055,7 @@ func testCOW_Slow_GenerateDoesNotReallocate() {
     pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("testCOW_Slow_GenerateDoesNotReallocate done")
 }
@@ -1065,19 +1065,19 @@ testCOW_Slow_GenerateDoesNotReallocate()
 
 func testCOW_Fast_EqualityTestDoesNotReallocate() {
   var d1 = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d1)
+  var identity1 = unsafeBitCast(d1, Word.self)
 
   var d2 = getCOWFastDictionary()
-  var identity2: Word = reinterpretCast(d2)
+  var identity2 = unsafeBitCast(d2, Word.self)
 
   assert(d1 == d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   d2[40] = 2040
   assert(d1 != d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   println("testCOW_Fast_EqualityTestDoesNotReallocate done")
 }
@@ -1086,19 +1086,19 @@ testCOW_Fast_EqualityTestDoesNotReallocate()
 
 func testCOW_Slow_EqualityTestDoesNotReallocate() {
   var d1 = getCOWSlowEquatableDictionary()
-  var identity1: Word = reinterpretCast(d1)
+  var identity1 = unsafeBitCast(d1, Word.self)
 
   var d2 = getCOWSlowEquatableDictionary()
-  var identity2: Word = reinterpretCast(d2)
+  var identity2 = unsafeBitCast(d2, Word.self)
 
   assert(d1 == d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   d2[TestKeyTy(40)] = TestEquatableValueTy(2040)
   assert(d1 != d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   println("testCOW_Slow_EqualityTestDoesNotReallocate done")
 }
@@ -1791,7 +1791,7 @@ func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKey
 
 func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {
   var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
@@ -1820,7 +1820,7 @@ test_BridgedFromObjC_Verbatim_DictionaryIsCopied()
 
 func test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied() {
   var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   // Find an existing key.
@@ -1850,7 +1850,7 @@ test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied()
 
 func test_BridgedFromObjC_Verbatim_IndexForKey() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
@@ -1870,7 +1870,7 @@ func test_BridgedFromObjC_Verbatim_IndexForKey() {
 
   // Try to find a key that does not exist.
   assert(!d.indexForKey(TestObjCKeyTy(40)))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_IndexForKey done")
 }
@@ -1879,7 +1879,7 @@ test_BridgedFromObjC_Verbatim_IndexForKey()
 
 func test_BridgedFromObjC_Nonverbatim_IndexForKey() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   // Find an existing key.
@@ -1899,7 +1899,7 @@ func test_BridgedFromObjC_Nonverbatim_IndexForKey() {
 
   // Try to find a key that does not exist.
   assert(!d.indexForKey(TestBridgedKeyTy(40)))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_IndexForKey done")
 }
@@ -1908,7 +1908,7 @@ test_BridgedFromObjC_Nonverbatim_IndexForKey()
 
 func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var startIndex = d.startIndex
@@ -1918,7 +1918,7 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
   assert(startIndex <= endIndex)
   assert(!(startIndex >= endIndex))
   assert(!(startIndex > endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
@@ -1927,7 +1927,7 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
     pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -1940,7 +1940,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithIndex()
 
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var startIndex = d.startIndex
@@ -1950,7 +1950,7 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
   assert(startIndex <= endIndex)
   assert(!(startIndex >= endIndex))
   assert(!(startIndex > endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
@@ -1959,7 +1959,7 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
     pairs += [kv]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -1972,7 +1972,7 @@ test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex()
 
 func test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty() {
   var d = getBridgedVerbatimDictionary([:])
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var startIndex = d.startIndex
@@ -1982,7 +1982,7 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty() {
   assert(startIndex <= endIndex)
   assert(startIndex >= endIndex)
   assert(!(startIndex > endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -1995,7 +1995,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty()
 
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
   var d = getBridgedNonverbatimDictionary([:])
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var startIndex = d.startIndex
@@ -2005,7 +2005,7 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
   assert(startIndex <= endIndex)
   assert(startIndex >= endIndex)
   assert(!(startIndex > endIndex))
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Keep indexes alive during the calls above.
   withExtendedLifetime(startIndex) { () }
@@ -2018,7 +2018,7 @@ test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty()
 
 func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   // Read existing key-value pairs.
@@ -2031,11 +2031,11 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
   v = d[TestObjCKeyTy(30)] as TestObjCValueTy
   assert(v.value == 1030)
 
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Insert a new key-value pair.
   d[TestObjCKeyTy(40)] = TestObjCValueTy(2040)
-  var identity2: Word = reinterpretCast(d)
+  var identity2 = unsafeBitCast(d, Word.self)
   assert(identity1 != identity2)
   assert(isNativeDictionary(d))
   assert(d.count == 4)
@@ -2054,7 +2054,7 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
 
   // Overwrite value in existing binding.
   d[TestObjCKeyTy(10)] = TestObjCValueTy(2010)
-  assert(identity2 == reinterpretCast(d))
+  assert(identity2 == unsafeBitCast(d, Word.self))
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
@@ -2077,7 +2077,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithKey()
 
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithKey() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   // Read existing key-value pairs.
@@ -2090,11 +2090,11 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithKey() {
   v = d[TestBridgedKeyTy(30)]
   assert(v!.value == 1030)
 
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   // Insert a new key-value pair.
   d[TestBridgedKeyTy(40)] = TestBridgedValueTy(2040)
-  var identity2: Word = reinterpretCast(d)
+  var identity2 = unsafeBitCast(d, Word.self)
   assert(identity1 != identity2)
   assert(isNativeDictionary(d))
   assert(d.count == 4)
@@ -2113,7 +2113,7 @@ func test_BridgedFromObjC_Nonverbatim_SubscriptWithKey() {
 
   // Overwrite value in existing binding.
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(2010)
-  assert(identity2 == reinterpretCast(d))
+  assert(identity2 == unsafeBitCast(d, Word.self))
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
@@ -2139,13 +2139,13 @@ func test_BridgedFromObjC_Verbatim_UpdateValueForKey() {
   // Insert a new key-value pair.
   if true {
     var d = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
 
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2040), forKey: TestObjCKeyTy(40))
     assert(!oldValue)
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
@@ -2159,14 +2159,14 @@ func test_BridgedFromObjC_Verbatim_UpdateValueForKey() {
   // Overwrite a value in existing binding.
   if true {
     var d = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
 
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
     assert((oldValue as TestObjCValueTy).value == 1010)
 
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 3)
@@ -2185,13 +2185,13 @@ func test_BridgedFromObjC_Nonverbatim_UpdateValueForKey() {
   // Insert a new key-value pair.
   if true {
     var d = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
 
     var oldValue =
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
     assert(!oldValue)
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
@@ -2205,14 +2205,14 @@ func test_BridgedFromObjC_Nonverbatim_UpdateValueForKey() {
   // Overwrite a value in existing binding.
   if true {
     var d = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
 
     var oldValue =
         d.updateValue(TestBridgedValueTy(2010), forKey: TestBridgedKeyTy(10))!
     assert(oldValue.value == 1010)
 
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 3)
@@ -2230,16 +2230,16 @@ test_BridgedFromObjC_Nonverbatim_UpdateValueForKey()
 
 func test_BridgedFromObjC_Verbatim_RemoveAtIndex() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   let foundIndex1 = d.indexForKey(TestObjCKeyTy(10))!
   assert(d[foundIndex1].0 == TestObjCKeyTy(10))
   assert(d[foundIndex1].1.value == 1010)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   d.removeAtIndex(foundIndex1)
-  assert(identity1 != reinterpretCast(d))
+  assert(identity1 != unsafeBitCast(d, Word.self))
   assert(isNativeDictionary(d))
   assert(d.count == 2)
   assert(!d.indexForKey(TestObjCKeyTy(10)))
@@ -2251,16 +2251,16 @@ test_BridgedFromObjC_Verbatim_RemoveAtIndex()
 
 func test_BridgedFromObjC_Nonverbatim_RemoveAtIndex() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   let foundIndex1 = d.indexForKey(TestBridgedKeyTy(10))!
   assert(d[foundIndex1].0 == TestBridgedKeyTy(10))
   assert(d[foundIndex1].1.value == 1010)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   d.removeAtIndex(foundIndex1)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
   assert(isNativeDictionary(d))
   assert(d.count == 2)
   assert(!d.indexForKey(TestBridgedKeyTy(10)))
@@ -2274,17 +2274,17 @@ test_BridgedFromObjC_Nonverbatim_RemoveAtIndex()
 func test_BridgedFromObjC_Verbatim_RemoveValueForKey() {
   if true {
     var d = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
 
     var deleted: AnyObject? = d.removeValueForKey(TestObjCKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(isCocoaDictionary(d))
 
     deleted = d.removeValueForKey(TestObjCKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
@@ -2292,12 +2292,12 @@ func test_BridgedFromObjC_Verbatim_RemoveValueForKey() {
     assert(!d[TestObjCKeyTy(10)])
     assert(d[TestObjCKeyTy(20)]!.value == 1020)
     assert(d[TestObjCKeyTy(30)]!.value == 1030)
-    assert(identity2 == reinterpretCast(d))
+    assert(identity2 == unsafeBitCast(d, Word.self))
   }
 
   if true {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
     assert(isCocoaDictionary(d1))
@@ -2305,14 +2305,14 @@ func test_BridgedFromObjC_Verbatim_RemoveValueForKey() {
 
     var deleted: AnyObject? = d2.removeValueForKey(TestObjCKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
     assert(isCocoaDictionary(d1))
     assert(isCocoaDictionary(d2))
 
     deleted = d2.removeValueForKey(TestObjCKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2: Word = reinterpretCast(d2)
+    var identity2 = unsafeBitCast(d2, Word.self)
     assert(identity1 != identity2)
     assert(isCocoaDictionary(d1))
     assert(isNativeDictionary(d2))
@@ -2321,12 +2321,12 @@ func test_BridgedFromObjC_Verbatim_RemoveValueForKey() {
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
     assert(d1[TestObjCKeyTy(20)]!.value == 1020)
     assert(d1[TestObjCKeyTy(30)]!.value == 1030)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     assert(!d2[TestObjCKeyTy(10)])
     assert(d2[TestObjCKeyTy(20)]!.value == 1020)
     assert(d2[TestObjCKeyTy(30)]!.value == 1030)
-    assert(identity2 == reinterpretCast(d2))
+    assert(identity2 == unsafeBitCast(d2, Word.self))
   }
 
   println("test_BridgedFromObjC_Verbatim_RemoveValueForKey done")
@@ -2337,17 +2337,17 @@ test_BridgedFromObjC_Verbatim_RemoveValueForKey()
 func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
   if true {
     var d = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
 
     var deleted = d.removeValueForKey(TestBridgedKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(isNativeDictionary(d))
 
     deleted = d.removeValueForKey(TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2: Word = reinterpretCast(d)
+    var identity2 = unsafeBitCast(d, Word.self)
     assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
@@ -2355,12 +2355,12 @@ func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
     assert(!d[TestBridgedKeyTy(10)])
     assert(d[TestBridgedKeyTy(20)]!.value == 1020)
     assert(d[TestBridgedKeyTy(30)]!.value == 1030)
-    assert(identity2 == reinterpretCast(d))
+    assert(identity2 == unsafeBitCast(d, Word.self))
   }
 
   if true {
     var d1 = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
 
     var d2 = d1
     assert(isNativeDictionary(d1))
@@ -2368,14 +2368,14 @@ func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
 
     var deleted = d2.removeValueForKey(TestBridgedKeyTy(0))
     assert(!deleted)
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity1 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity1 == unsafeBitCast(d2, Word.self))
     assert(isNativeDictionary(d1))
     assert(isNativeDictionary(d2))
 
     deleted = d2.removeValueForKey(TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2: Word = reinterpretCast(d2)
+    var identity2 = unsafeBitCast(d2, Word.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d1))
     assert(isNativeDictionary(d2))
@@ -2384,12 +2384,12 @@ func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
     assert(d1[TestBridgedKeyTy(20)]!.value == 1020)
     assert(d1[TestBridgedKeyTy(30)]!.value == 1030)
-    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
 
     assert(!d2[TestBridgedKeyTy(10)])
     assert(d2[TestBridgedKeyTy(20)]!.value == 1020)
     assert(d2[TestBridgedKeyTy(30)]!.value == 1030)
-    assert(identity2 == reinterpretCast(d2))
+    assert(identity2 == unsafeBitCast(d2, Word.self))
   }
 
   println("test_BridgedFromObjC_Nonverbatim_RemoveValueForKey done")
@@ -2401,25 +2401,25 @@ test_BridgedFromObjC_Nonverbatim_RemoveValueForKey()
 func test_BridgedFromObjC_Verbatim_RemoveAll() {
   if true {
     var d = getBridgedVerbatimDictionary([:])
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
     d.removeAll()
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d.count == 0)
   }
 
   if true {
     var d = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestObjCKeyTy(10)]!.value == 1010)
 
     d.removeAll()
-    assert(identity1 != reinterpretCast(d))
+    assert(identity1 != unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity < originalCapacity)
     assert(d.count == 0)
     assert(!d[TestObjCKeyTy(10)])
@@ -2427,14 +2427,14 @@ func test_BridgedFromObjC_Verbatim_RemoveAll() {
 
   if true {
     var d = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestObjCKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 != reinterpretCast(d))
+    assert(identity1 != unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(!d[TestObjCKeyTy(10)])
@@ -2442,7 +2442,7 @@ func test_BridgedFromObjC_Verbatim_RemoveAll() {
 
   if true {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2450,8 +2450,8 @@ func test_BridgedFromObjC_Verbatim_RemoveAll() {
 
     var d2 = d1
     d2.removeAll()
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
@@ -2462,7 +2462,7 @@ func test_BridgedFromObjC_Verbatim_RemoveAll() {
 
   if true {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2470,8 +2470,8 @@ func test_BridgedFromObjC_Verbatim_RemoveAll() {
 
     var d2 = d1
     d2.removeAll(keepCapacity: true)
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestObjCKeyTy(10)]!.value == 1010)
@@ -2488,25 +2488,25 @@ test_BridgedFromObjC_Verbatim_RemoveAll()
 func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
   if true {
     var d = getBridgedNonverbatimDictionary([:])
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
     d.removeAll()
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d.count == 0)
   }
 
   if true {
     var d = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
     d.removeAll()
-    assert(identity1 != reinterpretCast(d))
+    assert(identity1 != unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity < originalCapacity)
     assert(d.count == 0)
     assert(!d[TestBridgedKeyTy(10)])
@@ -2514,14 +2514,14 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
 
   if true {
     var d = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d)
+    var identity1 = unsafeBitCast(d, Word.self)
     assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepCapacity: true)
-    assert(identity1 == reinterpretCast(d))
+    assert(identity1 == unsafeBitCast(d, Word.self))
     assert(d._variantStorage.native.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(!d[TestBridgedKeyTy(10)])
@@ -2529,7 +2529,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
 
   if true {
     var d1 = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2537,8 +2537,8 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
 
     var d2 = d1
     d2.removeAll()
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2549,7 +2549,7 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
 
   if true {
     var d1 = getBridgedNonverbatimDictionary()
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2557,8 +2557,8 @@ func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
 
     var d2 = d1
     d2.removeAll(keepCapacity: true)
-    var identity2: Word = reinterpretCast(d2)
-    assert(identity1 == reinterpretCast(d1))
+    var identity2 = unsafeBitCast(d2, Word.self)
+    assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2575,11 +2575,11 @@ test_BridgedFromObjC_Nonverbatim_RemoveAll()
 
 func test_BridgedFromObjC_Verbatim_Count() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   assert(d.count == 3)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_Count done")
 }
@@ -2588,11 +2588,11 @@ test_BridgedFromObjC_Verbatim_Count()
 
 func test_BridgedFromObjC_Nonverbatim_Count() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   assert(d.count == 3)
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_Count done")
 }
@@ -2602,7 +2602,7 @@ test_BridgedFromObjC_Nonverbatim_Count()
 
 func test_BridgedFromObjC_Verbatim_Generate() {
   var d = getBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
@@ -2617,7 +2617,7 @@ func test_BridgedFromObjC_Verbatim_Generate() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_Generate done")
 }
@@ -2626,7 +2626,7 @@ test_BridgedFromObjC_Verbatim_Generate()
 
 func test_BridgedFromObjC_Nonverbatim_Generate() {
   var d = getBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
@@ -2641,7 +2641,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_Generate done")
 }
@@ -2650,7 +2650,7 @@ test_BridgedFromObjC_Nonverbatim_Generate()
 
 func test_BridgedFromObjC_Verbatim_Generate_Empty() {
   var d = getBridgedVerbatimDictionary([:])
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
@@ -2663,7 +2663,7 @@ func test_BridgedFromObjC_Verbatim_Generate_Empty() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_Generate_Empty done")
 }
@@ -2672,7 +2672,7 @@ test_BridgedFromObjC_Verbatim_Generate_Empty()
 
 func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
   var d = getBridgedNonverbatimDictionary([:])
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
@@ -2685,7 +2685,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_Generate_Empty done")
 }
@@ -2697,7 +2697,7 @@ assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   var d = getHugeBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
@@ -2716,7 +2716,7 @@ func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_Generate_Huge done")
 }
@@ -2725,7 +2725,7 @@ test_BridgedFromObjC_Verbatim_Generate_Huge()
 
 func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
   var d = getHugeBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
@@ -2744,7 +2744,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_Generate_Huge done")
 }
@@ -2756,7 +2756,7 @@ assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   var d = getParallelArrayBridgedVerbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
 
   var gen = d.generate()
@@ -2772,7 +2772,7 @@ func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_Generate_ParallelArray done")
 }
@@ -2785,7 +2785,7 @@ autoreleasepool {
 
 func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
   var d = getParallelArrayBridgedNonverbatimDictionary()
-  var identity1: Word = reinterpretCast(d)
+  var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
 
   var gen = d.generate()
@@ -2801,7 +2801,7 @@ func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
   assert(!gen.next())
   assert(!gen.next())
   assert(!gen.next())
-  assert(identity1 == reinterpretCast(d))
+  assert(identity1 == unsafeBitCast(d, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done")
 }
@@ -2817,26 +2817,26 @@ assert(TestObjCValueTy.objectCount == 0, "value leak")
 
 func test_BridgedFromObjC_Verbatim_EqualityTest_Empty() {
   var d1 = getBridgedVerbatimEquatableDictionary([:])
-  var identity1: Word = reinterpretCast(d1)
+  var identity1 = unsafeBitCast(d1, Word.self)
   assert(isCocoaDictionary(d1))
 
   var d2 = getBridgedVerbatimEquatableDictionary([:])
-  var identity2: Word = reinterpretCast(d2)
+  var identity2 = unsafeBitCast(d2, Word.self)
   assert(isCocoaDictionary(d2))
   assert(identity1 != identity2)
 
   assert(d1 == d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   d2[TestObjCKeyTy(10)] = TestObjCEquatableValueTy(2010)
   assert(isNativeDictionary(d2))
-  assert(identity2 != reinterpretCast(d2))
-  identity2 = reinterpretCast(d2)
+  assert(identity2 != unsafeBitCast(d2, Word.self))
+  identity2 = unsafeBitCast(d2, Word.self)
 
   assert(d1 != d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   println("test_BridgedFromObjC_Verbatim_EqualityTest_Empty done")
 }
@@ -2845,25 +2845,25 @@ test_BridgedFromObjC_Verbatim_EqualityTest_Empty()
 
 func test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty() {
   var d1 = getBridgedNonverbatimEquatableDictionary([:])
-  var identity1: Word = reinterpretCast(d1)
+  var identity1 = unsafeBitCast(d1, Word.self)
   assert(isNativeDictionary(d1))
 
   var d2 = getBridgedNonverbatimEquatableDictionary([:])
-  var identity2: Word = reinterpretCast(d2)
+  var identity2 = unsafeBitCast(d2, Word.self)
   assert(isNativeDictionary(d2))
   assert(identity1 != identity2)
 
   assert(d1 == d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   d2[TestBridgedKeyTy(10)] = TestBridgedEquatableValueTy(2010)
   assert(isNativeDictionary(d2))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   assert(d1 != d2)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity2 == reinterpretCast(d2))
+  assert(identity1 == unsafeBitCast(d1, Word.self))
+  assert(identity2 == unsafeBitCast(d2, Word.self))
 
   println("test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty done")
 }
@@ -2874,11 +2874,11 @@ test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty()
 func test_BridgedFromObjC_Verbatim_EqualityTest_Small() {
   func helper(nd1: Dictionary<Int, Int>, nd2: Dictionary<Int, Int>, expectedEq: Bool) {
     var d1 = getBridgedVerbatimEquatableDictionary(nd1)
-    var identity1: Word = reinterpretCast(d1)
+    var identity1 = unsafeBitCast(d1, Word.self)
     assert(isCocoaDictionary(d1))
 
     var d2 = getBridgedVerbatimEquatableDictionary(nd2)
-    var identity2: Word = reinterpretCast(d2)
+    var identity2 = unsafeBitCast(d2, Word.self)
     assert(isCocoaDictionary(d2))
 
     if true {
@@ -2894,14 +2894,14 @@ func test_BridgedFromObjC_Verbatim_EqualityTest_Small() {
       var neq2 = (d2 != d1)
       assert(neq2 != expectedEq)
     }
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity2 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity2 == unsafeBitCast(d2, Word.self))
 
     d2[TestObjCKeyTy(1111)] = TestObjCEquatableValueTy(1111)
     d2[TestObjCKeyTy(1111)] = nil
     assert(isNativeDictionary(d2))
-    assert(identity2 != reinterpretCast(d2))
-    identity2 = reinterpretCast(d2)
+    assert(identity2 != unsafeBitCast(d2, Word.self))
+    identity2 = unsafeBitCast(d2, Word.self)
 
     if true {
       var eq1 = (d1 == d2)
@@ -2916,8 +2916,8 @@ func test_BridgedFromObjC_Verbatim_EqualityTest_Small() {
       var neq2 = (d2 != d1)
       assert(neq2 != expectedEq)
     }
-    assert(identity1 == reinterpretCast(d1))
-    assert(identity2 == reinterpretCast(d2))
+    assert(identity1 == unsafeBitCast(d1, Word.self))
+    assert(identity2 == unsafeBitCast(d2, Word.self))
   }
 
   helper([:], [:], true)
@@ -3031,8 +3031,9 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
-  let bridged =
-      reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
+  let bridged
+  = unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
+  
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -3041,8 +3042,8 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
 func getBridgedEmptyNSDictionary() -> NSDictionary {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
-  let bridged =
-      reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
+  let bridged
+    = unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
   assert(isNativeNSDictionary(bridged))
 
   return bridged

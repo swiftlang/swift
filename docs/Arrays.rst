@@ -270,7 +270,7 @@ Upcasts
 .......
 
 When up-casting an ``Derived[]`` to ``Base[]``, a buffer of
-``Derived`` object can simply be ``reinterpretCast``\ 'ed to a buffer
+``Derived`` object can simply be ``unsafeBitCast``\ 'ed to a buffer
 of elements of type ``Base``—as long as the resulting buffer is never
 mutated.  For example, we cannot allow a ``Base`` element to be
 inserted in the buffer, because the buffer's destructor will destroy

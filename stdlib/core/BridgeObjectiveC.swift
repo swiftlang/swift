@@ -161,7 +161,7 @@ public protocol _ConditionallyBridgedToObjectiveCType :
 /// - otherwise, the result is empty.
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return reinterpretCast(x) as AnyObject
+    return unsafeBitCast(x, AnyObject.self)
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
@@ -243,7 +243,7 @@ func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 /// A type that's bridged "verbatim" does not conform to
 /// `_BridgedToObjectiveCType`, and can have its bits reinterpreted as an
 /// `AnyObject`.  When this function returns true, the storage of an
-/// `Array<T>` can be `reinterpretCast` as an array of `AnyObject`.
+/// `Array<T>` can be `unsafeBitCast` as an array of `AnyObject`.
 public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
   return _isClassOrObjCExistential(T.self)
 }
@@ -327,14 +327,15 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     @transparent nonmutating set {
       _debugPrecondition(!_isNull)
       // Autorelease the object reference.
-      Builtin.retain(reinterpretCast(newValue) as AnyObject?)
-      Builtin.autorelease(reinterpretCast(newValue) as AnyObject?)
+      typealias OptionalAnyObject = AnyObject?
+      Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
+      Builtin.autorelease(unsafeBitCast(newValue, OptionalAnyObject.self))
       // Trivially assign it as a COpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
       let p = UnsafeMutablePointer<COpaquePointer>(
         UnsafeMutablePointer<T>(self))
-      p.memory = reinterpretCast(newValue)
+        p.memory = unsafeBitCast(newValue, COpaquePointer.self)
     }
   }
 

@@ -15,7 +15,7 @@
 #include <stdint.h>
 
 // This struct is layout-compatible with NSRange.  Using the name
-// "NSRange" here could eliminate some horrible reinterpretCast
+// "NSRange" here could eliminate some horrible unsafeBitCast
 // shenanigans in our briging code, but swift's module importer is not
 // yet tolerant of the same struct coming in from two different Clang
 // modules. <rdar://problem/16294674>

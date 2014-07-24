@@ -320,7 +320,7 @@ An example of a conformance for ``ObjCInOut``::
     -> Builtin.RawPointer {
       // The initial object reference is passed into the callee effectively
       // __unsafe_unretained, so pass it as a RawPointer.
-      return reinterpretCast(ref)
+      return unsafeBitCast(ref, Builtin.RawPointer.self)
     }
 
     @transparent
@@ -328,7 +328,7 @@ An example of a conformance for ``ObjCInOut``::
                                  value: Builtin.RawPointer) {
       // The reference is autoreleased on return from the caller, so retain it
       // by loading it back as a T?.
-      ref = reinterpretCast(value)
+      ref = unsafeBitCast((value, T!.self)
     }
 
     @transparent

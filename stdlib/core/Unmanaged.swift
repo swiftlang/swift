@@ -30,7 +30,7 @@ public struct Unmanaged<T: AnyObject> {
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
-    return Unmanaged(_private: reinterpretCast(value))
+    return Unmanaged(_private: unsafeBitCast(value, T.self))
   }
 
   /// Unsafely turn an unmanaged class reference into an opaque
@@ -43,7 +43,7 @@ public struct Unmanaged<T: AnyObject> {
   ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   func toOpaque() -> COpaquePointer {
-    return reinterpretCast(_value)
+    return unsafeBitCast(_value, COpaquePointer.self)
   }
 
   /// Create an unmanaged reference with an unbalanced retain.

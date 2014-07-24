@@ -199,7 +199,7 @@ public struct ${Self}<T>
       // C.Generator.Element == T constraint here, because C._Element ==
       // C.Generator.Element in all cases, but doing so crashes the
       // type-checker.
-      p++.initialize(reinterpretCast(x))
+      p++.initialize(unsafeBitCast(x, T.self))
     }
   }
 

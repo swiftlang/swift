@@ -38,7 +38,7 @@ public struct ObjectIdentifier : Hashable {
   }
 
   public init(_ x: AnyObject) {
-    self.value = reinterpretCast(x)
+    self.value = unsafeBitCast(x, Builtin.RawPointer.self)
   }
 }
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {

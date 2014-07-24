@@ -82,7 +82,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
     
-    var native = reinterpretCast(owner) as NativeBuffer
+    var native = unsafeBitCast(owner, NativeBuffer.self)
     let offset = start - native.baseAddress
     let eraseCount = countElements(subRange)
     let growth = insertCount - eraseCount
@@ -105,7 +105,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// have the same identity and count.
   public
   var identity: Word {
-    return reinterpretCast(start)
+    return unsafeBitCast(start, Word.self)
   }
   
   
@@ -139,7 +139,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
         // tend to reduce shuffling of later elements.  Since this
         // function isn't called for subscripting, this won't slow
         // down that case.
-        var backing = reinterpretCast(owner) as NativeBuffer
+        var backing = unsafeBitCast(owner, NativeBuffer.self)
         let offset = self.baseAddress - backing.baseAddress
         let backingCount = backing.count
         let myCount = count
@@ -169,7 +169,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer) {
-      return  reinterpretCast(owner) as NativeBuffer
+      return  unsafeBitCast(owner, NativeBuffer.self)
     }
     return nil
   }

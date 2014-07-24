@@ -7,7 +7,7 @@ import Swift
 // ==== Tests =====
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + String(UInt64(reinterpretCast(x) as Word), radix: 16)
+  return "@0x" + String(UInt64(unsafeBitCast(x, Word.self)), radix: 16)
 }
 
 func hexAddr(x: AnyObject?) -> String {
@@ -78,7 +78,7 @@ func nonASCII() {
   // Offset of each character:     0 2 3 4 5 7 9 11
   var nsUTF16 = NSString(UTF8String: "🏂☃❅❆❄︎⛄️❄️")
   // CHECK-NEXT: has UTF-16: true
-  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsUTF16)) != nil)")
+  println("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, CFString.self)) != nil)")
 
   // CHECK: --- UTF-16 basic round-tripping ---
   println("--- UTF-16 basic round-tripping ---")
@@ -124,7 +124,7 @@ func ascii() {
   // treating it as an opaque NSString.
   var nsASCII = NSString(UTF8String: "foobar")
   // CHECK-NEXT: has UTF-16: false
-  println("has UTF-16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafeMutablePointer<UniChar>))")
+  println("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, CFString.self)) != nil)")
 
   // CHECK: --- ASCII basic round-tripping ---
   println("--- ASCII basic round-tripping ---")

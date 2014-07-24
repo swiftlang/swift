@@ -14,8 +14,10 @@ import SwiftShims
 
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
-let emptyNSSwiftArray : _NSSwiftArray
-  = reinterpretCast(_ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
+let emptyNSSwiftArray = unsafeBitCast(
+  _ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0),
+  _NSSwiftArray.self
+)
 
 // The class that implements the storage for a ContiguousArray<T>
 final internal class _ContiguousArrayStorage<T> : _NSSwiftArray {
@@ -126,7 +128,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   init(_ storage: _ContiguousArrayStorage<T>?) {
-    _base = reinterpretCast(storage)
+    _base = unsafeBitCast(storage , HeapBuffer<_ArrayBody, T>.self)
   }
   
   public var hasStorage: Bool {
@@ -335,7 +337,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     if count == 0 {
       return emptyNSSwiftArray
     }
-    return reinterpretCast(_base.storage)
+    return unsafeBitCast(_base.storage, _CocoaArrayType.self)
   }
   
   /// An object that keeps the elements stored in this buffer alive
@@ -349,7 +351,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// have the same identity and count.
   public
   var identity: Word {
-    return reinterpretCast(baseAddress)
+    return unsafeBitCast(baseAddress, Word.self)
   }
 
   /// Return true iff we have storage for elements of the given
@@ -377,8 +379,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     
     // Check the elements
     for x in self {
-      // FIXME: reinterpretCast works around <rdar://problem/16953026>
-      if !(reinterpretCast(x) as AnyObject is U) {
+      // FIXME: unsafeBitCast works around <rdar://problem/16953026>
+      if !(x is U) {
         return false
       }
     }
@@ -387,7 +389,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   
   //===--- private --------------------------------------------------------===//
   var _storage: _ContiguousArrayStorage<T>? {
-    return reinterpretCast(_base.storage)
+    typealias OptionalStorage = _ContiguousArrayStorage<T>?
+    return unsafeBitCast(_base.storage, OptionalStorage.self)
   }
   
   typealias _Base = HeapBuffer<_ArrayBody, T>

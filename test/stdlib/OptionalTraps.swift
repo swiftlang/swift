@@ -22,12 +22,12 @@ var arg = Process.arguments[1]
 if arg == "UnwrapNone1" {
   var a: AnyObject? = returnNil()
   println("OK")
-  var w = reinterpretCast(a!) as Word
+  var w = unsafeBitCast(a!, Word.self)
 }
 
 if arg == "UnwrapNoneFast1" {
   var a: AnyObject? = returnNil()
-  var w = reinterpretCast(a!) as Word
+  var w = unsafeBitCast(a!, Word.self)
   println("Unwrapping .None: \(w)")
   exit(0)
 }

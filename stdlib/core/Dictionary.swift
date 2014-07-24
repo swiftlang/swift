@@ -257,14 +257,14 @@ final class _NativeDictionaryStorageImpl<Key : Hashable, Value> :
 
   deinit {
     let buffer = DictionaryHeapBuffer(
-        reinterpretCast(self) as DictionaryHeapBuffer.Storage)
+      unsafeBitCast(self, DictionaryHeapBuffer.Storage.self))
     let body = buffer.value
     buffer._value.destroy()
     buffer.baseAddress.destroy(body.capacity)
   }
   final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     let buffer = DictionaryHeapBuffer(
-        reinterpretCast(self) as DictionaryHeapBuffer.Storage)
+      unsafeBitCast(self, DictionaryHeapBuffer.Storage.self))
     return buffer._allocatedSizeAndAlignMask()
   }
 }
@@ -1611,8 +1611,8 @@ class _CocoaDictionaryGenerator : GeneratorType {
           &fastEnumerationState, &fastEnumerationStackBuf) {
         (statePtr, bufPtr) -> Int in
         cocoaDictionary.countByEnumeratingWithState(
-            statePtr, objects: reinterpretCast(bufPtr),
-            count: stackBufLength)
+          statePtr, objects: UnsafeMutablePointer(bufPtr),
+          count: stackBufLength)
       }
       if itemCount == 0 {
         itemIndex = -1
@@ -2298,7 +2298,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
-    result[reinterpretCast(k)] = reinterpretCast(v)
+    result[unsafeBitCast(k, BaseKey.self)] = unsafeBitCast(v, BaseValue.self)
   }
   return result
 }
@@ -2332,22 +2332,22 @@ public func _dictionaryBridgeToObjectiveC<
     // Bridge the key
     var bridgedKey: ObjCKey
     if keyBridgesDirectly {
-      bridgedKey = reinterpretCast(key)
+      bridgedKey = unsafeBitCast(key, ObjCKey.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(key)
       _precondition(bridged, "dictionary key cannot be bridged to Objective-C")
-      bridgedKey = reinterpretCast(bridged!)
+      bridgedKey = unsafeBitCast(bridged!, ObjCKey.self)
     }
 
     // Bridge the value
     var bridgedValue: ObjCValue
     if valueBridgesDirectly {
-      bridgedValue = reinterpretCast(value)
+      bridgedValue = unsafeBitCast(value, ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(value)
       _precondition(bridged,
           "dictionary value cannot be bridged to Objective-C")
-      bridgedValue = reinterpretCast(bridged!)
+      bridgedValue = unsafeBitCast(bridged!, ObjCValue.self)
     }
 
     result[bridgedKey] = bridgedValue
@@ -2375,7 +2375,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   case .Native(let nativeOwner):
     // FIXME(performance): this introduces an indirection through Objective-C
     // runtime, even though we access native storage.  But we can not
-    // reinterpretCast the owner object, because that would change the generic
+    // unsafeBitCast the owner object, because that would change the generic
     // arguments.
     //
     // One way to solve this is to add a third, read-only, representation to
@@ -2384,10 +2384,14 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     //
     // Note: it is safe to treat the storage as immutable here because
     // Dictionary will not mutate storage with reference count greater than 1.
-    return Dictionary(_immutableCocoaDictionary: reinterpretCast(nativeOwner))
+    return Dictionary(
+      _immutableCocoaDictionary:
+        unsafeBitCast(nativeOwner, _SwiftNSDictionaryType.self))
 
   case .Cocoa(let cocoaStorage):
-    return Dictionary(_immutableCocoaDictionary: reinterpretCast(cocoaStorage))
+    return Dictionary(
+      _immutableCocoaDictionary:
+        unsafeBitCast(cocoaStorage, _SwiftNSDictionaryType.self))
   }
 }
 
@@ -2528,7 +2532,7 @@ struct _UnmanagedAnyObjectArray {
       return _reinterpretCastToAnyObject(value[i])
     }
     nonmutating set(newValue) {
-      value[i] = reinterpretCast(newValue) as Word
+      value[i] = unsafeBitCast(newValue, Word.self)
     }
   }
 }
