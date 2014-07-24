@@ -2131,8 +2131,8 @@ import SwiftShims
 @objc
 public protocol _SwiftNSFastEnumerationType {
   func countByEnumeratingWithState(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafeMutablePointer<AnyObject>, count: Int
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
 
@@ -2194,8 +2194,8 @@ public protocol _SwiftNSDictionaryRequiredOverridesType :
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
 
   func countByEnumeratingWithState(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafeMutablePointer<AnyObject>, count: Int
+    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>, count: Int
   ) -> Int
 }
 
