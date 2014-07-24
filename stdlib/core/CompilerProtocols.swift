@@ -33,7 +33,8 @@ public protocol BooleanType {
   var boolValue: Bool { get }
 }
 
-/// A `GeneratorType` is a `SequenceType` that is consumed when iterated.
+/// A `GeneratorType` is notionally a `SequenceType` that is consumed
+/// when iterated.
 ///
 /// While it is safe to copy a `GeneratorType`, only one copy should be advanced
 /// with `next()`.
@@ -47,7 +48,17 @@ public protocol BooleanType {
 /// multi-pass.
 public protocol GeneratorType /* : SequenceType */ { 
   // FIXME: Refinement pending <rdar://problem/14396120>
+  
+  /// The type of which `Self` is a generator.
   typealias Element
+
+  /// If all elements are exhausted, return `nil`.  Otherwise, advance
+  /// to the next element and return it.
+  ///
+  /// Note: after `next()` on an arbitrary generator has returned
+  /// `nil`, subsequent calls to `next()` have unspecified behavior.
+  /// Specific implementations of this protocol are encouraged to
+  /// respond by calling `trap("...")`.
   mutating func next() -> Element?
 }
 
@@ -58,7 +69,12 @@ public protocol _SequenceType {
 }
 
 public protocol _Sequence_Type : _SequenceType {
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
   typealias Generator : GeneratorType
+
+  /// Return a generator over the elements of this sequence.  The
+  /// generator's next element is the first element of the sequence.
   func generate() -> Generator
 }
 
