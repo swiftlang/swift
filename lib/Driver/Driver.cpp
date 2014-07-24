@@ -470,11 +470,10 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
       llvm_unreachable("invalid mode opt for interactive driver");
       break;
     }
-
-  // swiftc
-  } else {
-    // TODO
   }
+
+  // Don't warn for swiftc -emit-executable, as some build systems like to be
+  // explicit about everything.
 }
 
 void Driver::buildOutputInfo(const DerivedArgList &Args,
@@ -508,7 +507,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   if (!OutputModeArg) {
     if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
       OI.CompilerOutputType = types::TY_SwiftModuleFile;
-    } else if (Inputs.empty() && !Args.hasArg(options::OPT_v)) {
+    } else if (driverKind == DriverKind::Legacy && Inputs.empty() &&
+               !Args.hasArg(options::OPT_v)) {
       // No inputs and no mode arguments imply REPL mode
       // (Treat -v as a mode, since -v and no other mode arguments means
       // "print the version and exit".)

@@ -72,6 +72,11 @@
 
 // RUN: %swifti_driver -### | FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl
+// RUN: not %swiftc_driver 2>&1 | FileCheck -check-prefix=DEFAULT_EXEC_ERR  %s
+// DEFAULT_EXEC_ERR: error: no input files
+// RUN: %swiftc_driver %s -### 2>&1 | FileCheck -check-prefix=DEFAULT_EXEC  %s
+// DEFAULT_EXEC: -c
+// DEFAULT_EXEC: ld
 
 // RUN: %swifti_driver -repl -### 2>&1 | FileCheck -check-prefix=REPL %s
 // REPL: warning: unnecessary option '-repl'
