@@ -1092,12 +1092,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
       unsigned SizeInBytes =
         llvm::RoundUpToAlignment(Dim.SizeInBits, Dim.AlignInBits) / SizeOfByte;
 
-      if (Var.getName() == "i" && Var.getLineNumber() == 694) {
-        ElementSizes EltSizes(DITy, DIRefMap);
-        EltSizes.getNext();
-        EltSizes.getNext();
-      }
-
       // FIXME: Occasionally we miss out that the Storage is acually a
       // refcount wrapper. Silently skip these for now.
       unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
