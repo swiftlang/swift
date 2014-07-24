@@ -117,3 +117,7 @@ class MyDictionary2 : NSDictionary {
     super.init()
   }
 }
+
+class MyString : NSString {  // expected-error{{class 'MyString' does not implement its superclass's required members}}
+  override init() { super.init() }
+}

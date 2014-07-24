@@ -313,6 +313,10 @@ public:
   bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
                                const clang::ObjCMethodDecl *method);
 
+  /// Determine whether the given method is a required initializer
+  /// of the given class.
+  bool isRequiredInitializer(const clang::ObjCMethodDecl *method);
+
   /// Determine whether the given class method should be imported as
   /// an initializer.
   FactoryAsInitKind getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,

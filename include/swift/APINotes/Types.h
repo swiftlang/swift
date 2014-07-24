@@ -313,10 +313,14 @@ public:
   /// Whether to treat this method as a factory or initializer.
   unsigned FactoryAsInit : 2;
 
+  /// Whether this is a required initializer.
+  unsigned Required : 1;
+
   ObjCMethodInfo()
     : FunctionInfo(),
       DesignatedInit(false),
-      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)) { }
+      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
+      Required(false) { }
 
   FactoryAsInitKind getFactoryAsInitKind() const {
     return static_cast<FactoryAsInitKind>(FactoryAsInit);
@@ -329,7 +333,8 @@ public:
   friend bool operator==(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
     return static_cast<const FunctionInfo &>(lhs) == rhs &&
            lhs.DesignatedInit == rhs.DesignatedInit &&
-           lhs.FactoryAsInit == rhs.FactoryAsInit;
+           lhs.FactoryAsInit == rhs.FactoryAsInit &&
+           lhs.Required == rhs.Required;
   }
 
   friend bool operator!=(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {

@@ -34,6 +34,7 @@ Classes:
         Availability:    available
         AvailabilityMsg: ''
         DesignatedInit:  true
+        Required:        true
   - Name:            NSView
     AuditedForNullability: true
     Availability:    available

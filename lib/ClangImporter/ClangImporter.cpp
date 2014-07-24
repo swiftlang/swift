@@ -1579,6 +1579,16 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
   return false;
 }
 
+bool ClangImporter::Implementation::isRequiredInitializer(
+       const clang::ObjCMethodDecl *method) {
+  // FIXME: No way to express this in Objective-C.
+
+  if (auto info = getKnownObjCMethod(method))
+    return info->Required;
+
+  return false;
+}
+
 FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
                     const clang::ObjCInterfaceDecl *classDecl,
                     const clang::ObjCMethodDecl *method) {

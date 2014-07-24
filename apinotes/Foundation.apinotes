@@ -192,6 +192,7 @@ Classes:
       - Selector:        'initWithCoder:'
         MethodKind:      Instance
         DesignatedInit:  true
+        Required:        true
   - Name:            NSThread
     Methods:
       - Selector:        'init'

@@ -485,7 +485,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = sizeof(IdentifierID) + sizeof(SelectorID) + 1;
-      uint32_t dataLength = getFunctionInfoSize(data) + 2;
+      uint32_t dataLength = getFunctionInfoSize(data) + 3;
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
@@ -508,6 +508,7 @@ namespace {
       // FIXME: Inefficient representation
       writer.write<uint8_t>(data.DesignatedInit);
       writer.write<uint8_t>(data.FactoryAsInit);
+      writer.write<uint8_t>(data.Required);
     }
   };
 } // end anonymous namespace

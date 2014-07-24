@@ -97,6 +97,10 @@
                                       # factory initializer (false/true)
        DesignatedInit: false          # Optional: Specifies if this method is a
                                       # designated initializer (false/true)
+
+       Required: false                # Optional: Specifies if this method is a
+                                      # required initializer (false/true)
+
    Properties:
      - Name: window
 
@@ -169,6 +173,7 @@ namespace {
     api_notes::FactoryAsInitKind FactoryAsInit
       = api_notes::FactoryAsInitKind::Infer;
     bool DesignatedInit = false;
+    bool Required = false;
   };
   typedef std::vector<Method> MethodsSeq;
 
@@ -287,6 +292,7 @@ namespace llvm {
         io.mapOptional("FactoryAsInit",   m.FactoryAsInit,
                                           api_notes::FactoryAsInitKind::Infer);
         io.mapOptional("DesignatedInit",  m.DesignatedInit, false);
+        io.mapOptional("Required",        m.Required, false);
       }
     };
 
@@ -459,6 +465,7 @@ static bool compile(const Module &module, llvm::raw_ostream &os,
 
       // Translate the initializer info.
       mInfo.DesignatedInit = meth.DesignatedInit;
+      mInfo.Required = meth.Required;
       if (meth.FactoryAsInit != FactoryAsInitKind::Infer)
         mInfo.setFactoryAsInitKind(meth.FactoryAsInit);
 
@@ -738,6 +745,7 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
       handleAvailability(method.Availability, info);
       method.FactoryAsInit = info.getFactoryAsInitKind();
       method.DesignatedInit = info.DesignatedInit;
+      method.Required = info.Required;
 
       auto known = knownContexts[contextID.Value];
       if (known.second)

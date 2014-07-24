@@ -2801,7 +2801,7 @@ namespace {
       result->setInitKind(kind);
 
       // If this initializer is required, add the appropriate attribute.
-      if (required) {
+      if (required || Impl.isRequiredInitializer(objcMethod)) {
         result->getAttrs().add(
           new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
       }

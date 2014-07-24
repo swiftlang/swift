@@ -252,6 +252,7 @@ namespace {
       readFunctionInfo(data, info);
       info.DesignatedInit = endian::readNext<uint8_t, little, unaligned>(data);
       info.FactoryAsInit = endian::readNext<uint8_t, little, unaligned>(data);
+      info.Required = endian::readNext<uint8_t, little, unaligned>(data);
       return info;
     }
   };
