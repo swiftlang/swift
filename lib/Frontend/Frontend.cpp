@@ -412,16 +412,15 @@ void CompilerInstance::performSema() {
       parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                           TheSILModule ? &SILContext : nullptr,
                           &PersistentState, DelayedCB.get());
-      if (PrimaryBufferID == NO_SUCH_BUFFER ||
-          MainBufferID == PrimaryBufferID) {
+      if (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID) 
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             CurTUElem);
-        if (Invocation.getFrontendOptions().Playground)
-          performPlaygroundTransform(MainFile);
-      }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
-
+    
+    if (Invocation.getFrontendOptions().Playground &&
+        (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID))
+      performPlaygroundTransform(MainFile);
   }
 
   // Type-check each top-level input besides the main source file.
