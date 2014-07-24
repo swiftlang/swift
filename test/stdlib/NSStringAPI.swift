@@ -309,7 +309,7 @@ NSStringAPIs.test("cStringUsingEncoding(_:)") {
   expectEmpty("абв".cStringUsingEncoding(NSASCIIStringEncoding))
 
   let expectedBytes: [UInt8] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
-  var expectedStr: [CChar] = expectedBytes.map { $0.asSigned() }
+  var expectedStr: [CChar] = expectedBytes.map { CChar(bitPattern: $0) }
   expectEqual(expectedStr,
       "абв".cStringUsingEncoding(NSUTF8StringEncoding)!)
 }
@@ -406,14 +406,14 @@ NSStringAPIs.test("fastestEncoding") {
 
 NSStringAPIs.test("fileSystemRepresentation()") {
   if true {
-    let expectedStr = map("abc\0".utf8) { $0.asSigned() }
+    let expectedStr = map("abc\0".utf8) { Int8(bitPattern: $0) }
     expectEqual(expectedStr, "abc".fileSystemRepresentation())
   }
 
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr = map("\u{305f}\u{3099}くてん\0".utf8) { $0.asSigned() }
+    let expectedStr = map("\u{305f}\u{3099}くてん\0".utf8) { Int8(bitPattern: $0) }
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
 }
@@ -509,18 +509,20 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   if true {
     let bufferLength = 16
-    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     var result = s.getCString(&buffer, maxLength: 100,
         encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
   if true {
     let bufferLength = 17
-    var expectedStr = map("abc あかさた\0".utf8) { $0.asSigned() }
+    var expectedStr = map("abc あかさた\0".utf8) { CChar(bitPattern: $0) }
     while (expectedStr.count != bufferLength) {
-      expectedStr.append((0xff).asSigned())
+      expectedStr.append(CChar(bitPattern: 0xff))
     }
-    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     var result = s.getCString(&buffer, maxLength: 100,
         encoding: NSUTF8StringEncoding)
     expectTrue(result)
@@ -528,7 +530,8 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   }
   if true {
     let bufferLength = 100
-    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     var result = s.getCString(&buffer, maxLength: 8,
         encoding: NSUTF8StringEncoding)
     expectFalse(result)
@@ -541,17 +544,21 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   var s = "abc だくてん"
   if true {
     let bufferLength = 16
-    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     var result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
     expectFalse(result)
   }
   if true {
     let bufferLength = 100
-    var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) { $0.asSigned() }
-    while (expectedStr.count != bufferLength) {
-      expectedStr.append((0xff).asSigned())
+    var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) {
+      CChar(bitPattern: $0)
     }
-    var buffer = [CChar](count: bufferLength, repeatedValue: (0xff).asSigned())
+    while (expectedStr.count != bufferLength) {
+      expectedStr.append(CChar(bitPattern: 0xff))
+    }
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     expectTrue(s.getFileSystemRepresentation(&buffer, maxLength: bufferLength))
     expectTrue(equal(expectedStr, buffer))
   }
@@ -1246,7 +1253,7 @@ func getIllFormedUTF8String2() -> (UnsafeMutablePointer<CChar>, dealloc: ()->())
 }
 
 func asCCharArray(a: [UInt8]) -> [CChar] {
-  return a.map { $0.asSigned() }
+  return a.map { CChar(bitPattern: $0) }
 }
 
 CStringTests.test("String.fromCString") {

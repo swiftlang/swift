@@ -1,6 +1,17 @@
 Latest
 ------
 
+* Because their semantics were unclear, the methods "toUnsigned" (on
+  the signed integer types) and "toSigned" (on the unsigned integer
+  types) have been replaced.  The new idiom is explicit construction
+  of the target type using the "bitPattern:" argument label.  So, 
+
+    myInt.toUnsigned()
+
+  has become
+
+    UInt(bitPattern: myInt)
+
 * To better follow Cocoa naming conventions and to encourage 
   immutability, The following pointer types were renamed:
 
