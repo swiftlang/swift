@@ -190,6 +190,12 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
+#ifdef NDEBUG
+#define SHIMS_INCLUDE_FLAG "-isystem"
+#else
+#define SHIMS_INCLUDE_FLAG "-I"
+#endif
+
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx,
                       const ClangImporterOptions &importerOpts,
@@ -211,7 +217,7 @@ ClangImporter::create(ASTContext &ctx,
     "-fsyntax-only", "-w",
     "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
     "-target-abi", irGenOpts.TargetABI,
-    "-I", searchPathOpts.RuntimeResourcePath,
+    SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
