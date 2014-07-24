@@ -5244,11 +5244,18 @@ public:
     // This only makes sense when the overridden constructor is required.
     checkOverrides(CD);
 
-    // Determine whether this initializer is required.
+    // If this initializer overrides a 'required' initializer, it must itself
+    // be marked 'required'.
     if (!CD->getAttrs().hasAttribute<RequiredAttr>()) {
-      if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
+      if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired()) {
+        TC.diagnose(CD, diag::required_initializer_missing_keyword)
+          .fixItInsert(CD->getLoc(), "required ");
+        TC.diagnose(CD->getOverriddenDecl(),
+                    diag::overridden_required_initializer_here);
+
         CD->getAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
+      }
     }
 
     if (CD->isRequired() && ContextTy) {

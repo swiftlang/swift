@@ -101,7 +101,7 @@ class MyNSData : NSData {
     println("MyNSData code should not be executed")
   }
 
-  init(coder: NSCoder) {
+  required init(coder: NSCoder) {
     super.init(coder: coder)
   }
 }

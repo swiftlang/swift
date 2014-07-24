@@ -1361,6 +1361,10 @@ NOTE(required_initializer_not_overridden,attribute_parsing,none,
       "'required' initializer %0 not overridden", (DeclName))
 ERROR(required_initializer_not_accessible,sema_tcd,none,
       "'required' initializer must be as accessible as its enclosing type", ())
+ERROR(required_initializer_missing_keyword,sema_tcd,none,
+      "override of required initializer missing 'required' modifier", ())
+NOTE(overridden_required_initializer_here,sema_tcd,none,
+     "overridden required initializer is here", ())
 
 // Functions
 ERROR(attribute_requires_function_type,attribute_parsing,none,

@@ -90,7 +90,7 @@ class MyThirdTableViewController : NSTableViewController {
     super.init(int: i)
   }
 
-  init(coder: NSCoder) {
+  required init(coder: NSCoder) {
     super.init(coder: coder)
   }
 }

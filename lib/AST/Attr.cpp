@@ -127,11 +127,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
-  if (getKind() == DAK_Required && isImplicit()) {
-    Printer << "/* required(inferred) */ ";
-    return;
-  }
-
   switch (getKind()) {
     // Handle all of the SIMPLE_DECL_ATTRs.
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:

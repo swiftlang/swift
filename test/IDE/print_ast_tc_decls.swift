@@ -385,8 +385,8 @@ class d0120_TestClassBase {
 class d0121_TestClassDerived : d0120_TestClassBase {
 // PASS_COMMON-LABEL: {{^}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
 
-  init() {}
-// PASS_COMMON-NEXT: {{^}}  /* required(inferred) */ init(){{$}}
+  required init() {}
+// PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
   final override func baseFunc2() {}
 // PASS_COMMON-NEXT: {{^}}  {{(override |final )+}}func baseFunc2(){{$}}

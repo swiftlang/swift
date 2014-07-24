@@ -108,7 +108,7 @@ public class Base {
 }
 
 public class PublicSub: Base {
-  init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-3=public }}
+  required init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-12=public }}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
   override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
     get { return 0 }
@@ -118,7 +118,7 @@ public class PublicSub: Base {
 }
 
 internal class InternalSub: Base {
-  private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{3-10=internal}}
+  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=internal}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
     get { return 0 }
@@ -128,7 +128,7 @@ internal class InternalSub: Base {
 }
 
 internal class InternalSubGood: Base {
-  init() {} // no-warning
+  required init() {} // no-warning
   override func foo() {}
   override var bar: Int {
     get { return 0 }
@@ -138,7 +138,7 @@ internal class InternalSubGood: Base {
 }
 
 internal class InternalSubPrivateSet: Base {
-  init() {}
+  required init() {}
   private(set) override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-16=}}
     get { return 0 }
     set {}

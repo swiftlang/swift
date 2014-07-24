@@ -36,12 +36,13 @@ class C2b : C { // expected-error{{class 'C2b' does not implement its superclass
 }
 
 class C3 : C {
-  required init(string s: String) { }
+  required init(string s: String) { } // expected-note{{overridden required initializer is here}}
 }
 
 class C4 : C3 {
   // implicitly required
-  init(string s: String) { } // expected-note{{'required' initializer 'init(string:)' not overridden}}
+  init(string s: String) { } // expected-error{{override of required initializer missing 'required' modifier}}{{3-3=required }}
+  // expected-note @-1{{'required' initializer 'init(string:)' not overridden}}
 }
 
 class C5 : C4 {
