@@ -2,13 +2,16 @@ Latest
 ------
 
 * To better follow Cocoa naming conventions and to encourage 
-  immutability, UnsafePointer<T> has been renamed 
-  UnsafeMutablePointer<T>.  AutoreleasingUnsafePointer<T> has been renamed
-  AutoreleasingUnsafeMutablePointer<T>.  ConstUnsafePointer<T> has
-  been renamed UnsafePointer<T>.  As a result, some of your code may
-  fail to compile when assigning to an UnsafePointer's ".memory"
-  property.  The fix is to change your UnsafePointer<T> into an
-  UnsafeMutablePointer<T>.
+  immutability, The following pointer types were renamed:
+
+  UnsafePointer<T>              => UnsafeMutablePointer<T>
+  ConstUnsafePointer<T>         => UnsafePointer<T>
+  AutoreleasingUnsafePointer<T> => AutoreleasingUnsafeMutablePointer<T>
+
+  Note that the meaning of "UnsafePointer" has changed from mutable to
+  immutable. As a result, some of your code may fail to compile when
+  assigning to an UnsafePointer's ".memory" property.  The fix is to
+  change your UnsafePointer<T> into an UnsafeMutablePointer<T>.
 
 * The optional unwrapping operator 'x!' can now be assigned through, and
   mutating methods and operators can be applied through it:
