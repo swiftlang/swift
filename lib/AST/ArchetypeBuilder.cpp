@@ -1019,8 +1019,7 @@ Type swift::resolvePotentialArchetypeToType(
     for (auto proto : parentPA->getConformsTo()) {
       SmallVector<ValueDecl *, 2> decls;
       if (mod.lookupQualified(proto->getDeclaredType(), name,
-                              NL_VisitSupertypes | NL_IgnoreAccessibility,
-                              nullptr, decls)) {
+                              NL_VisitSupertypes, nullptr, decls)) {
         for (auto decl : decls) {
           associatedType = dyn_cast<AssociatedTypeDecl>(decl);
           if (associatedType)

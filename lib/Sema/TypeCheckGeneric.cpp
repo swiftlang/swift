@@ -125,8 +125,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   for (auto proto : basePA->getConformsTo()) {
     SmallVector<ValueDecl *, 2> decls;
     if (DC->lookupQualified(proto->getDeclaredType(), name,
-                            NL_VisitSupertypes | NL_IgnoreAccessibility,
-                            nullptr, decls)) {
+                            NL_VisitSupertypes, &TC, decls)) {
       for (auto decl : decls) {
         // Note: once we find any associated type, we have our answer, because
         // the archetype builder is supposed to ensure that all associated
