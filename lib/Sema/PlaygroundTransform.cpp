@@ -63,8 +63,6 @@ private:
   typedef std::forward_list<BracePair> BracePairStack;
 
   BracePairStack BracePairs;
-  bool EnteredGlobalBrace = false;
-
   class BracePairPusher {
     BracePairStack &BracePairs;
     bool Valid = false;
