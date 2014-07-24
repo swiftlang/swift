@@ -1295,6 +1295,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Strideof:
   case BuiltinValueKind::Alignof:
+  case BuiltinValueKind::StrideofNonZero:
     return getSizeOrAlignOfOperation(Context, Id);
 
   case BuiltinValueKind::AllocRaw:

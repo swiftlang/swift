@@ -217,6 +217,26 @@ func generic_sizeof_alignof_test<T>() {
   var a = Builtin.alignof(T.self)
 }
 
+// CHECK: define void @_TF8builtins21generic_strideof_testU__FT_T_(
+func generic_strideof_test<T>() {
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 19
+  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
+  var s = Builtin.strideof(T.self)
+}
+
+// CHECK: define void @_TF8builtins29generic_strideof_nonzero_testU__FT_T_(
+func generic_strideof_nonzero_test<T>() {
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8** [[T:%.*]], i32 19
+  // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+  // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK-NEXT: [[CMP:%.*]] = icmp eq i64 [[STRIDE]], 0
+  // CHECK-NEXT: [[SELECT:%.*]] = select i1 [[CMP]], i64 1, i64 [[STRIDE]]
+  // CHECK-NEXT: store i64 [[SELECT]], i64* [[S:%.*]]
+  var s = Builtin.strideof_nonzero(T.self)
+}
+
 class X {}
 
 class Y {}

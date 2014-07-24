@@ -1413,7 +1413,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                                    IGF.IGM.getSize(Size(1))));
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::StrideofNonZero) {
+    // Note this case must never return 0.
+    // It is implemented as max(strideof, 1)
+    args.claimAll();
+    CanType valueTy = substitutions[0].getReplacement()->getCanonicalType();
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    // Strideof should never return 0, so return 1 if the type has a 0 stride.
+    llvm::Value *StrideOf = valueTI.getStride(IGF, valueTy);
+    llvm::IntegerType *IntTy = cast<llvm::IntegerType>(StrideOf->getType());
+    auto *Zero = IGF.Builder.getIntN(IntTy->getPrimitiveSizeInBits(), 0);
+    auto *One = IGF.Builder.getIntN(IntTy->getPrimitiveSizeInBits(), 1);
+    llvm::Value *Cmp = IGF.Builder.CreateICmpEQ(StrideOf, Zero);
+    out->add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
+    return;
+  }
+
   // addressof expects an lvalue argument.
   if (Builtin.ID == BuiltinValueKind::AddressOf) {
     llvm::Value *address = args.claimNext();
