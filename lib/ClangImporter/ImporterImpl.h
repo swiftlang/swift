@@ -457,6 +457,9 @@ public:
   /// \brief Clang's setObject:forKeyedSubscript: selector.
   clang::Selector setObjectForKeyedSubscript;
 
+  /// Clang's initWithCoder: selector.
+  clang::Selector initWithCoder;
+
 private:
   Optional<Module *> checkedFoundationModule;
 

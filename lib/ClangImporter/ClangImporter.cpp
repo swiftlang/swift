@@ -1583,6 +1583,15 @@ bool ClangImporter::Implementation::isRequiredInitializer(
        const clang::ObjCMethodDecl *method) {
   // FIXME: No way to express this in Objective-C.
 
+  // FIXME: Hideous hack for initWithCoder:. We need a better answer here.
+  if (initWithCoder.isNull()) {
+    auto &ctx = getClangASTContext();
+    initWithCoder = ctx.Selectors.getUnarySelector(
+                      &ctx.Idents.get("initWithCoder"));
+  }
+  if (method->getSelector() == initWithCoder && method->isInstanceMethod())
+    return true;
+
   if (auto info = getKnownObjCMethod(method))
     return info->Required;
 

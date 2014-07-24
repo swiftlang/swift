@@ -76,6 +76,14 @@ func testNoReturn(a : NSAwesomeDocument) -> Int {
 class MyViewController : NSViewController {
 }
 
+class MyView : NSView { // expected-error{{class 'MyView' does not implement its superclass's required members}}
+  override init() { super.init() }
+}
+
+class MyMenu : NSMenu { // expected-error{{class 'MyMenu' does not implement its superclass's required members}}
+  override init() { super.init() }
+}
+
 class MyTableViewController : NSTableViewController {
 }
 

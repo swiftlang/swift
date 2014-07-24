@@ -640,7 +640,7 @@ namespace {
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
       if (CD->isRequired())
-        OS << " abstract";
+        OS << " required";
       switch (CD->getInitKind()) {
       case CtorInitializerKind::Designated:
         OS << " designated";

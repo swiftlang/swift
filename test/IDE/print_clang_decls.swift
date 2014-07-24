@@ -82,11 +82,12 @@
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// APPKIT-LABEL: {{^}}class NSView : NSObject {{{$}}
+// APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding {{{$}}
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
+// APPKIT-NEXT: init(withCoder aDecoder: NSCoder)
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]
 // APPKIT-LABEL:      extension NSView {

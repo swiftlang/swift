@@ -2523,7 +2523,15 @@ namespace {
 
         // Set constructor override.
         auto ctor = cast<ConstructorDecl>(decl);
-        ctor->setOverriddenDecl(cast<ConstructorDecl>(member));
+        auto memberCtor = cast<ConstructorDecl>(member);
+        ctor->setOverriddenDecl(memberCtor);
+
+        // Propagate 'required' to subclass initializers.
+        if (memberCtor->isRequired() &&
+            !ctor->getAttrs().hasAttribute<RequiredAttr>()) {
+          ctor->getAttrs().add(
+            new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
+        }
       }
     }
     
@@ -2801,7 +2809,8 @@ namespace {
       result->setInitKind(kind);
 
       // If this initializer is required, add the appropriate attribute.
-      if (required || Impl.isRequiredInitializer(objcMethod)) {
+      if ((required || Impl.isRequiredInitializer(objcMethod)) &&
+          !isa<ProtocolDecl>(dc)) {
         result->getAttrs().add(
           new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
       }
@@ -3350,6 +3359,15 @@ namespace {
           }
 
           conformance->setWitness(valueReq, valueReq);
+        } else {
+          // An initializer that conforms to a requirement is required.
+          auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
+          if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+            if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
+              ctor->getAttrs().add(
+                new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
+            }
+          }
         }
       }
 
@@ -3738,7 +3756,7 @@ namespace {
           if (!objcMethod)
             continue;
 
-          // When mirroring an initializer, make it designated.
+          // When mirroring an initializer, make it designated and required.
           if (objcMethod->getMethodFamily() == clang::OMF_init &&
               isReallyInitMethod(objcMethod)) {
             // Import the constructor.
