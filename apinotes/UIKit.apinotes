@@ -61,6 +61,7 @@ Classes:
         MethodKind:      Instance
         DesignatedInit:  true
   - Name:            UIFont
+    AuditedForNullability: true
     Methods:
       - Selector:        'preferredFontForTextStyle:'
         MethodKind:      Class
@@ -75,7 +76,9 @@ Classes:
         Nullability:     N
       - Name:            'fontName'
         Nullability:     N
+Protocols:
   - Name:            UIApplicationDelegate
+    AuditedForNullability: true
     Methods:
       - Selector:        'application:willFinishLaunchingWithOptions:'
         MethodKind:      Instance
