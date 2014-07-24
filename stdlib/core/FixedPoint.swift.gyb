@@ -390,9 +390,9 @@ extension ${Self} {
 
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
-  /// occurs, and the resulting `${Self}` may not have the same value
-  /// as `bitPattern`—it is only guaranteed to use the same pattern of
-  /// bits.
+  /// occurs, and the resulting `${Self}` may not have the same numeric
+  /// value as `bitPattern`—it is only guaranteed to use the same
+  /// pattern of bits.
   public init(bitPattern: ${OtherSelf}) {
     value = bitPattern.value
   }
