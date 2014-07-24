@@ -13,3 +13,13 @@ extension Foo {
 struct PrivateInit {
   private init() {}
 }
+
+extension Foo {
+  private func method() {}
+  private typealias TheType = Float
+}
+
+extension OriginallyEmpty {
+  func method() {}
+  typealias TheType = Float
+}

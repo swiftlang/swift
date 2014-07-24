@@ -15,7 +15,16 @@ public struct Foo {
 }
 
 public class Base {
+  internal func method() {}
   public internal(set) var value = 0
+}
+
+public class HiddenMethod {
   internal func method() {}
 }
 
+public class HiddenType {
+  typealias TheType = Int
+}
+
+public struct OriginallyEmpty {}

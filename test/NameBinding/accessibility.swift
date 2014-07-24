@@ -2,11 +2,11 @@
 // RUN: cp %s %t/main.swift
 
 // RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I=%S/Inputs -sdk "" -enable-access-control -verify
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I=%S/Inputs -sdk "" -disable-access-control -D DEFINE_VAR_FOR_SCOPED_IMPORT
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I=%S/Inputs -sdk "" -disable-access-control -D DEFINE_VAR_FOR_SCOPED_IMPORT -D ACCESS_DISABLED
 
 // RUN: %swift -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT
 // RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I=%t -sdk "" -enable-access-control -verify
-// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I=%t -sdk "" -disable-access-control
+// RUN: %swift -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I=%t -sdk "" -disable-access-control -D ACCESS_DISABLED
 
 import has_accessibility
 
@@ -62,3 +62,26 @@ class ReplacingOverrider : Base {
     set { super.value = newValue } // expected-error {{cannot assign to the result of this expression}}
   }
 }
+
+
+protocol MethodProto {
+  func method() // expected-note + {{protocol requires function 'method()' with type '() -> ()'}}
+}
+
+extension OriginallyEmpty : MethodProto {}
+extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
+#if !ACCESS_DISABLED
+extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}}
+#endif
+
+
+protocol TypeProto {
+  typealias TheType // expected-note + {{protocol requires nested type 'TheType'}}
+}
+
+extension OriginallyEmpty : MethodProto {}
+extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
+#if !ACCESS_DISABLED
+extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
+#endif
+
