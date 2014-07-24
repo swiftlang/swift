@@ -203,6 +203,16 @@ namespace {
       fieldValue = fieldTI.maskFixedExtraInhabitant(IGF, fieldValue);
       return IGF.Builder.CreateZExt(fieldValue, structValue->getType());
     }
+       
+    // This is dead code in NonFixedStructTypeInfo.
+    llvm::APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+      const FixedTypeInfo &fieldTI
+        = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      auto mask = APInt::getAllOnesValue(
+                                       fieldTI.getFixedSize().getValueInBits());
+      mask = mask.zextOrSelf(asImpl().getFixedSize().getValueInBits());
+      return mask;
+    }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address structAddr,
