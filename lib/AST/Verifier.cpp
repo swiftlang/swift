@@ -1036,6 +1036,14 @@ struct ASTNodeBase {};
       }
       verifyCheckedBase(E);
     }
+    
+    void verifyChecked(IdentityExpr *E) {
+      if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
+        Out << "Identity expression changes type of subexpression:\n";
+        E->dump(Out);
+        abort();
+      }
+    }
 
     void verifyChecked(MemberRefExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying MemberRefExpr", E);
