@@ -266,34 +266,34 @@ func testPostIncOverflow() {
 
 func testPreIncOverflow() {
   var   s_max = Int.max
-  s_max++  // expected-error {{arithmetic operation '9223372036854775807 + 1' (on signed 64-bit integer type) results in an overflow}}
+  ++s_max  // expected-error {{arithmetic operation '9223372036854775807 + 1' (on signed 64-bit integer type) results in an overflow}}
 
   var   u_max = UInt.max
-  u_max++ // expected-error {{arithmetic operation '18446744073709551615 + 1' (on unsigned 64-bit integer type) results in an overflow}}
+  ++u_max // expected-error {{arithmetic operation '18446744073709551615 + 1' (on unsigned 64-bit integer type) results in an overflow}}
 
   var  s8_max = Int8.max
-  s8_max++ // expected-error {{arithmetic operation '127 + 1' (on signed 8-bit integer type) results in an overflow}}
+  ++s8_max // expected-error {{arithmetic operation '127 + 1' (on signed 8-bit integer type) results in an overflow}}
 
   var  u8_max = UInt8.max
-  u8_max++ // expected-error {{arithmetic operation '255 + 1' (on unsigned 8-bit integer type) results in an overflow}}
+  ++u8_max // expected-error {{arithmetic operation '255 + 1' (on unsigned 8-bit integer type) results in an overflow}}
 
   var s16_max = Int16.max
-  s16_max++ // expected-error {{arithmetic operation '32767 + 1' (on signed 16-bit integer type) results in an overflow}}
+  ++s16_max // expected-error {{arithmetic operation '32767 + 1' (on signed 16-bit integer type) results in an overflow}}
 
   var u16_max = UInt16.max
-  u16_max++ // expected-error {{arithmetic operation '65535 + 1' (on unsigned 16-bit integer type) results in an overflow}}
+  ++u16_max // expected-error {{arithmetic operation '65535 + 1' (on unsigned 16-bit integer type) results in an overflow}}
 
   var s32_max = Int32.max
-  s32_max++ // expected-error {{arithmetic operation '2147483647 + 1' (on signed 32-bit integer type) results in an overflow}}
+  ++s32_max // expected-error {{arithmetic operation '2147483647 + 1' (on signed 32-bit integer type) results in an overflow}}
 
   var u32_max = UInt32.max
-  u32_max++ // expected-error {{arithmetic operation '4294967295 + 1' (on unsigned 32-bit integer type) results in an overflow}}
+  ++u32_max // expected-error {{arithmetic operation '4294967295 + 1' (on unsigned 32-bit integer type) results in an overflow}}
 
   var s64_max = Int64.max
-  s64_max++ // expected-error {{arithmetic operation '9223372036854775807 + 1' (on signed 64-bit integer type) results in an overflow}}
+  ++s64_max // expected-error {{arithmetic operation '9223372036854775807 + 1' (on signed 64-bit integer type) results in an overflow}}
 
   var u64_max = UInt64.max
-  u64_max++ // expected-error {{arithmetic operation '18446744073709551615 + 1' (on unsigned 64-bit integer type) results in an overflow}}
+  ++u64_max // expected-error {{arithmetic operation '18446744073709551615 + 1' (on unsigned 64-bit integer type) results in an overflow}}
 }
 
 func testPostDecOverflow() {
@@ -330,32 +330,32 @@ func testPostDecOverflow() {
 
 func testPreDecOverflow() {
   var   s_min = Int.min
-  s_min--  // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on signed 64-bit integer type) results in an overflow}}
+  --s_min  // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on signed 64-bit integer type) results in an overflow}}
 
   var   u_min = UInt.min
-  u_min-- // expected-error {{arithmetic operation '0 - 1' (on unsigned 64-bit integer type) results in an overflow}}
+  --u_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 64-bit integer type) results in an overflow}}
 
   var  s8_min = Int8.min
-  s8_min-- // expected-error {{arithmetic operation '-128 - 1' (on signed 8-bit integer type) results in an overflow}}
+  --s8_min // expected-error {{arithmetic operation '-128 - 1' (on signed 8-bit integer type) results in an overflow}}
 
   var  u8_min = UInt8.min
-  u8_min-- // expected-error {{arithmetic operation '0 - 1' (on unsigned 8-bit integer type) results in an overflow}}
+  --u8_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 8-bit integer type) results in an overflow}}
 
   var s16_min = Int16.min
-  s16_min-- // expected-error {{arithmetic operation '-32768 - 1' (on signed 16-bit integer type) results in an overflow}}
+  --s16_min // expected-error {{arithmetic operation '-32768 - 1' (on signed 16-bit integer type) results in an overflow}}
 
   var u16_min = UInt16.min
-  u16_min-- // expected-error {{arithmetic operation '0 - 1' (on unsigned 16-bit integer type) results in an overflow}}
+  --u16_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 16-bit integer type) results in an overflow}}
 
   var s32_min = Int32.min
-  s32_min-- // expected-error {{arithmetic operation '-2147483648 - 1' (on signed 32-bit integer type) results in an overflow}}
+  --s32_min // expected-error {{arithmetic operation '-2147483648 - 1' (on signed 32-bit integer type) results in an overflow}}
 
   var u32_min = UInt32.min
-  u32_min-- // expected-error {{arithmetic operation '0 - 1' (on unsigned 32-bit integer type) results in an overflow}}
+  --u32_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 32-bit integer type) results in an overflow}}
 
   var s64_min = Int64.min
-  s64_min-- // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on signed 64-bit integer type) results in an overflow}}
+  --s64_min // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on signed 64-bit integer type) results in an overflow}}
 
   var u64_min = UInt64.min
-  u64_min-- // expected-error {{arithmetic operation '0 - 1' (on unsigned 64-bit integer type) results in an overflow}}
+  --u64_min // expected-error {{arithmetic operation '0 - 1' (on unsigned 64-bit integer type) results in an overflow}}
 }
