@@ -256,7 +256,7 @@ final class _NSOpaqueString : NSString {
     super.init()
   }
 
-  override init(coder aDecoder: NSCoder) {
+  required init(coder aDecoder: NSCoder) {
     fatalError("init(coder:) not implemented for _NSOpaqueString")
   }
 
