@@ -2260,6 +2260,10 @@ import Foundation
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
+  required init(coder aDecoder: NSCoder!) {
+    fatalError("don't call this initializer")
+  }
+
   convenience init(_ utf8: [UInt8]) {
     var encoded: [UInt16] = []
     var g = utf8.generate()
