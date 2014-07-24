@@ -485,8 +485,18 @@ function(compile_swift_files)
       set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
       set(apinote_input_file
         "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
+
+      # Figure out the target to pass to create API notes.
+      if (SWIFTFILE_SDK)
+        set(apinote_target "-target" "${SWIFTFILE_ARCHITECTURE}-apple-${SWIFT_SDK_${SWIFTFILE_SDK}_TRIPLE_NAME}${SWIFT_SDK_${SWIFTFILE_SDK}_DEPLOYMENT_VERSION}")
+      elseif(SWIFT_HOST_TRIPLE)
+        set(apinote_target "-target" "${SWIFT_HOST_TRIPLE}")
+      else()
+        set(apinote_target)
+      endif()
+        
       list(APPEND create_apinotes
-        COMMAND ${SWIFT_EXEC} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_input_file}
+        COMMAND ${SWIFT_EXEC} -apinotes -yaml-to-binary -o ${apinote_file} ${apinote_target} ${apinote_input_file}
         DEPENDS ${apinote_input_file})
 
       list(APPEND apinote_files ${apinote_file})
