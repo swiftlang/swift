@@ -890,17 +890,15 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (Options.TypeDefinitions) {
-    bool ShouldPrint = true;
-    Type Ty = decl->getUnderlyingType();
-    // If the underlying type is private, don't print it.
-    if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
-      ShouldPrint = false;
+  bool ShouldPrint = true;
+  Type Ty = decl->getUnderlyingType();
+  // If the underlying type is private, don't print it.
+  if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
+    ShouldPrint = false;
 
-    if (ShouldPrint) {
-      Printer << " = ";
-      printTypeLoc(decl->getUnderlyingTypeLoc());
-    }
+  if (ShouldPrint) {
+    Printer << " = ";
+    printTypeLoc(decl->getUnderlyingTypeLoc());
   }
 }
 
