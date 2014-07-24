@@ -1161,6 +1161,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   if (match(AI, m_ApplyInst(BuiltinValueKind::SMulOver,
                             m_ApplyInst(BuiltinValueKind::Strideof),
+                            m_ValueBase(), m_IntegerLiteralInst())) ||
+      match(AI, m_ApplyInst(BuiltinValueKind::SMulOver,
+                            m_ApplyInst(BuiltinValueKind::StrideofNonZero),
                             m_ValueBase(), m_IntegerLiteralInst()))) {
     AI->swapOperands(1, 2);
     return AI;
@@ -1347,6 +1350,10 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                   m_TupleExtractInst(m_ApplyInst(Bytes), 0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
+                                             m_MetatypeInst(Metatype)),
+                                 m_ValueBase())) ||
+        match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
+                                 m_ApplyInst(BuiltinValueKind::StrideofNonZero,
                                              m_MetatypeInst(Metatype)),
                                  m_ValueBase()))) {
       SILType InstanceType =
