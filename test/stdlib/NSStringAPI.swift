@@ -1138,54 +1138,71 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   // FIXME
 }
 
+func checkHashable<T : Hashable>(
+  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack
+) {
+  // Test operator '==' that is found through witness tables.
+  expectEqual(expectedEqual, lhs == rhs, stackTrace: stackTrace)
+  expectEqual(!expectedEqual, lhs != rhs, stackTrace: stackTrace)
+
+  // Test 'hashValue'.
+  //
+  // If objects are not equal, then the hash value can be different or it can
+  // collide.
+  if expectedEqual {
+    expectEqual(lhs.hashValue, rhs.hashValue)
+  }
+}
+
 func checkEqualityImpl(
-  expected: Bool, lhs: String, rhs: String,
+  expectedEqualNFD: Bool, lhs: String, rhs: String,
   stackTrace: SourceLocStack
 ) {
   // String / String
-  expectEqual(expected, lhs == rhs, stackTrace: stackTrace)
-  expectEqual(!expected, lhs != rhs, stackTrace: stackTrace)
+  expectEqual(expectedEqualNFD, lhs == rhs, stackTrace: stackTrace)
+  expectEqual(!expectedEqualNFD, lhs != rhs, stackTrace: stackTrace)
+  checkHashable(expectedEqualNFD, lhs, rhs, stackTrace.withCurrentLoc())
 
   // NSString / NSString
   let lhsNSString = lhs as NSString
   let rhsNSString = rhs as NSString
-  expectEqual(expected, lhsNSString == rhsNSString, stackTrace: stackTrace)
-  // FIXME: this fails now.
-  //expectEqual(!expected, lhsNSString != rhsNSString, stackTrace: stackTrace)
+  let expectedEqualUnicodeScalars =
+    Array(lhs.unicodeScalars) == Array(rhs.unicodeScalars)
+  expectEqual(
+    expectedEqualUnicodeScalars, lhsNSString == rhsNSString,
+    stackTrace: stackTrace)
+  expectEqual(
+    !expectedEqualUnicodeScalars, lhsNSString != rhsNSString,
+    stackTrace: stackTrace)
+  checkHashable(
+    expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
+    stackTrace.withCurrentLoc())
 
   // String / NSString
-  expectEqual(expected, lhs == rhsNSString, stackTrace: stackTrace)
-  expectEqual(!expected, lhs != rhsNSString, stackTrace: stackTrace)
+  expectEqual(expectedEqualNFD, lhs == rhsNSString, stackTrace: stackTrace)
+  expectEqual(!expectedEqualNFD, lhs != rhsNSString, stackTrace: stackTrace)
 
   // NSString / String
-  expectEqual(expected, lhs == rhsNSString, stackTrace: stackTrace)
-  expectEqual(!expected, lhs != rhsNSString, stackTrace: stackTrace)
+  expectEqual(expectedEqualNFD, lhs == rhsNSString, stackTrace: stackTrace)
+  expectEqual(!expectedEqualNFD, lhs != rhsNSString, stackTrace: stackTrace)
 }
 
 func checkEquality(
-  expected: Bool, lhs: String, rhs: String, stackTrace: SourceLocStack
+  expectedEqualNFD: Bool, lhs: String, rhs: String, stackTrace: SourceLocStack
 ) {
-  // Test operator '=='.
-  checkEqualityImpl(expected, lhs, rhs, stackTrace.withCurrentLoc())
-  checkEqualityImpl(expected, rhs, lhs, stackTrace.withCurrentLoc())
-
-  // Test 'hashValue'.
-  if expected {
-    expectEqual(lhs.hashValue, rhs.hashValue)
-  } else {
-    expectNotEqual(lhs.hashValue, rhs.hashValue)
-  }
+  checkEqualityImpl(expectedEqualNFD, lhs, rhs, stackTrace.withCurrentLoc())
+  checkEqualityImpl(expectedEqualNFD, rhs, lhs, stackTrace.withCurrentLoc())
 }
 
 struct EqualityTest {
-  let expected: Bool
+  let expectedEqualNFD: Bool
   let lhs: String
   let rhs: String
   let loc: SourceLoc
 
-  init(_ expected: Bool, _ lhs: String, _ rhs: String,
+  init(_ expectedEqualNFD: Bool, _ lhs: String, _ rhs: String,
        file: String = __FILE__, line: UWord = __LINE__) {
-    self.expected = expected
+    self.expectedEqualNFD = expectedEqualNFD
     self.lhs = lhs
     self.rhs = rhs
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -1241,7 +1258,8 @@ let equalityTests = [
 
 NSStringAPIs.test("OperatorEquals") {
   for test in equalityTests {
-    checkEquality(test.expected, test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkEquality(
+      test.expectedEqualNFD, test.lhs, test.rhs, test.loc.withCurrentLoc())
   }
 }
 
