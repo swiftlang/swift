@@ -94,9 +94,22 @@
 // I_MODE: -interpret
 
 // RUN: not %swifti_driver -### -c %s 2>&1 | FileCheck -check-prefix=C_MODE %s
-// C_MODE: error: invalid mode '-c'
+// C_MODE: error: unsupported option '-c'
+// RUN: not %swifti_driver -### -emit-object %s 2>&1 | FileCheck -check-prefix=OBJ_MODE %s
+// OBJ_MODE: error: unsupported option '-emit-object'
 // RUN: not %swifti_driver -### -emit-executable %s 2>&1 | FileCheck -check-prefix=EXEC_MODE %s
-// EXEC_MODE: error: invalid mode '-emit-executable'
+// EXEC_MODE: error: unsupported option '-emit-executable'
+// RUN: not %swifti_driver -### -o %t %s 2>&1 | FileCheck -check-prefix=ARG_o %s
+// ARG_o: error: unsupported option '-o'
+
+// RUN: not %swiftc_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE_SWIFTC %s
+// I_MODE_SWIFTC: error: unsupported option '-i'
+// RUN: not %swiftc_driver -### -repl 2>&1 | FileCheck -check-prefix=REPL_MODE_SWIFTC %s
+// REPL_MODE_SWIFTC: error: unsupported option '-repl'
+// RUN: not %swiftc_driver -### -lldb-repl 2>&1 | FileCheck -check-prefix=LLDB_REPL_MODE_SWIFTC %s
+// LLDB_REPL_MODE_SWIFTC: error: unsupported option '-lldb-repl'
+// RUN: not %swiftc_driver -### -integrated-repl 2>&1 | FileCheck -check-prefix=INT_REPL_MODE_SWIFTC %s
+// INT_REPL_MODE_SWIFTC: error: unsupported option '-integrated-repl'
 
 // RUN: %swifti_driver -g -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g

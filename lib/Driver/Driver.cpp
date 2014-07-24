@@ -317,6 +317,20 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
                    A->getAsString(*ArgList));
   }
 
+  // Check for unsupported options
+  unsigned UnsupportedFlag = 0;
+  if (driverKind == DriverKind::Interactive)
+    UnsupportedFlag = options::NoInteractiveOption;
+  else if (driverKind == DriverKind::Batch)
+    UnsupportedFlag = options::NoBatchOption;
+
+  if (UnsupportedFlag)
+    for (const Arg *A : *ArgList)
+      if (A->getOption().hasFlag(UnsupportedFlag))
+        Diags.diagnose(SourceLoc(), diag::error_unsupported_option,
+            ArgList->getArgString(A->getIndex()), Name,
+            UnsupportedFlag == options::NoBatchOption ? "swift" : "swiftc");
+
   return ArgList;
 }
 
@@ -453,8 +467,7 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
       break;
 
     default:
-      diags.diagnose(SourceLoc(), diag::error_non_interactive_mode,
-                     args.getArgString(arg->getIndex()), driverName);
+      llvm_unreachable("invalid mode opt for interactive driver");
       break;
     }
 
@@ -1383,6 +1396,17 @@ void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
 void Driver::printHelp(bool ShowHidden) const {
   unsigned IncludedFlagsBitmask = 0;
   unsigned ExcludedFlagsBitmask = options::NoDriverOption;
+
+  switch (driverKind) {
+  case DriverKind::Interactive:
+    ExcludedFlagsBitmask |= options::NoInteractiveOption;
+    break;
+  case DriverKind::Batch:
+    ExcludedFlagsBitmask |= options::NoBatchOption;
+    break;
+  case DriverKind::Legacy:
+    break;
+  }
 
   if (!ShowHidden)
     ExcludedFlagsBitmask |= HelpHidden;

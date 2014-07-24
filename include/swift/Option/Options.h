@@ -28,6 +28,8 @@ namespace options {
   enum SwiftFlags {
     FrontendOption = (1 << 4),
     NoDriverOption = (1 << 5),
+    NoInteractiveOption = (1 << 6),
+    NoBatchOption = (1 << 7),
   };
 
   enum ID {

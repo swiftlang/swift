@@ -26,6 +26,11 @@ def FrontendOption : OptionFlag;
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
+// Some options should not be available depending on whether this is the
+// interactive driver 'swift', or the batch compiler 'swiftc'.
+def NoInteractiveOption : OptionFlag;
+def NoBatchOption : OptionFlag;
+
 /////////
 // Groups
 
@@ -88,7 +93,8 @@ def version : Flag<["-", "--"], "version">,
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption]>;
 
-def o : JoinedOrSeparate<["-"], "o">, Flags<[FrontendOption]>,
+def o : JoinedOrSeparate<["-"], "o">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">,
@@ -248,24 +254,30 @@ class ModeOpt : Group<modes_Group>;
 
 // Output Modes
 def emit_executable : Flag<["-"], "emit-executable">,
-  HelpText<"Emit a linked executable">, ModeOpt;
+  HelpText<"Emit a linked executable">, Flags<[NoInteractiveOption]>, ModeOpt;
 def emit_library : Flag<["-"], "emit-library">,
-  HelpText<"Emit a linked library">, ModeOpt;
-def emit_object : Flag<["-"], "emit-object">, Flags<[FrontendOption]>,
+  HelpText<"Emit a linked library">, Flags<[NoInteractiveOption]>, ModeOpt;
+def emit_object : Flag<["-"], "emit-object">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit object file(s) (-c)">, ModeOpt;
-def emit_assembly : Flag<["-"], "emit-assembly">, Flags<[FrontendOption]>,
+def emit_assembly : Flag<["-"], "emit-assembly">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit assembly file(s) (-S)">, ModeOpt;
 def emit_bc : Flag<["-"], "emit-bc">,
-  HelpText<"Emit LLVM BC file(s)">, Flags<[FrontendOption]>, ModeOpt;
+  HelpText<"Emit LLVM BC file(s)">,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def emit_ir : Flag<["-"], "emit-ir">,
-  HelpText<"Emit LLVM IR file(s)">, Flags<[FrontendOption]>, ModeOpt;
+  HelpText<"Emit LLVM IR file(s)">,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def emit_sil : Flag<["-"], "emit-sil">, HelpText<"Emit canonical SIL file(s)">,
-  Flags<[FrontendOption]>, ModeOpt;
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">, HelpText<"Emit raw SIL file(s)">,
-  Flags<[FrontendOption]>, ModeOpt;
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
-def c : Flag<["-"], "c">, Alias<emit_object>, Flags<[FrontendOption]>, ModeOpt;
-def S: Flag<["-"], "S">, Alias<emit_assembly>, Flags<[FrontendOption]>, ModeOpt;
+def c : Flag<["-"], "c">, Alias<emit_object>,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
+def S: Flag<["-"], "S">, Alias<emit_assembly>,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
@@ -278,13 +290,14 @@ def print_ast : Flag<["-"], "print-ast">, Flags<[FrontendOption]>, ModeOpt,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">;
 
 // Other Modes
-def repl : Flag<["-"], "repl">, HelpText<"REPL mode">, Flags<[FrontendOption]>,
-  ModeOpt;
+def repl : Flag<["-"], "repl">, HelpText<"REPL mode">,
+  Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
-  ModeOpt;
-def integrated_repl : Flag<["-"], "integrated-repl">, Flags<[FrontendOption]>,
+  Flags<[NoBatchOption]>, ModeOpt;
+def integrated_repl : Flag<["-"], "integrated-repl">,
+  Flags<[FrontendOption, NoBatchOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
-def i : Option<["-"], "i", KIND_REMAINING_ARGS>,
+def i : Option<["-"], "i", KIND_REMAINING_ARGS>, Flags<[NoBatchOption]>,
   HelpText<"Immediate mode">, ModeOpt;
 
 def force_single_frontend_invocation :
