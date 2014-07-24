@@ -1082,6 +1082,10 @@ ERROR(discard_expr_outside_of_assignment,sema_tce,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
 
+ERROR(not_enough_context_for_generic_method_reference,sema_tce,none,
+      "reference to generic method %0 is ambiguous without more context",
+      (Identifier))
+
 ERROR(missing_protocol,sema_tce,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,sema_tce,none,

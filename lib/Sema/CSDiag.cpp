@@ -1201,13 +1201,21 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   // to the "outside assignment" error.
   if (ActiveConstraints.empty() &&
       InactiveConstraints.empty() &&
-      !failedConstraint &&
-      isa<DiscardAssignmentExpr>(expr)) {
+      !failedConstraint) {
+    if (isa<DiscardAssignmentExpr>(expr)) {
+      TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
+        .highlight(expr->getSourceRange());
+      
+      return true;
+    }
     
-    TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
-    .highlight(expr->getSourceRange());
-    
-    return true;
+    if (auto dot = dyn_cast<UnresolvedDotExpr>(expr)) {
+      TC.diagnose(expr->getLoc(),
+                  diag::not_enough_context_for_generic_method_reference,
+                  dot->getName());
+      
+      return true;
+    }
   }
   
   return false;
