@@ -1319,6 +1319,11 @@ bool getApplySubstitutionsFromParsed(
             conformances.push_back(conformance.getPointer());
         }
 
+    if (subArchetype && !parsed.replacement->is<ArchetypeType>() &&
+        conformances.size() != subArchetype->getConformsTo().size()) {
+      SP.P.diagnose(parsed.loc, diag::sil_substitution_mismatch);
+      return true;
+    }
     subs.push_back({subArchetype, parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
@@ -2302,8 +2307,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         Member.loc = TheDecl;
         break;
       }
+      if (values.size() == 1 && !TheDecl) {
+        P.diagnose(TyLoc, diag::sil_member_decl_type_mismatch, declTy,
+                   lookupTy);
+        return true;
+      }
     }
-    assert(TheDecl && "Can't find a member with the right type");
+    if (!TheDecl) {
+      P.diagnose(TyLoc, diag::sil_member_decl_not_found);
+      return true;
+    }
 
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");

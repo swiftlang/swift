@@ -452,6 +452,12 @@ ERROR(sil_witness_archetype_not_found,decl_parsing,none,
       "archetype name not found in specialized protocol conformance", ())
 ERROR(sil_enum_is_tag_not_integer_type,decl_parsing,none,
       "enum_is_tag instruction requires a 'Builtin.Int1' type", ())
+ERROR(sil_member_decl_not_found,decl_parsing,none,
+      "member not found in method instructions", ())
+ERROR(sil_member_decl_type_mismatch, decl_parsing,none,
+      "member defined with mismatching type %0 (expected %1)", (Type, Type))
+ERROR(sil_substitution_mismatch,decl_parsing,none,
+      "substitution conformances dont match archetype", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
