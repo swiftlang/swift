@@ -14,11 +14,11 @@ class B {
 }
 
 class D : B {
-  init() {
+  override init() {
     super.init()
   }
 
-  init(x:Int) {
+  override init(x:Int) {
     super.init //  expected-error {{'super.init' cannot be referenced without arguments}} expected-error {{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 

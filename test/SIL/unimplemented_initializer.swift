@@ -8,7 +8,7 @@ import gizmo
 // code through calls to runtime trap function for unimplemented initializers.
 
 class DesignatedStubs : Gizmo {
-  init() { super.init() }
+  override init() { super.init() }
 }
 // CHECK-DEBUG: sil @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_S0_
 // CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift"

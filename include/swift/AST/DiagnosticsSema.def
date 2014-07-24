@@ -722,10 +722,15 @@ ERROR(property_does_not_override,sema_tcd,none,
       "property does not override any property from its superclass", ())
 ERROR(subscript_does_not_override,sema_tcd,none,
       "subscript does not override any subscript from its superclass", ())
+ERROR(initializer_does_not_override,sema_tcd,none,
+      "initializer does not override a designated initializer from its "
+      "superclass", ())
 NOTE(property_override_here,sema_tcd,none,
      "attempt to override property here", ())
 NOTE(subscript_override_here,sema_tcd,none,
      "attempt to override subscript here", ())
+NOTE(convenience_init_override_here,sema_tcd,none,
+     "attempt to override convenience initializer here", ())
 ERROR(override_nonclass_decl,sema_tcd,none,
       "'override' can only be specified on class members", ())
 ERROR(override_property_type_mismatch,sema_tcd,none,
@@ -1363,6 +1368,10 @@ ERROR(required_initializer_not_accessible,sema_tcd,none,
       "'required' initializer must be as accessible as its enclosing type", ())
 ERROR(required_initializer_missing_keyword,sema_tcd,none,
       "override of required initializer missing 'required' modifier", ())
+ERROR(required_initializer_override_wrong_keyword,sema_tcd,none,
+      "override of required initializer uses the 'required' modifier", ())
+ERROR(required_initializer_override_keyword,sema_tcd,none,
+      "'override' is redundant on a 'required' initializer", ())
 NOTE(overridden_required_initializer_here,sema_tcd,none,
      "overridden required initializer is here", ())
 

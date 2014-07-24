@@ -1,11 +1,11 @@
 @objc public class ForwardClass : NSObject {
-  public init() {}
+  override public init() {}
 }
 
 @objc public protocol ForwardProto : NSObjectProtocol {
 }
 @objc public class ForwardProtoAdopter : NSObject, ForwardProto {
-  public init() {}
+  override public init() {}
 }
 
 @objc public class PartialBaseClass {

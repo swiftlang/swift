@@ -539,7 +539,7 @@ struct d0200_EscapedIdentifiers {
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
 // PASS_COMMON: {{^}}    @objc deinit {{$}}
-// PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where` where `where` : `protocol`>(

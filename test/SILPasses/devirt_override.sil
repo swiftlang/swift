@@ -11,7 +11,7 @@ class Hash {
 }
 
 class MD5 : Hash {
-  init()
+  override init()
   override func hash()
 }
 

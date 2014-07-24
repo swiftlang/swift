@@ -254,7 +254,7 @@ class SelfCapturedInInit : Base {
   // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
   // CHECK:         strong_retain [[VAL]] : $SelfCapturedInInit
   // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
-  init() {
+  override init() {
     super.init()
     foo = { self }
   }

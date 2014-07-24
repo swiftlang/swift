@@ -15,7 +15,7 @@ class NewRangeGenerator1 {
 }
 
 final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
-  init(start: Int, end: Int)
+  override init(start: Int, end: Int)
 }
 
 // CHECK-LABEL: sil @test

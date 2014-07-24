@@ -151,7 +151,7 @@ class SwiftGizmo : Gizmo {
     return SwiftGizmo()
   }
 
-  init() {
+  override init() {
     super.init(bellsOn:0)
   }
 
@@ -186,7 +186,7 @@ sg.duplicate()
 class SwiftGizmo2 : Gizmo {
   var sg : SwiftGizmo
 
-  init() { 
+  override init() { 
     sg = SwiftGizmo()
     super.init()
   }

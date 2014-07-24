@@ -141,14 +141,14 @@ public class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   func doo()
   func dah()
 
-  init()
+  override init()
 }
 sil @_TFC15generic_classes22GenericInheritsGenericD : $@cc(method) @thin <T,U> (GenericInheritsGeneric<T,U>) -> ()
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
   var w : UInt8
 
-  init()
+  override init()
 }
 sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
 

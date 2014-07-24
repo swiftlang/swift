@@ -12,7 +12,7 @@ class Model : NSObject {
 class Observer : NSObject {
   let model = Model()
 
-  init() {
+  override init() {
     super.init()
     model.addObserver(self, forKeyPath: "name", options: nil, context: &kvoContext)
     self.addObserver(self, forKeyPath: "model.number", options: nil, context: &kvoContext)

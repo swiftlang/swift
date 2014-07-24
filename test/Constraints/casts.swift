@@ -4,7 +4,7 @@ class B {
   init() {} 
 }
 class D : B {
-  init() { super.init() }
+  override init() { super.init() }
 }
 
 var seven : Double = 7

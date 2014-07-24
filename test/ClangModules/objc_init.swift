@@ -23,7 +23,7 @@ extension NSDocument {
 }
 
 class MyDocument1 : NSDocument {
-  init() { 
+  override init() { 
     super.init()
   }
 }
@@ -43,7 +43,7 @@ class MyDocument2 : NSDocument {
 }
 
 class MyDocument3 : NSAwesomeDocument {
-  init() { 
+  override init() { 
     super.init()
   }
 }
@@ -54,7 +54,7 @@ func createMyDocument3() {
 }
 
 class MyInterestingDesignated : NSInterestingDesignatedSub { 
-  init(string str: String) {
+  override init(string str: String) {
     super.init(string: str)
   }
 
@@ -80,13 +80,13 @@ class MyTableViewController : NSTableViewController {
 }
 
 class MyOtherTableViewController : NSTableViewController { // expected-error{{class 'MyOtherTableViewController' does not implement its superclass's required members}}
-  init(int i: Int)  {
+  override init(int i: Int)  {
     super.init(int: i)
   }
 }
 
 class MyThirdTableViewController : NSTableViewController {
-  init(int i: Int)  {
+  override init(int i: Int)  {
     super.init(int: i)
   }
 
@@ -113,7 +113,7 @@ func getMyDictionary1() {
 
 // <rdar://problem/16838515>
 class MyDictionary2 : NSDictionary {
-  init() {
+  override init() {
     super.init()
   }
 }

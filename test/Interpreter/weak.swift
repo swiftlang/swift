@@ -13,7 +13,7 @@ class SwiftClassBase : Protocol {
 }
 
 class SwiftClass : SwiftClassBase {
-  init() {
+  override init() {
     println("SwiftClass Created")
   }
 
@@ -69,7 +69,7 @@ class ObjCClassBase : Protocol {
 
 @objc
 class ObjCClass : ObjCClassBase {
-  init() {
+  override init() {
     println("ObjCClass Created")
   }
 

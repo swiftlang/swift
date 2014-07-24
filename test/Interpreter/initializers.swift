@@ -43,7 +43,7 @@ class A {
 class B : A {
   var double: Double
 
-  convenience init(int i:Int, string: String) {
+  convenience override init(int i:Int, string: String) {
     printAtDepth("Starting B.init withInt(\(i)) string(\(string))")
     ++depth
     self.init(int: i, string:string, double:3.14159)
@@ -66,7 +66,7 @@ class B : A {
 }
 
 class C : B {
-  init(int i:Int, string: String, double: Double) {
+  override init(int i:Int, string: String, double: Double) {
     printAtDepth("Starting C.init withInt(\(i)) string(\(string)) double(\(double))")
     ++depth
     super.init(int: i, string: string, double: double)

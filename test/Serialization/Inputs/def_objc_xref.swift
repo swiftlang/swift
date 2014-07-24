@@ -1,6 +1,6 @@
 import AppKit
 
 public class MyObjectFactorySub : NSObjectFactorySub {
-  public init() { }
+  public override init() { }
 }
 

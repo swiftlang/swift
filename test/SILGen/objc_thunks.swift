@@ -206,7 +206,7 @@ public class Hoozit : Gizmo {
   // CHECK: [[EPILOG_BB]]:
   // CHECK-NOT: super_method
   // CHECK: return
-  init(bellsOn x : Int) {
+  override init(bellsOn x : Int) {
     super.init(bellsOn: x)
     other()
   }
@@ -339,7 +339,7 @@ func blockProperty(g: Gizmo) {
 class DesignatedStubs : Gizmo {
   var i: Int
 
-  init() { i = 5 }
+  override init() { i = 5 }
 
   // CHECK-LABEL: sil @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned DesignatedStubs) -> @owned DesignatedStubs
   // CHECK: function_ref @_TFSs26_unimplemented_initializer

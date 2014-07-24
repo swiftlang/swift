@@ -133,5 +133,5 @@ class Derived : Base {
 class SimpleInitBase { }
 
 class RequiredInitDerived : SimpleInitBase {
-  required init() { }
+  required override init() { }
 }

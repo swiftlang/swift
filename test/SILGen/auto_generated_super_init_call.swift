@@ -10,7 +10,7 @@ class SomeDerivedClass : Parent {
   var y: Int
   func foo() {}
 
-  init() {
+  override init() {
     y = 42
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT_S0_ : $@cc(method) @thin (@owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: integer_literal $Builtin.Int2048, 42
@@ -69,7 +69,7 @@ class SomeDerivedClass : Parent {
 
 // Check that we do call super.init.
 class HasNoIVars : Parent {
-  init() {
+  override init() {
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call10HasNoIVarscfMS0_FT_S0_ : $@cc(method) @thin (@owned HasNoIVars) -> @owned HasNoIVars
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
   }
@@ -92,7 +92,7 @@ class ParentWithNoExplicitInit : Grandparent {
 // Check that we add a call to super.init.
 class ChildOfParentWithNoExplicitInit : ParentWithNoExplicitInit {
   var y: Int
-  init() {
+  override init() {
     y = 10
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call31ChildOfParentWithNoExplicitInitcfMS0_FT_S0_
 // CHECK: function_ref @_TFC30auto_generated_super_init_call24ParentWithNoExplicitInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
@@ -106,7 +106,7 @@ class ParentWithNoExplicitInit2 : Grandparent {
 // Check that we add a call to super.init.
 class ChildOfParentWithNoExplicitInit2 : ParentWithNoExplicitInit2 {
   var y: Int
-  init() {
+  override init() {
     y = 10
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call32ChildOfParentWithNoExplicitInit2cfMS0_FT_S0_
 // CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2cfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   

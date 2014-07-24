@@ -47,7 +47,7 @@ class ThisBase1 {
 }
 
 class ThisDerived1 : ThisBase1 {
-  init() { super.init() }
+  override init() { super.init() }
 
   var derivedInstanceVar: Int
 

@@ -93,7 +93,7 @@ public class OptionalImplementer : ObjCProtoWithOptional {
 // Inheritance
 public class StillEmpty : Empty, Resettable {
   public func reset() {}
-  public init() {}
+  public override init() {}
 }
 
 public class BoolPair<T> : Pair<Bool, Bool>, PairLike {

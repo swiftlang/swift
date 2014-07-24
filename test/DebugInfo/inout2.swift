@@ -7,7 +7,7 @@ class Class {
 
 class Other : Class {
 	var ovar : Int
-	init () { ovar = 112233
+	override init () { ovar = 112233
 	    super.init()
 	    ivar = 4321
 	}

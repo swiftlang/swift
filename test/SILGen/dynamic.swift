@@ -137,7 +137,7 @@ protocol Proto {
 // Superclass dispatch
 class Subclass: Foo {
   // Native and objc methods can directly reference super members
-  init(native: Int) {
+  override init(native: Int) {
     super.init(native: native)
   }
   // CHECK-LABEL: sil @_TFC7dynamic8SubclassCfMS0_FT6nativeSi_S0_
@@ -167,7 +167,7 @@ class Subclass: Foo {
     // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT6nativeSi_Si
   }
 
-  init(objc: Int) {
+  override init(objc: Int) {
     super.init(objc: objc)
   }
   // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT4objcSi_S0_
@@ -198,7 +198,7 @@ class Subclass: Foo {
   }
 
   // Dynamic methods are super-dispatched by objc_msgSend
-  init(dynamic: Int) {
+  override init(dynamic: Int) {
     super.init(dynamic: dynamic)
   }
   // CHECK-LABEL: sil @_TFC7dynamic8SubclasscfMS0_FT7dynamicSi_S0_

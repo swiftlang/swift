@@ -101,7 +101,7 @@ class MultipleInitBase {
 }
 
 class MultipleInitDerived : MultipleInitBase {
-  init() { } // expected-error{{super.init isn't called before returning from initializer}}
+  override init() { } // expected-error{{super.init isn't called before returning from initializer}}
 }
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values

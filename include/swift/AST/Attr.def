@@ -162,7 +162,8 @@ SIMPLE_DECL_ATTR(convenience, Convenience,
                  OnConstructor|DeclModifier|NotSerialized, 43)
 
 SIMPLE_DECL_ATTR(override, Override,
-                 OnFunc | OnVar | OnSubscript | DeclModifier | NotSerialized,
+                 OnFunc | OnVar | OnSubscript | OnConstructor | DeclModifier |
+                 NotSerialized,
                  /* Not serialized */44)
 
 SIMPLE_DECL_ATTR(sil_stored, SILStored, OnVar | NotSerialized | SILOnly,

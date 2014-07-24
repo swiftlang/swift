@@ -10,7 +10,7 @@ class MyManagedObject : NSManagedObject {
   
   @NSManaged var managed: String 
 
-  init() { 
+  override init() { 
     foo = "1"
     bar = "2"
     super.init() 

@@ -12,7 +12,7 @@ class SwiftGizmo : Gizmo {
 
   // CHECK-LABEL: sil @_TFC12objc_dealloc10SwiftGizmocfMS0_FT_S0_ : $@cc(method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo
   // CHECK-NEXT: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
-  init() {
+  override init() {
     // CHECK:   [[SELF_UNINIT:%[0-9]+]] = mark_uninitialized [derivedselfonly]
     // CHECK-NOT: ref_element_addr
     // CHECK:   upcast

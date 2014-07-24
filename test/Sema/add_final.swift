@@ -96,7 +96,7 @@ class Derived3 : BaseClass {
   // CHECK: {{^}} override func overriddenPrivateFunc
 
   // CHECK: @objc deinit
-  // CHECK: {{^}} init
+  // CHECK: {{^}} override init
 }
 
 // CHECK: DerivedDerived

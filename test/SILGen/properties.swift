@@ -72,7 +72,7 @@ class Ref {
 class RefSubclass : Ref {
   var w : Int
 
-  init (i: Int) {
+  override init (i: Int) {
     w = i
     super.init(i: i)
   }
@@ -632,7 +632,7 @@ class rdar16151899Base {
 
 class rdar16151899Derived : rdar16151899Base {
     // CHECK-LABEL: sil @_TFC10properties19rdar16151899DerivedcfMS0_FT_S0_
-    init() {
+    override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK-NEXT: function_ref properties.rdar16151899Base.init
@@ -781,7 +781,7 @@ class ObservedBase {
      var printInfo: Ref!
 }
 class ObservedDerived : ObservedBase {
-  init() {}
+  override init() {}
   override var printInfo: Ref! {
     didSet { }
   }

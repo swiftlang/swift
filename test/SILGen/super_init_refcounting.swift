@@ -16,7 +16,7 @@ class Bar: Foo {
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF_UP]])
   // CHECK:         [[NEW_SELF_DOWN:%.*]] = unchecked_ref_cast [[NEW_SELF]]
   // CHECK:         store [[NEW_SELF_DOWN]] to [[SELF_VAR]]
-  init() {
+  override init() {
     super.init()
   }
 }
@@ -45,7 +45,7 @@ class Zim: Foo {
 class Zang: Foo {
   var foo: Foo
 
-  init() {
+  override init() {
     foo = Foo()
     super.init()
   }
@@ -58,7 +58,7 @@ class Zang: Foo {
 class Bad: Foo {
   // Invalid code, but it's not diagnosed till DI. We at least shouldn't
   // crash on it.
-  init() {
+  override init() {
     super.init(self)
   }
 }

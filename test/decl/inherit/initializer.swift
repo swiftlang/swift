@@ -47,7 +47,7 @@ func testD() {
 // Adding a subobject initializer prevents inheritance of subobject
 // initializers.
 class NotInherited1 : D {
-  init(int i: Int) {
+  override init(int i: Int) {
     super.init(int: i)
   }
 
@@ -62,7 +62,7 @@ func testNotInherited1() {
 }
 
 class NotInherited1Sub : NotInherited1 {
-  init(int i: Int) {
+  override init(int i: Int) {
     super.init(int: i)
   }
 }

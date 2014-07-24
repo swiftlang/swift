@@ -11,7 +11,7 @@ import gizmo
 class GenericInheritsObjC<D> : Gizmo {
   var x : D
 
-  init()
+  override init()
 }
 sil @_TFC15generic_classes19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
 
@@ -20,7 +20,7 @@ class GenericInheritsObjC2<E> : Gizmo {
   var y : E
   var z : UInt8
 
-  init()
+  override init()
 }
 sil @_TFC15generic_classes20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
 

@@ -653,7 +653,7 @@ class CTest_C2 {
 class CTest_C3 : CTest_C1 {
   var y : Builtin.Int8
 
-  init()
+  override init()
 }
 
 protocol AnyObject {}

@@ -18,7 +18,7 @@ class Target : NSString {
   // This Swift-typed property causes vtable usage on this class.
   var swiftValue: Guts
 
-  init() {
+  override init() {
     self.swiftValue = Guts()
     self.objcValue = ""
     super.init()
@@ -32,7 +32,7 @@ class Target : NSString {
 class Observer : NSObject {
   var target: Target?
 
-  init() { target = nil; super.init() }
+  override init() { target = nil; super.init() }
 
   func observeTarget(t: Target) {
     target = t
@@ -75,7 +75,7 @@ var kvoContext = Int()
 class ObserverKVO : NSObject {
   var target: Target?
 
-  init() { target = nil; super.init() }
+  override init() { target = nil; super.init() }
 
   func observeTarget(target: Target) {
     self.target = target

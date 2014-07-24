@@ -13,10 +13,10 @@ class B {
   init() {} 
 }
 class D1 : B {
-  init() { super.init() } 
+  override init() { super.init() } 
 }
 class D2 : B {
-  init() { super.init() } 
+  override init() { super.init() } 
 }
 
 func useB(x: B) {}

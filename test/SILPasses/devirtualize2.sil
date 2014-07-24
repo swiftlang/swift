@@ -10,7 +10,7 @@ class Bar {
 }
 
 class Foo : Bar {
-  init()
+  override init()
   override func ping()
 }
 

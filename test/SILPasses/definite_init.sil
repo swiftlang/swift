@@ -609,7 +609,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
 
 class DerivedClassWithIVars : RootClassWithIVars {
   var a: Int
-  init()
+  override init()
 }
 
 sil @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars

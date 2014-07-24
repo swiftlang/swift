@@ -6,7 +6,7 @@ class A {
 }
 @objc
 class B : A {
-  init() { super.init() }
+  override init() { super.init() }
 }
 @objc
 class C {

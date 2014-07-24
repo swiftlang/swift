@@ -33,7 +33,7 @@ class B : P {
   func b() {}
 }
 class D : B {
-  init() { super.init() } 
+  override init() { super.init() } 
   func d() {}
 }
 class E {

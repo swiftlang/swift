@@ -15,7 +15,7 @@ public class OverrideComputedProperty : ComputedProperty {
     return super.readOnly + 1
   }
 
-  public init () { super.init() }
+  public override init () { super.init() }
 }
 
 public class OverrideAddsSetter : ComputedProperty {
@@ -23,14 +23,14 @@ public class OverrideAddsSetter : ComputedProperty {
     get { return 1 }
     set { /* do nothing */ }
   }
-  public init () { super.init() }
+  public override init () { super.init() }
 }
 
 public class OverrideSimpleSubscript : ReadonlySimpleSubscript {
   public override subscript(x: Int) -> Bool {
     return false
   }
-  public init () {}
+  public override init () {}
 }
 
 public class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
@@ -42,7 +42,7 @@ public class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
       return super[x]
     }
   }
-  public init () {}
+  public override init () {}
 }
 
 public class OverrideComplexSubscript : ComplexSubscript {
@@ -54,12 +54,12 @@ public class OverrideComplexSubscript : ComplexSubscript {
       return super[x, y]
     }
   }
-  public init () {}
+  public override init () {}
 }
 
 public class OverrideFunc : StillEmpty {
   public override func reset() {
     println("ha!")
   }
-  public init () {}
+  public override init () {}
 }

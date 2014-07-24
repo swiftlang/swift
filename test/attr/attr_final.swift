@@ -19,7 +19,7 @@ class Sub : Super {
     }
   }
 
-  final init() {} // expected-error {{'final' modifier cannot be applied to this declaration}}
+  final override init() {} // expected-error {{'final' modifier cannot be applied to this declaration}}
 }
 
 
@@ -58,6 +58,6 @@ class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super
     }
   }
 
-  final init() {} // expected-error {{'final' modifier cannot be applied to this declaration}}
+  final override init() {} // expected-error {{'final' modifier cannot be applied to this declaration}}
 }
 

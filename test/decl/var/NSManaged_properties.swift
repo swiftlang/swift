@@ -26,6 +26,6 @@ class SwiftGizmo : Gizmo {
 
   @NSCopying @NSManaged var optionalProperty : NSString?  // expected-error {{'NSManaged' property cannot also be marked @NSCopying}}
 
-  init() {}
+  override init() {}
 }
 

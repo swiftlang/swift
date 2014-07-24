@@ -61,7 +61,7 @@ class SubclassDefaultInitComplete : DefaultInitComplete {
 
 // inherits convenience initializers
 class B1 : A {
-  init(double d: Double) {
+  override init(double d: Double) {
     super.init(double: d)
   }
 }
@@ -115,7 +115,7 @@ class Ab2 : Ab1 {
 }
 
 class Ab3 : Ab2 {
-  init(string s: String) {
+  override init(string s: String) {
     super.init(string: s)
   }
 }

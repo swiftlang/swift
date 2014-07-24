@@ -52,7 +52,7 @@ class A : NSObject {
   var x1 = X("A.x1")
   var x2 = X("A.x2")
 
-  init() {
+  override init() {
     println("Initializing A instance");
   }
 
@@ -65,7 +65,7 @@ class B : A {
   var y1 = X("B.y1")
   var y2 = X("B.y2")
 
-  init() {
+  override init() {
     super.init()
     println("Initializing B instance");
   }

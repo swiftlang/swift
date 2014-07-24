@@ -17,7 +17,7 @@ func onDestruct() { }
 
 class SwiftGizmo : Gizmo {
   var x : X
-  init()
+  override init()
   deinit
 }
 sil @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()

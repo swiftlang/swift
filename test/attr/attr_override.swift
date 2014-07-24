@@ -143,7 +143,7 @@ class B : A {
     get { return 5 }
   }
 
-  override init() { } // expected-error{{'override' modifier cannot be applied to this declaration}}
+  override init() { }
   override deinit { } // expected-error{{'override' modifier cannot be applied to this declaration}}
   override typealias Inner = Int // expected-error{{'override' modifier cannot be applied to this declaration}}
 }
@@ -196,4 +196,44 @@ var rdar16654075e = { () -> () in
     override func foo() {}
   }
   A().foo()
+}
+
+class C { 
+  init(string: String) { } // expected-note{{overridden declaration is here}}
+  required init(double: Double) { } // expected-note 2{{overridden required initializer is here}}
+
+  convenience init() { self.init(string: "hello") }
+}
+
+class D1 : C {
+  override init(string: String) { super.init(string: string) }
+  required init(double: Double) { }
+  convenience init() { self.init(string: "hello") }
+}
+
+class D2 : C {
+  init(string: String) { super.init(string: string) } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
+
+  // FIXME: Would like to remove the space after 'override' as well.
+  required override init(double: Double) { } // expected-error{{override' is redundant on a 'required' initializer}}{{12-20=}}
+  override convenience init() { self.init(string: "hello") } // expected-error{{initializer does not override a designated initializer from its superclass}}
+}
+
+class D3 : C {
+  override init(string: String) { super.init(string: string) }
+  override init(double: Double) { } // expected-error{{override of required initializer uses the 'required' modifier}}{{3-11=required}}
+}
+
+class D4 : C {
+  // "required override" only when we're overriding a non-required
+  // designated initializer with a required initializer.
+  required override init(string: String) { super.init(string: string) }
+  required init(double: Double) { }
+}
+
+class D5 : C {
+  // "required override" only when we're overriding a non-required
+  // designated initializer with a required initializer.
+  required convenience override init(string: String) { self.init(double: 5.0) }
+  required init(double: Double) { }
 }

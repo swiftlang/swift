@@ -544,7 +544,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   //
 
   @objc
-  required init() {
+  required override init() {
     _fatalError("don't call this designated initializer")
   }
 
@@ -596,7 +596,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 class _NativeDictionaryStorageOwnerBase
     : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverridesType {
 
-  init() {}
+  override init() {}
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic

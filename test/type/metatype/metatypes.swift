@@ -10,7 +10,7 @@ class Test1a {
   class func foo() {}
 }
 class Test1b : Test1a { 
-  init() { super.init() }
+  override init() { super.init() }
 }
 
 Test1b.foo()

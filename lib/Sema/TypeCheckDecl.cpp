@@ -4385,6 +4385,10 @@ public:
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
         return false;
+    } else if (auto parentCtor = dyn_cast<ConstructorDecl>(parentDecl)) {
+      // Only designated initializers can be overridden.
+      if (!parentCtor->isDesignatedInit())
+        return false;
     }
 
     return true;
@@ -4819,6 +4823,15 @@ public:
     }
   };
 
+  /// Determine whether overriding the given declaration requires a keyword.
+  static bool overrideRequiresKeyword(ValueDecl *overridden) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(overridden)) {
+      return ctor->isDesignatedInit() && !ctor->isRequired();
+    }
+
+    return true;
+  }
+
   /// Record that the \c overriding declarations overrides the
   /// \c overridden declaration.
   ///
@@ -4878,7 +4891,7 @@ public:
     // If the overriding declaration does not have the @override
     // attribute on it, complain.
     if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
-        !isa<ConstructorDecl>(override)) {
+        overrideRequiresKeyword(base)) {
       // FIXME: rdar://16320042 - For properties, we don't have a useful
       // location for the 'var' token.  Instead of emitting a bogus fixit, only
       // emit the fixit for 'func's.
@@ -5240,9 +5253,44 @@ public:
       markAsObjC(CD, isObjC);
     }
 
-    // Check whether this constructor overrides a constructor in its base class.
-    // This only makes sense when the overridden constructor is required.
-    checkOverrides(CD);
+    // Check whether this initializer overrides an initializer in its
+    // superclass.
+    if (!checkOverrides(CD)) {
+      // If an initializer has an override attribute but does not override
+      // anything or overrides something that doesn't need an 'override'
+      // keyword (e.g., a convenience initializer), complain.
+      // anything, or overrides something that complain.
+      if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!CD->getOverriddenDecl()) {
+          TC.diagnose(CD, diag::initializer_does_not_override)
+            .highlight(attr->getLocation());
+          CD->setInvalid();
+        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
+          // Special case: we are overriding a 'required' initializer, so we
+          // need (only) the 'required' keyword.
+          if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
+            if (CD->getAttrs().hasAttribute<RequiredAttr>()) {
+              TC.diagnose(CD, diag::required_initializer_override_keyword)
+                .fixItRemove(attr->getLocation());
+            } else {
+              TC.diagnose(CD, diag::required_initializer_override_wrong_keyword)
+                .fixItReplace(attr->getLocation(), "required");
+              CD->getAttrs().add(
+                new (TC.Context) RequiredAttr(/*implicit=*/true));
+            }
+
+            TC.diagnose(CD->getOverriddenDecl(),
+                        diag::overridden_required_initializer_here);
+          } else {
+            // We tried to override a convenience initializer.
+            TC.diagnose(CD, diag::initializer_does_not_override)
+              .highlight(attr->getLocation());
+            TC.diagnose(CD->getOverriddenDecl(),
+                        diag::convenience_init_override_here);
+          }
+        }
+      }
+    }
 
     // If this initializer overrides a 'required' initializer, it must itself
     // be marked 'required'.
@@ -5694,6 +5742,14 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   ctor->setImplicit();
   ctor->setAccessibility(accessLevel);
 
+  // If we are defining a default initializer for a class that has a superclass,
+  // it overrides the default initializer of its superclass. Add an implicit
+  // 'override' attribute.
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (classDecl->getSuperclass())
+      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*implicit=*/true));
+  }
+
   // Type-check the constructor declaration.
   tc.typeCheckDecl(ctor, /*isFirstPass=*/true);
 
@@ -5957,7 +6013,8 @@ createDesignatedInitOverride(TypeChecker &tc,
 
   }
 
-  // Wire up the overides.
+  // Wire up the overrides.
+  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*Implicit=*/true));
   DeclChecker(tc, false, false).checkOverrides(ctor);
 
   if (kind == DesignatedInitKind::Stub) {

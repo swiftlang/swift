@@ -32,10 +32,10 @@ class A {
   init() {} 
 }
 class B : A { 
-  init() { super.init() } 
+  override init() { super.init() } 
 }
 class C : B { 
-  init() { super.init() } 
+  override init() { super.init() } 
 }
 
 func bar(b: B) -> Int {} // #1

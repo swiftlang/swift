@@ -8,7 +8,7 @@ import gizmo
 class Hoozit : Gizmo {
 
   // CHECK-LABEL: sil  @_TFC10objc_super6HoozitcfMS0_FT_S0_{{.*}} : $@cc(method) @thin (@owned Hoozit) -> @owned Hoozit
-  init() {
+  override init() {
     // CHECK: super_method [volatile] {{%.*}} : $Hoozit, #Gizmo.init!initializer.1.foreign
     super.init()
   }

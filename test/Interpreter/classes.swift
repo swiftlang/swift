@@ -18,7 +18,7 @@ class Interval {
 }
 
 class OpenInterval : Interval {
-  init(_ lo:Int, _ hi:Int) {
+  override init(_ lo:Int, _ hi:Int) {
     super.init(lo, hi)
   }
 

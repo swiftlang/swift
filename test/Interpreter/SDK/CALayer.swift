@@ -23,7 +23,7 @@ class FooLayer: CALayer {
   var black: CGColor
   var white: CGColor = CGColorGetConstantColor(kCGColorWhite)
 
-  init() {
+  override init() {
     black = CGColorGetConstantColor(kCGColorBlack)
     super.init()
     hangCanary(self)

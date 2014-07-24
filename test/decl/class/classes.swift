@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify -parse-as-library
 
 class B : A {
-  init() { super.init() }
+  override init() { super.init() }
   override func f() {}
   func g() -> (B, B) { return (B(), B()) } // expected-error {{declaration 'g()' cannot override more than one superclass declaration}}
   override func h() -> (A, B) { return (B(), B()) }
@@ -52,7 +52,7 @@ class C<T> {
   func f(v: T) -> T { return v }
 }
 class D : C<Int> { // expected-error{{classes derived from generic classes must also be generic}}
-  init() { super.init() }
+  override init() { super.init() }
   override func f(v: Int) -> Int { return v+1 }
 }
 func f2() {

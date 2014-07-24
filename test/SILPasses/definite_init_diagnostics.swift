@@ -363,7 +363,7 @@ func tuple_test() -> Int {
 
 class SomeDerivedClass : SomeClass {
   var y : Int
-  init() { 
+  override init() { 
     y = 42  // ok
     super.init()
   }
@@ -527,7 +527,7 @@ enum DelegatingCtorEnum {
 class RequiresInitsDerived : Gizmo {
   var a = 1
 
-  init() {
+  override init() {
     super.init()
   }
 
@@ -552,7 +552,7 @@ class rdar16119509_Buffer {
 }
 class rdar16119509_Base {}
 class rdar16119509_Derived : rdar16119509_Base {
-  init() {
+  override init() {
     var capacity = 2
     while capacity < 2 {
       capacity <<= 1
@@ -661,7 +661,7 @@ extension Double {
 class r17686667Base {}
 class r17686667Test : r17686667Base {
   var x: Int
-  init() {  // expected-error {{property 'self.x' not initialized at implicitly generated super.init call}}
+  override init() {  // expected-error {{property 'self.x' not initialized at implicitly generated super.init call}}
 
   }
 }

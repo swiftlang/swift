@@ -61,7 +61,7 @@ class BaseWithDummyParameter {
   }
 }
 class DerivedWithDummyParameter : BaseWithDummyParameter {
-  init() {
+  override init() {
     super.init(dummy: ())
   }
 }

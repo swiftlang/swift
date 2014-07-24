@@ -170,7 +170,7 @@ class Bas : NSObject {
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bas8nsstrArgfS0_FT1sCSo8NSString_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
   func nsstrArg(#s: NSString) { }
 
-  init() { 
+  override init() { 
     strRealProp = String()
     nsstrRealProp = NSString()
     super.init()

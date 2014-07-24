@@ -112,7 +112,7 @@ class Z4 {
 }
 
 class Z5 : Z4 {
-  init() { }
+  override init() { }
 
   convenience init(other: Z5) {
     other.init() // expected-error{{'init' can only refer to the initializers of 'self' or 'super'}}
@@ -132,7 +132,7 @@ class Z6 {
 class Z7Base { }
 
 class Z7 : Z7Base {
-  init() { }
+  override init() { }
 
   init(b: Bool) {
     if b { super.init() } // expected-note{{previous chaining call is here}}

@@ -82,6 +82,18 @@ Latest
 * The -Ofast optimization flag has been renamed to -Ounchecked. We will accept
   both names for now and remove -Ofast in a later build.
 
+* An initializer that overrides a designated initializer from its
+  superclass must be marked with the 'override' keyword, so that all
+  overrides in the language consistently require the use of
+  'override'. For example:
+
+    class A {
+      init() { }
+    }
+
+    class B : A {
+      override init() { super.init() }
+    }
 
 2014-07-21
 ----------

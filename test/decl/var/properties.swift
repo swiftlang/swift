@@ -866,7 +866,7 @@ class Base16375910 {
 }
 
 class Derived16375910 : Base16375910 {
-  init() {}
+  override init() {}
   override var x : Int { // expected-error {{cannot observe read-only property 'x'; it can't change}}
     willSet {
       print(newValue)

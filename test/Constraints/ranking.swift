@@ -7,7 +7,7 @@ class A {
   init() {} 
 };
 class B : A { 
-  init() { super.init() } 
+  override init() { super.init() } 
 }
 
 func f1(a: A) -> A { return a }
