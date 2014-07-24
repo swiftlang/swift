@@ -184,6 +184,14 @@ Classes:
       - Selector:        'initWithObjects:count:'
         MethodKind:      Instance
         DesignatedInit:  true
+  - Name:            NSString
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithCoder:'
+        MethodKind:      Instance
+        DesignatedInit:  true
   - Name:            NSThread
     Methods:
       - Selector:        'init'

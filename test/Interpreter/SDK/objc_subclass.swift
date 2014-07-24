@@ -9,6 +9,10 @@ class SuperString : NSString {
     self.len = len
   }
 
+  required init(coder aDecoder: NSCoder) {
+    super.init(coder: aDecoder)
+  }
+
   func length() -> Int {
     return len
   }
