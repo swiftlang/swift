@@ -730,7 +730,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
     if (A->getOption().matches(OPT_O0)) {
       IRGenOpts.OptLevel = 0;
-    } else if (A->getOption().matches(OPT_Ofast)) {
+    } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Set the maximum optimization level and remove all runtime checks.
       IRGenOpts.OptLevel = MaxLevel;
       // Removal of cond_fail (overflow on binary operations).
@@ -776,12 +776,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.AssertConfig = SILOptions::DisableReplacement;
   } else if (Opts.AssertConfig == SILOptions::Debug) {
     // Set the assert configuration according to the optimization level if it
-    // has not been set by the "Ofast" flag.
+    // has not been set by the -Ounchecked flag.
     Opts.AssertConfig =
         IRGenOpts.OptLevel > 0 ? SILOptions::Release : SILOptions::Debug;
   }
 
-  // OFast might also set removal of runtime asserts (cond_fail).
+  // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_remove_runtime_asserts);
 
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);

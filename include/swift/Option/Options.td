@@ -229,7 +229,10 @@ def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
             Alias<O0>;
 
 def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
-def Ofast : Flag<["-"], "Ofast">, Group<O_Group>, Flags<[FrontendOption]>;
+def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
+  Flags<[FrontendOption]>,
+  HelpText<"Compile with optimizations and remove runtime safety checks">;
+def Ofast : Flag<["-"], "Ofast">, Group<O_Group>, Alias<Ounchecked>;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,

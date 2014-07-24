@@ -303,7 +303,7 @@ we can do this check in O(1) because the source holds a known buffer
 type.  Rather than incur O(N) checking for the other cases, the new
 intermediate object is marked for deferred checking, and all element
 accesses through that object are dynamically typechecked, with a trap
-upon failure (except in ``-Ofast`` builds).
+upon failure (except in ``-Ounchecked`` builds).
 
 When the resulting array is later up-cast (other than to a type that
 can be validated in O(1) by checking the type of the underlying

@@ -52,6 +52,13 @@ Latest
 
     import UIKit.UIGestureRecognizerSubclass
 
+* The numeric optimization levels -O[0-3] have been removed in favor of the
+  named levels -Onone and -O.
+
+* The -Ofast optimization flag has been renamed to -Ounchecked. We will accept
+  both names for now and remove -Ofast in a later build.
+
+
 2014-07-21
 ----------
 

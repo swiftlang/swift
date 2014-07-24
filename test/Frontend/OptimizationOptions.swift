@@ -2,7 +2,7 @@
 // RUN: %swift -O0 -emit-sil %s 2>&1 | FileCheck %s --check-prefix=DEBUG
 // RUN: %swift -O3 -emit-sil %s 2>&1 | FileCheck %s --check-prefix=RELEASE
 // RUN: %swift -O  -emit-sil %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %swift -Ofast -emit-sil %s 2>&1 | FileCheck %s --check-prefix=FAST
+// RUN: %swift -Ounchecked -emit-sil %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
 
 // REQUIRES: optimized_stdlib
 
@@ -85,12 +85,12 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // RELEASE:  cond_fail %[[V2]]
 // RELEASE:  return
 
-// In fast mode remove library precondition checks.
-// FAST-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// FAST-NOT:  "fatal error"
-// FAST-NOT:  builtin_function_ref "int_trap"
-// FAST-NOT:  unreachable
-// FAST:  return
+// In unchecked mode remove library precondition checks.
+// UNCHECKED-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
+// UNCHECKED-NOT:  "fatal error"
+// UNCHECKED-NOT:  builtin_function_ref "int_trap"
+// UNCHECKED-NOT:  unreachable
+// UNCHECKED:  return
 
 //  Partial safety checks.
 

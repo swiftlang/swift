@@ -4,7 +4,7 @@
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/ReturnNil/ReturnNil.m -c -o %t/ReturnNil.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Debug
 // RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Release -O
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Fast -Ofast
+// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Fast -Ounchecked
 //
 // RUN: %target-run %t/OptionalTraps_Debug UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/OptionalTraps_Release UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
