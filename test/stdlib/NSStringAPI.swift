@@ -1138,12 +1138,103 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   // FIXME
 }
 
-NSStringAPIs.test("OperatorEquals") {
-  // FIXME
+func checkEqualityImpl(
+  expected: Bool, lhs: String, rhs: String,
+  stackTrace: SourceLocStack
+) {
+  // String / String
+  expectEqual(expected, lhs == rhs, stackTrace: stackTrace)
+  expectEqual(!expected, lhs != rhs, stackTrace: stackTrace)
 
-  // NSString == NSString
-  // String == NSString
-  // NSString == String
+  // NSString / NSString
+  let lhsNSString = lhs as NSString
+  let rhsNSString = rhs as NSString
+  expectEqual(expected, lhsNSString == rhsNSString, stackTrace: stackTrace)
+  // FIXME: this fails now.
+  //expectEqual(!expected, lhsNSString != rhsNSString, stackTrace: stackTrace)
+
+  // String / NSString
+  expectEqual(expected, lhs == rhsNSString, stackTrace: stackTrace)
+  expectEqual(!expected, lhs != rhsNSString, stackTrace: stackTrace)
+
+  // NSString / String
+  expectEqual(expected, lhs == rhsNSString, stackTrace: stackTrace)
+  expectEqual(!expected, lhs != rhsNSString, stackTrace: stackTrace)
+}
+
+func checkEquality(
+  expected: Bool, lhs: String, rhs: String, stackTrace: SourceLocStack
+) {
+  checkEqualityImpl(expected, lhs, rhs, stackTrace.withCurrentLoc())
+  checkEqualityImpl(expected, rhs, lhs, stackTrace.withCurrentLoc())
+}
+
+struct EqualityTest {
+  let expected: Bool
+  let lhs: String
+  let rhs: String
+  let loc: SourceLoc
+
+  init(_ expected: Bool, _ lhs: String, _ rhs: String,
+       file: String = __FILE__, line: UWord = __LINE__) {
+    self.expected = expected
+    self.lhs = lhs
+    self.rhs = rhs
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let equalityTests = [
+  EqualityTest(true, "", ""),
+  EqualityTest(false, "a", ""),
+
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
+  EqualityTest(true, "a\u{301}", "\u{e1}"),
+  EqualityTest(false, "a\u{301}", "a"),
+  EqualityTest(false, "\u{e1}", "a"),
+
+  // U+304B HIRAGANA LETTER KA
+  // U+304C HIRAGANA LETTER GA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  EqualityTest(true, "\u{304b}", "\u{304b}"),
+  EqualityTest(true, "\u{304c}", "\u{304c}"),
+  EqualityTest(false, "\u{304b}", "\u{304c}"),
+  EqualityTest(false, "\u{304b}", "\u{304c}\u{3099}"),
+  EqualityTest(true, "\u{304c}", "\u{304b}\u{3099}"),
+  EqualityTest(false, "\u{304c}", "\u{304c}\u{3099}"),
+
+  // U+212B ANGSTROM SIGN
+  // U+030A COMBINING RING ABOVE
+  // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
+  EqualityTest(true, "\u{212b}", "A\u{30a}"),
+  EqualityTest(true, "\u{212b}", "\u{c5}"),
+  EqualityTest(true, "A\u{30a}", "\u{c5}"),
+  EqualityTest(false, "A\u{30a}", "a"),
+
+  // U+2126 OHM SIGN
+  // U+03A9 GREEK CAPITAL LETTER OMEGA
+  EqualityTest(true, "\u{2126}", "\u{03a9}"),
+
+  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
+  // U+0323 COMBINING DOT BELOW
+  // U+0307 COMBINING DOT ABOVE
+  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  EqualityTest(true, "\u{1e69}", "s\u{323}\u{307}"),
+  EqualityTest(true, "\u{1e69}", "s\u{307}\u{323}"),
+  EqualityTest(true, "\u{1e69}", "\u{1e63}\u{307}"),
+  EqualityTest(true, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
+  EqualityTest(true, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+
+  // U+FB01 LATIN SMALL LIGATURE FI
+  EqualityTest(true, "\u{fb01}", "\u{fb01}"),
+  EqualityTest(false, "\u{fb01}", "fi"),
+]
+
+NSStringAPIs.test("OperatorEquals") {
+  for test in equalityTests {
+    checkEquality(test.expected, test.lhs, test.rhs, test.loc.withCurrentLoc())
+  }
 }
 
 // FIXME: these properties should be implemented in the core library.
