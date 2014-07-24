@@ -461,13 +461,7 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
                        args.getArgString(arg->getIndex()), driverName);
       break;
 
-    // No warning, as these are not quite the same as -repl.
-    case options::OPT_integrated_repl:
-    case options::OPT_lldb_repl:
-      break;
-
     default:
-      llvm_unreachable("invalid mode opt for interactive driver");
       break;
     }
   }

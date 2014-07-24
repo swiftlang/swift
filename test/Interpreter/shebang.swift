@@ -1,5 +1,5 @@
 // RUN: rm -rf %t.mcp
-// RUN: echo '#!%swift_driver_plain -module-cache-path %t.mcp -i' > %t.shebang.swift
+// RUN: echo '#!%swift_legacy_driver_plain -module-cache-path %t.mcp -i' > %t.shebang.swift
 // RUN: cat %s >> %t.shebang.swift
 // RUN: chmod u+x %t.shebang.swift
 
@@ -7,7 +7,7 @@
 // RUN: %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
 
 // RUN: rm -rf %t.mcp
-// RUN: echo '#!%swifti_driver_plain -module-cache-path %t.mcp' > %t.shebang.swifti
+// RUN: echo '#!%swift_driver_plain -module-cache-path %t.mcp' > %t.shebang.swifti
 // RUN: cat %s >> %t.shebang.swifti
 // RUN: chmod u+x %t.shebang.swifti
 

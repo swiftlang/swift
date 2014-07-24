@@ -1,16 +1,16 @@
-// RUN: %swift_driver -emit-module -driver-print-jobs %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -emit-module -driver-print-jobs %s 2>&1 > %t.simple.txt
 // RUN: FileCheck %s < %t.simple.txt
 // RUN: FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: %swift_driver -driver-print-jobs -emit-module %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -o sdk.out -emit-objc-header-path path/to/header.h -F /path/to/frameworks -F /path/to/more/frameworks -I /path/to/headers -I path/to/more/headers -module-cache-path /tmp/modules 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -emit-module %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -o sdk.out -emit-objc-header-path path/to/header.h -F /path/to/frameworks -F /path/to/more/frameworks -I /path/to/headers -I path/to/more/headers -module-cache-path /tmp/modules 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
-// RUN: %swift_driver -driver-print-jobs -c -emit-module %s -o sdk.foo.out 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -c -emit-module %s -o sdk.foo.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix TWO-OUTPUTS %s < %t.complex.txt
 
-// RUN: %swift_driver -driver-print-jobs -c %s -emit-objc-header -o sdk.foo.out 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -c %s -emit-objc-header -o sdk.foo.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
 
@@ -65,7 +65,7 @@
 // THREE-OUTPUTS: -emit-objc-header-path sdk.foo.h
 // THREE-OUTPUTS: -o sdk.foo.out
 
-// RUN: %swift_driver -driver-print-jobs -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift -module-name merge -o /tmp/modules > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift -module-name merge -o /tmp/modules > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix MERGE_1 %s < %t.complex.txt
 

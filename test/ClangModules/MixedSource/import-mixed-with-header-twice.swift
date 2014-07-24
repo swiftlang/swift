@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp -R %S/Inputs/mixed-target %t
 
-// RUN: %swift_driver -Xfrontend %clang-importer-sdk -module-cache-path %t -I %S/../Inputs/custom-modules -import-objc-header %t/mixed-target/header.h -emit-module-path %t/MixedWithHeader.swiftmodule %S/Inputs/mixed-with-header.swift %S/../../Inputs/empty.swift -module-name MixedWithHeader
-// RUN: %swift_driver -Xfrontend %clang-importer-sdk -module-cache-path %t -I %t -I %S/../Inputs/custom-modules -import-objc-header %t/mixed-target/header-again.h -emit-module-path %t/MixedWithHeaderAgain.swiftmodule %S/Inputs/mixed-with-header-again.swift %S/../../Inputs/empty.swift -module-name MixedWithHeaderAgain
+// RUN: %swiftc_driver -Xfrontend %clang-importer-sdk -module-cache-path %t -I %S/../Inputs/custom-modules -import-objc-header %t/mixed-target/header.h -emit-module-path %t/MixedWithHeader.swiftmodule %S/Inputs/mixed-with-header.swift %S/../../Inputs/empty.swift -module-name MixedWithHeader
+// RUN: %swiftc_driver -Xfrontend %clang-importer-sdk -module-cache-path %t -I %t -I %S/../Inputs/custom-modules -import-objc-header %t/mixed-target/header-again.h -emit-module-path %t/MixedWithHeaderAgain.swiftmodule %S/Inputs/mixed-with-header-again.swift %S/../../Inputs/empty.swift -module-name MixedWithHeaderAgain
 // RUN: %swift %clang-importer-sdk -module-cache-path %t -I %S/../Inputs/custom-modules -I %t -parse %s -verify
 
 // RUN: rm %t/mixed-target/header.h
