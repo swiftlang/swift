@@ -173,19 +173,26 @@ extension String {
   }
 }
 
+/// Compare two strings, normalizing them to NFD first.
+///
+/// The behavior is equivalent to `NSString.compare()` with default options.
+///
+/// :returns:
+///   * -1 if `lhs < rhs`,
+///   * 0 if `lhs == rhs`,
+///   * 1 if `lhs > rhs`.
+@asmname("swift_stdlib_compareNSStringNormalizingToNFD")
+func _stdlib_compareNSStringNormalizingToNFD(lhs: AnyObject, rhs: AnyObject)
+    -> Int
+
 extension String: Equatable {
 }
 
 public func ==(lhs: String, rhs: String) -> Bool {
-  // FIXME: Compares UnicodeScalars, but should eventually do proper
-  // Unicode string comparison. This is above the level of the
-  // standard equal algorithm because even the largest units
-  // (Characters/a.k.a. grapheme clusters) don't have a 1-for-1
-  // correspondence.  For example, "SS" == "ß" should be true.
-  //
-  // NOTE: if this algorithm is changed, consider updating equality comparison
-  // of Character.
-  return Swift.equal(lhs.unicodeScalars, rhs.unicodeScalars)
+  // Note: this operation should be consistent with equality comparison of
+  // Character.
+  return _stdlib_compareNSStringNormalizingToNFD(
+    lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
 }
 
 public func <(lhs: String, rhs: String) -> Bool {
@@ -215,16 +222,23 @@ extension String {
   }
 }
 
+@asmname("swift_stdlib_NSStringNFDHashValue")
+func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
+
 extension String : Hashable {
   public var hashValue: Int {
-    var r : Int = 5381
-    _encode(
-      UTF8.self,
-      output: SinkOf<UTF8.CodeUnit> ({
-          r = ((r << 5) &+ r) &+ Int($0)
-        }))
-
-    return r
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+#if arch(i386) || arch(arm)
+    let hashOffset = 0x88ddcc21
+#else
+    let hashOffset = 0x429b126688ddcc21
+#endif
+    // FIXME(performance): constructing a temporary NSString is extremely
+    // wasteful and inefficient.
+    let cocoaString =
+      unsafeBitCast(self._bridgeToObjectiveCImpl(), _SwiftNSStringType.self)
+    return hashOffset ^ _stdlib_NSStringNFDHashValue(cocoaString)
   }
 }
 

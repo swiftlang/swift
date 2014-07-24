@@ -107,11 +107,13 @@ public func expectEqual<T>(
 
 public func expectNotEqual<T : Equatable>(
     expected: T, actual: T,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
   }

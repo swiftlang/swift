@@ -638,8 +638,8 @@ func test_DictionaryPrinting() {
   debugPrintedIs(dictSI, "[\"aaa\": 1]")
 
   dictSI = [ "aaa": 1, "bbb": 2 ]
-  printedIs(dictSI, "[aaa: 1, bbb: 2]")
-  debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]")
+  printedIs(dictSI, "[bbb: 2, aaa: 1]")
+  debugPrintedIs(dictSI, "[\"bbb\": 2, \"aaa\": 1]")
 
   var dictSS = [ "aaa": "bbb" ]
   printedIs(dictSS, "[aaa: bbb]")

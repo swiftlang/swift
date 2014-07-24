@@ -93,6 +93,20 @@ extern "C" bool swift_stdlib_NSObject_isEqual(NSObject *lhs, NSObject *rhs) {
   return Result;
 }
 
+extern "C" int swift_stdlib_compareNSStringNormalizingToNFD(NSString *lhs,
+                                                            NSString *rhs) {
+  // 'kCFCompareNonliteral' actually means "normalize to NFD".
+  int Result = CFStringCompare((__bridge CFStringRef)lhs,
+                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
+  swift_unknownRelease(lhs);
+  swift_unknownRelease(rhs);
+  return Result;
+}
+
+extern "C" size_t swift_stdlib_NSStringNFDHashValue(NSString *str) {
+  return str.decomposedStringWithCanonicalMapping.hash;
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
