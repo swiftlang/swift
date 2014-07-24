@@ -37,7 +37,7 @@ func alignofValue<T>(_:T) -> Int {
 // Like the builtin strideof, but never returns zero
 @transparent public
 func strideof<T>(_:T.Type) -> Int {
-  return max(Int(Builtin.strideof(T.self)), 1)
+  return Int(Builtin.strideof_nonzero(T.self))
 }
 
 @transparent public
