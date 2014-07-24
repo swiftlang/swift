@@ -405,6 +405,7 @@ function set_ios_options {
         -DSWIFT_DEPLOYMENT_OS=${platform}
         -DSWIFT_DEPLOYMENT_TARGET=${deployment_target}
         -DSWIFT_BUILD_TOOLS=OFF
+        -DSWIFT_RUN_LONG_TESTS="ON"
         -DPATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
         -DSWIFT_INCLUDE_DOCS=OFF
         -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
