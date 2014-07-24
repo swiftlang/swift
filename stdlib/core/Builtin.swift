@@ -26,7 +26,7 @@ func sizeofValue<T>(_:T) -> Int {
 
 @transparent public
 func alignof<T>(_:T.Type) -> Int {
-  return max(Int(Builtin.alignof(T.self)), 1)
+  return Int(Builtin.alignof(T.self))
 }
 
 @transparent public
