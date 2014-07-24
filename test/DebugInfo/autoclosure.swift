@@ -1,6 +1,6 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
 // CHECK: define linkonce_odr hidden void @_TFF11autoclosure7call_me
-// CHECK: call void @llvm.dbg.value{{.*}}, !dbg
+// CHECK: call void @llvm.dbg.declare{{.*}}, !dbg
 // CHECK: , !dbg ![[DBG:.*]]
 
 func get_truth(input: Int) -> Int {

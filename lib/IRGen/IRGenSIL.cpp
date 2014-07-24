@@ -469,15 +469,17 @@ public:
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
                               StringRef Name,
                               Alignment Align = Alignment(0)) {
-    if (IGM.Opts.Optimize
-        || isa<llvm::AllocaInst>(Storage)
-        || isa<llvm::UndefValue>(Storage))
+    auto Ty = Storage->getType();
+    if (IGM.Opts.Optimize ||
+        isa<llvm::AllocaInst>(Storage) ||
+        isa<llvm::UndefValue>(Storage) ||
+        Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
       return Storage;
 
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
 
-    auto Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
+    auto Alloca = createAlloca(Ty, Align, Name+".addr");
     Builder.CreateAlignedStore(Storage, Alloca.getAddress(), Align.getValue());
     return Alloca.getAddress();
   }
@@ -1207,7 +1209,10 @@ getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
   else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
     Explosion e = LoweredArg.getExplosion(*this);
     auto EVals = e.claimAll();
-    Vals.append(EVals.begin(), EVals.end());
+    for (auto val : EVals)
+      // Emit -O0 shadow copies for by-value parameters to ensure they
+      // are visible until the end of the function.
+      Vals.push_back(emitShadowCopy(val, Name));
   }
 }
 
