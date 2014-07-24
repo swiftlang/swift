@@ -1,4 +1,4 @@
-// RUN: %swift -sil-inline-threshold 0 -O3 -emit-sil %s | FileCheck %s
+// RUN: %swift -sil-inline-threshold 0 -O -emit-sil %s | FileCheck %s
 
 struct XXX<T> {
   init(t : T) {m_t = t}

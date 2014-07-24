@@ -1,5 +1,5 @@
 // RUN: %swift -emit-silgen -parse-stdlib %s | FileCheck %s
-// RUN: %swift -emit-sil -O0 -parse-stdlib %s | FileCheck -check-prefix=CANONICAL %s
+// RUN: %swift -emit-sil -Onone -parse-stdlib %s | FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 

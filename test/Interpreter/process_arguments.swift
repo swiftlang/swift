@@ -1,7 +1,7 @@
 // RUN: %swift -interpret %s | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -O0 -g | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -O0 -g -- | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -O0 -g -- a b c | FileCheck %s -check-prefix=CHECK-THREE
+// RUN: %swift -interpret %s -Onone -g | FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %swift -interpret %s -Onone -g -- | FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %swift -interpret %s -Onone -g -- a b c | FileCheck %s -check-prefix=CHECK-THREE
 
 println("Begin")
 for arg in Process.arguments { println(arg) }

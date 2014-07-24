@@ -1,4 +1,4 @@
-// RUN: %swift -O3  -emit-sil %s | FileCheck %s
+// RUN: %swift -O  -emit-sil %s | FileCheck %s
 
 // Make sure we can swap two values in an array without retaining anything.
 

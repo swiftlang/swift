@@ -1,4 +1,4 @@
-// RUN: %swift -sil-verify-all -O3 %s -emit-sil | FileCheck %s
+// RUN: %swift -sil-verify-all -O %s -emit-sil | FileCheck %s
 
 // Turn on this test when rdar://r16847192 is completed.
 // REQUIRES: r16847192

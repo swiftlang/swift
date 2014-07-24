@@ -469,7 +469,7 @@ public:
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
                               StringRef Name,
                               Alignment Align = Alignment(0)) {
-    if (IGM.Opts.OptLevel > 0
+    if (IGM.Opts.Optimize
         || isa<llvm::AllocaInst>(Storage)
         || isa<llvm::UndefValue>(Storage))
       return Storage;

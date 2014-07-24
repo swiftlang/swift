@@ -1,9 +1,9 @@
 // RUN: %target-build-swift -target arm64-apple-ios8.0 -target-cpu cyclone \
-// RUN:                          -O3 -S %s -parse-as-library | \
+// RUN:                          -O -S %s -parse-as-library | \
 // RUN:   FileCheck --check-prefix=BOTH --check-prefix=TBI %s
 
 // RUN: %target-build-swift -target arm64-apple-ios8.0 -target-cpu cyclone \
-// RUN:     -target-feature -tbi -O3 -S %s -parse-as-library | \
+// RUN:     -target-feature -tbi -O -S %s -parse-as-library | \
 // RUN:   FileCheck --check-prefix=BOTH --check-prefix=NO_TBI %s
 
 // REQUIRES: CPU=arm64, OS=ios

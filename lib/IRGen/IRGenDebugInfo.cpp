@@ -175,7 +175,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   StringRef Producer = BumpAllocatedString(version::getSwiftFullVersion());
 
-  bool IsOptimized = Opts.OptLevel > 0;
+  bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
 
   // FIXME.
@@ -710,7 +710,7 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   // Various flags
   bool IsLocalToUnit = false;
   bool IsDefinition = true;
-  bool IsOptimized = Opts.OptLevel > 0;
+  bool IsOptimized = Opts.Optimize;
   unsigned Flags = 0;
 
   // Mark everything that is not visible from the source code (i.e.,
@@ -1050,7 +1050,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
                                                 DITy, Addr, ArgNo);
   } else {
     Descriptor = DBuilder.createLocalVariable(
-        Tag, Scope, Name, Unit, Line, DITy, Opts.OptLevel > 0, Flags, ArgNo);
+        Tag, Scope, Name, Unit, Line, DITy, Opts.Optimize, Flags, ArgNo);
   }
 
   // Create inlined variables.

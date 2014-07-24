@@ -1,4 +1,4 @@
-// RUN: %swift %s -O3 -emit-sil | FileCheck %s
+// RUN: %swift %s -O -emit-sil | FileCheck %s
 
 protocol Pingable {
  func ping(x : Int);

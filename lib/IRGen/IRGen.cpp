@@ -88,8 +88,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     return nullptr;
   }
 
-  // The integer values 0-3 map exactly to the values of this enum.
-  CodeGenOpt::Level OptLevel = static_cast<CodeGenOpt::Level>(Opts.OptLevel);
+  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Aggressive
+                                             : CodeGenOpt::None;
 
   // Set up TargetOptions.
   // Things that maybe we should collect from the command line:
@@ -238,15 +238,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Set up a pipeline.
   PassManagerBuilder PMBuilder;
 
-  if (Opts.DisableLLVMOptzns) {
-    PMBuilder.OptLevel = 0;
+  if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
+    PMBuilder.OptLevel = 3;
+    PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
+    PMBuilder.SLPVectorize = true;
+    PMBuilder.LoopVectorize = true;
   } else {
-    PMBuilder.OptLevel = Opts.OptLevel;
-    if (Opts.OptLevel != 0) {
-      PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-      PMBuilder.SLPVectorize = true;
-      PMBuilder.LoopVectorize = true;
-    }
+    PMBuilder.OptLevel = 0;
   }
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer

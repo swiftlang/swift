@@ -70,8 +70,8 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
-  /// The optimization level, as in -O2.
-  unsigned OptLevel : 2;
+  /// Whether or not to run optimization passes.
+  unsigned Optimize : 1;
 
   /// Whether we should emit debug info.
   unsigned DebugInfo : 1;
@@ -98,7 +98,7 @@ public:
   unsigned Playground : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   OptLevel(0), DebugInfo(false), UseJIT(false),
+                   Optimize(false), DebugInfo(false), UseJIT(false),
                    EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableFPElim(true), HasUnderlyingModule(false),

@@ -725,30 +725,17 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
-    // The maximum optimization level we currently support.
-    unsigned MaxLevel = 3;
-
-    if (A->getOption().matches(OPT_O0)) {
-      IRGenOpts.OptLevel = 0;
+    if (A->getOption().matches(OPT_Onone)) {
+      IRGenOpts.Optimize = false;
     } else if (A->getOption().matches(OPT_Ounchecked)) {
-      // Set the maximum optimization level and remove all runtime checks.
-      IRGenOpts.OptLevel = MaxLevel;
+      // Turn on optimizations and remove all runtime checks.
+      IRGenOpts.Optimize = true;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;
-    } else if (!StringRef(A->getValue()).size()) {
-      // -O is an alias to -O3.
-      IRGenOpts.OptLevel = MaxLevel;
     } else {
-      unsigned OptLevel;
-      if (StringRef(A->getValue()).getAsInteger(10, OptLevel) ||
-          OptLevel > MaxLevel) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        return true;
-      }
-
-      IRGenOpts.OptLevel = OptLevel;
+      assert(A->getOption().matches(OPT_O));
+      IRGenOpts.Optimize = true;
     }
   }
 
@@ -778,7 +765,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Set the assert configuration according to the optimization level if it
     // has not been set by the -Ounchecked flag.
     Opts.AssertConfig =
-        IRGenOpts.OptLevel > 0 ? SILOptions::Release : SILOptions::Debug;
+        IRGenOpts.Optimize ? SILOptions::Release : SILOptions::Debug;
   }
 
   // -Ounchecked might also set removal of runtime asserts (cond_fail).

@@ -1435,7 +1435,7 @@ static void setMetadataRef(IRGenFunction &IGF,
 
   // Create a shadow copy of the metadata in an alloca for the debug info.
   StringRef Name = metadata->getName();
-  if (IGF.IGM.Opts.OptLevel == 0) {
+  if (!IGF.IGM.Opts.Optimize) {
     auto Alloca = IGF.createAlloca(metadata->getType(),
                                    IGF.IGM.getPointerAlignment(), Name);
     IGF.Builder.CreateAlignedStore(metadata, Alloca.getAddress(),

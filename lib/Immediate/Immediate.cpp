@@ -1102,7 +1102,7 @@ public:
 
     IRGenOpts.OutputFilename = "";
     IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
-    IRGenOpts.OptLevel = 0;
+    IRGenOpts.Optimize = false;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfo = false;

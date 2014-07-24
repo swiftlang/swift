@@ -26,7 +26,7 @@ benchmark() {
     rm -rfv $NAME.*.o $NAME.*_bin
 
     # Compile swift benchmark.
-    $SWIFT -O3 $NAME.swift -o $NAME.swift.o -c
+    $SWIFT -O $NAME.swift -o $NAME.swift.o -c
     $CLANG $NAME.swift.o -o $NAME.swift_bin -Wl,-rpath -Wl,"$BUILD_DIR/lib/swift/macosx" -L "$BUILD_DIR/lib/swift/macosx"
 
     # Compile CXX benchmark.

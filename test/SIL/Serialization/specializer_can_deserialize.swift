@@ -1,5 +1,5 @@
-// RUN: rm -rf %t; mkdir -p %t; %swift -emit-module %S/Inputs/specializer_input.swift -O2 -sil-serialize-all -parse-stdlib -parse-as-library -emit-module -o %t/Swift.swiftmodule -module-name=Swift -module-link-name swiftCore -sil-inline-threshold 0
-// RUN: %swift %s -O2 -I=%t -emit-sil -o - -sil-inline-threshold 0 | FileCheck %s
+// RUN: rm -rf %t; mkdir -p %t; %swift -emit-module %S/Inputs/specializer_input.swift -O -sil-serialize-all -parse-stdlib -parse-as-library -emit-module -o %t/Swift.swiftmodule -module-name=Swift -module-link-name swiftCore -sil-inline-threshold 0
+// RUN: %swift %s -O -I=%t -emit-sil -o - -sil-inline-threshold 0 | FileCheck %s
 
 import Swift
 

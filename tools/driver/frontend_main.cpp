@@ -205,7 +205,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Perform SIL optimization passes if optimizations haven't been disabled.
   // These may change across compiler versions.
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  if (IRGenOpts.OptLevel != 0) {
+  if (IRGenOpts.Optimize) {
     runSILOptimizationPasses(*SM, Invocation.getSILOptions());
     SM->verify();
   }

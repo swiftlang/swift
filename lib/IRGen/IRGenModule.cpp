@@ -75,7 +75,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto *CGO = new clang::CodeGenOptions;
-  CGO->OptimizationLevel = Opts.OptLevel;
+  CGO->OptimizationLevel = Opts.Optimize ? 3 : 0;
   CGO->DisableFPElim = Opts.DisableFPElim;
   auto &TO = ClangContext.getTargetInfo().getTargetOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),

@@ -37,11 +37,11 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 - The *SILGen* module generates *raw SIL* from an AST.
 - A series of *Guaranteed Optimization Passes* and *Diagnostic Passes* are run
   over the raw SIL both to perform optimizations and to emit
-  language-specific diagnostics.  These are always run, even at -O0, and produce
-  *canonical SIL*.
+  language-specific diagnostics.  These are always run, even at -Onone, and
+  produce *canonical SIL*.
 - General SIL *Optimization Passes* optionally run over the canonical SIL to
   improve performance of the resulting executable.  These are enabled and
-  controlled by the optimization level and are not run at -O0.
+  controlled by the optimization level and are not run at -Onone.
 - *IRGen* lowers canonical SIL to LLVM IR.
 - The LLVM backend (optionally) applies LLVM optimizations, runs the LLVM code
   generator and emits binary code.
@@ -92,7 +92,7 @@ If all diagnostic passes succeed, the final result is the
 TODO:
 
 - Generic specialization
-- Basic ARC optimization for acceptable performance at -O0.
+- Basic ARC optimization for acceptable performance at -Onone.
 
 General Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3654,8 +3654,8 @@ constant replacement but leave the function application to be serialized to
 sil).
 
 The compiler flag that influences the value of the ``assert_configuration``
-funtion application is the optimization flag: at ``-O0`` the application will be
-replaced by ``Debug`` at higher optimization levels the instruction will be
+funtion application is the optimization flag: at ``-Onone` the application will
+be replaced by ``Debug`` at higher optimization levels the instruction will be
 replaced by ``Release``. Optionally, the value to use for replacement can be
 specified with the ``-AssertConf`` flag which overwrites the value selected by
 the optimization flag (possible values are ``Debug``, ``Release``,

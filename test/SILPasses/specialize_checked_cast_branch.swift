@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil -O3 -sil-inline-threshold 0 %s -o - | FileCheck %s
+// RUN: %swift -emit-sil -O -sil-inline-threshold 0 %s -o - | FileCheck %s
 
 class C {}
 class D : C {}

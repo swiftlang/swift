@@ -1,4 +1,4 @@
-// RUN: %swift %s -O3 -emit-sil
+// RUN: %swift %s -O -emit-sil
 // Make sure we are not crashing on this one.
 
 class X { func ping() {} }

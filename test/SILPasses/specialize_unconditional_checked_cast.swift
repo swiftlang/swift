@@ -1,4 +1,4 @@
-// RUN: %swift -emit-sil -o - -O3 -sil-inline-threshold 0 -verify %s | FileCheck %s
+// RUN: %swift -emit-sil -o - -O -sil-inline-threshold 0 -verify %s | FileCheck %s
 
 //////////////////
 // Declarations //

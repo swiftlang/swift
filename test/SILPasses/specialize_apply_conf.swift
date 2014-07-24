@@ -1,4 +1,4 @@
-// RUN: %swift -O3 -sil-inline-threshold 1 -emit-sil %s | FileCheck %s
+// RUN: %swift -O -sil-inline-threshold 1 -emit-sil %s | FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.

@@ -224,11 +224,8 @@ def Xlinker : Separate<["-"], "Xlinker">,
 
 def O_Group : OptionGroup<"<optimization level options>">;
 
-def O0 : Flag<["-"], "O0">, Group<O_Group>, Flags<[FrontendOption]>;
-def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
-            Alias<O0>;
-
-def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
+def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>;
+def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
