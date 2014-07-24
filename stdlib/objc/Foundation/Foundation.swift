@@ -87,11 +87,11 @@ class NSConstantString {}
 
 @asmname("swift_convertStringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString {
-  return string as NSString
+  return String._bridgeFromObjectiveC(string)
 }
 
 internal func _convertNSStringToString(nsstring: NSString) -> String {
-  return String(nsstring)
+  return String._bridgeFromObjectiveC(nsstring)
 }
 
 extension NSString : StringLiteralConvertible {
@@ -207,77 +207,6 @@ func _cocoaStringSubscriptImpl(
 // when converting back and forth.
 //
 
-/// An NSString built around a slice of contiguous Swift String storage
-final class _NSContiguousString : NSString {
-  init(_ value: _StringCore) {
-    _sanityCheck(
-      value.hasContiguousStorage,
-      "_NSContiguousString requires contiguous storage")
-    self.value = value
-    super.init()
-  }
-
-  init(coder aDecoder: NSCoder) {
-    fatalError("init(coder:) not implemented for _NSContiguousString")
-  }
-
-  func length() -> Int {
-    return value.count
-  }
-
-  override func characterAtIndex(index: Int) -> unichar {
-    return value[index]
-  }
-
-  override func getCharacters(buffer: UnsafeMutablePointer<unichar>,
-                              range aRange: NSRange) {
-    _precondition(aRange.location + aRange.length <= Int(value.count))
-
-    if value.elementWidth == 2 {
-      UTF16.copy(
-        value.startUTF16 + aRange.location,
-        destination: UnsafeMutablePointer<unichar>(buffer),
-        count: aRange.length)
-    }
-    else {
-      UTF16.copy(
-        value.startASCII + aRange.location,
-        destination: UnsafeMutablePointer<unichar>(buffer),
-        count: aRange.length)
-    }
-  }
-
-  @objc
-  func _fastCharacterContents() -> UnsafeMutablePointer<unichar> {
-    return value.elementWidth == 2
-      ? UnsafeMutablePointer(value.startUTF16) : nil
-  }
-
-  //
-  // Implement sub-slicing without adding layers of wrapping
-  // 
-  override func substringFromIndex(start: Int) -> String {
-    return _NSContiguousString(value[Int(start)..<Int(value.count)])
-  }
-
-  override func substringToIndex(end: Int) -> String {
-    return _NSContiguousString(value[0..<Int(end)])
-  }
-
-  override func substringWithRange(aRange: NSRange) -> String {
-    return _NSContiguousString(
-      value[Int(aRange.location)..<Int(aRange.location + aRange.length)])
-  }
-
-  //
-  // Implement copy; since this string is immutable we can just return ourselves
-  override func copy() -> AnyObject {
-    return self
-  }
-
-  let value: _StringCore
-}
-
 // A substring of an arbitrary immutable NSString.  The underlying
 // NSString is assumed to not provide contiguous UTF-16 storage.
 final class _NSOpaqueString : NSString {
@@ -341,20 +270,22 @@ final class _NSOpaqueString : NSString {
   var subRange: NSRange
 }
 
+
 //
 // Conversion from NSString to Swift's native representation
 //
+
 extension String {
-  public init(_ value: NSString) {
-    if let wrapped = value as? _NSContiguousString {
-      self._core = wrapped.value
+  init(_cocoaString: NSString) {
+    if let wrapped = (_cocoaString as AnyObject) as? _NSContiguousString {
+      self._core = wrapped._core
       return
     }
-    
+
     // Treat it as a CF object because presumably that's what these
     // things tend to be, and CF has a fast path that avoids
     // objc_msgSend
-    let cfValue: CFString = reinterpretCast(value)
+    let cfValue: CFString = reinterpretCast(_cocoaString)
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
@@ -362,7 +293,7 @@ extension String {
     let cfImmutableValue: CFString = CFStringCreateCopy(nil, cfValue)
 
     let length = CFStringGetLength(cfImmutableValue)
-    
+
     // Look first for null-terminated ASCII
     // Note: the code in clownfish appears to guarantee
     // nul-termination, but I'm waiting for an answer from Chris Kane
@@ -393,17 +324,14 @@ extension String : _BridgedToObjectiveCType {
   }
 
   public func _bridgeToObjectiveC() -> NSString {
-    if let ns = _core.cocoaBuffer {
-      if _cocoaStringLength(source: ns) == _core.count {
-        return ns as NSString
-      }
-    }
-    _sanityCheck(_core.hasContiguousStorage)
-    return _NSContiguousString(_core)
+    // This method should not do anything extra except calling into the
+    // implementation inside core.  (These two entry points should be
+    // equivalent.)
+    return reinterpretCast(_bridgeToObjectiveCImpl())
   }
 
   public static func _bridgeFromObjectiveC(x: NSString) -> String {
-    return String(x)
+    return String(_cocoaString: reinterpretCast(x))
   }
 }
 

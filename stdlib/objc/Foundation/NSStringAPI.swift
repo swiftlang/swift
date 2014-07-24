@@ -1436,16 +1436,16 @@ extension String {
 
 @transparent public
 func == (lhs: NSString, rhs: NSString) -> Bool {
-  return String(lhs) == String(rhs)
+  return (lhs as String) == (rhs as String)
 }
 
 @transparent public
 func == (lhs: String, rhs: NSString) -> Bool {
-  return lhs == String(rhs)
+  return lhs == (rhs as String)
 }
 
 @transparent public
 func == (lhs: NSString, rhs: String) -> Bool {
-  return String(lhs) == rhs
+  return (lhs as String) == rhs
 }
 

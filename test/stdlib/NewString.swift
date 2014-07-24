@@ -88,7 +88,7 @@ func nonASCII() {
   println("  \(repr(nsUTF16))")
 
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 11))
-  var newNSUTF16 = String(nsUTF16)
+  var newNSUTF16 = nsUTF16 as String
   println("  \(repr(newNSUTF16))")
 
   // CHECK-NEXT: __NSCFString@[[utf16address]] = "🏂☃❅❆❄︎⛄️❄️"
@@ -112,7 +112,7 @@ func nonASCII() {
 
   // Check that we can recover the original buffer
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
-  println("  \(repr(String(nsSliceUTF16)))")
+  println("  \(repr(nsSliceUTF16 as String))")
 }
 nonASCII()
 
@@ -133,7 +133,7 @@ func ascii() {
   println("  \(repr(nsASCII))")
 
   // CHECK-NEXT NO: String(Opaque(buffer: @[[asciiaddress]][0...6]))
-  var newNSASCII = String(nsASCII)
+  var newNSASCII = nsASCII as String
   // println("  \(repr(newNSASCII))")
 
   // CHECK-NEXT: [[nsstringclass]]@[[asciiaddress]] = "foobar"
@@ -158,7 +158,7 @@ func ascii() {
 
   // When round-tripped back to Swift, the _NSOpaqueString object is the new owner
   // XCHECK-NEXT: String(Opaque(buffer: @[[nsOpaqueSliceAddress]][0...3]))
-  println("  \(repr(String(nsSliceASCII)))")
+  println("  \(repr(nsSliceASCII as String))")
 }
 ascii()
 

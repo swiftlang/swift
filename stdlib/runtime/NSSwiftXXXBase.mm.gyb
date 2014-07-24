@@ -12,8 +12,7 @@
 //
 // This file defines:
 //
-//    _NSSwiftArrayBase, _NSSwiftDictionaryBase, and eventually,
-//    _NSSwiftStringBase
+//    _NSSwiftArrayBase, _NSSwiftDictionaryBase, _NSSwiftStringBase
 //
 // To optimize bridging between Swift containers and their Cocoa
 // counterparts, we derive Swift containers' buffers from the
@@ -43,7 +42,7 @@ extern "C" id _objc_rootAutorelease(id);
 
 using namespace swift;
 
-% for Class in ('Array','Dictionary','Enumerator'):
+% for Class in ('Array', 'Dictionary', 'String', 'Enumerator'):
 @interface _NSSwift${Class}Base : NS${Class}
 {
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;

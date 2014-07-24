@@ -2352,7 +2352,8 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.toRaw()) != nil)
       expectTrue(CFStringGetCharactersPtr(cfstring) != nil)
-      checkUTF8View(expected, String(cfstring), test.loc.withCurrentLoc())
+      checkUTF8View(
+        expected, cfstring as NSString as String, test.loc.withCurrentLoc())
       return ()
     }
   }
@@ -2429,8 +2430,9 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   // actually test the code path we care about.
   if true {
     var bytes: [UInt8] = [ 97, 98, 99 ]
-    var cfstring: CFString = CFStringCreateWithBytesNoCopy(kCFAllocatorDefault,
-        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.toRaw(), 0, kCFAllocatorNull)
+    var cfstring: CFString = CFStringCreateWithBytesNoCopy(
+      kCFAllocatorDefault, bytes, bytes.count,
+      CFStringBuiltInEncodings.MacRoman.toRaw(), 0, kCFAllocatorNull)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
@@ -2444,7 +2446,9 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
         cfstring, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
     assert(CFStringGetCharactersPtr(cfstring) == nil)
 
-    checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
+    checkUTF8View(
+        bytes, cfstring as NSString as String,
+        SourceLocStack().withCurrentLoc())
     _fixLifetime(bytes)
   }
 
@@ -2467,7 +2471,9 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
           cfstring, CFStringBuiltInEncodings.UTF8.toRaw()) == nil)
       assert(CFStringGetCharactersPtr(cfstring) == nil)
 
-      checkUTF8View(bytes, String(cfstring), SourceLocStack().withCurrentLoc())
+      checkUTF8View(
+        bytes, cfstring as NSString as String,
+        SourceLocStack().withCurrentLoc())
     }
   }
 }

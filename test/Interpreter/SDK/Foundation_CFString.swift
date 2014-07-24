@@ -20,7 +20,7 @@ let cfstrAsNSStr: NSString = cfstr
 println(cfstrAsNSStr)
 
 // CHECK-NEXT: Created as NSString
-let cfstrAsStr = String(cfstr)
+let cfstrAsStr = cfstr as NSString as String
 println(cfstrAsStr)
 
 // CHECK-NEXT: Created as String
