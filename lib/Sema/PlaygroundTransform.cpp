@@ -713,7 +713,7 @@ public:
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName),
         DeclRefKind::Ordinary,
-        SourceLoc());
+        SR.End);
 
     LoggerRef->setImplicit(true);
 

@@ -402,7 +402,6 @@ void IRGenModule::emitDebuggerInitializers() {
   // In playgrounds mode, insert the initialization into top_level_code.
   if (Opts.Playground) {
     DebuggerSILFunction = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-    assert(DebuggerSILFunction && "did not emit top_level_code for playground");
   } else {
     // Otherwise, try to find the LLDBDebuggerFunction.
     for (SILFunction &SF : *SILMod) {
