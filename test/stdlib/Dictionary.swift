@@ -1746,10 +1746,14 @@ class ParallelArrayDictionary : NSDictionary {
   var keys = [ Keys() ]
   var value: AnyObject = TestObjCValueTy(1111)
 
-  init() {
+  override init() {
     super.init()
   }
 
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by ParallelArrayDictionary")
+  }
+  
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
     // Ensure that copying this dictionary does not produce a CoreFoundation
     // object.
