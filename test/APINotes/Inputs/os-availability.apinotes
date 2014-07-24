@@ -1,0 +1,53 @@
+Name:            Foundation
+Classes:
+  - Name:            NSCountedSet
+    Availability:    iOS
+    Methods:
+      - Selector:        'initWithCapacity:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+  - Name:            NSArray
+    Methods:
+      - Selector:        'init'
+        MethodKind:      Instance
+        DesignatedInit:  true
+      - Selector:        'initWithObjects:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+        Availability:    iOS
+      - Selector:        'initWithObjects:count:'
+        MethodKind:      Instance
+        DesignatedInit:  true
+        Availability:    iOS
+    Properties:
+      - Name:            'familyNameios'
+        Nullability:     N
+        Availability:    iOS
+      - Name:            'fontName'
+        Nullability:     N
+Protocols:        
+  - Name:            UIApplicationDelegate
+    AuditedForNullability: true
+    Methods:
+      - Selector:        'application:willFinishLaunchingWithOptions:'
+        MethodKind:      Instance
+        Nullability:     [ N, U ]
+  - Name:            UIApplicationDelegateIOS
+    Availability:    iOS
+    AuditedForNullability: true
+    Methods:
+      - Selector:        'application:willFinishLaunchingWithOptions:'
+        MethodKind:      Instance
+        Nullability:     [ N, U ]
+Functions:       
+  - Name:            NSAvailableWindowDepthsiOS
+    NullabilityOfRet: N
+    Availability:    iOS
+  - Name:            NSAvailableWindowDepths
+    NullabilityOfRet: N
+Globals:         
+  - Name:            NSCalibratedWhiteColorSpace
+    Nullability:     N
+    Availability:    OSX
+    AvailabilityMsg: ''
+

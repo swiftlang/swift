@@ -23,6 +23,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/Triple.h"
 
 using namespace llvm;
 
@@ -48,6 +49,10 @@ int apinotes_main(ArrayRef<const char *> Args) {
   static cl::opt<std::string>
   InputFilename(cl::Positional, cl::desc("<input file>"),
                 cl::Required, cl::cat(APINotesCategory));
+
+  static cl::opt<std::string>
+  Target("target", cl::desc("Generate binary format for the given target"),
+                   cl::cat(APINotesCategory));
 
   static cl::opt<std::string>
   OutputFilename("o", cl::desc("Output file name"), cl::cat(APINotesCategory));
@@ -86,16 +91,33 @@ int apinotes_main(ArrayRef<const char *> Args) {
 
   case swift::api_notes::ActionType::YAMLToBinary: {
     if (OutputFilename.empty()) {
-      errs() << "output file required\n";
+      errs() << "output file is required\n";
       cl::PrintHelpMessage();
       return 1;
     }
 
+    swift::api_notes::OSType targetOS = swift::api_notes::OSType::Absent;
+    // TODO: Check that we've specified the target.
+    if (!Target.empty()) {
+      llvm::Triple target(llvm::Triple::normalize(Target));
+      switch (target.getOS()) {
+        case llvm::Triple::Darwin:
+        case llvm::Triple::MacOSX:
+          targetOS = swift::api_notes::OSType::OSX;
+          break;
+        case llvm::Triple::IOS:
+          targetOS = swift::api_notes::OSType::IOS;
+          break;
+        default:
+          errs() << "traget is not supported\n";
+          return 1;
+      }
+    }
     std::string errorInfo;
     llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (swift::api_notes::compileAPINotes(input, os))
+    if (swift::api_notes::compileAPINotes(input, os, targetOS))
       return 1;
     
     os.flush();

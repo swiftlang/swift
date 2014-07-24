@@ -355,232 +355,265 @@ static bool parseAPINotes(StringRef yamlInput, Module &module) {
   return false;
 }
 
-static bool translateAvailability(const AvailabilityItem &in,
-                                  api_notes::CommonEntityInfo &outInfo,
-                                  llvm::StringRef apiName) {
+static bool compile(const Module &module, llvm::raw_ostream &os,
+                    api_notes::OSType targetOS){
   using namespace api_notes;
-  // TODO: handle more availability kinds here.
-  outInfo.Unavailable = (in.Mode == APIAvailability::None);
-  if (in.Mode != APIAvailability::Available) {
-    outInfo.UnavailableMsg = in.Msg;
-  } else {
-    if (!in.Msg.empty()) {
-      llvm::errs() << "Availability message for available class '" << apiName
-                   << "' will not be used.";
+
+  class YAMLConverter {
+    const Module &TheModule;
+    APINotesWriter *Writer;
+    OSType TargetOS;
+    llvm::raw_ostream &OS;
+
+    bool ErrorOccured;
+
+  public:
+    YAMLConverter(const Module &module,
+                 OSType targetOS,
+                 llvm::raw_ostream &os) :
+      TheModule(module), Writer(0), TargetOS(targetOS), OS(os),
+      ErrorOccured(false) {}
+
+    bool isAvailable(const AvailabilityItem &in) {
+      // Check if the API is available on the OS for which we are building.
+      if (in.Mode == APIAvailability::OSX && TargetOS != OSType::OSX)
+        return false;
+      if (in.Mode == APIAvailability::IOS && TargetOS != OSType::IOS)
+        return false;
       return true;
     }
-  }
-  return false;
-}
 
-static bool translateNullability(const NullabilitySeq &nullability,
-                                 api_notes::NullableKind nullabilityOfRet,
-                                 api_notes::FunctionInfo &outInfo,
-                                 llvm::StringRef apiName) {
-  if (nullability.size() > api_notes::FunctionInfo::getMaxNullabilityIndex()) {
-    llvm::errs() << "Nullability info for " << apiName << " does not fit.";
-    return true;
-  }
-
-  bool audited = false;
-  unsigned int idx = 1;
-  for (auto i = nullability.begin(), e = nullability.end(); i != e; ++i, ++idx){
-    outInfo.addTypeInfo(idx, *i);
-    audited = true;
-  }
-  if (nullabilityOfRet != AbsentNullability) {
-    outInfo.addTypeInfo(0, nullabilityOfRet);
-    audited = true;
-  } else if (audited) {
-    outInfo.addTypeInfo(0, DefaultNullability);
-  }
-  if (audited) {
-    outInfo.NullabilityAudited = audited;
-    outInfo.NumAdjustedNullable = idx;
-  }
-
-  return false;
-}
-
-// Translate from Method into ObjCMethodInfo and write it out.
-static bool writeMethod(api_notes::APINotesWriter &writer,
-                        const Method &meth,
-                        api_notes::ContextID classID, StringRef className) {
-  using namespace api_notes;
-  ObjCMethodInfo mInfo;
-  bool invalid = false;
-
-  // Check if the selector ends with ':' to determine if it takes arguments.
-  bool takesArguments = meth.Selector.endswith(":");
-
-  // Split the selector into pieces.
-  llvm::SmallVector<StringRef, 4> a;
-  meth.Selector.split(a, ":", /*MaxSplit*/ -1, /*KeepEmpty*/ false);
-  if (!takesArguments && a.size() > 1 ) {
-    llvm::errs() << "Selector " << meth.Selector
-                 << "is missing a ':' at the end\n";
-    return true;
-  }
-
-  // Construct ObjCSelectorRef.
-  api_notes::ObjCSelectorRef selectorRef;
-  selectorRef.NumPieces = !takesArguments ? 0 : a.size();
-  selectorRef.Identifiers = a;
-
-  // Translate the initializer info.
-  mInfo.DesignatedInit = meth.DesignatedInit;
-  if (meth.FactoryAsInit != FactoryAsInitKind::Infer)
-    mInfo.setFactoryAsInitKind(meth.FactoryAsInit);
-
-  // Translate availability info.
-  if (translateAvailability(meth.Availability, mInfo, meth.Selector))
-    invalid = true;
-
-  // Translate nullability info.
-  if (translateNullability(meth.Nullability, meth.NullabilityOfRet, mInfo,
-                           meth.Selector))
-    invalid = true;
-
-  // Write it.
-  writer.addObjCMethod(classID, selectorRef,
-                       meth.Kind == MethodKind::Instance,
-                       mInfo);
-  return invalid;
-}
-
-static bool writeContext(api_notes::APINotesWriter &writer,
-                         const Class &cl, bool isClass) {
-  using namespace api_notes;
-  bool invalid = false;
-
-  // Write the class.
-  ObjCContextInfo cInfo;
-  if (cl.AuditedForNullability)
-    cInfo.setDefaultNullability(DefaultNullability);
-  if (translateAvailability(cl.Availability, cInfo, cl.Name))
-    invalid = true;
-
-  ContextID clID = isClass ? writer.addObjCClass(cl.Name, cInfo) :
-                             writer.addObjCProtocol(cl.Name, cInfo);
-
-  // Write all methods.
-  llvm::StringMap<std::pair<bool, bool>> knownMethods;
-  for (const auto &method : cl.Methods) {
-    // Check for duplicate method definitions.
-    bool isInstanceMethod = method.Kind == MethodKind::Instance;
-    bool &known = isInstanceMethod ? knownMethods[method.Selector].first
-                                   : knownMethods[method.Selector].second;
-    if (known) {
-      llvm::errs() << "Duplicate definition of method '"
-                   << (isInstanceMethod? '-' : '+')
-                   << "[" << cl.Name << " " << method.Selector << "]'\n";
-      invalid = true;
-      continue;
-    }
-    known = true;
-
-    if (writeMethod(writer, method, clID, cl.Name))
-      invalid = true;
-  }
-
-  // Write all properties.
-  llvm::StringSet<> knownProperties;
-  for (const auto &prop : cl.Properties) {
-    // Check for duplicate property definitions.
-    if (!knownProperties.insert(prop.Name)) {
-      llvm::errs() << "Duplicate definition of property '" << cl.Name << "."
-                   << prop.Name << "'\n";
-      invalid = true;
-      continue;
+    bool convertAvailability(const AvailabilityItem &in,
+                             CommonEntityInfo &outInfo,
+                             llvm::StringRef apiName) {
+      // Populate the 'Unavailable' information.
+      outInfo.Unavailable = (in.Mode == APIAvailability::None);
+      if (outInfo.Unavailable) {
+        outInfo.UnavailableMsg = in.Msg;
+      } else {
+        if (!in.Msg.empty()) {
+          llvm::errs() << "Availability message for available class '"
+                       << apiName << "' will not be used.";
+          ErrorOccured = true;
+        }
+      }
+      return false;
     }
 
-    // Translate from Property into ObjCPropertyInfo.
-    ObjCPropertyInfo pInfo;
-    pInfo.setNullabilityAudited(prop.Nullability);
-    if (translateAvailability(cl.Availability, cInfo, cl.Name))
-      invalid = true;
-    writer.addObjCProperty(clID, prop.Name, pInfo);
-  }
+    void convertNullability(const NullabilitySeq &nullability,
+                                   NullableKind nullabilityOfRet,
+                                   FunctionInfo &outInfo,
+                                   llvm::StringRef apiName) {
+      if (nullability.size() > FunctionInfo::getMaxNullabilityIndex()) {
+        llvm::errs() << "Nullability info for " << apiName << " does not fit.";
+        ErrorOccured = true;
+        return;
+      }
 
-  return invalid;
-}
-
-static bool compile(const Module &module, llvm::raw_ostream &os){
-  using namespace api_notes;
-  APINotesWriter writer(module.Name);
-
-  bool invalid = false;
-
-  // Write all classes.
-  llvm::StringSet<> knownClasses;
-  for (const auto &cl : module.Classes) {
-    // Check for duplicate class definitions.
-    if (!knownClasses.insert(cl.Name)) {
-      llvm::errs() << "Multiple definitions of class '" << cl.Name << "'\n";
-      invalid = true;
-      continue;
+      bool audited = false;
+      unsigned int idx = 1;
+      for (auto i = nullability.begin(),
+                e = nullability.end(); i != e; ++i, ++idx){
+        outInfo.addTypeInfo(idx, *i);
+        audited = true;
+      }
+      if (nullabilityOfRet != AbsentNullability) {
+        outInfo.addTypeInfo(0, nullabilityOfRet);
+        audited = true;
+      } else if (audited) {
+        outInfo.addTypeInfo(0, DefaultNullability);
+      }
+      if (audited) {
+        outInfo.NullabilityAudited = audited;
+        outInfo.NumAdjustedNullable = idx;
+      }
     }
 
-    if (writeContext(writer, cl, /*isClass*/ true))
-      invalid = true;
-  }
+    // Translate from Method into ObjCMethodInfo and write it out.
+    void convertMethod(const Method &meth,
+                       ContextID classID, StringRef className) {
+      ObjCMethodInfo mInfo;
 
-  // Write all protocols.
-  llvm::StringSet<> knownProtocols;
-  for (const auto &pr : module.Protocols) {
-    // Check for duplicate protocol definitions.
-    if (!knownProtocols.insert(pr.Name)) {
-      llvm::errs() << "Multiple definitions of protocol '" << pr.Name << "'\n";
-      invalid = true;
-      continue;
+      if (!isAvailable(meth.Availability))
+        return;
+
+      convertAvailability(meth.Availability, mInfo, meth.Selector);
+
+      // Check if the selector ends with ':' to determine if it takes arguments.
+      bool takesArguments = meth.Selector.endswith(":");
+
+      // Split the selector into pieces.
+      llvm::SmallVector<StringRef, 4> a;
+      meth.Selector.split(a, ":", /*MaxSplit*/ -1, /*KeepEmpty*/ false);
+      if (!takesArguments && a.size() > 1 ) {
+        llvm::errs() << "Selector " << meth.Selector
+                     << "is missing a ':' at the end\n";
+        ErrorOccured = true;
+        return;
+      }
+
+      // Construct ObjCSelectorRef.
+      api_notes::ObjCSelectorRef selectorRef;
+      selectorRef.NumPieces = !takesArguments ? 0 : a.size();
+      selectorRef.Identifiers = a;
+
+      // Translate the initializer info.
+      mInfo.DesignatedInit = meth.DesignatedInit;
+      if (meth.FactoryAsInit != FactoryAsInitKind::Infer)
+        mInfo.setFactoryAsInitKind(meth.FactoryAsInit);
+
+      // Translate nullability info.
+      convertNullability(meth.Nullability, meth.NullabilityOfRet,
+                         mInfo, meth.Selector);
+
+      // Write it.
+      Writer->addObjCMethod(classID, selectorRef,
+                           meth.Kind == MethodKind::Instance,
+                           mInfo);
     }
 
-    if (writeContext(writer, pr, /*isClass*/ false))
-      invalid = true;
-  }
+    void convertContext(const Class &cl, bool isClass) {
+      // Write the class.
+      ObjCContextInfo cInfo;
 
-  // Write all global variables.
-  llvm::StringSet<> knownGlobals;
-  for (const auto &global : module.Globals) {
-    // Check for duplicate global variables.
-    if (!knownGlobals.insert(global.Name)) {
-      llvm::errs() << "Multiple definitions of global variable '" << global.Name
-                   << "'\n";
-      invalid = true;
-      continue;
+      // First, translate and check availability info.
+      if (!isAvailable(cl.Availability))
+        return;
+
+      convertAvailability(cl.Availability, cInfo, cl.Name);
+
+      if (cl.AuditedForNullability)
+        cInfo.setDefaultNullability(DefaultNullability);
+
+      ContextID clID = isClass ? Writer->addObjCClass(cl.Name, cInfo) :
+                                 Writer->addObjCProtocol(cl.Name, cInfo);
+
+      // Write all methods.
+      llvm::StringMap<std::pair<bool, bool>> knownMethods;
+      for (const auto &method : cl.Methods) {
+        // Check for duplicate method definitions.
+        bool isInstanceMethod = method.Kind == MethodKind::Instance;
+        bool &known = isInstanceMethod ? knownMethods[method.Selector].first
+                                       : knownMethods[method.Selector].second;
+        if (known) {
+          llvm::errs() << "Duplicate definition of method '"
+                       << (isInstanceMethod? '-' : '+')
+                       << "[" << cl.Name << " " << method.Selector << "]'\n";
+          ErrorOccured = true;
+          continue;
+        }
+        known = true;
+
+        convertMethod(method, clID, cl.Name);
+      }
+
+      // Write all properties.
+      llvm::StringSet<> knownProperties;
+      for (const auto &prop : cl.Properties) {
+        // Check for duplicate property definitions.
+        if (!knownProperties.insert(prop.Name)) {
+          llvm::errs() << "Duplicate definition of property '" << cl.Name << "."
+                       << prop.Name << "'\n";
+          ErrorOccured = true;
+          continue;
+        }
+
+        // Translate from Property into ObjCPropertyInfo.
+        ObjCPropertyInfo pInfo;
+        if (!isAvailable(prop.Availability))
+          continue;
+        convertAvailability(prop.Availability, pInfo, prop.Name);
+        pInfo.setNullabilityAudited(prop.Nullability);
+        Writer->addObjCProperty(clID, prop.Name, pInfo);
+      }
     }
 
-    GlobalVariableInfo info;
-    if (translateAvailability(global.Availability, info, global.Name))
-      invalid = true;
-    info.setNullabilityAudited(global.Nullability);
-    writer.addGlobalVariable(global.Name, info);
-  }
+    bool convertModule() {
+      if (!isAvailable(TheModule.Availability))
+        return false;
 
-  // Write all global functions.
-  llvm::StringSet<> knownFunctions;
-  for (const auto &function : module.Functions) {
-    // Check for duplicate global functions.
-    if (!knownFunctions.insert(function.Name)) {
-      llvm::errs() << "Multiple definitions of global function '"
-                   << function.Name << "'\n";
-      invalid = true;
-      continue;
+      // Set up the writer.
+      // FIXME: This is kindof ugly.
+      APINotesWriter writer(TheModule.Name);
+      Writer = &writer;
+
+      // Write all classes.
+      llvm::StringSet<> knownClasses;
+      for (const auto &cl : TheModule.Classes) {
+        // Check for duplicate class definitions.
+        if (!knownClasses.insert(cl.Name)) {
+          llvm::errs() << "Multiple definitions of class '" << cl.Name << "'\n";
+          ErrorOccured = true;
+          continue;
+        }
+
+        convertContext(cl, /*isClass*/ true);
+      }
+
+      // Write all protocols.
+      llvm::StringSet<> knownProtocols;
+      for (const auto &pr : TheModule.Protocols) {
+        // Check for duplicate protocol definitions.
+        if (!knownProtocols.insert(pr.Name)) {
+          llvm::errs() << "Multiple definitions of protocol '"
+                       << pr.Name << "'\n";
+          ErrorOccured = true;
+          continue;
+        }
+
+        convertContext(pr, /*isClass*/ false);
+      }
+
+      // Write all global variables.
+      llvm::StringSet<> knownGlobals;
+      for (const auto &global : TheModule.Globals) {
+        // Check for duplicate global variables.
+        if (!knownGlobals.insert(global.Name)) {
+          llvm::errs() << "Multiple definitions of global variable '"
+                       << global.Name << "'\n";
+          ErrorOccured = true;
+          continue;
+        }
+
+        GlobalVariableInfo info;
+        if (!isAvailable(global.Availability))
+          continue;
+        convertAvailability(global.Availability, info, global.Name);
+        info.setNullabilityAudited(global.Nullability);
+        Writer->addGlobalVariable(global.Name, info);
+      }
+
+      // Write all global functions.
+      llvm::StringSet<> knownFunctions;
+      for (const auto &function : TheModule.Functions) {
+        // Check for duplicate global functions.
+        if (!knownFunctions.insert(function.Name)) {
+          llvm::errs() << "Multiple definitions of global function '"
+                       << function.Name << "'\n";
+          ErrorOccured = true;
+          continue;
+        }
+
+        GlobalFunctionInfo info;
+        if (!isAvailable(function.Availability))
+          continue;
+        convertAvailability(function.Availability, info, function.Name);
+        convertNullability(function.Nullability,
+                           function.NullabilityOfRet,
+                           info, function.Name);
+
+        Writer->addGlobalFunction(function.Name, info);
+      }
+
+      if (!ErrorOccured)
+        Writer->writeToStream(OS);
+
+      return ErrorOccured;
     }
+  };
 
-    GlobalFunctionInfo info;
-    if (translateAvailability(function.Availability, info, function.Name))
-      invalid = true;
-    if (translateNullability(function.Nullability, function.NullabilityOfRet,
-                             info, function.Name))
-      invalid = true;
-
-    writer.addGlobalFunction(function.Name, info);
-  }
-
-  writer.writeToStream(os);
-
-  return invalid;
+  YAMLConverter c(module, targetOS, os);
+  return c.convertModule();
 }
 
 bool api_notes::parseAndDumpAPINotes(StringRef yamlInput)  {
@@ -596,13 +629,14 @@ bool api_notes::parseAndDumpAPINotes(StringRef yamlInput)  {
 }
 
 bool api_notes::compileAPINotes(StringRef yamlInput,
-                                llvm::raw_ostream &os) {
+                                llvm::raw_ostream &os,
+                                OSType targetOS) {
   Module module;
 
   if (parseAPINotes(yamlInput, module))
     return true;
 
-  return compile(module, os);
+  return compile(module, os, targetOS);
 }
 
 bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,

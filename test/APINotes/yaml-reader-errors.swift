@@ -1,4 +1,4 @@
-# RUN: not %swift_driver_plain -apinotes -yaml-to-binary -o %t.apinotesc %s > %t.err 2>&1
+# RUN: not %swift_driver_plain -apinotes -yaml-to-binary -target i386-apple-ios7 -o %t.apinotesc %s > %t.err 2>&1
 # RUN: FileCheck %s < %t.err
 
 ---

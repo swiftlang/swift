@@ -34,8 +34,15 @@ namespace api_notes {
     Dump,
   };
 
+  enum class OSType {
+    OSX,
+    IOS,
+    Absent
+  };
+
   /// Converts API notes from YAML format to binary format.
-  bool compileAPINotes(llvm::StringRef yamlInput, llvm::raw_ostream &os);
+  bool compileAPINotes(llvm::StringRef yamlInput, llvm::raw_ostream &os,
+                       OSType targetOS);
 
   bool parseAndDumpAPINotes(llvm::StringRef yamlInput);
 
