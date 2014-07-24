@@ -450,11 +450,11 @@ extension _ArrayBuffer {
 
   /// Our native representation, if any.  If there's no native
   /// representation, the result is an empty buffer.
+  typealias _OptStorage = _ContiguousArrayStorage<T>?
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
-      typealias OptStorage = _ContiguousArrayStorage<T>?
       return NativeBuffer(
-        unsafeBitCast(storage, OptStorage.self))
+        unsafeBitCast(storage, _OptStorage.self))
     }
     else {
       let i = indirect

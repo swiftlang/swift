@@ -388,9 +388,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
   
   //===--- private --------------------------------------------------------===//
+  typealias _OptionalStorage = _ContiguousArrayStorage<T>?
   var _storage: _ContiguousArrayStorage<T>? {
-    typealias OptionalStorage = _ContiguousArrayStorage<T>?
-    return unsafeBitCast(_base.storage, OptionalStorage.self)
+    return unsafeBitCast(_base.storage, _OptionalStorage.self)
   }
   
   typealias _Base = HeapBuffer<_ArrayBody, T>
