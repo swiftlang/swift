@@ -41,7 +41,7 @@ Classes:
     Methods:
       - Selector:        'notificationCenterForType:'
         MethodKind:      Class
-        FactoryAsInit:   true
+        FactoryAsInit:   C
   - Name:            NSError
     Methods:
       - Selector:        'initWithDomain:code:userInfo:'
@@ -170,7 +170,7 @@ Classes:
     Methods:
       - Selector:        'processInfo'
         MethodKind:      Class
-        FactoryAsInit:   true
+        FactoryAsInit:   C
   - Name:            NSScriptObjectSpecifier
     Methods:
       - Selector:        'initWithContainerClassDescription:containerSpecifier:key:'

@@ -29,10 +29,18 @@
  YAML Format specification.
 
  Nullability should be expressed using one of the following values:
- O - Optional (or Nullable)
- N - Not Optional
- U - Unknown
- S - Scalar
+   O - Optional (or Nullable)
+   N - Not Optional
+   S - Scalar
+   U - Unknown
+ Note, the API is considered 'audited' when at least the return value or a
+ parameter has a nullability value. For 'audited' APIs, we assume the default
+ nullability for any underspecified type.
+
+ FactoryAsInit can have the following values:
+   C - Treat as class method.
+   I - Treat as initializer.
+   A - Automatically infer based on the name and type (default).
 
 ---
  Name: AppKit             # The name of the framework
@@ -85,7 +93,7 @@
 
        AvailabilityMessage: ""
 
-       FactoryAsInit: false           # Optional: Specifies if this method is a
+       FactoryAsInit: C               # Optional: Specifies if this method is a
                                       # factory initializer (false/true)
        DesignatedInit: false          # Optional: Specifies if this method is a
                                       # designated initializer (false/true)
@@ -158,7 +166,8 @@ namespace {
     NullabilitySeq Nullability;
     api_notes::NullableKind NullabilityOfRet = api_notes::NullableKind::Unknown;
     AvailabilityItem Availability;
-    bool FactoryAsInit = false;
+    api_notes::FactoryAsInitKind FactoryAsInit
+      = api_notes::FactoryAsInitKind::Infer;
     bool DesignatedInit = false;
   };
   typedef std::vector<Method> MethodsSeq;
@@ -228,6 +237,15 @@ namespace llvm {
     };
 
     template <>
+    struct ScalarEnumerationTraits<api_notes::FactoryAsInitKind > {
+      static void enumeration(IO &io, api_notes::FactoryAsInitKind  &value) {
+        io.enumCase(value, "A", api_notes::FactoryAsInitKind::Infer);
+        io.enumCase(value, "C", api_notes::FactoryAsInitKind::AsClassMethod);
+        io.enumCase(value, "I", api_notes::FactoryAsInitKind::AsInitializer);
+      }
+    };
+
+    template <>
     struct ScalarEnumerationTraits<MethodKind> {
       static void enumeration(IO &io, MethodKind &value) {
         io.enumCase(value, "Class",    MethodKind::Class);
@@ -266,7 +284,8 @@ namespace llvm {
                                             AbsentNullability);
         io.mapOptional("Availability",    m.Availability.Mode);
         io.mapOptional("AvailabilityMsg", m.Availability.Msg);
-        io.mapOptional("FactoryAsInit",   m.FactoryAsInit, false);
+        io.mapOptional("FactoryAsInit",   m.FactoryAsInit,
+                                          api_notes::FactoryAsInitKind::Infer);
         io.mapOptional("DesignatedInit",  m.DesignatedInit, false);
       }
     };
@@ -410,10 +429,8 @@ static bool writeMethod(api_notes::APINotesWriter &writer,
 
   // Translate the initializer info.
   mInfo.DesignatedInit = meth.DesignatedInit;
-  // TODO: We should be able to express more in the YAML and/or need to
-  // rename the yaml entry.
-  if (meth.FactoryAsInit)
-    mInfo.setFactoryAsInitKind(FactoryAsInitKind::AsClassMethod);
+  if (meth.FactoryAsInit != FactoryAsInitKind::Infer)
+    mInfo.setFactoryAsInitKind(meth.FactoryAsInit);
 
   // Translate availability info.
   if (translateAvailability(meth.Availability, mInfo, meth.Selector))
@@ -685,7 +702,7 @@ bool api_notes::decompileAPINotes(std::unique_ptr<llvm::MemoryBuffer> input,
       handleNullability(method.Nullability, method.NullabilityOfRet, info,
                         selector.count(':'));
       handleAvailability(method.Availability, info);
-      method.FactoryAsInit = info.FactoryAsInit;
+      method.FactoryAsInit = info.getFactoryAsInitKind();
       method.DesignatedInit = info.DesignatedInit;
 
       auto known = knownContexts[contextID.Value];
