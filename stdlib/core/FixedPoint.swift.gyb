@@ -473,6 +473,39 @@ func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 % end
+
+// Prefix and postfix increment and decrement.
+
+// We already have generic versions of these, but when compiling
+// -Onone we are unable to devirtualize the generic call, which
+// results in worse performance than we would like for these simple
+// operations (tracked by <rdar://problem/17692569>).
+@transparent
+public prefix func ++ (inout x: ${Self}) -> ${Self} {
+  x = x.successor()
+  return x
+}
+
+@transparent
+public postfix func ++ (inout x: ${Self}) -> ${Self} {
+  var ret = x
+  x = x.successor()
+  return ret
+}
+
+@transparent
+public prefix func -- (inout x: ${Self}) -> ${Self} {
+  x = x.predecessor()
+  return x
+}
+
+@transparent
+public postfix func -- (inout x: ${Self}) -> ${Self} {
+  var ret = x
+  x = x.predecessor()
+  return ret
+}
+
 % end  # for bits in allInts
 
 public typealias Word = Int

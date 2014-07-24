@@ -296,8 +296,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
 }
 
 func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
-  ++x  // expected-error {{'Int' is not convertible to '@lvalue Float'}}
-  ++y  // expected-error {{'Int' is not convertible to '@lvalue Float'}}
+  ++x  // expected-error {{'Int' is not convertible to '@lvalue UInt8'}}
+  ++y  // expected-error {{'Int' is not convertible to '@lvalue UInt8'}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{'inout' arguments may not also be marked 'var' or 'let'}}

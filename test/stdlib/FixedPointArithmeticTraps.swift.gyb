@@ -226,9 +226,30 @@ allIntTypes = [
 % for (signedness, IntTy) in allIntTypes:
 
 //
-// Test increment/decrement for ${IntTy}
+// Test pre- and post-increment/decrement for ${IntTy}
 //
 
+if arg == "${testNum}" {
+  var x = get${IntTy}(${IntTy}.min)
+  ++x
+
+  x = get${IntTy}(${IntTy}.min)
+  println("OK")
+  // --IntTy.min
+  --x
+}
+%   testNum += 1
+
+if arg == "${testNum}" {
+  var x = get${IntTy}(${IntTy}.max)
+  --x
+
+  x = get${IntTy}(${IntTy}.max)
+  println("OK")
+  // ++IntTy.max
+  ++x
+}
+%   testNum += 1
 if arg == "${testNum}" {
   var x = get${IntTy}(${IntTy}.min)
   x++
