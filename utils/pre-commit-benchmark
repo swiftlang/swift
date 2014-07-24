@@ -271,14 +271,14 @@ if __name__ == '__main__':
         description='Show performance improvements/regressions in your Git working tree state')
     parser.add_argument('-r', '--repeat', dest='repeat', metavar='int', default=1, type=int,
                         help='number of times to repeat each test')
-    parser.add_argument('-O', dest='optimization', choices=('', 'fast', 'none'),
+    parser.add_argument('-O', dest='optimization', choices=('3', 'unchecked', 'none'),
                         action='append', help='Optimization levels to test')
     parser.add_argument(dest='baseline', nargs='?', metavar='tree-ish', default='origin/master',
                         help='the baseline Git commit to compare with.')
     args = parser.parse_args()
 
-    optimization = args.optimization or ['']
-    exeNames = ['PrecommitBench_O' + x for x in optimization]
+    optimization = args.optimization or ['3']
+    exeNames = ['PrecommitBench_O' + ('' if x == '3' else x) for x in optimization]
 
     # Update precommit bench to ToT. If it does not exist, throw an error.
     #
