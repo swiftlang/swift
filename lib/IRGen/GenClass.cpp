@@ -1560,9 +1560,11 @@ namespace {
         if (extMethodTypes) {
           extMethodTypes->push_back(
                           getMethodTypeExtendedEncoding(IGM, var->getGetter()));
-          if (auto setter = var->getSetter())
+          if (auto setter = var->getSetter()) {
+            assert(getter_setter.second && "no descriptor for setter?!");
             extMethodTypes->push_back(
                           getMethodTypeExtendedEncoding(IGM, setter));
+          }
         }
       }
     }
@@ -1753,6 +1755,7 @@ namespace {
       }
 
       if (getter_setter.second) {
+        assert(subscript->getSetter() && "no descriptor for setter?!");
         if (subscript->getAttrs().hasAttribute<OptionalAttr>()) {
           OptInstanceMethods.push_back(getter_setter.second);
           if (isBuildingProtocol())
