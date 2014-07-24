@@ -3362,7 +3362,7 @@ namespace {
         } else {
           // An initializer that conforms to a requirement is required.
           auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
-          if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+          if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
             if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
               ctor->getAttrs().add(
                 new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
