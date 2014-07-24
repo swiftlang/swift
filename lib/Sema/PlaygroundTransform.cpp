@@ -336,22 +336,14 @@ public:
     return nullptr;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS) {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
     llvm::ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef llvm::SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(),
                            OriginalElements.end());
 
-    bool IsGlobal = !EnteredGlobalBrace;
-    EnteredGlobalBrace = true;
-    
     SourceRange SR = BS->getSourceRange();
     BracePairPusher BPP(BracePairs, SR);
-    
-    if ((Context.SourceMgr.getLineAndColumn(SR.Start).first < LineOffset) &&
-        (!IsGlobal)) {
-      BPP.invalidate();
-    }
 
     for (size_t EI = 0;
          EI != Elements.size();
@@ -561,8 +553,8 @@ public:
       }
     }
 
-    if (BPP.isValid())
-    {
+    if ((Context.SourceMgr.getLineAndColumn(SR.Start).first >= LineOffset) &&
+        !TopLevel) {
       Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
     }
@@ -800,7 +792,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD);
-            BraceStmt *NewBody = I.transformBraceStmt(Body);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
             }

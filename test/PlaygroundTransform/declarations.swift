@@ -6,13 +6,6 @@
 var a = 2
 var b = 3
 a + b 
-// CHECK: [{{.*}}] $builtin_log_scope_entry
-// CHECK-NEXT: [{{.*}}] $builtin_log[a='2']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
+// CHECK: [{{.*}}] $builtin_log[a='2']
 // CHECK-NEXT: [{{.*}}] $builtin_log[b='3']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] $builtin_log[='5']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-
