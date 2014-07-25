@@ -198,7 +198,7 @@ extension String: Equatable {
 public func ==(lhs: String, rhs: String) -> Bool {
   // Note: this operation should be consistent with equality comparison of
   // Character.
-  return _stdlib_compareNSStringNormalizingToNFD(
+  return _stdlib_compareNSStringDeterministicUnicodeCollation(
     lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
 }
 
