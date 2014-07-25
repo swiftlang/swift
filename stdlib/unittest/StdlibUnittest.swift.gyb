@@ -347,11 +347,14 @@ public func asHex(a: [UInt32]) -> String {
 //
 
 public func checkHashable<T : Hashable>(
-  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack
+  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack,
+  _ collectMoreInfo: (()->String)? = nil
 ) {
   // Test operator '==' that is found through witness tables.
-  expectEqual(expectedEqual, lhs == rhs, stackTrace: stackTrace)
-  expectEqual(!expectedEqual, lhs != rhs, stackTrace: stackTrace)
+  expectEqual(
+    expectedEqual, lhs == rhs, stackTrace: stackTrace, collectMoreInfo)
+  expectEqual(
+    !expectedEqual, lhs != rhs, stackTrace: stackTrace, collectMoreInfo)
 
   // Test 'hashValue'.
   //

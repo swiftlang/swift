@@ -120,7 +120,7 @@ CharacterTests.test("sizeof") {
   expectEqual(size1, size2)
 }
 
-CharacterTests.test("Equality") {
+CharacterTests.test("Hashable") {
   for characters in [
     baseScalars,
     continuingScalars,
@@ -130,8 +130,9 @@ CharacterTests.test("Equality") {
       for j in indices(characters) {
         var ci = Character(characters[i])
         var cj = Character(characters[j])
-        expectEqual(i == j, ci == cj) { "i=\(i), j=\(j)" }
-        expectEqual(i != j, ci != cj) { "i=\(i), j=\(j)" }
+        checkHashable(i == j, ci, cj, SourceLocStack().withCurrentLoc()) {
+          "i=\(i), j=\(j)"
+        }
       }
     }
   }

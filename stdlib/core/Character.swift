@@ -24,7 +24,7 @@ internal struct IntEncoder : SinkType {
 /// segmentation algorithm.
 public enum Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
-  ExtendedGraphemeClusterLiteralConvertible, Equatable {
+  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -102,6 +102,12 @@ public enum Character :
 
   static func _smallValue(value: Builtin.Int63) -> UInt64 {
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
+  }
+
+  public var hashValue: Int {
+    // FIXME(performance): constructing a temporary string is extremely
+    // wasteful and inefficient.
+    return String(self).hashValue
   }
 }
 
