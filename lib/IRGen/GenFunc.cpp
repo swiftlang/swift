@@ -1423,8 +1423,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     // Strideof should never return 0, so return 1 if the type has a 0 stride.
     llvm::Value *StrideOf = valueTI.getStride(IGF, valueTy);
     llvm::IntegerType *IntTy = cast<llvm::IntegerType>(StrideOf->getType());
-    auto *Zero = IGF.Builder.getIntN(IntTy->getPrimitiveSizeInBits(), 0);
-    auto *One = IGF.Builder.getIntN(IntTy->getPrimitiveSizeInBits(), 1);
+    auto *Zero = llvm::ConstantInt::get(IntTy, 0);
+    auto *One = llvm::ConstantInt::get(IntTy, 1);
     llvm::Value *Cmp = IGF.Builder.CreateICmpEQ(StrideOf, Zero);
     out->add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
     return;
