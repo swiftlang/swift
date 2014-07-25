@@ -19,30 +19,32 @@
 // These generic functions are for user consumption; they dispatch to the
 // appropriate implementation for T.
 
-/// Measure the distance between start and end.
+/// Measure the distance between `start` and `end`.
 ///
-/// If T models RandomAccessIndexType, requires that start and end are
-/// part of the same sequence and executes in O(1).
+/// If `T` models `RandomAccessIndexType`, requires that `start` and `end` are
+/// part of the same sequence, and executes in O(1).
 ///
-/// Otherwise, requires that end is reachable from start by
+/// Otherwise, requires that `end` is reachable from `start` by
 /// incrementation, and executes in O(N), where N is the function's
 /// result.
 public func distance<T: ForwardIndexType>(start: T, end: T) -> T.Distance {
   return start~>_distanceTo(end)
 }
 
-/// Return the result of moving start by n positions.  If T models
-/// RandomAccessIndexType, executes in O(1).  Otherwise, executes in
-/// O(abs(n)).  If T does not model BidirectionalIndexType, requires that n
-/// is non-negative.
+/// Return the result of advancing `start` by `n` positions.  If `T`
+/// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
+/// executes in O(`abs(n)`).  If `T` does not model
+/// `BidirectionalIndexType`, requires that `n` is non-negative.
+///
+/// `advance(i, n)` is a synonym for `i++n'
 public func advance<T: ForwardIndexType>(start: T, n: T.Distance) -> T {
   return start~>_advance(n)
 }
 
-/// Return the result of moving start by n positions, or until it
-/// equals end.  If T models RandomAccessIndexType, executes in O(1).
-/// Otherwise, executes in O(abs(n)).  If T does not model
-/// BidirectionalIndexType, requires that n is non-negative.
+/// Return the result of advancing start by `n` positions, or until it
+/// equals `end`.  If `T` models `RandomAccessIndexType`, executes in
+/// O(1).  Otherwise, executes in O(`abs(n)`).  If `T` does not model
+/// `BidirectionalIndexType`, requires that `n` is non-negative.
 public func advance<T: ForwardIndexType>(start: T, n: T.Distance, end: T) -> T {
   return start~>_advance(n, end)
 }
