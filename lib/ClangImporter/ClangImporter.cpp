@@ -1063,8 +1063,7 @@ static DeclName mapSelectorName(ASTContext &ctx,
     ++NumNullaryInitMethodsMadeUnary;
     assert(camel_case::getFirstWord(nameText).equals("init"));
     auto baseName = ctx.Id_init;
-    auto argName = importArgName(ctx, nameText.substr(4),
-                                 /*dropWith=*/ctx.LangOpts.ImplicitObjCWith);
+    auto argName = importArgName(ctx, nameText.substr(4), /*dropWith=*/true);
     return DeclName(ctx, baseName, argName);
   }
 
@@ -1077,8 +1076,7 @@ static DeclName mapSelectorName(ASTContext &ctx,
     assert(camel_case::getFirstWord(firstPieceText).equals("init"));
     baseName = ctx.Id_init;
     argumentNames.push_back(
-      importArgName(ctx, firstPieceText.substr(4),
-                    /*dropWith=*/ctx.LangOpts.ImplicitObjCWith));
+      importArgName(ctx, firstPieceText.substr(4), /*dropWith=*/true));
   } else if (ctx.LangOpts.SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
@@ -1298,7 +1296,7 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
                   splitSelectorPieceAt(firstPieceStr,
                                        methodWordIter.getPosition(),
                                        scratch).second,
-                  /*dropWith=*/SwiftContext.LangOpts.ImplicitObjCWith));
+                  /*dropWith=*/true));
 
   // Handle nullary factory methods.
   if (selector.getNumArgs() == 0) {

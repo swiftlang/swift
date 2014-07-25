@@ -171,11 +171,6 @@ ImplicitProperties("enable-objc-implicit-properties",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-ImplicitObjCWith("implicit-objc-with",
-                 llvm::cl::desc("Make the \"with\" implicit in initializers"),
-                 llvm::cl::init(true));
-
-static llvm::cl::opt<bool>
 FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
                    llvm::cl::desc("Implicitly import Objective-C factory methods as initializers"),
                    llvm::cl::init(false));
@@ -2082,8 +2077,6 @@ int main(int argc, char *argv[]) {
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
-
-  InitInvok.getLangOptions().ImplicitObjCWith = options::ImplicitObjCWith;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);

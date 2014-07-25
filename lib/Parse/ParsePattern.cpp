@@ -420,7 +420,6 @@ mapParsedParameters(Parser &parser,
       // If the first parameter of a method or initializer is a keyword argument
       // and starts with "with", note that the "with" is implied.
       if (!argName.empty() && isFirstParameter && isFirstParameterClause &&
-          ctx.LangOpts.ImplicitObjCWith &&
           (paramContext == Parser::ParameterContextKind::Method ||
            paramContext == Parser::ParameterContextKind::Initializer) &&
           argName.str().size() > 4 &&

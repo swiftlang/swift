@@ -180,14 +180,6 @@ def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
-def implicit_objc_with : Flag<["-"], "implicit-objc-with">,
-  Flags<[FrontendOption,HelpHidden]>,
-  HelpText<"Make 'with' in the first keyword argument of an @objc method or initializer implicit">;
-
-def no_implicit_objc_with : Flag<["-"], "no-implicit-objc-with">,
-  Flags<[FrontendOption,HelpHidden]>,
-  HelpText<"Do not make 'with' in the first keyword argument of an @objc method or initializer implicit">;
-
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;

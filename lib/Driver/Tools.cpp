@@ -200,9 +200,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
 
-  inputArgs.AddLastArg(arguments, options::OPT_implicit_objc_with,
-                       options::OPT_no_implicit_objc_with);
-
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
