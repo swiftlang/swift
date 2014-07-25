@@ -31,4 +31,4 @@ typealias float = Float
 
 
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
-var y : float
+var y : float // expected-error {{'float' has been renamed to Float}}{{9-14=Float}}
