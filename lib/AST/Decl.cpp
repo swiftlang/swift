@@ -2593,6 +2593,13 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+bool FuncDecl::isExplicitNonMutating() const {
+  return !isMutating() &&
+         isAccessor() && !isGetter() &&
+         isInstanceMember() &&
+         !getDeclContext()->getDeclaredTypeInContext()->hasReferenceSemantics();
+}
+
 void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
                                         TypeLoc FnRetType) {
   MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();

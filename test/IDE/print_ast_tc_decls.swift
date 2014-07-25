@@ -333,6 +333,42 @@ struct d0110_ReadWriteProperties {
   }
 // PASS_RW_PROP_GET_SET-NEXT:    {{^}}  static var computedStaticProp1: Int { get set }{{$}}
 // PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  static var computedStaticProp1: Int{{$}}
+
+  var computedProp2: Int {
+    mutating get {
+      return 42
+    }
+    set {}
+  }
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  var computedProp2: Int { mutating get set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  var computedProp2: Int { mutating get set }{{$}}
+
+  var computedProp3: Int {
+    get {
+      return 42
+    }
+    nonmutating set {}
+  }
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  var computedProp3: Int { get nonmutating set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  var computedProp3: Int { get nonmutating set }{{$}}
+
+  var computedProp4: Int {
+    mutating get {
+      return 42
+    }
+    nonmutating set {}
+  }
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  var computedProp4: Int { mutating get nonmutating set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  var computedProp4: Int { mutating get nonmutating set }{{$}}
+
+  subscript(i: Float) -> Int {
+    get {
+      return 42
+    }
+    nonmutating set {}
+  }
+// PASS_RW_PROP_GET_SET-NEXT:    {{^}}  subscript (i: Float) -> Int { get nonmutating set }{{$}}
+// PASS_RW_PROP_NO_GET_SET-NEXT: {{^}}  subscript (i: Float) -> Int { get nonmutating set }{{$}}
 }
 // PASS_RW_PROP_GET_SET-NEXT:    {{^}}  init(){{$}}
 // PASS_RW_PROP_GET_SET-NEXT:    {{^}}}{{$}}

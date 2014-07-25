@@ -3925,6 +3925,10 @@ public:
     FuncDeclBits.Mutating = Mutating;
   }
 
+  /// \returns true if this is non-mutating due to applying a 'mutating'
+  /// attribute. For example a "mutating set" accessor.
+  bool isExplicitNonMutating() const;
+
   void setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
                                 TypeLoc FnRetType);
 

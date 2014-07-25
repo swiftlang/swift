@@ -590,29 +590,51 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
-  if (Options.PrintGetSetOnRWProperties && !Options.FunctionDefinitions &&
+  bool PrintGetSetOnRWProperties = Options.PrintGetSetOnRWProperties;
+  if (auto Getter = ASD->getGetter())
+    if (Getter->isMutating())
+      PrintGetSetOnRWProperties = true;
+  if (auto Setter = ASD->getSetter())
+    if (Setter->isExplicitNonMutating())
+      PrintGetSetOnRWProperties = true;
+
+  if (PrintGetSetOnRWProperties && !Options.FunctionDefinitions &&
       (ASD->getGetter() || ASD->getSetter())) {
     Printer << " {";
-    if (ASD->getGetter()) Printer << " get";
-    if (ASD->getSetter()) Printer << " set";
+    if (auto Getter = ASD->getGetter()) {
+      if (Getter->isMutating())
+        Printer << " mutating";
+      Printer << " get";
+    }
+    if (auto Setter = ASD->getSetter()) {
+      if (Setter->isExplicitNonMutating())
+        Printer << " nonmutating";
+      Printer << " set";
+    }
     Printer << " }";
     return;
   }
 
   bool InProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if (!InProtocol && !Options.FunctionDefinitions &&
-      !Options.PrintGetSetOnRWProperties &&
+      !PrintGetSetOnRWProperties &&
       ASD->getGetter() && ASD->getSetter())
     return;
 
   bool PrintAccessorBody = Options.FunctionDefinitions && !InProtocol;
 
-  auto PrintAccessor = [&](AbstractFunctionDecl *Accessor, StringRef Label) {
+  auto PrintAccessor = [&](FuncDecl *Accessor, StringRef Label) {
     if (!Accessor)
       return;
-    if (!PrintAccessorBody)
+    if (!PrintAccessorBody) {
+      if (Accessor->isGetter()) {
+        if (Accessor->isMutating())
+          Printer << " mutating";
+      } else if (Accessor->isExplicitNonMutating()) {
+        Printer << " nonmutating";
+      }
       Printer << " " << Label;
-    else {
+    } else {
       Printer.printNewline();
       IndentRAII IndentMore(*this);
       indent();
@@ -1211,6 +1233,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsGetter:
       recordDeclLoc(decl,
         [&]{
+          if (decl->isMutating())
+            Printer << "mutating ";
           Printer << "get";
         });
       Printer << " {";
@@ -1218,6 +1242,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsDidSet:
       recordDeclLoc(decl,
         [&]{
+          if (decl->isExplicitNonMutating())
+            Printer << "nonmutating ";
           Printer << "didSet";
         });
       Printer << " {";
@@ -1226,6 +1252,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case AccessorKind::IsWillSet:
       recordDeclLoc(decl,
         [&]{
+          if (decl->isExplicitNonMutating())
+            Printer << "nonmutating ";
           Printer << (decl->isSetter() ? "set" : "willSet");
 
           auto BodyParams = decl->getBodyParamPatterns();
