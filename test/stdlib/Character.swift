@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+import StdlibUnittest
+
 //===---
 // Utilities.
 //===---
@@ -7,132 +9,190 @@
 @asmname("random") func random() -> UInt32
 @asmname("srandomdev") func srandomdev()
 
-// String fragments that occupy a variety of bits in UTF-8
-var fragments = [
-  "o", "©", "ԡ", "໒", "륷", "𝑒", "􋧄", "e", "䖇", "Ģ", "뼁", "𞠥"
+// Single Unicode scalars that occupy a variety of bits in UTF-8.
+//
+// These scalars should be "base characters" with regards to their position in
+// a grapheme cluster.
+let baseScalars = [
+  // U+0065 LATIN SMALL LETTER E
+  "\u{0065}",
+
+  // U+006F LATIN SMALL LETTER O
+  "\u{006f}",
+
+  // U+00A9 COPYRIGHT SIGN
+  "\u{00a9}",
+
+  // U+0122 LATIN CAPITAL LETTER G WITH CEDILLA
+  "\u{0122}",
+
+  // U+0521 CYRILLIC SMALL LETTER EL WITH MIDDLE HOOK
+  "\u{0521}",
+
+  // U+0ED2 LAO DIGIT TWO
+  "\u{0ed2}",
+
+  // U+4587 CJK UNIFIED IDEOGRAPH-4587
+  "\u{4587}",
+
+  // U+B977 HANGUL SYLLABLE REUGS
+  "\u{b977}",
+
+  // U+BF01 HANGUL SYLLABLE BBENG
+  "\u{bf01}",
+
+  // U+1D452 MATHEMATICAL ITALIC SMALL E
+  "\u{1d452}",
+
+  // U+1E825 MENDE KIKAKUI SYLLABLE M163 EE
+  "\u{1e825}",
+
+  // U+10B9C4 (private use)
+  "\u{10b9c4}",
 ]
 
-func randomString(minSize: Int, maxSize: Int) -> String {
-    var n = Int(random()) % (maxSize - minSize) + minSize
-    var result = ""
-    for i in 0..<n {
-      result += fragments[Int(random()) % fragments.count]
-    }
-    return result
+// Single Unicode scalars that are "continuing characters" with regards to
+// their position in a grapheme cluster.
+let continuingScalars = [
+  // U+0300 COMBINING GRAVE ACCENT
+  "\u{0300}",
+
+  // U+0308 COMBINING DIAERESIS
+  "\u{0308}",
+
+  // U+0903 DEVANAGARI SIGN VISARGA
+  "\u{0903}",
+
+  // U+200D ZERO WIDTH JOINER
+  "\u{200D}",
+]
+
+let testCharacters = [
+  // U+000D CARRIAGE RETURN (CR)
+  // U+000A LINE FEED (LF)
+  "\u{000d}\u{000a}",
+
+  // Grapheme clusters that have UTF-8 representations of length 1..10 bytes.
+
+  // U+0061 LATIN SMALL LETTER A
+  // U+0300 COMBINING GRAVE ACCENT
+  "\u{0061}", // UTF-8: 1 byte
+  "\u{0061}\u{0300}", // UTF-8: 3 bytes
+  "\u{0061}\u{0300}\u{0300}", // UTF-8: 5 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}", // UTF-8: 7 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 9 bytes
+
+  // U+00A9 COPYRIGHT SIGN
+  // U+0300 COMBINING GRAVE ACCENT
+  "\u{00a9}", // UTF-8: 2 bytes
+  "\u{00a9}\u{0300}", // UTF-8: 4 bytes
+  "\u{00a9}\u{0300}\u{0300}", // UTF-8: 6 bytes
+  "\u{00a9}\u{0300}\u{0300}\u{0300}", // UTF-8: 8 bytes
+  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
+]
+
+func randomGraphemeCluster(minSize: Int, maxSize: Int) -> String {
+  var n = Int(random()) % (maxSize - minSize) + minSize - 1
+  var result = baseScalars[Int(random()) % baseScalars.count]
+  for i in 0..<n {
+    result += continuingScalars[Int(random()) % continuingScalars.count]
+  }
+  return result
 }
 
 //===---
 // Tests.
 //===---
 
-func testCharacterSize() {
+var CharacterTests = TestCase("Character")
+
+CharacterTests.test("sizeof") {
   // FIXME: should be 8.
   // <rdar://problem/16754935> sizeof(Character.self) is 9, should be 8
-  println(sizeof(Character.self)) // CHECK: {{^[89]$}}
+
+  let size1 = sizeof(Character.self)
+  expectTrue(size1 == 8 || size1 == 9)
 
   var a: Character = "a"
-  println(sizeofValue(a)) // CHECK: {{^[89]$}}
-}
-testCharacterSize()
+  let size2 = sizeofValue(a)
+  expectTrue(size2 == 8 || size2 == 9)
 
-func testCharacterEquality() {
-  // Single Unicode Scalar Value tests
-  for i in indices(fragments) {
-    for j in indices(fragments) {
-      if (i == j) != (fragments[i] == fragments[j]) {
-        println("Equality error: comparing \(i) and \(j)")
-        return
-      }
-      if (i != j) != (fragments[i] != fragments[j]) {
-        println("Inequality error: comparing \(i) and \(j)")
-        return
+  expectEqual(size1, size2)
+}
+
+CharacterTests.test("Equality") {
+  for characters in [
+    baseScalars,
+    continuingScalars,
+    testCharacters
+  ] {
+    for i in indices(characters) {
+      for j in indices(characters) {
+        var ci = Character(characters[i])
+        var cj = Character(characters[j])
+        expectEqual(i == j, ci == cj) { "i=\(i), j=\(j)" }
+        expectEqual(i != j, ci != cj) { "i=\(i), j=\(j)" }
       }
     }
   }
-
-  // CHECK: testCharacterEquality done.
-  println("testCharacterEquality done.")
 }
-testCharacterEquality()
 
-/// \brief test that s can be transformed into a Character and back
-/// without loss of information.  If it can't, print a message showing
-/// the problematic data and return true.  Return false otherwise.
-func roundTripThroughCharacterFails(s: String) -> Bool {
+/// Test that a given `String` can be transformed into a `Character` and back
+/// without loss of information.
+func checkRoundTripThroughCharacter(s: String) {
   var c = Character(s)
   var s2 = String(c)
-  if (s != s2) {
-     println("Round-tripping error: \"\(s)\" != \"\(s2)\"")
-     return true
+  expectEqual(Array(s.unicodeScalars), Array(s2.unicodeScalars)) {
+    "round-tripping error: \"\(s)\" != \"\(s2)\""
   }
-  return false
 }
 
-func expectedRepresentationFails(s: String, expectSmall: Bool) -> Bool {
-  var isSmall: Bool
-
+func isSmallRepresentation(s: String) -> Bool {
   switch(Character(s)) {
     case .SmallRepresentation:
-      isSmall = true
+      return true
     default:
-      isSmall = false
+      return false
   }
-  
-  if isSmall != expectSmall {
-    var expectedSize = expectSmall ? "small" : "large"
-    println("Error: Expected \"\(s)\" to use the \(expectedSize) representation!")
-    return true
-  }
-  return false
 }
 
-func testStringRoundTripping() {
-   // CHECK: testStringRoundTripping
-   println("testStringRoundTripping")
+func checkRepresentation(s: String) {
+  let expectSmall = countElements(s.utf8) <= 8
+  let isSmall = isSmallRepresentation(s)
 
-   // Single Unicode Scalar Value tests
-   for s in fragments {
-     if roundTripThroughCharacterFails(s) { 
-       return
-     }
-   }
-
-   // Edge case tests 
-   // 
-   // FIXME: Can't use Bool for 2nd elements here pending
-   // <rdar://problem/15136048> (different types for TupleElementExpr
-   // and the corresponding tuple element)
-   for sExpectSmall in [ 
-     ("0123456", 1),
-     ("012345\u{00A9}", 1),
-     ("01234567", 0),
-     ("0123456\u{00A9}", 0)
-   ] {
-     if (expectedRepresentationFails(sExpectSmall.0, sExpectSmall.1 != 0)
-     || roundTripThroughCharacterFails(sExpectSmall.0)
-     ) {
-       return
-     }
-   }
-
-   // Random tests
-   // Seed the random number generator
-   srandomdev()
-   for x in 0..<500 {
-     // Character's small representation variant has 63 bits. Making
-     // the maximum length 9 fragments tests both sides of the limit.
-     var s = randomString(1,9)
-     if roundTripThroughCharacterFails(s) {
-       return
-     }
-   }
-
-   // Final CHECK causes any error printed by
-   // roundTripThroughCharacterFails to be reported by FileCheck if we
-   // return early.
-
-   // CHECK: Done.
-   println("Done.")
+  expectEqual(expectSmall, isSmall) {
+    let expectedSize = expectSmall ? "small" : "large"
+    return "expected \"\(s)\" to use the \(expectedSize) representation"
+  }
 }
 
-testStringRoundTripping()
+CharacterTests.test("RoundTripping") {
+  // Single Unicode Scalar Value tests
+  for s in baseScalars {
+    checkRepresentation(s)
+    checkRoundTripThroughCharacter(s)
+  }
+
+  // Edge case tests
+  for s in testCharacters {
+    checkRepresentation(s)
+    checkRoundTripThroughCharacter(s)
+  }
+}
+
+CharacterTests.test("RoundTripping/Random") {
+  // Random tests
+  // Seed the random number generator
+  srandomdev()
+  for x in 0..<500 {
+    // Character's small representation variant has 63 bits. Making
+    // the maximum length 9 scalars tests both sides of the limit.
+    var s = randomGraphemeCluster(1, 9)
+    checkRepresentation(s)
+    checkRoundTripThroughCharacter(s)
+  }
+}
+
+CharacterTests.run()
+// CHECK: {{^}}Character: All tests passed
+

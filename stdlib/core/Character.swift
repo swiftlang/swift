@@ -70,6 +70,9 @@ public enum Character :
     // high bit is 1.
     _precondition(
       s._core.count != 0, "Can't form a Character from an empty String")
+    _precondition(
+      s.startIndex.successor() == s.endIndex,
+      "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     var (count, initialUTF8) = s._core._encodeSomeUTF8(0)
     // Notice that the result of sizeof() is a small non-zero number and can't
