@@ -787,7 +787,7 @@ ModuleFile::ModuleFile(
   }
 }
 
-bool ModuleFile::associateWithFileContext(FileUnit *file) {
+bool ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
   assert(getStatus() == ModuleStatus::Valid && "invalid module file");
@@ -808,7 +808,7 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
         clangImporter->importHeader(dependency.RawPath, file->getParentModule(),
                                     importedHeaderInfo.fileSize,
                                     importedHeaderInfo.fileModTime,
-                                    importedHeaderInfo.contents);
+                                    importedHeaderInfo.contents, diagLoc);
       }
       Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
       dependency.Import = { {}, importedHeaderModule };

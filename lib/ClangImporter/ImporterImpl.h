@@ -524,7 +524,7 @@ public:
   }
 
   /// Imports the given header contents into the Clang context.
-  void importHeader(Module *adapter, StringRef headerName,
+  void importHeader(Module *adapter, StringRef headerName, SourceLoc diagLoc,
                     std::unique_ptr<llvm::MemoryBuffer> contents);
 
   /// Returns the module \p D comes from, or \c Nothing if \p D does not have

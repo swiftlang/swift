@@ -133,19 +133,23 @@ public:
   ///        compiled against it.
   /// \param cachedContents A buffer to use if the header has been modified
   ///        since the module was compiled.
+  /// \param diagLoc A location to attach any diagnostics to if import fails.
   ///
   /// \sa getImportedHeaderModule
   void importHeader(StringRef header, Module *adapter, off_t expectedSize,
-                    time_t expectedModTime, StringRef cachedContents);
+                    time_t expectedModTime, StringRef cachedContents,
+                    SourceLoc diagLoc);
 
   /// Imports an Objective-C header file into the shared imported header module.
   ///
   /// \param header A header name or full path, to be used in a \#import
   ///        directive.
   /// \param adapter The module that depends on the contents of this header.
+  /// \param diagLoc A location to attach any diagnostics to if import fails.
   ///
   /// \sa getImportedHeaderModule
-  void importBridgingHeader(StringRef header, Module *adapter);
+  void importBridgingHeader(StringRef header, Module *adapter,
+                            SourceLoc diagLoc = {});
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.

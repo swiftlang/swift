@@ -400,7 +400,7 @@ public:
   /// Associates this module file with an AST module.
   ///
   /// Returns false if the association failed.
-  bool associateWithFileContext(FileUnit *file);
+  bool associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
 
   /// Checks whether this module can be used.
   ModuleStatus getStatus() const {

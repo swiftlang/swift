@@ -198,7 +198,8 @@ FileUnit *SerializedModuleLoader::loadAST(
   auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
   M.addFile(*fileUnit);
 
-  if (loadedModuleFile->associateWithFileContext(fileUnit)) {
+  auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
+  if (loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid)) {
     LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                    Ctx.getCurrentGeneration());
     return fileUnit;

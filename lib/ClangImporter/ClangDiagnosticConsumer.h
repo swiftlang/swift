@@ -55,6 +55,7 @@ private:
 
   ClangImporter::Implementation &ImporterImpl;
   const clang::IdentifierInfo *CurrentImport = nullptr;
+  SourceLoc DiagLoc;
   bool CurrentImportNotFound;
   bool DumpToStderr;
 
@@ -63,7 +64,9 @@ public:
                           clang::DiagnosticOptions &clangDiagOptions,
                           bool dumpToStderr);
 
-  LoadModuleRAII handleImport(const clang::IdentifierInfo *name) {
+  LoadModuleRAII handleImport(const clang::IdentifierInfo *name,
+                              SourceLoc diagLoc) {
+    DiagLoc = diagLoc;
     return LoadModuleRAII(*this, name);
   }
 

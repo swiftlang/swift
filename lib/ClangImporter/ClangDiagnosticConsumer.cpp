@@ -155,8 +155,9 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   if (clangDiag.getID() == clang::diag::err_module_not_built &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
-    SourceLoc loc = resolveSourceLocation(ctx, clangSrcMgr,
-                                          clangDiag.getLocation());
+    SourceLoc loc = DiagLoc;
+    if (clangDiag.getLocation().isValid())
+      loc = resolveSourceLocation(ctx, clangSrcMgr, clangDiag.getLocation());
 
     ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
                        CurrentImport->getName());

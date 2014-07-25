@@ -433,7 +433,7 @@ ClangImporter::create(ASTContext &ctx,
 }
 
 void ClangImporter::Implementation::importHeader(
-    Module *adapter, StringRef headerName,
+    Module *adapter, StringRef headerName, SourceLoc diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
   assert(adapter);
   ImportedHeaderOwners.push_back(adapter);
@@ -459,35 +459,39 @@ void ClangImporter::Implementation::importHeader(
   while (!Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
 
-  if (!hadError && getClangASTContext().getDiagnostics().hasErrorOccurred())
-    SwiftContext.Diags.diagnose({}, diag::bridging_header_error, headerName);
+  if (!hadError && getClangASTContext().getDiagnostics().hasErrorOccurred()) {
+    SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_error,
+                                headerName);
+  }
 
   bumpGeneration();
 }
 
 void ClangImporter::importHeader(StringRef header, Module *adapter,
                                  off_t expectedSize, time_t expectedModTime,
-                                 StringRef cachedContents) {
+                                 StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
                                                            /*open=*/true);
   if (headerFile && headerFile->getSize() == expectedSize &&
       headerFile->getModificationTime() == expectedModTime) {
-    return importBridgingHeader(header, adapter);
+    return importBridgingHeader(header, adapter, diagLoc);
   }
 
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };
-  Impl.importHeader(adapter, header, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, diagLoc, std::move(sourceBuffer));
 }
 
-void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
+void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
+                                         SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
                                                            /*open=*/true);
   if (!headerFile) {
-    Impl.SwiftContext.Diags.diagnose({}, diag::bridging_header_missing, header);
+    Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
+                                     header);
     return;
   }
 
@@ -500,7 +504,7 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
       importLine, Implementation::bridgingHeaderBufferName)
   };
 
-  Impl.importHeader(adapter, header, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, diagLoc, std::move(sourceBuffer));
 }
 
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
@@ -568,7 +572,8 @@ Module *ClangImporter::loadModule(
   {
     auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
     auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
-    auto importRAII = diagClient.handleImport(clangPath.front().first);
+    auto importRAII = diagClient.handleImport(clangPath.front().first,
+                                              importLoc);
 
     // Load the Clang module.
     // FIXME: The source location here is completely bogus. It can't be
