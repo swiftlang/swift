@@ -26,4 +26,9 @@ func availabilityUnknownPlatform() {}
 @availability(*, unavailable, message="oh no you dont")
 typealias int = Int
 
+@availability(*, unavailable, renamed="Float")
+typealias float = Float
+
+
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
+var y : float

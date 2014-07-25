@@ -482,15 +482,18 @@ static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
 
   if (Attr->IsUnvailable) {
     auto Name = D->getFullName();
-    auto Message = Attr->Message;
     SourceLoc Loc = R.Start;
 
-    if (Message.empty()) {
+    if (!Attr->Rename.empty()) {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
+                  Attr->Rename)
+        .fixItReplace(R, Attr->Rename);
+    } else if (Attr->Message.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable, Name)
         .highlight(R);
     } else {
       TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                  Name, Message)
+                  Name, Attr->Message)
         .highlight(SourceRange(Loc, Loc));
     }
 
@@ -528,7 +531,7 @@ public:
     if (auto DR = dyn_cast<DeclRefExpr>(E))
       diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
     if (auto MR = dyn_cast<MemberRefExpr>(E))
-      diagAvailability(TC, MR->getMember().getDecl(), MR->getSourceRange(), DC);
+      diagAvailability(TC, MR->getMember().getDecl(), MR->getNameLoc(), DC);
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))

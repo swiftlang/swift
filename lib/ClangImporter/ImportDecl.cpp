@@ -2253,6 +2253,7 @@ namespace {
 
         // Mark the imported class method "unavailable", with a useful error
         // message.
+        // TODO: Could add a replacement string?
         llvm::SmallString<64> message;
         llvm::raw_svector_ostream os(message);
         os << "use object construction '" << objcClass->getName() << "(";
@@ -4662,7 +4663,7 @@ void ClangImporter::Implementation::importAttributes(
 
       auto AvAttr = new (C) AvailabilityAttr(
         SourceLoc(), SourceRange(), platformK.getValue(),
-        avail->getMessage(),
+        avail->getMessage(), /*rename*/StringRef(),
         introduced, deprecated, obsoleted,
         false, /* FIXME: Adjust for minimum deployment target. */
         true);

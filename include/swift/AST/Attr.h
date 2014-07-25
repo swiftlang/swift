@@ -556,7 +556,7 @@ public:
 
   AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
-                   StringRef Message,
+                   StringRef Message, StringRef Rename,
                    const clang::VersionTuple &Introduced,
                    const clang::VersionTuple &Deprecated,
                    const clang::VersionTuple &Obsoleted,
@@ -564,7 +564,7 @@ public:
                    bool Implicit)
     : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
       Platform(Platform),
-      Message(Message),
+      Message(Message), Rename(Rename),
       IsUnvailable(IsUnavailable),
       INIT_VER_TUPLE(Introduced),
       INIT_VER_TUPLE(Deprecated),
@@ -578,6 +578,10 @@ public:
 
   /// The optional message.
   const StringRef Message;
+
+  /// An optional replacement string to emit in a fixit.  This allows simple
+  /// declaration renames to be applied by Xcode.
+  const StringRef Rename;
 
   /// Indicates if the declaration is unconditionally unavailable.
   const bool IsUnvailable;
@@ -611,14 +615,15 @@ public:
   /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
   /// This attribute is considered "implicit".
   static AvailabilityAttr *createImplicitUnavailableAttr(ASTContext &C,
-                                                         StringRef Message);
+                                                         StringRef Message,
+                                                         StringRef Rename = "");
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;
   }
 
   /// Determine if a given declaration has been marked unavailable.
-  static bool isUnavailable(const Decl *D);
+  static const AvailabilityAttr *isUnavailable(const Decl *D);
 
 };
 

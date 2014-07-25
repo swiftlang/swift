@@ -1513,17 +1513,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
-        unsigned platform;
-        unsigned messageSize;
+        unsigned platform, messageSize, renameSize;
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable,
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
-            platform, messageSize);
+            platform, messageSize, renameSize);
 
-        StringRef message = blobData;
+        StringRef message = blobData.substr(0, messageSize);
+        blobData = blobData.substr(messageSize);
+        StringRef rename = blobData.substr(0, renameSize);
         clang::VersionTuple Introduced, Deprecated, Obsoleted;
         DECODE_VER_TUPLE(Introduced)
         DECODE_VER_TUPLE(Deprecated)
@@ -1531,7 +1532,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
         Attr = new (ctx) AvailabilityAttr(
           SourceLoc(), SourceRange(),
-          (AvailabilityAttr::PlatformKind)platform, message,
+          (AvailabilityAttr::PlatformKind)platform, message, rename,
           Introduced, Deprecated, Obsoleted,
           isUnavailable, isImplicit);
         break;

@@ -816,25 +816,28 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl,
                                       IdentTypeRepr *IdType,
                                       SourceLoc Loc,
                                       TypeChecker &TC) {
-  for (auto Attr : TypeDecl->getAttrs()) {
-    auto AvAttr = dyn_cast<AvailabilityAttr>(Attr);
-    if (!AvAttr) continue;
+  for (auto anAttr : TypeDecl->getAttrs()) {
+    auto Attr = dyn_cast<AvailabilityAttr>(anAttr);
+    if (!Attr) continue;
 
     // FIXME: unify this checking with declarations.
-    if (AvAttr->hasPlatform())
+    if (Attr->hasPlatform())
       continue;
 
-    if (AvAttr->IsUnvailable) {
+    if (Attr->IsUnvailable) {
       if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-        StringRef Message = AvAttr->Message;
-        if (Message.empty()) {
+        if (!Attr->Rename.empty()) {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                      CI->getIdentifier(), Attr->Rename)
+          .fixItReplace(Loc, Attr->Rename);
+        } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable,
                       CI->getIdentifier())
           .highlight(SourceRange(Loc, Loc));
         }
         else {
           TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                      CI->getIdentifier(), Message)
+                      CI->getIdentifier(), Attr->Message)
           .highlight(SourceRange(Loc, Loc));
         }
         return true;

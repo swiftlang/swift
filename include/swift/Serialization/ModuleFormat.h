@@ -1071,6 +1071,7 @@ namespace decls_block {
     BC_AVAIL_TUPLE, // Obsoleted
     BCVBR<5>,   // platform
     BCVBR<5>,   // number of bytes in message string
+    BCVBR<5>,   // number of bytes in rename string
     BCBlob      // platform, followed by message
   >;
 

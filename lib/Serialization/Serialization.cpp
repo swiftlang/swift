@@ -1364,6 +1364,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
     llvm::SmallString<32> blob;
     blob.append(theAttr->Message);
+    blob.append(theAttr->Rename);
     auto abbrCode = DeclTypeAbbrCodes[AvailabilityDeclAttrLayout::Code];
     AvailabilityDeclAttrLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
@@ -1374,6 +1375,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         LIST_VER_TUPLE_PIECES(Obsoleted),
         theAttr->Platform,
         theAttr->Message.size(),
+        theAttr->Rename.size(),
         blob);
     return;
 #undef LIST_VER_TUPLE_PIECES

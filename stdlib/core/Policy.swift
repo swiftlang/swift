@@ -281,99 +281,93 @@ infix operator  |= { associativity right precedence 90 assignment }
 infix operator ~> { associativity left precedence 255 }
 
 //===--- Renamed protocols ------------------------------------------------===//
-@availability(*,unavailable,message="it has been renamed 'ArrayBoundType'")
+@availability(*,unavailable,renamed="ArrayBoundType")
 public typealias ArrayBound = ArrayBoundType
-@availability(
-  *,unavailable,message="it has been renamed 'BidirectionalIndexType'")
+@availability(*,unavailable,renamed="BidirectionalIndexType")
 public typealias BidirectionalIndex = BidirectionalIndexType
-@availability(
-  *,unavailable,message="it has been renamed 'BitwiseOperationsType'")
+@availability(*,unavailable,renamed="BitwiseOperationsType")
 public typealias BitwiseOperations = BitwiseOperationsType
-@availability(*,unavailable,message="it has been renamed 'CVarArgType'")
+@availability(*,unavailable,renamed="CVarArgType")
 public typealias CVarArg = CVarArgType
-@availability(*,unavailable,message="it has been renamed 'CollectionType'")
+@availability(*,unavailable,renamed="CollectionType")
 public typealias Collection = CollectionType
 @availability(
-  *,unavailable,message="it has been renamed 'ExtensibleCollectionType'")
+  *,unavailable,renamed="ExtensibleCollectionType")
 public typealias ExtensibleCollection = ExtensibleCollectionType
-@availability(*,unavailable,message="it has been renamed 'FloatingPointType'")
+@availability(*,unavailable,renamed="FloatingPointType")
 public typealias FloatingPointNumber = FloatingPointType
-@availability(*,unavailable,message="it has been renamed 'ForwardIndexType'")
+@availability(*,unavailable,renamed="ForwardIndexType")
 public typealias ForwardIndex = ForwardIndexType
-@availability(*,unavailable,message="it has been renamed 'GeneratorType'")
+@availability(*,unavailable,renamed="GeneratorType")
 public typealias Generator = GeneratorType
-@availability(*,unavailable,message="it has been renamed 'IntegerType'")
+@availability(*,unavailable,renamed="IntegerType")
 public typealias Integer = IntegerType
 @availability(
-  *,unavailable,message="it has been renamed 'IntegerArithmeticType'")
+  *,unavailable,renamed="IntegerArithmeticType")
 public typealias IntegerArithmetic = IntegerArithmeticType
-@availability(*,unavailable,message="it has been renamed 'BooleanType'")
+@availability(*,unavailable,renamed="BooleanType")
 public typealias LogicValue = BooleanType
-@availability(*,unavailable,message="it has been renamed 'MirrorType'")
+@availability(*,unavailable,renamed="MirrorType")
 public typealias Mirror = MirrorType
 @availability(
-  *,unavailable,message="it has been renamed 'MutableCollectionType'")
+  *,unavailable,renamed="MutableCollectionType")
 public typealias MutableCollection = MutableCollectionType
-@availability(*,unavailable,message="it has been renamed 'OutputStreamType'")
+@availability(*,unavailable,renamed="OutputStreamType")
 public typealias OutputStream = OutputStreamType
 @availability(
-  *,unavailable,message="it has been renamed 'RandomAccessIndexType'")
+  *,unavailable,renamed="RandomAccessIndexType")
 public typealias RandomAccessIndex = RandomAccessIndexType
-@availability(*,unavailable,message="it has been renamed 'RawOptionSetType'")
+@availability(*,unavailable,renamed="RawOptionSetType")
 public typealias RawOptionSet = RawOptionSetType
-@availability(*,unavailable,message="it has been renamed 'SequenceType'")
+@availability(*,unavailable,renamed="SequenceType")
 public typealias Sequence = SequenceType
-@availability(*,unavailable,message="it has been renamed 'SignedIntegerType'")
+@availability(*,unavailable,renamed="SignedIntegerType")
 public typealias SignedInteger = SignedIntegerType
-@availability(*,unavailable,message="it has been renamed 'SignedNumberType'")
+@availability(*,unavailable,renamed="SignedNumberType")
 public typealias SignedNumber = SignedNumberType
-@availability(*,unavailable,message="it has been renamed 'SinkType'")
+@availability(*,unavailable,renamed="SinkType")
 public typealias Sink = SinkType
-@availability(*,unavailable,message="it has been renamed 'UnicodeCodecType'")
+@availability(*,unavailable,renamed="UnicodeCodecType")
 public typealias UnicodeCodec = UnicodeCodecType
-@availability(*,unavailable,message="it has been renamed 'UnsignedIntegerType'")
+@availability(*,unavailable,renamed="UnsignedIntegerType")
 public typealias UnsignedInteger = UnsignedIntegerType
-@availability(
-  *,unavailable,message="it has been renamed '_BidirectionalIndexType'")
+@availability(*,unavailable,renamed="_BidirectionalIndexType")
 public typealias _BidirectionalIndex = _BidirectionalIndexType
-@availability(
-  *,unavailable,message="it has been renamed '_BridgedToObjectiveCType'")
+@availability(*,unavailable,renamed="_BridgedToObjectiveCType")
 public typealias _BridgedToObjectiveC = _BridgedToObjectiveCType
-@availability(*,unavailable,message="it has been renamed '_CocoaStringType'")
+@availability(*,unavailable,renamed="_CocoaStringType")
 public typealias _CocoaString = _CocoaStringType
-@availability(*,unavailable,message="it has been renamed '_CollectionType'")
+@availability(*,unavailable,renamed="_CollectionType")
 public typealias _Collection = _CollectionType
-@availability(
-  *,unavailable,
-  message="it has been renamed '_ConditionallyBridgedToObjectiveCType'")
+@availability(*,unavailable,
+  renamed="_ConditionallyBridgedToObjectiveCType")
 public typealias _ConditionallyBridgedToObjectiveC
   = _ConditionallyBridgedToObjectiveCType
 @availability(
-  *,unavailable,message="it has been renamed '_ExtensibleCollectionType'")
+  *,unavailable,renamed="_ExtensibleCollectionType")
 public typealias _ExtensibleCollection = _ExtensibleCollectionType
-@availability(*,unavailable,message="it has been renamed '_ForwardIndexType'")
+@availability(*,unavailable,renamed="_ForwardIndexType")
 public typealias _ForwardIndex = _ForwardIndexType
-@availability(*,unavailable,message="it has been renamed '_IntegerType'")
+@availability(*,unavailable,renamed="_IntegerType")
 public typealias _Integer = _IntegerType
 @availability(
-  *,unavailable,message="it has been renamed '_IntegerArithmeticType'")
+  *,unavailable,renamed="_IntegerArithmeticType")
 public typealias _IntegerArithmetic = _IntegerArithmeticType
 @availability(
-  *,unavailable,message="it has been renamed '_PrintableNSObjectType'")
+  *,unavailable,renamed="_PrintableNSObjectType")
 public typealias _PrintableNSObject = _PrintableNSObjectType
 @availability(
-  *,unavailable,message="it has been renamed '_RandomAccessIndexType'")
+  *,unavailable,renamed="_RandomAccessIndexType")
 public typealias _RandomAccessIndex = _RandomAccessIndexType
-@availability(*,unavailable,message="it has been renamed '_RawOptionSetType'")
+@availability(*,unavailable,renamed="_RawOptionSetType")
 public typealias _RawOptionSet = _RawOptionSetType
-@availability(*,unavailable,message="it has been renamed '_SequenceType'")
+@availability(*,unavailable,renamed="_SequenceType")
 public typealias _Sequence = _SequenceType
-@availability(*,unavailable,message="it has been renamed '_Sequence_Type'")
+@availability(*,unavailable,renamed="_Sequence_Type")
 public typealias _Sequence_ = _Sequence_Type
-@availability(*,unavailable,message="it has been renamed '_SignedIntegerType'")
+@availability(*,unavailable,renamed="_SignedIntegerType")
 public typealias _SignedInteger = _SignedIntegerType
-@availability(*,unavailable,message="it has been renamed '_SignedNumberType'")
+@availability(*,unavailable,renamed="_SignedNumberType")
 public typealias _SignedNumber = _SignedNumberType
-@availability(
-  *,unavailable,message="it has been renamed '_UnsignedIntegerType'")
+@availability(*,unavailable,renamed="_UnsignedIntegerType")
 public typealias _UnsignedInteger = _UnsignedIntegerType

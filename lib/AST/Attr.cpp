@@ -338,10 +338,11 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 
 AvailabilityAttr *
 AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
-                                                StringRef Message) {
+                                                StringRef Message,
+                                                StringRef Rename) {
   clang::VersionTuple NoVersion;
   return new (C) AvailabilityAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, Message,
+    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
     NoVersion, NoVersion, NoVersion,
     /* isUnavailable */ true,
     /* isImplicit */ true);
@@ -367,13 +368,13 @@ AvailabilityAttr::platformFromString(StringRef Name) {
     .Default(Optional<AvailabilityAttr::PlatformKind>());
 }
 
-bool AvailabilityAttr::isUnavailable(const Decl *D) {
+const AvailabilityAttr *AvailabilityAttr::isUnavailable(const Decl *D) {
   for (auto Attr : D->getAttrs())
     if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
       if (AvailAttr->IsUnvailable)
-        return true;
+        return AvailAttr;
 
-  return false;
+  return nullptr;
 }
 
 

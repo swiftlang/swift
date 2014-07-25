@@ -945,8 +945,8 @@ ERROR(attr_availability_unknown_platform,attribute_parsing,none,
 "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 
 ERROR(attr_availability_expected_option,attribute_parsing,none,
-"expected '%0' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', or 'message'",
-(StringRef))
+      "expected '%0' option such as 'unavailable', 'introduced', 'deprecated', "
+      "'obsoleted', 'message', or 'renamed'", (StringRef))
 
 ERROR(attr_availability_expected_equal,attribute_parsing,none,
 "expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))

@@ -589,10 +589,23 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     consumeToken();
 
-    StringRef Message;
+    StringRef Message, Renamed;
 
     if (consumeIf(tok::comma)) {
-      if (!Tok.is(tok::identifier) || Tok.getText() != "message") {
+      StringRef ArgumentKindStr = Tok.getText();
+
+      enum {
+        IsMessage, IsRenamed, IsInvalid
+      } ArgumentKind = IsInvalid;
+
+      if (Tok.is(tok::identifier)) {
+        if (ArgumentKindStr == "message")
+          ArgumentKind = IsMessage;
+        else if (ArgumentKindStr == "renamed")
+          ArgumentKind = IsRenamed;
+      }
+
+      if (ArgumentKind == IsInvalid) {
         diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
                  AttrName)
         .highlight(SourceRange(Tok.getLoc()));
@@ -602,8 +615,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       consumeToken();
 
       if (!consumeIf(tok::equal)) {
-        diagnose(Tok.getLoc(), diag::attr_availability_expected_equal,
-                 AttrName, "message");
+        diagnose(Tok.getLoc(), diag::attr_availability_expected_equal, AttrName,
+                 ArgumentKindStr);
         return false;
       }
 
@@ -612,16 +625,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         return false;
       }
 
-      Message =
-        getStringLiteralIfNotInterpolated(*this, Loc, Tok, "message");
-
+      auto Value =
+        getStringLiteralIfNotInterpolated(*this, Loc, Tok, ArgumentKindStr);
       // FIXME: an empty message is still possible if parsing was valid.
       // We need to updategetStringLiteralIfNotInterpolated().
-      if (Message.empty())
+      if (Value.empty())
         return false;
 
-      consumeToken(tok::string_literal);
+      switch (ArgumentKind) {
+      case IsInvalid: assert(0 && "Unreachable");
+      case IsMessage: Message = Value; break;
+      case IsRenamed: Renamed = Value; break;
+      }
 
+      consumeToken(tok::string_literal);
     }
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
@@ -638,7 +655,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         Attributes.add(new (Context)
                        AvailabilityAttr(AtLoc, AttrRange,
                                         PlatformKind.getValue(),
-                                        Message,
+                                        Message, Renamed,
                                         clang::VersionTuple(),
                                         clang::VersionTuple(),
                                         clang::VersionTuple(),
