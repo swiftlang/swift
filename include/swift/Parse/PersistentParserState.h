@@ -97,6 +97,8 @@ public:
     {}
   };
 
+  bool InPoundLineEnvironment = false;
+
 private:
   ScopeInfo ScopeInfo;
   typedef llvm::DenseMap<AbstractFunctionDecl *,
@@ -160,8 +162,10 @@ public:
     return TopLevelCode;
   }
 
-  void markParserPosition(SourceLoc Loc, SourceLoc PrevLoc) {
+  void markParserPosition(SourceLoc Loc, SourceLoc PrevLoc,
+                          bool InPoundLineEnvironment) {
     MarkedPos = {Loc, PrevLoc};
+    this->InPoundLineEnvironment = InPoundLineEnvironment;
   }
 
   /// \brief Returns the marked parser position and resets it.

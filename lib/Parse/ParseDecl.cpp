@@ -255,7 +255,8 @@ bool Parser::parseTopLevel() {
 
   // Next time start relexing from the beginning of the comment so that we can
   // attach it to the token.
-  State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc);
+  State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
+                            InPoundLineEnvironment);
 
   return FoundTopLevelCodeToExecute;
 }
@@ -1825,13 +1826,15 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
 ParserStatus Parser::parseLineDirective() {
   SourceLoc Loc = consumeToken(tok::pound_line);
-  bool InPoundLineEnvironment = SourceMgr.inVirtualFile();
-  if (InPoundLineEnvironment)
-    SourceMgr.closeVirtualFile(Tok.getText().begin());
+  bool WasInPoundLineEnvironment = InPoundLineEnvironment;
+  if (WasInPoundLineEnvironment) {
+    SourceMgr.closeVirtualFile(Tok.getLoc());
+    InPoundLineEnvironment = false;
+  }
 
   // #line\n returns to the main buffer.
   if (Tok.isAtStartOfLine()) {
-    if (!InPoundLineEnvironment) {
+    if (!WasInPoundLineEnvironment) {
       diagnose(Tok, diag::unexpected_line_directive);
       return makeParserError();
     }
@@ -1859,11 +1862,12 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserError();
   }
 
-  const char* Begin = Tok.getText().end() + 1;
+  // FIXME: This will be incorrect if there is trailing whitespace at the end
+  // of the #line.
+  SourceLoc Begin = Lexer::getSourceLoc(Tok.getText().end()).getAdvancedLoc(1);
   StringRef Filename =
     getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
-  int LineOffset = StartLine -
-    SourceMgr.getLineNumber(SourceLoc(llvm::SMLoc::getFromPointer(Begin)));
+  int LineOffset = StartLine - SourceMgr.getLineNumber(Begin);
 
   consumeToken(tok::string_literal);
   if (!Tok.isAtStartOfLine()) {
@@ -1872,7 +1876,8 @@ ParserStatus Parser::parseLineDirective() {
   }
 
   // Create a new virtual file for the region started by the #line marker.
-  SourceMgr.beginVirtualFile(Begin, Filename, LineOffset);
+  SourceMgr.openVirtualFile(Begin, Filename, LineOffset);
+  InPoundLineEnvironment = true;
   return makeParserSuccess();
 }
 

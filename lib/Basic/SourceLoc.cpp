@@ -39,32 +39,54 @@ unsigned SourceManager::addMemBufferCopy(StringRef InputData,
   return addNewSourceBuffer(Buffer);
 }
 
-const SourceManager::VirtualFile *
-SourceManager::getVirtualFile(llvm::SMLoc Loc) const {
-  const char *p = Loc.getPointer();
-  // If there is an open VFile, see if p is within the limits of the
-  // buffer that contains the VFile.
-  if (CurrentVFile.hasValue() && p >= CurrentVFile->Begin) {
-    auto Range = getRangeForBuffer(findBufferContainingLoc(SourceLoc(Loc)));
-    auto bufBegin = Range.getStart().Value.getPointer();
-    auto bufEnd = Range.getEnd().Value.getPointer();
-    if (bufBegin <= CurrentVFile->Begin &&
-        bufEnd >= CurrentVFile->Begin &&
-        bufEnd >= p)
-      return &*CurrentVFile;
+void SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
+                                    int lineOffset) {
+  assert(!getVirtualFile(loc) && "must call closeVirtualFile first");
+
+  CharSourceRange fullRange = getRangeForBuffer(findBufferContainingLoc(loc));
+  SourceLoc end;
+
+  auto nextRangeIter = VirtualFiles.upper_bound(loc.Value.getPointer());
+  if (nextRangeIter != VirtualFiles.end() &&
+      fullRange.contains(nextRangeIter->second.Range.getStart())) {
+    end = nextRangeIter->second.Range.getStart();
+  } else {
+    end = fullRange.getEnd();
   }
+
+  CharSourceRange range = CharSourceRange(*this, loc, end);
+  VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
+}
+
+void SourceManager::closeVirtualFile(SourceLoc end) {
+  auto *virtualFile = const_cast<VirtualFile *>(getVirtualFile(end));
+  assert(virtualFile && "no open virtual file for this location");
+  CachedVFile = {};
+
+  CharSourceRange oldRange = virtualFile->Range;
+  virtualFile->Range = CharSourceRange(*this, virtualFile->Range.getStart(),
+                                       end);
+  VirtualFiles[end.Value.getPointer()] = std::move(*virtualFile);
+
+  bool existed = VirtualFiles.erase(oldRange.getEnd().Value.getPointer());
+  assert(existed);
+  (void)existed;
+}
+
+const SourceManager::VirtualFile *
+SourceManager::getVirtualFile(SourceLoc Loc) const {
+  const char *p = Loc.Value.getPointer();
 
   if (CachedVFile.first == p)
     return CachedVFile.second;
 
   // Returns the first element that is >p.
   auto VFileIt = VirtualFiles.upper_bound(p);
-  if (VFileIt != VirtualFiles.end() &&
-      p >= VFileIt->second.Begin &&
-      p <= VFileIt->second.End) {
+  if (VFileIt != VirtualFiles.end() && VFileIt->second.Range.contains(Loc)) {
     CachedVFile = { p, &VFileIt->second };
     return CachedVFile.second;
   }
+
   return nullptr;
 }
 
@@ -129,12 +151,13 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
   assert(Loc.isValid());
   // Search the buffers back-to front, so later alias buffers are
   // visited first.
+  auto less_equal = std::less_equal<const char *>();
   for (unsigned i = LLVMSourceMgr.getNumBuffers(), e = 1; i >= e; --i) {
     auto Buf = LLVMSourceMgr.getMemoryBuffer(i);
-    if (Loc.Value.getPointer() >= Buf->getBufferStart() &&
+    if (less_equal(Buf->getBufferStart(), Loc.Value.getPointer()) &&
         // Use <= here so that a pointer to the null at the end of the buffer
         // is included as part of the buffer.
-        Loc.Value.getPointer() <= Buf->getBufferEnd())
+        less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
       return i;
   }
   llvm_unreachable("no buffer containing location found");
@@ -147,7 +170,7 @@ void SourceLoc::printLineAndColumn(raw_ostream &OS,
     return;
   }
 
-  auto LineAndCol = SM.getLineAndColumn(this->Value);
+  auto LineAndCol = SM.getLineAndColumn(*this);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
 }
 

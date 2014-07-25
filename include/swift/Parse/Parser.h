@@ -96,6 +96,8 @@ public:
   /// syntax working.
   bool ArgumentIsParameter = false;
 
+  bool InPoundLineEnvironment = false;
+
   LocalContext *CurLocalContext = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;

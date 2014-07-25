@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/SMLoc.h"
+#include <functional>
 
 namespace swift {
   class SourceManager;
@@ -29,6 +30,7 @@ namespace swift {
 class SourceLoc {
   friend class SourceManager;
   friend class SourceRange;
+  friend class CharSourceRange;
   friend class DiagnosticConsumer;
 
   llvm::SMLoc Value;
@@ -132,6 +134,14 @@ public:
       return Start.getAdvancedLoc(ByteLength);
     else
       return SourceLoc();
+  }
+
+  /// Returns true if the given source location is contained in the range.
+  bool contains(SourceLoc loc) const {
+    auto less = std::less<const char *>();
+    auto less_equal = std::less_equal<const char *>();
+    return less_equal(getStart().Value.getPointer(), loc.Value.getPointer()) &&
+           less(loc.Value.getPointer(), getEnd().Value.getPointer());
   }
 
   /// \brief Return the length of this valid range in bytes.  Can be zero.

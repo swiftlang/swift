@@ -5,6 +5,10 @@ func f() {
 #line
   }
   println("Test")
+#line 142 "abc.swift"
+  println("abc again")
+#line 142 "def.swift"
+  println("jump directly to def")
 }
 
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -S -g -o - | FileCheck %s
@@ -13,3 +17,6 @@ func f() {
 // CHECK: .file	[[ABC:.*]] "{{.*}}abc.swift"
 // CHECK: .loc	[[ABC]] 42
 // CHECK: .loc	[[MAIN]] 7
+// CHECK: .loc	[[ABC]] 142
+// CHECK: .file	[[DEF:.*]] "{{.*}}def.swift"
+// CHECK: .loc	[[DEF]] 142

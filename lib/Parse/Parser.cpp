@@ -284,6 +284,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
       SourceMgr.findBufferContainingLoc(ParserPos.Loc) == L->getBufferID()) {
     auto BeginParserPosition = getParserPosition(ParserPos);
     restoreParserPosition(BeginParserPosition);
+    InPoundLineEnvironment = State->InPoundLineEnvironment;
   }
 }
 

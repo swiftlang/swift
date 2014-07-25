@@ -36,15 +36,12 @@ class SourceManager {
 
   // #line directive handling.
   struct VirtualFile {
-    const char *Begin, *End;
+    CharSourceRange Range;
     std::string Name;
     int LineOffset;
   };
   std::map<const char *, VirtualFile> VirtualFiles;
-  mutable std::pair<const char *, const VirtualFile*> CachedVFile
-    = { 0, nullptr };
-  /// Used during parsing.
-  Optional<VirtualFile> CurrentVFile;
+  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {};
 
 public:
   llvm::SourceMgr &getLLVMSourceMgr() {
@@ -113,22 +110,15 @@ public:
     return addNewSourceBuffer(Buffer.release());
   }
 
-  bool inVirtualFile() { return CurrentVFile.hasValue(); }
-
-  /// Start a new #line-defined virtual file region.
-  void beginVirtualFile(const char *Begin, StringRef Name, int LineOffset) {
-    assert(!CurrentVFile.hasValue() && "previous VFile still open");
-    CurrentVFile = VirtualFile{ Begin, nullptr, Name.str(), LineOffset };
-  }
+  /// Add a #line-defined virtual file region.
+  ///
+  /// By default, this region continues to the end of the buffer.
+  ///
+  /// \sa closeVirtualFile.
+  void openVirtualFile(SourceLoc loc, StringRef name, int lineOffset);
 
   /// Close a #line-defined virtual file region.
-  void closeVirtualFile(const char *End) {
-    assert(CurrentVFile.hasValue() && "no open VFile");
-    VirtualFiles[End] = { CurrentVFile->Begin, End,
-                          CurrentVFile->Name,
-                          CurrentVFile->LineOffset };
-    CurrentVFile.reset();
-  }
+  void closeVirtualFile(SourceLoc end);
 
   /// Creates a copy of a \c MemoryBuffer and adds it to the \c SourceManager,
   /// taking ownership of the copy.
@@ -177,37 +167,37 @@ public:
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
 
-  const VirtualFile *getVirtualFile(llvm::SMLoc Loc) const;
-
-  int getLineOffset(llvm::SMLoc Loc) const {
-    if (auto VFile = getVirtualFile(Loc))
-      return VFile->LineOffset;
-    else
-      return 0;
-  }
-
+  /// Returns the identifier string for the buffer containing the given source
+  /// location.
+  ///
+  /// This respects #line directives.
   const char *getBufferIdentifierForLoc(SourceLoc Loc) const {
-    if (auto VFile = getVirtualFile(Loc.Value))
+    if (auto VFile = getVirtualFile(Loc))
       return VFile->Name.c_str();
     else
       return getIdentifierForBuffer(findBufferContainingLoc(Loc));
   }
 
+  /// Returns the line and column represented by the given source location.
+  ///
+  /// If \p BufferID is provided, \p Loc must come from that source buffer.
+  ///
+  /// This respects #line directives.
   std::pair<unsigned, unsigned>
   getLineAndColumn(SourceLoc Loc, unsigned BufferID = 0) const {
-    return getLineAndColumn(Loc.Value, BufferID);
-  }
-
-  std::pair<unsigned, unsigned> getLineAndColumn(llvm::SMLoc Loc,
-                                                 unsigned BufferID = 0) const {
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
-    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
+    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
     assert(LineOffset+l > 0 && "bogus line offset");
     return { LineOffset + l, c };
   }
 
+  /// Returns the real line number for a source location.
+  ///
+  /// If \p BufferID is provided, \p Loc must come from that source buffer.
+  ///
+  /// This does not respect #line directives.
   unsigned getLineNumber(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
@@ -220,6 +210,16 @@ public:
                                 const Twine &Msg,
                                 ArrayRef<llvm::SMRange> Ranges,
                                 ArrayRef<llvm::SMFixIt> FixIts) const;
+
+private:
+  const VirtualFile *getVirtualFile(SourceLoc Loc) const;
+
+  int getLineOffset(SourceLoc Loc) const {
+    if (auto VFile = getVirtualFile(Loc))
+      return VFile->LineOffset;
+    else
+      return 0;
+  }
 };
 
 } // namespace swift
