@@ -182,7 +182,10 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
-  swift::crash("Unrecognized selector");
+  Class cls = object_getClass(self);
+  fatalError("Unrecognized selector %c[%s %s]\n", 
+             class_isMetaClass(cls) ? '+' : '-', 
+             class_getName(cls), sel_getName(sel));
 }
 
 - (id)retain {

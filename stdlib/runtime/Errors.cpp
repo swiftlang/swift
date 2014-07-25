@@ -22,6 +22,7 @@
 #include <pthread.h>
 #include <malloc/malloc.h>
 #include <asl.h>
+#include "Debug.h"
 
 
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
@@ -67,6 +68,24 @@ reportNow(const char *message)
 {
   write(STDERR_FILENO, message, strlen(message));
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
+}
+
+
+// Report a fatal error to system console, stderr, and crash logs, then abort.
+LLVM_ATTRIBUTE_NORETURN
+void
+swift::fatalError(const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  char *log;
+  vasprintf(&log, format, args);
+
+  reportNow(log);
+  reportOnCrash(log);
+
+  abort();
 }
 
 

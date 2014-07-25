@@ -28,6 +28,9 @@
 
 namespace swift {
 
+// swift::crash() halts with a crash log message, 
+// but otherwise tries not to disturb register state.
+
 LLVM_ATTRIBUTE_NORETURN
 LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
 static void crash(const char *message) {
@@ -40,6 +43,12 @@ static void crash(const char *message) {
 #endif
   __builtin_unreachable();
 }
+
+// swift::fatalError() halts with a crash log message, 
+// but makes no attempt to preserve register state.
+LLVM_ATTRIBUTE_NORETURN
+extern void
+fatalError(const char *format, ...);
 
 };
 
