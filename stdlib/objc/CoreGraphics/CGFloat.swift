@@ -287,24 +287,15 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   return lhs.native < rhs.native
 }
 
-@transparent extension CGFloat : RandomAccessIndexType {
+@transparent extension CGFloat : Strideable {
   @transparent public
-  func successor() -> CGFloat {
-    return CGFloat(self.native + 1.0)
-  }
-  @transparent public
-  func predecessor() -> CGFloat {
-    return CGFloat(self.native - 1.0)
+  func distanceTo(other: CGFloat) -> CGFloat {
+    return CGFloat(other.native - self.native)
   }
   
   @transparent public
-  func distanceTo(other: CGFloat) -> CGFloat.Distance {
-    return Int(other.native-self.native)
-  }
-  
-  @transparent public
-  func advancedBy(amount: CGFloat.Distance) -> CGFloat {
-    return CGFloat(self.native + CGFloat(amount).native)
+  func advancedBy(amount: CGFloat) -> CGFloat {
+    return CGFloat(self.native + amount.native)
   }
 }
 

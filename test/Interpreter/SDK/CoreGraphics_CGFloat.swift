@@ -140,6 +140,26 @@ func arithmetic() {
 }
 arithmetic()
 
+// Striding
+func striding() {
+  // CHECK-LABEL: striding test
+  println("striding test")
+
+  // CHECK-NEXT: 1.0
+  // CHECK-NEXT: 1.5
+  for f: CGFloat in stride(from: 1.0, to: 2.0, by: 0.5) {
+    println(f)
+  }
+
+  // CHECK-NEXT: 1.0
+  // CHECK-NEXT: 1.5
+  // CHECK-NEXT: 2.0
+  for f: CGFloat in stride(from: 1.0, through: 2.0, by: 0.5) {
+    println(f)
+  }
+}
+striding()
+
 // Objective-C bridging to NSNumber.
 func bridging() {
   // CHECK-LABEL: bridging test
