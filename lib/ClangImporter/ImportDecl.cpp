@@ -2809,9 +2809,42 @@ namespace {
       // Set the kind of initializer.
       result->setInitKind(kind);
 
+      // Consult API notes to determine whether this initializer is required.
+      if (!required && Impl.isRequiredInitializer(objcMethod))
+        required = true;
+
+      // Check whether this initializer satisfies a requirement in a protocol.
+      if (!required && !isa<ProtocolDecl>(dc) &&
+          objcMethod->isInstanceMethod()) {
+        auto objcParent = cast<clang::ObjCContainerDecl>(
+                            objcMethod->getDeclContext());
+
+        if (isa<clang::ObjCProtocolDecl>(objcParent)) {
+          // An initializer declared in a protocol is required.
+          required = true;
+        } else {
+          // If the class in which this initializer was declared conforms to a
+          // protocol that requires this initializer, then this initializer is
+          // required.
+          SmallPtrSet<clang::ObjCProtocolDecl *, 8> objcProtocols;
+          objcParent->getASTContext().CollectInheritedProtocols(objcParent,
+                                                                objcProtocols);
+          for (auto objcProto : objcProtocols) {
+            for (auto decl : objcProto->lookup(objcMethod->getSelector())) {
+              if (cast<clang::ObjCMethodDecl>(decl)->isInstanceMethod()) {
+                required = true;
+                break;
+              }
+            }
+
+            if (required)
+              break;
+          }
+        }
+      }
+
       // If this initializer is required, add the appropriate attribute.
-      if ((required || Impl.isRequiredInitializer(objcMethod)) &&
-          !isa<ProtocolDecl>(dc)) {
+      if (required) {
         result->getAttrs().add(
           new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
       }
