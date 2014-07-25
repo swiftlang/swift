@@ -238,6 +238,7 @@ public:
   void clearOwnership() {
     clearAttribute(TAK_sil_weak);
     clearAttribute(TAK_sil_unowned);
+    clearAttribute(TAK_sil_unmanaged);
   }
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
