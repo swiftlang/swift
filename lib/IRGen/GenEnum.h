@@ -296,6 +296,10 @@ public:
   virtual llvm::BitVector
   getBitPatternForNoPayloadElement(IRGenModule &IGM,
                                    EnumElementDecl *theCase) const = 0;
+
+  /// Return the bit mask used to test for no-payload cases.
+  virtual llvm::BitVector
+  getBitMaskForNoPayloadElements(IRGenModule &IGM) const = 0;
   
   /// \group Indirect enum operations
   

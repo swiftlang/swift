@@ -157,6 +157,20 @@ namespace {
       eltValue = eltTI.maskFixedExtraInhabitant(IGF, eltValue);
       return IGF.Builder.CreateZExt(eltValue, tupleValue->getType());
     }
+        
+    // This is dead code in NonFixedTupleTypeInfo.
+    llvm::BitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+      if (asImpl().getFields().empty())
+        return {};
+      
+      const FixedTypeInfo &fieldTI
+        = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      
+      llvm::BitVector mask(fieldTI.getFixedSize().getValueInBits(), true);
+      
+      mask.resize(asImpl().getFixedSize().getValueInBits(), false);
+      return mask;
+    }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address tupleAddr,

@@ -440,6 +440,14 @@ namespace {
       // There's only a no-payload element if the type is empty.
       return {};
     }
+    
+    llvm::BitVector
+    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      // All bits are significant.
+      return llvm::BitVector(
+                     cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
+                     true);
+    }
   };
   
   /// Implementation strategy for no-payload enums, in other words, 'C-like'
@@ -608,6 +616,14 @@ namespace {
         = getBitVectorFromAPInt(getDiscriminatorIndex(theCase)->getValue());
       bits.resize(cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
       return bits;
+    }
+    
+    llvm::BitVector
+    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      // All bits are significant.
+      return llvm::BitVector(
+                       cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
+                       true);
     }
   };
   
@@ -2149,6 +2165,19 @@ namespace {
       }
       return bits;
     }
+    
+    llvm::BitVector
+    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      // Use the extra inhabitants mask from the payload.
+      auto &payloadTI = getFixedPayloadTypeInfo();
+      llvm::BitVector extraInhabitantsMask
+        = payloadTI.getFixedExtraInhabitantMask(IGM);
+      // Extend to include the extra tag bits, which are always significant.
+      unsigned totalSize
+        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
+      extraInhabitantsMask.resize(totalSize, true);
+      return extraInhabitantsMask;
+    }
 
     llvm::BitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
       // We only have tag bits if we spilled extra bits.
@@ -3185,6 +3214,15 @@ namespace {
       }
       return bits;
     }
+    
+    llvm::BitVector
+    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      // All bits are significant.
+      // TODO: They don't have to be.
+      return llvm::BitVector(
+                       cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
+                       true);
+    }
 
     llvm::BitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
       llvm::BitVector result = PayloadTagBits;
@@ -3840,6 +3878,14 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 
     llvm::BitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
+    
+    auto bitMask = strategy->getBitMaskForNoPayloadElements(IGM);
+    assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
+    DEBUG(llvm::dbgs() << "  no-payload mask:\t";
+          for (unsigned i = bitMask.size(); i-- > 0;) {
+            llvm::dbgs() << (bitMask[i] ? '1' : '0');
+          }
+          llvm::dbgs() << '\n');
     
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(IGM, elt.decl);
