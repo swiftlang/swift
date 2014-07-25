@@ -18,12 +18,15 @@ import MissingDependencyFromSwift
 // CHECK-NOT: no such module 'MissingDependencyFromSwift'
 
 import MissingDependencyFromClang
-// CHECK: error: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1: module 'Dependency' not found
+// CHECK: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1:9: error: module 'Dependency' not found
 // CHECK: error: could not build Objective-C module 'MissingDependencyFromClang'
 // CHECK-NOT: no such module 'MissingDependencyFromClang'
 
 import BrokenClangModule
-// CHECK: error: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2: redefinition of 'conflict' as different kind of symbol
+// CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2:13: error: redefinition of 'conflict' as different kind of symbol
+// CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:1:5: note: previous definition is here
+// CHECK: a-fake-file.h:43:13: error: redefinition of 'conflict2' as different kind of symbol
+// CHECK: a-fake-file.h:42:5: note: previous definition is here
 // CHECK: error: could not build Objective-C module 'BrokenClangModule'
 // CHECK-NOT: no such module 'BrokenClangModule'
 

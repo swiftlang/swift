@@ -39,16 +39,22 @@ unsigned SourceManager::addMemBufferCopy(StringRef InputData,
   return addNewSourceBuffer(Buffer);
 }
 
-void SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
+bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
                                     int lineOffset) {
-  assert(!getVirtualFile(loc) && "must call closeVirtualFile first");
-
   CharSourceRange fullRange = getRangeForBuffer(findBufferContainingLoc(loc));
   SourceLoc end;
 
   auto nextRangeIter = VirtualFiles.upper_bound(loc.Value.getPointer());
   if (nextRangeIter != VirtualFiles.end() &&
       fullRange.contains(nextRangeIter->second.Range.getStart())) {
+    const VirtualFile &existingFile = nextRangeIter->second;
+    if (existingFile.Range.getStart() == loc) {
+      assert(existingFile.Name == name);
+      assert(existingFile.LineOffset == lineOffset);
+      return false;
+    }
+    assert(!existingFile.Range.contains(loc) &&
+           "must close current open file first");
     end = nextRangeIter->second.Range.getStart();
   } else {
     end = fullRange.getEnd();
@@ -56,6 +62,7 @@ void SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
   VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
+  return true;
 }
 
 void SourceManager::closeVirtualFile(SourceLoc end) {

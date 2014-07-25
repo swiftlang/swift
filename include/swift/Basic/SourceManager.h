@@ -114,8 +114,11 @@ public:
   ///
   /// By default, this region continues to the end of the buffer.
   ///
+  /// \returns True if the new file was added, false if the file already exists.
+  /// The name and line offset must match exactly in that case.
+  ///
   /// \sa closeVirtualFile.
-  void openVirtualFile(SourceLoc loc, StringRef name, int lineOffset);
+  bool openVirtualFile(SourceLoc loc, StringRef name, int lineOffset);
 
   /// Close a #line-defined virtual file region.
   void closeVirtualFile(SourceLoc end);

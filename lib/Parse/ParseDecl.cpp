@@ -1876,7 +1876,10 @@ ParserStatus Parser::parseLineDirective() {
   }
 
   // Create a new virtual file for the region started by the #line marker.
-  SourceMgr.openVirtualFile(Begin, Filename, LineOffset);
+  bool isNewFile = SourceMgr.openVirtualFile(Begin, Filename, LineOffset);
+  assert(isNewFile);
+  (void)isNewFile;
+
   InPoundLineEnvironment = true;
   return makeParserSuccess();
 }

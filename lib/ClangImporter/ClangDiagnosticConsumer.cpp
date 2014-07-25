@@ -27,6 +27,17 @@ ClangDiagnosticConsumer::ClangDiagnosticConsumer(
   : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
     ImporterImpl(impl), DumpToStderr(dumpToStderr) {}
 
+static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
+                               unsigned bufferID) {
+  CharSourceRange entireBuffer = SM.getRangeForBuffer(bufferID);
+  CharSourceRange rangeFromLoc{SM, loc, entireBuffer.getEnd()};
+  StringRef textFromLoc = SM.extractText(rangeFromLoc);
+  size_t newlineOffset = textFromLoc.find_first_of("\r\n");
+  if (newlineOffset == StringRef::npos)
+    return entireBuffer.getEnd();
+  return loc.getAdvancedLoc(newlineOffset);
+}
+
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
     const clang::Diagnostic &clangDiag) {
@@ -41,9 +52,48 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   clang::SourceManager &clangSrcMgr = clangDiag.getSourceManager();
   clang::SourceLocation clangLoc = clangDiag.getLocation();
   clangLoc = clangSrcMgr.getFileLoc(clangLoc);
-  SourceLoc loc = ImporterImpl.importSourceLoc(clangLoc);
 
   auto &ctx = ImporterImpl.SwiftContext;
+  SourceLoc loc;
+
+  auto decomposedLoc = clangSrcMgr.getDecomposedLoc(clangLoc);
+  if (!decomposedLoc.first.isInvalid()) {
+    auto buffer = clangSrcMgr.getBuffer(decomposedLoc.first);
+
+    auto mirrorID =
+      ctx.SourceMgr.getIDForBufferIdentifier(buffer->getBufferIdentifier());
+    if (!mirrorID) {
+      std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
+        llvm::MemoryBuffer::getMemBuffer(buffer->getBuffer(),
+                                         buffer->getBufferIdentifier(),
+                                         /*nullTerminated=*/true)
+      };
+      mirrorID = ctx.SourceMgr.addNewSourceBuffer(std::move(mirrorBuffer));
+    }
+    loc = ctx.SourceMgr.getLocForOffset(mirrorID.getValue(),
+                                        decomposedLoc.second);
+
+    // Note: getPresumedLoc handles invalid source locations by returning an
+    // empty PresumedLoc structure. In these cases we just won't show location
+    // information.
+    auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
+    if (presumedLoc.getFilename()) {
+      assert(presumedLoc.getLine() > 0 && "can't handle non-positive lines");
+      unsigned bufferLineNumber =
+        clangSrcMgr.getLineNumber(decomposedLoc.first, decomposedLoc.second);
+
+      StringRef presumedFile = presumedLoc.getFilename();
+      SourceLoc startOfLine = loc.getAdvancedLoc(-presumedLoc.getColumn() + 1);
+      bool isNewVirtualFile =
+        ctx.SourceMgr.openVirtualFile(startOfLine, presumedFile,
+                                      presumedLoc.getLine() - bufferLineNumber);
+      if (isNewVirtualFile) {
+        SourceLoc endOfLine = findEndOfLine(ctx.SourceMgr, loc,
+                                            mirrorID.getValue());
+        ctx.SourceMgr.closeVirtualFile(endOfLine);
+      }
+    }
+  }
 
   if (clangDiag.getID() == clang::diag::err_module_not_built &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
@@ -79,20 +129,6 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   }
 
   llvm::SmallString<128> message;
-
-  // FIXME: Until we have real source locations, they're included in the
-  // diagnostic.
-  // Note: getPresumedLoc handles invalid source locations by returning an
-  // empty PresumedLoc structure. In these cases we just won't show location
-  // information.
-  auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
-  if (presumedLoc.getFilename()) {
-    message.append(presumedLoc.getFilename());
-    message.push_back(':');
-    llvm::raw_svector_ostream(message) << presumedLoc.getLine();
-    message.append(": ");
-  }
-
   clangDiag.FormatDiagnostic(message);
 
   // FIXME: Include source ranges in the diagnostic.
