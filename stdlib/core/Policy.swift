@@ -132,6 +132,10 @@ public protocol Hashable : Equatable {
   /// Returns the hash value.  The hash value is not guaranteed to be stable
   /// across different invocations of the same program.  Do not persist the hash
   /// value across program runs.
+  ///
+  /// The value of `hashValue` property must be consistent with the equality
+  /// comparison: if two values compare equal, they must have equal hash
+  /// values.
   var hashValue: Int { get }
 }
 
