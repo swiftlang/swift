@@ -6,12 +6,14 @@ swift - the amazingly new programming language
 
 =head1 SYNOPSIS
 
-B<swift> [B<-emit-object>|B<-emit-assembly>|B<-emit-library>|B<-i>] 
+B<swift> [-help] [I<input-filename> [I<program-arguments>]]
+
+B<swiftc> [B<-emit-object>|B<-emit-assembly>|B<-emit-library>]
   [-help]
   B<-o> I<output-file>
   I<input-filenames>
 
-The full list of supported options is available via "swift -help".
+The full list of supported options is available via "swift -help" or "swiftc -help".
 
 =head1 DESCRIPTION
 
