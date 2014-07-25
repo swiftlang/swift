@@ -93,8 +93,6 @@
                 [?\" "\""]
                 ;; escape-syntax characters ('\\')
                 [?\\ "\\"]
-                ;; character quote ('"')
-                [?\' "\""]
                 ))))
 
 ;; --------------------- Abbrev table -----------------------------
@@ -134,7 +132,7 @@
                  ;; (?' . ?\') ;; This isn't such a great idea because
                  ;; pairs are detected even in strings and comments,
                  ;; and sometimes an apostrophe is just an apostrophe
-                 (?{ . ?})  (?[ . ?]) (?( . ?))) electric-pair-pairs))
+                 (?{ . ?})  (?[ . ?]) (?( . ?)) (?` . ?`)) electric-pair-pairs))
   (set (make-local-variable 'electric-layout-rules)
        '((?\{ . after) (?\} . before)))
   
