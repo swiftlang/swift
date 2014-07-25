@@ -240,12 +240,13 @@ def AssertConfig : Separate<["-"], "assert-config">,
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file(s) as libraries, not scripts">;
-def parse_sil : Flag<["-"], "parse-sil">, Flags<[FrontendOption]>,
+def parse_sil : Flag<["-"], "parse-sil">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -290,7 +291,8 @@ def print_ast : Flag<["-"], "print-ast">, Flags<[FrontendOption]>, ModeOpt,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">;
 
 // Other Modes
-def repl : Flag<["-"], "repl">, HelpText<"REPL mode">,
+def repl : Flag<["-"], "repl">,
+  HelpText<"REPL mode (the default if there is no input file)">,
   Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
   Flags<[NoBatchOption]>, ModeOpt;
@@ -298,7 +300,8 @@ def integrated_repl : Flag<["-"], "integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
 def i : Option<["-"], "i", KIND_REMAINING_ARGS>, Flags<[NoBatchOption]>,
-  HelpText<"Immediate mode">, ModeOpt;
+  HelpText<"Immediate mode (the default if there is an input file)">,
+  ModeOpt;
 
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
