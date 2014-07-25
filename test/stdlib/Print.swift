@@ -736,6 +736,15 @@ func test_CustomStringInterpolation() {
 test_CustomStringInterpolation()
 // CHECK: test_CustomStringInterpolation done
 
+func test_StdoutUTF8Printing() {
+  println("\u{00B5}")
+// CHECK: {{^}}µ{{$}}
+
+  println("test_StdoutUTF8Printing done")
+}
+test_StdoutUTF8Printing()
+// CHECK: test_StdoutUTF8Printing done
+
 if !failed {
   println("OK")
 }
