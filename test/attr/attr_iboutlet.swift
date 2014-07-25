@@ -192,7 +192,9 @@ class MissingOptional {
   // expected-note @-1{{add '?' to form the optional type 'C?'}}{{21-21=?}}
   // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{21-21=!}}
 
-  @IBOutlet weak var b: C // expected-error{{'weak' variable should have optional type 'C?'}}
+  @IBOutlet weak var b: C // expected-error{{IBOutlet' property has non-optional type 'C'}}
+  // expected-note @-1{{add '!' to form the implicitly unwrapped optional type 'C!'}}
+  // expected-note @-2{{add '?' to form the optional type 'C?'}}
 
   init() {}
 }

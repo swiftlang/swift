@@ -1015,13 +1015,15 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
     else if (type->allowsOwnership()) {
       // Use this special diagnostic if it's actually a reference type but just
       // isn't Optional.
+      if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
+        // Let @IBOutlet complain about this; it's more specific.
+        attr->setInvalid();
+        return;
+      }
+
       diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
                OptionalType::get(type));
       attr->setInvalid();
-
-      // If the IBOutlet attribute is present, remove it as well.
-      if (auto attr = var->getAttrs().getAttribute<IBOutletAttr>())
-        var->getAttrs().removeAttribute(attr);
 
       return;
     } else {
