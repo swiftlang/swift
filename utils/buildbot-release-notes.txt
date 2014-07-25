@@ -1,6 +1,17 @@
 Latest
 ------
 
+* The swift command line interface is now divided into an interactive driver
+  'swift', and a batch compiler 'swiftc':
+
+  swift [options] input-file [program-arguments]
+    Runs the script 'input-file' immediately, passing any program-arguments
+    to the script. Without any input files, invokes the repl.
+
+  swiftc [options] input-filenames
+    The familiar swift compiler interface: compiles the input-files according
+    to the mode options like -emit-object, -emit-executable, etc.
+
 * For greater clarity and explicitness when bypassing the type system,
   reinterpretCast has been renamed unsafeBitCast, and it has acquired
   a (required) explicit type parameter.  So
