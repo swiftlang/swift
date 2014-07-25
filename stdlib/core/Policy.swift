@@ -245,9 +245,6 @@ infix operator   & { associativity left precedence 150 }
 
 // "Additive"
 
-infix operator ++ { associativity left precedence 140 }
-infix operator -- { associativity left precedence 140 }
-
 infix operator   + { associativity left precedence 140 }
 infix operator  &+ { associativity left precedence 140 }
 infix operator   - { associativity left precedence 140 }

@@ -1,12 +1,6 @@
 Latest
 ------
 
-* Binary ++ and -- operators have been added to make indexing using
-  integer offsets cleaner, without implying random access:
-
-    index++n    is equivalent to advance(index, n)
-    index--n    is equivalent to advance(index, -n)
-
 * The swift command line interface is now divided into an interactive driver
   'swift', and a batch compiler 'swiftc':
 
