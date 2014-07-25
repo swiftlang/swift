@@ -1138,22 +1138,6 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   // FIXME
 }
 
-func checkHashable<T : Hashable>(
-  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack
-) {
-  // Test operator '==' that is found through witness tables.
-  expectEqual(expectedEqual, lhs == rhs, stackTrace: stackTrace)
-  expectEqual(!expectedEqual, lhs != rhs, stackTrace: stackTrace)
-
-  // Test 'hashValue'.
-  //
-  // If objects are not equal, then the hash value can be different or it can
-  // collide.
-  if expectedEqual {
-    expectEqual(lhs.hashValue, rhs.hashValue)
-  }
-}
-
 func checkEqualityImpl(
   expectedEqualNFD: Bool, lhs: String, rhs: String,
   stackTrace: SourceLocStack
