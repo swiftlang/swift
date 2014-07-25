@@ -45,10 +45,23 @@ func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
+/// Returns if x is a power of 2, assuming that x is not 0
+@transparent
+func _isPowerOf2(v : Int) -> Bool {
+  _sanityCheck(v > 0)
+  return (v & (v - 1)) == 0
+}
+
 func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)
-  return (offset + alignment - 1) / alignment * alignment
+  _sanityCheck(_isPowerOf2(alignment))
+  // Note, given that offset is >= 0, and alignment > 0, we don't
+  // need to underflow check the -1, as it can never underflow.
+  let x = (offset + alignment &- 1)
+  // Note, as alignment is a power of 2, we'll use masking to efficiently
+  // get the aligned value
+  return x & ~(alignment &- 1)
 }
 
 @transparent
