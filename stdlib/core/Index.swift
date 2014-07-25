@@ -49,6 +49,25 @@ public func advance<T: ForwardIndexType>(start: T, n: T.Distance, end: T) -> T {
   return start~>_advance(n, end)
 }
 
+/// Return the result of advancing `start` by n positions.  If `T` models
+/// `RandomAccessIndexType`, executes in O(1).  Otherwise, executes in
+/// O(abs(n)).  If `T` does not model `BidirectionalIndexType`,
+/// requires that `n` is non-negative.
+///
+/// `i++n' is a synonym for `advance(i, n)`
+public func ++ <T: ForwardIndexType>(start: T, n: T.Distance) -> T {
+  return start~>_advance(n)
+}
+
+/// Return the result of advancing `start` by `-n` positions.  If `T`
+/// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
+/// executes in O(abs(n)). 
+///
+/// `i--n' is a synonym for `advance(i, -n)`
+public func -- <T: BidirectionalIndexType>(start: T, n: T.Distance) -> T {
+  return start~>_advance(-n)
+}
+
 /// Operation tags for distance and advance
 ///
 /// Operation tags allow us to use a single operator (~>) for

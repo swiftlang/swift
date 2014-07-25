@@ -100,8 +100,8 @@ func nonASCII() {
 
   // Slicing the String does not allocate
   // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
-  let i2 = advance(newNSUTF16.startIndex, 2)
-  let i8 = advance(newNSUTF16.startIndex, 6)
+  let i2 = newNSUTF16.startIndex++2
+  let i8 = newNSUTF16.startIndex++6
   println("  \(repr(newNSUTF16[i2..<i8]))")
 
   // Representing a slice as an NSString requires a new object
@@ -143,8 +143,8 @@ func ascii() {
   // CHECK: --- ASCII slicing ---
   println("--- ASCII slicing ---")
 
-  let i3 = advance(newNSASCII.startIndex, 3)
-  let i6 = advance(newNSASCII.startIndex, 6)
+  let i3 = newNSASCII.startIndex++3
+  let i6 = newNSASCII.startIndex++6
   
   // Slicing the String does not allocate
   // XCHECK-NEXT: String(Opaque(buffer: @[[asciiaddress]][3...6]))

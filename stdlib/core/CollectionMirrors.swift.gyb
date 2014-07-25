@@ -42,7 +42,7 @@ ${MirrorDecl} {
 
   subscript(i: Int) -> (String, MirrorType) {
     if i >= 0 && i < count {
-      return ("${ElementName}",reflect(_value[advance(_value.startIndex,i)]))
+      return ("${ElementName}",reflect(_value[_value.startIndex++i]))
     } else {
       _fatalError("MirrorType access out of bounds")
     }

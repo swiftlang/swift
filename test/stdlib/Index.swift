@@ -96,6 +96,12 @@ println("[\(advance(F(7), 2).x)]")
 // CHECK-NEXT: F.successor: 7
 // CHECK-NEXT: F.successor: 8
 // CHECK-NEXT: [9]
+println("[\((F(7)++0).x)]")
+// CHECK-NEXT: [7]
+println("[\((F(7)++2).x)]")
+// CHECK-NEXT: F.successor: 7
+// CHECK-NEXT: F.successor: 8
+// CHECK-NEXT: [9]
 println("[\(advance(F(3), 99, F(5)).x)]")
 // CHECK-NEXT: F.successor: 3
 // CHECK-NEXT: F.successor: 4
@@ -114,6 +120,15 @@ println("[\(advance(B(7), 2).x)]")
 // CHECK-NEXT: B.successor: 8
 // CHECK-NEXT: [9]
 println("[\(advance(B(7), -3).x)]")
+// CHECK-NEXT: B.predecessor: 7
+// CHECK-NEXT: B.predecessor: 6
+// CHECK-NEXT: B.predecessor: 5
+// CHECK-NEXT: [4]
+println("[\((B(7)++2).x)]")
+// CHECK-NEXT: B.successor: 7
+// CHECK-NEXT: B.successor: 8
+// CHECK-NEXT: [9]
+println("[\((B(7)--3).x)]")
 // CHECK-NEXT: B.predecessor: 7
 // CHECK-NEXT: B.predecessor: 6
 // CHECK-NEXT: B.predecessor: 5
@@ -143,6 +158,12 @@ println("[\(distance(R(10), R(20)))]")
 println("[\(advance(R(7), 2).x)]")
 // CHECK-NEXT: R.advancedBy: 7, 2
 // CHECK-NEXT: [9]
+println("[\((R(7)++2).x)]")
+// CHECK-NEXT: R.advancedBy: 7, 2
+// CHECK-NEXT: [9]
+println("[\((R(7)--3).x)]")
+// CHECK-NEXT: R.advancedBy: 7, -3
+// CHECK-NEXT: [4]
 println("[\(advance(R(13), 99, R(17)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 17
 // CHECK-NEXT: [17]
