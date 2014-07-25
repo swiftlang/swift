@@ -433,10 +433,12 @@ ClangImporter::create(ASTContext &ctx,
 }
 
 void ClangImporter::Implementation::importHeader(
-    Module *adapter,
+    Module *adapter, StringRef headerName,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
   assert(adapter);
   ImportedHeaderOwners.push_back(adapter);
+
+  bool hadError = getClangASTContext().getDiagnostics().hasErrorOccurred();
 
   clang::Preprocessor &pp = getClangPreprocessor();
   clang::SourceManager &sourceMgr = getClangASTContext().getSourceManager();
@@ -457,6 +459,9 @@ void ClangImporter::Implementation::importHeader(
   while (!Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
 
+  if (!hadError && getClangASTContext().getDiagnostics().hasErrorOccurred())
+    SwiftContext.Diags.diagnose({}, diag::bridging_header_error, headerName);
+
   bumpGeneration();
 }
 
@@ -474,7 +479,7 @@ void ClangImporter::importHeader(StringRef header, Module *adapter,
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };
-  Impl.importHeader(adapter, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, std::move(sourceBuffer));
 }
 
 void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
@@ -482,7 +487,7 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
   const clang::FileEntry *headerFile = fileManager.getFile(header,
                                                            /*open=*/true);
   if (!headerFile) {
-    Impl.SwiftContext.Diags.diagnose({}, diag::cannot_import_header, header);
+    Impl.SwiftContext.Diags.diagnose({}, diag::bridging_header_missing, header);
     return;
   }
 
@@ -491,10 +496,11 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter) {
   importLine += "\"\n";
 
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
-    llvm::MemoryBuffer::getMemBufferCopy(importLine, "<import>")
+    llvm::MemoryBuffer::getMemBufferCopy(
+      importLine, Implementation::bridgingHeaderBufferName)
   };
 
-  Impl.importHeader(adapter, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, std::move(sourceBuffer));
 }
 
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,

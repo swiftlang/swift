@@ -46,8 +46,10 @@ NOTE(note_from_clang,none,none,
 ERROR(clang_cannot_build_module,none,Fatal,
   "could not build Objective-C module '%0'", (StringRef))
 
-ERROR(cannot_import_header,none,Fatal,
+ERROR(bridging_header_missing,none,Fatal,
   "bridging header '%0' does not exist", (StringRef))
+ERROR(bridging_header_error,none,Fatal,
+  "failed to import bridging header '%0'", (StringRef))
 WARNING(could_not_rewrite_bridging_header,none,none,
   "unknown error serializing bridging header; "
   "target may not be debuggable outside of its original project", ())

@@ -229,6 +229,9 @@ public:
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
 
+  constexpr static const char * const bridgingHeaderBufferName =
+    "<bridging-header-import>";
+
 private:
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
@@ -521,7 +524,7 @@ public:
   }
 
   /// Imports the given header contents into the Clang context.
-  void importHeader(Module *adapter,
+  void importHeader(Module *adapter, StringRef headerName,
                     std::unique_ptr<llvm::MemoryBuffer> contents);
 
   /// Returns the module \p D comes from, or \c Nothing if \p D does not have

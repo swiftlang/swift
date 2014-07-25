@@ -1,5 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: not %swift -parse %s -I %S/Inputs/broken-modules/ -module-cache-path %t -enable-source-import -show-diagnostics-after-fatal 2>&1 | FileCheck %s
+// RUN: not %swift -parse %s -I %S/Inputs/broken-modules/ -module-cache-path %t -enable-source-import -show-diagnostics-after-fatal 2>&1 | FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s
+// RUN: not %swift -parse %s -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -module-cache-path %t -enable-source-import 2>&1 | FileCheck -check-prefix CHECK-BRIDGING-HEADER -check-prefix CLANG-CHECK %s
 // RUN: not %swift -parse %s -import-objc-header %t/fake.h -module-cache-path %t 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
 // RUN: not %swift -parse %s -import-objc-header %S/../../Inputs/empty.swift -module-cache-path %t 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
 
@@ -23,12 +24,16 @@ import MissingDependencyFromClang
 // CHECK-NOT: no such module 'MissingDependencyFromClang'
 
 import BrokenClangModule
-// CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2:13: error: redefinition of 'conflict' as different kind of symbol
-// CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:1:5: note: previous definition is here
-// CHECK: a-fake-file.h:43:13: error: redefinition of 'conflict2' as different kind of symbol
-// CHECK: a-fake-file.h:42:5: note: previous definition is here
+// CLANG-CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2:13: error: redefinition of 'conflict' as different kind of symbol
+// CLANG-CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:1:5: note: previous definition is here
+// CLANG-CHECK: a-fake-file.h:43:13: error: redefinition of 'conflict2' as different kind of symbol
+// CLANG-CHECK: a-fake-file.h:42:5: note: previous definition is here
+// CLANG-CHECK: a-fake-file.h:46:5: error: expected identifier or '('
+// CLANG-CHECK: a-fake-file.h:45:11: note: expanded from macro 'I'
+
 // CHECK: error: could not build Objective-C module 'BrokenClangModule'
 // CHECK-NOT: no such module 'BrokenClangModule'
+// CHECK-BRIDGING-HEADER: error: failed to import bridging header '{{.*}}/BrokenClangModule.h'
 
 
 let _ = BrokenClangModule.x
