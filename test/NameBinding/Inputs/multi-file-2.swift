@@ -3,6 +3,10 @@
 import ambiguous_right
 import tilde_tilde_high_precedence
 
+class DefaultInit {
+  var x: DefaultInit! // = nil by default
+}
+
 func test2() {
   funcOrVar = 1
   var f: () -> () = funcOrVar // expected-error{{'Int' is not convertible to '() -> ()'}}

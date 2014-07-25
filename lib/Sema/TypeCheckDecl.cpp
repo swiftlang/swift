@@ -967,7 +967,8 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
     return isDefaultInitializable(named->getTypeRepr());
   
   // Optional types are default-initializable.
-  if (isa<OptionalTypeRepr>(typeRepr))
+  if (isa<OptionalTypeRepr>(typeRepr) ||
+      isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
     return true;
 
   // Tuple types are default-initializable if all of their element
