@@ -16,6 +16,9 @@ var singleValue: NSSingleOptions = .Value
 var minceAndQuince: NSRuncingOptions = .EnableMince & .EnableQuince
 var minceOrQuince: NSRuncingOptions = .EnableMince | .EnableQuince
 var noMince: NSRuncingOptions = ~NSRuncingOptions.EnableMince
+minceOrQuince &= noMince
+minceOrQuince |= minceAndQuince
+minceOrQuince ^= .EnableMince
 
 var minceValue: UInt = minceAndQuince.toRaw()
 var minceFromMask: NSRuncingOptions = .fromMask(0)

@@ -171,19 +171,34 @@ public protocol RawRepresentable {
 // RawOptionSetType without a circularity our type-checker can't yet handle.
 public protocol _RawOptionSetType: RawRepresentable {
   typealias Raw : BitwiseOperationsType, Equatable
+  // A non-failable version of RawRepresentable.fromRaw.
+  class func fromMask(raw: Raw) -> Self
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
-                                NilLiteralConvertible {
-  // A non-failable version of RawRepresentable.fromRaw.
-  class func fromMask(raw: Raw) -> Self
-
+public protocol RawOptionSetType
+: _RawOptionSetType, BooleanType, Equatable,
+    // BitwiseOperationsType,  // FIXME <rdar://problem/17815538> 
+    NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
   // implementations in protocols)
   // The Clang importer synthesizes these for imported NS_OPTIONS.
 
   /* class func fromRaw(raw: Raw) -> Self? { return fromMask(raw) } */
+}
+
+// FIXME These overloads can go away once <rdar://problem/17815538> is
+// handled.
+public func |= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
+  lhs = lhs | rhs
+}
+
+public func &= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
+  lhs = lhs | rhs
+}
+
+public func ^= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
+  lhs = lhs | rhs
 }
 
 /// Conforming to this protocol allows a type to be usable with the 'nil'
