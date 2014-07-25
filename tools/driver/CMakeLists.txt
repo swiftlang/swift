@@ -40,10 +40,3 @@ add_custom_command(TARGET swift POST_BUILD
     WORKING_DIRECTORY ${SWIFT_RUNTIME_OUTPUT_INTDIR})
 
 install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink swift swiftc WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)")
-
-# TODO: remove swifti after staging in the interactive driver changes
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink swift swifti
-    WORKING_DIRECTORY ${SWIFT_RUNTIME_OUTPUT_INTDIR})
-
-install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink swift swifti WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)")

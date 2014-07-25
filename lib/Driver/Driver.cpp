@@ -64,10 +64,8 @@ Driver::Driver(StringRef DriverExecutable,
   // The default driver kind is determined by Name.
   if (Name.find("swiftc") != std::string::npos) {
     driverKind = DriverKind::Batch;
-  } else if (Name.find("swifti") != std::string::npos) { // TODO: remove
-    driverKind = DriverKind::Interactive;
   } else {
-    driverKind = DriverKind::Legacy; // TODO: interactive
+    driverKind = DriverKind::Interactive;
   }
 }
 
@@ -474,43 +472,31 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   // By default, the driver does not link its output; this will be updated
   // appropariately below if linking is required.
 
-  switch (driverKind) {
-  case DriverKind::Batch:
-  case DriverKind::Legacy:
-    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_force_single_frontend_invocation))
-      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
-    OI.CompilerOutputType = types::TY_Object;
-    break;
-  case DriverKind::Interactive:
+  if (driverKind == DriverKind::Interactive) {
     OI.CompilerMode = OutputInfo::Mode::Immediate;
     if (Inputs.empty())
       OI.CompilerMode = OutputInfo::Mode::REPL;
     OI.CompilerOutputType = types::TY_Nothing;
-    break;
+
+  } else { // DriverKind::Batch
+    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
+    if (Args.hasArg(options::OPT_force_single_frontend_invocation))
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+    OI.CompilerOutputType = types::TY_Object;
   }
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
 
-  if (driverKind != DriverKind::Legacy && OutputModeArg) {
-    diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
-                          driverKind == DriverKind::Interactive, Name);
-  }
-
   if (!OutputModeArg) {
     if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
       OI.CompilerOutputType = types::TY_SwiftModuleFile;
-    } else if (driverKind == DriverKind::Legacy && Inputs.empty() &&
-               !Args.hasArg(options::OPT_v)) {
-      // No inputs and no mode arguments imply REPL mode
-      // (Treat -v as a mode, since -v and no other mode arguments means
-      // "print the version and exit".)
-      OI.CompilerOutputType = types::TY_Nothing;
-      OI.CompilerMode = OutputInfo::Mode::REPL;
     } else if (driverKind != DriverKind::Interactive) {
       OI.LinkAction = LinkKind::Executable;
     }
   } else {
+    diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
+                          driverKind == DriverKind::Interactive, Name);
+
     switch (OutputModeArg->getOption().getID()) {
     case options::OPT_emit_executable:
       OI.LinkAction = LinkKind::Executable;
@@ -1413,8 +1399,6 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
     ExcludedFlagsBitmask |= options::NoBatchOption;
-    break;
-  case DriverKind::Legacy:
     break;
   }
 

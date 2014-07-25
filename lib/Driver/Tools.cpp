@@ -398,10 +398,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  // In immediate mode, pass through any arguments following -i INPUT after --.
+  // With -i, pass through any arguments following -i INPUT after --.
   if (OI.CompilerMode == OutputInfo::Mode::Immediate) {
     Arg *A = Args.getLastArg(options::OPT_i);
-    // FIXME: pass through arguments with swifti
     if (A && A->getNumValues() > 1) {
       Arguments.push_back("--");
       Arguments.append(A->getValues().begin() + 1, A->getValues().end());

@@ -115,9 +115,8 @@ class Driver {
   /// DriverKind determines how later arguments are parsed, as well as the
   /// allowable OutputInfo::Mode values.
   enum class DriverKind {
-    Interactive, // swifti (will be 'swift' after staging)
-    Batch,       // swiftc
-    Legacy       // swift (will disappear after staging)
+    Interactive, // swift
+    Batch        // swiftc
   };
 
   DriverKind driverKind;
