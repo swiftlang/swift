@@ -186,6 +186,13 @@ public:
                                   IndirectionKind = DirectValue,
                                   ArtificialKind = RealValue);
 
+  /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
+  void emitDbgIntrinsic(llvm::BasicBlock *BB,
+                        llvm::Value* Storage, llvm::DIVariable Var,
+                        unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
+                        SILDebugScope *DS);
+
+
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
                                      StringRef LinkageName,

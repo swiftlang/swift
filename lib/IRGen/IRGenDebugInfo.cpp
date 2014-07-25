@@ -1112,19 +1112,34 @@ void IRGenDebugInfo::emitVariableDeclaration(
         createVariablePiece(Descriptor, OffsetInBytes, SizeInBytes);
       OffsetInBytes += SizeInBytes;
     }
-    auto Call = isa<llvm::AllocaInst>(Piece)
-                    ? DBuilder.insertDeclare(Piece, Var, BB)
-                    : DBuilder.insertDbgValueIntrinsic(Piece, 0, Var, BB);
+    emitDbgIntrinsic(BB, Piece, Var, Line, Loc.Col, Scope, DS);
+  }
 
-    // Set the location/scope of the intrinsic.
-    llvm::MDNode *InlinedAt = nullptr;
-    if (DS && DS->InlinedCallSite) {
-      assert(Scope && "Inlined location without a lexical scope");
-      InlinedAt = createInlinedAt(DS);
-    }
-    Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope, InlinedAt));
+  // Emit locationless intrinsic for variables that were optimized away.
+  if (Storage.size() == 0) {
+    auto undef = llvm::UndefValue::get(llvm::Type::getVoidTy(M.getContext()));
+    emitDbgIntrinsic(BB, undef, Descriptor, Line, Loc.Col, Scope, DS);
   }
 }
+
+void IRGenDebugInfo::
+emitDbgIntrinsic(llvm::BasicBlock *BB,
+                 llvm::Value* Storage, llvm::DIVariable Var,
+                 unsigned Line, unsigned Col, llvm::DIDescriptor Scope,
+                 SILDebugScope *DS) {
+  auto Call = (isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage))
+    ? DBuilder.insertDeclare(Storage, Var, BB)
+    : DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, BB);
+
+  // Set the location/scope of the intrinsic.
+  llvm::MDNode *InlinedAt = nullptr;
+  if (DS && DS->InlinedCallSite) {
+    assert(Scope && "Inlined location without a lexical scope");
+    InlinedAt = createInlinedAt(DS);
+  }
+  Call->setDebugLoc(llvm::DebugLoc::get(Line, Col, Scope, InlinedAt));
+}
+
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef Name,
