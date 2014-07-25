@@ -593,10 +593,6 @@ extern "C" void swift_instantiateObjCClass(Class c) {
   assert(registered == c
          && "objc_readClassPair failed to instantiate the class in-place");
   (void)registered;
-  
-  // objc_readClassPair does not preserve the "is Swift" bit in the rodata, so
-  // set it back.
-  ((ClassMetadata*)c)->Data |= 1;
 }
 
 extern "C" Class swift_getInitializedObjCClass(Class c) {
