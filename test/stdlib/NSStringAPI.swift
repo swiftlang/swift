@@ -1238,6 +1238,23 @@ let equalityTests = [
   // U+FB01 LATIN SMALL LIGATURE FI
   EqualityTest(true, "\u{fb01}", "\u{fb01}"),
   EqualityTest(false, "\u{fb01}", "fi"),
+
+  // Test that Unicode collation is performed in deterministic mode.
+  //
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+0341 COMBINING ACUTE TONE MARK
+  // U+0954 DEVANAGARI ACUTE ACCENT
+  //
+  // Collation elements from DUCET:
+  // 0301  ; [.0000.0024.0002] # COMBINING ACUTE ACCENT
+  // 0341  ; [.0000.0024.0002] # COMBINING ACUTE TONE MARK
+  // 0954  ; [.0000.0024.0002] # DEVANAGARI ACUTE ACCENT
+  //
+  // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
+  // U+0341 has a canonical decomposition mapping of U+0301.
+  EqualityTest(true, "\u{0301}", "\u{0341}"),
+  EqualityTest(false, "\u{0301}", "\u{0954}"),
+  EqualityTest(false, "\u{0341}", "\u{0954}"),
 ]
 
 NSStringAPIs.test("OperatorEquals") {

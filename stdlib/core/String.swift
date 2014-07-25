@@ -173,7 +173,13 @@ extension String {
   }
 }
 
-/// Compare two strings, normalizing them to NFD first.
+/// Compare two strings using the Unicode collation algorithm in the
+/// deterministic comparison mode.  (The strings which are equivalent according
+/// to their NFD form are considered equal.  Strings which are equivalent
+/// according to the plain Unicode collation algorithm are additionaly ordered
+/// based on their NFD.)
+///
+/// See Unicode Technical Standard #10.
 ///
 /// The behavior is equivalent to `NSString.compare()` with default options.
 ///
@@ -181,9 +187,10 @@ extension String {
 ///   * -1 if `lhs < rhs`,
 ///   * 0 if `lhs == rhs`,
 ///   * 1 if `lhs > rhs`.
-@asmname("swift_stdlib_compareNSStringNormalizingToNFD")
-func _stdlib_compareNSStringNormalizingToNFD(lhs: AnyObject, rhs: AnyObject)
-    -> Int
+@asmname("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
+public func _stdlib_compareNSStringDeterministicUnicodeCollation(
+  lhs: AnyObject, rhs: AnyObject
+)-> Int
 
 extension String: Equatable {
 }

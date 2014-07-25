@@ -93,8 +93,9 @@ extern "C" bool swift_stdlib_NSObject_isEqual(NSObject *lhs, NSObject *rhs) {
   return Result;
 }
 
-extern "C" int swift_stdlib_compareNSStringNormalizingToNFD(NSString *lhs,
-                                                            NSString *rhs) {
+extern "C" int
+swift_stdlib_compareNSStringDeterministicUnicodeCollation(NSString *lhs,
+                                                          NSString *rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
   int Result = CFStringCompare((__bridge CFStringRef)lhs,
                                (__bridge CFStringRef)rhs, kCFCompareNonliteral);
