@@ -31,6 +31,7 @@ const char *Action::getClassName(ActionClass AC) {
     case MergeModuleJob: return "merge-module";
     case REPLJob: return "repl";
     case LinkJob: return "link";
+    case GenerateDSYMJob: return "generate-dSYM";
   }
 
   llvm_unreachable("invalid class");
@@ -47,3 +48,5 @@ void MergeModuleJobAction::anchor() {}
 void REPLJobAction::anchor() {}
 
 void LinkJobAction::anchor() {}
+
+void GenerateDSYMJobAction::anchor() {}

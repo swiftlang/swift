@@ -27,6 +27,7 @@
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main4 -emit-module-path %t/main4.swiftmodule -g
 // RUN: ls %t/main4
 // RUN: ls %t/main4.swiftmodule
+// RUN: ls %t/main4.dSYM
 // RUN: ls %t/tmp | FileCheck -check-prefix=OBJECT-ONLY %s
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
@@ -34,11 +35,13 @@
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main5 -output-file-map %t.json -g
 // RUN: ls %t/main5
 // RUN: ls %t/main5.o
+// RUN: ls %t/main5.dSYM
 // RUN: ls %t/tmp | FileCheck -check-prefix=EMPTY %s
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main6 -g -save-temps
 // RUN: ls %t/main6
+// RUN: ls %t/main6.dSYM
 // RUN: ls %t/tmp | FileCheck -check-prefix=SAVE-TEMPS %s
 
 // SAVE-TEMPS-DAG: temp-files-{{.+}}.o

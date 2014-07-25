@@ -45,7 +45,7 @@ public:
 class LLVM_LIBRARY_VISIBILITY MergeModule : public Tool {
 public:
   explicit MergeModule(const ToolChain &TC)
-    : Tool("merge-module", "merge-module", TC) {}
+    : Tool("merge-module", TC) {}
 
   virtual bool hasGoodDiagnostics() const { return true; }
 
@@ -66,6 +66,18 @@ public:
   explicit LLDB(const ToolChain &TC) : Tool("LLDB", "LLDB REPL", TC), Bits() {}
 
   bool isPresentRelativeToDriver() const;
+
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            const OutputInfo &OI) const;
+};
+
+class LLVM_LIBRARY_VISIBILITY Dsymutil : public Tool {
+public:
+  explicit Dsymutil(const ToolChain &TC) : Tool("dsymutil", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,

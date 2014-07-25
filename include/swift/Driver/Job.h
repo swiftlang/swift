@@ -80,6 +80,8 @@ public:
   const_iterator begin() const { return Jobs.begin(); }
   iterator end() { return Jobs.end(); }
   const_iterator end() const { return Jobs.end(); }
+  Job *front() const { return Jobs.front(); }
+  Job *back() const { return Jobs.back(); }
 
   static bool classof(const Job *J) {
     return J->getKind() == JobListClass;

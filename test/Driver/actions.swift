@@ -38,6 +38,7 @@
 // DEBUG: 1: compile, {0}, object
 // DEBUG: 2: merge-module, {1}, swiftmodule
 // DEBUG: 3: link, {1, 2}, image
+// DEBUG: 4: generate-dSYM, {3}, dSYM
 
 // RUN: %swiftc_driver -driver-print-actions -g -c %s 2>&1 | FileCheck %s -check-prefix=DEBUG-OBJECT
 // DEBUG-OBJECT: 0: input, "{{.*}}actions.swift", swift
@@ -49,6 +50,7 @@
 // DEBUG-MODULE: 1: compile, {0}, object
 // DEBUG-MODULE: 2: merge-module, {1}, swiftmodule
 // DEBUG-MODULE: 3: link, {1, 2}, image
+// DEBUG-MODULE: 4: generate-dSYM, {3}, dSYM
 
 // RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | FileCheck %s -check-prefix=MULTI
 // MULTI: 0: input, "{{.*}}Inputs/main.swift", swift
@@ -68,6 +70,7 @@
 // DEBUG-MULTI: 5: compile, {4}, object
 // DEBUG-MULTI: 6: merge-module, {1, 3, 5}, swiftmodule
 // DEBUG-MULTI: 7: link, {1, 3, 5, 6}, image
+// DEBUG-MULTI: 8: generate-dSYM, {7}, dSYM
 
 
 // RUN: touch %t/a.o %t/b.o
@@ -84,3 +87,4 @@
 // DEBUG-LINK-ONLY: 3: input, "{{.*}}/b.swiftmodule", swiftmodule
 // DEBUG-LINK-ONLY: 4: merge-module, {0, 1, 2, 3}, swiftmodule
 // DEBUG-LINK-ONLY: 5: link, {0, 1, 2, 3, 4}, image
+// DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM

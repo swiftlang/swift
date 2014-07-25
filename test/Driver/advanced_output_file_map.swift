@@ -24,3 +24,4 @@
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}/Inputs/lib.swift"], output: {object: "/build/obj/lib.o", dependencies: "/build/d/lib.d", swiftmodule: "/build/swiftmodule/lib.swiftmodule", swiftdoc: "/build/swiftmodule/lib_x.swiftdoc", diagnostics: "/build/dia/lib.dia"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "merge-module", inputs: ["/build/obj/advanced_output_file_map.o", "/build/obj/main.o", "/build/obj/lib.o"], output: {swiftmodule: "/build/OutputFileMap.swiftmodule", swiftdoc: "/build/OutputFileMap.swiftdoc"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "darwin::Linker", inputs: ["/build/obj/advanced_output_file_map.o", "/build/obj/main.o", "/build/obj/lib.o", "/build/OutputFileMap.swiftmodule"], output: {image: "/build/advanced_output_file_map.out"}
+// BINDINGS: # "x86_64-apple-macosx10.9" - "dsymutil", inputs: ["/build/advanced_output_file_map.out"], output: {dSYM: "/build/advanced_output_file_map.out.dSYM"}

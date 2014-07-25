@@ -498,11 +498,35 @@ Job *LLDB::constructJob(const JobAction &JA,
     Exec = Path.c_str();
   } else {
     auto &TC = getToolChain();
-    Exec = Args.MakeArgString(TC.getDriver().getProgramPath("lldb", TC));
+    Exec = Args.MakeArgString(TC.getProgramPath("lldb"));
   }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
+}
+
+Job *Dsymutil::constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const ArgList &Args,
+                            const OutputInfo &OI) const {
+  assert(Inputs->size() == 1);
+  assert(InputActions.empty());
+  assert(Output->getPrimaryOutputType() == types::TY_dSYM);
+
+  ArgStringList Arguments;
+
+  auto inputJob = cast<Command>(Inputs->front());
+  StringRef inputPath = inputJob->getOutput().getPrimaryOutputFilename();
+  Arguments.push_back(Args.MakeArgString(inputPath));
+
+  Arguments.push_back("-o");
+  Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
+
+  std::string Exec = getToolChain().getProgramPath("dsymutil");
+  return new Command(JA, *this, std::move(Inputs), std::move(Output),
+                     Args.MakeArgString(Exec), Arguments);
 }
 
 /// Darwin Tools
@@ -664,7 +688,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
 
-  std::string Exec = D.getProgramPath("ld", getToolChain());
+  std::string Exec = getToolChain().getProgramPath("ld");
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output),
                      Args.MakeArgString(Exec), Arguments);

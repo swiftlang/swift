@@ -40,9 +40,10 @@ public:
     MergeModuleJob,
     REPLJob,
     LinkJob,
+    GenerateDSYMJob,
 
     JobFirst=CompileJob,
-    JobLast=LinkJob
+    JobLast=GenerateDSYMJob
   };
 
   static const char *getClassName(ActionClass AC);
@@ -154,6 +155,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::MergeModuleJob;
+  }
+};
+
+class GenerateDSYMJobAction : public JobAction {
+  virtual void anchor();
+public:
+  explicit GenerateDSYMJobAction(Action *Input)
+    : JobAction(Action::GenerateDSYMJob, Input, types::TY_dSYM) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::GenerateDSYMJob;
   }
 };
 

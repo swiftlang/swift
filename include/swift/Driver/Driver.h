@@ -263,12 +263,6 @@ public:
   /// \param ShowHidden Show hidden options.
   void printHelp(bool ShowHidden) const;
 
-  /// Look up \p Name in the list of program search paths.
-  ///
-  /// \param TC The provided tool chain for additional information on
-  /// directories to search.
-  std::string getProgramPath(StringRef Name, const ToolChain &TC) const;
-
 private:
   const ToolChain &getToolChain(const llvm::opt::ArgList &Args,
                                 StringRef DarwinArchName = "") const;

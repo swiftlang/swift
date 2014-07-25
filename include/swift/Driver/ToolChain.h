@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Types.h"
+#include "llvm/Support/Program.h"
 #include "llvm/ADT/Triple.h"
 
 #include <memory>
@@ -42,10 +43,13 @@ class ToolChain {
   mutable std::unique_ptr<Tool> MergeModule;
   mutable std::unique_ptr<Tool> LLDB;
   mutable std::unique_ptr<Tool> Linker;
+  mutable std::unique_ptr<Tool> Dsymutil;
+
   Tool *getSwift() const;
   Tool *getMergeModule() const;
   Tool *getLLDB() const;
   Tool *getLinker() const;
+  Tool *getDsymutil() const;
 
 protected:
   ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {}
@@ -69,6 +73,9 @@ public:
 
   /// Choose a tool to use to handle the action \p JA.
   virtual Tool *selectTool(const JobAction &JA) const;
+
+  /// Look up \p Name in the list of program search paths.
+  virtual std::string getProgramPath(StringRef Name) const;
 
   // Platform defaults information
 

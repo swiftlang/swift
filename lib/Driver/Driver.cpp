@@ -46,7 +46,6 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
@@ -796,6 +795,11 @@ void Driver::buildActions(const ToolChain &TC,
         Actions.push_back(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
+    if (OI.ShouldGenerateDebugInfo) {
+      Action *dSYMAction = new GenerateDSYMJobAction(LinkAction);
+      dSYMAction->setOwnsInputs(false);
+      Actions.push_back(dSYMAction);
+    }
   } else if (MergeModuleAction) {
     Actions.push_back(MergeModuleAction.release());
   } else {
@@ -855,11 +859,13 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
       types::ID Type = A->getType();
-      if (Type != types::TY_Nothing && Type != types::TY_SwiftModuleFile) {
+      if (Type != types::TY_Nothing && Type != types::TY_SwiftModuleFile &&
+          Type != types::TY_dSYM) {
         // Only increment NumOutputs if this is an output which must have its
         // path specified using -o.
         // (Module outputs can be specified using -module-output-path, or will
-        // be inferred if there are other top-level outputs.)
+        // be inferred if there are other top-level outputs. dSYM outputs are
+        // based on the image.)
         ++NumOutputs;
       }
     }
@@ -915,6 +921,7 @@ static StringRef getOutputFilename(const JobAction *JA,
                                    const llvm::opt::DerivedArgList &Args,
                                    bool AtTopLevel,
                                    StringRef BaseInput,
+                                   const JobList &InputJobs,
                                    DiagnosticEngine &Diags,
                                    llvm::SmallString<128> &Buffer) {
   if (JA->getType() == types::TY_Nothing)
@@ -952,6 +959,15 @@ static StringRef getOutputFilename(const JobAction *JA,
       llvm::sys::path::replace_extension(Buffer, SERIALIZED_MODULE_EXTENSION);
       return Buffer.str();
     }
+  }
+
+  // dSYM actions are never treated as top-level.
+  if (isa<GenerateDSYMJobAction>(JA)) {
+    auto linkJob = cast<Command>(InputJobs.front());
+    Buffer = linkJob->getOutput().getPrimaryOutputFilename();
+    Buffer.push_back('.');
+    Buffer.append(types::getTypeTempSuffix(JA->getType()));
+    return Buffer.str();
   }
 
   // We don't have an output from an Action-specific command line option,
@@ -1149,7 +1165,8 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   llvm::SmallString<128> Buf;
   StringRef OutputFile = getOutputFilename(JA, OI, OutputMap, C.getArgs(),
-                                           AtTopLevel, BaseInput, Diags, Buf);
+                                           AtTopLevel, BaseInput, *InputJobs,
+                                           Diags, Buf);
   std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType(),
                                                           OutputFile,
                                                           BaseInput));
@@ -1407,17 +1424,6 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
-}
-
-std::string Driver::getProgramPath(StringRef Name, const ToolChain &TC) const {
-  // TODO: perform ToolChain-specific lookup
-
-  std::string P(llvm::sys::FindProgramByName(Name));
-  if (!P.empty()) {
-    return P;
-  }
-
-  return Name;
 }
 
 static void setTargetFromArch(DiagnosticEngine &diags, llvm::Triple &target,

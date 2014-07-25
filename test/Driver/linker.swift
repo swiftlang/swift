@@ -46,3 +46,6 @@
 // DEBUG-NEXT: bin/ld{{ }}
 // DEBUG: -add_ast_path {{.*}}/{{[^/]+}}.swiftmodule
 // DEBUG: -o linker
+// DEBUG-NEXT: bin/dsymutil
+// DEBUG: linker
+// DEBUG: -o linker.dSYM

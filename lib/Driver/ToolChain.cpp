@@ -19,23 +19,23 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-Tool *ToolChain::getSwift() const {
-  if (!Swift)
-    Swift.reset(new tools::Swift(*this));
-  return Swift.get();
+template <typename T>
+static Tool *cacheTool(const ToolChain &TC,
+                       const std::unique_ptr<Tool> &tool) {
+  if (!tool)
+    const_cast<std::unique_ptr<Tool> &>(tool).reset(new T(TC));
+  return tool.get();
 }
 
-Tool *ToolChain::getMergeModule() const {
-  if (!MergeModule)
-    MergeModule.reset(new tools::MergeModule(*this));
-  return MergeModule.get();
+#define CACHE_TOOL(X) \
+Tool *ToolChain::get##X() const { \
+  return cacheTool<tools::X>(*this, X); \
 }
 
-Tool *ToolChain::getLLDB() const {
-  if (!LLDB)
-    LLDB.reset(new tools::LLDB(*this));
-  return LLDB.get();
-}
+CACHE_TOOL(Swift)
+CACHE_TOOL(MergeModule)
+CACHE_TOOL(LLDB)
+CACHE_TOOL(Dsymutil)
 
 Tool *ToolChain::getLinker() const {
   if (!Linker)
@@ -51,6 +51,8 @@ Tool *ToolChain::selectTool(const JobAction &JA) const {
     return getMergeModule();
   case Action::LinkJob:
     return getLinker();
+  case Action::GenerateDSYMJob:
+    return getDsymutil();
   case Action::REPLJob:
     switch (cast<REPLJobAction>(JA).getRequestedMode()) {
     case REPLJobAction::Mode::Integrated:
@@ -67,6 +69,16 @@ Tool *ToolChain::selectTool(const JobAction &JA) const {
   }
 
   llvm_unreachable("Invalid tool kind.");
+}
+
+std::string ToolChain::getProgramPath(StringRef Name) const {
+  // TODO: perform ToolChain-specific lookup
+
+  std::string P = llvm::sys::FindProgramByName(Name);
+  if (!P.empty())
+    return P;
+
+  return Name;
 }
 
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {

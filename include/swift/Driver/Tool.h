@@ -50,6 +50,8 @@ class Tool {
 public:
   Tool(StringRef Name, StringRef DiagName, const ToolChain &TC)
       : Name(Name), DiagName(DiagName), TheToolChain(TC) {}
+  Tool(StringRef Name, const ToolChain &TC)
+      : Tool(Name, Name, TC) {}
 
   virtual ~Tool() = default;
 
