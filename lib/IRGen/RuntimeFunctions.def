@@ -242,81 +242,90 @@ FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
-// type_metadata_t *swift_getBlockTypeMetadata(type_metadata_t *arg,
-//                                             type_metadata_t *result);
+// Metadata *swift_getBlockTypeMetadata(Metadata *arg, Metadata *result);
 FUNCTION(GetBlockMetadata, swift_getBlockTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getFunctionTypeMetadata(type_metadata_t *arg,
-//                                                type_metadata_t *result);
+// Metadata *swift_getFunctionTypeMetadata(Metadata *arg, Metadata *result);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getForeignTypeMetadata(type_metadata_t *nonUnique);
+// Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
 FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
-//                                           const void *arguments);
+// Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
+//                                    const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getGenericMetadata1(type_metadata_pattern_t *pattern,
-//                                            const void *arg0);
+// Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+//                                              const void * const *arguments,
+//                                              objc_class *superclass);
+FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
+         RuntimeCC, RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+// Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+//                                              const void * const *arguments);
+FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
+         RuntimeCC, RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// Metadata *swift_getGenericMetadata1(GenericMetadata *pattern,
+//                                     const void *arg0);
 FUNCTION(GetGenericMetadata1, swift_getGenericMetadata1, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getGenericMetadata2(type_metadata_pattern_t *pattern,
-//                                            const void *arg0,
-//                                            const void *arg1);
+// Metadata *swift_getGenericMetadata2(GenericMetadata *pattern,
+//                                     const void *arg0, const void *arg1);
 FUNCTION(GetGenericMetadata2, swift_getGenericMetadata2, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getGenericMetadata3(type_metadata_pattern_t *pattern,
-//                                            const void *arg0,
-//                                            const void *arg1,
-//                                            const void *arg2);
+// Metadata *swift_getGenericMetadata3(GenericMetadata *pattern,
+//                                     const void *arg0, const void *arg1,
+//                                     const void *arg2);
 FUNCTION(GetGenericMetadata3, swift_getGenericMetadata3, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getGenericMetadata4(type_metadata_pattern_t *pattern,
-//                                            const void *arg0,
-//                                            const void *arg1,
-//                                            const void *arg2,
-//                                            const void *arg3);
+// Metadata *swift_getGenericMetadata4(GenericMetadata *pattern,
+//                                     const void *arg0, const void *arg1,
+//                                     const void *arg2, const void *arg3);
 FUNCTION(GetGenericMetadata4, swift_getGenericMetadata4, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
+// Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getExistentialMetatypeMetadata(type_metadata_t *instanceTy);
+// Metadata *swift_getExistentialMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetExistentialMetatypeMetadata,
          swift_getExistentialMetatypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
+// Metadata *swift_getObjCClassMetadata(objc_class *theClass);
 FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(ObjCClassPtrTy),
@@ -327,38 +336,35 @@ FUNCTION(ObjCRespondsToSelector, swift_objcRespondsToSelector, C_CC,
          RETURNS(Int1Ty), ARGS(ObjCPtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getTupleTypeMetadata(size_t numElements,
-//                                             type_metadata_t * const *elts,
-//                                             const char *labels,
-//                                            value_witness_table_t *proposed);
+// Metadata *swift_getTupleTypeMetadata(size_t numElements,
+//                                      Metadata * const *elts,
+//                                      const char *labels,
+//                                      value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getTupleTypeMetadata2(type_metadata_t *elt0,
-//                                              type_metadata_t *elt1,
-//                                              const char *labels,
-//                                            value_witness_table_t *proposed);
+// Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
+//                                       const char *labels,
+//                                       value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getTupleTypeMetadata3(type_metadata_t *elt0,
-//                                              type_metadata_t *elt1,
-//                                              type_metadata_t *elt2,
-//                                              const char *labels,
-//                                            value_witness_table_t *proposed);
+// Metadata *swift_getTupleTypeMetadata3(Metadata *elt0, Metadata *elt1,
+//                                       Metadata *elt2, const char *labels,
+//                                       value_witness_table_t *proposed);
 FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getExistentialTypeMetadata(size_t numProtocols,
+// Metadata *swift_getExistentialTypeMetadata(size_t numProtocols,
 //                              const protocol_descriptor_t * const *protocols);
 FUNCTION(GetExistentialMetadata,
          swift_getExistentialTypeMetadata, RuntimeCC,
@@ -367,7 +373,7 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
-// const char *swift_getGenericClassObjCName(type_metadata_t *self,
+// const char *swift_getGenericClassObjCName(Metadata *self,
 //                                           const char *basename);
 FUNCTION(GetGenericClassObjCName,
          swift_getGenericClassObjCName, RuntimeCC,
@@ -375,11 +381,11 @@ FUNCTION(GetGenericClassObjCName,
          ARGS(TypeMetadataPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
-// void swift_initClassMetadata_UniversalStrategy(type_metadata_t *self,
-//                                          type_metadata_t *super,
-//                                          size_t numFields,
-//                                          type_metadata_t * const *fieldTypes,
-//                                          size_t *fieldOffsets);
+// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                Metadata *super,
+//                                                size_t numFields,
+//                                                Metadata * const *fieldTypes,
+//                                                size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, RuntimeCC,
          RETURNS(VoidTy),
@@ -389,9 +395,9 @@ FUNCTION(InitClassMetadataUniversal,
          ATTRS(NoUnwind))
 
 // void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-//                                     type_metadata_t * const *fieldTypes,
-//                                     size_t *fieldOffsets,
-//                                     value_witness_table_t *vwtable);
+//                                                 Metadata * const *fieldTypes,
+//                                                 size_t *fieldOffsets,
+//                                              value_witness_table_t *vwtable);
 FUNCTION(InitStructMetadataUniversal,
          swift_initStructMetadata_UniversalStrategy, RuntimeCC,
          RETURNS(VoidTy),
@@ -400,8 +406,8 @@ FUNCTION(InitStructMetadataUniversal,
          ATTRS(NoUnwind))
 
 // void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
-//                                                    type_metadata_t *payload,
-//                                                    unsigned num_empty_cases);
+//                                                   Metadata *payload,
+//                                                   unsigned num_empty_cases);
 FUNCTION(InitEnumValueWitnessTableSinglePayload,
          swift_initEnumValueWitnessTableSinglePayload,
          RuntimeCC,
@@ -409,9 +415,8 @@ FUNCTION(InitEnumValueWitnessTableSinglePayload,
          ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
-// int swift_getEnumCaseSinglePayload(opaque_t *obj,
-//                                     type_metadata_t *payload,
-//                                     unsigned num_empty_cases);
+// int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,
+//                                    unsigned num_empty_cases);
 FUNCTION(GetEnumCaseSinglePayload,
          swift_getEnumCaseSinglePayload,
          RuntimeCC,
@@ -419,10 +424,9 @@ FUNCTION(GetEnumCaseSinglePayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
-// void swift_storeEnumTagSinglePayload(opaque_t *obj,
-//                                       type_metadata_t *payload,
-//                                       int case_index,
-//                                       unsigned num_empty_cases);
+// void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
+//                                      int case_index,
+//                                      unsigned num_empty_cases);
 FUNCTION(StoreEnumTagSinglePayload,
          swift_storeEnumTagSinglePayload,
          RuntimeCC,
@@ -430,19 +434,19 @@ FUNCTION(StoreEnumTagSinglePayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
-// type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
+// Metadata *swift_staticTypeof(opaque_t *obj, Metadata *self);
 FUNCTION(StaticTypeof, swift_staticTypeof, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
+// Metadata *swift_objectTypeof(opaque_t *obj, Metadata *self);
 FUNCTION(ObjectTypeof, swift_objectTypeof, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
+// Metadata *swift_objcTypeof(opaque_t *obj, Metadata *self);
 FUNCTION(ObjCTypeof, swift_objcTypeof, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy),
@@ -457,7 +461,7 @@ FUNCTION(GetObjectClass, object_getClass, C_CC,
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// type_metadata_t *swift_getObjectType(id object);
+// Metadata *swift_getObjectType(id object);
 //
 // Since this is intended to look through dynamic subclasses, it's
 // invariant across reasonable isa-rewriting schemes and therefore can

@@ -4056,6 +4056,22 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
   }
 }
 
+/// Emit a single protocol witness table reference.
+llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
+                                        CanArchetypeType archetype,
+                                        ProtocolDecl *proto) {
+  assert(requiresProtocolWitnessTable(proto) &&
+         "looking up witness table for protocol that doesn't have one");
+
+  auto &archTI = getArchetypeInfo(IGF, archetype,
+                                  IGF.getTypeInfoForLowered(archetype));
+  ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
+  auto wtable = archTI.getWitnessTable(IGF, archetype,
+                                       path.getOriginIndex());
+  wtable = path.apply(IGF, wtable);
+  return wtable;
+}
+
 /// Emit the witness table references required for the given type
 /// substitution.
 void irgen::emitWitnessTableRefs(IRGenFunction &IGF,

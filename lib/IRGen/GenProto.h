@@ -167,6 +167,11 @@ namespace irgen {
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
                             SmallVectorImpl<llvm::Value *> &out);
 
+  /// Emit a witness table reference.
+  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
+                                   CanArchetypeType archetype,
+                                   ProtocolDecl *protocol);
+
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                                Address archetypeAddr,

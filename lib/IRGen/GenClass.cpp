@@ -541,16 +541,20 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  llvm::Value *metadata =
-    emitClassHeapMetadataRef(IGF, selfType.getSwiftRValueType(),
-                             /*allow uninitialized*/ objc);
+  auto classType = selfType.getSwiftRValueType();
 
   // If we need to use Objective-C allocation, do so.
   // If the root class isn't known to use the Swift allocator, we need
   // to call [self alloc].
   if (objc) {
+    llvm::Value *metadata =
+      emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
+                               /*allow uninitialized*/ true);
     return emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
   }
+
+  llvm::Value *metadata =
+    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata);
 
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   llvm::Value *size, *alignMask;

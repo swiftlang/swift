@@ -66,11 +66,19 @@ namespace irgen {
   llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                                  CanType type);
 
+  enum class MetadataValueType { ObjCClass, TypeMetadata };
+
   /// Emit a reference to the heap metadata for a class.
+  ///
+  /// \returns a value of type ObjCClassPtrTy or TypeMetadataPtrTy,
+  ///    depending on desiredType
   llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
+                                        MetadataValueType desiredType,
                                         bool allowUninitialized = false);
 
   /// Emit a reference to the (initialized) ObjC heap metadata for a class.
+  ///
+  /// \returns a value of type ObjCClassPtrTy
   llvm::Value *emitObjCHeapMetadataRef(IRGenFunction &IGF, ClassDecl *theClass,
                                        bool allowUninitialized = false);
 

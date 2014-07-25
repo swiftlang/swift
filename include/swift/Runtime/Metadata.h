@@ -1679,7 +1679,7 @@ struct ExistentialMetatypeMetadata : public Metadata {
 struct GenericMetadata {
   /// The fill function. Receives a pointer to the instantiated metadata and
   /// the argument pointer passed to swift_getGenericMetadata.
-  void (*FillFunction)(void *metadata, const void *arguments);
+  Metadata *(*CreateFunction)(GenericMetadata *pattern, const void *arguments);
   
   /// The size of the template in bytes.
   uint32_t MetadataSize;
@@ -1747,6 +1747,17 @@ swift_getGenericMetadata4(GenericMetadata *pattern,
                           const void *arg1,
                           const void *arg2,
                           const void *arg3);
+
+// Callback to allocate a generic class metadata object.
+extern "C" ClassMetadata *
+swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+                                   const void *arguments,
+                                   ClassMetadata *superclass);
+
+// Callback to allocate a generic struct/enum metadata object.
+extern "C" Metadata *
+swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+                                   const void *arguments);
   
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *

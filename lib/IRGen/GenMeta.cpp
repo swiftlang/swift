@@ -135,6 +135,43 @@ namespace {
   };
 }
 
+/// Given an array of polymorphic arguments as might be set up by
+/// GenericArguments, bind the polymorphic parameters.
+static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
+                                               const GenericParamList &generics,
+                                               Address array) {
+  unsigned nextIndex = 0;
+  auto claimNext = [&](llvm::PointerType *desiredType) {
+    Address addr = array;
+    if (unsigned index = nextIndex++) {
+      addr = IGF.Builder.CreateConstArrayGEP(array, index,
+                                             index * IGF.IGM.getPointerSize());
+    }
+    llvm::Value *value = IGF.Builder.CreateLoad(addr);
+    return IGF.Builder.CreateBitCast(value, desiredType);
+  };
+
+  // Bind all the argument archetypes.
+  for (auto archetype : generics.getAllArchetypes()) {
+    llvm::Value *metadata = claimNext(IGF.IGM.TypeMetadataPtrTy);
+    metadata->setName(archetype->getFullName());
+    IGF.setUnscopedLocalTypeData(CanType(archetype), LocalTypeData::Metatype,
+                                 metadata);
+  }
+
+  // Bind all the argument witness tables.
+  for (auto archetype : generics.getAllArchetypes()) {
+    unsigned nextProtocolIndex = 0;
+    for (auto protocol : archetype->getConformsTo()) {
+      if (!requiresProtocolWitnessTable(protocol))
+        continue;
+      LocalTypeData key = (LocalTypeData) nextProtocolIndex++;
+      llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
+      IGF.setUnscopedLocalTypeData(CanType(archetype), key, wtable);
+    }
+  }
+}
+
 static bool isMetadataIndirect(IRGenModule &IGM, NominalTypeDecl *theDecl) {
   // FIXME
   return false;
@@ -874,6 +911,7 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(SILType type) {
 /// class, but for Objective-C-defined types, this is the class
 /// object.
 llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
+                                             MetadataValueType desiredType,
                                              bool allowUninitialized) {
   assert(isa<ClassType>(type) || isa<BoundGenericClassType>(type));
 
@@ -881,14 +919,23 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
 
   if (auto classType = dyn_cast<ClassType>(type)) {
     auto theClass = classType->getDecl();
-    if (hasKnownSwiftMetadata(IGF.IGM, theClass))
-      return IGF.emitTypeMetadataRef(classType);
-    return emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
+    if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
+      llvm::Value *result =
+        emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
+      if (desiredType == MetadataValueType::TypeMetadata)
+        result = IGF.Builder.CreateBitCast(result, IGF.IGM.TypeMetadataPtrTy);
+      return result;
+    }
+  } else {
+    auto genericType = cast<BoundGenericClassType>(type);
+    assert(hasKnownSwiftMetadata(IGF.IGM, genericType->getDecl()));
+    (void) genericType;
   }
 
-  auto classType = cast<BoundGenericClassType>(type);
-  assert(hasKnownSwiftMetadata(IGF.IGM, classType->getDecl()));
-  return IGF.emitTypeMetadataRef(classType);
+  llvm::Value *result = IGF.emitTypeMetadataRef(type);
+  if (desiredType == MetadataValueType::ObjCClass)
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.ObjCClassPtrTy);
+  return result;
 }
 
 namespace {
@@ -945,7 +992,8 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
     break;
 
   case MetatypeRepresentation::ObjC:
-    explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType()));
+    explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType(),
+                                           MetadataValueType::ObjCClass));
     break;
   }
 }
@@ -1720,11 +1768,9 @@ namespace {
     unsigned NumGenericWitnesses = 0;
 
     struct FillOp {
-      Size FromOffset;
+      CanArchetypeType Archetype;
+      ProtocolDecl *Protocol;
       Size ToOffset;
-
-      FillOp() = default;
-      FillOp(Size from, Size to) : FromOffset(from), ToOffset(to) {}
     };
 
     SmallVector<FillOp, 8> FillOps;
@@ -1759,46 +1805,51 @@ namespace {
                                T &&...args)
       : super(IGM, std::forward<T>(args)...), ClassGenerics(generics) {}
 
-    /// Emit the fill function for the template.
-    llvm::Function *emitFillFunction() {
-      // void (*FillFunction)(void*, const void*)
-      llvm::Type *argTys[] = {IGM.Int8PtrTy, IGM.Int8PtrTy};
-      auto ty = llvm::FunctionType::get(IGM.VoidTy, argTys, /*isVarArg*/ false);
+    /// Emit the create function for the template.
+    llvm::Function *emitCreateFunction() {
+      // Metadata *(*CreateFunction)(GenericMetadata*, const void * const *)
+      llvm::Type *argTys[] = {IGM.TypeMetadataPatternPtrTy, IGM.Int8PtrPtrTy};
+      auto ty = llvm::FunctionType::get(IGM.TypeMetadataPtrTy,
+                                        argTys, /*isVarArg*/ false);
       llvm::Function *f = llvm::Function::Create(ty,
                                            llvm::GlobalValue::InternalLinkage,
-                                           "fill_generic_metadata",
+                                           "create_generic_metadata",
                                            &IGM.Module);
       
       IRGenFunction IGF(IGM, f);
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+      Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+      llvm::Value *metadataPattern = params.claimNext();
+      llvm::Value *args = params.claimNext();
+
+      // Bind the generic arguments.
+      auto &generics = *super::Target->getGenericParamsOfContext();
+      Address argsArray(args, IGM.getPointerAlignment());
+      emitPolymorphicParametersFromArray(IGF, generics, argsArray);
+
+      // Allocate the metadata.
+      llvm::Value *metadataValue =
+        asImpl().emitAllocateMetadata(IGF, metadataPattern, args);
       
       // Execute the fill ops. Cast the parameters to word pointers because the
       // fill indexes are word-indexed.
-      Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
-      llvm::Value *fullMeta = params.claimNext();
-      llvm::Value *args = params.claimNext();
-      
-      Address fullMetaWords(IGF.Builder.CreateBitCast(fullMeta,
-                                                   IGM.SizeTy->getPointerTo()),
-                            Alignment(IGM.getPointerAlignment()));
-      Address argWords(IGF.Builder.CreateBitCast(args,
-                                                 IGM.SizeTy->getPointerTo()),
-                       Alignment(IGM.getPointerAlignment()));
+      Address metadataWords(IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy),
+                            IGM.getPointerAlignment());
       
       for (auto &fillOp : FillOps) {
-        auto dest = createPointerSizedGEP(IGF, fullMetaWords, fillOp.ToOffset);
-        auto src = createPointerSizedGEP(IGF, argWords, fillOp.FromOffset);
-        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(src), dest);
+        llvm::Value *value;
+        if (fillOp.Protocol) {
+          value = emitWitnessTableRef(IGF, fillOp.Archetype, fillOp.Protocol);
+        } else {
+          value = IGF.getLocalTypeData(fillOp.Archetype, LocalTypeData::Metatype);
+        }
+        value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
+        auto dest = createPointerSizedGEP(IGF, metadataWords,
+                                          fillOp.ToOffset - AddressPoint);
+        IGF.Builder.CreateStore(value, dest);
       }
-      
-      // Derive the metadata value.
-      auto addressPointAddr =
-        createPointerSizedGEP(IGF, fullMetaWords, AddressPoint);
-
-      llvm::Value *metadataValue
-        = IGF.Builder.CreateBitCast(addressPointAddr.getAddress(),
-                                    IGF.IGM.TypeMetadataPtrTy);
       
       // Initialize the instantiated dependent value witness table, if we have
       // one.
@@ -1809,16 +1860,15 @@ namespace {
         
         // Fill in the pointer from the metadata to the VWT. The VWT pointer
         // always immediately precedes the address point.
-        auto vwtAddr = createPointerSizedGEP(IGF, fullMetaWords,
-                                             DependentVWTPoint);
-        auto vwtAddrVal = IGF.Builder.CreatePtrToInt(vwtAddr.getAddress(),
-                                                     IGM.SizeTy);
-        auto vwtRefAddr = createPointerSizedGEP(IGF, fullMetaWords,
-                                        AddressPoint - IGM.getPointerSize());
-        IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
-
+        auto vwtAddr = createPointerSizedGEP(IGF, metadataWords,
+                                             DependentVWTPoint - AddressPoint);
         vwtableValue = IGF.Builder.CreateBitCast(vwtAddr.getAddress(),
                                                  IGF.IGM.WitnessTablePtrTy);
+
+        auto vwtAddrVal = IGF.Builder.CreateBitCast(vwtableValue, IGM.Int8PtrTy);
+        auto vwtRefAddr = createPointerSizedGEP(IGF, metadataWords,
+                                                Size(0) - IGM.getPointerSize());
+        IGF.Builder.CreateStore(vwtAddrVal, vwtRefAddr);
         
         HasDependentMetadata = true;
       }
@@ -1828,7 +1878,7 @@ namespace {
       }
       
       // The metadata is now complete.
-      IGF.Builder.CreateRetVoid();
+      IGF.Builder.CreateRet(metadataValue);
       
       return f;
     }
@@ -1862,8 +1912,8 @@ namespace {
       auto headerFields =
         this->claimReservation(header, TemplateHeaderFieldCount);
 
-      //   void (*FillFunction)(void *, const void*);
-      headerFields[Field++] = emitFillFunction();
+      //   Metadata *(*CreateFunction)(GenericMetadata *, const void*);
+      headerFields[Field++] = emitCreateFunction();
       
       //   uint32_t MetadataSize;
       // We compute this assuming that every entry in the metadata table
@@ -1903,16 +1953,16 @@ namespace {
 
     template <class... T>
     void addGenericArgument(ArchetypeType *type, T &&...args) {
-      FillOps.push_back(FillOp(NumGenericWitnesses++ * IGM.getPointerSize(),
-                               getNextOffset()));
+      NumGenericWitnesses++;
+      FillOps.push_back({ CanArchetypeType(type), nullptr, getNextOffset() });
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
 
     template <class... T>
     void addGenericWitnessTable(ArchetypeType *type, ProtocolDecl *protocol,
                                 T &&...args) {
-      FillOps.push_back(FillOp(NumGenericWitnesses++ * IGM.getPointerSize(),
-                               getNextOffset()));
+      NumGenericWitnesses++;
+      FillOps.push_back({ CanArchetypeType(type), protocol, getNextOffset() });
       super::addGenericWitnessTable(type, protocol, std::forward<T>(args)...);
     }
     
@@ -2291,6 +2341,27 @@ namespace {
         HasDependentSuperclass = true;
       }
     }
+
+    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                      llvm::Value *metadataPattern,
+                                      llvm::Value *arguments) {
+      llvm::Value *superMetadata;
+      if (Target->hasSuperclass()) {
+        Type superclass = Target->getSuperclass();
+        superclass = ArchetypeBuilder::mapTypeIntoContext(Target, superclass);
+        superMetadata =
+          emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
+                                   MetadataValueType::ObjCClass);
+      } else if (IGM.ObjCInterop) {
+        superMetadata = emitObjCHeapMetadataRef(IGF, IGM.getSwiftRootClass());
+      } else {
+        superMetadata
+          = llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy);
+      }
+
+      return IGF.Builder.CreateCall3(IGM.getAllocateGenericClassMetadataFn(),
+                                     metadataPattern, arguments, superMetadata);
+    }
     
     void addMetadataFlags() {
       // The metaclass pointer will be instantiated here.
@@ -2300,8 +2371,9 @@ namespace {
     
     void addClassDataPointer() {
       // The rodata pointer will be instantiated here.
+      // Make sure we at least set the 'is Swift class' bit, though.
       ClassRODataPtrOffset = getNextOffset();
-      addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+      addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 1));
     }
     
     void addDependentData() {
@@ -2412,10 +2484,6 @@ namespace {
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
-      emitPolymorphicParametersForGenericValueWitness(IGF,
-                                                      Target,
-                                                      metadata);
-      
       assert(!HasDependentVWT && "class should never have dependent VWT");
       
       // Fill in the metaclass pointer.
@@ -2491,36 +2559,28 @@ namespace {
       // Get the superclass metadata.
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
-        Type superclassTy
-          = ArchetypeBuilder::mapTypeIntoContext(Target,
-                                                 Target->getSuperclass());
-
-        superMetadata = IGF.emitTypeMetadataRef(
-                          superclassTy->getCanonicalType());
+        Address superField
+          = emitAddressOfSuperclassRefInClassMetadata(IGF, Target, metadata);
+        superMetadata = IGF.Builder.CreateLoad(superField);
       } else {
         assert(!HasDependentSuperclass
                && "dependent superclass without superclass?!");
         superMetadata
           = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
       }
-      
-      // If the superclass is generic, populate the superclass fields of the
-      // class and metaclass.
+
+      // If the superclass is generic, we need to populate the
+      // superclass field of the metaclass.
       if (HasDependentSuperclass) {
-        Address superField
-          = emitAddressOfSuperclassRefInClassMetadata(IGF,Target,metadata);
-        IGF.Builder.CreateStore(superMetadata, superField);
-        
         // The superclass of the metaclass is the metaclass of the superclass.
         Address metaSuperField
-          = emitAddressOfSuperclassRefInClassMetadata(IGF,Target,metaclass);
-        metaSuperField = IGF.Builder.CreateBitCast(metaSuperField,
-                                           IGM.ObjCClassPtrTy->getPointerTo());
-        llvm::Value *superMetaMetadata
-          = IGF.Builder.CreateStructGEP(metaclass, 0);
-        superMetaMetadata = IGF.Builder.CreateLoad(superMetaMetadata,
-                                                   IGM.getPointerAlignment());
-        IGF.Builder.CreateStore(superMetaMetadata, metaSuperField);
+          = emitAddressOfSuperclassRefInClassMetadata(IGF, Target, metaclass);
+
+        Address superMetaField(IGF.Builder.CreateBitCast(superMetadata,
+                                      IGM.TypeMetadataPtrTy->getPointerTo()),
+                               IGM.getPointerAlignment());
+        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(superMetaField),
+                                metaSuperField);
       }
       
       // If we have any ancestor generic parameters or field offset vectors,
@@ -3546,6 +3606,13 @@ namespace {
                                 const GenericParamList &structGenerics)
       : super(IGM, structGenerics, theStruct) {}
 
+    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                      llvm::Value *metadataPattern,
+                                      llvm::Value *arguments) {
+      return IGF.Builder.CreateCall2(IGM.getAllocateGenericValueMetadataFn(),
+                                     metadataPattern, arguments);
+    }
+
     void addValueWitnessTable() {
       addWord(getValueWitnessTableForGenericValueType(IGM, Target,
                                                       HasDependentVWT));
@@ -3563,7 +3630,6 @@ namespace {
     void emitInitializeMetadata(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 llvm::Value *vwtable) {
-      emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
       IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
         .initializeMetadata(IGF, metadata, vwtable,
                             Target->getDeclaredTypeInContext()
@@ -3663,6 +3729,13 @@ public:
   GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
                               const GenericParamList &enumGenerics)
     : GenericMetadataBuilderBase(IGM, enumGenerics, theEnum) {}
+
+  llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                    llvm::Value *metadataPattern,
+                                    llvm::Value *arguments) {
+    return IGF.Builder.CreateCall2(IGM.getAllocateGenericValueMetadataFn(),
+                                   metadataPattern, arguments);
+  }
   
   void addValueWitnessTable() {
     addWord(getValueWitnessTableForGenericValueType(IGM, Target,
@@ -3681,7 +3754,6 @@ public:
   void emitInitializeMetadata(IRGenFunction &IGF,
                               llvm::Value *metadata,
                               llvm::Value *vwtable) {
-    emitPolymorphicParametersForGenericValueWitness(IGF, Target, metadata);
     IGM.getTypeInfoForLowered(CanType(Target->getDeclaredTypeInContext()))
       .initializeMetadata(IGF, metadata, vwtable,
                           Target->getDeclaredTypeInContext()

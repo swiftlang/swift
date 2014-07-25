@@ -256,7 +256,8 @@ llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
   case MetatypeRepresentation::ObjC: {
     // Get the ObjC metadata for the type we're checking.
-    toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType());
+    toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
+                                          MetadataValueType::ObjCClass);
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();

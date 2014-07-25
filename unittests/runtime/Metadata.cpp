@@ -31,12 +31,14 @@ struct GenericMetadataTest {
 GenericMetadataTest<3> MetadataTest1 = {
   // Header
   {
-    // fill function
-    [](void *metadata, const void *args) {
+    // allocation function
+    [](GenericMetadata *pattern, const void *args) {
+      auto metadata = swift_allocateGenericValueMetadata(pattern, args);
       auto metadataWords = reinterpret_cast<const void**>(metadata);
       auto argsWords = reinterpret_cast<const void* const*>(args);
       metadataWords[0] = argsWords[0];
       metadataWords[2] = argsWords[0];
+      return metadata;
     },
     3 * sizeof(void*), // metadata size
     1, // num arguments

@@ -7,7 +7,7 @@
 // CHECK: [[D:%C13generic_types1D]] = type
 
 // CHECK: @_TMPdC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
-// CHECK:   void (i8*, i8*)* [[A_METADATA_FILL:@[a-z0-9_]+]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
 // CHECK:   i32 312,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
@@ -18,7 +18,7 @@
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
-// CHECK:   i64 0,
+// CHECK:   i64 1,
 // CHECK:   i32 0,
 // CHECK:   i32 0,
 // CHECK:   i32 24,
@@ -31,7 +31,7 @@
 // CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcU__fMGS0_Q__FT1ySi_GS0_Q__
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
-// CHECK:   void (i8*, i8*)* [[B_METADATA_FILL:@[a-z0-9_]+]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_]+]],
 // CHECK:   i32 304,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
@@ -42,7 +42,7 @@
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
-// CHECK:   i64 0,
+// CHECK:   i64 1,
 // CHECK:   i32 0,
 // CHECK:   i32 0,
 // CHECK:   i32 24,
@@ -59,7 +59,7 @@
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
-// CHECK:   i64 0,
+// CHECK:   i64 1,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1D = global [[D_METADATA_T:{.*\* } }]] {
@@ -69,30 +69,34 @@
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
-// CHECK:   i64 0,
+// CHECK:   i64 1,
 // CHECK:   void (i64, [[D]]*)* @_TFC13generic_types1D3run
 // CHECK: }
 
-// CHECK: define internal void [[A_METADATA_FILL]](i8*, i8*) {
+// CHECK: define internal %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
-// CHECK:   [[METADATA_ADDR:%.*]] = bitcast i8* %0 to i64*
-// CHECK:   [[ARG_ADDR:%.*]] = bitcast i8* %1 to i64*
-// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 11
-// CHECK:   [[ARG_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[ARG_ADDR]], i32 0
-// CHECK:   [[ARG:%.*]] = load i64* [[ARG_SLOT_ADDR]], align 8
-// CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8
-// CHECK:   ret void
+// CHECK:   [[T0:%.*]] = load i8** %1
+// CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
+// CHECK:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
+// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 9
+// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
+// CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// CHECK: define internal void [[B_METADATA_FILL]](i8*, i8*) {
+// CHECK: define internal %swift.type* [[B_METADATA_CREATE]](%swift.type_pattern*, i8**) {
 // CHECK: entry:
-// CHECK:   [[METADATA_ADDR:%.*]] = bitcast i8* %0 to i64*
-// CHECK:   [[ARG_ADDR:%.*]] = bitcast i8* %1 to i64*
-// CHECK:   [[METADATA_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 11
-// CHECK:   [[ARG_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[ARG_ADDR]], i32 0
-// CHECK:   [[ARG:%.*]] = load i64* [[ARG_SLOT_ADDR]], align 8
-// CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8
-// CHECK:   ret void
+// CHECK:   [[T0:%.*]] = load i8** %1
+// CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
+// CHECK:   [[SUPER:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
+// CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
+// CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8** [[SELF_ARRAY]], i32 9
+// CHECK:   store i8* [[T0]], i8** [[T1]], align 8
+// CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
 class A<T> {

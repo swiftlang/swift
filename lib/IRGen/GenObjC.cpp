@@ -476,6 +476,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   llvm::Value *searchValue;
   if (isInstanceMethod) {
     searchValue = emitClassHeapMetadataRef(IGF, searchClass.getSwiftRValueType(),
+                                           MetadataValueType::ObjCClass,
                                            /*allow uninitialized*/ true);
   } else {
     ClassDecl *searchClassDecl =
@@ -484,7 +485,6 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
                                                    NotForDefinition);
   }
-  searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
   
   // Store the receiver and class to the struct.
   llvm::Value *selfIndices[2] = {

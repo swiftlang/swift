@@ -67,7 +67,7 @@ import Builtin
 // CHECK: }
 
 // CHECK: @_TMPdO20enum_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
-// CHECK:   void (i8*, i8*)* @{{[a-z0-9_]+}},
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @{{[a-z0-9_]+}},
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [8 x i8*] zeroinitializer,
 // CHECK:   i8** getelementptr inbounds ([20 x i8*]* @_TWVO20enum_value_semantics18GenericFixedLayout, i32 0, i32 0),

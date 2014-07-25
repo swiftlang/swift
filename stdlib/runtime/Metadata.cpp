@@ -24,6 +24,7 @@
 #include <new>
 #include <mutex>
 #include <cctype>
+#include <dispatch/dispatch.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -40,10 +41,15 @@ using namespace metadataimpl;
 namespace {
   template <class Entry> class MetadataCache;
 
-  /// A CRTP class for defining entries in a metadata cache.
-  template <class Impl> class alignas(void*) CacheEntry {
+  template <class Impl>
+  struct CacheEntryHeader {
+    /// LLDB walks this list.
     const Impl *Next;
-    friend class MetadataCache<Impl>;
+  };
+
+  /// A CRTP class for defining entries in a metadata cache.
+  template <class Impl, class Header = CacheEntryHeader<Impl> >
+  class alignas(void*) CacheEntry : public Header {
 
     CacheEntry(const CacheEntry &other) = delete;
     void operator=(const CacheEntry &other) = delete;
@@ -52,11 +58,9 @@ namespace {
     const Impl *asImpl() const { return static_cast<const Impl*>(this); }
 
   protected:
-    CacheEntry(unsigned NumArguments) : NumArguments(NumArguments) {}
+    CacheEntry() = default;
 
   public:
-    const unsigned NumArguments;
-    
     static Impl *allocate(const void * const *arguments,
                           size_t numArguments, size_t payloadSize) {
       void *buffer = operator new(sizeof(Impl)  +
@@ -73,10 +77,11 @@ namespace {
     }
 
     void **getArgumentsBuffer() {
-      return reinterpret_cast<void**>(this) - NumArguments;
+      return reinterpret_cast<void**>(this) - asImpl()->getNumArguments();
     }
     void * const *getArgumentsBuffer() const {
-      return reinterpret_cast<void * const*>(this) - NumArguments;
+      return reinterpret_cast<void * const *>(this)
+               - asImpl()->getNumArguments();
     }
 
     template <class T> T *getData() {
@@ -164,57 +169,78 @@ namespace llvm {
 }
 
 namespace {
-  /// A CacheEntry implementation where the entries in the cache may
-  /// have different numbers of arguments.
-  class HeterogeneousCacheEntry : public CacheEntry<HeterogeneousCacheEntry> {
-  public:
-    HeterogeneousCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
-  };
-
-  /// A CacheEntry implementation where all the entries in the cache
-  /// have the same number of arguments.
-  class HomogeneousCacheEntry : public CacheEntry<HomogeneousCacheEntry> {
-  public:
-    HomogeneousCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+  struct MetadataCacheLock {
+    std::mutex Mutex;
+    std::condition_variable Queue;
   };
 
   /// The implementation of a metadata cache.  Note that all-zero must
   /// be a valid state for the cache.
   template <class Entry> class MetadataCache {
     /// Thread safety
-    std::mutex *mutex;
+    MetadataCacheLock *Lock;
 
     /// The head of a linked list connecting all the metadata cache entries.
     /// TODO: Remove this when LLDB is able to understand the final data
     /// structure for the metadata cache.
     const Entry *Head;
+
+    enum class EntryState : uint8_t { Complete, Building, BuildingWithWaiters };
     
     /// The lookup table for cached entries.
+    ///
+    /// The EntryRef may be to temporary memory lacking a full backing
+    /// Entry unless the value is Complete.  However, if there is an
+    /// entry with a non-Complete value, there will eventually be a
+    /// notification to the lock's queue.
+    ///
     /// TODO: Consider a more tuned hashtable implementation.
-    llvm::DenseMap<EntryRef<Entry>, bool> Entries;
+    llvm::DenseMap<EntryRef<Entry>, EntryState> Entries;
 
   public:
-    // Compiler generated generic clases do not call the constructor
-    void lazyInit() {
-      if (mutex == nullptr) {
-        new (this) MetadataCache();
-      }
+    MetadataCache() : Lock(new MetadataCacheLock()) {
     }
-    MetadataCache() : mutex(new std::mutex()) {
-      assert(mutex);
-    }
-    ~MetadataCache() { delete mutex; }
-    /// Mutexes are not copyable
+    ~MetadataCache() { delete Lock; }
+
+    /// Caches are not copyable.
     MetadataCache(const MetadataCache &other) = delete;
-    MetadataCache &operator =(MetadataCache other) = delete;
-    /// Try to find an existing entry in this cache.
-    const Entry *find(const void * const *arguments, size_t numArguments) const{
-      std::lock_guard<std::mutex> lock(*mutex);
-      auto found
-        = Entries.find(EntryRef<Entry>::forArguments(arguments, numArguments));
-      if (found == Entries.end())
-        return nullptr;
-      return found->first.getEntry();
+    MetadataCache &operator=(const MetadataCache &other) = delete;
+
+    /// Try to find an existing entry in this cache.  If this returns
+    /// null, it is the caller's responsibility to eventually call add.
+    const Entry *find(const void * const *arguments, size_t numArguments) {
+      std::unique_lock<std::mutex> lockGuard(Lock->Mutex);
+
+      auto key = EntryRef<Entry>::forArguments(arguments, numArguments);
+
+      // Try to insert 'false' as the map value.  Note that this is
+      // inserting
+      auto found = Entries.insert({key, EntryState::Building});
+
+      // If that succeeded, we're in charge of creating the entry now.
+      if (found.second) return nullptr;
+
+      // If it failed, there's an existing entry.
+      auto it = found.first;
+
+      // Wait until the entry's state goes to Complete.
+      while (it->second != EntryState::Complete) {
+        // Make sure the adder knows to notify us.
+        it->second = EntryState::BuildingWithWaiters;
+
+        // Wait.
+        Lock->Queue.wait(lockGuard);
+
+        // Don't trust the existing iterator.
+        it = Entries.find(key);
+        assert(it != Entries.end());
+
+        // We need to check again because (1) wait() is allowed to
+        // return spuriously and (2) we share one condition variable
+        // for all the entries.
+      }
+
+      return it->first.getEntry();
     }
 
     /// Add the given entry to the cache, taking responsibility for
@@ -222,36 +248,108 @@ namespace {
     /// the same as the argument if we lost a race to instantiate it.
     /// Regardless, the argument should be considered potentially
     /// invalid after this call.
-    ///
-    /// FIXME: locking!
     const Entry *add(Entry *entry) {
-      std::lock_guard<std::mutex> lock(*mutex);
+      // Grab the lock.
+      std::unique_lock<std::mutex> lockGuard(Lock->Mutex);
+
       // Maintain the linked list.
-      /// TODO: Remove this when LLDB is able to understand the final data
-      /// structure for the metadata cache.
+      // TODO: Remove this when LLDB is able to understand the final data
+      // structure for the metadata cache.
       entry->Next = Head;
       Head = entry;
-      
-      Entries[EntryRef<Entry>::forEntry(entry, entry->NumArguments)]
-        = true;
+
+      // Find the existing entry, which should always exist.
+      auto key = EntryRef<Entry>::forEntry(entry, entry->getNumArguments());
+      auto it = Entries.find(key);
+      assert(it != Entries.end());
+
+      // The existing key is a reference to the (probably stack-based)
+      // arguments array, so overwrite it.  Maps don't normally allow
+      // their keys to be overwritten, and doing so isn't officially
+      // allowed, but supposedly it is unofficially guaranteed to
+      // work, at least with the standard containers.
+      const_cast<EntryRef<Entry>&>(it->first) = key;
+
+      assert(it->second != EntryState::Complete);
+      bool shouldNotify = (it->second == EntryState::BuildingWithWaiters);
+      it->second = EntryState::Complete;
+
+      // Drop the lock before notifying the queue.
+      lockGuard.unlock();
+
+      // Notify anybody who was waiting for us (or really, anybody who
+      // was waiting on the queue at all).
+      if (shouldNotify)
+        Lock->Queue.notify_all();
+
       return entry;
+    }
+  };
+
+  /// A template for lazily-constructed, zero-initialized global objects.
+  template <class T> class Lazy {
+    T Value;
+    dispatch_once_t OnceToken;
+
+  public:
+    T &get() {
+      dispatch_once_f(&OnceToken, this, lazyInitCallback);
+      return Value;
+    }
+
+  private:
+    static void lazyInitCallback(void *argument) {
+      auto self = reinterpret_cast<Lazy*>(argument);
+      ::new (&self->Value) T();
     }
   };
 }
 
-typedef HomogeneousCacheEntry GenericCacheEntry;
-typedef MetadataCache<GenericCacheEntry> GenericMetadataCache; 
+namespace {
+  struct GenericCacheEntry;
+
+  // The cache entries in a generic cache are laid out like this:
+  struct GenericCacheEntryHeader : CacheEntry<GenericCacheEntry> {
+    const Metadata *Value;
+    size_t NumArguments;
+  };
+
+  struct GenericCacheEntry
+      : CacheEntry<GenericCacheEntry, GenericCacheEntryHeader> {
+    GenericCacheEntry(unsigned numArguments) {
+      NumArguments = numArguments;
+    }
+
+    size_t getNumArguments() const { return NumArguments; }
+
+    static GenericCacheEntry *getFromMetadata(GenericMetadata *pattern,
+                                              Metadata *metadata) {
+      char *bytes = (char*) metadata;
+      if (auto classType = dyn_cast<ClassMetadata>(metadata)) {
+        assert(classType->isTypeMetadata());
+        bytes -= classType->getClassAddressPoint();
+      } else {
+        bytes -= pattern->AddressPoint;
+      }
+      bytes -= sizeof(GenericCacheEntry);
+      return reinterpret_cast<GenericCacheEntry*>(bytes);
+    }
+  };
+}
+
+using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
+using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
 
 /// Fetch the metadata cache for a generic metadata structure.
 static GenericMetadataCache &getCache(GenericMetadata *metadata) {
   // Keep this assert even if you change the representation above.
-  static_assert(sizeof(GenericMetadataCache) <=
+  static_assert(sizeof(LazyGenericMetadataCache) <=
                 sizeof(GenericMetadata::PrivateData),
                 "metadata cache is larger than the allowed space");
 
-  auto value = reinterpret_cast<GenericMetadataCache*>(metadata->PrivateData);
-  value->lazyInit();
-  return *value;
+  auto lazyCache =
+    reinterpret_cast<LazyGenericMetadataCache*>(metadata->PrivateData);
+  return lazyCache->get();
 }
 
 template <class T>
@@ -259,32 +357,88 @@ static const T *adjustAddressPoint(const T *raw, uint32_t offset) {
   return reinterpret_cast<const T*>(reinterpret_cast<const char*>(raw) + offset);
 }
 
-static const Metadata *
-instantiateGenericMetadata(GenericMetadata *pattern,
-                           const void *arguments) {
-  size_t numGenericArguments = pattern->NumKeyArguments;
+ClassMetadata *
+swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+                                          const void *arguments,
+                                          ClassMetadata *superclass) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
+  size_t numGenericArguments = pattern->NumKeyArguments;
 
-  // Allocate the new entry.
-  auto entry = GenericCacheEntry::allocate(argumentsAsArray,
-                                           numGenericArguments,
-                                           pattern->MetadataSize);
+  // Right now, we only worry about there being a difference in prefix matter.
+  size_t metadataSize = pattern->MetadataSize;
+  size_t prefixSize = pattern->AddressPoint;
+  size_t extraPrefixSize = 0;
+  if (superclass && superclass->isTypeMetadata()) {
+    if (superclass->getClassAddressPoint() > prefixSize) {
+      extraPrefixSize = (superclass->getClassAddressPoint() - prefixSize);
+      prefixSize += extraPrefixSize;
+      metadataSize += extraPrefixSize;
+    }
+  }
+  assert(metadataSize == pattern->MetadataSize + extraPrefixSize);
+  assert(prefixSize == pattern->AddressPoint + extraPrefixSize);
 
-  // Initialize the metadata by copying the template.
-  auto fullMetadata = entry->getData<Metadata>();
-  memcpy(fullMetadata, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  char *bytes = GenericCacheEntry::allocate(argumentsAsArray,
+                                            numGenericArguments,
+                                            metadataSize)->getData<char>();
 
-  // Fill in the missing spaces from the arguments using the pattern's fill
-  // function.
-  pattern->FillFunction(fullMetadata, arguments);
+  // Copy any extra prefix bytes in from the superclass.
+  if (extraPrefixSize) {
+    memcpy(bytes, (const char*) superclass - prefixSize, extraPrefixSize);
+    bytes += extraPrefixSize;
+  }
 
-  // The metadata is now valid.
+  // Copy in the metadata template.
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
 
-  // Add the cache to the list.  This can in theory be made thread-safe,
-  // but really this should use a non-linear lookup algorithm.
-  auto canonFullMetadata =
-    getCache(pattern).add(entry)->getData<Metadata>();
-  return adjustAddressPoint(canonFullMetadata, pattern->AddressPoint);
+  // Okay, move to the address point.
+  bytes += pattern->AddressPoint;
+  ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
+  assert(metadata->isTypeMetadata());
+
+  // Overwrite the superclass field.
+  metadata->SuperClass = superclass;
+
+  // Adjust the class object extents.
+  if (extraPrefixSize) {
+    metadata->setClassSize(metadata->getClassSize() + extraPrefixSize);
+    metadata->setClassAddressPoint(prefixSize);
+  }
+  assert(metadata->getClassAddressPoint() == prefixSize);
+
+  return metadata;
+}
+
+Metadata *
+swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+                                          const void *arguments) {
+  void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
+  size_t numGenericArguments = pattern->NumKeyArguments;
+
+  char *bytes =
+    GenericCacheEntry::allocate(argumentsAsArray, numGenericArguments,
+                                pattern->MetadataSize)->getData<char>();
+
+  // Copy in the metadata template.
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
+
+  // Okay, move to the address point.
+  bytes += pattern->AddressPoint;
+  Metadata *metadata = reinterpret_cast<Metadata*>(bytes);
+  return metadata;
+}
+
+static const Metadata *
+instantiateGenericMetadata(GenericMetadata *pattern, const void *arguments) {
+  // Create the metadata.
+  Metadata *metadata = pattern->CreateFunction(pattern, arguments);
+
+  // The metadata is now valid.  Add to the cache list.
+  auto entry = GenericCacheEntry::getFromMetadata(pattern, metadata);
+  entry->Value = metadata;
+
+  auto canonFullMetadata = getCache(pattern).add(entry)->Value;
+  return canonFullMetadata;
 }
 
 /// The primary entrypoint.
@@ -363,7 +517,11 @@ namespace {
     FullMetadata<ObjCClassWrapperMetadata> Metadata;
 
   public:
-    ObjCClassCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+    ObjCClassCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 1;
+    }
 
     FullMetadata<ObjCClassWrapperMetadata> *getData() {
       return &Metadata;
@@ -406,7 +564,11 @@ namespace {
     FullMetadata<FunctionTypeMetadata> Metadata;
 
   public:
-    FunctionCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+    FunctionCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 2;
+    }    
 
     FullMetadata<FunctionTypeMetadata> *getData() {
       return &Metadata;
@@ -470,17 +632,26 @@ swift::swift_getBlockTypeMetadata(const Metadata *argMetadata,
 /*** Tuples ****************************************************************/
 
 namespace {
-  class TupleCacheEntry : public CacheEntry<TupleCacheEntry> {
+  class TupleCacheEntry;
+  struct TupleCacheEntryHeader : CacheEntryHeader<TupleCacheEntry> {
+    size_t NumArguments;
+  };
+  class TupleCacheEntry
+    : public CacheEntry<TupleCacheEntry, TupleCacheEntryHeader> {
   public:
     // NOTE: if you change the layout of this type, you'll also need
     // to update tuple_getValueWitnesses().
     ExtraInhabitantsValueWitnessTable Witnesses;
     FullMetadata<TupleTypeMetadata> Metadata;
 
-    TupleCacheEntry(size_t numArguments) : CacheEntry(numArguments) {
-      Metadata.NumElements = numArguments;
+    TupleCacheEntry(size_t numArguments) {
+      NumArguments = numArguments;
     }
     
+    size_t getNumArguments() const {
+      return Metadata.NumElements;
+    }
+
     FullMetadata<TupleTypeMetadata> *getData() {
       return &Metadata;
     }
@@ -1126,7 +1297,11 @@ namespace {
     FullMetadata<MetatypeMetadata> Metadata;
 
   public:
-    MetatypeCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+    MetatypeCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 1;
+    }
 
     FullMetadata<MetatypeMetadata> *getData() {
       return &Metadata;
@@ -1188,7 +1363,11 @@ namespace {
     FullMetadata<ExistentialMetatypeMetadata> Metadata;
 
   public:
-    ExistentialMetatypeCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+    ExistentialMetatypeCacheEntry(size_t numArguments) {}
+
+    static constexpr size_t getNumArguments() {
+      return 1;
+    }
 
     FullMetadata<ExistentialMetatypeMetadata> *getData() {
       return &Metadata;
@@ -1248,8 +1427,12 @@ namespace {
   public:
     FullMetadata<ExistentialTypeMetadata> Metadata;
 
-    ExistentialCacheEntry(size_t numArguments) : CacheEntry(numArguments) {
+    ExistentialCacheEntry(size_t numArguments) {
       Metadata.Protocols.NumProtocols = numArguments;
+    }
+
+    size_t getNumArguments() const {
+      return Metadata.Protocols.NumProtocols;
     }
 
     FullMetadata<ExistentialTypeMetadata> *getData() {
