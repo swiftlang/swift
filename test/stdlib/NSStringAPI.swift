@@ -1138,14 +1138,167 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   // FIXME
 }
 
-func checkEqualityImpl(
-  expectedEqualNFD: Bool, lhs: String, rhs: String,
-  stackTrace: SourceLocStack
+enum ExpectedComparisonResult {
+  case LT, EQ, GT
+
+  func isLT() -> Bool {
+    return self == .LT
+  }
+
+  func isEQ() -> Bool {
+    return self == .EQ
+  }
+
+  func isGT() -> Bool {
+    return self == .GT
+  }
+
+  func isLE() -> Bool {
+    return isLT() || isEQ()
+  }
+
+  func isGE() -> Bool {
+    return isGT() || isEQ()
+  }
+
+  func isNE() -> Bool {
+    return !isEQ()
+  }
+
+  func flip() -> ExpectedComparisonResult {
+    switch self {
+    case .LT:
+      return .GT
+    case .EQ:
+      return .EQ
+    case .GT:
+      return .LT
+    }
+  }
+}
+
+struct ComparisonTest {
+  let expectedUnicodeCollation: ExpectedComparisonResult
+  let lhs: String
+  let rhs: String
+  let loc: SourceLoc
+
+  init(
+    _ expectedUnicodeCollation: ExpectedComparisonResult,
+    _ lhs: String, _ rhs: String,
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.expectedUnicodeCollation = expectedUnicodeCollation
+    self.lhs = lhs
+    self.rhs = rhs
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let comparisonTests = [
+  ComparisonTest(.EQ, "", ""),
+  ComparisonTest(.LT, "", "a"),
+
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
+  ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
+  ComparisonTest(.LT, "a", "a\u{301}"),
+  ComparisonTest(.LT, "a", "\u{e1}"),
+
+  // U+304B HIRAGANA LETTER KA
+  // U+304C HIRAGANA LETTER GA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  ComparisonTest(.EQ, "\u{304b}", "\u{304b}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}\u{3099}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304b}\u{3099}"),
+  ComparisonTest(.LT, "\u{304c}", "\u{304c}\u{3099}"),
+
+  // U+212B ANGSTROM SIGN
+  // U+030A COMBINING RING ABOVE
+  // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
+  ComparisonTest(.EQ, "\u{212b}", "A\u{30a}"),
+  ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
+  ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
+  ComparisonTest(.LT, "A\u{30a}", "a"),
+
+  // U+2126 OHM SIGN
+  // U+03A9 GREEK CAPITAL LETTER OMEGA
+  ComparisonTest(.EQ, "\u{2126}", "\u{03a9}"),
+
+  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
+  // U+0323 COMBINING DOT BELOW
+  // U+0307 COMBINING DOT ABOVE
+  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{307}\u{323}"),
+  ComparisonTest(.EQ, "\u{1e69}", "\u{1e63}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+
+  // U+FB01 LATIN SMALL LIGATURE FI
+  ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
+  ComparisonTest(.LT, "fi", "\u{fb01}"),
+
+  // Test that Unicode collation is performed in deterministic mode.
+  //
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+0341 COMBINING ACUTE TONE MARK
+  // U+0954 DEVANAGARI ACUTE ACCENT
+  //
+  // Collation elements from DUCET:
+  // 0301  ; [.0000.0024.0002] # COMBINING ACUTE ACCENT
+  // 0341  ; [.0000.0024.0002] # COMBINING ACUTE TONE MARK
+  // 0954  ; [.0000.0024.0002] # DEVANAGARI ACUTE ACCENT
+  //
+  // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
+  // U+0341 has a canonical decomposition mapping of U+0301.
+  ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
+  ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
+  ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
+]
+
+func checkComparable<T : Comparable>(
+  expected: ExpectedComparisonResult,
+  lhs: T, rhs: T, stackTrace: SourceLocStack
+) {
+  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+}
+
+func checkCharacterComparisonImpl(
+  expected: ExpectedComparisonResult,
+  lhs: Character, rhs: Character, stackTrace: SourceLocStack
+) {
+  // Character / Character
+  expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
+  expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
+  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
+
+  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
+}
+
+func checkStringComparisonImpl(
+  expected: ExpectedComparisonResult,
+  lhs: String, rhs: String, stackTrace: SourceLocStack
 ) {
   // String / String
-  expectEqual(expectedEqualNFD, lhs == rhs, stackTrace: stackTrace)
-  expectEqual(!expectedEqualNFD, lhs != rhs, stackTrace: stackTrace)
-  checkHashable(expectedEqualNFD, lhs, rhs, stackTrace.withCurrentLoc())
+  expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
+  expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
+  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
+
+  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
 
   // NSString / NSString
   let lhsNSString = lhs as NSString
@@ -1162,105 +1315,53 @@ func checkEqualityImpl(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace.withCurrentLoc())
 
+  // Test mixed comparisons.  Currently we rely on implicit bridging for these
+  // operators to work.
+
   // String / NSString
-  expectEqual(expectedEqualNFD, lhs == rhsNSString, stackTrace: stackTrace)
-  expectEqual(!expectedEqualNFD, lhs != rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isEQ(), lhs == rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isNE(), lhs != rhsNSString, stackTrace: stackTrace)
+
+  expectEqual(expected.isLT(), lhs < rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhsNSString, stackTrace: stackTrace)
 
   // NSString / String
-  expectEqual(expectedEqualNFD, lhs == rhsNSString, stackTrace: stackTrace)
-  expectEqual(!expectedEqualNFD, lhs != rhsNSString, stackTrace: stackTrace)
+  expectEqual(expected.isEQ(), lhsNSString == rhs, stackTrace: stackTrace)
+  expectEqual(expected.isNE(), lhsNSString != rhs, stackTrace: stackTrace)
+
+  expectEqual(expected.isLT(), lhsNSString < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhsNSString <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhsNSString >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhsNSString > rhs, stackTrace: stackTrace)
 }
 
-func checkEquality(
-  expectedEqualNFD: Bool, lhs: String, rhs: String, stackTrace: SourceLocStack
+func checkComparison(
+  expectedUnicodeCollation: ExpectedComparisonResult,
+  lhs: String, rhs: String, stackTrace: SourceLocStack
 ) {
-  checkEqualityImpl(expectedEqualNFD, lhs, rhs, stackTrace.withCurrentLoc())
-  checkEqualityImpl(expectedEqualNFD, rhs, lhs, stackTrace.withCurrentLoc())
-}
+  checkStringComparisonImpl(
+    expectedUnicodeCollation, lhs, rhs, stackTrace.withCurrentLoc())
+  checkStringComparisonImpl(
+    expectedUnicodeCollation.flip(), rhs, lhs, stackTrace.withCurrentLoc())
 
-struct EqualityTest {
-  let expectedEqualNFD: Bool
-  let lhs: String
-  let rhs: String
-  let loc: SourceLoc
-
-  init(_ expectedEqualNFD: Bool, _ lhs: String, _ rhs: String,
-       file: String = __FILE__, line: UWord = __LINE__) {
-    self.expectedEqualNFD = expectedEqualNFD
-    self.lhs = lhs
-    self.rhs = rhs
-    self.loc = SourceLoc(file, line, comment: "test data")
+  if countElements(lhs) == 1 && countElements(rhs) == 1 {
+    let lhsCharacter = Character(lhs)
+    let rhsCharacter = Character(rhs)
+    checkCharacterComparisonImpl(
+      expectedUnicodeCollation, lhsCharacter, rhsCharacter,
+      stackTrace.withCurrentLoc())
+    checkCharacterComparisonImpl(
+      expectedUnicodeCollation.flip(), rhsCharacter, lhsCharacter,
+      stackTrace.withCurrentLoc())
   }
 }
 
-let equalityTests = [
-  EqualityTest(true, "", ""),
-  EqualityTest(false, "a", ""),
-
-  // U+0301 COMBINING ACUTE ACCENT
-  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
-  EqualityTest(true, "a\u{301}", "\u{e1}"),
-  EqualityTest(false, "a\u{301}", "a"),
-  EqualityTest(false, "\u{e1}", "a"),
-
-  // U+304B HIRAGANA LETTER KA
-  // U+304C HIRAGANA LETTER GA
-  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
-  EqualityTest(true, "\u{304b}", "\u{304b}"),
-  EqualityTest(true, "\u{304c}", "\u{304c}"),
-  EqualityTest(false, "\u{304b}", "\u{304c}"),
-  EqualityTest(false, "\u{304b}", "\u{304c}\u{3099}"),
-  EqualityTest(true, "\u{304c}", "\u{304b}\u{3099}"),
-  EqualityTest(false, "\u{304c}", "\u{304c}\u{3099}"),
-
-  // U+212B ANGSTROM SIGN
-  // U+030A COMBINING RING ABOVE
-  // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
-  EqualityTest(true, "\u{212b}", "A\u{30a}"),
-  EqualityTest(true, "\u{212b}", "\u{c5}"),
-  EqualityTest(true, "A\u{30a}", "\u{c5}"),
-  EqualityTest(false, "A\u{30a}", "a"),
-
-  // U+2126 OHM SIGN
-  // U+03A9 GREEK CAPITAL LETTER OMEGA
-  EqualityTest(true, "\u{2126}", "\u{03a9}"),
-
-  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
-  // U+0323 COMBINING DOT BELOW
-  // U+0307 COMBINING DOT ABOVE
-  // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
-  EqualityTest(true, "\u{1e69}", "s\u{323}\u{307}"),
-  EqualityTest(true, "\u{1e69}", "s\u{307}\u{323}"),
-  EqualityTest(true, "\u{1e69}", "\u{1e63}\u{307}"),
-  EqualityTest(true, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
-  EqualityTest(true, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
-
-  // U+FB01 LATIN SMALL LIGATURE FI
-  EqualityTest(true, "\u{fb01}", "\u{fb01}"),
-  EqualityTest(false, "\u{fb01}", "fi"),
-
-  // Test that Unicode collation is performed in deterministic mode.
-  //
-  // U+0301 COMBINING ACUTE ACCENT
-  // U+0341 COMBINING ACUTE TONE MARK
-  // U+0954 DEVANAGARI ACUTE ACCENT
-  //
-  // Collation elements from DUCET:
-  // 0301  ; [.0000.0024.0002] # COMBINING ACUTE ACCENT
-  // 0341  ; [.0000.0024.0002] # COMBINING ACUTE TONE MARK
-  // 0954  ; [.0000.0024.0002] # DEVANAGARI ACUTE ACCENT
-  //
-  // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
-  // U+0341 has a canonical decomposition mapping of U+0301.
-  EqualityTest(true, "\u{0301}", "\u{0341}"),
-  EqualityTest(false, "\u{0301}", "\u{0954}"),
-  EqualityTest(false, "\u{0341}", "\u{0954}"),
-]
-
 NSStringAPIs.test("OperatorEquals") {
-  for test in equalityTests {
-    checkEquality(
-      test.expectedEqualNFD, test.lhs, test.rhs, test.loc.withCurrentLoc())
+  for test in comparisonTests {
+    checkComparison(
+      test.expectedUnicodeCollation, test.lhs, test.rhs, test.loc.withCurrentLoc())
   }
 }
 

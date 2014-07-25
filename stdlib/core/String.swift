@@ -184,13 +184,13 @@ extension String {
 /// The behavior is equivalent to `NSString.compare()` with default options.
 ///
 /// :returns:
-///   * -1 if `lhs < rhs`,
-///   * 0 if `lhs == rhs`,
-///   * 1 if `lhs > rhs`.
+///   * an unspecified value less than zero if `lhs < rhs`,
+///   * zero if `lhs == rhs`,
+///   * an unspecified value greater than zero  if `lhs > rhs`.
 @asmname("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
   lhs: AnyObject, rhs: AnyObject
-)-> Int
+)-> Int32
 
 extension String: Equatable {
 }
@@ -202,11 +202,12 @@ public func ==(lhs: String, rhs: String) -> Bool {
     lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) == 0
 }
 
+extension String : Comparable {
+}
+
 public func <(lhs: String, rhs: String) -> Bool {
-  // FIXME: Does lexicographical ordering on component UnicodeScalars,
-  // but should eventually do a proper unicode String collation.  See
-  // the comment on == for more information.
-  return lexicographicalCompare(lhs.unicodeScalars, rhs.unicodeScalars)
+  return _stdlib_compareNSStringDeterministicUnicodeCollation(
+    lhs._bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()) < 0
 }
 
 // Support for copy-on-write

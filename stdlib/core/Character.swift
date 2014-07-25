@@ -24,7 +24,7 @@ internal struct IntEncoder : SinkType {
 /// segmentation algorithm.
 public enum Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
-  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable {
+  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -135,3 +135,8 @@ public func ==(lhs: Character, rhs: Character) -> Bool {
   return String(lhs) == String(rhs)
 }
 
+public func <(lhs: Character, rhs: Character) -> Bool {
+  // FIXME(performance): constructing two temporary strings is extremely
+  // wasteful and inefficient.
+  return String(lhs) < String(rhs)
+}

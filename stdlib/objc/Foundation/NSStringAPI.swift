@@ -1434,13 +1434,3 @@ extension String {
   }
 }
 
-@transparent public
-func == (lhs: String, rhs: NSString) -> Bool {
-  return lhs == (rhs as String)
-}
-
-@transparent public
-func == (lhs: NSString, rhs: String) -> Bool {
-  return (lhs as String) == rhs
-}
-
