@@ -36,7 +36,6 @@ GenericMetadataTest<3> MetadataTest1 = {
       auto metadata = swift_allocateGenericValueMetadata(pattern, args);
       auto metadataWords = reinterpret_cast<const void**>(metadata);
       auto argsWords = reinterpret_cast<const void* const*>(args);
-      metadataWords[0] = argsWords[0];
       metadataWords[2] = argsWords[0];
       return metadata;
     },
@@ -48,7 +47,7 @@ GenericMetadataTest<3> MetadataTest1 = {
 
   // Fields
   {
-    nullptr,
+    (void*) MetadataKind::Struct,
     &Global1,
     nullptr
   }
@@ -64,7 +63,7 @@ TEST(MetadataTest, getGenericMetadata) {
   ASSERT_EQ(inst1a, inst1b);
 
   void * const *fields = reinterpret_cast<void * const *>(inst1a);
-  ASSERT_EQ(&Global2, fields[0]);
+  ASSERT_EQ((void*) MetadataKind::Struct, fields[0]);
   ASSERT_EQ(&Global1, fields[1]);
   ASSERT_EQ(&Global2, fields[2]);
 
@@ -75,7 +74,7 @@ TEST(MetadataTest, getGenericMetadata) {
   ASSERT_NE(inst1a, inst2a);
 
   fields = reinterpret_cast<void * const *>(inst2a);
-  ASSERT_EQ(&Global3, fields[0]);
+  ASSERT_EQ((void*) MetadataKind::Struct, fields[0]);
   ASSERT_EQ(&Global1, fields[1]);
   ASSERT_EQ(&Global3, fields[2]);
 }
