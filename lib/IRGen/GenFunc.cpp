@@ -2123,14 +2123,16 @@ void CallEmission::emitToExplosion(Explosion &out) {
     if (auto origArchetype = dyn_cast<ArchetypeType>(origResultType)) {
       if (origArchetype->requiresClass()) {
         // Remap a class archetype to an instance.
-        assert((substResultType.getClassOrBoundGenericClass() ||
-                isClassArchetype(substResultType)) &&
+        assert(substResultType.hasReferenceSemantics() &&
                "remapping class archetype to non-class?!");
+        auto schema = substResultTI.getSchema(getCallee().getExplosionLevel());
+        assert(schema.size() == 1 && schema.begin()->isScalar()
+               && "remapping class archetype to non-single-scalar");
         Explosion temp(getCallee().getExplosionLevel());
         emitToUnmappedExplosion(temp);
         llvm::Value *pointer = temp.claimNext();
         pointer = IGF.Builder.CreateBitCast(pointer,
-                                            substResultTI.getStorageType());
+                                            schema.begin()->getScalarType());
         out.add(pointer);
         return;
       }
