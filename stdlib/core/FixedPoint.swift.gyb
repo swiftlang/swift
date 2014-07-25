@@ -263,6 +263,14 @@ extension ${Self} : Printable {
   }
 }
 
+// When ${Self} is used as an index, there are always bounds---more
+// restrictive than the full range of ${Self}---against which we're
+// not able to check.  Overflows are not useful indicators of
+// precondition violations in this context.  Therefore, we use masked
+// arithmetic in this conformance, and we need to be be sure that
+// generic implementations of the arithmetic operators for
+// RandomAccessIndexType's are all shadowed by more-specific
+// implementations that *do* check for overflows.
 @transparent
 extension ${Self} : RandomAccessIndexType {
   // HACK: Disable indexing and slicing Ranges of IntegerType types
@@ -272,23 +280,25 @@ extension ${Self} : RandomAccessIndexType {
   
   @transparent public
   func successor() -> ${Self} {
-    return self + 1
+    return self &+ 1
   }
   @transparent public
   func predecessor() -> ${Self} {
-    return self - 1
+    return self &- 1
   }
   
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self}.Distance {
-    return numericCast((numericCast(other) as IntMax) - numericCast(self))
+    return numericCast((numericCast(other) as IntMax) &- numericCast(self))
   }
   
   @transparent public
   func advancedBy(amount: ${Self}.Distance) -> ${Self} {
-    return numericCast((numericCast(self) as IntMax) + numericCast(amount))
+    return numericCast((numericCast(self) as IntMax) &+ numericCast(amount))
   }
+}
 
+extension ${Self} {
 % for Method,op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
   @transparent public
   static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
@@ -494,27 +504,27 @@ func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
 // operations (tracked by <rdar://problem/17692569>).
 @transparent
 public prefix func ++ (inout x: ${Self}) -> ${Self} {
-  x = x.successor()
+  x = x + 1
   return x
 }
 
 @transparent
 public postfix func ++ (inout x: ${Self}) -> ${Self} {
   var ret = x
-  x = x.successor()
+  x = x + 1
   return ret
 }
 
 @transparent
 public prefix func -- (inout x: ${Self}) -> ${Self} {
-  x = x.predecessor()
+  x = x - 1
   return x
 }
 
 @transparent
 public postfix func -- (inout x: ${Self}) -> ${Self} {
   var ret = x
-  x = x.predecessor()
+  x = x - 1
   return ret
 }
 
