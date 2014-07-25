@@ -240,18 +240,18 @@ enum myCoolEnum {
 }
 
 class C10 {
-  init(withInt: Int, andThis: Float) {}
+  init(int: Int, andThis: Float) {}
   func meth(x: Int, withFloat: Float) {}
 }
 
-// CHECK: var <Var>c10</Var> = <Ctor@[[@LINE-4]]:3-Class@[[@LINE-5]]:7>C10</Ctor>(<Ctor@[[@LINE-4]]:3>withInt</Ctor>: 0, <Ctor@[[@LINE-4]]:3>andThis</Ctor>: 0)
-var c10 = C10(withInt: 0, andThis: 0)
+// CHECK: var <Var>c10</Var> = <Ctor@[[@LINE-4]]:3-Class@[[@LINE-5]]:7>C10</Ctor>(<Ctor@[[@LINE-4]]:3>int</Ctor>: 0, <Ctor@[[@LINE-4]]:3>andThis</Ctor>: 0)
+var c10 = C10(int: 0, andThis: 0)
 // CHECK: <Var@[[@LINE-1]]:5>c10</Var>.<Func@[[@LINE-5]]:8>meth</Func>(0, <Func@[[@LINE-5]]:8>withFloat</Func>: 0)
 c10.meth(0, withFloat: 0)
 
-func test7(withInt x: Int, andThis y: Float) {}
-// CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>withInt</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
-test7(withInt: 0, andThis: 0)
+func test7(int x: Int, andThis y: Float) {}
+// CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>int</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
+test7(int: 0, andThis: 0)
 
 class C11 {
   // CHECK: var <Var>a</Var>: <iStruct@>Int</iStruct> = { var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:22>tmp</Var> }()

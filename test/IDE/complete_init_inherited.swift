@@ -4,17 +4,17 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | FileCheck %s -check-prefix=TEST_D
 
 class A {
-  init(withInt i: Int) {}
-  init(withDouble d: Double) {}
-  convenience init(withFloat f: Float) {
+  init(int i: Int) {}
+  init(double d: Double) {}
+  convenience init(float f: Float) {
     self.init(Double(f))
   }
 }
 
 // TEST_A: Begin completions
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#withInt: Int#})[#A#]{{$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#withDouble: Double#})[#A#]{{$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#withFloat: Float#})[#A#]{{$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#A#]{{$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#A#]{{$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#A#]{{$}}
 // TEST_A-NEXT: End completions
 
 class B : A {
@@ -24,24 +24,24 @@ class B : A {
 }
 
 // TEST_B: Begin completions
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#withInt: Int#})[#B#]{{$}}
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#withDouble: Double#})[#B#]{{$}}
-// TEST_B-NEXT: Decl[Constructor]/Super:            ({#withFloat: Float#})[#A#]{{$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#B#]{{$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#B#]{{$}}
+// TEST_B-NEXT: Decl[Constructor]/Super:            ({#float: Float#})[#A#]{{$}}
 // TEST_B-NEXT: End completions
 
 class C : B {
-  init(withInt i: Int) {
-    super.init(withInt: i)
+  init(int i: Int) {
+    super.init(int: i)
   }
-  convenience init(withC other: C) {
-    self.init(withInt: 0)
+  convenience init(c other: C) {
+    self.init(int: 0)
   }
   // No initializers are inherited.
 }
 
 // TEST_C: Begin completions
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#withInt: Int#})[#C#]{{$}}
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#withC: C#})[#C#]{{$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#C#]{{$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#c: C#})[#C#]{{$}}
 // TEST_C-NEXT: End completions
 
 class D : C {
@@ -50,15 +50,15 @@ class D : C {
   // C's complete object initializers are inherited.
   // Initializers from A are not included in D's interface.
 
-  convenience init(withD other: D) {
-    self.init(withInt: 0)
+  convenience init(d other: D) {
+    self.init(int: 0)
   }
 }
 
 // TEST_D: Begin completions
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#withD: D#})[#D#]{{$}}
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#withInt: Int#})[#D#]{{$}}
-// TEST_D-NEXT: Decl[Constructor]/Super:            ({#withC: C#})[#C#]{{$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#d: D#})[#D#]{{$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#D#]{{$}}
+// TEST_D-NEXT: Decl[Constructor]/Super:            ({#c: C#})[#C#]{{$}}
 // TEST_D-NEXT: End completions
 
 func testA() {

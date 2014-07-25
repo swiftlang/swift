@@ -137,7 +137,7 @@ class FooClassBase {
   class func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
   func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
   init()
-  convenience init(withFloat f: Float)
+  convenience init(float f: Float)
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
@@ -171,7 +171,7 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooBaseInstanceFuncOverridden()
   class func fooClassFunc0()
   init()
-  convenience init(withFloat f: Float)
+  convenience init(float f: Float)
 
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -213,7 +213,7 @@ class FooClassPropertyOwnership : FooClassBase {
   weak var weakRef: @sil_weak AnyObject!
   var scalar: Int32
   init()
-  convenience init(withFloat f: Float)
+  convenience init(float f: Float)
 }
 func fooSubFunc1(a: Int32) -> Int32
 struct FooSubEnum1 {

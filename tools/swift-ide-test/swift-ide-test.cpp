@@ -173,7 +173,7 @@ ImplicitProperties("enable-objc-implicit-properties",
 static llvm::cl::opt<bool>
 ImplicitObjCWith("implicit-objc-with",
                  llvm::cl::desc("Make the \"with\" implicit in initializers"),
-                 llvm::cl::init(false));
+                 llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
 FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",

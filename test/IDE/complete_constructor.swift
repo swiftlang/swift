@@ -114,15 +114,15 @@ func testExplicitConstructors3P() {
 
 
 struct ExplicitConstructorsSelector1 {
-  init(withInt a : Int) {}
-  init(withInt a : Int, andFloat b : Float) {}
+  init(int a : Int) {}
+  init(int a : Int, andFloat b : Float) {}
 }
 
 func testExplicitConstructorsSelector1() {
   ExplicitConstructorsSelector1#^EXPLICIT_CONSTRUCTORS_SELECTOR_1^#
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1: Begin completions, 2 items
-// EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Decl[Constructor]/CurrNominal: ({#withInt: Int#})[#ExplicitConstructorsSelector1#]{{$}}
-// EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Decl[Constructor]/CurrNominal: ({#withInt: Int#}, {#andFloat: Float#})[#ExplicitConstructorsSelector1#]{{$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#})[#ExplicitConstructorsSelector1#]{{$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#}, {#andFloat: Float#})[#ExplicitConstructorsSelector1#]{{$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1: End completions
 }
 
@@ -130,7 +130,7 @@ struct ExplicitConstructorsSelector2 {
   init(noArgs _ : ()) {}
   init(_ a : Int) {}
   init(_ a : Int, withFloat b : Float) {}
-  init(withInt a : Int, _ b : Float) {}
+  init(int a : Int, _ b : Float) {}
 }
 
 func testExplicitConstructorsSelector2() {
@@ -139,7 +139,7 @@ func testExplicitConstructorsSelector2() {
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#noArgs: ()#})[#ExplicitConstructorsSelector2#]{{$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#Int#})[#ExplicitConstructorsSelector2#]{{$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#Int#}, {#withFloat: Float#})[#ExplicitConstructorsSelector2#]{{$}}
-// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#withInt: Int#}, {#Float#})[#ExplicitConstructorsSelector2#]{{$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#}, {#Float#})[#ExplicitConstructorsSelector2#]{{$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2: End completions
 }
 

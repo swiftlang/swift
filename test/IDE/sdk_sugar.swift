@@ -5,9 +5,6 @@
 // REQUIRES: sdk
 // REQUIRES: OS=macosx
 
-// FIXME: rdar://17791048
-// XFAIL: *
-
 import Foundation
 
 // CHECK: func loadAndReturnError(error: NSErrorPointer) -> Bool
