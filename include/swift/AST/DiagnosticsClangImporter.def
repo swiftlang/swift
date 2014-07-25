@@ -51,7 +51,7 @@ ERROR(bridging_header_missing,none,Fatal,
 ERROR(bridging_header_error,none,Fatal,
   "failed to import bridging header '%0'", (StringRef))
 WARNING(could_not_rewrite_bridging_header,none,none,
-  "unknown error serializing bridging header; "
+  "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
 
 #ifndef DIAG_NO_UNDEF
