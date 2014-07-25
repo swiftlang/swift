@@ -1055,9 +1055,8 @@ collectTemporaryFilesForAction(const Action &A, const Job &J,
 
       switch (output.getPrimaryOutputType()) {
         case types::TY_Object:
-          if (!OI.ShouldGenerateDebugInfo)
-            if (!outputMap || outputMap->lookup(types::TY_Object).empty())
-              callback(output.getPrimaryOutputFilename());
+          if (!outputMap || outputMap->lookup(types::TY_Object).empty())
+            callback(output.getPrimaryOutputFilename());
           break;
         case types::TY_SwiftModuleFile:
           if (!OI.ShouldTreatModuleAsTopLevelOutput) {

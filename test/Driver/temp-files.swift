@@ -16,19 +16,14 @@
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main3 -g
 // RUN: ls %t/main3
-// RUN: ls %t/tmp | FileCheck -check-prefix=OBJECT-ONLY %s
-
-// OBJECT-ONLY-NOT: .swiftmodule
-// OBJECT-ONLY-NOT: .swiftdoc
-// OBJECT-ONLY: .o
-// OBJECT-ONLY-NOT: .{{(o|swiftmodule|swiftdoc)}}
+// RUN: ls %t/tmp | FileCheck -check-prefix=EMPTY %s
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: env TMPDIR=%t/tmp/ %swiftc_driver -emit-executable %s -o %t/main4 -emit-module-path %t/main4.swiftmodule -g
 // RUN: ls %t/main4
 // RUN: ls %t/main4.swiftmodule
 // RUN: ls %t/main4.dSYM
-// RUN: ls %t/tmp | FileCheck -check-prefix=OBJECT-ONLY %s
+// RUN: ls %t/tmp | FileCheck -check-prefix=EMPTY %s
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: echo "{\"%s\": {\"object\": \"%t/main5.o\"}}" > %t.json
