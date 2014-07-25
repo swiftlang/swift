@@ -83,6 +83,10 @@ func otherInitializations() {
   // CHECK-NEXT: 3
   let u8 = UInt8(flt)
   println(u8)
+
+  // CHECK-NEXT: 3
+  let ui = UInt(flt)
+  println(ui)
 }
 otherInitializations()
 
