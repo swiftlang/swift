@@ -81,10 +81,10 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 //
 
 /// Types implementing the `Equatable` protocol can be compared for value
-/// equality using operator `==` and `!=`.
+/// equality using operators `==` and `!=`.
 ///
-/// When adopting `Equatable`, the only `==` operator is required to be
-/// implemented.  Standard library provides an implementation for `!=`.
+/// When adopting `Equatable`, only the `==` operator is required to be
+/// implemented.  The standard library provides an implementation for `!=`.
 public protocol Equatable {
   func == (lhs: Self, rhs: Self) -> Bool
 }
@@ -113,9 +113,9 @@ public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
 /// Types implementing the `Comparable` protocol can be compared using
 /// relational operators `<`, `<=`, `>=`, `>`.
 ///
-/// When adopting `Comparable`, the only `<` operator is required to be
-/// implemented.  Standard library provides implementations for `<=`, `>=`,
-/// `>`.
+/// When adopting `Comparable`, only the `<` operator is required to be
+/// implemented.  The standard library provides implementations for `<=`,
+/// `>=`, `>`.
 public protocol Comparable : _Comparable, Equatable {
   func <=(lhs: Self, rhs: Self) -> Bool
   func >=(lhs: Self, rhs: Self) -> Bool
