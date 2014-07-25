@@ -85,6 +85,8 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 ///
 /// When adopting `Equatable`, only the `==` operator is required to be
 /// implemented.  The standard library provides an implementation for `!=`.
+///
+/// The `==` operator must define an equivalence relation.
 public protocol Equatable {
   func == (lhs: Self, rhs: Self) -> Bool
 }
@@ -116,6 +118,8 @@ public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
 /// When adopting `Comparable`, only the `<` operator is required to be
 /// implemented.  The standard library provides implementations for `<=`,
 /// `>=`, `>`.
+///
+/// The `<` operator must define a total order.
 public protocol Comparable : _Comparable, Equatable {
   func <=(lhs: Self, rhs: Self) -> Bool
   func >=(lhs: Self, rhs: Self) -> Bool
