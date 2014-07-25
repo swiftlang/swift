@@ -83,13 +83,19 @@
 @property (readonly) NSDictionary *nsDictionaryProperty;
 @end
 
+@interface CALayer
+- (instancetype)init;
+@end
+
 @interface NSView : NSObject <NSCoding>
+- (instancetype)initWithCoder:(NSCoder *)aDecoder;
 - (BOOL)isDescendantOf:(NSView *)aView;
 - (NSView *)ancestorSharedWithView:(NSView *)aView;
 - (void)setSubviews:(NSArray *)newSubviews;
 - (void)addSubview:(NSView *)aView;
 - (void)addSubview:(NSView *)aView positioned:(unsigned)place relativeTo:(NSView *)otherView;
-- (instancetype)initWithCoder:(NSCoder *)aDecoder;
+@property (readonly, assign) NSView *superview;
+@property (strong) CALayer *layer;
 @property (readonly, copy) NSArray *trackingAreas;
 @property (copy) NSArray *subviews;
 @end

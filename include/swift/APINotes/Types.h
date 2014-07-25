@@ -265,9 +265,21 @@ public:
     assert(index <= getMaxNullabilityIndex());
     assert(static_cast<unsigned>(kind) < NullableKindMask);
     NullabilityAudited = true;
+    if (NumAdjustedNullable < index + 1)
+      NumAdjustedNullable = index + 1;
     unsigned kindValue =
     (static_cast<unsigned>(kind)) << (index * NullableKindSize);
     NullabilityPayload |= kindValue;
+  }
+
+  /// Adds the return type info.
+  void addReturnTypeInfo(NullableKind kind) {
+    addTypeInfo(0, kind);
+  }
+
+  /// Adds the parameter type info.
+  void addParamTypeInfo(unsigned index, NullableKind kind) {
+    addTypeInfo(index + 1, kind);
   }
 
 private:
@@ -340,6 +352,10 @@ public:
   friend bool operator!=(const ObjCMethodInfo &lhs, const ObjCMethodInfo &rhs) {
     return !(lhs == rhs);
   }
+
+  void mergePropInfoIntoSetter(const ObjCPropertyInfo &pInfo);
+
+  void mergePropInfoIntoGetter(const ObjCPropertyInfo &pInfo);
 
   /// Merge class-wide information into the given method.
   friend ObjCMethodInfo &operator|=(ObjCMethodInfo &lhs,

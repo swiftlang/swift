@@ -294,6 +294,11 @@ public:
   Optional<api_notes::ObjCMethodInfo> getKnownObjCMethod(
                                         const clang::ObjCMethodDecl *method);
 
+  /// For ObjC property accessor, if the property is known, lookup
+  /// the property info and merge it in.
+  void mergePropInfoIntoAccessor(const clang::ObjCMethodDecl *method,
+                                 api_notes::ObjCMethodInfo &methodInfo);
+
   /// Retrieve information about the given Objective-C context scoped to the
   /// given Swift module.
   Optional<api_notes::ObjCContextInfo>

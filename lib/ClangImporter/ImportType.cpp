@@ -1009,9 +1009,14 @@ Type ClangImporter::Implementation::importMethodType(
       swiftParamTy = getOptionalType(getNSCopyingType(),
                                      ImportTypeKind::Parameter);
     } else if (kind == SpecialMethodKind::PropertyAccessor) {
+      OptionalTypeKind OptionalityOfParam
+        = knownMethod
+            ? translateNullability(knownMethod->getParamTypeInfo(index))
+            : OTK_ImplicitlyUnwrappedOptional;
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::PropertyAccessor,
-                                isFromSystemModule);
+                                isFromSystemModule,
+                                OptionalityOfParam);
     } else {
       OptionalTypeKind OptionalityOfParam
         = knownMethod

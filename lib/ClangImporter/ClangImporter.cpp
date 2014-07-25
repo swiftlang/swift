@@ -1382,6 +1382,26 @@ ClangImporter::Implementation::getAPINotesForContext(
   return std::make_tuple(name, primary, secondary);
 }
 
+void ClangImporter::Implementation::mergePropInfoIntoAccessor(
+    const clang::ObjCMethodDecl *method, api_notes::ObjCMethodInfo &methodInfo){
+
+  if (!method->isPropertyAccessor())
+    return;
+
+  const clang::ObjCPropertyDecl *pDecl = method->findPropertyDecl();
+  if (!pDecl)
+    return;
+
+  if (auto pInfo = getKnownObjCProperty(pDecl)) {
+    if (method->param_size() == 0) {
+      methodInfo.mergePropInfoIntoGetter(*pInfo);
+    } else {
+      assert(method->param_size() == 1);
+      methodInfo.mergePropInfoIntoSetter(*pInfo);
+    }
+  }
+}
+
 Optional<api_notes::ObjCMethodInfo>
 ClangImporter::Implementation::getKnownObjCMethod(
     const clang::ObjCMethodDecl *method) {
@@ -1427,6 +1447,9 @@ ClangImporter::Implementation::getKnownObjCMethod(
     if (!methodInfo)
       methodInfo = api_notes::ObjCMethodInfo();
 
+    // If accessor, merge the property info in.
+    mergePropInfoIntoAccessor(method, *methodInfo);
+
     // Merge class information into the method.
     *methodInfo |= contextInfo->second;
 
@@ -1444,8 +1467,16 @@ ClangImporter::Implementation::getKnownObjCMethod(
     // Look for the method in the secondary source. We don't merge context
     // information from the secondary source.
     if (contextInfo) {
-      return secondary->lookupObjCMethod(contextInfo->first, selectorRef,
-                                         method->isInstanceMethod());
+      methodInfo = secondary->lookupObjCMethod(contextInfo->first, selectorRef,
+                                               method->isInstanceMethod());
+
+      if (!methodInfo)
+        methodInfo = api_notes::ObjCMethodInfo();
+
+      // If accessor, merge the property info in.
+      mergePropInfoIntoAccessor(method, *methodInfo);
+
+      return methodInfo;
     }
   }
 
