@@ -36,6 +36,38 @@ public struct CGFloat : Reflectable {
     self.native = NativeType(value)
   }
 
+  @transparent public init(_ value: Int8) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: UInt8) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: Int16) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: UInt16) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: Int32) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: UInt32) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: Int64) {
+    self.native = NativeType(value)
+  }
+
+  @transparent public init(_ value: UInt64) {
+    self.native = NativeType(value)
+  }
+
   @transparent public init(_ value: Float) {
     self.native = NativeType(value)
   }
@@ -176,6 +208,12 @@ public let CGFLOAT_MAX = CGFloat.max
   }
 }
 
+@transparent extension UInt {
+  public init(_ value: CGFloat) { 
+    self = UInt(value.native) 
+  }
+}
+
 @transparent extension Double {
   public init(_ value: CGFloat) { 
     self = Double(value.native) 
@@ -185,6 +223,54 @@ public let CGFLOAT_MAX = CGFloat.max
 @transparent extension Float {
   public init(_ value: CGFloat) { 
     self = Float(value.native) 
+  }
+}
+
+@transparent extension Int8 {
+  public init(_ value: CGFloat) { 
+    self = Int8(value.native) 
+  }
+}
+
+@transparent extension UInt8 {
+  public init(_ value: CGFloat) { 
+    self = UInt8(value.native) 
+  }
+}
+
+@transparent extension Int16 {
+  public init(_ value: CGFloat) { 
+    self = Int16(value.native) 
+  }
+}
+
+@transparent extension UInt16 {
+  public init(_ value: CGFloat) { 
+    self = UInt16(value.native) 
+  }
+}
+
+@transparent extension Int32 {
+  public init(_ value: CGFloat) { 
+    self = Int32(value.native) 
+  }
+}
+
+@transparent extension UInt32 {
+  public init(_ value: CGFloat) { 
+    self = UInt32(value.native) 
+  }
+}
+
+@transparent extension Int64 {
+  public init(_ value: CGFloat) { 
+    self = Int64(value.native) 
+  }
+}
+
+@transparent extension UInt64 {
+  public init(_ value: CGFloat) { 
+    self = UInt64(value.native) 
   }
 }
 

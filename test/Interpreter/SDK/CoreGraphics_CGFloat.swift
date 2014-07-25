@@ -26,6 +26,11 @@ func initialization() {
   var i: Int = 3
   flt = CGFloat(i)
   println(flt)
+
+  // CHECK-NEXT: 24
+  let i8: Int8 = 24
+  flt = CGFloat(i8)
+  println(flt)
 }
 initialization()
 
@@ -73,7 +78,11 @@ func otherInitializations() {
 
   // CHECK-NEXT: 3.14
   let d = Double(flt)
-  println(d)
+  println(d)  
+
+  // CHECK-NEXT: 3
+  let u8 = UInt8(flt)
+  println(u8)
 }
 otherInitializations()
 
