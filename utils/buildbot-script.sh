@@ -39,6 +39,7 @@ KNOWN_SETTINGS=(
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
+    skip-test-validation        ""               "set to skip validation test suite"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
 )
@@ -512,6 +513,11 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
         fi
 
+        test_target=check-${product}-all
+        if [[ "$SKIP_TEST_VALIDATION" ]]; then
+            test_target=check-${product}
+        fi
+
         if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
             # Ninja buffers command output to avoid scrambling the output
             # of parallel jobs, which is awesome... except that it
@@ -519,9 +525,9 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
             # executing ninja directly, have it dump the commands it would
             # run, strip Ninja's progress prefix with sed, and tell the
             # shell to execute that.
-            sh -c "$("${build_cmd[@]}" -n -v check-${product} | sed -e 's/[^]]*] //')"
+            sh -c "$("${build_cmd[@]}" -n -v ${test_target} | sed -e 's/[^]]*] //')"
         else
-            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-${product}
+            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
         fi
 
         trap - ERR
