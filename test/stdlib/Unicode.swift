@@ -965,6 +965,16 @@ let UTF16Tests = [
   ],
 ]
 
+var UnicodeScalars = TestCase("UnicodeScalars")
+UnicodeScalars.test("Construction") {
+  expectEqual("f", UnicodeScalar(102))
+  expectEqual("g", UnicodeScalar(UInt32(103)))
+  expectEqual("h", UnicodeScalar(UInt16(104)))
+  expectEqual("i", UnicodeScalar(UInt8(105)))
+}
+UnicodeScalars.run()
+// CHECK: {{^}}UnicodeScalars: All tests passed
+
 var UTF8Decoder = TestCase("UTF8Decoder")
 
 UTF8Decoder.test("Internal/_numTrailingBytes") {

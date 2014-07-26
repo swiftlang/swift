@@ -54,6 +54,14 @@ public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     self._value = v.value
   }
 
+  public init(_ v : UInt16) {
+    self = UnicodeScalar(UInt32(v))
+  }
+
+  public init(_ v : UInt8) {
+    self = UnicodeScalar(UInt32(v))
+  }
+
   public init(_ v: UnicodeScalar) {
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
