@@ -1027,7 +1027,7 @@ struct ClassMetadata : public HeapMetadata {
       CacheData{nullptr, nullptr}, Data(data),
       Flags(flags), InstanceAddressPoint(addressPoint),
       InstanceSize(size), InstanceAlignMask(alignMask),
-      Reserved(0), ClassSize(size), ClassAddressPoint(classAddressPoint),
+      Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(description) {}
 
   /// The metadata for the superclass.  This is null for the root class.

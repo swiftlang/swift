@@ -246,3 +246,85 @@ TEST(MetadataTest, getExistentialMetadata) {
     ASSERT_EQ(3U, mixedWitnessTable->Protocols.NumProtocols);
   }
 }
+
+static void destroySuperclass(HeapObject *toDestroy) {}
+
+struct {
+  void *Prefix[4];
+  FullMetadata<ClassMetadata> Metadata;
+} SuperclassWithPrefix = {
+  { &Global1, &Global3, &Global2, &Global3 },
+  { { { &destroySuperclass }, { &_TWVBo } },
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+      0, 0, 0, sizeof(SuperclassWithPrefix),
+      sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
+};
+ClassMetadata * const SuperclassWithPrefix_AddressPoint =
+  &SuperclassWithPrefix.Metadata;
+
+static void destroySubclass(HeapObject *toDestroy) {}
+
+struct {
+  GenericMetadata Header;
+  FullMetadata<ClassMetadata> Pattern;
+  void *Suffix[3];
+} GenericSubclass = {
+  {
+    // allocation function
+    [](GenericMetadata *pattern, const void *args) -> Metadata* {
+      auto metadata =
+        swift_allocateGenericClassMetadata(pattern, args,
+                                           SuperclassWithPrefix_AddressPoint);
+      char *bytes = (char*) metadata + sizeof(ClassMetadata);
+      auto metadataWords = reinterpret_cast<const void**>(bytes);
+      auto argsWords = reinterpret_cast<const void* const *>(args);
+      metadataWords[2] = argsWords[0];
+      return metadata;
+    },
+    sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix), // pattern size
+    1, // num arguments
+    sizeof(HeapMetadataHeader), // address point
+    {} // private data
+  },
+  { { { &destroySubclass }, { &_TWVBO } },
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+      0, 0, 0, sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
+      sizeof(HeapMetadataHeader) } },
+  { &Global2, &Global1, &Global2 }
+};
+
+TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
+  auto metadataTemplate = &GenericSubclass.Header;
+
+  void *args[] = { &Global3 };
+
+  auto inst = static_cast<const ClassMetadata*>(
+                            swift_getGenericMetadata(metadataTemplate, args));
+  void * const *fields = reinterpret_cast<void * const *>(inst);
+
+  // Assert that we copied the extra prefix data from the superclass.
+  ASSERT_EQ(&Global1, fields[-6]);
+  ASSERT_EQ(&Global3, fields[-5]);
+  ASSERT_EQ(&Global2, fields[-4]);
+  ASSERT_EQ(&Global3, fields[-3]);
+
+  // Assert that we copied the shared prefix data from the subclass.
+  ASSERT_EQ((void*) &destroySubclass, fields[-2]);
+  ASSERT_EQ(&_TWVBO, fields[-1]);
+
+  // Assert that we set the superclass field.
+  ASSERT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
+
+  // Assert that we copied the subclass suffix data.
+  auto suffix = (void * const *) ((char*) inst + sizeof(ClassMetadata));
+  ASSERT_EQ(&Global2, suffix[0]);
+  ASSERT_EQ(&Global1, suffix[1]);
+
+  // This should have been overwritten by the creation function.
+  ASSERT_EQ(&Global3, suffix[2]);
+
+  ASSERT_EQ(7 * sizeof(void*) + sizeof(GenericSubclass.Pattern),
+            inst->getClassSize());
+  ASSERT_EQ(4 * sizeof(void*) + sizeof(HeapMetadataHeader),
+            inst->getClassAddressPoint());
+}
