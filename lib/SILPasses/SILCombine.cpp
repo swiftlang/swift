@@ -367,6 +367,7 @@ public:
   visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+  SILInstruction *visitEnumIsTagInst(EnumIsTagInst *EIT);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
@@ -1733,6 +1734,15 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitEnumIsTagInst(EnumIsTagInst *EIT) {
+  auto *EI = dyn_cast<EnumInst>(EIT->getOperand());
+  if (!EI)
+    return nullptr;
+
+  bool SameTag = EI->getElement() == EIT->getElement();
+  return IntegerLiteralInst::create(EIT->getLoc(), EIT->getType(),
+                                    APInt(1, SameTag), *EIT->getFunction());
+}
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points
