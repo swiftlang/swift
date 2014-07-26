@@ -1885,7 +1885,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC, isStatic, isLet;
-    uint8_t storageKind, rawAccessLevel;
+    uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
@@ -1895,7 +1895,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        isLet, storageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        willSetID, didSetID, overriddenID,
-                                       rawAccessLevel);
+                                       rawAccessLevel, rawSetterAccessLevel);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1909,13 +1909,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                  getIdentifier(nameID), type, DC);
 
     declOrOffset = var;
-
-    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
-      var->setAccessibility(*accessLevel);
-    } else {
-      error();
-      return nullptr;
-    }
 
     if (auto interfaceType = getType(interfaceTypeID))
       var->setInterfaceType(interfaceType);
@@ -1941,6 +1934,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       var->setObservingAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
                                  cast_or_null<FuncDecl>(getDecl(setterID)));
       break;
+    }
+
+    if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
+      var->setAccessibility(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
+
+    if (var->isSettable(nullptr)) {
+      if (auto setterAccess = getActualAccessibility(rawSetterAccessLevel)) {
+        var->setSetterAccessibility(*setterAccess);
+      } else {
+        error();
+        return nullptr;
+      }
     }
 
     if (isImplicit)
@@ -2487,6 +2496,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     subscript->setAccessors(SourceRange(), Getter, Setter);
+    if (Setter)
+      subscript->setSetterAccessibility(Setter->getAccessibility());
+
     subscript->setType(getType(declTypeID));
     if (auto interfaceType = getType(interfaceTypeID))
       subscript->setInterfaceType(interfaceType);

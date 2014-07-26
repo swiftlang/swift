@@ -898,6 +898,8 @@ public:
     D->setEarlyAttrValidation(true);
     if (auto VD = dyn_cast<ValueDecl>(D))
       VD->setAccessibility(Accessibility::Public);
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
+      ASD->setSetterAccessibility(Accessibility::Public);
     return D;
   }
 };

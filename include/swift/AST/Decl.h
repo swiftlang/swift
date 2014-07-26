@@ -3204,11 +3204,11 @@ private:
     FuncDecl *DidSet = nullptr;    // didSet:
   };
 
-  GetSetRecord *GetSetInfo = nullptr;
+  llvm::PointerIntPair<GetSetRecord*, 2, OptionalEnum<Accessibility>> GetSetInfo;
 
   ObservingRecord &getDidSetInfo() const {
     assert(getStorageKind() == Observing);
-    return *static_cast<ObservingRecord*>(GetSetInfo);
+    return *static_cast<ObservingRecord*>(GetSetInfo.getPointer());
   }
 
   void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
@@ -3283,14 +3283,37 @@ public:
   void setInvalidBracesRange(SourceRange BracesRange);
 
   SourceRange getBracesRange() const {
-    return GetSetInfo ? GetSetInfo->Braces : SourceRange();
+    if (auto info = GetSetInfo.getPointer())
+      return info->Braces;
+    return SourceRange();
   }
 
   /// \brief Retrieve the getter used to access the value of this variable.
-  FuncDecl *getGetter() const { return GetSetInfo ? GetSetInfo->Get : nullptr; }
+  FuncDecl *getGetter() const {
+    if (auto info = GetSetInfo.getPointer())
+      return info->Get;
+    return nullptr;
+  }
   
   /// \brief Retrieve the setter used to mutate the value of this variable.
-  FuncDecl *getSetter() const { return GetSetInfo ? GetSetInfo->Set : nullptr; }
+  FuncDecl *getSetter() const {
+    if (auto info = GetSetInfo.getPointer())
+      return info->Set;
+    return nullptr;
+  }
+
+  Accessibility getSetterAccessibility() const {
+    assert(hasAccessibility());
+    assert(GetSetInfo.getInt().hasValue());
+    return GetSetInfo.getInt().getValue();
+  }
+
+  void setSetterAccessibility(Accessibility accessLevel) {
+    assert(!GetSetInfo.getInt().hasValue());
+    overwriteSetterAccessibility(accessLevel);
+  }
+
+  void overwriteSetterAccessibility(Accessibility accessLevel);
   
   /// \brief Return the funcdecl for the willSet specifier if it exists, this is
   /// only valid on a VarDecl with Observing storage.
@@ -4679,7 +4702,7 @@ inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
     return false;
 }
 
-inline Optional<VarDecl *> 
+inline Optional<VarDecl *>
 NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     if (!var->isStatic() && var->hasStorage())
@@ -4687,6 +4710,13 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
   }
 
   return Nothing;
+}
+
+inline void
+AbstractStorageDecl::overwriteSetterAccessibility(Accessibility accessLevel) {
+  GetSetInfo.setInt(accessLevel);
+  if (auto setter = getSetter())
+    setter->overwriteAccessibility(accessLevel);
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {

@@ -1483,6 +1483,7 @@ namespace {
                                                    underlyingType,
                                                    structDecl);
         var->setAccessibility(Accessibility::Public);
+        var->setSetterAccessibility(Accessibility::Public);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
@@ -1564,6 +1565,7 @@ namespace {
                                                    underlyingType,
                                                    structDecl);
         var->setAccessibility(Accessibility::Private);
+        var->setSetterAccessibility(Accessibility::Private);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);

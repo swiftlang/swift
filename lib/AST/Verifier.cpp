@@ -1311,6 +1311,19 @@ struct ASTNodeBase {};
     void verifyChecked(PatternBindingDecl *binding) {
     }
 
+    void verifyChecked(AbstractStorageDecl *ASD) {
+      if (ASD->hasAccessibility() && ASD->isSettable(nullptr)) {
+        auto setterAccess = ASD->getSetterAccessibility();
+        if (ASD->getSetter() &&
+            ASD->getSetter()->getAccessibility() != setterAccess) {
+          Out << "AbstractStorageDecl's setter accessibility is out of sync"
+                 " with the accessibility actually on the setter";
+          abort();
+        }
+      }
+      verifyCheckedBase(ASD);
+    }
+
     void verifyChecked(VarDecl *var) {
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 

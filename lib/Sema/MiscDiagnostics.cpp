@@ -587,8 +587,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   DeclAttribute *attr;
   if (isForSetter) {
     attr = VD->getAttrs().getAttribute<SetterAccessibilityAttr>();
-    if (auto setter = cast<AbstractStorageDecl>(VD)->getSetter())
-      setter->overwriteAccessibility(desiredAccess);
+    cast<AbstractStorageDecl>(VD)->overwriteSetterAccessibility(desiredAccess);
   } else {
     attr = VD->getAttrs().getAttribute<AccessibilityAttr>();
     VD->overwriteAccessibility(desiredAccess);

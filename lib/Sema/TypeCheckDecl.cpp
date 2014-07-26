@@ -1934,6 +1934,7 @@ static void completeLazyVarImplementation(VarDecl *VD, TypeChecker &TC) {
     Storage->getAttrs().add(new (Ctx) FinalAttr(true));
   Storage->setImplicit();
   Storage->setAccessibility(Accessibility::Private);
+  Storage->setSetterAccessibility(Accessibility::Private);
 
   TC.typeCheckDecl(Get, true);
   TC.typeCheckDecl(Get, false);
@@ -2074,11 +2075,11 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
     // Special case for accessors, which inherit the access of their storage.
     // decl. A setter attribute can also override this.
     if (AbstractStorageDecl *storage = fn->getAccessorStorageDecl()) {
-      const DeclAttributes &attrs = storage->getAttrs();
-      if (auto accessAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
-        fn->setAccessibility(accessAttr->getAccess());
-      } else if (storage->hasAccessibility()) {
-        fn->setAccessibility(storage->getAccessibility());
+      if (storage->hasAccessibility()) {
+        if (storage->isSettable(nullptr) && storage->getSetter() == fn)
+          fn->setAccessibility(storage->getSetterAccessibility());
+        else
+          fn->setAccessibility(storage->getAccessibility());
       } else {
         computeAccessibility(TC, storage);
       }
@@ -2116,6 +2117,11 @@ static void computeAccessibility(TypeChecker &TC, ValueDecl *D) {
   }
 
   if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+      ASD->setSetterAccessibility(AA->getAccess());
+    else
+      ASD->setSetterAccessibility(ASD->getAccessibility());
+
     if (auto getter = ASD->getGetter())
       computeAccessibility(TC, getter);
     if (auto setter = ASD->getSetter())

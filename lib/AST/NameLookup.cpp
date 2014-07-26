@@ -985,12 +985,7 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
-  assert(hasAccessibility());
-  if (auto setter = getSetter())
-    return setter->isAccessibleFrom(DC);
-  if (auto setterAttr = getAttrs().getAttribute<SetterAccessibilityAttr>())
-    return checkAccessibility(DC, getDeclContext(), setterAttr->getAccess());
-  return isAccessibleFrom(DC);
+  return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
 }
 
 bool DeclContext::lookupQualified(Type type,

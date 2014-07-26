@@ -28,3 +28,9 @@ public class HiddenType {
 }
 
 public struct OriginallyEmpty {}
+
+
+public struct StructWithPrivateSetter {
+  public private(set) var x = 0
+  public init() {}
+}

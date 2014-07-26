@@ -38,6 +38,9 @@ Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
 Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
 PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
 
+var s = StructWithPrivateSetter()
+s.x = 42 // expected-error {{cannot assign to 'x' in 's'}}
+
 class Sub : Base {
   func test() {
     value = 4 // expected-error {{cannot assign to 'value' in 'self'}}

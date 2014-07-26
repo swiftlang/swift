@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 122;
+const uint16_t VERSION_MINOR = 123;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -720,7 +720,8 @@ namespace decls_block {
     DeclIDField,  // willset
     DeclIDField,  // didset
     DeclIDField,  // overridden decl
-    AccessibilityKindField // accessibility
+    AccessibilityKindField, // accessibility
+    AccessibilityKindField // setter accessibility, if applicable
   >;
 
   using ParamLayout = BCRecordLayout<

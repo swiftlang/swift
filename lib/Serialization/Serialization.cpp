@@ -1762,6 +1762,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(var->getAccessibility());
+    uint8_t rawSetterAccessLevel = rawAccessLevel;
+    if (var->isSettable(nullptr))
+      rawSetterAccessLevel =
+        getRawStableAccessibility(var->getSetterAccessibility());
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1779,7 +1783,7 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(willSet),
                           addDeclRef(didSet),
                           addDeclRef(var->getOverriddenDecl()),
-                          rawAccessLevel);
+                          rawAccessLevel, rawSetterAccessLevel);
     break;
   }
 

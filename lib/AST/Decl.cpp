@@ -1854,16 +1854,23 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSetInfo = new (Mem) GetSetRecord();
-  GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
-  GetSetInfo->Get = Get;
-  GetSetInfo->Set = Set;
-  
+  auto *getSetInfo = new (Mem) GetSetRecord();
+  getSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  getSetInfo->Get = Get;
+  getSetInfo->Set = Set;
+  GetSetInfo.setPointer(getSetInfo);
+
   if (Get)
     Get->makeAccessor(this, AccessorKind::IsGetter);
-  if (Set)
+  if (Set) {
     Set->makeAccessor(this, AccessorKind::IsSetter);
-  
+    if (auto setterAccess = GetSetInfo.getInt()) {
+      assert(!Set->hasAccessibility() ||
+             Set->getAccessibility() == setterAccess.getValue());
+      Set->overwriteAccessibility(setterAccess.getValue());
+    }
+  }
+
   // Mark that this is a computed property.
   setStorageKind(Computed);
 }
@@ -1874,8 +1881,13 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   assert(!getSetter() && "already has a setter");
   assert(hasClangNode() && "should only be used for ObjC properties");
   assert(Set && "should not be called for readonly properties");
-  GetSetInfo->Set = Set;
+  GetSetInfo.getPointer()->Set = Set;
   Set->makeAccessor(this, AccessorKind::IsSetter);
+  if (auto setterAccess = GetSetInfo.getInt()) {
+    assert(!Set->hasAccessibility() ||
+           Set->getAccessibility() == setterAccess.getValue());
+    Set->overwriteAccessibility(setterAccess.getValue());
+  }
 }
 
 /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
@@ -1886,13 +1898,21 @@ void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
   assert(Get);
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSetInfo = new (Mem) GetSetRecord();
-  GetSetInfo->Braces = SourceRange();
-  GetSetInfo->Get = Get;
-  GetSetInfo->Set = Set;
+  auto *getSetInfo = new (Mem) GetSetRecord();
+  getSetInfo->Braces = SourceRange();
+  getSetInfo->Get = Get;
+  getSetInfo->Set = Set;
+  GetSetInfo.setPointer(getSetInfo);
   
   Get->makeAccessor(this, AccessorKind::IsGetter);
-  if (Set) Set->makeAccessor(this, AccessorKind::IsSetter);
+  if (Set) {
+    Set->makeAccessor(this, AccessorKind::IsSetter);
+    if (auto setterAccess = GetSetInfo.getInt()) {
+      assert(!Set->hasAccessibility() ||
+             Set->getAccessibility() == setterAccess.getValue());
+      Set->overwriteAccessibility(setterAccess.getValue());
+    }
+  }
   
   // Mark that this is a StoredWithTrivialAccessors property.
   setStorageKind(StoredWithTrivialAccessors);
@@ -1907,14 +1927,15 @@ void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(ObservingRecord),
                                alignof(ObservingRecord));
-  GetSetInfo = new (Mem) ObservingRecord;
-  GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  auto *observingInfo = new (Mem) ObservingRecord;
+  observingInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  GetSetInfo.setPointer(observingInfo);
 
   // Mark that this is a Observing property.
   setStorageKind(Observing);
 
-  getDidSetInfo().WillSet = WillSet;
-  getDidSetInfo().DidSet = DidSet;
+  observingInfo->WillSet = WillSet;
+  observingInfo->DidSet = DidSet;
   
   if (WillSet) WillSet->makeAccessor(this, AccessorKind::IsWillSet);
   if (DidSet) DidSet->makeAccessor(this, AccessorKind::IsDidSet);
@@ -1923,27 +1944,33 @@ void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
 /// \brief Specify the synthesized get/set functions for a Observing var.
 /// This is used by Sema.
 void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
-                                                    FuncDecl *Set) {
+                                                FuncDecl *Set) {
   assert(getStorageKind() == Observing && "VarDecl is wrong type");
   assert(!getGetter() && !getSetter() && "getter and setter already set");
   assert(Get && Set && "Must specify getter and setter");
 
-  GetSetInfo->Get = Get;
-  GetSetInfo->Set = Set;
+  GetSetInfo.getPointer()->Get = Get;
+  GetSetInfo.getPointer()->Set = Set;
 
   Get->makeAccessor(this, AccessorKind::IsGetter);
   Set->makeAccessor(this, AccessorKind::IsSetter);
+  if (auto setterAccess = GetSetInfo.getInt()) {
+    assert(!Set->hasAccessibility() ||
+           Set->getAccessibility() == setterAccess.getValue());
+    Set->overwriteAccessibility(setterAccess.getValue());
+  }
 }
 
 void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
-  assert(GetSetInfo == nullptr && "Braces range has already been set");
+  assert(!GetSetInfo.getPointer() && "Braces range has already been set");
 
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSetInfo = new (Mem) GetSetRecord();
-  GetSetInfo->Braces = BracesRange;
-  GetSetInfo->Get = nullptr;
-  GetSetInfo->Set = nullptr;
+  auto *getSetInfo = new (Mem) GetSetRecord();
+  getSetInfo->Braces = BracesRange;
+  getSetInfo->Get = nullptr;
+  getSetInfo->Set = nullptr;
+  GetSetInfo.setPointer(getSetInfo);
 }
 
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
