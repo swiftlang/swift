@@ -467,3 +467,72 @@ Runtime.test("demangleName") {
 Runtime.run()
 // CHECK: {{^}}Runtime: All tests passed
 
+var RuntimeFoundationWrappers = TestCase("RuntimeFoundationWrappers")
+
+var nsObjectCanaryCount = 0
+@objc class NSObjectCanary : NSObject {
+  override init() {
+    ++nsObjectCanaryCount
+  }
+  deinit {
+    --nsObjectCanaryCount
+  }
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
+  nsObjectCanaryCount = 0
+  if true {
+    let a = NSObjectCanary()
+    let b = NSObjectCanary()
+    expectEqual(2, nsObjectCanaryCount)
+    _stdlib_NSObject_isEqual(a, b)
+  }
+  expectEqual(0, nsObjectCanaryCount)
+}
+
+var nsStringCanaryCount = 0
+@objc class NSStringCanary : NSString {
+  override init() {
+    ++nsStringCanaryCount
+    super.init()
+  }
+  required init(coder: NSCoder!) {
+    fatalError("don't call this initializer")
+  }
+  deinit {
+    --nsStringCanaryCount
+  }
+  @objc override var length: Int {
+    return 0
+  }
+  @objc override func characterAtIndex(index: Int) -> unichar {
+    fatalError("out-of-bounds access")
+  }
+}
+
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollation/NoLeak"
+) {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    _stdlib_compareNSStringDeterministicUnicodeCollation(a, b)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
+  nsStringCanaryCount = 0
+  if true {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringNFDHashValue(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.run()
+// CHECK: {{^}}RuntimeFoundationWrappers: All tests passed
+

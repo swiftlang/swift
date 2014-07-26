@@ -105,7 +105,9 @@ swift_stdlib_compareNSStringDeterministicUnicodeCollation(NSString *lhs,
 }
 
 extern "C" size_t swift_stdlib_NSStringNFDHashValue(NSString *str) {
-  return str.decomposedStringWithCanonicalMapping.hash;
+  int Result = str.decomposedStringWithCanonicalMapping.hash;
+  swift_unknownRelease(str);
+  return Result;
 }
 
 // ${'Local Variables'}:
