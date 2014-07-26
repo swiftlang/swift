@@ -280,6 +280,7 @@ infix operator && { associativity left precedence 120 }
 // "Disjunctive"
 
 infix operator || { associativity left precedence 110 }
+infix operator ?? { associativity right precedence 110 }
 
 
 // User-defined ternary operators are not supported. The ? : operator is

@@ -171,3 +171,24 @@ func nilComparison() {
   println(nil != e0) // CHECK-NEXT: false
 }
 nilComparison()
+
+var counter = 0
+func nextCounter() -> Int {
+  return counter++
+}
+
+let a: Int? = 123
+let b: Int? = nil
+let c: Int? = nil
+let d: Int? = 456
+let e: Int? = nil
+let f: Int? = nil
+
+println(a ?? nextCounter()) // CHECK-NEXT: 123
+println(b ?? nextCounter()) // CHECK-NEXT: 0
+println(c ?? nextCounter()) // CHECK-NEXT: 1
+println(d ?? nextCounter()) // CHECK-NEXT: 456
+println(e ?? d ?? nextCounter()) // CHECK-NEXT: 456
+println(f ?? nextCounter()) // CHECK-NEXT: 2
+
+
