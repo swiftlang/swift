@@ -100,3 +100,14 @@ func ??(x: Man, y: TheDevil) -> TheDevil {
 func test3(a: Man, b: Man, c: TheDevil) -> TheDevil {
   return a ?? b ?? c
 }
+
+// <rdar://problem/17821399> We don't parse infix operators bound on both
+// sides that begin with ! or ? correctly yet.
+infix operator !! {}
+
+func !!(x: Man, y: Man) {}
+let foo = Man()
+let bar = TheDevil()
+foo!!foo // expected-error{{should have optional type}} expected-error{{consecutive statements}}
+foo??bar // expected-error{{broken standard library}} expected-error{{consecutive statements}}
+
