@@ -15,6 +15,12 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/PointerUnion.h"
+#include <string>
+
+namespace clang {
+  class Module;
+}
 
 namespace swift {
   class DeclContext;
@@ -28,6 +34,25 @@ namespace swift {
   class Expr;
 
 namespace ide {
+
+/// Wraps either a swift module or a clang one.
+/// FIXME: Should go away once swift modules can support submodules natively.
+class ModuleEntity {
+  llvm::PointerUnion<const Module *, const clang::Module *> Mod;
+
+public:
+  ModuleEntity() = default;
+  ModuleEntity(const Module *Mod) : Mod(Mod) {}
+  ModuleEntity(const clang::Module *Mod) : Mod(Mod) {}
+
+  StringRef getName() const;
+  std::string getFullName() const;
+
+  bool isSystemModule() const;
+  bool isBuiltinModule() const;
+
+  explicit operator bool() const { return !Mod.isNull(); }
+};
 
 /// An abstract class used to traverse the AST and provide source information.
 /// Visitation happens in source-order and compiler-generated semantic info,
@@ -93,7 +118,7 @@ public:
                                 ValueDecl *D);
 
   /// This method is called when a Module is referenced in source.
-  virtual bool visitModuleReference(Module *Mod, CharSourceRange Range) {
+  virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) {
     return true;
   }
 

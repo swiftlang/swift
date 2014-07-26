@@ -21,7 +21,13 @@ namespace llvm {
   class MemoryBuffer;
 }
 
+namespace clang {
+  class Module;
+}
+
 namespace swift {
+  class Module;
+
 namespace ide {
 
 struct SourceCompleteResult {
@@ -49,6 +55,8 @@ struct SourceCompleteResult {
 
 SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 SourceCompleteResult isSourceInputComplete(StringRef Text);
+
+const clang::Module *findUnderlyingClangModule(const Module *M);
 
 } // namespace ide
 } // namespace swift

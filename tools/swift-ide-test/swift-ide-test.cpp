@@ -767,7 +767,7 @@ private:
     CharSourceRange Range;
     ValueDecl *Dcl = nullptr;
     TypeDecl *CtorTyRef = nullptr;
-    Module *Mod = nullptr;
+    ModuleEntity Mod;
     bool IsRef = true;
 
     SemanticSourceEntity(CharSourceRange Range,
@@ -780,7 +780,7 @@ private:
         IsRef(IsRef) {}
 
     SemanticSourceEntity(CharSourceRange Range,
-                         Module *Mod)
+                         ModuleEntity Mod)
       : Range(Range),
         Mod(Mod) {}
   };
@@ -805,7 +805,7 @@ private:
     return true;
   }
 
-  bool visitModuleReference(Module *Mod, CharSourceRange Range) override {
+  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override {
     annotateSourceEntity({ Range, Mod });
     return true;
   }
@@ -874,7 +874,7 @@ private:
       }
 
     } else {
-      if (Entity.Mod->isSystemModule())
+      if (Entity.Mod.isSystemModule())
         OS << 'i';
       OS << "Mod";
     }
@@ -893,7 +893,7 @@ private:
       }
 
     } else {
-      if (Entity.Mod->isSystemModule())
+      if (Entity.Mod.isSystemModule())
         OS << 'i';
       OS << "Mod";
     }

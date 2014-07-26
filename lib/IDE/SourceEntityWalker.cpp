@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/Utils.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -21,9 +22,38 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "clang/Basic/Module.h"
 
 using namespace swift;
 using namespace ide;
+
+StringRef ModuleEntity::getName() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->getName().str();
+  return Mod.get<const clang::Module*>()->Name;
+}
+
+std::string ModuleEntity::getFullName() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->getName().str();
+  return Mod.get<const clang::Module*>()->getFullModuleName();
+}
+
+bool ModuleEntity::isSystemModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->isSystemModule();
+  return Mod.get<const clang::Module*>()->IsSystem;
+}
+
+bool ModuleEntity::isBuiltinModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod->isBuiltinModule();
+  return false;
+}
 
 namespace {
 
@@ -52,8 +82,12 @@ private:
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
 
+  bool handleImports(ImportDecl *Import);
+  bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
+                              const clang::Module *ClangMod);
+
   bool passReference(ValueDecl *D, SourceLoc Loc);
-  bool passReference(Module *Mod, SourceLoc Loc);
+  bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
@@ -97,15 +131,8 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     }
 
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
-    if (auto Mod = Import->getModule()) {
-      if (!passReference(Mod, Import->getLoc()))
-        return false;
-    }
-    auto Decls = Import->getDecls();
-    if (Decls.size() == 1) {
-      if (!passReference(Decls.front(), Import->getEndLoc()))
-        return false;
-    }
+    if (!handleImports(Import))
+      return false;
 
   } else {
     return true;
@@ -225,7 +252,8 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
     if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType()))
       return passReference(TyD, IdT->getIdLoc());
     if (auto Mod = IdT->getBoundModule())
-      return passReference(Mod, IdT->getIdLoc());
+      return passReference(Mod, std::make_pair(IdT->getIdentifier(),
+                                               IdT->getIdLoc()));
   }
   return true;
 }
@@ -259,6 +287,42 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   return { false, P };
 }
 
+bool SemaAnnotator::handleImports(ImportDecl *Import) {
+  auto Mod = Import->getModule();
+  if (!Mod)
+    return true;
+
+  auto ClangMod = findUnderlyingClangModule(Mod);
+  if (ClangMod && ClangMod->isSubModule()) {
+    if (!passModulePathElements(Import->getModulePath(), ClangMod))
+      return false;
+  } else {
+    if (!passReference(Mod, Import->getModulePath().front()))
+      return false;
+  }
+
+  auto Decls = Import->getDecls();
+  if (Decls.size() == 1) {
+    if (!passReference(Decls.front(), Import->getEndLoc()))
+      return false;
+  }
+
+  return true;
+}
+
+bool SemaAnnotator::passModulePathElements(
+    ArrayRef<ImportDecl::AccessPathElement> Path,
+    const clang::Module *ClangMod) {
+
+  if (Path.empty() || !ClangMod)
+    return true;
+
+  if (!passModulePathElements(Path.drop_back(1), ClangMod->Parent))
+    return false;
+
+  return passReference(ClangMod, Path.back());
+}
+
 bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   unsigned NameLen = D->getName().getLength();
   TypeDecl *CtorTyRef = nullptr;
@@ -281,11 +345,12 @@ bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   return Continue;
 }
 
-bool SemaAnnotator::passReference(Module *Mod, SourceLoc Loc) {
-  if (Loc.isInvalid())
+bool SemaAnnotator::passReference(ModuleEntity Mod,
+                                  std::pair<Identifier, SourceLoc> IdLoc) {
+  if (IdLoc.second.isInvalid())
     return true;
-  unsigned NameLen = Mod->getName().getLength();
-  CharSourceRange Range{ Loc, NameLen };
+  unsigned NameLen = IdLoc.first.getLength();
+  CharSourceRange Range{ IdLoc.second, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;

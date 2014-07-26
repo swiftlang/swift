@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/ModuleInterfacePrinting.h"
+#include "swift/IDE/Utils.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -94,22 +95,6 @@ private:
 };
 } // unnamed namespace
 
-static const clang::Module *findTopLevelClangModule(const Module *M) {
-  const ClangModuleUnit *CMU = nullptr;
-  for (auto *FU : M->getFiles()) {
-    if ((CMU = dyn_cast<ClangModuleUnit>(FU)))
-      break;
-    if (auto *AST = dyn_cast<SerializedASTFile>(FU)) {
-      if (auto *ShadowedModule = AST->getFile().getShadowedModule())
-        if (auto *Result = findTopLevelClangModule(ShadowedModule))
-          return Result;
-    }
-  }
-  if (!CMU)
-    return nullptr;
-  return CMU->getClangModule();
-}
-
 void swift::ide::printModuleInterface(Module *M,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
@@ -154,7 +139,7 @@ void swift::ide::printSubmoduleInterface(
   // Drop top-level module name.
   FullModuleName = FullModuleName.slice(1);
 
-  InterestingClangModule = findTopLevelClangModule(M);
+  InterestingClangModule = findUnderlyingClangModule(M);
   if (InterestingClangModule) {
     for (StringRef Name : FullModuleName) {
       InterestingClangModule = InterestingClangModule->findSubmodule(Name);

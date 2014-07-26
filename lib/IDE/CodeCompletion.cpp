@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
@@ -2223,12 +2224,8 @@ static bool isDynamicLookup(Type T) {
 }
 
 static bool isClangSubModule(Module *TheModule) {
-  auto Files = TheModule->getFiles();
-  assert(!Files.empty());
-  if (auto CMU = dyn_cast<ClangModuleUnit>(Files.front())) {
-    if (auto ClangMod = CMU->getClangModule())
-      return ClangMod->isSubModule();
-  }
+  if (auto ClangMod = ide::findUnderlyingClangModule(TheModule))
+    return ClangMod->isSubModule();
   return false;
 }
 

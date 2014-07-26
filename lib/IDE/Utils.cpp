@@ -12,7 +12,10 @@
 
 #include "swift/IDE/Utils.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -179,3 +182,18 @@ SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
   return ide::isSourceInputComplete(std::move(InputBuf));
 }
 
+const clang::Module *ide::findUnderlyingClangModule(const Module *M) {
+  const ClangModuleUnit *CMU = nullptr;
+  for (auto *FU : M->getFiles()) {
+    if ((CMU = dyn_cast<ClangModuleUnit>(FU)))
+      break;
+    if (auto *AST = dyn_cast<SerializedASTFile>(FU)) {
+      if (auto *ShadowedModule = AST->getFile().getShadowedModule())
+        if (auto *Result = findUnderlyingClangModule(ShadowedModule))
+          return Result;
+    }
+  }
+  if (!CMU)
+    return nullptr;
+  return CMU->getClangModule();
+}
