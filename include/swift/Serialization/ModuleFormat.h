@@ -783,7 +783,7 @@ namespace decls_block {
     AssociativityField,
     BCFixed<8>,  // precedence
     BCFixed<1>,  // assignment
-    BCFixed<1>,  // IsAccocImplicit flag
+    BCFixed<1>,  // IsAssocImplicit flag
     BCFixed<1>,  // IsPrecedenceImplicit flag
     BCFixed<1>   // IsAssignmentImplicit flag
   >;
