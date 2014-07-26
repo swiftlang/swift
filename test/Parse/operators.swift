@@ -87,3 +87,16 @@ func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 prefix operator ⚽️ {}
 
 prefix func ⚽️(x: Man) { }
+
+infix operator ?? {
+  associativity right
+  precedence 100
+}
+
+func ??(x: Man, y: TheDevil) -> TheDevil {
+  return y
+}
+
+func test3(a: Man, b: Man, c: TheDevil) -> TheDevil {
+  return a ?? b ?? c
+}

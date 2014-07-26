@@ -583,8 +583,14 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
+  // We only allow '?' or '??' as operators for now. '?' is the intrinsic
+  // ternary operator.
+  if (*TokStart == '?') {
+    if (*CurPtr == '?')
+      ++CurPtr;
+
   // We only allow '.' in a series.
-  if (*TokStart == '.') {
+  } else if (*TokStart == '.') {
     while (*CurPtr == '.')
       ++CurPtr;
     
@@ -632,6 +638,10 @@ void Lexer::lexOperatorIdentifier() {
       diagnose(TokStart, diag::lex_unary_postfix_dot_is_reserved);
       // always emit 'tok::period' to avoid trickle down parse errors
       return formToken(tok::period, TokStart);
+    case '?':
+      if (leftBound)
+        return formToken(tok::question_postfix, TokStart);
+      return formToken(tok::question_infix, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
@@ -1416,9 +1426,6 @@ Restart:
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
-  case '?': return formToken(isLeftBound(TokStart, BufferStart)
-                               ? tok::question_postfix : tok::question_infix,
-                             TokStart);
 
   case '#': {
     if (getSubstring(TokStart + 1, 2).equals("if") &&
@@ -1496,6 +1503,11 @@ Restart:
       return formToken(tok::sil_exclamation, TokStart);
     if (isLeftBound(TokStart, BufferStart))
       return formToken(tok::exclaim_postfix, TokStart);
+    return lexOperatorIdentifier();
+  
+  case '?':
+    if (isLeftBound(TokStart, BufferStart))
+      return formToken(tok::question_postfix, TokStart);
     return lexOperatorIdentifier();
       
   case '=': case '-': case '+': case '*': case '<': case '>':
