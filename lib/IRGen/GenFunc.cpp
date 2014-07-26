@@ -2036,17 +2036,6 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   llvm_unreachable("bad difference kind");
 }
 
-#ifndef NDEBUG
-/// Check whether this type is an archetype that is known to refer to
-/// a class.
-static bool isClassArchetype(CanType type) {
-  if (auto archetypeTy = cast<ArchetypeType>(type))
-    return archetypeTy->requiresClass();
-  
-  return false;
-}
-#endif
-
 /// Emit the result of this call to an explosion.
 void CallEmission::emitToExplosion(Explosion &out) {
   assert(LastArgWritten <= 1);
