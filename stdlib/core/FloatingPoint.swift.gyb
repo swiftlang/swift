@@ -126,7 +126,7 @@ def getInfinityExponent(bits):
 % end
 
 public struct ${Self} {
-  public var value: Builtin.FPIEEE${bits}
+  var value: Builtin.FPIEEE${bits}
 
   @transparent public
   init() {

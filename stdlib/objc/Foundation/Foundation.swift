@@ -383,7 +383,7 @@ extension UInt : _BridgedToObjectiveCType {
 
 extension Float : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
-    value = number.floatValue.value
+    self = number.floatValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -401,7 +401,7 @@ extension Float : _BridgedToObjectiveCType {
 
 extension Double : _BridgedToObjectiveCType {
   public init(_ number: NSNumber) {
-    value = number.doubleValue.value
+    self = number.doubleValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
