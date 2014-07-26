@@ -28,6 +28,7 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
@@ -1776,7 +1777,7 @@ public:
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
-  llvm::PointerIntPair<Type, 2, unsigned> TypeAndAccess;
+  llvm::PointerIntPair<Type, 2, OptionalEnum<Accessibility>> TypeAndAccess;
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
@@ -1841,12 +1842,12 @@ public:
   void overwriteType(Type T);
 
   bool hasAccessibility() const {
-    return TypeAndAccess.getInt() != 0;
+    return TypeAndAccess.getInt().hasValue();
   }
 
   Accessibility getAccessibility() const {
     assert(hasAccessibility() && "accessibility not computed yet");
-    return static_cast<Accessibility>(TypeAndAccess.getInt() - 1);
+    return TypeAndAccess.getInt().getValue();
   }
 
   void setAccessibility(Accessibility access) {
@@ -1855,9 +1856,9 @@ public:
   }
 
   /// Overwrite the accessibility of this declaration.
-  /// This is needed in the LLDB REPL.
+  // This is needed in the LLDB REPL.
   void overwriteAccessibility(Accessibility access) {
-    TypeAndAccess.setInt(static_cast<unsigned>(access) + 1);
+    TypeAndAccess.setInt(access);
   }
 
   /// Returns true if this declaration is accessible from the given context.
