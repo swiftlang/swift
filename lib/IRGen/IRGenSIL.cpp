@@ -488,6 +488,36 @@ public:
     return emitShadowCopy(Storage.getAddress(), Name, Storage.getAlignment());
   }
 
+  void emitShadowCopy(ArrayRef<llvm::Value *> Vals, StringRef Name,
+                      llvm::SmallVectorImpl<llvm::Value *> &Copy) {
+    // Only do this at -O0.
+    if (IGM.Opts.Optimize) {
+      for (auto val : Vals)
+        Copy.push_back(val);
+      return;
+    }
+
+    // Single or empty values.
+    if (Vals.size() <= 1) {
+      for (auto val : Vals)
+        Copy.push_back(emitShadowCopy(val, Name));
+      return;
+    }
+
+    // Create a single aggregate alloca for explosions.
+    SmallVector<llvm::Type *, 8> Eltypes;
+    for (auto val : Vals)
+      Eltypes.push_back(val->getType());
+    auto AggregateType = llvm::StructType::get(Builder.getContext(), Eltypes);
+    auto Align = IGM.getPointerAlignment();
+    auto Alloca = createAlloca(AggregateType, Align, Name+".coerce");
+    unsigned i = 0;
+    for (auto val : Vals) {
+      auto addr = Builder.CreateConstGEP2_32(Alloca.getAddress(), 0, i++);
+      Builder.CreateStore(val, addr);
+    }
+    Copy.push_back(Alloca.getAddress());
+  }
 
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
@@ -1205,14 +1235,12 @@ getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
                    SILArgument *Arg, StringRef Name) {
   const LoweredValue &LoweredArg = getLoweredValue(Arg);
   if (LoweredArg.isAddress())
-    Vals.push_back(emitShadowCopy(LoweredArg.getAddress(), Name));
+    Vals.push_back(LoweredArg.getAddress().getAddress());
   else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
     Explosion e = LoweredArg.getExplosion(*this);
-    auto EVals = e.claimAll();
-    for (auto val : EVals)
-      // Emit -O0 shadow copies for by-value parameters to ensure they
-      // are visible until the end of the function.
-      Vals.push_back(emitShadowCopy(val, Name));
+    auto vals = e.claimAll();
+    for (auto val : vals)
+      Vals.push_back(val);
   }
 }
 
@@ -1245,20 +1273,24 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                       getTypeInfo(Arg->getType()));
 
-    // Consolidate all pieces of an exploded multi-argument into one list.
-    llvm::SmallVector<llvm::Value *, 8> Vals;
+    llvm::SmallVector<llvm::Value *, 8> Vals, Copy;
     getLoweredArgValue(Vals, Arg, Name);
     // Don't bother emitting swift.refcounted* for now.
     if (Vals.size() && Vals.back()->getType() == IGM.RefCountedPtrTy)
       Vals.pop_back();
 
+    // Consolidate all pieces of an exploded multi-argument into one list.
     for (auto Next = I+1; Next != E; ++Next, ++I) {
       if ((*Next)->getDecl() != Arg->getDecl())
         break;
       getLoweredArgValue(Vals, *Next, Name);
     }
+
+    // Emit -O0 shadow copies for by-value parameters to ensure they
+    // are visible until the end of the function.
+    emitShadowCopy(Vals, Name, Copy);
     IGM.DebugInfo->emitArgVariableDeclaration
-      (Builder, Vals, DTI, getDebugScope(), Name, N,
+      (Builder, Copy, DTI, getDebugScope(), Name, N,
        DirectValue, RealValue);
 
     DidEmitDebugInfoForArg.set(N);
