@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVM.h"
+#include "swift/AST/SILOptions.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "swift/AST/SILOptions.h"
-#include "swift/SILAnalysis/Analysis.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H
 #define SWIFT_SILPASSES_PASSMANAGER_H
@@ -47,6 +48,9 @@ namespace swift {
 
     /// Number of optimization iterations run.
     unsigned NumOptimizationIterations = 0;
+
+    /// Should the pass manager perform an early stop?
+    bool StopRunning = false;
 
   public:
     /// C'tor
@@ -79,14 +83,19 @@ namespace swift {
     /// analysis to the pass manager that will delete it when done.
     void registerAnalysis(SILAnalysis *A) { Analysis.push_back(A); }
 
-    /// \brief Run the transformations on the module.
-    void run();
+    /// \brief Run the transformations on the module. Returns true if the pass
+    /// manager was not requested to stop by a pass while running.
+    bool run();
 
-    /// \brief Run one iteration of the optimization pipeline.
-    void runOneIteration();
+    /// \brief Run one iteration of the optimization pipeline. Returns true if
+    /// the pass manager was not requested to stop by a pass while running.
+    bool runOneIteration();
 
     /// \brief Request another invocation of the transformation pipeline.
     void scheduleAnotherIteration() { anotherIteration = true; }
+
+    /// \brief Request the pass manager not to run any more passes.
+    void stopRunning() { StopRunning = true; }
 
     ///  \brief Broadcast the invalidation of the module to all analysis.
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
@@ -109,8 +118,7 @@ namespace swift {
     ~SILPassManager();
 
   protected:
-    void runFunctionPasses(
-      llvm::ArrayRef<SILFunctionTransform*> FuncTransforms);
+    bool runFunctionPasses(ArrayRef<SILFunctionTransform*> FuncTransforms);
   };
 
 } // end namespace swift
