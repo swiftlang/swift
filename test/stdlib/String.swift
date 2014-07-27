@@ -9,7 +9,8 @@ StringTests.test("sizeof") {
 }
 
 func checkUnicodeScalarViewIteration(
-    expectedScalars: [UInt32], str: String) -> AssertionResult {
+    expectedScalars: [UInt32], str: String
+) {
   if true {
     var us = str.unicodeScalars
     var i = us.startIndex
@@ -20,12 +21,7 @@ func checkUnicodeScalarViewIteration(
       decoded.append(us[i].value)
       i = i.successor()
     }
-    if expectedScalars != decoded {
-      return assertionFailure()
-          .withDescription("forward traversal:\n")
-          .withDescription("expected: \(asHex(expectedScalars))\n")
-          .withDescription("actual:   \(asHex(decoded))")
-    }
+    expectEqual(expectedScalars, decoded)
   }
   if true {
     var us = str.unicodeScalars
@@ -36,15 +32,8 @@ func checkUnicodeScalarViewIteration(
       i = i.predecessor()
       decoded.append(us[i].value)
     }
-    if expectedScalars != decoded {
-      return assertionFailure()
-          .withDescription("backward traversal:\n")
-          .withDescription("expected: \(asHex(expectedScalars))\n")
-          .withDescription("actual:   \(asHex(decoded))")
-    }
+    expectEqual(expectedScalars, decoded)
   }
-
-  return assertionSuccess()
 }
 
 StringTests.test("unicodeScalars") {
@@ -87,6 +76,20 @@ StringTests.test("_splitFirst") {
   expectTrue(found)
   expectEqual("foo", before)
   expectEqual("bar", after)
+}
+
+StringTests.test("hasPrefix") {
+  expectFalse("".hasPrefix(""))
+  expectFalse("".hasPrefix("a"))
+  expectFalse("a".hasPrefix(""))
+  expectTrue("a".hasPrefix("a"))
+
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
+  expectFalse("abc".hasPrefix("a\u{0301}"))
+  expectFalse("a\u{0301}bc".hasPrefix("a"))
+  expectTrue("\u{00e1}bc".hasPrefix("a\u{0301}"))
+  expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
 }
 
 StringTests.run()

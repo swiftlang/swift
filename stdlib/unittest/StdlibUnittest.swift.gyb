@@ -251,11 +251,13 @@ public func expectTrue(
 
 public func expectFalse(
     actual: ${BoolType},
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected: false")
     println("actual: \(actual)")
     println()

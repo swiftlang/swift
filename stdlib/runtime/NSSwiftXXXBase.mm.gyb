@@ -110,6 +110,30 @@ extern "C" size_t swift_stdlib_NSStringNFDHashValue(NSString *str) {
   return Result;
 }
 
+extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
+                                                  NSString *prefix) {
+  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
+  int Result = CFStringFindWithOptions(
+      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
+      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
+      nullptr);
+  swift_unknownRelease(theString);
+  swift_unknownRelease(prefix);
+  return Result;
+}
+
+extern "C" bool swift_stdlib_NSStringHasSuffixNFD(NSString *theString,
+                                                  NSString *suffix) {
+  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
+  int Result = CFStringFindWithOptions(
+      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
+      CFRangeMake(0, Length),
+      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
+  swift_unknownRelease(theString);
+  swift_unknownRelease(suffix);
+  return Result;
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

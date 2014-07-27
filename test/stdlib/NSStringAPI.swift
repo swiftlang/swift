@@ -1222,20 +1222,23 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
   ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
   ComparisonTest(.LT, "A\u{30a}", "a"),
+  ComparisonTest(.LT, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
   // U+03A9 GREEK CAPITAL LETTER OMEGA
   ComparisonTest(.EQ, "\u{2126}", "\u{03a9}"),
 
-  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
   // U+0323 COMBINING DOT BELOW
   // U+0307 COMBINING DOT ABOVE
   // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
+  // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
   ComparisonTest(.EQ, "\u{1e69}", "s\u{323}\u{307}"),
   ComparisonTest(.EQ, "\u{1e69}", "s\u{307}\u{323}"),
   ComparisonTest(.EQ, "\u{1e69}", "\u{1e63}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}", "s\u{323}"),
   ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
   ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+  ComparisonTest(.LT, "s\u{323}", "\u{1e69}"),
 
   // U+FB01 LATIN SMALL LIGATURE FI
   ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
@@ -1269,23 +1272,7 @@ func checkComparable<T : Comparable>(
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
 }
 
-func checkCharacterComparisonImpl(
-  expected: ExpectedComparisonResult,
-  lhs: Character, rhs: Character, stackTrace: SourceLocStack
-) {
-  // Character / Character
-  expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
-  expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
-  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
-
-  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
-  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
-  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
-}
-
-func checkStringComparisonImpl(
+func checkStringComparison(
   expected: ExpectedComparisonResult,
   lhs: String, rhs: String, stackTrace: SourceLocStack
 ) {
@@ -1315,8 +1302,7 @@ func checkStringComparisonImpl(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace.withCurrentLoc())
 
-  // Test mixed comparisons.  Currently we rely on implicit bridging for these
-  // operators to work.
+  // Test mixed comparisons.
 
   // String / NSString
   expectEqual(expected.isEQ(), lhs == rhsNSString, stackTrace: stackTrace)
@@ -1337,31 +1323,88 @@ func checkStringComparisonImpl(
   expectEqual(expected.isGT(), lhsNSString > rhs, stackTrace: stackTrace)
 }
 
-func checkComparison(
-  expectedUnicodeCollation: ExpectedComparisonResult,
-  lhs: String, rhs: String, stackTrace: SourceLocStack
-) {
-  checkStringComparisonImpl(
-    expectedUnicodeCollation, lhs, rhs, stackTrace.withCurrentLoc())
-  checkStringComparisonImpl(
-    expectedUnicodeCollation.flip(), rhs, lhs, stackTrace.withCurrentLoc())
-
-  if countElements(lhs) == 1 && countElements(rhs) == 1 {
-    let lhsCharacter = Character(lhs)
-    let rhsCharacter = Character(rhs)
-    checkCharacterComparisonImpl(
-      expectedUnicodeCollation, lhsCharacter, rhsCharacter,
-      stackTrace.withCurrentLoc())
-    checkCharacterComparisonImpl(
-      expectedUnicodeCollation.flip(), rhsCharacter, lhsCharacter,
-      stackTrace.withCurrentLoc())
+NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
+  for test in comparisonTests {
+    checkStringComparison(
+      test.expectedUnicodeCollation, test.lhs, test.rhs,
+      test.loc.withCurrentLoc())
+    checkStringComparison(
+      test.expectedUnicodeCollation.flip(), test.rhs, test.lhs,
+      test.loc.withCurrentLoc())
   }
 }
 
-NSStringAPIs.test("OperatorEquals") {
+func checkCharacterComparison(
+  expected: ExpectedComparisonResult,
+  lhs: Character, rhs: Character, stackTrace: SourceLocStack
+) {
+  // Character / Character
+  expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
+  expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
+  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
+
+  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
+}
+
+NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
   for test in comparisonTests {
-    checkComparison(
-      test.expectedUnicodeCollation, test.lhs, test.rhs, test.loc.withCurrentLoc())
+    if countElements(test.lhs) == 1 && countElements(test.rhs) == 1 {
+      let lhsCharacter = Character(test.lhs)
+      let rhsCharacter = Character(test.rhs)
+      checkCharacterComparison(
+        test.expectedUnicodeCollation, lhsCharacter, rhsCharacter,
+        test.loc.withCurrentLoc())
+      checkCharacterComparison(
+        test.expectedUnicodeCollation.flip(), rhsCharacter, lhsCharacter,
+        test.loc.withCurrentLoc())
+    }
+  }
+}
+
+func checkHasPrefixHasSuffix(
+  lhs: String, rhs: String, stackTrace: SourceLocStack
+) {
+  if lhs == "" {
+    return
+  }
+  if rhs == "" {
+    expectFalse(lhs.hasPrefix(rhs), stackTrace: stackTrace)
+    expectFalse(lhs.hasSuffix(rhs), stackTrace: stackTrace)
+    return
+  }
+
+  // To determine the expected results, compare grapheme clusters,
+  // scalar-to-scalar, of the NFD form of the strings.
+  let lhsNFDGraphemeClusters =
+    map(lhs.decomposedStringWithCanonicalMapping) {
+      Array(String($0).unicodeScalars)
+    }
+  let rhsNFDGraphemeClusters =
+    map(rhs.decomposedStringWithCanonicalMapping) {
+      Array(String($0).unicodeScalars)
+    }
+  let expectHasPrefix =
+    startsWith(lhsNFDGraphemeClusters, rhsNFDGraphemeClusters) { $0 == $1 }
+  let expectHasSuffix = startsWith(
+    lazy(lhsNFDGraphemeClusters).reverse(),
+    lazy(rhsNFDGraphemeClusters).reverse()) { $0 == $1 }
+
+  expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
+  expectEqual(
+    expectHasPrefix, (lhs + "abc").hasPrefix(rhs), stackTrace: stackTrace)
+  expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
+  expectEqual(
+    expectHasSuffix, ("abc" + lhs).hasSuffix(rhs), stackTrace: stackTrace)
+}
+
+NSStringAPIs.test("hasPrefix,hasSuffix") {
+  for test in comparisonTests {
+    checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
   }
 }
 

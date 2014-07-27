@@ -53,19 +53,32 @@ extension String {
     return true
   }
 
-  public func hasPrefix(prefix: String) -> Bool {
-    return Swift.startsWith(self, prefix)
-  }
-  
-  public func hasSuffix(suffix: String) -> Bool {
-    return Swift.startsWith(lazy(self).reverse(), lazy(suffix).reverse())
-  }
-
   func _isAlpha() -> Bool { return _isAll({ $0._isAlpha() }) }
   func _isDigit() -> Bool { return _isAll({ $0._isDigit() }) }
   func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 
+/// Determines if `theString` starts with `prefix` comparing the strings under
+/// canonical equivalence.
+@asmname("swift_stdlib_NSStringHasPrefixNFD")
+func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, prefix: AnyObject) -> Bool
+
+/// Determines if `theString` ends with `suffix` comparing the strings under
+/// canonical equivalence.
+@asmname("swift_stdlib_NSStringHasSuffixNFD")
+func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, suffix: AnyObject) -> Bool
+
+extension String {
+  public func hasPrefix(prefix: String) -> Bool {
+    return _stdlib_NSStringHasPrefixNFD(
+      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
+  }
+
+  public func hasSuffix(suffix: String) -> Bool {
+    return _stdlib_NSStringHasSuffixNFD(
+      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
+  }
+}
 
 // Conversions to string from other types.
 extension String {
