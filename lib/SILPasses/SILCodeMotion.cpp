@@ -391,6 +391,16 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
   if (Ptr != S->getOperand())
     return false;
 
+  // If S has a default case bail since the default case could represent
+  // multiple cases.
+  //
+  // TODO: I am currently just disabling this behavior so we can get this out
+  // for Seed 5. After Seed 5, we should be able to recognize if a switch_enum
+  // handles all cases except for 1 and has a default case. We might be able to
+  // stick code into SILBuilder that has this behavior.
+  if (S->hasDefault())
+    return false;
+
   // Next go over all instructions after I in the basic block. If none of them
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can

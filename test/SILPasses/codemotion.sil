@@ -342,3 +342,26 @@ sil @virtual_callee : $@cc(method) @thin (@owned Test) -> UInt64
 sil_vtable Test {
   #Test.testing!1: virtual_callee
 }
+
+// Don't sink a retain over switch_enum with a default case.
+//
+// CHECK-LABEL: sil @dont_sink_retain_over_default_case_switch_enum : $@thin (FakeOptional) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: switch_enum
+// CHECK: return
+sil @dont_sink_retain_over_default_case_switch_enum : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  retain_value %0 : $FakeOptional
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, default bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $() 
+}
