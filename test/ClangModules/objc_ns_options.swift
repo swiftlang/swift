@@ -25,6 +25,7 @@ var minceFromMask: NSRuncingOptions = .fromMask(0)
 
 var nothing: NSRuncingOptions = NSRuncingOptions()
 var nothing2: NSRuncingOptions = nil
+let nothing3: NSRuncingOptions = .allZeros
 
 if noMince {}
 

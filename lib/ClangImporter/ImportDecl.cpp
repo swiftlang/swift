@@ -684,6 +684,79 @@ static void makeOptionSetBoolValueProperty(StructDecl *optionSetDecl,
   NewDecls.push_back(PatternBinding);
 }
 
+/// Build the 'allZeros' property for an option set.
+/// \code
+/// struct NSSomeOptionSet : RawOptionSet {
+///   static var allZeros: NSSomeOptionSet {
+///     return nil
+///   }
+/// }
+/// \endcode
+static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
+                                           SmallVectorImpl<Decl *> &NewDecls) {
+  ASTContext &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+
+  // Create the getter.
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*isStaticMethod=*/true);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(), {}, SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+
+  Type getterType = FunctionType::get(TupleType::getEmpty(C), optionSetType);
+  getterType = FunctionType::get(MetatypeType::get(optionSetType), getterType);
+
+  auto *getterDecl = FuncDecl::create(C, SourceLoc(),
+                                      StaticSpellingKind::KeywordStatic,
+                                      SourceLoc(), Identifier(), SourceLoc(),
+                                      nullptr, getterType, params,
+                                      TypeLoc::withoutLoc(optionSetType),
+                                      optionSetDecl);
+  getterDecl->setImplicit();
+  getterDecl->setStatic();
+  getterDecl->setBodyResultType(optionSetType);
+  getterDecl->setAccessibility(Accessibility::Public);
+
+  // Fill in the body of the getter.
+  {
+    auto nilLiteral = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
+    auto ret = new (C) ReturnStmt(SourceLoc(), nilLiteral);
+
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  /*Implicit=*/true);
+    getterDecl->setBody(body);
+  }
+
+  // Add as an external definition.
+  C.addedExternalDecl(getterDecl);
+
+  NewDecls.push_back(getterDecl);
+
+  // Create the property.
+  auto *PropertyDecl =
+      new (C) VarDecl(/*IsStatic=*/true, /*IsLet=*/false, SourceLoc(),
+                      C.Id_AllZeros, optionSetType, optionSetDecl);
+  PropertyDecl->setInterfaceType(optionSetDecl->getDeclaredInterfaceType());
+  PropertyDecl->setImplicit();
+  PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  PropertyDecl->setAccessibility(optionSetDecl->getAccessibility());
+  NewDecls.push_back(PropertyDecl);
+
+  Pattern *PropertyPattern =
+      new (C) NamedPattern(PropertyDecl, /*Implicit=*/true);
+  PropertyPattern->setType(optionSetType);
+  PropertyPattern = new (C) TypedPattern(
+      PropertyPattern, TypeLoc::withoutLoc(optionSetType), /*Implicit=*/true);
+  PropertyPattern->setType(optionSetType);
+
+  auto *PatternBinding = new (C) PatternBindingDecl(
+      SourceLoc(), StaticSpellingKind::KeywordStatic, SourceLoc(),
+      PropertyPattern, nullptr, /*IsConditional=*/false, optionSetDecl);
+  PatternBinding->setImplicit();
+  NewDecls.push_back(PatternBinding);
+}
+
 // Build the NilLiteralConvertible conformance:
 //
 // extension NSSomeOptionSet : NilLiteralConvertible {
@@ -1604,6 +1677,7 @@ namespace {
                                            OptionSetFactoryMethod::FromRaw));
             NewDecls.push_back(makeOptionSetToRawMethod(structDecl, var));
             makeOptionSetBoolValueProperty(structDecl, var, NewDecls);
+            makeOptionSetAllZerosProperty(structDecl, NewDecls);
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
           }
         };

@@ -61,6 +61,7 @@ IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 // Built-in identifiers
 IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "_MaxBuiltinIntegerType")
 IDENTIFIER(IntegerLiteralType)
+IDENTIFIER_WITH_NAME(AllZeros, "allZeros")
 IDENTIFIER_WITH_NAME(BoolValue, "boolValue")
 IDENTIFIER_WITH_NAME(ConvertFromNilLiteral, "convertFromNilLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
