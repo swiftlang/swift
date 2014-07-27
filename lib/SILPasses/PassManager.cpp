@@ -42,6 +42,15 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       SFT->injectFunction(&F);
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
+
+      ++NumPassesRun;
+      if (Mod->getStage() == SILStage::Canonical
+          && NumPassesRun >= Options.NumOptPassesToRun) {
+        DEBUG(llvm::dbgs() << "        HIT MAX COUNTER LIMIT! BAILING!\n");
+        stopRunning();
+        return false;
+      }
+
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
@@ -73,7 +82,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 }
 
 bool SILPassManager::runOneIteration() {
-  assert(!ShouldStop && "Should never call this if we were asked to stop "
+  assert(!StopRunning && "Should never call this if we were asked to stop "
          "without reseting the pass manager.");
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
@@ -86,17 +95,18 @@ bool SILPassManager::runOneIteration() {
   for (SILTransform *ST : Transformations) {
     // Bail out if we've hit the optimization pass limit.
     if (Mod->getStage() == SILStage::Canonical
-        && NumPassesRun >= Options.NumOptPassesToRun)
+        && NumPassesRun >= Options.NumOptPassesToRun) {
+      stopRunning();
       break;
-
-    ++NumPassesRun;
+    }
 
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
       // Run all function passes that we've seen since the last module pass. If
       // one of the passes asked us to stop the pass pipeline, return false.
       if (!runFunctionPasses(PendingFuncTransforms)) {
-        DEBUG(llvm::dbgs() << "        PASS ASKED US TO STOP! BAILING!\n");
+        DEBUG(llvm::dbgs() << "        PASS ASKED US TO STOP OR WE HIT PASS "
+              "LIMIT! BAILING!\n");
         return false;
       }
 
@@ -110,6 +120,15 @@ bool SILPassManager::runOneIteration() {
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
+      ++NumPassesRun;
+
+      if (Mod->getStage() == SILStage::Canonical
+          && NumPassesRun >= Options.NumOptPassesToRun) {
+        stopRunning();
+        DEBUG(llvm::dbgs() << "        HIT MAX COUNTER LIMIT! BAILING!\n");
+        return false;
+      }
+
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
