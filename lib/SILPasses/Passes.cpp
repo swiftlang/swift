@@ -148,9 +148,11 @@ void AddSSAPasses(SILPassManager &PM, SILModule &Module,
   PM.add(createGlobalARCOpts());
 }
 
-
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
+  if (Options.DisableSILPerfOptimizations)
+    return;
+
   if (Options.DebugSerialization) {
     SILPassManager PM(&Module, Options);
     registerAnalysisPasses(PM, &Module);
