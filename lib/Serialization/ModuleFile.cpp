@@ -139,7 +139,9 @@ SerializedModuleLoader::ValidationInfo
 SerializedModuleLoader::validateSerializedAST(StringRef data) {
   ValidationInfo result = { {}, 0, ModuleStatus::Malformed };
 
-  if (data.size() % 4 != 0)
+  // Check 32-bit alignment.
+  if (data.size() % 4 != 0 ||
+      reinterpret_cast<uintptr_t>(data.data()) % 4 != 0)
     return result;
 
   llvm::BitstreamReader reader(reinterpret_cast<const uint8_t *>(data.begin()),
