@@ -19,6 +19,7 @@
 #define SWIFT_AST_SILOPTIONS_H
 
 #include <string>
+#include <climits>
 
 namespace swift {
 
