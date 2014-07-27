@@ -51,76 +51,60 @@ func testSplit() {
 }
 testSplit()
 
-//
-// Convenience functions for testing
-//
+struct StartsWithTest {
+  let expected: Bool
+  let sequence: [Int]
+  let prefix: [Int]
+  let loc: SourceLoc
 
-// FIXME: Until <rdar://problem/13985164> is fixed, we can't build
-// generic algorithms that work on Sequences, so need a lightweight
-// way to get Streams out of them.
-prefix operator ^ {}
-prefix func ^ (x: [Int]) -> Array<Int>.Generator
-{ return x.generate() }
-
-// FIXME: This class is a temporary workaround for
-// <rdar://problem/13987068> (Vector enumerators can dangle)
-struct VecIntStream : GeneratorType, SequenceType {
-  typealias Element = Int
-
-  init(_ owner: [Int]) {
-    self.owner = owner
-    self.value = owner.generate()
+  init(
+    _ expected: Bool, _ sequence: [Int], _ prefix: [Int],
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.prefix = prefix
+    self.loc = SourceLoc(file, line, comment: "test data")
   }
-  mutating
-  func next() -> Element? { return value.next() }
-  
-  func generate() -> VecIntStream {
-    return self
+}
+
+let startsWithTests = [
+  StartsWithTest(true, [], []),
+  StartsWithTest(false, [], [ 1 ]),
+  StartsWithTest(true, [ 1 ], []),
+  StartsWithTest(true, [ 0, 1, 3, 5 ], [ 0, 1 ]),
+  StartsWithTest(true, [ 0, 1 ], [ 0, 1 ]),
+  StartsWithTest(false, [ 0, 1, 3, 5 ], [ 0, 1, 4 ]),
+  StartsWithTest(false, [ 0, 1 ], [ 0, 1, 4 ]),
+]
+
+func checkStartsWith(
+  expected: Bool, sequence: [Int], prefix: [Int],
+  stackTrace: SourceLocStack
+) {
+  expectEqual(expected, startsWith(sequence, prefix), stackTrace: stackTrace)
+  expectEqual(
+    expected, startsWith(sequence, prefix) { $0 == $1 },
+    stackTrace: stackTrace)
+  expectEqual(
+    expected, startsWith(map(sequence) { $0 * 2 }, prefix) { $0 / 2 == $1 },
+    stackTrace: stackTrace)
+
+  // Test using different types for the sequence and prefix.
+  expectEqual(
+    expected, startsWith(ContiguousArray(sequence), prefix),
+    stackTrace: stackTrace)
+  expectEqual(
+    expected, startsWith(ContiguousArray(sequence), prefix) { $0 == $1 },
+    stackTrace: stackTrace)
+}
+
+Algorithm.test("startsWith") {
+  for test in startsWithTests {
+    checkStartsWith(
+      test.expected, test.sequence, test.prefix, test.loc.withCurrentLoc())
   }
-  var owner: [Int]
-  var value: Array<Int>.Generator
 }
-
-prefix operator ^^ {}
-prefix func ^^ (x: [Int]) -> VecIntStream
-{ 
-  var result = Array<Int>()
-  
-  for a in x { result.append(a) }
-  return VecIntStream(result)
-}
-
-func testStartsWith() {
-  // CHECK: testing startsWith
-  println("testing startsWith")
-  
-  // CHECK-NEXT: true
-  println(startsWith(^[0, 1, 3, 5], ^[0, 1]))
-
-  // CHECK-NEXT: true
-  println(startsWith(^[0, 1], ^[0, 1]))
-
-  // CHECK-NEXT: false
-  println(startsWith(^[0, 1, 3, 5], ^[0, 1, 4]))
-
-  // CHECK-NEXT: false
-  println(startsWith(^[0, 1], ^[0, 1, 4]))
-
-
-  // Same tests using heterogeneous enumerators
-  // CHECK-NEXT: true
-  println(startsWith(^^[0, 1, 3, 5], ^[0, 1]))
-
-  // CHECK-NEXT: true
-  println(startsWith(^^[0, 1], ^[0, 1]))
-
-  // CHECK-NEXT: false
-  println(startsWith(^^[0, 1, 3, 5], ^[0, 1, 4]))
-  // CHECK-NEXT: false
-  println(startsWith(^^[0, 1], ^[0, 1, 4]))
-  println("done.")
-}
-testStartsWith()
 
 func testEnumerate() {
   println("testing enumerate")

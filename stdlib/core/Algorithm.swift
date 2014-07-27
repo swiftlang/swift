@@ -548,6 +548,27 @@ public func startsWith<
   return prefixGenerator.next() ? false : true
 }
 
+/// Return true iff the the initial elements of `s` are equal to `prefix`,
+/// using `pred` as equality `==` comparison.
+public func startsWith<
+  S0: SequenceType, S1: SequenceType
+  where
+    S0.Generator.Element == S1.Generator.Element
+>(s: S0, prefix: S1,
+  predicate: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
+{
+  var prefixGenerator = prefix.generate()
+
+  for e0 in s {
+    var e1 = prefixGenerator.next()
+    if !e1 { return true }
+    if !predicate(e0, e1!) {
+      return false
+    }
+  }
+  return prefixGenerator.next() ? false : true
+}
+
 public struct EnumerateGenerator<
   Base: GeneratorType
 > : GeneratorType, SequenceType {
