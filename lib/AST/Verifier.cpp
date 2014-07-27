@@ -1107,14 +1107,45 @@ struct ASTNodeBase {};
 
       verifyCheckedBase(E);
     }
+    
+    void checkOptionalObjectType(Type optionalType,
+                                 Type objectType,
+                                 Expr *E) {
+      auto optionalRVType = optionalType->getRValueType();
+      auto objectRVType = objectType->getRValueType();
+      
+      checkSameType(objectRVType, optionalRVType->getAnyOptionalObjectType(),
+                    "optional object type");
+      
+      if (objectType->is<LValueType>() != optionalType->is<LValueType>()) {
+        Out << "optional operation must preserve lvalue-ness of base\n";
+        E->print(Out);
+        abort();
+      }
+    }
 
+    void verifyChecked(OptionalEvaluationExpr *E) {
+      if (E->getType()->isLValueType()) {
+        Out << "Optional evaluation should not produce an lvalue";
+        E->print(Out);
+        abort();
+      }
+      checkSameType(E->getType(), E->getSubExpr()->getType(),
+                    "OptionalEvaluation cannot change type");
+    }
+    
     void verifyChecked(BindOptionalExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying BindOptionalExpr", E);
 
       if (E->getDepth() >= OptionalEvaluations.size()) {
-        Out << "BindOptional expression is out of its depth";
+        Out << "BindOptional expression is out of its depth\n";
+        E->print(Out);
         abort();
       }
+      
+      checkOptionalObjectType(E->getSubExpr()->getType(),
+                              E->getType(), E);
+      
       verifyCheckedBase(E);
     }
 
@@ -1263,19 +1294,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ForceValueExpr *E) {
-      auto objectLVTy = E->getType();
-      auto objectTy = objectLVTy->getRValueType();
-      
-      auto optLVTy = E->getSubExpr()->getType();
-      auto optTy = optLVTy->getRValueType();
-      
-      checkSameType(objectTy, optTy->getAnyOptionalObjectType(),
-                    "optional value type");
-      
-      if (objectLVTy->is<LValueType>() != optLVTy->is<LValueType>()) {
-        Out << "ForceValueExpr must preserve lvalue-ness of base\n";
-        abort();
-      }
+      checkOptionalObjectType(E->getSubExpr()->getType(),
+                              E->getType(), E);
       
       verifyCheckedBase(E);
     }
