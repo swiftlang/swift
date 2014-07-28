@@ -403,3 +403,10 @@ public typealias _SignedInteger = _SignedIntegerType
 public typealias _SignedNumber = _SignedNumberType
 @availability(*,unavailable,renamed="_UnsignedIntegerType")
 public typealias _UnsignedInteger = _UnsignedIntegerType
+
+@availability(*,unavailable,renamed="debugTrap")
+public func fatalError(
+  message: StaticString,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {}
+

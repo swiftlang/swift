@@ -14,7 +14,7 @@ import Foundation
 // about.
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder!) {
-    fatalError("don't call this initializer")
+    debugTrap("don't call this initializer")
   }
 
   init(_ value: [UInt16]) {

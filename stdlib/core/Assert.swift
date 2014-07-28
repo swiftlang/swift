@@ -50,7 +50,7 @@ public func assert<T : BooleanType>(
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
 @transparent @noreturn
-public func fatalError(
+public func debugTrap(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {

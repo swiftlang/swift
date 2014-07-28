@@ -116,7 +116,7 @@ public final class _NSContiguousString : _NSSwiftString {
   }
 
   init(coder aDecoder: AnyObject) {
-    fatalError("init(coder:) not implemented for _NSContiguousString")
+    _fatalError("init(coder:) not implemented for _NSContiguousString")
   }
 
   func length() -> Int {

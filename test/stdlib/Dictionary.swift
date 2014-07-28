@@ -1751,7 +1751,7 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   required init(coder aDecoder: NSCoder) {
-    fatalError("init(coder:) not implemented by ParallelArrayDictionary")
+    debugTrap("init(coder:) not implemented by ParallelArrayDictionary")
   }
   
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {

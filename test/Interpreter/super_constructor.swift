@@ -54,7 +54,7 @@ println(D())
 
 class BaseWithDummyParameter {
   init() {
-    fatalError("wrong init")
+    debugTrap("wrong init")
   }
   init(dummy: ()) {
     println("correct")
