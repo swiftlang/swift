@@ -780,19 +780,11 @@ extension NSArray : Swift.CollectionType {
 }
 */
 
-// FIXME: This should not be necessary.  We
-// should get this from the extension on 'NSArray' above.
-extension NSMutableArray : SequenceType {}
-
 extension NSSet : SequenceType {
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
 }
-
-// FIXME: This should not be necessary.  We
-// should get this from the extension on 'NSSet' above.
-extension NSMutableSet : SequenceType {}
 
 extension NSDictionary : SequenceType {
   // FIXME: A class because we can't pass a struct with class fields through an
@@ -824,10 +816,6 @@ extension NSDictionary : SequenceType {
     return Generator(self)
   }
 }
-
-// FIXME: This should not be necessary.  We
-// should get this from the extension on 'NSDictionary' above.
-extension NSMutableDictionary : SequenceType {}
 
 //===----------------------------------------------------------------------===//
 // Ranges

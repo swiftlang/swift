@@ -814,12 +814,6 @@ LookupConformanceResult Module::lookupConformance(Type type,
       return inheritedConformance;
 
     case ConformanceKind::Conforms:
-      // If the inherited conformance is not in fact inheritable, then
-      // we're done.
-      if (!inheritedConformance.getPointer()->isInheritable(resolver)) {
-        return { nullptr, ConformanceKind::DoesNotConform };
-      }
-
       // Create inherited conformance below.
       break;
     }

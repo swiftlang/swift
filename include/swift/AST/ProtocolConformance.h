@@ -208,9 +208,6 @@ public:
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
-  /// Determine whether this conformance is inheritable by subclasses.
-  bool isInheritable(LazyResolver *resolver) const;
-
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   ///
@@ -266,16 +263,6 @@ private:
 /// requirement \c foo.
 class NormalProtocolConformance : public ProtocolConformance,
                                   public llvm::FoldingSetNode {
-  /// Describes whether this conformance is inheritable to subclasses or not.
-  enum class IsInheritableKind {
-    /// We haven't checked yet whether this conformance is inheritable.
-    Unknown,
-    /// This conformance is inheritable.
-    Inheritable,
-    /// Ths conformance is not inheritable.
-    NotInheritable
-  };
-
   /// \brief The protocol being conformed to and its current state.
   llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
     ProtocolAndState;
@@ -284,10 +271,8 @@ class NormalProtocolConformance : public ProtocolConformance,
   SourceLoc Loc;
 
   /// The declaration context containing the ExtensionDecl or
-  /// NominalTypeDecl that declared the conformance, along with whether this
-  /// conformance is inheritable.
-  mutable llvm::PointerIntPair<DeclContext *, 2, IsInheritableKind> 
-    DCAndInheritable;
+  /// NominalTypeDecl that declared the conformance.
+  mutable DeclContext *DC;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -311,12 +296,9 @@ class NormalProtocolConformance : public ProtocolConformance,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc),
-      DCAndInheritable(dc, IsInheritableKind::Unknown)
+      ProtocolAndState(protocol, state), Loc(loc), DC(dc)
   {
   }
-
-  bool isInheritableSlow(LazyResolver *resolver) const;
 
 public:
   /// Get the protocol being conformed to.
@@ -327,15 +309,11 @@ public:
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  DeclContext *getDeclContext() const {
-    return DCAndInheritable.getPointer();
-  }
+  DeclContext *getDeclContext() const { return DC; }
 
   /// Set the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  void setDeclContext(DeclContext *dc) {
-    DCAndInheritable.setPointer(dc);
-  }
+  void setDeclContext(DeclContext *dc) { DC = dc; }
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
@@ -345,20 +323,6 @@ public:
   /// Set the state of this conformance.
   void setState(ProtocolConformanceState state) {
     ProtocolAndState.setInt(state);
-  }
-
-  /// Determine whether this conformance is inheritable by subclasses.
-  bool isInheritable(LazyResolver *resolver) const {
-    switch (DCAndInheritable.getInt()) {
-    case IsInheritableKind::Inheritable:
-      return true;
-
-    case IsInheritableKind::NotInheritable:
-      return false;
-
-    case IsInheritableKind::Unknown:
-      return isInheritableSlow(resolver);
-    }
   }
 
   /// Retrieve the type witness corresponding to the given associated type
@@ -512,11 +476,6 @@ public:
     return GenericConformance->getState();
   }
 
-  /// Determine whether this conformance is inheritable by subclasses.
-  bool isInheritable(LazyResolver *resolver) const {
-    return GenericConformance->isInheritable(resolver);
-  }
-
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(AssociatedTypeDecl *assocType, 
                                      LazyResolver *resolver) const;
@@ -603,12 +562,6 @@ public:
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
     return InheritedConformance->getState();
-  }
-
-  /// Determine whether this conformance is inheritable by subclasses.
-  bool isInheritable(LazyResolver *resolver) const {
-    // Always inheritable, because it was itself inherited.
-    return true;
   }
 
   /// Retrieve the type witness for the given associated type.
