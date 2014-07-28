@@ -462,6 +462,11 @@ extension String : CollectionType {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
+  @availability(*, unavailable, message="cannot subscript String with an Int")
+  public subscript(i: Int) -> Character {
+    return " "
+  }
+
   public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
   }
@@ -505,6 +510,11 @@ extension String : Sliceable {
   public subscript(subRange: Range<Index>) -> String {
     return String(
       unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
+  }
+
+  @availability(*, unavailable, message="cannot subscript String with a range of Int")
+  public subscript(subRange: Range<Int>) -> String {
+    return ""
   }
 }
 
