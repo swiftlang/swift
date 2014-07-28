@@ -561,12 +561,12 @@ public func startsWith<
 
   for e0 in s {
     var e1 = prefixGenerator.next()
-    if !e1 { return true }
+    if e1 == nil { return true }
     if !predicate(e0, e1!) {
       return false
     }
   }
-  return prefixGenerator.next() ? false : true
+  return prefixGenerator.next() != nil ? false : true
 }
 
 public struct EnumerateGenerator<
