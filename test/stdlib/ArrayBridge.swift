@@ -45,7 +45,7 @@ var nextTrackedSerialNumber = 0
 class Tracked : NSObject, ForwardIndexType, Printable, Fooable {
   func foo() { }
 
-  init(_ value: Int) {
+  required init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
     self.value = value
@@ -62,8 +62,8 @@ class Tracked : NSObject, ForwardIndexType, Printable, Fooable {
     return "Base#\(serialNumber)(\(value))"
   }
 
-  func successor() -> Tracked {
-    return Tracked(self.value.successor())
+  func successor() -> Self {
+    return self.dynamicType(self.value.successor())
   }
 
   var value: Int

@@ -344,7 +344,7 @@ protocol IntrusiveListNode : class {
   var next : Self { get }
 }
 
-class ClassNode : IntrusiveListNode {
+final class ClassNode : IntrusiveListNode {
   var next : ClassNode = ClassNode()
 }
 
@@ -352,7 +352,7 @@ struct StructNode : IntrusiveListNode { // expected-error{{non-class type 'Struc
   var next : StructNode
 }
 
-class ClassNodeByExtension { }
+final class ClassNodeByExtension { }
 struct StructNodeByExtension { }
 
 extension ClassNodeByExtension : IntrusiveListNode {
@@ -373,7 +373,7 @@ extension StructNodeByExtension : IntrusiveListNode { // expected-error{{non-cla
   }
 }
 
-class GenericClassNode<T> : IntrusiveListNode {
+final class GenericClassNode<T> : IntrusiveListNode {
   var next : GenericClassNode<T> = GenericClassNode()
 }
 
@@ -386,7 +386,7 @@ protocol IntrusiveDListNode : IntrusiveListNode {
   var prev : Self { get }
 }
 
-class ClassDNode : IntrusiveDListNode {
+final class ClassDNode : IntrusiveDListNode {
   var prev : ClassDNode = ClassDNode()
   var next : ClassDNode = ClassDNode()
 }

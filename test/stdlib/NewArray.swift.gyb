@@ -22,7 +22,7 @@ var xSerial = 0
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
 class X : ForwardIndexType, Comparable, Printable, IntegerLiteralConvertible {
-  init(_ value: Int) {
+  required init(_ value: Int) {
     ++xCount
     serial = ++xSerial
     self.value = value
@@ -39,12 +39,12 @@ class X : ForwardIndexType, Comparable, Printable, IntegerLiteralConvertible {
     return value.description
   }
 
-  func successor() -> X {
-    return X(self.value.successor())
+  func successor() -> Self {
+    return self.dynamicType(self.value.successor())
   }
   
-  class func convertFromIntegerLiteral(value: Int) -> X {
-    return X(value)
+  class func convertFromIntegerLiteral(value: Int) -> Self {
+    return self(value)
   }
 
   var value: Int

@@ -254,12 +254,12 @@ extension Bar {
 // underlying type) don't break protocol conformance or use.
 class XArray : ArrayLiteralConvertible {
   typealias Element = Int
-  class func convertFromArrayLiteral(elements: Int...) -> XArray { }
+  class func convertFromArrayLiteral(elements: Int...) -> Self { }
 }
 
 class YArray : XArray, ArrayLiteralConvertible {
   typealias Element = Int
-  override class func convertFromArrayLiteral(elements: Int...) -> YArray { }
+  override class func convertFromArrayLiteral(elements: Int...) -> Self { }
 }
 
 var yarray : YArray = [1, 2, 3]

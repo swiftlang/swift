@@ -458,16 +458,16 @@ extension CGFloat : _BridgedToObjectiveCType {
 // Literal support for NSNumber
 extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
                      BooleanLiteralConvertible {
-  public class func convertFromIntegerLiteral(value: Int) -> NSNumber {
-    return NSNumber(integer: value)
+  public class func convertFromIntegerLiteral(value: Int) -> Self {
+    return self(integer: value)
   }
 
-  public class func convertFromFloatLiteral(value: Double) -> NSNumber {
-    return NSNumber(double: value)
+  public class func convertFromFloatLiteral(value: Double) -> Self {
+    return self(double: value)
   }
 
-  public class func convertFromBooleanLiteral(value: Bool) -> NSNumber {
-    return NSNumber(bool: value)
+  public class func convertFromBooleanLiteral(value: Bool) -> Self {
+    return self(bool: value)
   }
 }
 

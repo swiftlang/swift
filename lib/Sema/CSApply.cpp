@@ -4549,6 +4549,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // If we're constructing a class object, either the metatype must be
   // statically derived (rather than an arbitrary value of metatype type) or
   // the referenced constructor must be abstract.
+  // FIXME: The "hasClangNode" check here is a complete hack.
   if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
       !fn->isStaticallyDerivedMetatype() &&
       !decl->hasClangNode() &&

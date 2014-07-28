@@ -1,31 +1,31 @@
 // RUN: %swift -parse -verify %s
 
-class IntList : ArrayLiteralConvertible {
+struct IntList : ArrayLiteralConvertible {
   typealias Element = Int
-  class func convertFromArrayLiteral(elements: Int...) -> IntList {}
+  static func convertFromArrayLiteral(elements: Int...) -> IntList {}
 }
 
-class DoubleList : ArrayLiteralConvertible {
+struct DoubleList : ArrayLiteralConvertible {
   typealias Element = Double
-  class func convertFromArrayLiteral(elements: Double...) -> DoubleList {}
+  static func convertFromArrayLiteral(elements: Double...) -> DoubleList {}
 }
 
-class IntDict : ArrayLiteralConvertible {
+struct  IntDict : ArrayLiteralConvertible {
   typealias Element = (String, Int)
-  class func convertFromArrayLiteral(elements: Element...) -> IntDict {}
+  static func convertFromArrayLiteral(elements: Element...) -> IntDict {}
 }
 
-class DoubleDict : ArrayLiteralConvertible {
+final class DoubleDict : ArrayLiteralConvertible {
   typealias Element = (String, Double)
   class func convertFromArrayLiteral(elements: Element...) -> DoubleDict {}
 }
 
-class List<T> : ArrayLiteralConvertible {
+final class List<T> : ArrayLiteralConvertible {
   typealias Element = T
   class func convertFromArrayLiteral(elements: T...) -> List<T> {}
 }
 
-class Dict<K,V> : ArrayLiteralConvertible {
+final class Dict<K,V> : ArrayLiteralConvertible {
   typealias Element = (K,V)
 
   class func convertFromArrayLiteral(elements: (K,V)...) -> Dict<K,V> {}

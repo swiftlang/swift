@@ -1,12 +1,12 @@
 // RUN: %swift -parse -verify %s
 
-class DictStringInt : DictionaryLiteralConvertible {
+final class DictStringInt : DictionaryLiteralConvertible {
   typealias Key = String
   typealias Value = Int
   class func convertFromDictionaryLiteral(elements: (String, Int)...) -> DictStringInt {}
 }
 
-class Dictionary<K, V> : DictionaryLiteralConvertible {
+final class Dictionary<K, V> : DictionaryLiteralConvertible {
   typealias Key = K
   typealias Value = V
   class func convertFromDictionaryLiteral(elements: (K, V)...) -> Dictionary<K, V> {}

@@ -158,7 +158,7 @@ func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return 
 // CHECK-NEXT:    return %9 : $()
 // CHECK-NEXT:  }
 
-class ConformingClass : X {
+final class ConformingClass : X {
   func selfTypes(#x: ConformingClass) -> ConformingClass { return x }
   // CHECK-LABEL: sil @_TTWC9witnesses15ConformingClassS_1XFS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingClass, @in ConformingClass, @inout ConformingClass) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):

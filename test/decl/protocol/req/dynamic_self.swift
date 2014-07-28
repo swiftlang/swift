@@ -19,9 +19,9 @@ class GX<T> : P {
 // Okay: dynamic Self method in superclass.
 class Z : Y, P { }
 
-// Okay: Z2 conforms, subclass would not
+// Erro: Z2 conforms, but subclass would not
 class Z2 : P {
-  func f() -> Z2 { return self }
+  func f() -> Z2 { return self } // expected-error{{method 'f()' in non-final class 'Z2' must return `Self` to conform to protocol 'P'}}
 }
 
 // Okay: struct conforms by returning itself

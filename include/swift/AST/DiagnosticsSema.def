@@ -543,6 +543,15 @@ ERROR(witness_initializer_not_required,sema_tcd,none,
       "initializer requirement %0 can only be satisfied by a `required` "
       "initializer in%select{| the definition of}1 non-final class %2", 
       (DeclName, bool, Type))
+ERROR(witness_self_non_subtype,sema_tcd,none,
+      "protocol %0 requirement %1 cannot be satisfied by a non-final class "
+      "(%2) because it uses 'Self' in a non-parameter, non-result type "
+      "position",
+      (Type, DeclName, Type))
+ERROR(witness_requires_dynamic_self,sema_tcd,none,
+      "method %0 in non-final class %1 must return `Self` to conform to "
+      "protocol %2",
+      (DeclName, Type, Type))
 
 ERROR(witness_not_accessible_proto,sema_tcd,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"

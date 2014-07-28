@@ -29,7 +29,7 @@ var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
 class Tracked : ForwardIndexType, Printable {
-  init(_ value: Int) {
+  required init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
     self.value = value
@@ -46,8 +46,8 @@ class Tracked : ForwardIndexType, Printable {
     return value.description
   }
 
-  func successor() -> Tracked {
-    return Tracked(self.value.successor())
+  func successor() -> Self {
+    return self.dynamicType(self.value.successor())
   }
 
   var value: Int
