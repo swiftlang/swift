@@ -510,7 +510,7 @@ func testCOW_Slow_AddDoesNotReallocate() {
     var identity1 = unsafeBitCast(d1, Word.self)
 
     // Insert a new key-value pair.
-    assert(!d1.updateValue(TestValueTy(2040), forKey: TestKeyTy(40)) == nil)
+    assert(d1.updateValue(TestValueTy(2040), forKey: TestKeyTy(40)) == nil)
     assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(d1.count == 4)
     assert(d1[TestKeyTy(40)]!.value == 2040)
@@ -606,7 +606,7 @@ func testCOW_Fast_IndexForKeyDoesNotReallocate() {
   // Try to find a key that is not present.
   if true {
     var foundIndex1 = d.indexForKey(1111)
-    assert(!foundIndex1 == nil)
+    assert(foundIndex1 == nil)
     assert(identity1 == unsafeBitCast(d, Word.self))
   }
 
@@ -678,7 +678,7 @@ func testCOW_Fast_RemoveAtIndexDoesNotReallocate() {
     d2.removeAtIndex(foundIndex1)
     assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity1 != unsafeBitCast(d2, Word.self))
-    assert(!d2.indexForKey(10) != nil)
+    assert(d2.indexForKey(10) == nil)
   }
 
   println("testCOW_Fast_RemoveAtIndexDoesNotReallocate done")
@@ -717,7 +717,7 @@ func testCOW_Slow_RemoveAtIndexDoesNotReallocate() {
     d2.removeAtIndex(foundIndex1)
     assert(identity1 == unsafeBitCast(d1, Word.self))
     assert(identity1 != unsafeBitCast(d2, Word.self))
-    assert(!d2.indexForKey(TestKeyTy(10)) == nil)
+    assert(d2.indexForKey(TestKeyTy(10)) == nil)
   }
 
   println("testCOW_Slow_RemoveAtIndexDoesNotReallocate done")
