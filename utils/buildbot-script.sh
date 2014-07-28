@@ -513,9 +513,13 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
         fi
 
-        test_target=check-${product}-all
-        if [[ "$SKIP_TEST_VALIDATION" ]]; then
+        if [[ "${product}" == SourceKit ]] ; then
             test_target=check-${product}
+        else
+            test_target=check-${product}-all
+            if [[ "$SKIP_TEST_VALIDATION" ]]; then
+                test_target=check-${product}
+            fi
         fi
 
         if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
