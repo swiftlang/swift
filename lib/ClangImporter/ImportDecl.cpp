@@ -932,14 +932,24 @@ namespace {
   class CFPointeeInfo {
     bool IsValid;
     bool IsConst;
-    const clang::RecordDecl *Decl;
+    PointerUnion<const clang::RecordDecl*, const clang::TypedefNameDecl*> Decl;
     CFPointeeInfo() = default;
 
-    static CFPointeeInfo forRecord(bool isConst, const clang::RecordDecl *decl) {
+    static CFPointeeInfo forRecord(bool isConst,
+                                   const clang::RecordDecl *decl) {
       assert(decl);
       CFPointeeInfo info;
       info.IsValid = true;
       info.IsConst = isConst;
+      info.Decl = decl;
+      return info;
+    }
+
+    static CFPointeeInfo forTypedef(const clang::TypedefNameDecl *decl) {
+      assert(decl);
+      CFPointeeInfo info;
+      info.IsValid = true;
+      info.IsConst = false;
       info.Decl = decl;
       return info;
     }
@@ -968,16 +978,25 @@ namespace {
 
     bool isConstVoid() const {
       assert(isValid());
-      return Decl == nullptr;
+      return Decl.isNull();
     }
 
     bool isRecord() const {
       assert(isValid());
-      return Decl != nullptr;
+      return !Decl.isNull() && Decl.is<const clang::RecordDecl *>();
     }
     const clang::RecordDecl *getRecord() const {
       assert(isRecord());
-      return Decl;
+      return Decl.get<const clang::RecordDecl *>();
+    }
+
+    bool isTypedef() const {
+      assert(isValid());
+      return !Decl.isNull() && Decl.is<const clang::TypedefNameDecl *>();
+    }
+    const clang::TypedefNameDecl *getTypedef() const {
+      assert(isTypedef());
+      return Decl.get<const clang::TypedefNameDecl *>();
     }
   };
 }
@@ -986,6 +1005,13 @@ namespace {
 CFPointeeInfo
 CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
   clang::QualType type = typedefDecl->getUnderlyingType();
+
+  if (auto subTypedef = type->getAs<clang::TypedefType>()) {
+    if (classifyTypedef(subTypedef->getDecl()))
+      return forTypedef(subTypedef->getDecl());
+    return forInvalid();
+  }
+
   if (auto ptr = type->getAs<clang::PointerType>()) {
     auto pointee = ptr->getPointeeType();
 
@@ -1151,8 +1177,9 @@ namespace {
     Type importCFClassType(const clang::TypedefNameDecl *decl,
                            CFPointeeInfo info) {
       // Name the class 'CFString', not 'CFStringRef'.
-      Identifier className =
-        Impl.SwiftContext.getIdentifier(decl->getName().drop_back(3));
+      StringRef nameWithoutRef =
+        decl->getName().drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+      Identifier className = Impl.SwiftContext.getIdentifier(nameWithoutRef);
 
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc) return Type();
@@ -1220,6 +1247,39 @@ namespace {
             if (pointee.isRecord()) {
               SwiftType = importCFClassType(Decl, pointee);
               if (!SwiftType) return nullptr;
+              NameMapping = MappedTypeNameKind::DefineOnly;
+
+            // If the pointee is another CF typedef, create an extra typealias
+            // for the name without "Ref", but not a separate type.
+            } else if (pointee.isTypedef()) {
+              auto underlying =
+                cast_or_null<TypeDecl>(Impl.importDecl(pointee.getTypedef()));
+              if (!underlying)
+                return nullptr;
+
+              // Remove one level of "Ref" from the typealias.
+              if (auto typealias = dyn_cast<TypeAliasDecl>(underlying))
+                SwiftType = typealias->getUnderlyingType();
+              else
+                SwiftType = underlying->getDeclaredType();
+
+              auto DC = Impl.importDeclContextOf(Decl);
+              if (!DC)
+                return nullptr;
+
+              StringRef nameWithoutRef =
+                Name.str().drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
+              Identifier idWithoutRef =
+                Impl.SwiftContext.getIdentifier(nameWithoutRef);
+              auto aliasWithoutRef =
+                Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
+                                      Impl.importSourceLoc(Decl->getLocStart()),
+                                      idWithoutRef,
+                                      Impl.importSourceLoc(Decl->getLocation()),
+                                      TypeLoc::withoutLoc(SwiftType),
+                                      DC);
+
+              SwiftType = aliasWithoutRef->getDeclaredType();
               NameMapping = MappedTypeNameKind::DefineOnly;
 
             // If the pointee is 'const void', and the typedef is named

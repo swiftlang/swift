@@ -84,3 +84,10 @@ func testTollFree1(ccmduct: CCMutableDuct) {
   let ccduct: CCDuct = ccmduct
   let duct: Duct = ccduct
 }
+
+func testChainedAliases(fridge: CCRefrigerator) {
+  let _: CCRefrigeratorRef = fridge
+
+  let _: CCFridge = fridge
+  let _: CCFridgeRef = fridge
+}

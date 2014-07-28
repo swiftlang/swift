@@ -1732,10 +1732,20 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
         if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
           auto alias = dyn_cast<TypeAliasDecl>(swiftDecl);
           if (!alias) continue;
-          auto aliasedClass = alias->getUnderlyingType()->getAs<ClassType>();
-          if (!aliasedClass) continue;
-          if (aliasedClass->getDecl()->getName() == name) {
-            consumer.foundDecl(aliasedClass->getDecl(),
+
+          Type underlyingTy = alias->getUnderlyingType();
+          TypeDecl *underlying = nullptr;
+          if (auto anotherAlias =
+                dyn_cast<NameAliasType>(underlyingTy.getPointer())) {
+            underlying = anotherAlias->getDecl();
+          } else if (auto aliasedClass = underlyingTy->getAs<ClassType>()) {
+            underlying = aliasedClass->getDecl();
+          }
+          
+          if (!underlying)
+            continue;
+          if (underlying->getName() == name) {
+            consumer.foundDecl(underlying,
                                DeclVisibilityKind::VisibleAtTopLevel);
           }
         }
