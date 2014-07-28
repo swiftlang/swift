@@ -10,6 +10,35 @@
 import StdlibUnittest
 import Foundation
 
+// The most simple subclass of NSString that CoreFoundation does not know
+// about.
+class NonContiguousNSString : NSString {
+  required init(coder aDecoder: NSCoder!) {
+    fatalError("don't call this initializer")
+  }
+
+  init(_ value: [UInt16]) {
+    _value = value
+    super.init()
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    // Ensure that copying this string produces a class that CoreFoundation
+    // does not know about.
+    return self
+  }
+
+  @objc override var length: Int {
+    return _value.count
+  }
+
+  @objc override func characterAtIndex(index: Int) -> unichar {
+    return _value[index]
+  }
+
+  var _value: [UInt16]
+}
+
 var NSStringAPIs = TestCase("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
@@ -534,6 +563,15 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     var result = s.getCString(&buffer, maxLength: 8,
         encoding: NSUTF8StringEncoding)
+    expectFalse(result)
+  }
+  if true {
+    let illFormedUTF16: String = NonContiguousNSString([ 0xd800 ])
+    let bufferLength = 16
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+    var result = s.getCString(&buffer, maxLength: 100,
+      encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
 }
