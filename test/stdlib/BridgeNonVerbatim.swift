@@ -28,7 +28,7 @@ import ObjectiveC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ForwardIndexType, Printable {
+final class Tracked : ForwardIndexType, Printable {
   required init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber

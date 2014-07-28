@@ -42,7 +42,7 @@ var nextTrackedSerialNumber = 0
   func baz()
 }
 
-class Tracked : NSObject, ForwardIndexType, Printable, Fooable {
+class Tracked : NSObject, Printable, Fooable {
   func foo() { }
 
   required init(_ value: Int) {

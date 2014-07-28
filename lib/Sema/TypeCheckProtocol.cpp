@@ -1343,14 +1343,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             if (func->hasDynamicSelf())
               break;
 
-            // Allow a global generic operator ~> that returns Self.
-            // FIXME: If we create the witness correctly, we could
-            // de-hackify this in the case of generic operators.
-            if (func->isOperator() && !func->getDeclContext()->isTypeContext() 
-                && func->getName().str() == "~>")
-              break;
-
-            TC.diagnose(best.Witness->getLoc(), 
+            TC.diagnose(best.Witness->getLoc(),
                         diag::witness_requires_dynamic_self,
                         requirement->getFullName(), Adoptee,
                         Proto->getDeclaredType());

@@ -21,7 +21,9 @@ var xSerial = 0
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-class X : ForwardIndexType, Comparable, Printable, IntegerLiteralConvertible {
+final class X : ForwardIndexType, Comparable, Printable, 
+                IntegerLiteralConvertible 
+{
   required init(_ value: Int) {
     ++xCount
     serial = ++xSerial
