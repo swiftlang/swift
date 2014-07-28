@@ -28,7 +28,7 @@ func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?,
   var s3Opt = objImplicitOpt as? BridgedStruct
 
   // Make sure we seem to have the right result type.
-  if s1Opt { return s1Opt }
+  if s1Opt != nil { return s1Opt }
   s2Opt = s1Opt
   s2Opt = s3Opt
   s3Opt = s1Opt

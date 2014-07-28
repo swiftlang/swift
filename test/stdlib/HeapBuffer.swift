@@ -21,7 +21,7 @@ for x in 0..<10 {
   (a.baseAddress + x).initialize(x)
 }
 
-println("buffer has storage: \(a.storage.boolValue)")
+println("buffer has storage: \(a.storage != nil)")
 // CHECK-NEXT: buffer has storage: true
 
 func testUnique() {

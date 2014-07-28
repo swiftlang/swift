@@ -356,12 +356,12 @@ extension String {
     // According to Ali Ozer, there may be some real advantage to
     // dispatching to the minimal selector for the supplied options.
     // So let's do that; the switch should compile away anyhow.
-    return locale ? _ns.compare(
+    return locale != nil ? _ns.compare(
       aString, options: mask,
-      range: _toNSRange(range ? range! : indices(self)), locale: locale)
+      range: _toNSRange(range != nil ? range! : indices(self)), locale: locale)
     
-    : range ? _ns.compare(
-      aString, options: mask, range: _toNSRange(range ? range! : indices(self)))
+    : range != nil ? _ns.compare(
+      aString, options: mask, range: _toNSRange(range != nil ? range! : indices(self)))
       
     : mask ? _ns.compare(aString, options: mask)
       
@@ -531,7 +531,7 @@ extension String {
       _toNSRange(range),
       scheme: tagScheme,
       options: opts,
-      orthography: orthography ? orthography! : nil
+      orthography: orthography != nil ? orthography! : nil
     ) {
       var stop_ = false
       body($0, self._range($1), self._range($2), &stop_)
@@ -936,10 +936,10 @@ extension String {
     let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
       self._ns.linguisticTagsInRange(
         _toNSRange(range), scheme: tagScheme, options: opts,
-        orthography: orthography ? orthography! : nil, tokenRanges: $0)
+        orthography: orthography != nil ? orthography! : nil, tokenRanges: $0)
     }
     
-    if nsTokenRanges {
+    if nsTokenRanges != nil {
       tokenRanges._setIfNonNil {
         (nsTokenRanges! as [AnyObject]).map {
           self._range($0.rangeValue)
@@ -1073,7 +1073,7 @@ extension String {
     return _optionalRange(
       _ns.rangeOfCharacterFromSet(
         aSet, options: mask,
-        range: _toNSRange(aRange ? aRange! : indices(self))))
+        range: _toNSRange(aRange != nil ? aRange! : indices(self))))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)anIndex
@@ -1126,12 +1126,12 @@ extension String {
     locale: NSLocale? = nil
   ) -> Range<Index>? {
     return _optionalRange(
-      locale ? _ns.rangeOfString(
+      locale != nil ? _ns.rangeOfString(
         aString, options: mask,
-        range: _toNSRange(searchRange ? searchRange! : indices(self)),
+        range: _toNSRange(searchRange != nil ? searchRange! : indices(self)),
         locale: locale
       )
-      : searchRange ? _ns.rangeOfString(
+      : searchRange != nil ? _ns.rangeOfString(
         aString, options: mask, range: _toNSRange(searchRange!)
       )
       : mask ? _ns.rangeOfString(aString, options: mask)
@@ -1311,11 +1311,11 @@ extension String {
     range searchRange: Range<Index>? = nil
   ) -> String {
     // FIXME: " != nil" needed pending <rdar://problem/16997968> 
-    return searchRange || options != nil 
+    return (searchRange !=  nil) || (options != nil)
     ? _ns.stringByReplacingOccurrencesOfString(
       target,
       withString: replacement, options: options,
-      range: _toNSRange(searchRange ? searchRange! : indices(self))
+      range: _toNSRange(searchRange != nil ? searchRange! : indices(self))
     )
     : _ns.stringByReplacingOccurrencesOfString(target, withString: replacement)
   }

@@ -21,9 +21,9 @@ public struct ZipGenerator2<
 
   public mutating func next() -> Element? {
     var e0 = baseStreams.0.next()
-    if !e0 { return .None }
+    if e0 == nil { return .None }
     var e1 = baseStreams.1.next()
-    if !e1 { return .None }
+    if e1 ==  nil { return .None }
     return .Some((e0!, e1!))
   }
 

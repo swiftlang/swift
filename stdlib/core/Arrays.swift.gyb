@@ -240,7 +240,7 @@ extension ${Self} : ArrayType {
   /// Complexity: O(N)
   @semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
-    if !_buffer.requestUniqueMutableBackingBuffer(minimumCapacity) {
+    if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
 
       var newBuffer = _ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
@@ -583,7 +583,7 @@ func _arrayReplace<
   let insertCount = numericCast(countElements(newValues)) as Int
   let growth = insertCount - eraseCount
   
-  if target.requestUniqueMutableBackingBuffer(oldCount + growth) {
+  if target.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
     target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
   }
   else {
@@ -784,7 +784,7 @@ func _arrayAppend<_Buffer: _ArrayBufferType>(
 ) {
   let oldCount = buffer.count
   var newBuffer = _createUniqueMutableBuffer(&buffer, oldCount + 1)
-  if _fastPath(!newBuffer) {
+  if _fastPath(newBuffer == nil) {
     (buffer.baseAddress + oldCount).initialize(newValue)
   }
   else {
@@ -803,7 +803,7 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
   let oldCount = buffer.count
   var newBuffer = _createUniqueMutableBuffer(
     &buffer, oldCount, minimumCapacity: minimumCapacity)
-  if _slowPath(newBuffer) {
+  if _slowPath(newBuffer != nil){
     _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 0, _IgnorePointer())
   }
 }
@@ -830,7 +830,7 @@ func _arrayAppendSequence<
   var stream = newItems.generate()
   var nextItem = stream.next()
 
-  if !nextItem {
+  if nextItem == nil {
     return
   }
 
@@ -838,16 +838,16 @@ func _arrayAppendSequence<
   _arrayAppend(&buffer, nextItem!)
   var count = buffer.count
   nextItem = stream.next()
-  while nextItem {
+  while nextItem != nil {
     let capacity = buffer.capacity
     let base = buffer.baseAddress
     
-    while nextItem && count < capacity {
+    while (nextItem != nil) && count < capacity {
       (base + count++).initialize(nextItem!)
       nextItem = stream.next()
     }
     buffer.count = count
-    if nextItem {
+    if nextItem != nil {
       _arrayReserve(&buffer, _growArrayCapacity(capacity))
     }
   }
@@ -874,7 +874,7 @@ public func ==<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   var streamRHS = rhs.generate()
   
   var nextLHS = streamLHS.next()
-  while nextLHS {
+  while nextLHS != nil {
     let nextRHS = streamRHS.next()
     if nextLHS != nextRHS {
       return false
@@ -925,7 +925,7 @@ public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
     
   // Fast path: a native buffer that already stores elements of the
   // Derived type.
-  if _fastPath(native) {
+  if _fastPath(native !=  nil) {
     if _fastPath(native!.storesOnlyElementsOfType(Derived.self)) {
       return Array(a._buffer.castToBufferOf(Derived.self))
     }
@@ -933,7 +933,7 @@ public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
 
   // FIXME: Make these checks deferred.
   let result: [Derived]? = _arrayDownCastConditional(a)
-  _precondition(result, "array cannot be downcast to array of derived")
+  _precondition(result != nil, "array cannot be downcast to array of derived")
   return result!
 }
 
@@ -953,7 +953,7 @@ public func _arrayDownCastConditional<Base, Derived>(
   if _fastPath(!a.isEmpty) {
     let native = a._buffer.requestNativeBuffer()
     
-    if _fastPath(native) {
+    if _fastPath(native != nil) {
       if native!.storesOnlyElementsOfType(Derived.self) {
         return Array(a._buffer.castToBufferOf(Derived.self))
       }
@@ -988,7 +988,7 @@ public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   var p = buf._unsafeElementStorage
   for value in source {
     let bridged: AnyObject? = _bridgeToObjectiveC(value)
-    _precondition(bridged, "array element cannot be bridged to Objective-C")
+    _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
     p++.initialize(unsafeBitCast(bridged!, Base.self))
   }
   return Array(_ArrayBuffer(buf))
@@ -1006,7 +1006,7 @@ public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
 ) -> Array<BridgesToDerived> {
   let result: Array<BridgesToDerived>?
     = _arrayBridgeFromObjectiveCConditional(source);
-  _precondition(result, "array cannot be bridged from Objective-C")
+  _precondition(result != nil, "array cannot be bridged from Objective-C")
   return result!
 }
 
@@ -1031,7 +1031,7 @@ ElementwiseBridging:
     for object: Base in source {
       let value = Swift._bridgeFromObjectiveCConditional(
         unsafeBitCast(object, AnyObject.self), BridgesToDerived.self)
-      if _slowPath(!value) {
+      if _slowPath(value == nil) {
         break ElementwiseBridging
       }
       p++.initialize(value!)

@@ -78,7 +78,7 @@ class _IndirectArrayBuffer {
   func getNativeBufferOf<T>(_: T.Type) -> _ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
     return _ContiguousArrayBuffer(
-      buffer ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
+      buffer != nil ? unsafeBitCast(buffer, _ContiguousArrayStorage<T>.self) : nil)
   }
 
   func getCocoa() -> _CocoaArrayType {
@@ -140,7 +140,7 @@ extension _ArrayBuffer {
   init(_ source: NativeBuffer) {
     if !_isClassOrObjCExistential(T.self) {
       self.storage
-        = source._storage ? Builtin.castToNativeObject(source._storage!) : nil
+        = (source._storage != nil) ? Builtin.castToNativeObject(source._storage!) : nil
     }
     else {
       self.storage = Builtin.castToNativeObject(
@@ -373,7 +373,7 @@ extension _ArrayBuffer {
     body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
     if _isClassOrObjCExistential(T.self) {
-      if _nonNative {
+      if _nonNative != nil {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }

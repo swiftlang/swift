@@ -402,8 +402,8 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
     // until we find one
     while true {
       var keyVal = self[bucket]
-      if !keyVal || keyVal!.key == k {
-        return (Index(nativeStorage: self, offset: bucket), Bool(keyVal))
+      if (keyVal == nil) || keyVal!.key == k {
+        return (Index(nativeStorage: self, offset: bucket), (keyVal != nil))
       }
       bucket = _next(bucket)
     }
@@ -463,13 +463,13 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   func assertingGet(i: Index) -> (Key, Value) {
     let e = self[i.offset]
     _precondition(
-      e, "attempting to access Dictionary elements using an invalid Index")
+      e != nil, "attempting to access Dictionary elements using an invalid Index")
     return (e!.key, e!.value)
   }
 
   func assertingGet(key: Key) -> Value {
     let e = self[_find(key, _bucket(key)).pos.offset]
-    _precondition(e, "key not found in Dictionary")
+    _precondition(e != nil, "key not found in Dictionary")
     return e!.value
   }
 
@@ -792,7 +792,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorageType {
     // the key is present, this lookup is a penalty for the slow path, but the
     // potential savings are significant: we could skip a memory allocation and
     // a linear search.
-    if !maybeGet(key) {
+    if maybeGet(key) == nil {
       return .None
     }
 
@@ -817,7 +817,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorageType {
 
   func assertingGet(key: AnyObject) -> AnyObject {
     let value: AnyObject? = cocoaDictionary.objectForKey(key)
-    _precondition(value, "key not found in underlying NSDictionary")
+    _precondition(value != nil, "key not found in underlying NSDictionary")
     return value!
   }
 
@@ -920,7 +920,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
 
       for i in 0..<oldCapacity {
         var x = oldNativeStorage[i]
-        if x {
+        if x != nil {
           if oldCapacity == newCapacity {
             // FIXME(performance): optimize this case further: we don't have to
             // initialize the buffer first and then copy over the buckets, we
@@ -1102,13 +1102,13 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
 
     // Find the first bucket in the contigous chain
     var start = idealBucket
-    while nativeStorage[nativeStorage._prev(start)] {
+    while nativeStorage[nativeStorage._prev(start)] != nil {
       start = nativeStorage._prev(start)
     }
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    for var b = nativeStorage._next(lastInChain); nativeStorage[b];
+    for var b = nativeStorage._next(lastInChain); nativeStorage[b] != nil;
         b = nativeStorage._next(b) {
       lastInChain = b
     }
@@ -1220,7 +1220,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       return nativeRemoveObjectForKey(key)
     case .Cocoa(let cocoaStorage):
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
-      if !cocoaStorage.maybeGet(anyObjectKey) {
+      if cocoaStorage.maybeGet(anyObjectKey) == nil {
         return .None
       }
       migrateDataToNativeStorage(cocoaStorage)
@@ -1310,7 +1310,7 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
   func predecessor() -> NativeIndex {
     var j = offset
     while --j > 0 {
-      if nativeStorage[j] {
+      if nativeStorage[j] != nil {
         return NativeIndex(nativeStorage: nativeStorage, offset: j)
       }
     }
@@ -1323,7 +1323,7 @@ struct _NativeDictionaryIndex<Key : Hashable, Value> :
     // <rdar://problem/15484639> Refcounting bug
     while i < nativeStorage.capacity /*&& !nativeStorage[i]*/ {
       // FIXME: workaround for <rdar://problem/15484639>
-      if nativeStorage[i] {
+      if nativeStorage[i] != nil {
         break
       }
       // end workaround
@@ -2335,7 +2335,7 @@ public func _dictionaryBridgeToObjectiveC<
       bridgedKey = unsafeBitCast(key, ObjCKey.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(key)
-      _precondition(bridged, "dictionary key cannot be bridged to Objective-C")
+      _precondition(bridged != nil, "dictionary key cannot be bridged to Objective-C")
       bridgedKey = unsafeBitCast(bridged!, ObjCKey.self)
     }
 
@@ -2345,7 +2345,7 @@ public func _dictionaryBridgeToObjectiveC<
       bridgedValue = unsafeBitCast(value, ObjCValue.self)
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(value)
-      _precondition(bridged,
+      _precondition(bridged != nil,
           "dictionary value cannot be bridged to Objective-C")
       bridgedValue = unsafeBitCast(bridged!, ObjCValue.self)
     }
@@ -2439,7 +2439,7 @@ public func _dictionaryBridgeFromObjectiveC<
 ) -> Dictionary<SwiftKey, SwiftValue> {
   let result: Dictionary<SwiftKey, SwiftValue>? =
       _dictionaryBridgeFromObjectiveCConditional(source)
-  _precondition(result, "dictionary cannot be bridged from Objective-C")
+  _precondition(result != nil, "dictionary cannot be bridged from Objective-C")
   return result!
 }
 

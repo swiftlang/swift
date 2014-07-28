@@ -23,7 +23,7 @@ class SwiftClass : SwiftClassBase {
 }
 
 func printState(x : SwiftClassBase?) {
-  println(x ? "is present" : "is nil")
+  println((x != nil) ? "is present" : "is nil")
 }
 
 func testSwiftClass() {
@@ -79,7 +79,7 @@ class ObjCClass : ObjCClassBase {
 }
 
 func printState(x : ObjCClassBase?) {
-  println(x ? "is present" : "is nil")
+  println((x != nil) ? "is present" : "is nil")
 }
 
 func testObjCClass() {
@@ -104,7 +104,7 @@ testObjCClass()
 
   
 func printState(x : Protocol?) {
-  println(x ? "is present" : "is nil")
+  println((x != nil) ? "is present" : "is nil")
 }
 
 func testProtocol() {
@@ -130,7 +130,7 @@ protocol P : class { }
 
 func test_rdar15293354() {
   weak var x : P? = .None
-  if x {
+  if x != nil {
     _ = x!
   }
 }

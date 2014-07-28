@@ -1054,6 +1054,9 @@ NOTE(subscript_decl_here,sema_tca,none,
      "subscript operator declared here", ())
 ERROR(condition_broken_proto,sema_tce,none,
       "protocol 'BooleanType' is broken", ())
+ERROR(option_type_broken,sema_tce,none,
+      "type 'Optional' is broken", ())
+
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 ERROR(binding_injected_optional,sema_tce,none,
       "operand of postfix '?' should have optional type; type is %0", (Type))

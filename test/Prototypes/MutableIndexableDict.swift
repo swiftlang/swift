@@ -185,7 +185,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
   func predecessor() -> Index {
     var j = self.offset
     while --j > 0 {
-      if buffer[j] {
+      if buffer[j] != nil {
         return Index(buffer: buffer, offset: j)
       }
     }
@@ -198,7 +198,7 @@ struct DictionaryIndex<Element> : BidirectionalIndexType {
     // <rdar://problem/15484639> Refcounting bug
     while i < buffer.count /*&& !buffer[i]*/ {
       // FIXME: workaround for <rdar://problem/15484639>
-      if buffer[i] {
+      if buffer[i] != nil {
         break
       }
       // end workaround
@@ -302,7 +302,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
       for i in 0..<capacity {
         var x = _buffer[i]
-        if x {
+        if x != nil {
           if capacity == newOwner.capacity {
             newOwner._buffer[i] = x
           }
@@ -338,8 +338,8 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
     // until we find one
     while true {
       var keyVal = _buffer[bucket]
-      if !keyVal || keyVal!.key == k {
-        return (Index(buffer: _buffer, offset: bucket), Bool(keyVal))
+      if (keyVal == nil) || keyVal!.key == k {
+        return (Index(buffer: _buffer, offset: bucket), keyVal != nil)
       }
       bucket = _next(bucket)
     }
@@ -368,7 +368,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    for var b = _next(lastInChain); _buffer[b]; b = _next(b) {
+    for var b = _next(lastInChain); _buffer[b] != nil; b = _next(b) {
       lastInChain = b
     }
 

@@ -44,10 +44,10 @@ dump(Matte("456"))
 
 // Structs have no identity and thus no object identifier
 // CHECK-NEXT: false
-println(reflect(Matte("")).objectIdentifier.boolValue)
+println(reflect(Matte("")).objectIdentifier.hasValue)
 // The default mirror provides no quick look object
 // CHECK-NEXT: false
-println(reflect(Matte("")).quickLookObject.boolValue)
+println(reflect(Matte("")).quickLookObject.hasValue)
 // CHECK-NEXT: true
 println(reflect(Matte("")).disposition == .Struct)
 
@@ -179,7 +179,7 @@ println("Tuple:")
 // CHECK-NEXT:        s: nine
 dump(tuple)
 // CHECK-NEXT: false
-println(reflect(tuple).quickLookObject.boolValue)
+println(reflect(tuple).quickLookObject.hasValue)
 // CHECK-NEXT: true
 println(reflect(tuple).disposition == .Tuple)
 
@@ -228,7 +228,7 @@ println(reflect(x).objectIdentifier! == reflect(x).objectIdentifier!)
 // CHECK-NEXT: false
 println(reflect(x).objectIdentifier! == reflect(y).objectIdentifier!)
 // CHECK-NEXT: false
-println(reflect(x).quickLookObject.boolValue)
+println(reflect(x).quickLookObject.hasValue)
 // CHECK-NEXT: true
 println(reflect(x).disposition == .Class)
 

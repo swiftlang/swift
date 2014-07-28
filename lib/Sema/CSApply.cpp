@@ -5220,30 +5220,29 @@ Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
   ExprRewriter rewriter(cs, *this);
   auto &tc = cs.getTypeChecker();
 
-  auto proto = tc.getProtocol(
-    expr->getLoc(), KnownProtocolKind::BooleanType);
-
   // Find the witness we need to use.
   Type type = expr->getType();
-  auto witness = findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(),
-                                          proto, tc.Context.Id_BoolValue,
-                                          diag::condition_broken_proto);
+  auto hasValueMembers = tc.lookupMember(type, tc.Context.Id_HasValue, cs.DC);
+  
+  if (hasValueMembers.size() != 1) {
+    tc.diagnose(expr->getLoc(), diag::option_type_broken);
+    return nullptr;
+  }
+  
+  auto hasValueMember = dyn_cast<ValueDecl>(hasValueMembers[0]);
+  
+  if (!hasValueMember) {
+    tc.diagnose(expr->getLoc(), diag::option_type_broken);
+    return nullptr;
+    
+  }
 
   // Form a reference to this member.
   auto &ctx = tc.Context;
   Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                            witness, expr->getEndLoc(),
+                                            hasValueMember, expr->getEndLoc(),
                                             /*Implicit=*/true);
-  bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-  if (failed) {
-    // If the member reference expression failed to type check, the Expr's
-    // type does not conform to the given protocol.
-    tc.diagnose(expr->getLoc(),
-                diag::type_does_not_conform,
-                type,
-                proto->getType());
-    return nullptr;
-  }
+  tc.typeCheckExpressionShallow(memberRef, cs.DC);
 
   return memberRef;
 }

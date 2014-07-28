@@ -26,62 +26,62 @@ _ = obj as SwiftSubPort
 _ = obj as SwiftSuperPort
 _ = (obj as? NSPort)
 _ = (obj as? NSObject)!
-if !(obj as? SwiftSubPort)   { abort() }
-if !(obj as? SwiftSuperPort) { abort() }
-if !(obj as? NSPort)         { abort() }
-if !(obj as? NSObject)       { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if  (obj as? SwiftSuper)     { abort() }
+if (obj as? SwiftSubPort) == nil    { abort() }
+if (obj as? SwiftSuperPort) ==  nil { abort() }
+if (obj as? NSPort) == nil          { abort() }
+if (obj as? NSObject) == nil        { abort() }
+if (obj as? NSArray) != nil         { abort() }
+if (obj as? SwiftSub) != nil        { abort() }
+if (obj as? SwiftSuper) != nil      { abort() }
 
 obj = SwiftSuperPort()
 _ = obj as SwiftSuperPort
 _ = obj as NSPort
 _ = obj as NSObject
-if  (obj as? SwiftSubPort)   { abort() }
-if !(obj as? SwiftSuperPort) { abort() }
-if !(obj as? NSPort)         { abort() }
-if !(obj as? NSObject)       { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if  (obj as? SwiftSuper)     { abort() }
+if (obj as? SwiftSubPort) != nil   { abort() }
+if (obj as? SwiftSuperPort) == nil { abort() }
+if (obj as? NSPort) == nil         { abort() }
+if (obj as? NSObject) == nil       { abort() }
+if (obj as? NSArray) != nil        { abort() }
+if (obj as? SwiftSub) != nil       { abort() }
+if (obj as? SwiftSuper) != nil     { abort() }
 
 // Test instance of Objective-C class that has Swift subclass
 
 obj = NSPort()
 _ = obj as NSPort
 _ = obj as NSObject
-if  (obj as? SwiftSubPort)   { abort() }
-if  (obj as? SwiftSuperPort) { abort() }
-if !(obj as? NSPort)         { abort() }
-if !(obj as? NSObject)       { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if  (obj as? SwiftSuper)     { abort() }
-if !(obj as? SwiftObjCProto) { abort() }
+if (obj as? SwiftSubPort) != nil    { abort() }
+if (obj as? SwiftSuperPort) !=  nil { abort() }
+if (obj as? NSPort) == nil          { abort() }
+if (obj as? NSObject) == nil        { abort() }
+if (obj as? NSArray) != nil         { abort() }
+if (obj as? SwiftSub) != nil        { abort() }
+if (obj as? SwiftSuper) != nil      { abort() }
+if (obj as? SwiftObjCProto) == nil  { abort() }
 
 obj = NSPort()
 _ = genericCast(obj, NSPort.self)!
 _ = genericCast(obj, NSObject.self)!
-if  genericCast(obj, SwiftSubPort.self)   { abort() }
-if  genericCast(obj, SwiftSuperPort.self) { abort() }
-if !genericCast(obj, NSPort.self)         { abort() }
-if !genericCast(obj, NSObject.self)       { abort() }
-if  genericCast(obj, NSArray.self)        { abort() }
-if  genericCast(obj, SwiftSub.self)       { abort() }
-if  genericCast(obj, SwiftSuper.self)     { abort() }
+if genericCast(obj, SwiftSubPort.self) != nil   { abort() }
+if genericCast(obj, SwiftSuperPort.self) != nil { abort() }
+if genericCast(obj, NSPort.self) == nil         { abort() }
+if genericCast(obj, NSObject.self) == nil       { abort() }
+if genericCast(obj, NSArray.self) != nil        { abort() }
+if genericCast(obj, SwiftSub.self) != nil       { abort() }
+if genericCast(obj, SwiftSuper.self) != nil     { abort() }
 
 obj = NSObject()
 _ = obj as NSObject
-if  (obj as? SwiftSubPort)   { abort() }
-if  (obj as? SwiftSuperPort) { abort() }
-if  (obj as? NSPort)         { abort() }
-if !(obj as? NSObject)       { abort() }
-if  (obj as? NSCopying)      { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if  (obj as? SwiftSuper)     { abort() }
-if  (obj as? SwiftObjCProto) { abort() }
+if  (obj as? SwiftSubPort) != nil   { abort() }
+if  (obj as? SwiftSuperPort) != nil { abort() }
+if  (obj as? NSPort) != nil         { abort() }
+if  (obj as? NSObject) == nil       { abort() }
+if  (obj as? NSCopying) != nil      { abort() }
+if  (obj as? NSArray) != nil        { abort() }
+if  (obj as? SwiftSub) != nil       { abort() }
+if  (obj as? SwiftSuper) != nil     { abort() }
+if  (obj as? SwiftObjCProto) != nil { abort() }
 
 // Test instance of a tagged pointer type
 
@@ -90,36 +90,36 @@ _ = obj as NSNumber
 _ = obj as NSValue
 _ = obj as NSObject
 _ = obj as NSCopying
-if  (obj as? SwiftSubPort)   { abort() }
-if  (obj as? SwiftSuperPort) { abort() }
-if !(obj as? NSNumber)       { abort() }
-if !(obj as? NSValue)        { abort() }
-if !(obj as? NSObject)       { abort() }
-if !(obj as? NSCopying)      { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if  (obj as? SwiftSuper)     { abort() }
+if  (obj as? SwiftSubPort) != nil   { abort() }
+if  (obj as? SwiftSuperPort) != nil { abort() }
+if  (obj as? NSNumber) == nil       { abort() }
+if  (obj as? NSValue) == nil        { abort() }
+if  (obj as? NSObject) == nil       { abort() }
+if  (obj as? NSCopying) == nil      { abort() }
+if  (obj as? NSArray) != nil        { abort() }
+if  (obj as? SwiftSub) != nil       { abort() }
+if  (obj as? SwiftSuper) != nil     { abort() }
 
 // Test instance of a Swift class with no Objective-C inheritance
 
 obj = SwiftSub()
 _ = obj as SwiftSub
 _ = obj as SwiftSuper
-if  (obj as? SwiftSubPort)   { abort() }
-if  (obj as? SwiftSuperPort) { abort() }
-if  (obj as? NSObject)       { abort() }
-if  (obj as? NSArray)        { abort() }
-if !(obj as? SwiftSub)       { abort() }
-if !(obj as? SwiftSuper)     { abort() }
+if  (obj as? SwiftSubPort) != nil   { abort() }
+if  (obj as? SwiftSuperPort) != nil { abort() }
+if  (obj as? NSObject) != nil       { abort() }
+if  (obj as? NSArray) != nil        { abort() }
+if  (obj as? SwiftSub) == nil       { abort() }
+if  (obj as? SwiftSuper) == nil     { abort() }
 
 obj = SwiftSuper()
 _ = obj as SwiftSuper
-if  (obj as? SwiftSubPort)   { abort() }
-if  (obj as? SwiftSuperPort) { abort() }
-if  (obj as? NSObject)       { abort() }
-if  (obj as? NSArray)        { abort() }
-if  (obj as? SwiftSub)       { abort() }
-if !(obj as? SwiftSuper)     { abort() }
+if  (obj as? SwiftSubPort) != nil   { abort() }
+if  (obj as? SwiftSuperPort) != nil { abort() }
+if  (obj as? NSObject) != nil       { abort() }
+if  (obj as? NSArray) != nil        { abort() }
+if  (obj as? SwiftSub) != nil       { abort() }
+if  (obj as? SwiftSuper) == nil     { abort() }
 
 // Test optional and non-optional bridged conversions
 var ao: AnyObject = "s"

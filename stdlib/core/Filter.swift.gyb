@@ -19,7 +19,7 @@ public struct FilterGenerator<
     var n: Base.Element?
     for/*ever*/;; {
       n = _base.next()
-      if n ? _include(n!) : true {
+      if n != nil ? _include(n!) : true {
         return n
       }
     }

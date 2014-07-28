@@ -129,7 +129,7 @@ public struct PermutationGenerator<
 
   public mutating func next() -> Element? {
     var result = indices.next()
-    return result ? seq[result!] : .None
+    return result != nil ? seq[result!] : .None
   }
 
   // Every GeneratorType is also a single-pass SequenceType

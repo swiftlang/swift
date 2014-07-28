@@ -168,7 +168,7 @@ public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
 
 public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
   let optResult: AnyObject? = _bridgeToObjectiveC(x)
-  _precondition(optResult,
+  _precondition(optResult != nil,
       "value failed to bridge from Swift type to a Objective-C type")
   return optResult!
 }

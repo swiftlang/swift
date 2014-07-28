@@ -36,14 +36,15 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   init(_ buffer: NativeBuffer) {
     owner = buffer._storage
     start = buffer.baseAddress
-    _countAndFlags = (UInt(buffer.count) << 1) | (owner ? 1 : 0)
+    _countAndFlags = (UInt(buffer.count) << 1) | ((owner != nil) ? 1 : 0)
     _invariantCheck()
   }
 
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
+    let isNativeStorage: Bool = (owner as? NativeStorage) != nil
     _sanityCheck(
-      (owner as? NativeStorage).boolValue == isNative
+      isNativeStorage == isNative
     )
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
@@ -52,7 +53,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   
   var _hasNativeBuffer: Bool {
     _sanityCheck(
-      owner || (_countAndFlags & 1) == 0,
+      (owner != nil) || (_countAndFlags & 1) == 0,
       "Something went wrong: an unowned buffer cannot have a native buffer")
     return (_countAndFlags & 1) != 0
   }

@@ -370,7 +370,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   ) -> Bool {
     _sanityCheck(_isClassOrObjCExistential(U.self))
     let s = _storage
-    if _fastPath(s) {
+    if _fastPath(s != nil){
       if _fastPath(s!.staticElementType is U.Type) {
         // Done in O(1)
         return true

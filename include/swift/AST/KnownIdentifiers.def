@@ -63,6 +63,7 @@ IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "_MaxBuiltinIntegerType")
 IDENTIFIER(IntegerLiteralType)
 IDENTIFIER_WITH_NAME(AllZeros, "allZeros")
 IDENTIFIER_WITH_NAME(BoolValue, "boolValue")
+IDENTIFIER_WITH_NAME(HasValue, "hasValue")
 IDENTIFIER_WITH_NAME(ConvertFromNilLiteral, "convertFromNilLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,

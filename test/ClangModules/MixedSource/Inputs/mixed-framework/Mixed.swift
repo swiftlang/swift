@@ -3,7 +3,7 @@
 @objc public class SwiftClass {
   public init(x: Int) {}
   public func pureSwiftMethod(x: Int?) -> Bool {
-    return x ? true : false
+    return x != nil ? true : false
   }
 }
 

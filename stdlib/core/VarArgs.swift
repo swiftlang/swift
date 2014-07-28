@@ -181,7 +181,7 @@ class VaListBuilder {
   func append(arg: CVarArgType) {
     var encoded = arg.encode()
     
-    if ((arg as? Float) || (arg as? Double))
+    if (((arg as? Float) != nil) || ((arg as? Double) != nil))
     && sseRegistersUsed < _x86_64CountSSERegisters {
       var startIndex = _x86_64CountGPRegisters
            + (sseRegistersUsed * _x86_64SSERegisterWords)

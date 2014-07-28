@@ -206,7 +206,7 @@ extension String {
           }
           return 1
         }
-        if e2_ {
+        if e2_ != nil {
           return -1
         }
         return 0

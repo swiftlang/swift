@@ -500,7 +500,7 @@ public func split<Seq: Sliceable, R:BooleanType>(
 
   for j in indices(seq) {
     if isSeparator(seq[j]) {
-      if startIndex {
+      if startIndex != nil {
         var i = startIndex!
         result.append(seq[i..<j])
         startIndex = .Some(j.successor())
@@ -513,7 +513,7 @@ public func split<Seq: Sliceable, R:BooleanType>(
       }
     }
     else {
-      if !startIndex {
+      if startIndex == nil {
         startIndex = .Some(j)
       }
     }
@@ -540,12 +540,12 @@ public func startsWith<
 
   for e0 in s {
     var e1 = prefixGenerator.next()
-    if !e1 { return true }
+    if e1 == nil { return true }
     if e0 != e1! {
       return false
     }
   }
-  return prefixGenerator.next() ? false : true
+  return prefixGenerator.next() != nil ? false : true
 }
 
 /// Return true iff the the initial elements of `s` are equal to `prefix`,
@@ -583,7 +583,7 @@ public struct EnumerateGenerator<
 
   public mutating func next() -> Element? {
     var b = base.next()
-    if !b { return .None }
+    if b == nil { return .None }
     return .Some((index: count++, element: b!))
   }
 
@@ -614,13 +614,13 @@ public func equal<
   while true {
     var e1 = g1.next()
     var e2 = g2.next()
-    if e1 && e2 {
+    if (e1 != nil) && (e2 != nil) {
       if e1! != e2! {
         return false
       }
     }
     else {
-      return !e1 == !e2
+      return (e1 == nil) == (e2 == nil)
     }
   }
 }
@@ -639,13 +639,13 @@ public func equal<
   while true {
     var e1 = g1.next()
     var e2 = g2.next()
-    if e1 && e2 {
+    if (e1 != nil) && (e2 != nil) {
       if !predicate(e1!, e2!) {
         return false
       }
     }
     else {
-      return !e1 == !e2
+      return (e1 == nil) == (e2 == nil)
     }
   }
 }
@@ -675,7 +675,8 @@ public func lexicographicalCompare<
       }
       return false
     }
-    return e2_.boolValue
+
+    return e2_ != nil
   }
 }
 
@@ -706,7 +707,10 @@ public func lexicographicalCompare<
       }
       return false
     }
-    return e2_.boolValue
+    switch e2_ {
+    case .Some(_): return true
+    case .None: return false
+    }
   }
 }
 

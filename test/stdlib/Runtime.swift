@@ -119,7 +119,7 @@ struct ConditionallyBridgedValueType<T>
   }
 
   static func _isBridgedToObjectiveC() -> Bool {
-    return !((T.self as Any) as? String.Type)
+    return ((T.self as Any) as? String.Type) == nil
   }
 
   var value: Int

@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 var x : Optional<Int> = nil
-if x { 
+if x != nil { 
   println("x is non-empty!")
 }
 else { 
@@ -20,14 +20,14 @@ x = .Some(0)
 
 x = .Some(1)
 
-if x {
+if x != nil {
   println("a non-empty optional is logically true") 
 } else { 
   assert(false, "x is empty!")
 }
 // CHECK: a non-empty optional is logically true
 
-if !x { 
+if x == nil { 
   println("logical negation fails 0")
 }
 else { 
@@ -37,20 +37,20 @@ else {
 
 if true {
   var y1 : Optional<Int> = .None
-  if !y1 {
+  if y1 == nil {
     println("y1 is .None")
   }
   // CHECK: y1 is .None
 
   var y2 : Optional<Int> = .None
-  if !y2 {
+  if y2 == nil {
     println("y2 is .None")
   }
   // CHECK: y2 is .None
 }
 
 func optional_param(x: Optional<Int>) {
-  if !x {
+  if x == nil {
     println("optional param OK")
   }
 }
@@ -60,7 +60,7 @@ optional_param(.None)
 func optional_return() -> Optional<Int> {
   return .None
 }
-if !optional_return() {
+if optional_return() == nil {
   println("optional return OK")
 }
 // CHECK: optional return OK

@@ -31,9 +31,9 @@ var f1 : [(Int,Int)]
 var g : Swift // expected-error {{use of module 'Swift' as a type}}
 
 var h0 : Int?
-!h0 // no-warning
+h0 == nil // no-warning
 var h1 : Int??
-!h1! // no-warning
+h1! == nil // no-warning
 var h2 : [Int?]
 var h3 : [Int]?
 var h3a : [[Int?]]

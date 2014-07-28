@@ -47,14 +47,14 @@ public struct _StringCore {
     _sanityCheck(count >= 0)
     
     if _baseAddress == .null() {
-      _sanityCheck(cocoaBuffer,
+      _sanityCheck(cocoaBuffer != nil,
         "Only opaque cocoa strings may have a null base pointer")
       _sanityCheck(elementWidth == 2,
         "Opaque cocoa strings should have an elementWidth of 2")
     }
     else if _baseAddress == _emptyStringBase {
       _sanityCheck(count == 0, "Empty string storage with non-zero length")
-      _sanityCheck(!_owner, "String pointing at empty storage has owner")
+      _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
     }
     else if let buffer = nativeBuffer {
       _sanityCheck(elementWidth == buffer.elementWidth,
@@ -326,7 +326,7 @@ public struct _StringCore {
   /// the existing buffer's storage
   mutating func _claimCapacity(newSize: Int, 
                                minElementWidth: Int) -> (Int, COpaquePointer) {
-    if _fastPath(nativeBuffer && elementWidth >= minElementWidth) {
+    if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
       // The buffer's "used" field must match this in order to be

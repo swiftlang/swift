@@ -66,14 +66,14 @@ func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
   var e1 = range1.next()
   var e2 = range2.next()
     
-  while e1 && e2 {
+  while (e1 != nil) && (e2 != nil) {
     if e1! != e2! {
       return false
     }
     e1 = range1.next()
     e2 = range2.next()
   }
-  return !e1 == !e2
+  return (e1 == nil) == (e2 == nil)
 }
 
 func equalIf<R1 : GeneratorType, R2 : GeneratorType>
@@ -82,14 +82,14 @@ func equalIf<R1 : GeneratorType, R2 : GeneratorType>
   var e1 = range1.next()
   var e2 = range2.next()
     
-  while e1 && e2 {
+  while (e1 != nil) && (e2 != nil) {
     if !predicate(e1!, e2!) {
       return false
     }
     e1 = range1.next()
     e2 = range2.next()
   }
-  return !e1 == !e2
+  return (e1 == nil) == (e2 == nil)
 }
 
 func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
@@ -100,7 +100,7 @@ func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
   while true {
     var e1 = range1.next(), e2 = range2.next()
     
-    if !e1 || !e2 || e1! != e2! { break }
+    if (e1 == nil) || (e2 == nil) || e1! != e2! { break }
     prev1.next()
     prev2.next()
   }
@@ -116,7 +116,7 @@ func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
   while true {
     var e1 = range1.next(), e2 = range2.next()
     
-    if !e1 || !e2 || !predicate(e1!, e2!) { break }
+    if (e1 == nil) || (e2 == nil) || !predicate(e1!, e2!) { break }
     prev1.next()
     prev2.next()
   }

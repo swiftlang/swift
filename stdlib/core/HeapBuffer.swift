@@ -173,7 +173,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   public var hasStorage: Bool {
-    return storage.boolValue
+    return storage != nil
   }
 
   subscript(i: Int) -> Element {
@@ -194,7 +194,7 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   public mutating func isUniquelyReferenced() -> Bool {
-    if !storage {
+    if storage == nil {
       return false
     }
     var workaroundForRadar16119895 = unsafeBitCast(storage, COpaquePointer.self)

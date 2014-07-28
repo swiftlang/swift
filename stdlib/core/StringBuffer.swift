@@ -179,7 +179,7 @@ public struct _StringBuffer {
   }
 
   var _anyObject: AnyObject? {
-    return _storage.storage ? .Some(_storage.storage!) : .None
+    return _storage.storage != nil ? .Some(_storage.storage!) : .None
   }
 
   var _storage: _Storage

@@ -69,7 +69,7 @@ internal func _printStackTrace(stackTrace: SourceLocStack?) {
     println("stacktrace:")
     for i in 0..<s.locs.count {
       let loc = s.locs[s.locs.count - i - 1]
-      let comment = loc.comment ? " ; \(loc.comment!)" : ""
+      let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
       println("  #\(i): \(loc.file):\(loc.line)\(comment)")
     }
   }
@@ -100,7 +100,7 @@ public func expectEqual<T>(
     _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    if collectMoreInfo { println(collectMoreInfo!()) }
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -125,7 +125,7 @@ public func expectOptionalEqual<T : Equatable>(
     expected: T, actual: T?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if !actual || expected != actual! {
+  if (actual == nil) || expected != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
@@ -271,7 +271,7 @@ public func expectEmpty<T>(
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if value {
+  if value != nil {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
@@ -285,7 +285,7 @@ public func expectNotEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
-  if !value {
+  if value == nil {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("expected optional to be non-empty")
@@ -504,7 +504,7 @@ public func expectEqualSequence<
     _printStackTrace(stackTrace)
     println("expected elements: \"\(expected)\"")
     println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo { println(collectMoreInfo!()) }
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }

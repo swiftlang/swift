@@ -8,7 +8,7 @@ var maybe_one = w.next()
 var is_ = "is"
 var is_not = "is not"
 
-println("maybe_one \(!maybe_one ? is_ : is_not) None")
+println("maybe_one \(maybe_one == nil ? is_ : is_not) None")
 // CHECK: maybe_one is not None
 
 switch maybe_one {
@@ -19,7 +19,7 @@ case .None:
   ()
 }
 
-println("w.next() \(!w.next() ? is_ : is_not) None")
+println("w.next() \(w.next() == nil ? is_ : is_not) None")
 // CHECK: w.next() is None
 
 // Test SequenceType protocol

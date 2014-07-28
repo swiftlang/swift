@@ -147,7 +147,7 @@ class NonObjC {}
   @IBOutlet var outlet4: AnyObject?
 
   func testStrong() {
-    if outlet4 {}
+    if outlet4 != nil {}
   }
 }
 

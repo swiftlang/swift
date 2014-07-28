@@ -112,7 +112,7 @@ if arg == "RemoveInvalidIndex4" {
   var d = [ 10: 1010 ]
   let index = d.indexForKey(10)!
   d.removeAtIndex(index)
-  assert(!d[10])
+  assert(d[10] == nil)
   println("OK")
   d.removeAtIndex(index)
 }

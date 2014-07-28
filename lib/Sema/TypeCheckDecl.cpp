@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
@@ -1824,7 +1825,16 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Build the "if" around the early return.
   Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
                                   /*directpropertyaccess*/true);
-  Body.push_back(new (Ctx) IfStmt(SourceLoc(), Tmp1DRE, Return,
+  
+  // Call through "hasValue" on the decl ref.
+  Tmp1DRE->setType(OptionalType::get(VD->getType()));
+  constraints::ConstraintSystem cs(TC,
+                                   VD->getDeclContext(),
+                                   constraints::ConstraintSystemOptions());
+  constraints::Solution solution(cs, constraints::Score());
+  auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
+  
+  Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
                                   /*implicit*/ true));
 

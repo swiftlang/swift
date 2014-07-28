@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-public enum Optional<T>: BooleanType, Reflectable, NilLiteralConvertible {
+public enum Optional<T>: Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
@@ -20,9 +20,8 @@ public enum Optional<T>: BooleanType, Reflectable, NilLiteralConvertible {
 
   public init(_ some: T) { self = .Some(some) }
 
-  /// Allow use in a Boolean context.
   @transparent
-  public var boolValue: Bool {
+  public var hasValue: Bool {
     switch self {
     case .Some:
       return true
@@ -30,7 +29,7 @@ public enum Optional<T>: BooleanType, Reflectable, NilLiteralConvertible {
       return false
     }
   }
-
+  
   /// Haskell's fmap, which was mis-named
   public func map<U>(f: (T)->U) -> U? {
     switch self {
@@ -85,12 +84,12 @@ public func map<T, U>(x: T?, f: (T)->U) -> U? {
 // Intrinsics for use by language features.
 @transparent internal
 func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
-  return v.boolValue.value
+  return (v != nil).value
 }
 
 @transparent internal
 func _preconditionOptionalHasValue<T>(inout v: T?) {
-  _precondition(v.boolValue,
+  _precondition(v != nil,
                 "unexpectedly found nil while unwrapping an Optional value")
 }
 
@@ -141,7 +140,12 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
 }
 @transparent public
 func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
-  return !rhs.boolValue
+  switch rhs {
+  case .Some(_) :
+    return false
+  case .None :
+    return true
+  }
 }
 
 // Enable equality comparisons against the nil literal, even if the
@@ -195,7 +199,7 @@ internal struct _OptionalMirror<T> : MirrorType {
 
   var objectIdentifier: ObjectIdentifier? { return .None }
 
-  var count: Int { return _value ? 1 : 0 }
+  var count: Int { return (_value != nil) ? 1 : 0 }
 
   subscript(i: Int) -> (String, MirrorType) { 
     switch (_value,i) {

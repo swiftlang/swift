@@ -3,23 +3,23 @@
 import Foundation
 
 func testAnyObjectIsa(obj: AnyObject) {
-  switch obj {
-  case is String:
+
+  if obj is String {
     println("String")
-
-  case is Int:
+  }
+  else if obj is Int {
     println("Int")
-    
-  case is [NSString]:
+  }
+  else if obj is [NSString] {
     println("[NSString]")
-
-  case is [Int]:
+  }
+  else if obj is [Int] {
     println("[Int]")
-
-  case is Dictionary<String, Int>:
+  }
+  else if obj is Dictionary<String, Int> {
     println("Dictionary<String, Int>")
-
-  default:
+  }
+  else {
     println("Did not match")
   }
 }
@@ -40,15 +40,14 @@ testAnyObjectIsa([1, 2, 3, 4, 5])
 testAnyObjectIsa(["hello" : 1, "world" : 2])
 
 func testNSArrayIsa(nsArr: NSArray) {
-  switch nsArr {
-  case is [String]:
+  if nsArr is [String] {
     println("[String]")
-
-  case is [Int]:
+  }
+  else if nsArr is [Int] {
     println("[Int]")
-
-  default:
-    println("Did not match");
+  }
+  else {
+    println("Did not match")
   }
 }
 
@@ -62,15 +61,14 @@ testNSArrayIsa([1, 2, 3])
 testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsa(arr: Array<AnyObject>) {
-  switch arr {
-  case is [NSString]:
+  if arr is [NSString] {
     println("[NSString]")
-
-  case is [NSNumber]:
+  }
+  else if arr is [NSNumber] {
     println("[NSNumber]")
-
-  default:
-    println("Did not match");
+  }
+  else {
+    println("Did not match")
   }
 }
 
@@ -84,14 +82,13 @@ testArrayIsa([1, 2, 3])
 testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsaBridged(arr: Array<AnyObject>) {
-  switch arr {
-  case is [String]:
+  if arr is [String] {
     println("[String]")
-
-  case is [Int]:
+  }
+  else if arr is [Int] {
     println("[Int]")
-
-  default:
+  }
+  else {
     println("Did not match");
   }
 }
