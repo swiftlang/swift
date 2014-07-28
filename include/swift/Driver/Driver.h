@@ -265,6 +265,12 @@ public:
 private:
   const ToolChain &getToolChain(const llvm::opt::ArgList &Args,
                                 StringRef DarwinArchName = "") const;
+
+  /// Parse the driver kind.
+  ///
+  /// \param Args The arguments passed to the driver (excluding the path to the
+  /// driver)
+  void parseDriverKind(ArrayRef<const char *> Args);
 };
 
 } // end namespace driver

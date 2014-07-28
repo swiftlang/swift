@@ -37,6 +37,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
@@ -59,18 +60,41 @@ Driver::Driver(StringRef DriverExecutable,
                DiagnosticEngine &Diags)
   : Opts(createSwiftOptTable()), Diags(Diags),
     Name(Name), DriverExecutable(DriverExecutable),
-    DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {
+    DefaultTargetTriple(llvm::sys::getDefaultTargetTriple()) {}
 
+Driver::~Driver() {
+  llvm::DeleteContainerSeconds(ToolChains);
+}
+
+void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   // The default driver kind is determined by Name.
   if (Name.find("swiftc") != std::string::npos) {
     driverKind = DriverKind::Batch;
   } else {
     driverKind = DriverKind::Interactive;
   }
-}
 
-Driver::~Driver() {
-  llvm::DeleteContainerSeconds(ToolChains);
+  // However, the driver kind may be overridden if the first argument is
+  // --driver-mode.
+  if (Args.size() > 0) {
+    const std::string OptName =
+    getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
+
+    StringRef FirstArg(Args[0]);
+    if (FirstArg.startswith(OptName)) {
+      StringRef Value = FirstArg.drop_front(OptName.size());
+      Optional<DriverKind> Kind =
+      llvm::StringSwitch<Optional<DriverKind>>(Value)
+      .Case("swift", DriverKind::Interactive)
+      .Case("swiftc", DriverKind::Batch)
+      .Default(Nothing);
+
+      if (Kind.hasValue())
+        driverKind = Kind.getValue();
+      else
+        Diags.diagnose({}, diag::error_invalid_arg_value, OptName, Value);
+    }
+  }
 }
 
 static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
@@ -84,9 +108,16 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
+  // The driver kind must be parsed prior to parsing arguments, since that
+  // affects how argumens are parsed.
+  parseDriverKind(Args.slice(1));
+
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
     return nullptr;
+
+  // Claim --driver-mode here, since it's already been handled.
+  (void) ArgList->hasArg(options::OPT_driver_mode);
 
   bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
   bool DriverPrintOutputFileMap =

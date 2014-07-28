@@ -77,6 +77,9 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
   InternalDebugOpt,
   HelpText<"Skip execution of subtasks when performing compilation">;
 
+def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
+  HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
+
 def help : Flag<["-", "--"], "help">, Flags<[FrontendOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
