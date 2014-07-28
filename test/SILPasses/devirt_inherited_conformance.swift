@@ -1,4 +1,5 @@
 // RUN: %swift -O %s -emit-sil -sil-inline-threshold 1000 | FileCheck %s
+// XFAIL: *
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.

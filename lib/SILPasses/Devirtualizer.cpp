@@ -339,9 +339,14 @@ bool WitnessMethodDevirtualizer::devirtualize() {
   /// If we dont and do not have any substitutions, we must then have a pure
   /// inherited protocol conformance.
   if (Subs.empty()) {
+#if 1
+    // Disable inherited protocol conformance for seed 5.
+    return false;
+#else
     assert(isa<InheritedProtocolConformance>(C) &&
            "At this point C must be an inherited protocol conformance.");
     return processInheritedProtocolConformance();
+#endif
   }
 
   /// If we have substitutions, we must have some sort of specialized protocol
