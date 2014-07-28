@@ -326,13 +326,22 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     return;
 
   llvm::SmallPtrSet<ProtocolDecl *, 8> ProtocolsWithConformances;
-  for (const auto *Conformance : CurrNominal->getConformances()) {
-    if (!Conformance->isComplete())
-      continue;
-    auto Proto = Conformance->getProtocol();
-    ProtocolsWithConformances.insert(Proto);
-    auto Protocols = Proto->getProtocols();
-    ProtocolsWithConformances.insert(Protocols.begin(), Protocols.end());
+  {
+    SmallVector<ProtocolDecl *, 8> Worklist;
+    for (const auto *Conformance : CurrNominal->getConformances()) {
+      if (!Conformance->isComplete())
+        continue;
+      Worklist.push_back(Conformance->getProtocol());
+    }
+
+    while (!Worklist.empty()) {
+      auto Proto = Worklist.pop_back_val();
+      if(!ProtocolsWithConformances.insert(Proto))
+        continue;
+
+      auto Protocols = Proto->getProtocols();
+      Worklist.append(Protocols.begin(), Protocols.end());
+    }
   }
 
   auto TopProtocols = CurrNominal->getProtocols();
