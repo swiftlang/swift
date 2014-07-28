@@ -122,7 +122,7 @@ extension String {
         input: UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(
             Builtin.addressof(&value)), 
-          length: size))
+          count: size))
     case .LargeRepresentation(var value):
       self = value._value
     }

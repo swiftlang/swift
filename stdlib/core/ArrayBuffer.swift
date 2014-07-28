@@ -377,7 +377,7 @@ extension _ArrayBuffer {
         indirect.replaceStorage(_copyCollectionToNativeArrayBuffer(self))
       }
     }
-    let ret = body(UnsafeBufferPointer(start: self.baseAddress, length: count))
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
     _fixLifetime(self)
     return ret
   }
@@ -394,7 +394,7 @@ extension _ArrayBuffer {
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     let ret = body(
-      UnsafeMutableBufferPointer(start: baseAddress, length: count))
+      UnsafeMutableBufferPointer(start: baseAddress, count: count))
     _fixLifetime(self)
     return ret
   }

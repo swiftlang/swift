@@ -287,7 +287,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   func withUnsafeBufferPointer<R>(
     body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
-    let ret = body(UnsafeBufferPointer(start: self.baseAddress, length: count))
+    let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
     _fixLifetime(self)
     return ret
   }
@@ -299,7 +299,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     body: (UnsafeMutableBufferPointer<T>)->R
   ) -> R {
     let ret = body(
-      UnsafeMutableBufferPointer(start: baseAddress, length: count))
+      UnsafeMutableBufferPointer(start: baseAddress, count: count))
     _fixLifetime(self)
     return ret
   }

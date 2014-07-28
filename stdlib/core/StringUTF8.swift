@@ -56,7 +56,7 @@ extension _StringCore {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
 
-    let storage = UnsafeBufferPointer(start: startUTF16, length: self.count)
+    let storage = UnsafeBufferPointer(start: startUTF16, count: self.count)
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }
 

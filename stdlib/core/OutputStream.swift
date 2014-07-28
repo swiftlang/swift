@@ -281,7 +281,7 @@ internal func _doubleToString(value: Double) -> String {
     let actualLength = _doubleToStringImpl(bufferUTF8Ptr, 32, value)
     return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
-        input: UnsafeBufferPointer(start: bufferUTF8Ptr, length: Int(actualLength)))
+        input: UnsafeBufferPointer(start: bufferUTF8Ptr, count: Int(actualLength)))
   }
 }
 
@@ -304,7 +304,7 @@ internal func _int64ToString(
           _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
-          input: UnsafeBufferPointer(start: bufferUTF8Ptr, length: Int(actualLength)))
+          input: UnsafeBufferPointer(start: bufferUTF8Ptr, count: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
@@ -315,7 +315,7 @@ internal func _int64ToString(
           _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
-          input: UnsafeBufferPointer(start: bufferUTF8Ptr, length: Int(actualLength)))
+          input: UnsafeBufferPointer(start: bufferUTF8Ptr, count: Int(actualLength)))
     }
   }
 }
@@ -338,7 +338,7 @@ func _uint64ToString(
           _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
-          input: UnsafeBufferPointer(start: bufferUTF8Ptr, length: Int(actualLength)))
+          input: UnsafeBufferPointer(start: bufferUTF8Ptr, count: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
@@ -349,7 +349,7 @@ func _uint64ToString(
           _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
           UTF8.self,
-          input: UnsafeBufferPointer(start: bufferUTF8Ptr, length: Int(actualLength)))
+          input: UnsafeBufferPointer(start: bufferUTF8Ptr, count: Int(actualLength)))
     }
   }
 }

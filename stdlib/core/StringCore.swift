@@ -287,7 +287,7 @@ public struct _StringCore {
         var out = output
         for x in UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
-          length: count
+          count: count
         ) {
           Encoding.encode(UnicodeScalar(UInt32(x)), output: &out)
         }
@@ -296,7 +296,7 @@ public struct _StringCore {
         let hadError = transcode(UTF16.self, encoding,
           UnsafeBufferPointer(
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
-            length: count
+            count: count
           ).generate(),
           output,
           stopOnError: true
@@ -463,8 +463,8 @@ public struct _StringCore {
       return true
     }
     return !contains(
-      UnsafeBufferPointer(start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), 
-                  length: count)
+      UnsafeBufferPointer(
+        start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress), count: count)
     ) { $0 > 0x7f }
   }
 }

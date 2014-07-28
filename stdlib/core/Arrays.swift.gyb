@@ -426,7 +426,7 @@ extension ${Self} {
 
     // Create an UnsafeBufferPointer over work that we can pass to body
     var a = UnsafeMutableBufferPointer(
-      start: work._buffer.baseAddress, length: work.count)
+      start: work._buffer.baseAddress, count: work.count)
     
     // Invoke the body
     let ret = body(&a)
@@ -448,7 +448,7 @@ extension Array {
   ) -> Array {
     let elements = UnsafeBufferPointer(
       start: unsafeBitCast(base, UnsafeMutablePointer<T>.self),
-      length: unsafeBitCast(count, Int.self)
+      count: unsafeBitCast(count, Int.self)
     )
     let r = Array(elements)
     _fixLifetime(owner)
