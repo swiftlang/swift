@@ -966,7 +966,7 @@ public:
     if (Cur.isCompositeType() &&
         Cur.getTag() != llvm::dwarf::DW_TAG_subroutine_type) {
       llvm::DICompositeType CTy(Cur);
-      llvm::DIArray Elts = CTy.getTypeArray();
+      llvm::DIArray Elts = CTy.getElements();
       unsigned N = Cur.getTag() == llvm::dwarf::DW_TAG_union_type
                        ? 1 // For unions, pick any one.
                        : Elts.getNumElements();
@@ -1622,7 +1622,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto PDITy = getOrCreateType(PDbgTy);
       Protocols.push_back(DBuilder.createInheritance(DITy, PDITy, 0, Flags));
     }
-    DITy.setTypeArray(DBuilder.getOrCreateArray(Protocols));
+    DITy.setArrays(DBuilder.getOrCreateArray(Protocols));
     return DITy;
   }
 
