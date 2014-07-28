@@ -2685,9 +2685,9 @@ public:
   // Expose this to users.
   using DeclContext::setParent;
 
-  /// Returns the body of the auto_closure as an \c Expr.
+  /// Returns the body of the autoclosure as an \c Expr.
   ///
-  /// The body of an auto_closure always consists of a single expression.
+  /// The body of an autoclosure always consists of a single expression.
   Expr *getSingleExpressionBody() const;
 
   // Implement isa/cast/dyncast/etc.

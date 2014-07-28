@@ -84,7 +84,6 @@ public:
   void visitIBOutletAttr(IBOutletAttr *attr);
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
-  void visitAssignmentAttr(AssignmentAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
@@ -321,10 +320,6 @@ visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::attr_for_debugger_support_only);
 }
 
-void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
-  diagnoseAndRemoveAttr(attr, diag::assignment_attribute_removed);
-}
-
 void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
   if (!isa<ClassDecl>(D->getDeclContext()) &&
       !isa<ExtensionDecl>(D->getDeclContext()))
@@ -534,7 +529,6 @@ public:
     // one it overrides.
   }
 
-  void visitAssignmentAttr(AssignmentAttr *attr) {}
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);

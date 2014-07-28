@@ -183,8 +183,6 @@ ERROR(ownership_not_attribute,decl_parsing,none,
  
 ERROR(cskeyword_not_attribute,decl_parsing,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
-ERROR(auto_closure_attribute_renamed,decl_parsing,none,
-      "the @auto_closure attribute was renamed to @autoclosure", ())
 
 ERROR(convenience_invalid,sema_tcd,none,
       "'convenience' is not valid on this declaration", ())
@@ -331,11 +329,6 @@ ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
       "expected ')' to close parameter list", ())
 ERROR(destructor_params,decl_parsing,none,
       "deinitializer does not have a parameter clause", ())
-
-
-// FIXME: Remove this.
-ERROR(operator_fixity_moved,decl_parsing,PointsToFirstBadToken,
-      "%0 moved to before the 'operator' declaration", (StringRef))
 
 // Operator
 ERROR(operator_decl_inner_scope,decl_parsing,none,

@@ -736,7 +736,7 @@
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
     attribute      ::= attribute-inout
-    attribute      ::= attribute-auto_closure
+    attribute      ::= attribute-autoclosure
     attribute      ::= attribute-noreturn
   </pre>
   
@@ -846,13 +846,13 @@
   </p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="attribute-auto_closure">auto_closure Attribute</h4>
+  <h4 id="attribute-autoclosure">autoclosure Attribute</h4>
   
   <pre class="grammar">
-    attribute-auto_closure ::= 'auto_closure'
+    attribute-autoclosure ::= 'autoclosure'
   </pre>
   
-  <p>The <tt>auto_closure</tt> attribute modifies a <a 
+  <p>The <tt>autoclosure</tt> attribute modifies a <a
   href="#type-function">function type</a>, changing the behavior of any
   assignment into (or initialization of) a value with the function type. 
   Instead of requiring that the rvalue and lvalue have the same function type,
@@ -861,7 +861,7 @@
   closure over this expression.  This is typically useful for function arguments
   that want to capture computation that can be run lazily.</p>
   
-  <p><tt>auto_closure</tt> is only valid in a <tt>type</tt> of a
+  <p><tt>autoclosure</tt> is only valid in a <tt>type</tt> of a
   syntactic function type that is defined to take a syntactic empty tuple.
   </p>
 
@@ -1095,7 +1095,7 @@
      be <a href="#materializable">materializable</a>.  The argument type of a
      function is always required to be parenthesized (a tuple).  The  behavior
      of function types may be modified with the <a 
-      href="#attribute-auto_closure"><tt>auto_closure</tt> attribute</a>.</p>
+      href="#attribute-autoclosure"><tt>autoclosure</tt> attribute</a>.</p>
 
   <p>Because of the grammar structure, a nested function type like 
      "(a) -&gt; (b) -&gt; c" is parsed as "(a) -&gt; ((b) -&gt; c)".  This means

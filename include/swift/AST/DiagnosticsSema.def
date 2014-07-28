@@ -1359,10 +1359,6 @@ ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
 ERROR(invalid_weak_let,attribute_parsing,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 
-ERROR(assignment_attribute_removed, decl_parsing,none,
-      "@assignment attribute has been removed", ())
-
-
 // required
 ERROR(required_initializer_nonclass,attribute_parsing,none,
       "'required' initializer in non-class type %0", (Type))

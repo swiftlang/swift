@@ -4719,7 +4719,6 @@ public:
 
     UNINTERESTING_ATTR(Accessibility)
     UNINTERESTING_ATTR(Asmname)
-    UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)

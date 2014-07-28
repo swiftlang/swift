@@ -36,10 +36,6 @@ void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
 /// corresponds to it.  This returns TAK_Count on failure.
 ///
 TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
-  // FIXME: Remove.  auto_closure_attribute_renamed
-  if (Str == "auto_closure")
-    return TAK_autoclosure;
-
   return llvm::StringSwitch<TypeAttrKind>(Str)
 #define TYPE_ATTR(X) .Case(#X, TAK_##X)
 #include "swift/AST/Attr.def"

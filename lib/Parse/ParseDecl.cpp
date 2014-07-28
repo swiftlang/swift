@@ -890,11 +890,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   } else if (Attributes.has(attr)) {
     diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
   } else {
-
-    if (Text == "auto_closure")
-      diagnose(Loc, diag::auto_closure_attribute_renamed)
-        .fixItReplace(Loc, "autoclosure");
-
     Attributes.setAttr(attr, Loc);
   }
   
@@ -3899,27 +3894,6 @@ ParserResult<OperatorDecl>
 Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
-
-  // Check to see if this is declared with the old syntax to help with migration
-  // FIXME: Remove this.
-  if (Tok.is(tok::identifier)) {
-    DeclAttribute *attr = nullptr;
-    if (Tok.getText() == "infix")
-      attr = new (Context) InfixAttr(/*implicit*/false);
-    else if (Tok.getText() == "postfix")
-      attr = new (Context) PostfixAttr(/*implicit*/false);
-    else if (Tok.getText() == "prefix")
-      attr = new (Context) PrefixAttr(/*implicit*/false);
-
-    if (attr) {
-      diagnose(Tok, diag::operator_fixity_moved, Tok.getText())
-        .fixItInsert(OperatorLoc, Tok.getText().str() + " ")
-        .fixItRemove(Tok.getLoc());
-
-      Attributes.add(attr);
-      consumeToken(tok::identifier);
-    }
-  }
 
   if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
     diagnose(Tok, diag::expected_operator_name_after_operator);
