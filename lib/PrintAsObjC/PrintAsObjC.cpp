@@ -298,7 +298,7 @@ private:
 
     bool isSettable = VD->isSettable(nullptr);
     if (isSettable && ctx.LangOpts.EnableAccessControl)
-      isSettable = VD->isSetterAccessibleFrom(VD->getModuleContext());
+      isSettable = (VD->getSetterAccessibility() >= minRequiredAccess);
     if (!isSettable)
       os << ", readonly";
 
