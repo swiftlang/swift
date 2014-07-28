@@ -373,7 +373,7 @@ namespace {
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
                               bool IsSuperInitComplete);
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
-    void handleSelfInitUse(const DIMemoryUse &InstInfo);
+    void handleSelfInitUse(DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
@@ -885,7 +885,7 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
 
 /// handleSuperInitUse - When processing a 'self' argument on a class, this is
 /// a call to self.init.
-void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
+void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
   assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
@@ -903,7 +903,8 @@ void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
     return;
   }
 
-  // Otherwise everything is good!
+  // Lower Assign instructions if needed.
+  updateInstructionForInitState(InstInfo);
 }
 
 
@@ -913,9 +914,10 @@ void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
 /// operations.
 void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   SILInstruction *Inst = InstInfo.Inst;
-  
+
+  bool IsSelfInit = InstInfo.Kind == DIUseKind::SelfInit;
   IsInitialization_t InitKind;
-  if (InstInfo.Kind == DIUseKind::Initialization)
+  if (InstInfo.Kind == DIUseKind::Initialization || IsSelfInit)
     InitKind = IsInitialization;
   else {
     assert(InstInfo.Kind == DIUseKind::Assign);
@@ -968,8 +970,10 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
     }
     return;
   }
-  
-  assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
+
+  // Ignore non-stores for SelfInits.
+  assert((isa<StoreInst>(Inst) || IsSelfInit) &&
+         "Unknown store instruction!");
 }
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
