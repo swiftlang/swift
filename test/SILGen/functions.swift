@@ -452,7 +452,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
 
 // CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@thin (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : $SomeClass):
-// CHECK:   %1 = class_method %0 : $SomeClass, #SomeClass.method!1
+// CHECK:   %1 = function_ref @_TFC9functions9SomeClass6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
 // CHECK:   return %2
 
@@ -531,3 +531,20 @@ func noinline_callee() {}
 // CHECK-LABEL: sil [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@thin () -> ()
 @semantics("foo")
 func semantics() {}
+
+
+// <rdar://problem/17828355> curried final method on a class crashes in irgen
+final class r17828355Class {
+  func method(x : Int) {
+    var a : r17828355Class
+    var fn = a.method  // currying a final method.
+  }
+}
+
+// The curry thunk for the method should not include a class_method instruction.
+// CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodFS0_FBi64_T_
+// CHECK-NEXT: bb0(%0 : $r17828355Class):
+// CHECK-NEXT: // function_ref functions.r17828355Class.method (functions.r17828355Class)(Builtin.Int64) -> ()
+// CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
+// CHECK-NEXT:  partial_apply %1(%0) : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
+// CHECK-NEXT:  return

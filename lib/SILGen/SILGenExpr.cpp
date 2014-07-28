@@ -4001,18 +4001,20 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
   if (next.isForeign)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
   
-  // For the fully-uncurried reference to a native class method, emit the
-  // dynamic dispatch.
-  if (!next.isCurried
-      && !next.isForeign
-      && next.kind == SILDeclRef::Kind::Func
-      && next.hasDecl() && isa<ClassDecl>(next.getDecl()->getDeclContext())) {
+  // If the fully-uncurried reference is to a native dynamic class method, emit
+  // the dynamic dispatch.
+  if (!next.isCurried && !next.isForeign &&
+      next.kind == SILDeclRef::Kind::Func &&
+      next.hasDecl() &&
+      gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
+        == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
     
     return gen.B.createClassMethod(loc, thisArg, next,
                                    gen.SGM.getConstantType(next));
   }
-  
+
+  // Otherwise, emit a direct call.
   return gen.emitGlobalFunctionRef(loc, next);
 }
 
