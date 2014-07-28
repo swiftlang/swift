@@ -144,8 +144,6 @@ public protocol BitwiseOperationsType {
   class var allZeros: Self { get }
 }
 
-/*
-// FIXME: These should be enabled, but <rdar://problem/17815767> 
 public func |= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
@@ -157,7 +155,6 @@ public func &= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
 public func ^= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
-*/
 
 public protocol Hashable : Equatable {
   /// Returns the hash value.  The hash value is not guaranteed to be stable
@@ -174,25 +171,6 @@ public protocol Hashable : Equatable {
 public protocol SinkType {
   typealias Element
   mutating func put(x: Element)
-}
-
-public func == <T: _RawOptionSetType>(a: T, b: T) -> Bool {
-  return a.toRaw() == b.toRaw()
-}
-
-/* FIXME: These should be default implementations of the BitwiseOperationsType
-   conformance for RawOptionSetType. */
-public func & <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() & b.toRaw())
-}
-public func | <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() | b.toRaw())
-}
-public func ^ <T: _RawOptionSetType>(a: T, b: T) -> T {
-  return T.fromMask(a.toRaw() ^ b.toRaw())
-}
-public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
-  return T.fromMask(~a.toRaw())
 }
 
 //===----------------------------------------------------------------------===//

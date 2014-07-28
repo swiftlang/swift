@@ -1,6 +1,13 @@
 Latest
 ------
 
+* 'RawOptionSetType' now implements to 'BitwiseOperationsType', so imported
+  NS_OPTIONS now support the bitwise assignment operators '|=', '&=',
+  and '^='
+
+* Types implementing 'BitwiseOperationsType' now automatically support
+  the bitwise assignment operators '|=', '&=', and '^='.
+
 * Optionals can now be coalesced with default values using the '??' operator.
   '??' is a short-circuiting operator that takes an optional on the left and
   a non-optional expression on the right. If the optional has a value, its

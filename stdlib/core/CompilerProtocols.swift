@@ -169,14 +169,31 @@ public protocol RawRepresentable {
 // Workaround for our lack of circular conformance checking. Allow == to be
 // defined on _RawOptionSetType in order to satisfy the Equatable requirement of
 // RawOptionSetType without a circularity our type-checker can't yet handle.
-public protocol _RawOptionSetType: RawRepresentable {
+public protocol _RawOptionSetType: RawRepresentable, Equatable {
   typealias Raw : BitwiseOperationsType, Equatable
   // A non-failable version of RawRepresentable.fromRaw.
   class func fromMask(raw: Raw) -> Self
 }
 
+public func == <T: _RawOptionSetType>(a: T, b: T) -> Bool {
+  return a.toRaw() == b.toRaw()
+}
+
+public func & <T: _RawOptionSetType>(a: T, b: T) -> T {
+  return T.fromMask(a.toRaw() & b.toRaw())
+}
+public func | <T: _RawOptionSetType>(a: T, b: T) -> T {
+  return T.fromMask(a.toRaw() | b.toRaw())
+}
+public func ^ <T: _RawOptionSetType>(a: T, b: T) -> T {
+  return T.fromMask(a.toRaw() ^ b.toRaw())
+}
+public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
+  return T.fromMask(~a.toRaw())
+}
+
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
+public protocol RawOptionSetType : _RawOptionSetType, BooleanType,
     BitwiseOperationsType,
     NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
@@ -184,20 +201,6 @@ public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
   // The Clang importer synthesizes these for imported NS_OPTIONS.
 
   /* class func fromRaw(raw: Raw) -> Self? { return fromMask(raw) } */
-}
-
-// FIXME These overloads can go away once <rdar://problem/17815538> is
-// handled.
-public func |= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
-  lhs = lhs | rhs
-}
-
-public func &= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
-  lhs = lhs | rhs
-}
-
-public func ^= <T: RawOptionSetType>(inout lhs: T, rhs: T) {
-  lhs = lhs | rhs
 }
 
 /// Conforming to this protocol allows a type to be usable with the 'nil'
