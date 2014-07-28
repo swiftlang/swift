@@ -60,6 +60,23 @@ public func debugTrap(
   _conditionallyUnreachable()
 }
 
+/// A fatal error occurred and program execution should stop in debug mode and
+/// in optimized mode.  In unchecked builds this is a noop.
+@transparent @noreturn
+public func trap(
+  message: StaticString,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  // Only check in debug and release mode. In release mode just trap.
+  if _isDebugAssertConfiguration() {
+    _assertionFailed("fatal error", message, file, line)
+  } else if _isReleaseAssertConfiguration() {
+    Builtin.int_trap()
+  }
+  _conditionallyUnreachable()
+}
+
+
 /// Library precondition checks
 ///
 /// Library precondition checks are enabled in debug mode and release mode. When

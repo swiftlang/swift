@@ -1,11 +1,16 @@
 // These tests should crash.
 // RUN: mkdir -p %t
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out
+// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Debug
 //
-// RUN: %target-run %t/a.out fatal 2>&1 | FileCheck %s -check-prefix=CHECK_FATAL
-// RUN: %target-run %t/a.out Bool 2>&1 | FileCheck %s -check-prefix=CHECK_BOOL
-// RUN: %target-run %t/a.out BooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_LOGICVALUE
+// RUN: %target-run %t/Assert_Debug fatal 2>&1 | FileCheck %s -check-prefix=CHECK_FATAL
+// RUN: %target-run %t/Assert_Debug Bool 2>&1 | FileCheck %s -check-prefix=CHECK_BOOL
+// RUN: %target-run %t/Assert_Debug BooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_LOGICVALUE
+// RUN: %target-run %t/Assert_Debug trap 2>&1 | FileCheck %s -check-prefix=CHECK_TRAP_DEBUG
+//
+// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Release -O
+//
+// RUN: %target-run %t/Assert_Release trap 2>&1 | FileCheck %s -check-prefix=CHECK_TRAP_RELEASE
 
 // REQUIRES: swift_stdlib_asserts
 
@@ -82,5 +87,19 @@ if (Process.arguments[1] == "BooleanType") {
   test_securityCheckLogicValue()
 }
 
+func test_trop() {
+  println("OK")
+  // CHECK_TRAP_DEBUG: OK
+  // CHECK_TRAP_RELEASE: OK
+  trap("this should fail")
+  // CHECK_TRAP_DEBUG-NEXT: fatal error: this should fail
+  // CHECK_TRAP_DEBUG-NEXT: CRASHED: SIG{{ILL|TRAP}}
+  // CHECK_TRAP_RELEASE-NEXT: CRASHED: SIG{{ILL|TRAP}}
+}
+if Process.arguments[1] == "trap" {
+  test_trop()
+}
+
 println("BUSTED: should have crashed already")
 exit(1)
+
