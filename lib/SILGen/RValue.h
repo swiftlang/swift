@@ -199,6 +199,22 @@ public:
   RValue copy(SILGenFunction &gen, SILLocation l) const & {
     return RValue(*this, gen, l);
   }
+
+  bool isObviouslyEqual(const RValue &rhs) const {
+    assert(isComplete() && rhs.isComplete() && "Comparing incomplete rvalues");
+
+    // Compare the count of elements instead of the type.
+    if (values.size() != rhs.values.size())
+      return false;
+
+    return std::equal(values.begin(), values.end(), rhs.values.begin(),
+        [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
+          return lhs.getValue() == rhs.getValue() &&
+                 lhs.getCleanup() == rhs.getCleanup();
+        });
+
+  }
+
 };
 
 /// A means of generating an r-value.

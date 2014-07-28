@@ -150,6 +150,7 @@ public:
   std::vector<LValueWriteback> *WritebackStack = 0;
   std::vector<LValueWriteback> &getWritebackStack();
 
+  size_t ActiveWritebackScopeBase = 0;
   bool InWritebackScope = false;
   bool InInOutConversionScope = false;
 
