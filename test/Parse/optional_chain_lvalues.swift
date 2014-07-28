@@ -34,12 +34,13 @@ mutT?.mutS?.y++ // expected-error{{not convertible to '@lvalue}}
 ++mutT?.mutS?.y // expected-error{{could not find an overload}}
 
 // TODO: assignment operators
-// mutT? = T()
-// mutT?.mutS = S()
-// mutT?.mutS? = S()
-// mutT?.mutS?.x = 0
-// mutT?.mutS?.y = 0 // ex/pected-error{{cannot assign}}
-// mutT?.immS = S() // exp/ected-error{{cannot assign}}
-// mutT?.immS? = S() // ex/pected-error{{cannot assign}}
-// mutT?.immS?.x = 0 // ex/pected-error{{cannot assign}}
-// mutT?.immS?.y = 0 // ex/pected-error{{cannot assign}}
+mutT? = T()
+mutT?.mutS = S()
+mutT?.mutS? = S()
+mutT?.mutS?.x += 0
+_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
+mutT?.mutS?.y -= 0 // expected-error{{not convertible to '@lvalue}}
+mutT?.immS = S() // expected-error{{cannot assign}}
+mutT?.immS? = S() // expected-error{{cannot assign}}
+mutT?.immS?.x += 0 // expected-error{{not convertible to '@lvalue}}
+mutT?.immS?.y -= 0 // expected-error{{not convertible to '@lvalue}}

@@ -192,16 +192,35 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                    /*assignment*/ false);
 }
 
-static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
+static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
+                       const InfixData &infixData) {
   if (!LHS || !RHS)
     return nullptr;
+  
+  // If this is an assignment operator, and the left operand is an optional
+  // evaluation, pull the operator into the chain.
+  OptionalEvaluationExpr *optEval = nullptr;
+  if (infixData.isAssignment()) {
+    if ((optEval = dyn_cast<OptionalEvaluationExpr>(LHS))) {
+      LHS = optEval->getSubExpr();
+    }
+  }
+  
+  // Fold the result into the optional evaluation, if we have one.
+  auto makeResultExpr = [&](Expr *result) -> Expr * {
+    if (optEval) {
+      optEval->setSubExpr(result);
+      return optEval;
+    }
+    return result;
+  };
   
   if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
     // Resolve the ternary expression.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     ifExpr->setCondExpr(LHS);
     ifExpr->setElseExpr(RHS);
-    return ifExpr;
+    return makeResultExpr(ifExpr);
   }
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
@@ -209,7 +228,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     assign->setDest(LHS);
     assign->setSrc(RHS);
-    return assign;
+    return makeResultExpr(assign);
   }
   
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
@@ -217,7 +236,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
-    return as;
+    return makeResultExpr(as);
   }
   
   // Build the argument to the operation.
@@ -229,8 +248,10 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
                                      /*hasTrailingClosure=*/false,
                                      LHS->isImplicit() && RHS->isImplicit());
 
+  
+  
   // Build the operation.
-  return new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit());
+  return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
 }
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
@@ -278,7 +299,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(Op1.op)) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
       Op1 = getNextOperator();
       RHS = S[1];
       S = S.slice(2);
@@ -298,7 +319,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // both left-associative, fold LHS and RHS immediately.
     if (Op1.infixData.getPrecedence() > Op2Info.getPrecedence() ||
         (Op1.infixData == Op2Info && Op1.infixData.isLeftAssociative())) {
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
       Op1 = getNextOperator();
       assert(Op1 && "should get a valid operator here");
       RHS = S[1];
@@ -321,7 +342,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // immediately fold LHS and RHS.
     if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
       RHS = foldSequence(TC, DC, RHS, S, Op1.infixData.getPrecedence());
-      LHS = makeBinOp(TC, Op1.op, LHS, RHS);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
@@ -346,12 +367,12 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, Op1.op, LHS, RHS);
+    LHS = makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
     return foldSequence(TC, DC, LHS, S, MinPrecedence);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, Op1.op, LHS, RHS);
+  return makeBinOp(TC, Op1.op, LHS, RHS, Op1.infixData);
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
