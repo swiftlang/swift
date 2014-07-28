@@ -5010,12 +5010,28 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   return SGF.emitEmptyTupleRValue(E);
 }
 
-RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
-  assert(E->getDepth() < SGF.BindOptionalFailureDests.size());
-  auto failureDest =
-    SGF.BindOptionalFailureDests[SGF.BindOptionalFailureDests.size()
-                                   - E->getDepth() - 1];
+void SILGenFunction::emitBindOptional(SILLocation loc,
+                                      SILValue optionalAddr,
+                                      unsigned depth) {
+  assert(depth < BindOptionalFailureDests.size());
+  auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
+                                                - depth - 1];
 
+  // Check whether the optional has a value.
+  SILBasicBlock *hasValueBB = createBasicBlock();
+  SILBasicBlock *hasNoValueBB = createBasicBlock();
+  SILValue hasValue = emitDoesOptionalHaveValue(loc, optionalAddr);
+  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
+
+  // If not, thread out through a bunch of cleanups.
+  B.emitBlock(hasNoValueBB);
+  Cleanups.emitBranchAndCleanups(failureDest, loc);
+
+  // If so, continue.
+  B.emitBlock(hasValueBB);
+}
+
+RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   // Create a temporary of type Optional<T>.
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   auto temp = SGF.emitTemporary(E, optTL);
@@ -5025,18 +5041,10 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
 
   SILValue addr = temp->getAddress();
 
-  // Check whether the optional has a value.
-  SILBasicBlock *hasValueBB = SGF.createBasicBlock();
-  SILBasicBlock *hasNoValueBB = SGF.createBasicBlock();
-  SILValue hasValue = SGF.emitDoesOptionalHaveValue(E, addr);
-  SGF.B.createCondBranch(E, hasValue, hasValueBB, hasNoValueBB);
-
-  // If not, thread out through a bunch of cleanups.
-  SGF.B.emitBlock(hasNoValueBB);
-  SGF.Cleanups.emitBranchAndCleanups(failureDest, E);
-
-  // If so, get that value as the result of our expression.
-  SGF.B.emitBlock(hasValueBB);
+  // Branch out if the thing is nil.
+  SGF.emitBindOptional(E, addr, E->getDepth());
+  
+  // If we continued, get the value out as the result of the expression.
   auto optValue = temp->getManagedAddress();
   auto resultValue = SGF.emitGetOptionalValueFrom(E, optValue, optTL, C);
   return RValue(SGF, E, resultValue);

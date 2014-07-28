@@ -186,6 +186,7 @@ public:
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   LValue visitForceValueExpr(ForceValueExpr *e);
+  LValue visitBindOptionalExpr(BindOptionalExpr *e);
   
   // Expressions that wrap lvalues
   
@@ -343,9 +344,7 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-} // end anonymous namespace.
 
-namespace {
   class TupleElementComponent : public PhysicalPathComponent {
     unsigned ElementIndex;
   public:
@@ -362,9 +361,7 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-} // end anonymous namespace.
 
-namespace {
   class StructElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
     SILType SubstFieldType;
@@ -382,9 +379,9 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
   };
-} // end anonymous namespace.
 
-namespace {
+  /// Abstract base class for components that project the object out of
+  /// optionals.
   class OptionalObjectComponent : public PhysicalPathComponent {
     SILType SubstFieldType;
   public:
@@ -413,10 +410,61 @@ namespace {
                                    getTypeData().TypeOfRValue.getAddressType());
       return ManagedValue::forLValue(someAddr);
     }
+  protected:
+    // Get the address of the object within the optional wrapper, assuming it
+    // has already been validated at the current insertion point.
+    ManagedValue getOffsetOfObject(SILGenFunction &gen, SILLocation loc,
+                                   ManagedValue base) const {
+      // Project out the 'Some' payload.
+      OptionalTypeKind otk;
+      auto objTy
+        = base.getType().getSwiftRValueType()->getAnyOptionalObjectType(otk);
+      assert(objTy);
+      (void)objTy;
+      
+      EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+      // UncheckedTakeEnumDataAddr is safe to apply to Optional, because it is
+      // a single-payload enum. There will (currently) never be spare bits
+      // embedded in the payload.
+      SILValue someAddr = gen.B
+        .createUncheckedTakeEnumDataAddr(loc, base.getValue(),
+                                   someDecl,
+                                   getTypeData().TypeOfRValue.getAddressType());
+      return ManagedValue::forLValue(someAddr);
+    }
   };
-} // end anonymous namespace.
+  
+  class ForceOptionalObjectComponent : public OptionalObjectComponent {
+  public:
+    using OptionalObjectComponent::OptionalObjectComponent;
+    
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
+      // Assert that the optional value is present.
+      gen.emitPreconditionOptionalHasValue(loc, base.getValue());
+      // Project out the payload.
+      return getOffsetOfObject(gen, loc, base);
+    }
+  };
+  
+  class BindOptionalObjectComponent : public OptionalObjectComponent {
+    unsigned Depth;
+  public:
+    BindOptionalObjectComponent(LValueTypeData typeData,
+                                unsigned Depth)
+      : OptionalObjectComponent(typeData), Depth(Depth)
+    {}
+    
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc,
+                        ManagedValue base) const override {
+      // Check if the optional value is present.
+      gen.emitBindOptional(loc, base.getUnmanagedValue(), Depth);
+      
+      // Project out the payload on the success branch.
+      return getOffsetOfObject(gen, loc, base);
+    }
+  };
 
-namespace {
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
   public:
@@ -959,23 +1007,32 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   return lv;
 }
 
-LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e) {
-  LValue lv = visitRec(e->getSubExpr());
-
-  auto baseTypeData = lv.getTypeData();
-  
+static LValueTypeData
+getOptionalObjectTypeData(SILGenFunction &gen,
+                          const LValueTypeData &baseTypeData) {
   OptionalTypeKind otk;
   CanType objectTy = baseTypeData.SubstFormalType.getAnyOptionalObjectType(otk);
   assert(objectTy);
   EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
   
-  LValueTypeData typeData = {
+  return {
     AbstractionPattern(someDecl->getArgumentType()),
     objectTy,
     baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
   };
-  
-  lv.add<OptionalObjectComponent>(typeData);
+}
+
+LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e) {
+  LValue lv = visitRec(e->getSubExpr());
+  LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
+  lv.add<ForceOptionalObjectComponent>(typeData);
+  return lv;
+}
+
+LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e) {
+  LValue lv = visitRec(e->getSubExpr());
+  LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
+  lv.add<BindOptionalObjectComponent>(typeData, e->getDepth());
   return lv;
 }
 

@@ -53,3 +53,13 @@ func assign_optional_lvalue_computed(inout x: S?, y: Int) -> Int {
   x!.computed = y
   return x!.computed
 }
+
+// CHECK-LABEL: sil @_TF15optional_lvalue28assign_bound_optional_lvalueFTRGSqSi_Si_T_
+// CHECK:         function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
+// CHECK:         cond_br {{%.*}}, [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
+// CHECK:       [[SOME]]:
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr
+// CHECK:         assign {{%.*}} to [[PAYLOAD]]
+func assign_bound_optional_lvalue(inout x: Int?, y: Int) {
+  x? = y
+}
