@@ -238,7 +238,7 @@ def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
