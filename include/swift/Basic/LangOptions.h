@@ -77,7 +77,7 @@ namespace swift {
     bool EnableDynamic = true;
     
     /// Enables lvalue propagation through optional operations.
-    bool EnableOptionalLValues = true;
+    bool EnableOptionalLValues = false;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;

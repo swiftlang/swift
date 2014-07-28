@@ -2764,6 +2764,12 @@ namespace {
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
+      if (cs.getASTContext().LangOpts.EnableOptionalLValues) {
+        Type valueType = simplifyType(expr->getType());
+        expr->setType(valueType);
+        return expr;
+      }
+      
       Type valueType = simplifyType(expr->getType());
       Type optType =
         cs.getTypeChecker().getOptionalType(expr->getQuestionLoc(), valueType);

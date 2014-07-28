@@ -1253,6 +1253,21 @@ namespace {
 
     Type visitBindOptionalExpr(BindOptionalExpr *expr) {
       // The operand must be coercible to T?, and we will have type T.
+
+      if (CS.getASTContext().LangOpts.EnableOptionalLValues) {
+        auto locator = CS.getConstraintLocator(expr);
+
+        auto objectTy = CS.createTypeVariable(locator,
+                                              TVO_PrefersSubtypeBinding
+                                              | TVO_CanBindToLValue);
+        
+        // The result is the object type of the optional subexpression.
+        CS.addConstraint(ConstraintKind::OptionalObject,
+                         expr->getSubExpr()->getType(), objectTy,
+                         locator);
+        return objectTy;
+      }
+      
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                             /*options*/ 0);
 
