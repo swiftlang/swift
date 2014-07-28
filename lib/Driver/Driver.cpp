@@ -334,27 +334,14 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
 DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
   DerivedArgList *DAL = new DerivedArgList(ArgList);
 
-  bool ImmediateMode = driverKind == DriverKind::Interactive ||
-                       ArgList.hasArgNoClaim(options::OPT_i);
-
   for (Arg *A : ArgList) {
     // If we're not in immediate mode, pick up inputs via the -- option.
-    if (!ImmediateMode && A->getOption().matches(options::OPT__DASH_DASH)) {
+    if (driverKind != DriverKind::Interactive && A->getOption().matches(options::OPT__DASH_DASH)) {
       A->claim();
       for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
         DAL->append(makeInputArg(*DAL, *Opts, A->getValue(i)));
       }
       continue;
-    }
-
-    // In immediate mode, synthesize an input for -i INPUT ARGS...
-    if (ImmediateMode && A->getOption().matches(options::OPT_i)) {
-      if (A->getNumValues() < 1) {
-        Diags.diagnose(SourceLoc(), diag::error_expected_immediate_input,
-                       A->getSpelling());
-        continue;
-      }
-      DAL->append(makeInputArg(*DAL, *Opts, A->getValue(0)));
     }
     DAL->append(A);
   }
@@ -443,28 +430,22 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
                                   bool hasInputs, const DerivedArgList &args,
                                   bool isInteractiveDriver,
                                   StringRef driverName) {
-  if (isInteractiveDriver) {
-    switch (arg->getOption().getID()) {
+  switch (arg->getOption().getID()) {
 
-    case options::OPT_i:
-      if (hasInputs)
-        diags.diagnose(SourceLoc(), diag::warning_unnecessary_i_mode,
-                       args.getArgString(arg->getIndex()), driverName);
-      break;
+  case options::OPT_i:
+    diags.diagnose(SourceLoc(), diag::error_i_mode,
+                   isInteractiveDriver ? driverName : "swift");
+    break;
 
-    case options::OPT_repl:
-      if (!hasInputs)
-        diags.diagnose(SourceLoc(), diag::warning_unnecessary_repl_mode,
-                       args.getArgString(arg->getIndex()), driverName);
-      break;
+  case options::OPT_repl:
+    if (isInteractiveDriver && !hasInputs)
+      diags.diagnose(SourceLoc(), diag::warning_unnecessary_repl_mode,
+                     args.getArgString(arg->getIndex()), driverName);
+    break;
 
-    default:
-      break;
-    }
+  default:
+    break;
   }
-
-  // Don't warn for swiftc -emit-executable, as some build systems like to be
-  // explicit about everything.
 }
 
 void Driver::buildOutputInfo(const DerivedArgList &Args,
@@ -540,8 +521,9 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       break;
 
     case options::OPT_i:
-      OI.CompilerOutputType = types::TY_Nothing;
-      OI.CompilerMode = OutputInfo::Mode::Immediate;
+      // Keep the default output/mode; this flag was removed and should already
+      // have been diagnosed above.
+      assert(Diags.hadAnyError() && "-i flag was removed");
       break;
 
     case options::OPT_repl:

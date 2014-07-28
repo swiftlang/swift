@@ -395,15 +395,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  // With -i, pass through any arguments following -i INPUT after --.
-  if (OI.CompilerMode == OutputInfo::Mode::Immediate) {
-    Arg *A = Args.getLastArg(options::OPT_i);
-    if (A && A->getNumValues() > 1) {
-      Arguments.push_back("--");
-      Arguments.append(A->getValues().begin() + 1, A->getValues().end());
-    }
-  }
-
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
 }

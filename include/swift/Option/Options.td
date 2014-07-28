@@ -291,7 +291,7 @@ def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
 def integrated_repl : Flag<["-"], "integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
-def i : Option<["-"], "i", KIND_REMAINING_ARGS>, Flags<[NoBatchOption]>,
+def i : Flag<["-"], "i">, Flags<[HelpHidden]>,
   HelpText<"Immediate mode (the default if there is an input file)">,
   ModeOpt;
 

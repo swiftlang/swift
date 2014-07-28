@@ -97,9 +97,11 @@
 // RUN: %swift_driver -### %s | FileCheck -check-prefix=DEFAULT_I %s
 // DEFAULT_I: -interpret
 
-// RUN: %swift_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE %s
-// I_MODE: warning: unnecessary option '-i'
-// I_MODE: -interpret
+// RUN: not %swift_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE %s
+// RUN: not %swift_driver -### -i 2>&1 | FileCheck -check-prefix=I_MODE %s
+// RUN: not %swiftc_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE %s
+// RUN: not %swiftc_driver -### -i 2>&1 | FileCheck -check-prefix=I_MODE %s
+// I_MODE: error: the flag '-i' is no longer required and has been removed; use 'swift input-filename'
 
 // RUN: not %swift_driver -### -c %s 2>&1 | FileCheck -check-prefix=C_MODE %s
 // C_MODE: error: unsupported option '-c'
@@ -110,8 +112,6 @@
 // RUN: not %swift_driver -### -o %t %s 2>&1 | FileCheck -check-prefix=ARG_o %s
 // ARG_o: error: unsupported option '-o'
 
-// RUN: not %swiftc_driver -### -i %s 2>&1 | FileCheck -check-prefix=I_MODE_SWIFTC %s
-// I_MODE_SWIFTC: error: unsupported option '-i'
 // RUN: not %swiftc_driver -### -repl 2>&1 | FileCheck -check-prefix=REPL_MODE_SWIFTC %s
 // REPL_MODE_SWIFTC: error: unsupported option '-repl'
 // RUN: not %swiftc_driver -### -lldb-repl 2>&1 | FileCheck -check-prefix=LLDB_REPL_MODE_SWIFTC %s
