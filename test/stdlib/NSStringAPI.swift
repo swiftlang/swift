@@ -537,14 +537,16 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   var s = "abc あかさた"
   if true {
+    // The largest buffer that can not accomodate the string plus null terminator.
     let bufferLength = 16
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    var result = s.getCString(&buffer, maxLength: 100,
-        encoding: NSUTF8StringEncoding)
+    let result = s.getCString(&buffer, maxLength: 100,
+      encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
   if true {
+    // The smallest buffer where the result can fit.
     let bufferLength = 17
     var expectedStr = map("abc あかさた\0".utf8) { CChar(bitPattern: $0) }
     while (expectedStr.count != bufferLength) {
@@ -552,25 +554,27 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     }
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    var result = s.getCString(&buffer, maxLength: 100,
-        encoding: NSUTF8StringEncoding)
+    let result = s.getCString(&buffer, maxLength: 100,
+      encoding: NSUTF8StringEncoding)
     expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
   }
   if true {
+    // Limit buffer size with 'maxLength'.
     let bufferLength = 100
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    var result = s.getCString(&buffer, maxLength: 8,
-        encoding: NSUTF8StringEncoding)
+    let result = s.getCString(&buffer, maxLength: 8,
+      encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
   if true {
+    // String with unpaired surrogates.
     let illFormedUTF16: String = NonContiguousNSString([ 0xd800 ])
-    let bufferLength = 16
+    let bufferLength = 100
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    var result = s.getCString(&buffer, maxLength: 100,
+    let result = illFormedUTF16.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectFalse(result)
   }
@@ -581,14 +585,16 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   // This test might need to be adjusted for other systems.
   var s = "abc だくてん"
   if true {
-    let bufferLength = 16
+    // The largest buffer that can not accomodate the string plus null terminator.
+    let bufferLength = 19
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    var result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
+    let result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
     expectFalse(result)
   }
   if true {
-    let bufferLength = 100
+    // The smallest buffer where the result can fit.
+    let bufferLength = 20
     var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) {
       CChar(bitPattern: $0)
     }
@@ -597,8 +603,28 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
     }
     var buffer = Array(
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    expectTrue(s.getFileSystemRepresentation(&buffer, maxLength: bufferLength))
+    let result = s.getFileSystemRepresentation(
+      &buffer, maxLength: bufferLength)
+    expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
+  }
+  if true {
+    // Limit buffer size with 'maxLength'.
+    let bufferLength = 100
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+    let result = s.getFileSystemRepresentation(&buffer, maxLength: 19)
+    expectFalse(result)
+  }
+  if true {
+    // String with unpaired surrogates.
+    let illFormedUTF16: String = NonContiguousNSString([ 0xd800 ])
+    let bufferLength = 100
+    var buffer = Array(
+      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
+    let result = illFormedUTF16.getFileSystemRepresentation(
+      &buffer, maxLength: 100)
+    expectFalse(result)
   }
 }
 
