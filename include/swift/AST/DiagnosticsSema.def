@@ -1079,6 +1079,11 @@ NOTE(forced_to_conditional_downcast,sema_tce,none,
 NOTE(silence_inject_forced_downcast,sema_tce,none,
      "add parentheses around the cast to silence this warning", ())
 
+NOTE(optional_used_as_boolean,sema_tce,none,
+     "Optional type %0 can not be used as a boolean. "
+     "Test for '!= nil' instead", (Type))
+
+
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
 ERROR(non_constant_array,type_parsing,none,

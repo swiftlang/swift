@@ -104,7 +104,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   
   // this is the only member that needs to validate _a - others either don't touch it or call into this
   var count: Int {
-    if _a {
+    if _a != nil {
       return _a.count
     }
     return 0

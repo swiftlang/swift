@@ -115,7 +115,7 @@ func properties(b: B) {
   // Dynamic properties.
   var obj : AnyObject = b
   var optStr = obj.nsstringProperty
-  if optStr {
+  if optStr != nil {
     var s : String = optStr!
   }
 }

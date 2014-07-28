@@ -10,7 +10,7 @@ println(array[2].description)
 // Dynamic subscripting on an array using an object (fails)
 // CHECK: NSArray subscript with an object fails
 var optVal1 = array["Hello"]
-if optVal1 {
+if optVal1 != nil {
    println(optVal1.description)
 } else {
    println("NSArray subscript with an object fails")
@@ -25,7 +25,7 @@ println(dict["World"].description)
 // Dynamic subscripting on an array using an object (fails)
 // CHECK: NSDictionary subscript with an object fails
 var optVal2 = dict[1]
-if optVal2 {
+if optVal2 != nil {
    println(optVal2.description)
 } else {
    println("NSDictionary subscript with an object fails")

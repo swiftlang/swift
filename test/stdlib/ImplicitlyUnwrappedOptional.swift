@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 var x : Int! = .None
-if x {
+if x != nil {
   println("x is non-empty!")
 }
 else {
@@ -11,7 +11,7 @@ else {
 
 x = .Some(0)
 
-if x {
+if x != nil {
   println("a non-empty optional is logically true")
 }
 else {

@@ -29,7 +29,7 @@ extension Z {
 
 func test_dynamic_lookup_f(obj: AnyObject) {
   var of = obj.f
-  if of {
+  if of != nil {
     of!()
   } else {
     print("Object does not respond to the selector \"f\".\n")
@@ -38,7 +38,7 @@ func test_dynamic_lookup_f(obj: AnyObject) {
 
 func test_dynamic_lookup_g(obj: AnyObject) {
   var og = obj.dynamicType.g
-  if og {
+  if og != nil {
     og!()
   } else {
     print("Class does not respond to the selector \"g\".\n")
@@ -47,7 +47,7 @@ func test_dynamic_lookup_g(obj: AnyObject) {
 
 func test_dynamic_lookup_myValue(obj: AnyObject) {
   var ov = obj.myValue
-  if ov {
+  if ov != nil {
     println("myValue = \(ov!)")
   } else {
     println("Object does not respond to the selector \"myValue\".")
