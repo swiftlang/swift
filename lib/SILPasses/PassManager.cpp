@@ -27,11 +27,6 @@ STATISTIC(NumOptzIterations, "Number of optimization iterations");
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
-
-  DEBUG(for (auto SFT : FuncTransforms) {
-      llvm::dbgs() << "        Running: " << SFT->getName() << "\n";
-  });
-
   for (auto &F : *Mod) {
     if (F.empty() || CompleteFuncs->isComplete(&F))
       continue;
@@ -45,11 +40,8 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       ++NumPassesRun;
       if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= Options.NumOptPassesToRun) {
-        DEBUG(llvm::dbgs() << "        HIT MAX COUNTER LIMIT! BAILING!\n");
-        stopRunning();
+          && NumPassesRun >= Options.NumOptPassesToRun)
         return false;
-      }
 
       if (Options.TimeTransforms) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
@@ -69,22 +61,13 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
           F.verify();
         }
       }
-
-      // If the pass asked us to stop running, return false.
-      if (StopRunning)
-        return false;
     }
   }
 
-  // We executed all of the passes that we were asked to run without being
-  // signaled to stop.
   return true;
 }
 
-bool SILPassManager::runOneIteration() {
-  assert(!StopRunning && "Should never call this if we were asked to stop "
-         "without reseting the pass manager.");
-
+void SILPassManager::runOneIteration() {
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
   NumOptzIterations++;
   NumOptimizationIterations++;
@@ -95,24 +78,17 @@ bool SILPassManager::runOneIteration() {
   for (SILTransform *ST : Transformations) {
     // Bail out if we've hit the optimization pass limit.
     if (Mod->getStage() == SILStage::Canonical
-        && NumPassesRun >= Options.NumOptPassesToRun) {
-      stopRunning();
-      break;
-    }
+        && NumPassesRun >= Options.NumOptPassesToRun)
+      return;
 
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
       // Run all function passes that we've seen since the last module pass. If
       // one of the passes asked us to stop the pass pipeline, return false.
-      if (!runFunctionPasses(PendingFuncTransforms)) {
-        DEBUG(llvm::dbgs() << "        PASS ASKED US TO STOP OR WE HIT PASS "
-              "LIMIT! BAILING!\n");
-        return false;
-      }
+      if (!runFunctionPasses(PendingFuncTransforms))
+        return;
 
       PendingFuncTransforms.clear();
-
-      DEBUG(llvm::dbgs() << "        Running: " << SMT->getName() << "\n");
 
       CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
@@ -124,9 +100,7 @@ bool SILPassManager::runOneIteration() {
 
       if (Mod->getStage() == SILStage::Canonical
           && NumPassesRun >= Options.NumOptPassesToRun) {
-        stopRunning();
-        DEBUG(llvm::dbgs() << "        HIT MAX COUNTER LIMIT! BAILING!\n");
-        return false;
+        return;
       }
 
       if (Options.TimeTransforms) {
@@ -146,35 +120,24 @@ bool SILPassManager::runOneIteration() {
           Mod->verify();
         }
       }
-
-      if (StopRunning) {
-        DEBUG(llvm::dbgs() << "        PASSED ASKED US TO STOP! BAILING!\n");
-        return false;
-      }
-
+      
       continue;
     }
 
     // Run function transformation on all functions.
     if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
-      PendingFuncTransforms.push_back(SFT);
+      PendingFuncTransforms.push_back(SFT);      
       continue;
     }
 
     llvm_unreachable("Unknown pass kind.");
   }
 
-  bool AskedToStop = !runFunctionPasses(PendingFuncTransforms);
-  (void)AskedToStop;
+  runFunctionPasses(PendingFuncTransforms);
   CompleteFuncs->setComplete();
-
-  DEBUG(if (AskedToStop) {
-    llvm::dbgs() << "        PASS ASKED US TO STOP! BAILING!\n";
-  });
-  return !AskedToStop;
 }
 
-bool SILPassManager::run() {
+void SILPassManager::run() {
   if (Options.PrintAll) {
     llvm::dbgs() << "*** SIL module before transformation ("
                  << NumOptimizationIterations << ") ***\n";
@@ -185,14 +148,8 @@ bool SILPassManager::run() {
   const unsigned IterationLimit = 20;
   do {
     anotherIteration = false;
-    // Run an iteration. If a pass asked us to stop, return false.
-    if (!runOneIteration()) {
-      return false;
-    }
+    runOneIteration();
   } while (anotherIteration && NumOptimizationIterations < IterationLimit);
-
-  // We iterated until convergence and no passes asked us to stop! Return true.
-  return true;
 }
 
 /// D'tor.
@@ -213,10 +170,8 @@ void SILPassManager::resetAndRemoveTransformations() {
     delete T;
 
   Transformations.clear();
-  NumPassesRun = 0;
   NumOptimizationIterations = 0;
   anotherIteration = false;
-  StopRunning = false;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   CompleteFuncs->reset();
 }

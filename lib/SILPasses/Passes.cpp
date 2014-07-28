@@ -148,11 +148,9 @@ void AddSSAPasses(SILPassManager &PM, SILModule &Module,
   PM.add(createGlobalARCOpts());
 }
 
+
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
-  if (Options.DisableSILPerfOptimizations)
-    return;
-
   if (Options.DebugSerialization) {
     SILPassManager PM(&Module, Options);
     registerAnalysisPasses(PM, &Module);
@@ -167,30 +165,24 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // Start by specializing generics and by cloning functions from stdlib.
   PM.add(createSILLinker());
   PM.add(createGenericSpecializer());
-  if (!PM.run())
-    return;
+  PM.run();
   PM.resetAndRemoveTransformations();
 
   // Run two iterations of the high-level SSA passes.
   AddSSAPasses(PM, Module, true);
-  if (!PM.runOneIteration())
-    return;
-  if (!PM.runOneIteration())
-    return;
+  PM.runOneIteration();
+  PM.runOneIteration();
 
   // Run the high-level loop optimization passes.
   PM.resetAndRemoveTransformations();
   AddHighLevelLoopOptPasses(PM, Module);
-  if (!PM.runOneIteration())
-    return;
+  PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   // Run two iterations of the low-level SSA passes.
   AddSSAPasses(PM, Module, false);
-  if (!PM.runOneIteration())
-    return;
-  if (!PM.runOneIteration())
-    return;
+  PM.runOneIteration();
+  PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   // Perform lowering optimizations.
@@ -203,20 +195,17 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // Insert inline caches for virtual calls.
   PM.add(createDevirtualization());
   PM.add(createInlineCaches());
-  if (!PM.run())
-    return;
+  PM.run();
   PM.resetAndRemoveTransformations();
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches.
   AddSSAPasses(PM, Module, false);
-  if (!PM.runOneIteration())
-    return;
+  PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();
   AddLowLevelLoopOptPasses(PM, Module);
-  if (!PM.runOneIteration())
-    return;
+  PM.runOneIteration();
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.
   Module.invalidateSILLoader();

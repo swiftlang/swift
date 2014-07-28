@@ -766,7 +766,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_remove_runtime_asserts);
 
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
-  Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll |= Args.hasArg(OPT_sil_print_all);
   Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
