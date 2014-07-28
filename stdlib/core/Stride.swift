@@ -30,6 +30,10 @@ public func < <T: _Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) > 0
 }
 
+public func == <T: _Strideable>(x: T, y: T) -> Bool {
+  return x.distanceTo(y) == 0
+}
+
 /// A protocol for types that can be stride()d over.
 public protocol Strideable : Comparable, _Strideable {}
 

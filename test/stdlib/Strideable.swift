@@ -36,10 +36,6 @@ struct R : RandomAccessIndexType {
   }
 }
 
-func ==(a: R, b: R) -> Bool {
-  return a.x == b.x
-}
-
 strideTestCase.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
   // to RandomAccessIndexType
