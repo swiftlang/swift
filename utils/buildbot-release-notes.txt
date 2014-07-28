@@ -1,6 +1,21 @@
 Latest
 ------
 
+* Optionals can now be coalesced with default values using the '??' operator.
+  '??' is a short-circuiting operator that takes an optional on the left and
+  a non-optional expression on the right. If the optional has a value, its
+  value is returned as a non-optional; otherwise, the expression on the right
+  is evaluated and returned:
+
+    var sequence: [Int] = []
+    sequence.first ?? 0 // produces 0, because sequence.first is nil
+    sequence.append(22)
+    sequence.first ?? 0 // produces 22, the value of sequence.first
+
+
+2014-07-28
+----------
+
 * The swift command line interface is now divided into an interactive driver
   'swift', and a batch compiler 'swiftc':
 
@@ -133,17 +148,6 @@ Latest
   initializer:
 
     class MySimpleSubClass : MyClass { } // inherits the required init(coder:).
-
-* Optionals can now be coalesced with default values using the '??' operator.
-  '??' is a short-circuiting operator that takes an optional on the left and
-  a non-optional expression on the right. If the optional has a value, its
-  value is returned as a non-optional; otherwise, the expression on the right
-  is evaluated and returned:
-
-    var sequence: [Int] = []
-    sequence.first ?? 0 // produces 0, because sequence.first is nil
-    sequence.append(22)
-    sequence.first ?? 0 // produces 22, the value of sequence.first
 
 2014-07-21
 ----------
