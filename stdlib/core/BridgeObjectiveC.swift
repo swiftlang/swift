@@ -270,9 +270,6 @@ var _nilRawPointer: Builtin.RawPointer {
   return Builtin.inttoptr_Word(0.value)
 }
 
-@availability(*,unavailable,renamed="AutoreleasingUnsafeMutablePointer")
-public struct AutoreleasingUnsafePointer<T> {}
-
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
 /// This type has implicit conversions to allow passing any of the following
