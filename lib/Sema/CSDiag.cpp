@@ -791,6 +791,15 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       
       return true;
     }
+    
+    if (auto bind = dyn_cast_or_null<BindOptionalExpr>(anchor)) {
+      tc.diagnose(loc, diag::binding_injected_optional,
+                  failure.getFirstType())
+        .highlight(bind->getSourceRange())
+        .fixItRemove(bind->getQuestionLoc());
+      
+      return true;      
+    }
     return false;
   }
 
