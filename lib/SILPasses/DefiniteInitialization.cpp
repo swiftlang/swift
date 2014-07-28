@@ -904,7 +904,8 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   }
 
   // Lower Assign instructions if needed.
-  updateInstructionForInitState(InstInfo);
+  if (isa<AssignInst>(InstInfo.Inst))
+    updateInstructionForInitState(InstInfo);
 }
 
 
@@ -915,9 +916,9 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
 void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   SILInstruction *Inst = InstInfo.Inst;
 
-  bool IsSelfInit = InstInfo.Kind == DIUseKind::SelfInit;
   IsInitialization_t InitKind;
-  if (InstInfo.Kind == DIUseKind::Initialization || IsSelfInit)
+  if (InstInfo.Kind == DIUseKind::Initialization ||
+      InstInfo.Kind == DIUseKind::SelfInit)
     InitKind = IsInitialization;
   else {
     assert(InstInfo.Kind == DIUseKind::Assign);
@@ -972,8 +973,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   }
 
   // Ignore non-stores for SelfInits.
-  assert((isa<StoreInst>(Inst) || IsSelfInit) &&
-         "Unknown store instruction!");
+  assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
 
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
