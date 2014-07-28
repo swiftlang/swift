@@ -90,7 +90,7 @@
 // APPKIT-NEXT: func addSubview(aView: NSView)
 // APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
-// APPKIT-NEXT: var layer: CALayer
+// APPKIT-NEXT: var layer: CALayer?
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]
 // APPKIT-LABEL:      extension NSView {

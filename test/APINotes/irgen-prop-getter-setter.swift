@@ -10,6 +10,7 @@ class MyView: NSView {
         var l = self.layer
         self.layer = CALayer()
         self.nextKeyView = nil
+        subviews = []
     }    
 }
 var m = MyView()
