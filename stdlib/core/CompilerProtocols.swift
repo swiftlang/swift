@@ -176,9 +176,8 @@ public protocol _RawOptionSetType: RawRepresentable {
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSetType
-: _RawOptionSetType, BooleanType, Equatable,
-    // BitwiseOperationsType,  // FIXME <rdar://problem/17815538> 
+public protocol RawOptionSetType : _RawOptionSetType, BooleanType, Equatable,
+    BitwiseOperationsType,
     NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
   // implementations in protocols)
