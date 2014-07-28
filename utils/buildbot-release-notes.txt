@@ -19,6 +19,20 @@ Latest
     sequence.append(22)
     sequence.first ?? 0 // produces 22, the value of sequence.first
 
+* The optional chaining '?' operator can now be mutated through, like '!'.
+  The assignment and the evaluation of the right-hand side of the operator
+  are conditional on the presence of the optional value:
+
+    var sequences = ["fibonacci": [1, 1, 2, 3, 4], "perfect": [6, 28, 496]]
+    sequences["fibonacci"]?[4]++ // Increments element 4 of key "fibonacci"
+    sequences["perfect"]?.append(8128) // Appends to key "perfect"
+
+    sequences["cubes"]?[3] = 3*3*3 // Does nothing; no "cubes" key
+
+  Note that optional chaining still flows to the right, so prefix increment
+  operators are *not* included in the chain, so this won't type-check:
+
+    ++sequences["fibonacci"]?[4] // Won't type check, can't '++' Int?
 
 2014-07-28
 ----------
