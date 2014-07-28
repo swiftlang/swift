@@ -1823,7 +1823,7 @@ ParserStatus Parser::parseLineDirective() {
   SourceLoc Loc = consumeToken(tok::pound_line);
   bool WasInPoundLineEnvironment = InPoundLineEnvironment;
   if (WasInPoundLineEnvironment) {
-    SourceMgr.closeVirtualFile(Tok.getLoc());
+    SourceMgr.closeVirtualFile(Loc);
     InPoundLineEnvironment = false;
   }
 
