@@ -121,13 +121,11 @@ func ArchetypeToConcreteCastE<T>(#t : T) -> E {
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt8) -> UInt8 {
 // CHECK-NEXT: bb0
 // CHECK-NEXT: [[VALUE:%.*]] = load %0 : $*UInt8
-// CHECK-NEXT: return [[VALUE]]
 ArchetypeToConcreteCastUInt8(t: b)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
-// CHECK-NOT: bb1
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
@@ -136,7 +134,6 @@ ArchetypeToConcreteCastUInt8(t: c)
 // CHECK-LABEL: sil shared @_TTSVSs6UInt64___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt64) -> UInt8 {
 // CHECK-NEXT: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
-// CHECK-NOT: bb1
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
@@ -145,13 +142,11 @@ ArchetypeToConcreteCastUInt8(t: f)
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in C) -> @owned C {
 // CHECK-NEXT: bb0
 // CHECK-NEXT:  [[VALUE:%.*]] = load %0 : $*C
-// CHECK-NEXT: return [[VALUE]]
 ArchetypeToConcreteCastC(t: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in UInt8) -> @owned C {
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
-// CHECK-NOT: bb1
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
@@ -166,7 +161,6 @@ ArchetypeToConcreteCastC(t: d)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1E___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
-// CHECK-NOT: bb1
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
@@ -174,7 +168,6 @@ ArchetypeToConcreteCastC(t: e)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
-// CHECK-NOT: bb1
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: cond_fail [[TRUE]]
 // CHECK: unreachable
