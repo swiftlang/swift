@@ -1315,7 +1315,8 @@ bool getApplySubstitutionsFromParsed(
           auto proto = protoTy->getDecl();
           auto conformance = SP.P.SF.getParentModule()->lookupConformance(
                                parsed.replacement, proto, nullptr);
-          if (conformance.getPointer())
+          if (conformance.getPointer() &&
+              req.getSubject().getPointer() == subArchetype)
             conformances.push_back(conformance.getPointer());
         }
 
@@ -2293,15 +2294,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
     auto declPoly = dyn_cast<PolymorphicFunctionType>(declTy.getPointer());
+    auto unlabeledDecl =
+      declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
       auto lookupTy = values[I]->getType()->getCanonicalType();
+      auto unlabeledLookup =
+        lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
       auto lookupPoly = dyn_cast<PolymorphicFunctionType>(
                             lookupTy.getPointer());
       // We handle comparision of PolymorphicFunctionType by calling
       // checkPolymorphicFunctionType.
       if ((declPoly && lookupPoly &&
            checkPolymorphicFunctionType(lookupPoly, declPoly, P.Context)) ||
-          lookupTy == Ty.getType()->getCanonicalType()) {
+          unlabeledLookup == unlabeledDecl) {
         TheDecl = values[I];
         // Update SILDeclRef to point to the right Decl.
         Member.loc = TheDecl;
