@@ -234,9 +234,9 @@ private:
   StringRef getName(SILLocation L);
   StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
-  llvm::DIArray createParameterTypes(CanSILFunctionType FnTy,
+  llvm::DITypeArray createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx);
-  llvm::DIArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx);
+  llvm::DITypeArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value *> &Parameters,
                            SILType CanTy, DeclContext *DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,

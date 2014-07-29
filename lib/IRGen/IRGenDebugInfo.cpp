@@ -636,15 +636,15 @@ void IRGenDebugInfo::createParameterType(
 }
 
 /// Create the array of function parameters for FnTy. SIL Version.
-llvm::DIArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
+llvm::DITypeArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
                                                    DeclContext *DeclCtx) {
   if (!SILTy)
-    return llvm::DIArray();
+    return llvm::DITypeArray();
   return createParameterTypes(SILTy.castTo<SILFunctionType>(), DeclCtx);
 }
 
 /// Create the array of function parameters for a function type.
-llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
+llvm::DITypeArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    DeclContext *DeclCtx) {
   SmallVector<llvm::Value *, 16> Parameters;
 
@@ -660,7 +660,7 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   for (auto Param : FnTy->getParameters())
     createParameterType(Parameters, Param.getSILType(), DeclCtx);
 
-  return DBuilder.getOrCreateArray(Parameters);
+  return DBuilder.getOrCreateTypeArray(Parameters);
 }
 
 /// FIXME: replace this condition with something more sane.
