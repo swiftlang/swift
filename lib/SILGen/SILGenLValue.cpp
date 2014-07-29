@@ -707,15 +707,15 @@ namespace {
         return true;
       }
 
-      // If the index value doesn't lower to literally the same SILValue's,
-      // do some fuzzy matching to catch the common case.
-      if (areCertainlyEqualIndices(subscriptIndexExpr, rhs.subscriptIndexExpr))
-        return true;
-
       // Otherwise, it is a subscript, check the index values.
       // If we haven't emitted the lvalue for some reason, just ignore this.
       if (!origSubscripts || !rhs.origSubscripts)
         return false;
+
+      // If the index value doesn't lower to literally the same SILValue's,
+      // do some fuzzy matching to catch the common case.
+      if (areCertainlyEqualIndices(subscriptIndexExpr, rhs.subscriptIndexExpr))
+        return true;
 
       // If the indices are literally identical SILValue's, then they are equal.
       if (origSubscripts.isObviouslyEqual(rhs.origSubscripts))

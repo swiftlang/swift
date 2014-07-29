@@ -151,11 +151,3 @@ func test() {
 test()
 // CHECK: true
 
-
-func testSwiftWTF20140716() {
-  var a = [[1,2,3,4,5]]
-  swap(&a[0][1], &a[0][2])
-  println(a)
-}
-testSwiftWTF20140716()  // CHECK: [1, 3, 2, 4, 5]
-
