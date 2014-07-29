@@ -528,6 +528,7 @@ public:
 
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
+    checkInheritanceClause(ext);
   }
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {

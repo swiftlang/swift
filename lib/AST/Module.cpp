@@ -638,6 +638,9 @@ findExplicitConformance(NominalTypeDecl *nominal, ProtocolDecl *protocol,
 
       // Visit the extensions of this type.
       for (auto ext : currentNominal->getExtensions()) {
+        if (resolver)
+          resolver->resolveExtension(ext);
+
         if (isProtocolInList(ext, ext->getProtocols(), ext->getConformances())) {
           // Break outer loop as well.
           stack.clear();

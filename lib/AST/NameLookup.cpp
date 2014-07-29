@@ -1210,6 +1210,9 @@ bool DeclContext::lookupQualified(Type type,
 
     // Add protocols from the extensions of the current type.
     for (auto ext : current->getExtensions()) {
+      if (typeResolver)
+        typeResolver->resolveExtension(ext);
+
       addProtocols(ext->getProtocols());
     }
   }

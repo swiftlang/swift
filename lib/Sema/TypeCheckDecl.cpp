@@ -5403,6 +5403,16 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 }
 
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
+  // Validate the context. We don't do this for generic parameters, because
+  // those are validated as part of their context.
+  if (D->getKind() != DeclKind::GenericTypeParam) {
+    auto dc = D->getDeclContext();
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+      validateDecl(nominal, false);
+    else if (auto ext = dyn_cast<ExtensionDecl>(dc))
+      validateExtension(ext);
+  }
+
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
@@ -5480,9 +5490,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
-    for (auto ext : nominal->getExtensions())
-      checkInheritanceClause(ext);
-
     if (nominal->hasType())
       return;
 
