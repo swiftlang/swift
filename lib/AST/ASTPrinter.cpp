@@ -26,6 +26,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -2365,6 +2366,34 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   else
     TypePrinter(Printer, PO).visit(*this);
 }
+
+void Type::dumpVerbose() const {
+  class TypeDumper : public TypeWalker {
+    unsigned indentation = 0;
+
+    Action walkToTypePre(Type ty) override {
+      llvm::errs().indent(indentation * 2);
+      switch (ty->getKind()) {
+#define TYPE(CLASS, ...) \
+      case TypeKind::CLASS: \
+        llvm::errs() << #CLASS "Type: "; \
+        break;
+#include "swift/AST/TypeNodes.def"
+      }
+      ty->print(llvm::errs());
+      llvm::errs() << '\n';
+      ++indentation;
+      return Action::Continue;
+    }
+
+    Action walkToTypePost(Type ty) override {
+      --indentation;
+      return Action::Continue;
+    }
+  };
+  walk(TypeDumper());
+}
+
 
 void GenericSignature::print(raw_ostream &OS) const {
   StreamPrinter Printer(OS);
