@@ -101,10 +101,10 @@ struct funcOrStruct { int i; };
 #define STDLIB_TYPEDEF(TYPE, NAME) \
   typedef TYPE NAME; \
   STDLIB_TEST(TYPE, NAME)
-STDLIB_TYPEDEF(unsigned __INT8_TYPE__, UInt8);
-STDLIB_TYPEDEF(unsigned __INT16_TYPE__, UInt16);
-STDLIB_TYPEDEF(unsigned __INT32_TYPE__, UInt32);
-STDLIB_TYPEDEF(unsigned __INT64_TYPE__, UInt64);
+STDLIB_TYPEDEF(__UINT8_TYPE__, UInt8);
+STDLIB_TYPEDEF(__UINT16_TYPE__, UInt16);
+STDLIB_TYPEDEF(__UINT32_TYPE__, UInt32);
+STDLIB_TYPEDEF(__UINT64_TYPE__, UInt64);
 STDLIB_TYPEDEF(float, Float32);
 STDLIB_TYPEDEF(double, Float64);
 STDLIB_TYPEDEF(long double, Float80);
@@ -117,16 +117,16 @@ STDLIB_TYPEDEF(__INT64_TYPE__, SInt64);
 
 // Types from stdint.h.
 #include <stdint.h>
-STDLIB_TEST(unsigned __INT8_TYPE__, uint8_t);
-STDLIB_TEST(unsigned __INT16_TYPE__, uint16_t);
-STDLIB_TEST(unsigned __INT32_TYPE__, uint32_t);
-STDLIB_TEST(unsigned __INT64_TYPE__, uint64_t);
+STDLIB_TEST(__UINT8_TYPE__, uint8_t);
+STDLIB_TEST(__UINT16_TYPE__, uint16_t);
+STDLIB_TEST(__UINT32_TYPE__, uint32_t);
+STDLIB_TEST(__UINT64_TYPE__, uint64_t);
 STDLIB_TEST(__INT8_TYPE__, int8_t);
 STDLIB_TEST(__INT16_TYPE__, int16_t);
 STDLIB_TEST(__INT32_TYPE__, int32_t);
 STDLIB_TEST(__INT64_TYPE__, int64_t);
 STDLIB_TEST(__INTPTR_TYPE__, intptr_t);
-STDLIB_TEST(unsigned __INTPTR_TYPE__, uintptr_t);
+STDLIB_TEST(__UINTPTR_TYPE__, uintptr_t);
 
 // Types from stddef.h.
 STDLIB_TYPEDEF(__PTRDIFF_TYPE__, ptrdiff_t);
@@ -134,10 +134,10 @@ STDLIB_TYPEDEF(__SIZE_TYPE__, size_t);
 
 // Types from sys/types.h (POSIX).
 STDLIB_TYPEDEF(long, ssize_t);
-STDLIB_TYPEDEF(unsigned __INT8_TYPE__, u_int8_t);
-STDLIB_TYPEDEF(unsigned __INT16_TYPE__, u_int16_t);
-STDLIB_TYPEDEF(unsigned __INT32_TYPE__, u_int32_t);
-STDLIB_TYPEDEF(unsigned __INT64_TYPE__, u_int64_t);
+STDLIB_TYPEDEF(__UINT8_TYPE__, u_int8_t);
+STDLIB_TYPEDEF(__UINT16_TYPE__, u_int16_t);
+STDLIB_TYPEDEF(__UINT32_TYPE__, u_int32_t);
+STDLIB_TYPEDEF(__UINT64_TYPE__, u_int64_t);
 
 // Types from libkern/OSTypes.h.
 STDLIB_TYPEDEF(signed int, SInt);
