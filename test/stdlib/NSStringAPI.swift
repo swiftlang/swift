@@ -1050,9 +1050,9 @@ func getHomeDir() -> String {
   return String.fromCString(getpwuid(getuid()).memory.pw_dir)!
 }
 
-NSStringAPIs.test("stringByAbbreviatingWithTildeInPath()") {
+NSStringAPIs.test("stringByAbbreviatingWithTildeInPath") {
   let s = getHomeDir() + "/abcde.txt"
-  expectEqual("~/abcde.txt", s.stringByAbbreviatingWithTildeInPath())
+  expectEqual("~/abcde.txt", s.stringByAbbreviatingWithTildeInPath)
 }
 
 NSStringAPIs.test("stringByAddingPercentEncodingWithAllowedCharacters(_:)") {

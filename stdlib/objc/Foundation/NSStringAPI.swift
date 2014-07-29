@@ -1147,12 +1147,12 @@ extension String {
     return _ns.smallestEncoding
   }
 
-  // - (NSString *)stringByAbbreviatingWithTildeInPath
+  // @property NSString *stringByAbbreviatingWithTildeInPath;
 
   /// Returns a new string that replaces the current home
   /// directory portion of the current path with a tilde (`~`)
   /// character.
-  public func stringByAbbreviatingWithTildeInPath() -> String {
+  public var stringByAbbreviatingWithTildeInPath: String {
     return _ns.stringByAbbreviatingWithTildeInPath
   }
 
