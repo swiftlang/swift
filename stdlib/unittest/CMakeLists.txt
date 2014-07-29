@@ -5,5 +5,6 @@ set(SWIFTUNITTEST_SOURCES
 
 add_swift_library(swiftStdlibUnittest INSTALL
   ${SWIFTUNITTEST_SOURCES}
+  InterceptTraps.cpp
   DEPENDS swiftCore swiftDarwin)
 
