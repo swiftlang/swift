@@ -666,7 +666,7 @@ NSStringAPIs.test("hash") {
   expectEqual(nsstr.hash, s.hash)
 }
 
-NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
+NSStringAPIs.test("stringWithBytes(_:encoding:)") {
   var s: String = "abc あかさた"
   expectOptionalEqual(
     s, String.stringWithBytes(s.utf8, encoding: NSUTF8StringEncoding))
@@ -1042,15 +1042,23 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
 }
 
 NSStringAPIs.test("smallestEncoding") {
-  // FIXME
+  let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
+  expectTrue(contains(availableEncodings, "abc".smallestEncoding))
+}
+
+func getHomeDir() -> String {
+  return String.fromCString(getpwuid(getuid()).memory.pw_dir)!
 }
 
 NSStringAPIs.test("stringByAbbreviatingWithTildeInPath()") {
-  // FIXME
+  let s = getHomeDir() + "/abcde.txt"
+  expectEqual("~/abcde.txt", s.stringByAbbreviatingWithTildeInPath())
 }
 
 NSStringAPIs.test("stringByAddingPercentEncodingWithAllowedCharacters(_:)") {
-  // FIXME
+  expectEqual("ab%63d %D0%B0%D0%B1%D0%B2%D0%B3",
+    "abcd абвг".stringByAddingPercentEncodingWithAllowedCharacters(
+      NSCharacterSet(charactersInString: "abd ")))
 }
 
 NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
@@ -1082,7 +1090,8 @@ NSStringAPIs.test("stringByDeletingPathExtension") {
 }
 
 NSStringAPIs.test("stringByExpandingTildeInPath") {
-  // FIXME
+  let s = getHomeDir() + "/abcde.txt"
+  expectEqual(s, "~/abcde.txt".stringByExpandingTildeInPath)
 }
 
 NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
