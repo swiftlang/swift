@@ -575,6 +575,12 @@ public:
   // log*() functions return a newly-created log expression to be inserted
   // after or instead of the expression they're looking at.
   Expr *logVarDecl(VarDecl *VD) {
+    if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
+        VD->getNameStr().equals("self")) {
+      // Don't log "self" in a constructor
+      return nullptr;
+    }
+
     return buildLoggerCall(
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                 SourceLoc(),
@@ -586,6 +592,13 @@ public:
 
   Expr *logDeclRef(DeclRefExpr *DRE) {
     VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
+
+    if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
+        VD->getNameStr().equals("self")) {
+      // Don't log "self" in a constructor
+      return nullptr;
+    }
+
     return buildLoggerCall(
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                 SourceLoc(),
