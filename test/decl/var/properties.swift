@@ -385,7 +385,7 @@ struct StructWithExtension1 {
   static var fooStatic = 4
 }
 extension StructWithExtension1 {
-  var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -394,16 +394,16 @@ class ClassWithExtension1 {
   class var fooStatic = 4 // expected-error {{class variables not yet supported}}
 }
 extension ClassWithExtension1 {
-  var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
   class var fooExtStatic = 4 // expected-error {{class variables not yet supported}}
 }
 
 enum EnumWithExtension1 {
-  var foo: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var foo: Int // expected-error {{enums may not contain stored properties}}
   static var fooStatic  = 4
 }
 extension EnumWithExtension1 {
-  var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
   static var fooExtStatic = 4
 }
 
@@ -412,7 +412,7 @@ protocol ProtocolWithExtension1 {
   class var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 { // expected-error {{protocol 'ProtocolWithExtension1' cannot be extended}}
-  var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var fooExt: Int // expected-error {{extensions may not contain stored properties}}
   class var fooExtStatic = 4
 }
 
@@ -1017,5 +1017,31 @@ class OwnershipBadSub : OwnershipBase {
   }
   override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override unowned(unsafe) property with unowned property}}
     didSet {}
+  }
+}
+
+
+
+// <rdar://problem/17391625> Swift Compiler Crashes when Declaring a Variable and didSet in an Extension
+class rdar17391625 {
+  var prop = 42  // expected-note {{overridden declaration is here}}
+}
+
+extension rdar17391625 {
+  var someStoredVar: Int       // expected-error {{extensions may not contain stored properties}}
+  var someObservedVar: Int {   // expected-error {{extensions may not contain stored properties}}
+  didSet {
+  }
+  }
+}
+
+class rdar17391625derived :  rdar17391625 {
+}
+
+extension rdar17391625derived {
+  // Not a stored property, computed because it is an override.
+  override var prop: Int { // expected-error {{declarations in extensions cannot override yet}} expected-error {{extensions may not contain stored properties}}
+  didSet {
+  }
   }
 }

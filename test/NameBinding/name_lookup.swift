@@ -103,7 +103,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42
     self.baseExtFunc0()
-    self.baseExtStaticVar = 42
+    self.baseExtStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'baseExtStaticVar'}}
     self.baseExtStaticProp = 42
     self.baseExtStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'baseExtStaticFunc0'}}
 
@@ -136,7 +136,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42
     self.derivedExtFunc0()
-    self.derivedExtStaticVar = 42
+    self.derivedExtStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'derivedExtStaticVar'}}
     self.derivedExtStaticProp = 42
     self.derivedExtStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'derivedExtStaticFunc0'}}
 
@@ -175,7 +175,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42
     super.baseExtFunc0()
-    super.baseExtStaticVar = 42
+    super.baseExtStaticVar = 42 // expected-error {{'ThisBase1' does not have a member named 'baseExtStaticVar'}}
     super.baseExtStaticProp = 42
     super.baseExtStaticFunc0() // expected-error {{'ThisBase1' does not have a member named 'baseExtStaticFunc0'}}
 
@@ -348,7 +348,7 @@ extension ThisBase1 {
 
   func baseExtFunc0() {}
 
-  var baseExtStaticVar: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var baseExtStaticVar: Int // expected-error {{extensions may not contain stored properties}}
 
   var baseExtStaticProp: Int {
     get {
@@ -380,7 +380,7 @@ extension ThisDerived1 {
 
   func derivedExtFunc0() {}
 
-  var derivedExtStaticVar: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
+  var derivedExtStaticVar: Int // expected-error {{extensions may not contain stored properties}}
 
   var derivedExtStaticProp: Int {
     get {

@@ -2913,17 +2913,33 @@ public:
       }
     }
 
-    // In a protocol context, variables written as "var x : Int" are errors and
-    // recovered by building a computed property with just a getter.  Diagnose
-    // this and create the getter decl now.
-    if (isa<ProtocolDecl>(VD->getDeclContext()) &&
-        VD->getStorageKind() == VarDecl::Stored) {
-      if (VD->isLet())
-        TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed_var);
-      else
-        TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
-      
-      convertStoredVarInProtocolToComputed(VD, TC);
+    // Reject cases where this is a variable that has storage but it isn't
+    // allowed.
+    if (VD->hasStorage()) {
+
+      // In a protocol context, variables written as "var x : Int" are errors
+      // and recovered by building a computed property with just a getter.
+      // Diagnose this and create the getter decl now.
+      if (isa<ProtocolDecl>(VD->getDeclContext())) {
+        if (VD->isLet())
+          TC.diagnose(VD->getLoc(),
+                      diag::protocol_property_must_be_computed_var);
+        else
+          TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
+        
+        convertStoredVarInProtocolToComputed(VD, TC);
+      } else if (isa<EnumDecl>(VD->getDeclContext()) &&
+                 !VD->isStatic()) {
+        // Enums can only have computed properties.
+        TC.diagnose(VD->getLoc(), diag::enum_stored_property);
+        VD->setInvalid();
+        VD->overwriteType(ErrorType::get(TC.Context));
+      } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
+                 !VD->isStatic()) {
+        TC.diagnose(VD->getLoc(), diag::extension_stored_property);
+        VD->setInvalid();
+        VD->overwriteType(ErrorType::get(TC.Context));
+      }
     }
 
 
@@ -2969,6 +2985,9 @@ public:
             new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
     TC.checkDeclAttributes(VD);
+
+
+
   }
 
 

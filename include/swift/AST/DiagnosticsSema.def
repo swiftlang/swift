@@ -522,6 +522,8 @@ ERROR(extension_generic_args,sema_tcd,none,
       "generic arguments are not allowed on an extension", ())
 ERROR(extension_metatype,sema_tcd,none,
       "cannot extend a metatype of a type", ())
+ERROR(extension_stored_property,sema_tcd,none,
+      "extensions may not contain stored properties", ())
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,
@@ -810,6 +812,8 @@ ERROR(enum_case_access,sema_tcd,none,
       "enum case in %select{PRIVATE|an internal|a public}0 enum uses "
       "%select{a private|an internal|PUBLIC}1 type",
       (Accessibility, Accessibility))
+ERROR(enum_stored_property,sema_tcd,none,
+      "enums may not contain stored properties", ())
 
 // Enum raw types
 ERROR(multiple_enum_raw_types,sema_tcd,none,

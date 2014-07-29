@@ -1823,7 +1823,6 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                   /*AllowSepAfterLast=*/false, diag::expected_rbrace_extension,
                   [&]() -> ParserStatus {
       ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowStoredInstanceVar |
                                PD_InExtension);
 
       return parseDecl(MemberDecls, Options);
@@ -2702,7 +2701,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
   } Bindings(*this);
 
-  bool HasGetSet = false;
+  bool HasAccessors = false;  // Syntactically has accessor {}'s.
+  bool HasStorage = false;    // True if any parsed variables have storage.
   ParserStatus Status;
 
   do {
@@ -2815,19 +2815,19 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       if (isLet)
         return makeParserError();
 
-      HasGetSet = true;
+      HasAccessors = true;
     }
 
     // Add all parsed vardecls to this scope.
     addPatternVariablesToScope(pattern.get());
-    
+
     // Configure them properly with attributes and 'static'.
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->setParentPattern(PBD);
       VD->getAttrs() = Attributes;
-
       Decls.push_back(VD);
+      HasStorage |= VD->hasStorage();
     });
     
     // Propagate back types for simple patterns, like "var A, B : T".
@@ -2838,7 +2838,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
           Pattern *PrevPat = PrevPBD->getPattern();
           if (!isa<NamedPattern>(PrevPat) || PrevPBD->hasInit())
             break;
-          if (HasGetSet) {
+          if (HasAccessors) {
             // FIXME -- offer a fixit to explicitly specify the type
             diagnose(PrevPat->getLoc(), diag::getset_cannot_be_implied);
             Status.setIsParseError();
@@ -2853,15 +2853,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
   } while (consumeIf(tok::comma));
 
-  if (HasGetSet) {
+  if (HasAccessors) {
     if (Bindings.All.size() > 1) {
       diagnose(VarLoc, diag::disallowed_var_multiple_getset);
       Status.setIsParseError();
     }
-  } else if (!StaticLoc.isValid() && (Flags & PD_DisallowStoredInstanceVar)) {
-    diagnose(VarLoc, diag::disallowed_stored_var_decl);
-    Status.setIsParseError();
-    return Status;
   }
 
   return Status;
@@ -3180,8 +3176,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   } else {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement |
-                             PD_DisallowStoredInstanceVar);
+    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_enum,
                                 Options))
