@@ -121,12 +121,9 @@ ${test('Downcast1')} {
 
 ${test('Downcast2')} {
   let a: [AnyObject] = ["String", 1]
-  // <rdar://problem/17340393> Array downcast should do deferred checking
-  // FIXME: The "OK" should be moved after "let s0 = sa[0]" when we
-  // get deferred checking.
-  println("OK")
   let sa: [NSString] = _arrayBridgeFromObjectiveC(a)
   let s0 = sa[0]
+  println("OK")
   let s1 = sa[1]
 }
 
