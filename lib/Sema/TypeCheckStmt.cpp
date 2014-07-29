@@ -426,13 +426,9 @@ public:
       if (!getGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
-      StringRef name = "$generator";
-      if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
-        name = np->getBoundName().str();
-      generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
-                                           S->getInLoc(),
-                                           TC.Context.getIdentifier(name),
-                                           generatorTy, DC);
+      generator = new (TC.Context)
+        VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
+                TC.Context.getIdentifier("$generator"), generatorTy, DC);
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
