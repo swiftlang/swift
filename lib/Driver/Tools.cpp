@@ -594,10 +594,12 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     break;
   }
 
+  assert(Triple.isOSDarwin());
+  bool wantsObjCRuntime =
+    Triple.isiOS() ? Triple.isOSVersionLT(8) : Triple.isMacOSXVersionLT(10, 10);
   if (Args.hasFlag(options::OPT_link_objc_runtime,
                    options::OPT_no_link_objc_runtime,
-                   /*default=*/true)) {
-    // FIXME: Copied from Clang's ToolChains.cpp.
+                   /*default=*/wantsObjCRuntime)) {
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
     llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
