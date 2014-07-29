@@ -1,6 +1,12 @@
 Latest
 ------
 
+* When force-casting between arrays of class or @objc protocol types
+  using "a as [C]", type checking is now deferred until the moment
+  each element is accessed.  Because bridging conversions from NSArray
+  are equivalent to force-casts from [NSArray], this makes certain
+  Array round-trips through Objective-C code O(1) instead of O(N).
+
 * 'RawOptionSetType' now implements to 'BitwiseOperationsType', so imported
   NS_OPTIONS now support the bitwise assignment operators '|=', '&=',
   and '^='
