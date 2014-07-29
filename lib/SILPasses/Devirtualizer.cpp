@@ -38,6 +38,7 @@
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
 
+STATISTIC(NumInlineCaches, "Number of monomorphic inline caches inserted");
 STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
 STATISTIC(NumAMI, "Number of witness_method devirtualzied");
@@ -926,6 +927,9 @@ static bool specializeClassMethodDispatch(ApplyInst *AI,
   // Remove the old Apply instruction.
   AI->replaceAllUsesWith(Arg);
   AI->eraseFromParent();
+
+  // Update the stats.
+  NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
   optimizeClassMethod(IdenAI, CMI, CD);
