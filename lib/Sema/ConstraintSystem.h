@@ -1891,6 +1891,10 @@ public:
     /// Indicates we're unwrapping an optional type for an value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
+    
+    /// Indicates we're applying an operator function with a nil-literal
+    /// argument.
+    TMF_ApplyingOperatorWithNil = 0x10,
   };
 
 private:

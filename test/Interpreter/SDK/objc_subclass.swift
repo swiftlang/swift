@@ -111,7 +111,7 @@ class MyNSData : NSData {
 }
 
 // CHECK-NOT: should not be executed
-var myNSData = MyNSData(base64EncodedString:"\n\n\n")
+var myNSData : MyNSData! = MyNSData(base64EncodedString:"\n\n\n")
 if myNSData == nil {
   // CHECK: nil MyNSData as expected
   println("nil MyNSData as expected")
@@ -127,7 +127,7 @@ extension NSData {
 }
 
 // CHECK-NOT: NSData code should not be executed
-var nsData = NSData(myString:"\n\n\n")
+var nsData : NSData! = NSData(myString:"\n\n\n")
 if nsData == nil {
   // CHECK: nil NSData as expected
   println("nil NSData as expected")
