@@ -15,6 +15,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
