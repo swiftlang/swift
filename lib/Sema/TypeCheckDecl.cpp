@@ -829,8 +829,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Revert the dependent types within the given generic parameter list.
-void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
-                                         DeclContext *dc) {
+void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
     param->setCheckedInheritanceClause(false);
@@ -945,7 +944,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // Revert the generic parameter list.
   if (func->getGenericParams())
-    revertGenericParamList(func->getGenericParams(), func);
+    revertGenericParamList(func->getGenericParams());
 
   // Clear out the types.
   if (auto fn = dyn_cast<FuncDecl>(func))
@@ -5495,7 +5494,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // Validate the generic type parameters.
       validateGenericTypeSignature(nominal);
 
-      revertGenericParamList(nominal->getGenericParams(), nominal);
+      revertGenericParamList(gp);
 
       ArchetypeBuilder builder =
         createArchetypeBuilder(nominal->getModuleContext());
@@ -5538,7 +5537,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Validate the generic type parameters.
     validateGenericTypeSignature(proto);
 
-    revertGenericParamList(proto->getGenericParams(), proto);
+    revertGenericParamList(proto->getGenericParams());
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());

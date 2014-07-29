@@ -782,7 +782,7 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
   // and type-check it again, completely.
-  revertGenericParamList(nominal->getGenericParams(), nominal);
+  revertGenericParamList(nominal->getGenericParams());
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (checkGenericParameters(*this, nullptr, nominal->getGenericParams(),
                              dc, completeResolver)) {

@@ -553,8 +553,7 @@ public:
   void revertGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the dependent types within the given generic parameter list.
-  void revertGenericParamList(GenericParamList *genericParams,
-                              DeclContext *dc);
+  void revertGenericParamList(GenericParamList *genericParams);
 
   /// Validate the signature of a generic type.
   ///
