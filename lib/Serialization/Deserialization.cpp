@@ -1913,6 +1913,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto interfaceType = getType(interfaceTypeID))
       var->setInterfaceType(interfaceType);
 
+    if (auto referenceStorage = type->getAs<ReferenceStorageType>())
+      AddAttribute(new (ctx) OwnershipAttr(referenceStorage->getOwnership()));
+
     switch ((VarDeclStorageKind)storageKind) {
     case VarDeclStorageKind::Stored: break;
     case VarDeclStorageKind::StoredWithTrivialAccessors:
