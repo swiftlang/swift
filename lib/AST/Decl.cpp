@@ -748,6 +748,20 @@ void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
   Conformances.setLoader(resolver, contextData);
 }
 
+void ExtensionDecl::setGenericParams(GenericParamList *params) {
+  assert(!GenericParams && "Already has generic parameters");
+  GenericParams = params;
+  
+  if (params)
+    for (auto Param : *params)
+      Param->setDeclContext(this);
+}
+
+void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
+  assert(!GenericSig && "Already have generic signature");
+  GenericSig = sig;
+}
+
 DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
@@ -768,14 +782,6 @@ void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
   assert(!Conformances.isLazy() && "already have a resolver");
   assert(Conformances.getArray().empty() && "already have conformances");
   Conformances.setLoader(resolver, contextData);
-}
-
-GenericParamList *ExtensionDecl::getGenericParams() const {
-  auto extendedType = getExtendedType();
-  if (auto nominalDecl = extendedType->getNominalOrBoundGenericNominal()) {
-    return nominalDecl->getGenericParamsOfContext();
-  }
-  return nullptr;
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {

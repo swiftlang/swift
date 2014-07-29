@@ -393,7 +393,11 @@ public:
                    ValueDecl *typeContext = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
-  
+
+  /// Validate the given extension declaration, ensuring that it
+  /// properly extends the nominal type it names.
+  void validateExtension(ExtensionDecl *ext);
+
   /// \brief Force all members of an external decl, and also add its
   /// conformances.
   void forceExternalDeclMembers(NominalTypeDecl *NTD);
@@ -520,6 +524,10 @@ public:
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD, true);
+  }
+
+  virtual void resolveExtension(ExtensionDecl *ext) override {
+    validateExtension(ext);
   }
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {

@@ -4086,6 +4086,7 @@ namespace {
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       importObjCProtocols(result, decl->getReferencedProtocols());
+      result->setValidated();
       result->setCheckedInheritanceClause();
       result->setMemberLoader(&Impl, 0);
 

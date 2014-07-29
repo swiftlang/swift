@@ -183,8 +183,8 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedTypeLoc().wasValidated())
     return;
-  
-  // FIXME: Should require bound generics here.
+
+  // FIXME: Tighten this up to only allow unbound generics at the top level.
   if (TC.validateType(ED->getExtendedTypeLoc(), ED->getDeclContext(),
                       TR_AllowUnboundGenerics)) {
     ED->setInvalid();

@@ -170,10 +170,18 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
+    bool validatedExtension = false;
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
-        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
+        if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver)) {
+          // Resolve the extension, if we haven't done so already.
+          if (!validatedExtension && TypeResolver) {
+            TypeResolver->resolveExtension(extension);
+            validatedExtension = true;
+          }
+
           FoundDecls.push_back(VD);
+        }
     }
   }
 

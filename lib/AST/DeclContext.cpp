@@ -28,16 +28,9 @@ STATISTIC(NumUnloadedLazyIterableDeclContexts,
           "# of serialized iterable declaration contexts never loaded");
 
 CanType DeclContext::getExtendedType(const ExtensionDecl *ED) {
-  CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-  
-  // FIXME: we should require generic parameter clauses here
-  if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
-    auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
-    auto mutableED = const_cast<ExtensionDecl *>(ED);
-    mutableED->getExtendedTypeLoc().setType(boundType, true);
-    ExtendedTy = boundType->getCanonicalType();
-  }
-  return ExtendedTy;
+  // Unbound generic types should already have been resolved by now.
+  assert(!ED->getExtendedType()->is<UnboundGenericType>());
+  return ED->getExtendedType()->getCanonicalType();
 }
 
 // Only allow allocation of DeclContext using the allocator in ASTContext.
@@ -155,12 +148,8 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     return nominal->getDeclContext()->getGenericParamsOfContext();
   }
 
-  case DeclContextKind::ExtensionDecl: {
-    auto extension = cast<ExtensionDecl>(this);
-    if (auto gp = extension->getGenericParams())
-      return gp;
-    return nullptr;
-  }
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getGenericParams();
   }
 }
 
@@ -187,14 +176,8 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
     return nominal->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  case DeclContextKind::ExtensionDecl: {
-    auto extension = cast<ExtensionDecl>(this);
-    auto extendedType = extension->getExtendedType();
-    // FIXME: What if the extended type is bound, or the extension has
-    // constraints?
-    auto nomDecl = extendedType->getNominalOrBoundGenericNominal();
-    return nomDecl->getGenericSignatureOfContext();
-  }
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getGenericSignature();
   }
 }
 

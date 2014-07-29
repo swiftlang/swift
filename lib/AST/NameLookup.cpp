@@ -396,6 +396,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
@@ -540,14 +541,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       if (FoundAny)
         return;
 
-      // Check the generic parameters for something with the given name.
-      auto nominal = isMetatypeType
-                       ? ExtendedType->castTo<AnyMetatypeType>()
-                           ->getInstanceType()->getAnyNominal()
-                       : ExtendedType->getAnyNominal();
-      if (nominal && nominal->getGenericParams()) {
+      // Check the generic parameters if our context is a generic type or
+      // extension thereof.
+      GenericParamList *dcGenericParams = nullptr;
+      if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+        dcGenericParams = nominal->getGenericParams();
+      else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+        dcGenericParams = ext->getGenericParams();
+
+      if (dcGenericParams) {
         FindLocalVal localVal(SM, Loc, Name);
-        localVal.checkGenericParams(nominal->getGenericParams());
+        localVal.checkGenericParams(dcGenericParams);
 
         if (localVal.MatchingValue) {
           Results.push_back(Result::getLocalDecl(localVal.MatchingValue));

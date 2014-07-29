@@ -560,9 +560,12 @@ class alignas(8) Decl {
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
 
+    /// Whether this extension has already been validated.
+    unsigned Validated : 1;
+
     unsigned DefaultAccessLevel : 2;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 3 };
+  enum { NumExtensionDeclBits = NumDeclBits + 4 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1427,6 +1430,19 @@ class ExtensionDecl : public Decl, public DeclContext,
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
 
+  /// The generic parameters of this extension.
+  GenericParamList *GenericParams = nullptr;
+
+  /// \brief The generic signature of this extension.
+  ///
+  /// This is the semantic representation of a generic parameters and the
+  /// requirements placed on them.
+  ///
+  /// FIXME: The generic parameters here are also derivable from
+  /// \c GenericParams. However, we likely want to make \c GenericParams
+  /// the parsed representation, and not part of the module file.
+  GenericSignature *GenericSig = nullptr;
+
   /// ExtendedType - The type being extended.
   TypeLoc ExtendedType;
   MutableArrayRef<TypeLoc> Inherited;
@@ -1464,7 +1480,11 @@ public:
       IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
       ExtensionLoc(ExtensionLoc),
       ExtendedType(ExtendedType), Inherited(Inherited)
-  {}
+  {
+    ExtensionDeclBits.Validated = false;
+    ExtensionDeclBits.CheckedInheritanceClause = false;
+    ExtensionDeclBits.DefaultAccessLevel = 0;
+  }
   
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLoc() const { return ExtensionLoc; }
@@ -1475,6 +1495,18 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// Provide the set of parameters to a generic type, or null if
+  /// this function is not generic.
+  void setGenericParams(GenericParamList *params);
+
+  /// Retrieve the generic signature for this extension.
+  GenericSignature *getGenericSignature() const { return GenericSig; }
+
+  /// Set the generic signature of this extension.
+  void setGenericSignature(GenericSignature *sig);
+
   Type getExtendedType() const { return ExtendedType.getType(); }
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
 
@@ -1482,6 +1514,16 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// Whether we already validated this extension.
+  bool validated() const {
+    return ExtensionDeclBits.Validated;
+  }
+
+  /// Set whether we have validated this extension.
+  void setValidated(bool validated = true) {
+    ExtensionDeclBits.Validated = validated;
+  }
 
   /// Whether we already type-checked the inheritance clause.
   bool checkedInheritanceClause() const {
@@ -1515,8 +1557,6 @@ public:
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     Protocols = protocols;
   }
-
-  GenericParamList *getGenericParams() const;
 
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///

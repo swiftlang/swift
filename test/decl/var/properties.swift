@@ -413,7 +413,7 @@ protocol ProtocolWithExtension1 {
 }
 extension ProtocolWithExtension1 { // expected-error {{protocol 'ProtocolWithExtension1' cannot be extended}}
   var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
-  class var fooExtStatic = 4  // expected-error {{class variables not yet supported in generic types}}
+  class var fooExtStatic = 4
 }
 
 func getS() -> S {

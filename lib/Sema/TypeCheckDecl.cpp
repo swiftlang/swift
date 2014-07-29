@@ -247,6 +247,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
+
+    validateExtension(ext);
+
     if (ext->checkedInheritanceClause())
       return;
 
@@ -5082,6 +5085,8 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    TC.validateExtension(ED);
+
     if (ED->isInvalid()) {
       // Mark children as invalid.
       // FIXME: This is awful.
@@ -5684,6 +5689,39 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   assert(D->hasType());  
 }
 
+void TypeChecker::validateExtension(ExtensionDecl *ext) {
+  // If we already validated this extension, there's nothing more to do.
+  if (ext->validated())
+    return;
+
+  ext->setValidated();
+
+  // If the extension is already known to be invalid, we're done.
+  if (ext->isInvalid())
+    return;
+
+  // If the type being extended is an unbound generic type, complain and
+  // conjure up generic parameters for it.
+  auto extendedType = ext->getExtendedType();
+  if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
+    auto nominal = unbound->getDecl();
+    validateDecl(nominal);
+
+    // FIXME: Create new generic parameters with the same signature.
+    auto genericParams = nominal->getGenericParams();
+    ext->setGenericParams(genericParams);
+    ext->setGenericSignature(nominal->getGenericSignature());
+
+    // FIXME: We want to use the new generic parameters, not the old ones,
+    // for this reference.
+    ext->getExtendedTypeLoc().setType(nominal->getDeclaredTypeInContext(),true);
+    return;
+  }
+
+  // FIXME: Once we're parsing and storing generic parameters, we need to
+  // verify that we aren't adding any additional requirements.
+}
+
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
   checkInheritanceClause(nominal);
@@ -5692,6 +5730,7 @@ TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
 
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(ExtensionDecl *ext) {
+  validateExtension(ext);
   checkInheritanceClause(ext);
   return ext->getProtocols();
 }

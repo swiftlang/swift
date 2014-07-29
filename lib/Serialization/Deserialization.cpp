@@ -2545,8 +2545,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
     extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
-    baseTy.getType()->getAnyNominal()->addExtension(extension);
+    auto nominal = baseTy.getType()->getAnyNominal();
+    nominal->addExtension(extension);
+    extension->setValidated(true);
     extension->setCheckedInheritanceClause();
+
+    // FIXME: Hack because extensions always get the generic parameters of their
+    // nominal types.
+    extension->setGenericParams(nominal->getGenericParams());
+    extension->setGenericSignature(nominal->getGenericSignature());
     break;
   }
 
