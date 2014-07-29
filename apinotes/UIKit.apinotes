@@ -51,10 +51,83 @@ Classes:
         MethodKind:      Instance
         DesignatedInit:  true
   - Name:            UIView
+    AuditedForNullability: true
     Methods:
       - Selector:        'initWithFrame:'
         MethodKind:      Instance
         DesignatedInit:  true
+      - Selector:        'hitTest:withEvent:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+        NullabilityOfRet: O
+      - Selector:        'pointInside:withEvent:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+      - Selector:        'convertPoint:fromView:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+      - Selector:        'convertPoint:toView:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+      - Selector:        'convertRect:fromView:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+      - Selector:        'convertRect:toView:'
+        MethodKind:      Instance
+        Nullability:     [ S, O ]
+      - Selector:        'willMoveToSuperview:'
+        MethodKind:      Instance
+        Nullability:     [ O ]
+      - Selector:        'willMoveToWindow:'
+        MethodKind:      Instance
+        Nullability:     [ O ]
+      - Selector:        'viewWithTag:'
+        MethodKind:      Instance
+        NullabilityOfRet: O
+      - Selector:        'beginAnimations:context:'
+        MethodKind:      Class
+        Nullability:     [ N, O ]
+      - Selector:        'animateWithDuration:delay:options:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ S, S, S, N, O ]
+      - Selector:        'animateWithDuration:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ S, N, O ]
+      - Selector:        'animateWithDuration:animations:'
+        MethodKind:      Class
+        Nullability:     [ S, N ]
+      - Selector:        'animateWithDuration:delay:usingSpringWithDamping:initialSpringVelocity:options:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ S, S, S, S, S, N, O ]
+      - Selector:        'transitionWithView:duration:options:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ N, S, S, N, O ]
+      - Selector:        'transitionFromView:toView:duration:options:completion:'
+        MethodKind:      Class
+        Nullability:     [ N, N, S, S, O ]
+      - Selector:        'performSystemAnimation:onViews:options:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ S, N, S, N, O ]
+      - Selector:        'animateKeyframesWithDuration:delay:options:animations:completion:'
+        MethodKind:      Class
+        Nullability:     [ S, S, S, N, O ]
+      - Selector:        'addKeyframeWithRelativeStartTime:relativeDuration:animations:'
+        MethodKind:      Class
+        Nullability:     [ S, S, N ]
+      - Selector:        'viewForBaselineLayout'
+        MethodKind:      Instance
+        NullabilityOfRet: O
+    Properties:
+      - Name:            'superview'
+        Nullability:     O
+      - Name:            'window'
+        Nullability:     O
+      - Name:            'backgroundColor'
+        Nullability:     O
+      - Name:            'maskView'
+        Nullability:     O
+      - Name:            'restorationIdentifier'
+        Nullability:     O        
   - Name:            UIViewController
     Methods:
       - Selector:        'initWithNibName:bundle:'
@@ -66,26 +139,28 @@ Classes:
       - Selector:        'preferredFontForTextStyle:'
         MethodKind:      Class
         Nullability:     [ N ]
-        NullabilityOfRet: O
+        NullabilityOfRet: U
       - Selector:        'fontWithName:size:'
         MethodKind:      Class
         Nullability:     [ N ]
-        NullabilityOfRet: O
+        NullabilityOfRet: U
     Properties:
       - Name:            'familyName'
         Nullability:     N
       - Name:            'fontName'
         Nullability:     N
 Protocols:
+  - Name:            UICoordinateSpace
+    AuditedForNullability: true
   - Name:            UIApplicationDelegate
     AuditedForNullability: true
     Methods:
       - Selector:        'application:willFinishLaunchingWithOptions:'
         MethodKind:      Instance
-        Nullability:     [ N, U ]
+        Nullability:     [ N, O ]
       - Selector:        'application:didFinishLaunchingWithOptions:'
         MethodKind:      Instance
-        Nullability:     [ N, U ]
+        Nullability:     [ N, O ]
       - Selector:        'application:openURL:sourceApplication:annotation:'
         MethodKind:      Instance
         Nullability:     [ N, N, U ]

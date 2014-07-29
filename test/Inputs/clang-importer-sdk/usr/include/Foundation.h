@@ -11,6 +11,8 @@ typedef struct objc_object { void *isa; } *id;
 typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
 
+typedef double NSTimeInterval;
+
 extern NSUInteger NSRealMemoryAvailable(void) __attribute__((availability(macosx,introduced=10.0 ,deprecated=10.8,message="" ))) __attribute__((availability(ios,introduced=2.0 ,deprecated=6.0,message="" )));
 extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void) __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")));
 
