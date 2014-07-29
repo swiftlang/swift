@@ -183,7 +183,7 @@ func bridging() {
 
   // Array bridging.
   var arr: [CGFloat] = [3.14159, 2.71818]
-
+    
   // Array -> NSArray
   // CHECK-NEXT: (
   // CHECK-NEXT:   "3.14

@@ -131,7 +131,7 @@ public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
 ElementwiseBridging:
   do {
     for object: Base in source {
-      let value = Swift._bridgeFromObjectiveCConditional(
+      let value = Swift._conditionallyBridgeFromObjectiveC(
         unsafeBitCast(object, AnyObject.self), BridgesToDerived.self)
       if _slowPath(value == nil) {
         break ElementwiseBridging

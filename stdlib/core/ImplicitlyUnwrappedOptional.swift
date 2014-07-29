@@ -113,7 +113,7 @@ func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None
 }
 
-extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveCType {
+extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return Swift._getBridgedObjectiveCType(T.self)!
   }
@@ -128,12 +128,12 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveCType {
     }
   }
 
-  public static func _bridgeFromObjectiveC(x: AnyObject) -> T! {
-    return Swift._bridgeFromObjectiveC(x, T.self)
+  public static func _forceBridgeFromObjectiveC(x: AnyObject) -> T! {
+    return Swift._forceBridgeFromObjectiveC(x, T.self)
   }
 
-  public static func _bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {
-    let bridged: T? = Swift._bridgeFromObjectiveCConditional(x, T.self)
+  public static func _conditionallyBridgeFromObjectiveC(x: AnyObject) -> T!? {
+    let bridged: T? = Swift._conditionallyBridgeFromObjectiveC(x, T.self)
     if let value = bridged {
       return value
     }

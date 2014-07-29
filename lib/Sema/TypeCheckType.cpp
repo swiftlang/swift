@@ -2262,7 +2262,7 @@ Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
 
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto
-    = Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveCType);
+    = Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
   if (!bridgedProto)
     return nullptr;
 

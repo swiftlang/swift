@@ -14,14 +14,21 @@ class ObjC : Root {
 
 class DerivesObjC : ObjC { }
 
-struct BridgedToObjC : Hashable, _BridgedToObjectiveCType {
+struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return ObjC.self
   }
   func _bridgeToObjectiveC() -> ObjC {
     return ObjC()
   }
-  static func _bridgeFromObjectiveC(x: ObjC) -> BridgedToObjC {
+  static func _forceBridgeFromObjectiveC(x: ObjC) -> BridgedToObjC {
+    return BridgedToObjC()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: ObjC) -> BridgedToObjC? {
     return BridgedToObjC()
   }
 

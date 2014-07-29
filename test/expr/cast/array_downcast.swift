@@ -28,14 +28,21 @@ class A {
   var x = 0
 }
 
-struct B : _BridgedToObjectiveCType {
+struct B : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
-  static func _bridgeFromObjectiveC(x: A) -> B {
+  static func _forceBridgeFromObjectiveC(x: A) -> B {
+    return B()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: A) -> B? {
     return B()
   }
 }

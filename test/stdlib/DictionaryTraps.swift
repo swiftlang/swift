@@ -138,7 +138,11 @@ class TestObjCKeyTy : NSObject {
   var value: Int
 }
 
-struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveCType {
+struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }
@@ -151,7 +155,13 @@ struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveCType {
     return TestObjCKeyTy(value)
   }
 
-  static func _bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
+  static func _forceBridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
+    return TestBridgedKeyTy(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    x: TestObjCKeyTy
+  ) -> TestBridgedKeyTy? {
     return TestBridgedKeyTy(x.value)
   }
 

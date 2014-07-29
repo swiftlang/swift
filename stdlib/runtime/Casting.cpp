@@ -1556,9 +1556,12 @@ extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
 namespace {
 
 // protocol _BridgedToObjectiveC {
-struct _BridgedToObjectiveCWitnessTable {
+struct _ObjectiveCBridgeableWitnessTable {
   // typealias _ObjectiveCType: class
   const Metadata *ObjectiveCType;
+
+  // class func _isBridgedToObjectiveC() -> bool
+  bool (*isBridgedToObjectiveC)(const Metadata *value, const Metadata *T);
 
   // class func _getObjectiveCType() -> Any.Type
   const Metadata *(*getObjectiveCType)(const Metadata *self,
@@ -1566,27 +1569,13 @@ struct _BridgedToObjectiveCWitnessTable {
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
   HeapObject *(*bridgeToObjectiveC)(OpaqueValue *self, const Metadata *Self);
-  // class func _bridgeFromObjectiveC(x: _ObjectiveCType) -> Self
-  OpaqueExistentialContainer (*bridgeFromObjectiveC)(HeapObject *sourceValue,
+  // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType) -> Self
+  OpaqueExistentialContainer (*forceBridgeFromObjectiveC)(HeapObject *sourceValue,
                                                      const Metadata *self,
                                                      const Metadata *selfType);
-};
-// }
 
-// protocol _ConditionallyBridgedToObjectiveC {
-struct _ConditionallyBridgedToObjectiveCWitnessTable {
-  // My untrained eye can't find this offset in the generated LLVM IR,
-  // but I do see it being applied in x86 assembly.  It disappears
-  // when inheritance from _BridgedToObjectiveC is removed.  If it
-  // presents any portability problems we can drop that inheritance
-  // relationship.
-  const void *const probablyPointsAtBridgedToObjectiveCWitnessTable;
-
-  // class func _isBridgedToObjectiveC() -> bool
-  bool (*isBridgedToObjectiveC)(const Metadata *value, const Metadata *T);
-
-  // class func _bridgeFromObjectiveCConditional(x: _ObjectiveCType) -> Self?
-  OpaqueExistentialContainer (*bridgeFromObjectiveCConditional)(
+  // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType) -> Self?
+  OpaqueExistentialContainer (*conditionallyBridgeFromObjectiveC)(
                                HeapObject *sourceValue,
                                const Metadata *self,
                                const Metadata *selfType);
@@ -1595,27 +1584,17 @@ struct _ConditionallyBridgedToObjectiveCWitnessTable {
 
 } // unnamed namespace
 
-extern "C" const ProtocolDescriptor _TMpSs24_BridgedToObjectiveCType;
-extern "C" const ProtocolDescriptor _TMpSs37_ConditionallyBridgedToObjectiveCType;
+extern "C" const ProtocolDescriptor _TMpSs21_ObjectiveCBridgeable;
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
 // conformance to a given protocol.  See ../core/BridgeObjectiveC.swift for
 // documentation.
 //===----------------------------------------------------------------------===//
-static const _BridgedToObjectiveCWitnessTable *
+static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(T, &_TMpSs24_BridgedToObjectiveCType, nullptr);
-  return reinterpret_cast<const _BridgedToObjectiveCWitnessTable *>(w);
-}
-
-static const _ConditionallyBridgedToObjectiveCWitnessTable *
-findConditionalBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(
-      T, &_TMpSs37_ConditionallyBridgedToObjectiveCType, nullptr);
-
-  return reinterpret_cast<
-      const _ConditionallyBridgedToObjectiveCWitnessTable *>(w);
+  auto w = swift_conformsToProtocol(T, &_TMpSs21_ObjectiveCBridgeable, nullptr);
+  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
 }
 
 static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
@@ -1632,13 +1611,9 @@ extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
 ) {
   assert(!swift_isClassOrObjCExistentialImpl(T));
 
-  auto const bridgeWitness = findBridgeWitness(T);
-
-  if (bridgeWitness) {
-    if (auto conditionalWitness = findConditionalBridgeWitness(T)) {
-      if (!conditionalWitness->isBridgedToObjectiveC(T, T))
+  if (const auto *bridgeWitness = findBridgeWitness(T)) {
+      if (!bridgeWitness->isBridgedToObjectiveC(T, T))
         return nullptr;
-    }
     auto result = bridgeWitness->bridgeToObjectiveC(value, T);
     // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
     T->vw_destroy(value);
@@ -1674,15 +1649,10 @@ swift_bridgeNonVerbatimFromObjectiveC(
   const Metadata *nativeType_
 ) {
   // Check if the type conforms to _BridgedToObjectiveC.
-  const auto *bridgeWitness = findBridgeWitness(nativeType);
-  if (bridgeWitness) {
+  if (const auto *bridgeWitness = findBridgeWitness(nativeType)) {
     // if the type also conforms to _ConditionallyBridgedToObjectiveC,
     // make sure it bridges at runtime
-    auto conditionalWitness = findConditionalBridgeWitness(nativeType);
-    if (
-      conditionalWitness == nullptr
-      || conditionalWitness->isBridgedToObjectiveC(nativeType, nativeType)
-    ) {
+    if (bridgeWitness->isBridgedToObjectiveC(nativeType, nativeType)) {
       // Check if sourceValue has the _ObjectiveCType type required by the
       // protocol.
       const Metadata *objectiveCType =
@@ -1693,9 +1663,9 @@ swift_bridgeNonVerbatimFromObjectiveC(
                                                           objectiveCType));
         
       if (sourceValueAsObjectiveCType) {
-        // The type matches.  _bridgeFromObjectiveC returns `Self`, so
+        // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
         // we can just return it directly.
-        return bridgeWitness->bridgeFromObjectiveC(
+        return bridgeWitness->forceBridgeFromObjectiveC(
           static_cast<HeapObject*>(sourceValueAsObjectiveCType),
             nativeType, nativeType);
       }
@@ -1742,22 +1712,9 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
 
   // If the type also conforms to _ConditionallyBridgedToObjectiveC,
   // use conditional bridging.
-  if (auto conditionalWitness = findConditionalBridgeWitness(nativeType)) {
-    return conditionalWitness->bridgeFromObjectiveCConditional(
-          static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-            nativeType, nativeType);
-  }
-
-  // Perform direct bridging. _bridgeFromObjectiveC returns `Self`, so
-  // we need to wrap it in an optional.
-  OpaqueExistentialContainer value
-    = bridgeWitness->bridgeFromObjectiveC(
-        static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-        nativeType, nativeType);
-
-  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
-           reinterpret_cast<OpaqueValue *>(&value), 
-           nativeType);
+  return bridgeWitness->conditionallyBridgeFromObjectiveC(
+    static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+      nativeType, nativeType);
 }
 
 // func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
@@ -1767,14 +1724,7 @@ extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
   assert(!swift_isClassOrObjCExistentialImpl(T));
 
   auto bridgeWitness = findBridgeWitness(T);
-
-  if (bridgeWitness) {
-    auto conditionalWitness = findConditionalBridgeWitness(T);
-    return !conditionalWitness ||
-           conditionalWitness->isBridgedToObjectiveC(value, T);
-  }
-
-  return false;
+  return bridgeWitness && bridgeWitness->isBridgedToObjectiveC(value, T);
 }
 
 // func isClassOrObjCExistential<T>(x: T.Type) -> Bool

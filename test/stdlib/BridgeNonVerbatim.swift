@@ -58,7 +58,11 @@ func == (x: Tracked, y: Tracked) -> Bool {
   return x.value == y.value
 }
 
-struct X : _BridgedToObjectiveCType {
+struct X : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   init(_ value: Int) {
     self.value = value
   }
@@ -71,7 +75,11 @@ struct X : _BridgedToObjectiveCType {
     return Tracked(value)
   }
 
-  static func _bridgeFromObjectiveC(x: Tracked) -> X {
+  static func _forceBridgeFromObjectiveC(x: Tracked) -> X {
+    return X(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(x: Tracked) -> X? {
     return X(x.value)
   }
 

@@ -24,9 +24,9 @@
 #endif
 
 IDENTIFIER(atIndexedSubscript)
-IDENTIFIER_WITH_NAME(bridgeFromObjectiveC, "_bridgeFromObjectiveC")
-IDENTIFIER_WITH_NAME(bridgeFromObjectiveCConditional,
-                     "_bridgeFromObjectiveCConditional")
+IDENTIFIER_WITH_NAME(forceBridgeFromObjectiveC, "_forceBridgeFromObjectiveC")
+IDENTIFIER_WITH_NAME(conditionallyBridgeFromObjectiveC,
+                     "_conditionallyBridgeFromObjectiveC")
 IDENTIFIER_WITH_NAME(bridgeToObjectiveC, "_bridgeToObjectiveC")
 IDENTIFIER(dealloc)
 IDENTIFIER(deinit)

@@ -18,7 +18,7 @@ var nsValueBridging = TestCase("NSValueBridging")
 
 nsValueBridging.test("NSRange") {
   let nsValue = _bridgeToObjectiveC(NSRange(location: 17, length: 19)) as NSValue
-  let swiftValue: NSRange = _bridgeFromObjectiveC(nsValue, NSRange.self)
+  let swiftValue: NSRange = _forceBridgeFromObjectiveC(nsValue, NSRange.self)
   expectEqual(17, swiftValue.location)
   expectEqual(19, swiftValue.length)
 }

@@ -11,9 +11,13 @@ class BridgedClass : NSObject, NSCopying {
 
 class BridgedClassSub : BridgedClass { }
 
-struct BridgedStruct : Hashable, _BridgedToObjectiveCType {
+struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
   var hashValue: Int { return 0 }
 
+ static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
@@ -22,8 +26,14 @@ struct BridgedStruct : Hashable, _BridgedToObjectiveCType {
     return BridgedClass()
   }
 
-  static func _bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+  static func _forceBridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
     return BridgedStruct()
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    x: BridgedClass
+  ) -> BridgedStruct? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 }
 

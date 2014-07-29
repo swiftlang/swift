@@ -721,7 +721,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
   }
 
   override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    let nativeKey = _bridgeFromObjectiveC(aKey, Key.self)
+    let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
     if let nativeValue = nativeStorage.maybeGet(nativeKey) {
       return _bridgeToObjectiveCUnconditional(nativeValue)
     }
@@ -945,8 +945,8 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       var oldCocoaGenerator = _CocoaDictionaryGenerator(cocoaDictionary)
       while let (key: AnyObject, value: AnyObject) = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
-            key: _bridgeFromObjectiveC(key, Key.self),
-            value: _bridgeFromObjectiveC(value, Value.self))
+            key: _forceBridgeFromObjectiveC(key, Key.self),
+            value: _forceBridgeFromObjectiveC(value, Value.self))
       }
       newNativeStorage.count = cocoaDictionary.count
 
@@ -1011,8 +1011,8 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Cocoa(let cocoaStorage):
       var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaStorage.assertingGet(i._cocoaIndex)
-      let nativeKey = _bridgeFromObjectiveC(anyObjectKey, Key.self)
-      let nativeValue = _bridgeFromObjectiveC(anyObjectValue, Value.self)
+      let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
+      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return (nativeKey, nativeValue)
     }
   }
@@ -1025,7 +1025,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
       // FIXME: This assumes that Key and Value are bridged verbatim.
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
-      return _bridgeFromObjectiveC(anyObjectValue, Value.self)
+      return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
     }
   }
 
@@ -1036,7 +1036,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Cocoa(let cocoaStorage):
       let anyObjectKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
-        return _bridgeFromObjectiveC(anyObjectValue, Value.self)
+        return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       }
       return .None
     }
@@ -1206,7 +1206,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
           cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
       migrateDataToNativeStorage(cocoaStorage)
       nativeRemoveObjectForKey(
-          _bridgeFromObjectiveC(anyObjectKey, Key.self))
+          _forceBridgeFromObjectiveC(anyObjectKey, Key.self))
     }
   }
 
@@ -1693,8 +1693,8 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
     case ._Cocoa(var cocoaGenerator):
       if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaGenerator.next() {
-        let nativeKey = _bridgeFromObjectiveC(anyObjectKey, Key.self)
-        let nativeValue = _bridgeFromObjectiveC(anyObjectValue, Value.self)
+        let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
+        let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
         return (nativeKey, nativeValue)
       }
       return .None
@@ -1934,7 +1934,7 @@ public func == <Key : Equatable, Value : Equatable>(
       let optRhsValue: AnyObject? =
           rhsCocoa.maybeGet(_bridgeToObjectiveCUnconditional(key))
       if let rhsValue: AnyObject = optRhsValue {
-        if value == _bridgeFromObjectiveC(rhsValue, Value.self) {
+        if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
           continue
         }
       }
@@ -2480,7 +2480,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
         return nil
       }
     } else {
-      if let bridgedKey = _bridgeFromObjectiveCConditional(
+      if let bridgedKey = _conditionallyBridgeFromObjectiveC(
           _reinterpretCastToAnyObject(key), SwiftKey.self) {
         resultKey = bridgedKey
       } else {
@@ -2497,7 +2497,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
         return nil
       }
     } else {
-      if let bridgedValue = _bridgeFromObjectiveCConditional(
+      if let bridgedValue = _conditionallyBridgeFromObjectiveC(
           _reinterpretCastToAnyObject(value), SwiftValue.self) {
         resultValue = bridgedValue
       } else {

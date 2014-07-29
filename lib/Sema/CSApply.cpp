@@ -1117,7 +1117,7 @@ namespace {
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveCType);
+        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
 
       // Find the conformance of the value type to _BridgedToObjectiveC.
       Type valueType = value->getType()->getRValueType();
@@ -1144,12 +1144,12 @@ namespace {
     /// \param valueType The value type to which we are bridging.
     ///
     /// \returns a value of type \c valueType that stores the bridged result.
-    Expr *bridgeFromObjectiveC(Expr *object, Type valueType) {
+    Expr *forceBridgeFromObjectiveC(Expr *object, Type valueType) {
       auto &tc = cs.getTypeChecker();
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveCType);
+        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
 
       // Find the conformance of the value type to _BridgedToObjectiveC.
       ProtocolConformance *conformance = nullptr;
@@ -1161,7 +1161,7 @@ namespace {
       // Form the call.
       return tc.callWitness(TypeExpr::createImplicit(valueType, tc.Context), 
                             cs.DC, bridgedProto, conformance,
-                            tc.Context.Id_bridgeFromObjectiveC,
+                            tc.Context.Id_forceBridgeFromObjectiveC,
                             { object }, 
                             diag::broken_bridged_to_objc_protocol);
     }
@@ -1177,29 +1177,27 @@ namespace {
     /// \param valueType The value type to which we are bridging.
     ///
     /// \returns a value of type \c valueType? that stores the bridged result.
-    Expr *bridgeFromObjectiveCConditional(Expr *object, Type valueType) {
+    Expr *conditionallyBridgeFromObjectiveC(Expr *object, Type valueType) {
       auto &tc = cs.getTypeChecker();
 
-      // Find the _ConditionallyBridgedToObjectiveC protocol.
-      auto conditionalBridgedProto
-        = tc.Context.getProtocol(
-            KnownProtocolKind::_ConditionallyBridgedToObjectiveCType);
+      // Find the _ObjCBridgeable protocol.
+      auto bridgeableProto
+        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
 
-      // Check whether the value type conforms to
-      // _ConditionallyBridgedToObjectiveC. If so, we have a specific
-      // entry point for conditional bridging.
+      // Check whether the value type conforms to _ObjCBridgeable. If
+      // so, we have a specific entry point for conditional bridging.
       ProtocolConformance *conditionalConformance = nullptr;
-      if (tc.conformsToProtocol(valueType, conditionalBridgedProto, cs.DC,
+      if (tc.conformsToProtocol(valueType, bridgeableProto, cs.DC,
                                 &conditionalConformance)) {
         Expr *valueMetatype = TypeExpr::createImplicit(valueType, tc.Context);
         Expr *args[1] = { object };
-        return tc.callWitness(valueMetatype, cs.DC, conditionalBridgedProto,
+        return tc.callWitness(valueMetatype, cs.DC, bridgeableProto,
                               conditionalConformance,
-                              tc.Context.Id_bridgeFromObjectiveCConditional,
+                              tc.Context.Id_conditionallyBridgeFromObjectiveC,
                               args, diag::broken_bridged_to_objc_protocol);
       }
 
-      Expr *result = bridgeFromObjectiveC(object, valueType);
+      Expr *result = forceBridgeFromObjectiveC(object, valueType);
       if (!result)
         return nullptr;
 
@@ -2523,7 +2521,7 @@ namespace {
             result->setImplicit(true);
           }
 
-          result = bridgeFromObjectiveCConditional(result, destValueType);
+          result = conditionallyBridgeFromObjectiveC(result, destValueType);
           if (!result)
             return nullptr;
 
@@ -2536,7 +2534,7 @@ namespace {
                                         OptionalType::get(destValueType));
           }
         } else {
-          result = bridgeFromObjectiveC(result, destValueType);
+          result = forceBridgeFromObjectiveC(result, destValueType);
           if (!result)
             return nullptr;
 
@@ -4087,7 +4085,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::BridgeFromObjC:
-      return bridgeFromObjectiveC(expr, toType);
+      return forceBridgeFromObjectiveC(expr, toType);
     }
   }
 

@@ -4,14 +4,21 @@ class A {
   var x = 0
 }
 
-struct B : _BridgedToObjectiveCType {
+struct B : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
-  static func _bridgeFromObjectiveC(x: A) -> B {
+  static func _forceBridgeFromObjectiveC(x: A) -> B {
+    return B()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: A) -> B? {
     return B()
   }
 }
@@ -36,14 +43,21 @@ class E {
   var x = 0
 }
 
-struct F : _BridgedToObjectiveCType {
+struct F : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return E.self
   }
   func _bridgeToObjectiveC() -> E {
     return E()
   }
-  static func _bridgeFromObjectiveC(x: E) -> F {
+  static func _forceBridgeFromObjectiveC(x: E) -> F {
+    return F()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: E) -> F? {
     return F()
   }
 }
@@ -58,17 +72,17 @@ class G {
   var x = 0
 }
 
-struct H : _ConditionallyBridgedToObjectiveCType {
+struct H : _ObjectiveCBridgeable {
   static func _getObjectiveCType() -> Any.Type {
     return G.self
   }
   func _bridgeToObjectiveC() -> G {
     return G()
   }
-  static func _bridgeFromObjectiveC(x: G) -> H {
+  static func _forceBridgeFromObjectiveC(x: G) -> H {
     return H()
   }
-  static func _bridgeFromObjectiveCConditional(x: G) -> H? {
+  static func _conditionallyBridgeFromObjectiveC(x: G) -> H? {
     _preconditionFailure("implement")
   }
   static func _isBridgedToObjectiveC() -> Bool {
@@ -82,14 +96,21 @@ var h: [H] = []
 g = h // should type check, but cause a failure at runtime
 
 
-struct I : _BridgedToObjectiveCType {
+struct I : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return A.self
   }
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
-  static func _bridgeFromObjectiveC(x: AnyObject) -> I {
+  static func _forceBridgeFromObjectiveC(x: AnyObject) -> I {
+    return I()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: AnyObject) -> I? {
     return I()
   }
 }

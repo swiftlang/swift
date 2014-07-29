@@ -31,62 +31,80 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
   return Dictionary<K, V>()
 }
 
-extension String : _BridgedToObjectiveCType {
+extension String : _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   public static func _getObjectiveCType() -> Any.Type {
     return NSString.self
   }
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  public static func _bridgeFromObjectiveC(x: NSString) -> String {
-    fatal("implement")
+  public static func _forceBridgeFromObjectiveC(x: NSString) -> String {
+    fatalError("implement")
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSString
+  ) -> String? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 }
 
-extension Int : _BridgedToObjectiveCType {
+extension Int : _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   public static func _getObjectiveCType() -> Any.Type {
     return NSNumber.self
   }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func _bridgeFromObjectiveC(x: NSNumber) -> Int {
+  public static func _forceBridgeFromObjectiveC(x: NSNumber) -> Int {
     fatal("implement")
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSNumber
+  ) -> Int? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 }
 
-extension Array : _ConditionallyBridgedToObjectiveCType {
+extension Array : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSArray.self
   }
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  public static func _bridgeFromObjectiveC(x: NSArray) -> Array {
+  public static func _forceBridgeFromObjectiveC(x: NSArray) -> Array {
     fatal("implement")
   }
-  static func _bridgeFromObjectiveCConditional(x: NSArray) -> Array? {
+  public static func _conditionallyBridgeFromObjectiveC(x: NSArray) -> Array? {
     return nil
   }
-  static func _isBridgedToObjectiveC() -> Bool {
+  public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
 }
 
-extension Dictionary : _ConditionallyBridgedToObjectiveCType {
+extension Dictionary : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  public static func _bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+  public static func _forceBridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
     fatal("implement")
   }
-  static func _bridgeFromObjectiveCConditional(x: NSDictionary) -> Dictionary? {
+  public static func _conditionallyBridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
     return nil
   }
-  static func _isBridgedToObjectiveC() -> Bool {
+  public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
 }

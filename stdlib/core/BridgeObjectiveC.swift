@@ -101,17 +101,29 @@ public func withUnsafePointers<A0, A1, A2, Result>(
 }
 
 /// A Swift Array or Dictionary of types conforming to
-/// `_BridgedToObjectiveCType` can be passed to ObjectiveC as an NSArray or
+/// `_ObjectiveCBridgeable` can be passed to ObjectiveC as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each elmeent of the source container.
-public protocol _BridgedToObjectiveCType {
+public protocol _ObjectiveCBridgeable {
   typealias _ObjectiveCType: AnyObject
 
-  // Workaround: right now protocol witness tables don't include associated
-  // types, so we can not find '_ObjectiveCType' from them.
+  /// Return true iff instances of `Self` can be converted to
+  /// Objective-C.  Even if this method returns `true`, A given
+  /// instance of `Self._ObjectiveCType` may, or may not, convert
+  /// successfully to `Self`; for example, an `NSArray` will only
+  /// convert successfully to `[String]` if it contains only
+  /// `NSString`\ s.
+  class func _isBridgedToObjectiveC() -> Bool
+  
+  // _getObjectiveCType is a workaround: right now protocol witness
+  // tables don't include associated types, so we can not find
+  // '_ObjectiveCType.self' from them.
+  
+  /// Must return `_ObjectiveCType.self`.
   class func _getObjectiveCType() -> Any.Type
 
+  /// Convert `self` to Objective-C
   func _bridgeToObjectiveC() -> _ObjectiveCType
 
   /// Bridge from an Objective-C object of the bridged class type to a
@@ -121,15 +133,7 @@ public protocol _BridgedToObjectiveCType {
   /// via as), and may defer complete checking until later. For
   /// example, when bridging from NSArray to Array<T>, we can defer
   /// the checking for the individual elements of the array.
-  class func _bridgeFromObjectiveC(source: _ObjectiveCType) -> Self
-}
-
-/// Whether a given type conforming to this protocol bridges to
-/// ObjectiveC is only knowable at runtime.  Array<T> is an example;
-/// it bridges to ObjectiveC iff T does.
-public protocol _ConditionallyBridgedToObjectiveCType :
-    _BridgedToObjectiveCType {
-  class func _isBridgedToObjectiveC() -> Bool
+  class func _forceBridgeFromObjectiveC(source: _ObjectiveCType) -> Self
 
   /// Try to bridge from an Objective-C object of the bridged class
   /// type to a value of the Self type.
@@ -141,7 +145,9 @@ public protocol _ConditionallyBridgedToObjectiveCType :
   ///
   /// Returns the bridged value if bridging succeeded, nil if bridging
   /// did not succeed.
-  class func _bridgeFromObjectiveCConditional(source: _ObjectiveCType) -> Self?
+  class func _conditionallyBridgeFromObjectiveC(
+    source: _ObjectiveCType
+  ) -> Self?
 }
 
 //===--- Bridging facilities written in Objective-C -----------------------===//
@@ -154,10 +160,12 @@ public protocol _ConditionallyBridgedToObjectiveCType :
 ///
 /// - If `T` is a class type, it is alaways bridged verbatim, the function
 ///   returns `x`;
-/// - otherwise, `T` conforms to `_BridgedToObjectiveCType`:
-///   + if `T` conforms to `_ConditionallyBridgedToObjectiveCType` and
-///     `T._isBridgedToObjectiveC()` returns `false`, then the result is empty;
+///
+/// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
+///   + if `T._isBridgedToObjectiveC()` returns `false`, then the
+///     result is empty;
 ///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
+///  
 /// - otherwise, the result is empty.
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -182,12 +190,12 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 /// - If `T` is a class type:
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`:
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
 ///   + if the dynamic type of `x` is not `T._getObjectiveCType()`
 ///     or a subclass of it, trap
-///   + otherwise, returns the result of `T._bridgeFromObjectiveC(x)`;
+///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap
-public func _bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as T
   }
@@ -200,15 +208,17 @@ public func _bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 /// - If `T` is a class type:
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`:
-///   + if `T` conforms to `_ConditionallyBridgedToObjectiveCType` and
-///     `T._isBridgedToObjectiveC()` returns `false`, then the result is empty;
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
+///   + if `T._isBridgedToObjectiveC()` returns `false`, then the result is
+///     empty;
 ///   + otherwise, if the dynamic type of `x` is not `T._getObjectiveCType()`
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of
-///     `T._bridgeFromObjectiveCConditional(x)`;
+///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
-public func _bridgeFromObjectiveCConditional<T>(x: AnyObject, _: T.Type) -> T? {
+public func _conditionallyBridgeFromObjectiveC<T>(
+  x: AnyObject, _: T.Type
+) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as? T
   }
@@ -226,10 +236,8 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject,
 /// representation.
 ///
 /// - If `T` is a class type, returns `true`;
-/// - otherwise, `T` conforms to
-///   `_ConditionallyBridgedToObjectiveCType`, returns
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`, returns
 ///   `T._isBridgedToObjectiveC()`;
-/// - otherwise, if `T` conforms to `_BridgedToObjectiveCType`, returns `true`.
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
@@ -241,7 +249,7 @@ public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
 func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
 /// A type that's bridged "verbatim" does not conform to
-/// `_BridgedToObjectiveCType`, and can have its bits reinterpreted as an
+/// `_ObjectiveCBridgeable`, and can have its bits reinterpreted as an
 /// `AnyObject`.  When this function returns true, the storage of an
 /// `Array<T>` can be `unsafeBitCast` as an array of `AnyObject`.
 public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {

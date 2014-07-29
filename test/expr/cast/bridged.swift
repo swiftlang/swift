@@ -7,7 +7,11 @@ class NSObject { }
 class BridgedClass : NSObject { 
 }
 
-struct BridgedStruct : _BridgedToObjectiveCType {
+struct BridgedStruct : _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static func _getObjectiveCType() -> Any.Type {
     return BridgedClass.self
   }
@@ -16,7 +20,10 @@ struct BridgedStruct : _BridgedToObjectiveCType {
     return BridgedClass()
   }
 
-  static func _bridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+  static func _forceBridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct {
+    return BridgedStruct()
+  }
+  static func _conditionallyBridgeFromObjectiveC(x: BridgedClass) -> BridgedStruct? {
     return BridgedStruct()
   }
 }

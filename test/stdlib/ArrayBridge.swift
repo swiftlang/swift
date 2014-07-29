@@ -95,7 +95,7 @@ class BridgedObjC : Base, Printable, Barable {
 var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
-struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
+struct BridgedSwift : Printable, _ObjectiveCBridgeable {
   static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
@@ -109,13 +109,13 @@ struct BridgedSwift : Printable, _ConditionallyBridgedToObjectiveCType {
     return true
   }
 
-  static func _bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+  static func _forceBridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
     assert(x.value >= 0, "not bridged")
     ++bridgeFromOperationCount
     return BridgedSwift(x.value)
   }
 
-  static func _bridgeFromObjectiveCConditional(x: BridgedObjC) -> BridgedSwift? {
+  static func _conditionallyBridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift? {
     return x.value >= 0 ? BridgedSwift(x.value) : nil
   }
   
@@ -309,7 +309,7 @@ func testBridgedVerbatim() {
 testBridgedVerbatim()
 
 //===--- Explicitly Bridged -----------------------------------------------===//
-// BridgedSwift conforms to _BridgedToObjectiveCType
+// BridgedSwift conforms to _ObjectiveCBridgeable
 //===----------------------------------------------------------------------===//
 func testExplicitlyBridged() {
   // CHECK-LABEL: testExplicitlyBridged()
@@ -323,7 +323,7 @@ func testExplicitlyBridged() {
 
   // Make sure we can bridge back.
   let roundTripBridgedSwifts
-    = [BridgedSwift]._bridgeFromObjectiveC(bridgedSwiftsAsNSArray)
+    = [BridgedSwift]._forceBridgeFromObjectiveC(bridgedSwiftsAsNSArray)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
   println("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
@@ -333,7 +333,7 @@ func testExplicitlyBridged() {
 
   // ...and bridge *that* back
   let bridgedBackSwifts
-    = [BridgedSwift]._bridgeFromObjectiveC(cocoaBridgedSwifts)
+    = [BridgedSwift]._forceBridgeFromObjectiveC(cocoaBridgedSwifts)
   // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
   // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
   // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]

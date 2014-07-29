@@ -7,7 +7,11 @@ class BridgedObjC : NSObject { }
 
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
-struct BridgedSwift : Hashable, _BridgedToObjectiveCType {
+struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   var hashValue: Int { return 0 }
 
   static func _getObjectiveCType() -> Any.Type {
@@ -18,7 +22,12 @@ struct BridgedSwift : Hashable, _BridgedToObjectiveCType {
     return BridgedObjC()
   }
 
-  static func _bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+  static func _forceBridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
+    return BridgedSwift()
+  }
+  static func _conditionallyBridgeFromObjectiveC(
+    x: BridgedObjC
+  ) -> BridgedSwift? {
     return BridgedSwift()
   }
 }

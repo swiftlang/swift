@@ -1208,8 +1208,7 @@ namespace index_block {
     Hashable,
     Comparable,
 
-    _BridgedToObjectiveCType,
-    _ConditionallyBridgedToObjectiveCType,
+    _ObjectiveCBridgeable
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<

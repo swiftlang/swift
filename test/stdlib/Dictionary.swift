@@ -1457,7 +1457,11 @@ var bridgedKeySerial = 0
 var _bridgedKeyBridgeOperations = 0
 
 struct TestBridgedKeyTy 
-  : Equatable, Hashable, Printable, _BridgedToObjectiveCType {
+  : Equatable, Hashable, Printable, _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static var bridgeOperations: Int {
     get {
       return _bridgedKeyBridgeOperations
@@ -1492,9 +1496,15 @@ struct TestBridgedKeyTy
     return TestObjCKeyTy(value)
   }
 
-  static func _bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
+  static func _forceBridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
     TestBridgedKeyTy.bridgeOperations++
     return TestBridgedKeyTy(x.value)
+  }
+  
+  static func _conditionallyBridgeFromObjectiveC(
+    x: TestObjCKeyTy
+  ) -> TestBridgedKeyTy? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 
   var value: Int
@@ -1510,7 +1520,11 @@ var bridgedValueCount = 0
 var bridgedValueSerial = 0
 var _bridgedValueBridgeOperations = 0
 
-struct TestBridgedValueTy : Printable, _BridgedToObjectiveCType {
+struct TestBridgedValueTy : Printable, _ObjectiveCBridgeable {
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   static var bridgeOperations: Int {
     get {
       return _bridgedValueBridgeOperations
@@ -1540,9 +1554,17 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveCType {
     return TestObjCValueTy(value)
   }
 
-  static func _bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy {
+  static func _forceBridgeFromObjectiveC(
+    x: TestObjCValueTy
+  ) -> TestBridgedValueTy {
     TestBridgedValueTy.bridgeOperations++
     return TestBridgedValueTy(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    x: TestObjCValueTy
+  ) -> TestBridgedValueTy? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 
   var value: Int
@@ -1550,7 +1572,12 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveCType {
 }
 
 struct TestBridgedEquatableValueTy
-  : Equatable, Printable, _BridgedToObjectiveCType {
+  : Equatable, Printable, _ObjectiveCBridgeable {
+
+  static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
   init(_ value: Int) {
     ++bridgedValueCount
     serial = ++bridgedValueSerial
@@ -1570,8 +1597,16 @@ struct TestBridgedEquatableValueTy
     return TestObjCEquatableValueTy(value)
   }
 
-  static func _bridgeFromObjectiveC(x: TestObjCEquatableValueTy) -> TestBridgedEquatableValueTy {
+  static func _forceBridgeFromObjectiveC(
+    x: TestObjCEquatableValueTy
+  ) -> TestBridgedEquatableValueTy {
     return TestBridgedEquatableValueTy(x.value)
+  }
+
+  static func _conditionallyBridgeFromObjectiveC(
+    x: TestObjCEquatableValueTy
+  ) -> TestBridgedEquatableValueTy? {
+    return self._forceBridgeFromObjectiveC(x)
   }
 
   var value: Int
@@ -1688,18 +1723,18 @@ func getBridgedVerbatimDictionaryAndNSMutableDictionary()
 
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
-  return Dictionary._bridgeFromObjectiveC(nsd)
+  return Dictionary._forceBridgeFromObjectiveC(nsd)
 }
 
 func getBridgedNonverbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getAsNSDictionary(d)
-  return Dictionary._bridgeFromObjectiveC(nsd)
+  return Dictionary._forceBridgeFromObjectiveC(nsd)
 }
 
 func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<TestBridgedKeyTy, TestBridgedValueTy>, NSMutableDictionary) {
   var nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
-  return (Dictionary._bridgeFromObjectiveC(nsd), nsd)
+  return (Dictionary._forceBridgeFromObjectiveC(nsd), nsd)
 }
 
 func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
@@ -1709,7 +1744,7 @@ func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionar
 
 func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
   var nsd = getAsEquatableNSDictionary(d)
-  return Dictionary._bridgeFromObjectiveC(nsd)
+  return Dictionary._forceBridgeFromObjectiveC(nsd)
 }
 
 func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
@@ -1730,7 +1765,7 @@ func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
 
 func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd = getHugeBridgedVerbatimDictionaryHelper()
-  return Dictionary._bridgeFromObjectiveC(nsd)
+  return Dictionary._forceBridgeFromObjectiveC(nsd)
 }
 
 /// A mock dictionary that stores its keys and values in parallel arrays, which
@@ -1790,7 +1825,7 @@ func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObje
 
 func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   var nsd: NSDictionary = ParallelArrayDictionary()
-  return Dictionary._bridgeFromObjectiveC(nsd)
+  return Dictionary._forceBridgeFromObjectiveC(nsd)
 }
 
 func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {

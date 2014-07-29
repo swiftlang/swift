@@ -156,7 +156,7 @@ Bridging Rules and Terminology for all Types
     protocol _BridgedToObjectiveC {
       typealias _ObjectiveCType: AnyObject
       func _bridgeToObjectiveC() -> _ObjectiveCType
-      class func _bridgeFromObjectiveC(_: _ObjectiveCType) -> Self
+      class func _forceBridgeFromObjectiveC(_: _ObjectiveCType) -> Self
     }
 
   .. Note:: classes and ``@objc`` existentials shall not conform to
@@ -169,14 +169,14 @@ Bridging Rules and Terminology for all Types
 
     protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
       class func _isBridgedToObjectiveC() -> Bool
-      class func _bridgeFromObjectiveCConditional(_: _ObjectiveCType) -> Self?
+      class func _conditionallyBridgeFromObjectiveC(_: _ObjectiveCType) -> Self?
     }
 
   Bridging from, or *bridging back* to, a type ``T`` conforming to
   ``_ConditionallyBridgedToObjectiveC`` when
   ``T._isBridgedToObjectiveC()`` is ``false`` is a user programming
   error that may be diagnosed at
-  runtime. ``_bridgeFromObjectiveCConditional`` can be used to attempt
+  runtime. ``_conditionallyBridgeFromObjectiveC`` can be used to attempt
   to bridge back, and return ``nil`` if the entire object cannot be
   bridged.
 
@@ -194,7 +194,7 @@ Bridging Rules and Terminology for all Types
     then a value ``x`` of type ``T`` is **bridged** as
     ``T._ObjectiveCType`` via ``x._bridgeToObjectiveC()``, and an object
     ``y`` of ``T._ObjectiveCType`` is **bridged back** to ``T`` via
-    ``T._bridgeFromObjectiveC(y)``
+    ``T._forceBridgeFromObjectiveC(y)``
 
   - Otherwise, ``T`` **does not bridge** to Objective-C
 
