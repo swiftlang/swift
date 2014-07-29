@@ -613,8 +613,9 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
 
   auto &cacheEntry = ModuleWrappers[clangModule];
   Module *result;
-  if (ClangModuleUnit *cached = cacheEntry.getPointer()) {
-    result = cached->getParentModule();
+  ClangModuleUnit *wrapperUnit;
+  if ((wrapperUnit = cacheEntry.getPointer())) {
+    result = wrapperUnit->getParentModule();
     if (!cacheEntry.getInt()) {
       // Force load adapter modules for all imported modules.
       // FIXME: This forces the creation of wrapper modules for all imports as
@@ -629,9 +630,10 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = Module::create(name, SwiftContext);
 
-    auto file = new (SwiftContext) ClangModuleUnit(*result, owner, clangModule);
-    result->addFile(*file);
-    cacheEntry.setPointerAndInt(file, true);
+    wrapperUnit =
+      new (SwiftContext) ClangModuleUnit(*result, owner, clangModule);
+    result->addFile(*wrapperUnit);
+    cacheEntry.setPointerAndInt(wrapperUnit, true);
 
     // Force load adapter modules for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
@@ -649,6 +651,10 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     if (!loaded)
       loaded = result;
   }
+
+  if (findAdapter)
+    if (Module *adapter = wrapperUnit->getAdapterModule())
+      result = adapter;
 
   return result;
 }
