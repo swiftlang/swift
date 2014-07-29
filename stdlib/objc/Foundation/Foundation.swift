@@ -580,7 +580,7 @@ extension Array : _ObjectiveCBridgeable {
     // Bit-cast our NSArray to _CocoaArrayType so it can be adopted by
     // an _ArrayBuffer.
     let cocoa = unsafeBitCast(source, _CocoaArrayType.self)
-    self = Array(_ArrayBuffer(noCopy ? cocoa : cocoa.copyWithZone(nil)))
+    self = Array(_fromCocoaArray: cocoa, noCopy: noCopy)
   }
   
   public static func _isBridgedToObjectiveC() -> Bool {

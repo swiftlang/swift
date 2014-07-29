@@ -912,6 +912,13 @@ extension Array {
     }
     return nil
   }
+
+  /// Construct from the given `_CocoaArrayType`.  If `noCopy` is `true`,
+  /// either `source` must be known to be immutable, or the resulting
+  /// `Array` must not survive across code that could mutate `source`.
+  public init(_fromCocoaArray source: _CocoaArrayType, noCopy: Bool = false) {
+    self = Array(_ArrayBuffer(noCopy ? source : source.copyWithZone(nil)))
+  }
 }
 
 
