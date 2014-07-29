@@ -212,6 +212,12 @@ set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
 
+# FIXME: Remove this when OS X builds as an SDK.
+set(SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS "" CACHE STRING
+  "Extra compile flags to pass when building the default (OS X) target library")
+set(SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS "" CACHE STRING
+  "Extra link flags to pass when building the default (OS X) target library")
+
 set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
 if ( PATH_TO_SWIFT_BUILD STREQUAL "" )
    set(SWIFT_EXEC "swift")
@@ -1159,8 +1165,9 @@ macro(add_swift_library name)
         FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
         COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
         COMPILE_FLAGS
-          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
-        LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+          "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS}"
+          
+        LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS}"
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
         ${SWIFTLIB_INSTALL_FLAG}
