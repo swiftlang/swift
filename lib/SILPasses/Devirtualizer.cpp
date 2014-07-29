@@ -23,6 +23,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILAnalysis/ClassHierarchyAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/PassManager.h"
@@ -857,13 +858,19 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
 }
 
 /// Specialize virtual dispatch.
-static bool specializeClassMethodDispatch(ApplyInst *AI) {
+static bool specializeClassMethodDispatch(ApplyInst *AI,
+                                          ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
   assert(CMI && "Invalid class method instruction");
 
   SILValue ClassInstance = CMI->getOperand();
   SILType InstanceType = ClassInstance.stripCasts().getType();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+  if (CHA->inheritedInModule(CD)) {
+    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
+          " Not inserting monomorphic inline caches.\n");
+    return false;
+  }
   if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
     return false;
 
@@ -933,6 +940,8 @@ namespace {
     virtual ~SILInlineCaches() {}
 
     virtual void run() {
+      ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
+
       bool Changed = false;
 
       // Collect virtual calls that may be specialized.
@@ -947,7 +956,7 @@ namespace {
 
       // Create the inline caches.
       for (auto AI : ToSpecialize)
-        Changed |= specializeClassMethodDispatch(AI);
+        Changed |= specializeClassMethodDispatch(AI, CHA);
 
       if (Changed) {
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);

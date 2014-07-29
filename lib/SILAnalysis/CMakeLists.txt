@@ -7,6 +7,7 @@ add_swift_library(swiftSILAnalysis
   GlobalARCPairingAnalysis.cpp
   GlobalARCSequenceDataflow.cpp
   SILLoopInfo.cpp
+  ClassHierarchyAnalysis.cpp
   IVAnalysis.cpp
   DEPENDS swiftSILPassesUtils)
 

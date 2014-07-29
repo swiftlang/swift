@@ -47,6 +47,7 @@ namespace swift {
       ColdBlocks,
       IVAnalysis,
       PostOrder,
+      ClassHierarchyAnalysis,
     };
 
     /// Stores the kind of derived class.
@@ -147,6 +148,7 @@ namespace swift {
   SILAnalysis *createLoopInfoAnalysis(SILModule *M, SILPassManager *PM);
   SILAnalysis *createInductionVariableAnalysis(SILModule *M);
   SILAnalysis *createPostOrderAnalysis(SILModule *M);
+  SILAnalysis *createClassHierarchyAnalysis(SILModule *M);
 } // end namespace swift
 
 #endif
