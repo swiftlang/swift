@@ -113,7 +113,7 @@ class Derived : Base { }
 
 ${test('Downcast1')} {
   let ba: [Base] = [Derived(), Base()]
-  let da: [Derived] = _arrayDownCast(ba)
+  let da = ba as [Derived]
   let d0 = da[0]
   println("OK")
   let d1 = da[1]
@@ -121,7 +121,7 @@ ${test('Downcast1')} {
 
 ${test('Downcast2')} {
   let a: [AnyObject] = ["String", 1]
-  let sa: [NSString] = _arrayBridgeFromObjectiveC(a)
+  let sa = a as [NSString]
   let s0 = sa[0]
   println("OK")
   let s1 = sa[1]
