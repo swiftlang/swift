@@ -408,8 +408,8 @@ dump(CollectionOfOne("Howdy Swift!"))
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
 println(reflect(emptyCollectionOfInt).summary)
 
-// CHECK-NEXT: .one
-println(reflect(Bit.one).summary)
+// CHECK-NEXT: .One
+println(reflect(Bit.One).summary)
 
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:

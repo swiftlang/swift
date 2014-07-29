@@ -35,11 +35,11 @@ public struct CollectionOfOne<T> : CollectionType {
   }
 
   public var startIndex: Index {
-    return .zero
+    return .Zero
   }
   
   public var endIndex: Index {
-    return .one
+    return .One
   }
 
   public func generate() -> GeneratorOfOne<T> {
@@ -47,7 +47,7 @@ public struct CollectionOfOne<T> : CollectionType {
   }
 
   public subscript(i: Index) -> T {
-    _precondition(i == .zero, "Index out of range")
+    _precondition(i == .Zero, "Index out of range")
     return element
   }
   

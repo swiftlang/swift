@@ -14,16 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 public enum Bit : Int, RandomAccessIndexType, Reflectable {
-  case zero = 0, one = 1
+  case Zero = 0, One = 1
 
   public func successor() -> Bit {
-    _precondition(self == .zero, "Can't increment past one")
-    return .one
+    _precondition(self == .Zero, "Can't increment past one")
+    return .One
   }
 
   public func predecessor() -> Bit {
-    _precondition(self == .one, "Can't decrement past zero")
-    return .zero
+    _precondition(self == .One, "Can't decrement past zero")
+    return .Zero
   }
 
   public func distanceTo(other: Bit) -> Int {
@@ -31,7 +31,7 @@ public enum Bit : Int, RandomAccessIndexType, Reflectable {
   }
 
   public func advancedBy(distance: Int) -> Bit {
-    return toRaw().advancedBy(distance) > 0 ? one : zero
+    return toRaw().advancedBy(distance) > 0 ? One : Zero
   }
 
   public
@@ -61,8 +61,8 @@ struct _BitMirror: MirrorType {
 
   var summary: String { 
     switch _value {
-      case .zero: return ".zero"
-      case .one:  return ".one"
+      case .Zero: return ".Zero"
+      case .One:  return ".One"
     }
   }
 
@@ -84,23 +84,33 @@ extension Bit : IntegerArithmeticType {
     return (Bit.fromRaw(v.0)!, v.overflow)
   }
   
-  public static func addWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func addWithOverflow(
+    lhs: Bit, _ rhs: Bit
+  ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.addWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  public static func subtractWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func subtractWithOverflow(
+    lhs: Bit, _ rhs: Bit
+  ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.subtractWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  public static func multiplyWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func multiplyWithOverflow(
+    lhs: Bit, _ rhs: Bit
+  ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.multiplyWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  public static func divideWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func divideWithOverflow(
+    lhs: Bit, _ rhs: Bit
+  ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.divideWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 
-  public static func remainderWithOverflow(lhs: Bit, _ rhs: Bit) -> (Bit, overflow: Bool) {
+  public static func remainderWithOverflow(
+    lhs: Bit, _ rhs: Bit
+  ) -> (Bit, overflow: Bool) {
     return _withOverflow(Int.remainderWithOverflow(lhs.toRaw(), rhs.toRaw()))
   }
 

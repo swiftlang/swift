@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
 
-let zero: Bit = .zero
-let one: Bit = .one
+let zero: Bit = .Zero
+let one: Bit = .One
 
 // CHECK: testing
 println("testing")
