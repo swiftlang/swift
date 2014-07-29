@@ -1,4 +1,4 @@
-//===--- ArrayBridge.swift - Casts and conversions for Array --------------===//
+//===--- ArrayCast.swift - Casts and conversions for Array ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
