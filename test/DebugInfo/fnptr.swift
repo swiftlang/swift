@@ -18,7 +18,7 @@ func main() -> Int {
     // CHECK-DAG: ![[BARMEMBER]] = {{.*}}metadata ![[BARPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BARPTR]] = {{.*}} metadata ![[BART:[0-9]+]]} ; [ DW_TAG_pointer_type ]
     // CHECK-DAG: ![[BART]] = {{.*}}null, metadata ![[BARARGS:.*]], i32 0, null, null, null} ; [ DW_TAG_subroutine_type ]
-    // CHECK-DAG: ![[BARARGS]] = metadata !{metadata ![[VOIDNODE]]}
+    // CHECK-DAG: ![[BARARGS]] = metadata !{metadata !"_TtT_"}
     bar_function_pointer();// Set breakpoint here
 
     // CHECK-DAG: i32 {{.*}}, metadata ![[BAZPT:.*]], i32 0, i32 0, metadata ![[OP_DEREF]]} ; [ DW_TAG_auto_variable ] [baz_function_pointer]
@@ -27,7 +27,7 @@ func main() -> Int {
     // CHECK-DAG: ![[BAZMEMBER]] = {{.*}}metadata ![[BAZPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BAZPTR]] = {{.*}} metadata ![[BAZT:[0-9]+]]} ; [ DW_TAG_pointer_type ]
     // CHECK-DAG: ![[BAZT]] = {{.*}}metadata ![[BAZARGS:.*]], i32 0, null, null, null} ; [ DW_TAG_subroutine_type ]
-    // CHECK-DAG: ![[BAZARGS]] = metadata !{metadata ![[SINODE]], metadata ![[SFNODE]]}
+    // CHECK-DAG: ![[BAZARGS]] = metadata !{metadata !"_TtSi", metadata !"_TtSf"}
     var baz_function_pointer = baz
     baz_function_pointer(2.89)
 
@@ -37,7 +37,7 @@ func main() -> Int {
     // CHECK-DAG: ![[BARZMEMBER]] = {{.*}}metadata ![[BARZPTR:[0-9]+]]} ; [ DW_TAG_member ] [pointer]
     // CHECK-DAG: ![[BARZPTR]] = {{.*}} metadata ![[BARZT:[0-9]+]]} ; [ DW_TAG_pointer_type ]
     // CHECK-DAG: ![[BARZT]] = {{.*}}metadata ![[BARZARGS:.*]], i32 0, null, null, null} ; [ DW_TAG_subroutine_type ]
-    // CHECK-DAG: ![[BARZARGS]] = metadata !{metadata ![[SINODE]], metadata ![[SFNODE]], metadata ![[SFNODE]]}
+    // CHECK-DAG: ![[BARZARGS]] = metadata !{metadata !"_TtSi", metadata !"_TtSf", metadata !"_TtSf"}
     var barz_function_pointer = barz
     return barz_function_pointer(2.89, -1.0)
 }

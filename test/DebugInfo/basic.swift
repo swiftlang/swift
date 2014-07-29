@@ -55,11 +55,7 @@ func foo(var a: Int, var b: Int) -> Int {
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = {{.*}} metadata ![[PARAMTYPES:[0-9]+]],{{.*}}DW_TAG_subroutine_type
-// CHECK-DAG: ![[PARAMTYPES]] = metadata !{metadata ![[R:[0-9]+]], metadata ![[A:[0-9]+]], metadata ![[B:[0-9]+]]}
-// CHECK-DAG: ![[R]] = {{.*}}"_TtSi"
-// CHECK-DAG: ![[A]] = {{.*}}"_TtSi"
-// CHECK-DAG: ![[B]] = {{.*}}"_TtSi"
-
+// CHECK-DAG: ![[PARAMTYPES]] = metadata !{metadata !"_TtSi", metadata !"_TtSi", metadata !"_TtSi"}
 // Import of the main module.
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = {{.*}}DW_TAG_file_type{{.*}}basic.swift
 // CHECK-DAG: metadata ![[MAINFILE]], metadata ![[MAINMODULE:[0-9]+]], i32 1} ; [ DW_TAG_imported_module ]
