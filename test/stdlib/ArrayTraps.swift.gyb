@@ -113,12 +113,9 @@ class Derived : Base { }
 
 ${test('Downcast1')} {
   let ba: [Base] = [Derived(), Base()]
-  // <rdar://problem/17340393> Array downcast should do deferred checking
-  // FIXME: The "OK" should be moved after "let d0 = da[0]" when we
-  // get deferred checking.
-  println("OK")
   let da: [Derived] = _arrayDownCast(ba)
   let d0 = da[0]
+  println("OK")
   let d1 = da[1]
 }
 

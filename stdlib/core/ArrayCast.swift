@@ -34,11 +34,7 @@ public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
       return Array(a._buffer.castToBufferOf(Derived.self))
     }
   }
-
-  // FIXME: Make these checks deferred.
-  let result: [Derived]? = _arrayDownCastConditional(a)
-  _precondition(result != nil, "array cannot be downcast to array of derived")
-  return result!
+  return Array(_fromCocoaArray: a._asCocoaArray())
 }
 
 /// Convert a to its corresponding bridged array type.
@@ -73,6 +69,7 @@ public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
     = _arrayBridgeFromObjectiveCConditional(source);
   _precondition(result != nil, "array cannot be bridged from Objective-C")
   return result!
+  /*return Array(_fromCocoaArray: source._buffer._asCocoaArray())*/
 }
 
 /// Implements `source as [TargetElement]`.
