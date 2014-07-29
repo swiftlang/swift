@@ -84,6 +84,9 @@ ERROR(error_unsupported_option,driver,none,
       "unsupported option '%0' for '%1'; did you mean '%2 %0'?",
       (StringRef, StringRef, StringRef))
 
+ERROR(error_os_minimum_deployment,frontend,none,
+      "Swift requires a minimum deployment target of %0", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

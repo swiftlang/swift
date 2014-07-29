@@ -5,7 +5,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.8 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
@@ -56,7 +56,7 @@
 // COMPLEX-DAG: -L baz
 // COMPLEX-DAG: -F garply
 // COMPLEX-DAG: -undefined dynamic_lookup
-// COMPLEX-DAG: -macosx_version_min 10.8.0
+// COMPLEX-DAG: -macosx_version_min 10.9.1
 // COMPLEX: -o sdk.out
 
 

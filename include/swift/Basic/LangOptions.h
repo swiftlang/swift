@@ -90,6 +90,11 @@ namespace swift {
       assert(!Name.empty() && !Value.empty());
       TargetConfigOptions.push_back(std::make_pair(Name, Value));
     }
+
+    /// Removes all configuration options added with addTargetConfigOption.
+    void clearAllTargetConfigOptions() {
+      TargetConfigOptions.clear();
+    }
     
     /// Returns the value for the given target configuration or an empty string.
     StringRef getTargetConfigOption(StringRef Name);

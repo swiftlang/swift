@@ -117,9 +117,6 @@ ERROR(error_doing_code_completion,frontend,none,
 ERROR(verify_encountered_fatal,frontend,none,
       "fatal error encountered while in -verify mode", ())
 
-ERROR(error_os_minimum_deployment,frontend,none,
-  "Swift requires a minimum deployment target of %0", (StringRef))
-
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

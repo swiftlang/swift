@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 swift::CompilerInvocation::CompilerInvocation() {
-  IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
+  setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
@@ -39,15 +39,11 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeResourcePath(LibPath.str());
 }
 
-void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
-  SearchPathOpts.RuntimeResourcePath = Path;
-  updateRuntimeLibraryPath();
-}
-
-void CompilerInvocation::updateRuntimeLibraryPath() {
+static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
+                                     StringRef tripleStr) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
-  llvm::Triple Triple(IRGenOpts.Triple);
+  llvm::Triple Triple{tripleStr};
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
@@ -56,9 +52,47 @@ void CompilerInvocation::updateRuntimeLibraryPath() {
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
+void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
+  SearchPathOpts.RuntimeResourcePath = Path;
+  updateRuntimeLibraryPath(SearchPathOpts, getTargetTriple());
+}
+
+static void updateTargetConfigurationOptions(LangOptions &LangOpts,
+                                             StringRef tripleStr) {
+  LangOpts.clearAllTargetConfigOptions();
+  llvm::Triple triple = llvm::Triple(tripleStr);
+
+  // Set the "os" target configuration.
+  if (triple.isMacOSX())
+    LangOpts.addTargetConfigOption("os", "OSX");
+  else if (triple.isiOS())
+    LangOpts.addTargetConfigOption("os", "iOS");
+  else
+    llvm_unreachable("Unsupported target OS");
+
+  // Set the "arch" target configuration.
+  switch (triple.getArch()) {
+  case llvm::Triple::ArchType::arm:
+    LangOpts.addTargetConfigOption("arch", "arm");
+    break;
+  case llvm::Triple::ArchType::aarch64:
+    LangOpts.addTargetConfigOption("arch", "arm64");
+    break;
+  case llvm::Triple::ArchType::x86:
+    LangOpts.addTargetConfigOption("arch", "i386");
+    break;
+  case llvm::Triple::ArchType::x86_64:
+    LangOpts.addTargetConfigOption("arch", "x86_64");
+    break;
+  default:
+    llvm_unreachable("Unsupported target architecture");
+  }
+}
+
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
   IRGenOpts.Triple = Triple.str();
-  updateRuntimeLibraryPath();
+  updateRuntimeLibraryPath(SearchPathOpts, Triple);
+  updateTargetConfigurationOptions(LangOpts, Triple);
 }
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
@@ -937,7 +971,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  updateRuntimeLibraryPath();
+  updateRuntimeLibraryPath(SearchPathOpts, getTargetTriple());
+  updateTargetConfigurationOptions(LangOpts, getTargetTriple());
 
   return false;
 }

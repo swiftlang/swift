@@ -102,6 +102,20 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
       Args.hasArgNoClaim(options::OPT_import_objc_header)) {
     diags.diagnose({}, diag::error_framework_bridging_header);
   }
+
+  // Check minimum supported OS versions.
+  if (const Arg *A = Args.getLastArg(options::OPT_target)) {
+    llvm::Triple triple(A->getValue());
+    if (triple.isMacOSX()) {
+      if (triple.isMacOSXVersionLT(10, 9))
+        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                       "OS X 10.9");
+    } else if (triple.isiOS()) {
+      if (triple.isOSVersionLT(7))
+        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                       "iOS 7");
+    }
+  }
 }
 
 std::unique_ptr<Compilation> Driver::buildCompilation(

@@ -39,50 +39,6 @@ void CompilerInstance::createSILModule() {
   TheSILModule = SILModule::createEmptyModule(getMainModule());
 }
 
-void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
-                                               LangOptions &LangOpts) {
-  
-  llvm::Triple triple = llvm::Triple(IRGenOpts.Triple);
-  
-  // Set the "os" target configuration.
-  if (triple.isMacOSX()) {
-    LangOpts.addTargetConfigOption("os", "OSX");
-    unsigned Major, Minor, Micro;
-    if (triple.getMacOSXVersion(Major, Minor, Micro) &&
-        (Major < 10 || (Major == 10 && Minor < 9)))
-      Diagnostics.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                           "OSX 10.9");
-  } else if (triple.isiOS()) {
-    LangOpts.addTargetConfigOption("os", "iOS");
-    unsigned Major, Minor, Micro;
-    triple.getiOSVersion(Major, Minor, Micro);
-    if (Major < 7)
-      Diagnostics.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                           "iOS 7");
-
-  } else {
-    assert(false && "Unsupported target OS");
-  }
-  
-  // Set the "arch" target configuration.
-  switch (triple.getArch()) {
-  case llvm::Triple::ArchType::arm:
-    LangOpts.addTargetConfigOption("arch", "arm");
-    break;
-  case llvm::Triple::ArchType::aarch64:
-    LangOpts.addTargetConfigOption("arch", "arm64");
-    break;
-  case llvm::Triple::ArchType::x86:
-    LangOpts.addTargetConfigOption("arch", "i386");
-    break;
-  case llvm::Triple::ArchType::x86_64:
-    LangOpts.addTargetConfigOption("arch", "x86_64");
-    break;
-  default:
-    llvm_unreachable("Unsupported target architecture");
-  }
-}
-
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -100,10 +56,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
-
-  // Initialize the target build configuration settings ("os" and "arch").
-  setTargetConfigurations(Invocation.getIRGenOptions(),
-                          Invocation.getLangOptions());
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
