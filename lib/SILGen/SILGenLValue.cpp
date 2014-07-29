@@ -322,6 +322,10 @@ void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
 
+void PathComponent::dump() const {
+  print(llvm::errs());
+}
+
 /// Return the LValueTypeData for a value whose type is its own
 /// lowering.
 static LValueTypeData getValueTypeData(SILValue value) {
@@ -346,8 +350,7 @@ namespace {
         Field(field), SubstFieldType(substFieldType) {}
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base)
-      const override
-    {
+      const override {
       assert(base.getType().isObject() &&
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
@@ -355,6 +358,10 @@ namespace {
       auto Res = gen.B.createRefElementAddr(loc, base.getValue(), Field,
                                             SubstFieldType);
       return ManagedValue::forLValue(Res);
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "RefElementComponent(" << Field->getName() << ")\n";
     }
   };
 
@@ -373,6 +380,10 @@ namespace {
                                               getTypeOfRValue().getAddressType());
       return ManagedValue::forLValue(Res);
     }
+
+    void print(raw_ostream &OS) const override {
+      OS << "TupleElementComponent(" << ElementIndex << ")\n";
+    }
   };
 
   class StructElementComponent : public PhysicalPathComponent {
@@ -390,6 +401,9 @@ namespace {
       auto Res = gen.B.createStructElementAddr(loc, base.getUnmanagedValue(),
                                                Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
+    }
+    void print(raw_ostream &OS) const override {
+      OS << "StructElementComponent(" << Field->getName() << ")\n";
     }
   };
 
@@ -423,6 +437,11 @@ namespace {
                                    getTypeData().TypeOfRValue.getAddressType());
       return ManagedValue::forLValue(someAddr);
     }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OptionalObjectComponent()\n";
+    }
+
   protected:
     // Get the address of the object within the optional wrapper, assuming it
     // has already been validated at the current insertion point.
@@ -458,6 +477,10 @@ namespace {
       // Project out the payload.
       return getOffsetOfObject(gen, loc, base);
     }
+
+    void print(raw_ostream &OS) const override {
+      OS << "ForceOptionalObjectComponent()\n";
+    }
   };
   
   class BindOptionalObjectComponent : public OptionalObjectComponent {
@@ -476,6 +499,9 @@ namespace {
       // Project out the payload on the success branch.
       return getOffsetOfObject(gen, loc, base);
     }
+    void print(raw_ostream &OS) const override {
+      OS << "BindOptionalObjectComponent(" << Depth << ")\n";
+    }
   };
 
   class ValueComponent : public PhysicalPathComponent {
@@ -490,6 +516,10 @@ namespace {
                         ManagedValue base) const override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "ValueComponent()\n";
     }
   };
 } // end anonymous namespace.
@@ -597,7 +627,8 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(AbstractStorageDecl *decl,
+
+     GetterSetterComponent(AbstractStorageDecl *decl,
                           bool isSuper,
                           ArrayRef<Substitution> substitutions,
                           LValueTypeData typeData,
@@ -648,6 +679,15 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
+    void print(raw_ostream &OS) const override {
+      OS << "GetterSetterComponent(" << decl->getName() << ")";
+      if (IsSuper) OS << " isSuper";
+      if (subscriptIndexExpr) {
+        OS << " subscript_index:\n";
+        subscriptIndexExpr->print(OS, 2);
+      }
+      OS << '\n';
+    }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
     /// the same dynamic PathComponent type as the receiver) to see if they can
@@ -667,6 +707,11 @@ namespace {
         return true;
       }
 
+      // If the index value doesn't lower to literally the same SILValue's,
+      // do some fuzzy matching to catch the common case.
+      if (areCertainlyEqualIndices(subscriptIndexExpr, rhs.subscriptIndexExpr))
+        return true;
+
       // Otherwise, it is a subscript, check the index values.
       // If we haven't emitted the lvalue for some reason, just ignore this.
       if (!origSubscripts || !rhs.origSubscripts)
@@ -674,11 +719,6 @@ namespace {
 
       // If the indices are literally identical SILValue's, then they are equal.
       if (origSubscripts.isObviouslyEqual(rhs.origSubscripts))
-        return true;
-
-      // If the index value doesn't lower to literally the same SILValue's,
-      // do some fuzzy matching to catch the common case.
-      if (areCertainlyEqualIndices(subscriptIndexExpr, rhs.subscriptIndexExpr))
         return true;
 
       // Otherwise, we don't know.  TODO: Could strengthen this with SIL-level
@@ -740,6 +780,10 @@ namespace {
                      SILGenFunction &gen) const override {
       return false; // Conservative.  TODO: make more aggressive.
     }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OrigToSubstComponent(...)\n";
+    }
   };
 } // end anonymous namespace.
 
@@ -785,6 +829,10 @@ namespace {
     bool isIdentical(LogicalPathComponent &rhs,
                      SILGenFunction &gen) const override {
       return false; // Conservative.  TODO: make more aggressive.
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OwnershipComponent(...)\n";
     }
   };
 } // end anonymous namespace.

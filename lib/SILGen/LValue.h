@@ -127,6 +127,9 @@ public:
   const LValueTypeData &getTypeData() const { return TypeData; }
 
   KindTy getKind() const { return Kind; }
+
+  void dump() const;
+  virtual void print(raw_ostream &OS) const = 0;
 };
 
 /// An abstract class for "physical" path components, i.e. path

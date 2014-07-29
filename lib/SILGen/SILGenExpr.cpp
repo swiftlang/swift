@@ -5360,6 +5360,10 @@ public:
                    SILGenFunction &gen) const override {
     return false; // Conservative.  TODO: make more aggressive.
   }
+
+  void print(raw_ostream &OS) const override {
+    OS << "AutoreleasingWritebackComponent()\n";
+  }
 };
 } // end anonymous namespace
 
