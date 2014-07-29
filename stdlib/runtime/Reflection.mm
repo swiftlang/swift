@@ -369,6 +369,9 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
   
   result.second = swift_unsafeReflectAny(owner, eltData, elt.Type);
+
+  // 'owner' is passed using normal Swift +1 convention for in arguments.
+  swift_release(owner);
   return result;
 }
   

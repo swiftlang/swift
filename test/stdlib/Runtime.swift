@@ -577,8 +577,7 @@ Reflection.test("TupleMirror/NoLeak") {
     var output = ""
     dump(tuple, &output)
   }
-  // FIXME: this leaks now.
-  //expectEqual(0, nsObjectCanaryCount)
+  expectEqual(0, nsObjectCanaryCount)
 }
 
 Reflection.run()
