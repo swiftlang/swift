@@ -556,12 +556,12 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
-  /// Validate the signature of a generic type.
+  /// Validate the signature of a generic type or extension thereof.
   ///
-  /// \param nominal The generic type.
+  /// \param nominalOrExtension The generic type or extension.
   ///
   /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericTypeSignature(NominalTypeDecl *nominal);
+  bool validateGenericTypeSignature(Decl *nominalOrExtension);
 
   /// Given a type that was produced within the given generic declaration
   /// context, produce the corresponding interface type.

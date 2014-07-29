@@ -524,6 +524,11 @@ ERROR(extension_metatype,sema_tcd,none,
       "cannot extend a metatype of a type", ())
 ERROR(extension_stored_property,sema_tcd,none,
       "extensions may not contain stored properties", ())
+ERROR(extension_generic_extra_requirements,sema_tcd,none,
+      "extension of generic type %0 cannot add requirements", (Type))
+ERROR(extension_generic_wrong_number_of_parameters,sema_tcd,none,
+      "extension of generic type %0 has %select{too few|too many}1 generic "
+      "parameters (have %2, expected %3)", (Type, bool, unsigned, unsigned))
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,

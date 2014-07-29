@@ -5746,22 +5746,95 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // conjure up generic parameters for it.
   auto extendedType = ext->getExtendedType();
   if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
+    // Validate the nominal type declaration being extended.
     auto nominal = unbound->getDecl();
     validateDecl(nominal);
 
-    // FIXME: Create new generic parameters with the same signature.
-    auto genericParams = nominal->getGenericParams();
-    ext->getRefComponents().back().GenericParams = genericParams;
-    ext->setGenericSignature(nominal->getGenericSignature());
+    // If the user omitted generic parameters, deal with them now.
+    // FIXME: This is just to keep the existing code path working in the short
+    // term. It should become an error with Fix-It that suggests the appropriate
+    // generic parameters.
+    auto genericParams = ext->getRefComponents().back().GenericParams;
+    if (!genericParams) {
+      // FIXME: Create new generic parameters with the same signature.
+      auto genericParams = nominal->getGenericParams();
+      ext->getRefComponents().back().GenericParams = genericParams;
+      ext->setGenericSignature(nominal->getGenericSignature());
 
-    // FIXME: We want to use the new generic parameters, not the old ones,
-    // for this reference.
-    ext->setExtendedType(nominal->getDeclaredTypeInContext());
+      // FIXME: We want to use the new generic parameters, not the old ones,
+      // for this reference.
+      ext->setExtendedType(nominal->getDeclaredTypeInContext());
+      return;
+    }
+
+    // Make sure we have the right number of generic parameters.
+    if (genericParams->size() != nominal->getGenericParams()->size()) {
+      unsigned numHave = genericParams->size();
+      unsigned numExpected = nominal->getGenericParams()->size();
+      diagnose(ext->getLoc(),
+               diag::extension_generic_wrong_number_of_parameters,
+               nominal->getDeclaredType(), numHave > numExpected,
+               numHave, numExpected);
+      ext->setInvalid();
+      ext->setExtendedType(ErrorType::get(Context));
+      return;
+    }
+
+    // Validate the generic type signature.
+    if (validateGenericTypeSignature(ext)) {
+      ext->setInvalid();
+      ext->setExtendedType(ErrorType::get(Context));
+      return;
+    }
+
+    // If the generic extension signature is not equivalent to that of the
+    // nominal type, there are extraneous requirements.
+    // Note that we cannot have missing requirements due to requirement
+    // inference.
+    // FIXME: Figure out an extraneous requirement to point to.
+    if (ext->getGenericSignature()->getCanonicalSignature() !=
+          nominal->getGenericSignature()->getCanonicalSignature()) {
+      diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
+               nominal->getDeclaredType())
+        .highlight(genericParams->getSourceRange());
+      ext->setInvalid();
+      ext->setExtendedType(ErrorType::get(Context));
+      return;
+    }
+
+    // Validate the generic parameters for the last time.
+    revertGenericParamList(genericParams);
+
+    ArchetypeBuilder builder = createArchetypeBuilder(ext->getModuleContext());
+    checkGenericParamList(builder, genericParams, *this, ext->getDeclContext());
+
+    // Compute the extended type so that we can infer requirements from it.
+    // FIXME: Copied from validateGenericTypeSignature(). This is silly.
+    SmallVector<Type, 2> genericArgs;
+    for (auto gp : *genericParams) {
+      genericArgs.push_back(gp->getDeclaredType());
+    }
+    extendedType = BoundGenericType::get(nominal, /*FIXME:*/Type(),
+                                         genericArgs);
+    builder.inferRequirements(TypeLoc::withoutLoc(extendedType));
+
+    // ... final step to assign archetypes.
+    finalizeGenericParamList(builder, genericParams, ext, *this);
+
+    // Compute the final extended type.
+    genericArgs.clear();
+    for (auto gp : *genericParams) {
+      genericArgs.push_back(gp->getArchetype());
+    }
+    extendedType = BoundGenericType::get(nominal, /*FIXME:*/Type(),
+                                         genericArgs);
+    ext->setExtendedType(extendedType);
+
+    // ... now complain about this, because it probably doesn't work yet.
+    diagnose(ext, diag::extension_generic_args)
+      .highlight(genericParams->getSourceRange());
     return;
   }
-
-  // FIXME: Once we're parsing and storing generic parameters, we need to
-  // verify that we aren't adding any additional requirements.
 }
 
 ArrayRef<ProtocolDecl *>

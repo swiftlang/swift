@@ -200,14 +200,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
     components.push_back(
       new (TC.Context) SimpleIdentTypeRepr(ref.NameLoc, ref.Name));
-
-    // FIXME: Handle generic parameters rather than throwing them away.
-    if (ref.GenericParams) {
-      TC.diagnose(ref.GenericParams->getLAngleLoc(),
-                  diag::extension_generic_args)
-        .highlight(ref.GenericParams->getSourceRange());
-      ref.GenericParams = nullptr;
-    }
   }
 
   // Validate the representation.
@@ -219,7 +211,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   }
 
-  // Check whether we exteded
+  // Check whether we extended something that is not a nominal type.
   Type extendedTy = typeLoc.getType();
   if (!extendedTy->is<NominalType>() && !extendedTy->is<UnboundGenericType>()) {
     TC.diagnose(ED, diag::non_nominal_extension, false, extendedTy);

@@ -754,11 +754,26 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   return false;
 }
 
-bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
-  assert(nominal->getGenericParams() && "Missing generic parameters?");
+bool TypeChecker::validateGenericTypeSignature(Decl *nominalOrExtension) {
+  ExtensionDecl *ext = dyn_cast<ExtensionDecl>(nominalOrExtension);
+  NominalTypeDecl *type;
+  if (ext)
+    type = ext->getExtendedType()->getAnyNominal();
+  else
+    type = cast<NominalTypeDecl>(nominalOrExtension);
+
+  GenericParamList *genericParams = nullptr;
+  if (ext) {
+    // FIXME: Do the same thing for all levels of generic parameters.
+    genericParams = ext->getRefComponents().back().GenericParams;
+  } else {
+    genericParams = type->getGenericParams();
+  }
+
+  assert(genericParams && "Missing generic parameters?");
 
   // Create the archetype builder.
-  Module *module = nominal->getModuleContext();
+  Module *module = nominalOrExtension->getModuleContext();
   ArchetypeBuilder builder = createArchetypeBuilder(module);
 
   // Type check the generic parameters, treating all generic type
@@ -769,31 +784,54 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   DeclContext *dc;
   // Ignore the decl context of protocol declarations. Protocols aren't valid
   // in nested generic contexts.
-  if (isa<ProtocolDecl>(nominal))
+  if (isa<ProtocolDecl>(nominalOrExtension))
     dc = nullptr;
   else
-    dc = nominal->getDeclContext();
+    dc = nominalOrExtension->getDeclContext();
   
-  if (checkGenericParameters(*this, &builder, nominal->getGenericParams(),
-                             dc, dependentResolver)) {
+  if (checkGenericParameters(*this, &builder, genericParams, dc,
+                             dependentResolver)) {
     invalid = true;
   }
+
+  // Compute the extended type with generic parameters as its generic arguments.
+  TypeLoc extendedType;
+  if (ext) {
+    SmallVector<Type, 2> genericArgs;
+    for (auto gp : *genericParams) {
+      genericArgs.push_back(gp->getDeclaredInterfaceType());
+    }
+
+    extendedType.setType(BoundGenericType::get(type, /*FIXME:*/Type(),
+                                               genericArgs));
+  }
+
+  // Infer requirements from the extended type. This allows an extension to
+  // avoid repeating the requirements placed on the generic parameters in the
+  // original type definition.
+  if (!extendedType.isNull())
+    builder.inferRequirements(extendedType);
 
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
   // and type-check it again, completely.
-  revertGenericParamList(nominal->getGenericParams());
+  revertGenericParamList(genericParams);
   CompleteGenericTypeResolver completeResolver(*this, builder);
-  if (checkGenericParameters(*this, nullptr, nominal->getGenericParams(),
-                             dc, completeResolver)) {
+  if (checkGenericParameters(*this, nullptr, genericParams, dc,
+                             completeResolver)) {
     invalid = true;
   }
+
+  // Infer requirements from the extended type. This allows an extension to
+  // avoid repeating the requirements placed on the generic parameters in the
+  // original type definition.
+  if (!extendedType.isNull())
+    builder.inferRequirements(extendedType);
 
   // The generic function signature is complete and well-formed. Gather
   // the generic parameter types at this level.
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(nominal->getGenericParams(), nullptr,
-                           allGenericParams);
+  collectGenericParamTypes(genericParams, nullptr, allGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   // FIXME: This ends up copying all of the requirements from outer scopes,
@@ -803,7 +841,10 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
 
   // Record the generic type parameter types and the requirements.
   auto sig = GenericSignature::get(allGenericParams, requirements);
-  nominal->setGenericSignature(sig);
+  if (ext)
+    ext->setGenericSignature(sig);
+  else
+    type->setGenericSignature(sig);
 
   return invalid;
 }
