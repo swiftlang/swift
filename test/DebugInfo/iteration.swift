@@ -1,4 +1,5 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir -g -o %t.ll
+// RUN cat %t.ll | FileCheck %s
 var puzzleInput = "great minds think alike"
 var puzzleOutput = ""
 // CHECK: [ DW_TAG_auto_variable ] [$generator] [line [[@LINE+2]]]
@@ -22,3 +23,11 @@ func count() {
   }
 }
 count()
+
+// End-to-end test:
+// RUN: llc %t.ll -filetype=obj -o - | llvm-dwarfdump - | FileCheck %s --check-prefix DWARF-CHECK
+// DWARF-CHECK:  DW_TAG_variable
+// DWARF-CHECK:  DW_AT_name {{.*}} "letter"
+//
+// DWARF-CHECK:  DW_TAG_variable
+// DWARF-CHECK:  DW_AT_name {{.*}} "i"
