@@ -58,6 +58,9 @@ func test_array_construct<T>() {
   var c = [UnsafeMutablePointer<Int>]()  // UnsafeMutablePointer<Int> is a specialized name.
   var d = [UnsafeMutablePointer<Int?>]()  // Nesting.
   var e = [([UnsafeMutablePointer<Int>])]()
+  var f = [(String, Float)]()
+
+  
 }
 
 // <rdar://problem/15295763> default constructing an optional fails to typecheck

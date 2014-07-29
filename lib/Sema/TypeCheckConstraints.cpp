@@ -59,20 +59,15 @@ TypeBase *TypeVariableType::getBaseBeingSubstituted() {
   auto impl = this->getImpl();
   auto archetype = impl.getArchetype();
   
-  if (archetype) {
+  if (archetype)
     return archetype;
-  } else {
-    if (auto locator = impl.getLocator()) {
-      if (auto anchor = locator->getAnchor()) {
-        if (auto anchorType = anchor->getType()) {
-          if (!(anchorType->getAs<TypeVariableType>())) {
-            return anchorType.getPointer();
-          }
-        }
-      }
-    }
-  }
-  
+
+  if (auto locator = impl.getLocator())
+    if (auto anchor = locator->getAnchor())
+      if (auto anchorType = anchor->getType())
+        if (!anchorType->getAs<TypeVariableType>())
+          return anchorType.getPointer();
+
   return this;
 }
 
@@ -594,7 +589,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
     assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
 
     if (MRE->getName() == TC.Context.Id_Protocol) {
@@ -625,7 +620,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
     assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
     
     // The optional evaluation is passed through.
@@ -651,8 +646,33 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
      new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(InnerTypeRepr),
                                     PE->getSourceRange(), SourceLoc());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-
   }
+  
+  // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
+  if (auto *TE = dyn_cast<TupleExpr>(E)) {
+    if (TE->hasTrailingClosure() ||
+        // FIXME: Handle tuple element names too.
+        TE->hasElementNames() ||
+        // FIXME: Decide what to do about ().  It could be a type or an expr.
+        TE->getNumElements() == 0)
+      return nullptr;
+
+    SmallVector<TypeRepr *, 4> Elts;
+    for (auto Elt : TE->getElements()) {
+      auto *eltTE = dyn_cast<TypeExpr>(Elt);
+      if (!eltTE) return nullptr;
+      assert(eltTE->getTypeRepr() && !eltTE->isImplicit() &&
+             "This doesn't work on implicit TypeExpr's, the "
+             "TypeExpr should have been built correctly in the first place");
+
+      Elts.push_back(eltTE->getTypeRepr());
+    }
+    auto *NewTypeRepr =
+      new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(Elts),
+                                     TE->getSourceRange(), SourceLoc());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+  
 
   // Fold [T] into an array type.
   if (auto *AE = dyn_cast<ArrayExpr>(E)) {
@@ -677,18 +697,37 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (DE->getElements().size() != 1)
       return nullptr;
 
-    auto EltTuple = cast<TupleExpr>(DE->getElements()[0]);
-    TypeExpr *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
-    if (!KeyTyExpr)
-      return nullptr;
+    TypeRepr *keyTypeRepr, *valueTypeRepr;
+    
+    if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElements()[0])) {
+      TypeExpr *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
+      if (!KeyTyExpr)
+        return nullptr;
 
-    TypeExpr *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
-    if (!ValueTyExpr)
-      return nullptr;
+      TypeExpr *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
+      if (!ValueTyExpr)
+        return nullptr;
+     
+      keyTypeRepr = KeyTyExpr->getTypeRepr();
+      valueTypeRepr = ValueTyExpr->getTypeRepr();
+    } else {
+      auto *TE = dyn_cast<TypeExpr>(DE->getElements()[0]);
+      if (!TE) return nullptr;
+      
+      auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
+      if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
+      while (TRE->isParenType()) {
+        TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElements()[0]);
+        if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
+      }
+
+      assert(TRE->getElements().size() == 2);
+      keyTypeRepr = TRE->getElements()[0];
+      valueTypeRepr = TRE->getElements()[1];
+    }
 
     auto *NewTypeRepr =
-      new (TC.Context) DictionaryTypeRepr(KeyTyExpr->getTypeRepr(), 
-                                          ValueTyExpr->getTypeRepr(),
+      new (TC.Context) DictionaryTypeRepr(keyTypeRepr, valueTypeRepr,
                                           /*FIXME:colonLoc=*/SourceLoc(),
                                           SourceRange(DE->getLBracketLoc(),
                                                       DE->getRBracketLoc()));
