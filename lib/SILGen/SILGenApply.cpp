@@ -739,7 +739,7 @@ class SILGenApply : public Lowering::ExprVisitor<SILGenApply>
 public:
   SILGenFunction &gen;
   Optional<Callee> callee;
-  RValue selfParam;
+  RValueSource selfParam;
   Expr *SelfApplyExpr = nullptr;
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
@@ -761,7 +761,7 @@ public:
     sideEffect = sideEffectExpr;
   }
   
-  void setSelfParam(RValue &&theSelfParam, Expr *theSelfApplyExpr) {
+  void setSelfParam(RValueSource &&theSelfParam, Expr *theSelfApplyExpr) {
     assert(!selfParam && "already set this!");
     selfParam = std::move(theSelfParam);
     SelfApplyExpr = theSelfApplyExpr;
@@ -970,14 +970,15 @@ public:
                         selfValue);
         }
 
-        setSelfParam(std::move(self), thisCallSite);
+        auto pointer = self.peekScalarValue();
+        setSelfParam({thisCallSite->getArg(), std::move(self)}, thisCallSite);
         SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             gen.SGM.requiresObjCDispatch(afd));
         
-        setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
-                                         constant, getSubstFnType(), e));
+        setCallee(Callee::forClassMethod(gen, pointer, constant,
+                                         getSubstFnType(), e));
         
         // setSelfParam bumps the callDepth, but we aren't really past the
         // 'self' call depth in this case.
@@ -1106,8 +1107,9 @@ public:
     }
 
     if (!baseTy->isExistentialType()) {
-      setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
-                          baseVal), e);
+      setSelfParam({ e->getBase(),
+                     RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
+                            baseVal)}, e);
       
     } else if (fd->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets
@@ -1126,14 +1128,16 @@ public:
         proj = ManagedValue::forUnmanaged(val);
       }
 
-      setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
+      setSelfParam({ e->getBase(), RValue(gen, e, protoSelfTy.getSwiftType(),
+                                          proj)}, e);
     } else {
       assert(baseVal.getType().is<ExistentialMetatypeType>() &&
              "non-existential-metatype for existential static method?!");
       // FIXME: It is impossible to invoke a class method on a protocol
       // directly, it must be done through an archetype.
-      setSelfParam(RValue(gen, e, baseVal.getType().getSwiftRValueType(),
-                          baseVal), e);
+      setSelfParam({e->getBase(), RValue(gen, e,
+                                         baseVal.getType().getSwiftRValueType(),
+                                         baseVal) }, e);
     }
 
     // Method calls through ObjC protocols require ObjC dispatch.
@@ -1141,8 +1145,8 @@ public:
     
     ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
 
-    if (!baseTy->getRValueInstanceType()->isExistentialType()) {
-      setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
+    if (!baseTy->isExistentialType()) {
+      setCallee(Callee::forArchetype(gen, baseVal.getValue(),
                                      SILDeclRef(fd, kind).asForeign(isObjC),
                                      getSubstFnType(), e));
 
@@ -1209,7 +1213,7 @@ public:
       llvm_unreachable("invalid super callee");
 
     CanType superFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(RValue(gen, apply, superFormalType, super), apply);
+    setSelfParam({arg, RValue(gen, apply, superFormalType, super)}, apply);
     
     SILValue superMethod;
     if (constant.isForeign) {
@@ -1260,7 +1264,7 @@ public:
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(RValue(gen, expr, selfFormalType, self), expr);
+    setSelfParam({arg, RValue(gen, expr, selfFormalType, self)}, expr);
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
@@ -1370,8 +1374,8 @@ public:
       return false;
 
     // We found it. Emit the base.
-    ManagedValue existential =
-      gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
+    auto *baseExpr = dynamicMemberRef->getBase();
+    ManagedValue existential = gen.emitRValueAsSingleValue(baseExpr);
 
     assert(fd->isObjC() && "Dynamic member references require @objc");
     SILValue val;
@@ -1386,17 +1390,17 @@ public:
       val = gen.B.createUncheckedRefCast(dynamicMemberRef, val,
                              SILType::getUnknownObjectType(gen.getASTContext()));
       ManagedValue proj(val, existential.getCleanup());
-      setSelfParam(RValue(gen, dynamicMemberRef,
-                          proj.getType().getSwiftRValueType(), proj),
+      setSelfParam({baseExpr, RValue(gen, dynamicMemberRef,
+                                     proj.getType().getSwiftRValueType(), proj) },
                    dynamicMemberRef);
     } else {
       assert(existential.getType().is<ExistentialMetatypeType>() &&
              "non-dynamic-lookup-metatype for static method?!");
       val = existential.getValue();
       ManagedValue proj(val, existential.getCleanup());
-      setSelfParam(RValue(gen, dynamicMemberRef,
-                          existential.getType().getSwiftRValueType(),
-                          existential),
+      setSelfParam({ baseExpr, RValue(gen, dynamicMemberRef,
+                                      existential.getType().getSwiftRValueType(),
+                                      existential)},
                    dynamicMemberRef);
     }
 
@@ -2750,8 +2754,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Apply 'self' if provided.
   if (apply.selfParam)
     emission.addCallSite(RegularLocation(e),
-                         RValueSource(apply.SelfApplyExpr,
-                                      std::move(apply.selfParam)),
+                         std::move(apply.selfParam),
                          apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
