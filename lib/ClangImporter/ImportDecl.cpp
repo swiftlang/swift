@@ -4077,12 +4077,12 @@ namespace {
 
       // Create the extension declaration and record it.
       auto loc = Impl.importSourceLoc(decl->getLocStart());
-      auto result
-        = Impl.createDeclWithClangNode<ExtensionDecl>(decl,
-                          loc,
-                          TypeLoc::withoutLoc(objcClass->getDeclaredType()),
-                          None,
-                          dc);
+      ExtensionDecl::RefComponent refComponent{objcClass->getName(),
+                                               SourceLoc(),
+                                               nullptr};
+      auto result = ExtensionDecl::create(Impl.SwiftContext, loc,
+                                          refComponent, { }, dc, decl);
+      result->setExtendedType(objcClass->getDeclaredType());
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       importObjCProtocols(result, decl->getReferencedProtocols());

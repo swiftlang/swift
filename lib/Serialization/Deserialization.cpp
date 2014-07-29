@@ -2524,15 +2524,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto baseTy = TypeLoc::withoutLoc(getType(baseID));
+    auto baseTy = getType(baseID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, { }, DC);
+    auto nominal = baseTy->getAnyNominal();
+    ExtensionDecl::RefComponent component{nominal->getName(), SourceLoc(),
+                                          nominal->getGenericParams()};
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), component, { },
+                                           DC);
+
     declOrOffset = extension;
 
     if (isImplicit)
       extension->setImplicit();
+    extension->setExtendedType(baseTy);
 
     auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
     for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
@@ -2545,14 +2551,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
     extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
-    auto nominal = baseTy.getType()->getAnyNominal();
     nominal->addExtension(extension);
     extension->setValidated(true);
     extension->setCheckedInheritanceClause();
 
     // FIXME: Hack because extensions always get the generic parameters of their
     // nominal types.
-    extension->setGenericParams(nominal->getGenericParams());
     extension->setGenericSignature(nominal->getGenericSignature());
     break;
   }

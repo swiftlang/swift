@@ -43,11 +43,7 @@ struct S1 {
   struct NestedStruct {}
 }
 extension S1 {} // no-error
-extension S1.Type {} // expected-error {{non-nominal type 'S1.Type' cannot be extended}}
-extension S1.Type.Type {} // expected-error {{non-nominal type 'S1.Type.Type' cannot be extended}}
-extension (S1) {} // expected-error {{non-nominal type '(S1)' cannot be extended}}
-extension ((S1)) {} // expected-error {{non-nominal type '((S1))' cannot be extended}}
-extension S1? {} // expected-error {{non-nominal type 'S1?' cannot be extended}}
+extension S1.Type {} // expected-error {{cannot extend a metatype of a type}}
 extension S1.NestedStruct {} // no-error
 
 typealias TA_S1 = S1
@@ -60,53 +56,24 @@ enum U1 {
   struct NestedStruct {}
 }
 extension U1 {} // no-error
-extension U1.Type {} // expected-error {{non-nominal type 'U1.Type' cannot be extended}}
-extension U1.Type.Type {} // expected-error {{non-nominal type 'U1.Type.Type' cannot be extended}}
-extension (U1) {} // expected-error {{non-nominal type '(U1)' cannot be extended}}
-extension U1? {} // expected-error {{non-nominal type 'U1?' cannot be extended}}
 extension U1.NestedStruct {} // no-error
 
 class C1 {
   struct NestedStruct {}
 }
 extension C1 {} // no-error
-extension C1.Type {} // expected-error {{non-nominal type 'C1.Type' cannot be extended}}
-extension C1.Type.Type {} // expected-error {{non-nominal type 'C1.Type.Type' cannot be extended}}
-extension (C1) {} // expected-error {{non-nominal type '(C1)' cannot be extended}}
-extension C1? {} // expected-error {{non-nominal type 'C1?' cannot be extended}}
 extension C1.NestedStruct {} // no-error
 
 protocol P1 {}
 extension P1 {} // expected-error {{protocol 'P1' cannot be extended}}
-extension P1.Type {} // expected-error {{non-nominal type 'P1.Type' cannot be extended}}
-extension P1.Type.Type {} // expected-error {{non-nominal type 'P1.Type.Type' cannot be extended}}
-extension (P1) {} // expected-error {{non-nominal type '(P1)' cannot be extended}}
-extension P1? {} // expected-error {{non-nominal type 'P1?' cannot be extended}}
 
 protocol P2 {}
 
-extension () {} // expected-error {{non-nominal type '()' cannot be extended}}
-extension (x: Int) {} // expected-error {{non-nominal type '(x: Int)' cannot be extended}}
-extension (x: Int, y: Int) {} // expected-error {{non-nominal type '(x: Int, y: Int)' cannot be extended}}
+extension () {} // expected-error {{expected identifier in extension declaration}}
+// expected-error @-1{{braced block of statements is an unused closure}}
 
 typealias TupleAlias = (x: Int, y: Int)
 extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' cannot be extended}}
-
-extension protocol<P1> {} // expected-error {{non-nominal type 'protocol<P1>' cannot be extended}}
-extension protocol<P1, P2> {} // expected-error {{non-nominal type 'protocol<P1, P2>' cannot be extended}}
-// For non-nominal types, we also need to properly recover from errors when continuing with semantic analysis
-extension protocol<P1> { // expected-error {{non-nominal type 'protocol<P1>' cannot be extended}}
-  init() {
-  }
-}
-
-extension [S1] {} // expected-error {{non-nominal type '[S1]' cannot be extended}}
-
-extension [S1]? {} // expected-error {{non-nominal type '[S1]?' cannot be extended}}
-
-extension [S1?] {} // expected-error {{non-nominal type '[S1?]' cannot be extended}}
-
-extension (S1) -> () {} // expected-error {{non-nominal type '(S1) -> ()' cannot be extended}}
 
 // Test property accessors in extended types
 class C {}

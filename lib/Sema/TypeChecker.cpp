@@ -181,26 +181,55 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
 }
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
-  if (ED->getExtendedTypeLoc().wasValidated())
+  if (ED->getExtendedType())
     return;
 
-  // FIXME: Tighten this up to only allow unbound generics at the top level.
-  if (TC.validateType(ED->getExtendedTypeLoc(), ED->getDeclContext(),
-                      TR_AllowUnboundGenerics)) {
+  auto dc = ED->getDeclContext();
+
+  // Synthesize a type representation for the extended type.
+  // FIXME: We want to do this more incrementally to handle generic parameters.
+  SmallVector<ComponentIdentTypeRepr *, 2> components;
+  for (auto &ref : ED->getRefComponents()) {
+    // A reference to ".Type" is an attempt to extend the metatype.
+    if (ref.Name == TC.Context.Id_Type && !components.empty()) {
+      TC.diagnose(ref.NameLoc, diag::extension_metatype);
+      ED->setInvalid();
+      ED->setExtendedType(ErrorType::get(TC.Context));
+      return;
+    }
+
+    components.push_back(
+      new (TC.Context) SimpleIdentTypeRepr(ref.NameLoc, ref.Name));
+
+    // FIXME: Handle generic parameters rather than throwing them away.
+    if (ref.GenericParams) {
+      TC.diagnose(ref.GenericParams->getLAngleLoc(),
+                  diag::extension_generic_args)
+        .highlight(ref.GenericParams->getSourceRange());
+      ref.GenericParams = nullptr;
+    }
+  }
+
+  // Validate the representation.
+  // FIXME: Stop allowing unbound generics.
+  TypeLoc typeLoc(IdentTypeRepr::create(TC.Context, components));
+  if (TC.validateType(typeLoc, dc, TR_AllowUnboundGenerics)) {
     ED->setInvalid();
+    ED->setExtendedType(ErrorType::get(TC.Context));
     return;
   }
 
-  Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
-  if (!ExtendedTy->is<NominalType>() && !ExtendedTy->is<UnboundGenericType>() &&
-      !ExtendedTy->is<ErrorType>()) {
-    TC.diagnose(ED, diag::non_nominal_extension,
-                false, ED->getExtendedType());
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
+  // Check whether we exteded
+  Type extendedTy = typeLoc.getType();
+  if (!extendedTy->is<NominalType>() && !extendedTy->is<UnboundGenericType>()) {
+    TC.diagnose(ED, diag::non_nominal_extension, false, extendedTy);
+    ED->setInvalid();
+    ED->setExtendedType(ErrorType::get(TC.Context));
     return;
   }
 
-  if (auto nominal = ExtendedTy->getAnyNominal())
+  ED->setExtendedType(extendedTy);
+  if (auto nominal = extendedTy->getAnyNominal())
     nominal->addExtension(ED);
 }
 

@@ -1736,55 +1736,86 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///
 /// \verbatim
 ///   extension:
-///    'extension' attribute-list type-identifier inheritance? '{' decl* '}'
+///    'extension' attribute-list extension-target inheritance? '{' decl* '}'
+///
+///   extension-target:
+///     identifier generic-params?
+///     identifier generic-params? '.' extension-target
 /// \endverbatim
 ParserResult<ExtensionDecl>
 Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+  using RefComponent = ExtensionDecl::RefComponent;
+
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
   
   DebuggerContextChange DCC (*this);
 
-  ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
-      diag::expected_type, diag::expected_ident_type_in_extension);
-  if (Ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<ExtensionDecl>();
-  if (Ty.isNull() && Tok.isKeyword()) {
-    // We failed to parse the type, but we could try recovering by parsing a
-    // keyword if the lookahead token looks promising.
-    Identifier ExtensionName;
-    SourceLoc NameLoc;
-    if (parseIdentifierDeclName(*this, ExtensionName, NameLoc, tok::colon,
-                                tok::l_brace,
-                                diag::invalid_diagnostic).isError())
-      return nullptr;
-    Ty = makeParserErrorResult(
-        new (Context) SimpleIdentTypeRepr(NameLoc, ExtensionName));
-  }
-  if (Ty.isNull())
-    return nullptr;
+  ParserStatus status;
+  SmallVector<RefComponent, 2> refComponents;
+  while (true) {
+    // Code completion for extensions.
+    if (Tok.is(tok::code_complete)) {
+      // FIXME: Code completion should pass along a type representation, if it
+      // can.
+      status = makeParserCodeCompletionStatus();
+      if (CodeCompletion)
+        CodeCompletion->completeTypeSimpleBeginning();
+      break;
+    }
 
-  ParserStatus Status;
+    // Parse the name.
+    Identifier name;
+    SourceLoc nameLoc;
+    status |=
+    parseIdentifierDeclName(*this, name, nameLoc, tok::colon,
+                            tok::l_brace, TokenProperty::StartsWithLess,
+                            diag::expected_identifier_in_decl, "extension");
+    if (status.isError())
+      break;
+
+    // Parse the generic parameter list.
+    GenericParamList *genericParams = nullptr;
+    {
+      Scope scope(this, ScopeKind::Generics);
+      genericParams = maybeParseGenericParams();
+    }
+
+    refComponents.push_back(RefComponent{name,nameLoc,genericParams});
+
+    if (consumeIf(tok::period))
+      continue;
+    
+    break;
+  }
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
+    status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
 
-  ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
-                                  Context.AllocateCopy(Inherited),
-                                  CurDeclContext);
-  ED->getAttrs() = Attributes;
+  // If we have no ref-components, don't try to continue parsing.
+  if (refComponents.empty()) {
+    if (Tok.is(tok::l_brace))
+      skipSingle();
+
+    return status;
+  }
+
+  ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
+                                             refComponents,
+                                             Context.AllocateCopy(Inherited),
+                                             CurDeclContext);
+  ext->getAttrs() = Attributes;
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
     LBLoc = Tok.getLoc();
     RBLoc = LBLoc;
-    Status.setIsParseError();
+    status.setIsParseError();
   } else {
     // Parse the body.
-    ContextChange CC(*this, ED);
+    ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
 
     ParserStatus BodyStatus =
@@ -1801,22 +1832,22 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // code completion inside a member decl, and our callers can not do
     // anything about it either.  But propagate the error bit.
     if (BodyStatus.isError())
-      Status.setIsParseError();
+      status.setIsParseError();
   }
 
-  ED->setBraces({LBLoc, RBLoc});
+  ext->setBraces({LBLoc, RBLoc});
   for (auto member : MemberDecls)
-    ED->addMember(member);
+    ext->addMember(member);
 
   if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
-    Status.setIsParseError();
+    status.setIsParseError();
 
     // Tell the type checker not to touch this extension.
-    ED->setInvalid();
+    ext->setInvalid();
   }
 
-  return DCC.fixupParserResult(Status, ED);
+  return DCC.fixupParserResult(status, ext);
 }
 
 ParserStatus Parser::parseLineDirective() {

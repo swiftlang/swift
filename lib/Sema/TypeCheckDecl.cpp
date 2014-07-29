@@ -5708,12 +5708,12 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // FIXME: Create new generic parameters with the same signature.
     auto genericParams = nominal->getGenericParams();
-    ext->setGenericParams(genericParams);
+    ext->getRefComponents().back().GenericParams = genericParams;
     ext->setGenericSignature(nominal->getGenericSignature());
 
     // FIXME: We want to use the new generic parameters, not the old ones,
     // for this reference.
-    ext->getExtendedTypeLoc().setType(nominal->getDeclaredTypeInContext(),true);
+    ext->setExtendedType(nominal->getDeclaredTypeInContext());
     return;
   }
 

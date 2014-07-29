@@ -748,13 +748,58 @@ void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
   Conformances.setLoader(resolver, contextData);
 }
 
-void ExtensionDecl::setGenericParams(GenericParamList *params) {
-  assert(!GenericParams && "Already has generic parameters");
-  GenericParams = params;
-  
-  if (params)
-    for (auto Param : *params)
-      Param->setDeclContext(this);
+ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
+                             ArrayRef<RefComponent> refComponents,
+                             MutableArrayRef<TypeLoc> inherited,
+                             DeclContext *parent)
+  : Decl(DeclKind::Extension, parent),
+    DeclContext(DeclContextKind::ExtensionDecl, parent),
+    IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
+    ExtensionLoc(extensionLoc),
+    Inherited(inherited)
+{
+  ExtensionDeclBits.Validated = false;
+  ExtensionDeclBits.CheckedInheritanceClause = false;
+  ExtensionDeclBits.DefaultAccessLevel = 0;
+  ExtensionDeclBits.NumRefComponents = refComponents.size();
+
+  std::copy(refComponents.begin(), refComponents.end(),
+            getRefComponents().data());
+}
+
+ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
+                                     ArrayRef<RefComponent> refComponents,
+                                     MutableArrayRef<TypeLoc> inherited,
+                                     DeclContext *parent,
+                                     ClangNode clangNode) {
+  // Determine how much storage we require for this declaration.
+  unsigned size = sizeof(ExtensionDecl)
+                + refComponents.size() * sizeof(RefComponent);
+  if (clangNode)
+    size += sizeof(void *);
+
+  // Allocate memory for the declaration, and adjust the point if we have a
+  // Clang node associated with this extension.
+  void *mem = ctx.Allocate(size, alignof(ExtensionDecl));
+  void *declPtr = mem;
+  if (clangNode)
+    declPtr = reinterpret_cast<void **>(mem) + 1;
+
+  // Construct the extension.
+  auto result = ::new (declPtr) ExtensionDecl(extensionLoc, refComponents,
+                                              inherited, parent);
+  if (clangNode)
+    result->setClangNode(clangNode);
+
+  return result;
+}
+
+SourceRange ExtensionDecl::getExtendedTypeRange() const {
+  SourceRange range;
+  range.Start = getRefComponents().front().NameLoc;
+  // FIXME: Consider generic parameters.
+  range.End = getRefComponents().back().NameLoc;
+  return range;
 }
 
 void ExtensionDecl::setGenericSignature(GenericSignature *sig) {

@@ -564,8 +564,11 @@ class alignas(8) Decl {
     unsigned Validated : 1;
 
     unsigned DefaultAccessLevel : 2;
+
+    /// The number of ref-components following the ExtensionDecl.
+    unsigned NumRefComponents : 8;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 4 };
+  enum { NumExtensionDeclBits = NumDeclBits + 12 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1425,13 +1428,24 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl : public Decl, public DeclContext, 
-                      public IterableDeclContext {
+class ExtensionDecl final : public Decl, public DeclContext,
+                            public IterableDeclContext {
+public:
+  /// A single component within the reference to the extended type.
+  struct RefComponent {
+    /// The name of the type being extended.
+    Identifier Name;
+
+    /// The location of the name.
+    SourceLoc NameLoc;
+    
+    /// The generic parameters associated with this name.
+    GenericParamList *GenericParams;
+  };
+
+private:
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
-
-  /// The generic parameters of this extension.
-  GenericParamList *GenericParams = nullptr;
 
   /// \brief The generic signature of this extension.
   ///
@@ -1443,8 +1457,9 @@ class ExtensionDecl : public Decl, public DeclContext,
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
-  /// ExtendedType - The type being extended.
-  TypeLoc ExtendedType;
+  /// The type being extended.
+  Type ExtendedType;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// \brief The set of protocols to which this extension conforms.
@@ -1469,23 +1484,20 @@ class ExtensionDecl : public Decl, public DeclContext,
   friend class MemberLookupTable;
   friend class IterableDeclContext;
 
+  ExtensionDecl(SourceLoc extensionLoc, ArrayRef<RefComponent> refComponents,
+                MutableArrayRef<TypeLoc> inherited,
+                DeclContext *parent);
+
 public:
   using Decl::getASTContext;
-  
-  ExtensionDecl(SourceLoc ExtensionLoc, TypeLoc ExtendedType,
-                MutableArrayRef<TypeLoc> Inherited,
-                DeclContext *Parent)
-    : Decl(DeclKind::Extension, Parent),
-      DeclContext(DeclContextKind::ExtensionDecl, Parent),
-      IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
-      ExtensionLoc(ExtensionLoc),
-      ExtendedType(ExtendedType), Inherited(Inherited)
-  {
-    ExtensionDeclBits.Validated = false;
-    ExtensionDeclBits.CheckedInheritanceClause = false;
-    ExtensionDeclBits.DefaultAccessLevel = 0;
-  }
-  
+
+  /// Create a new extension declaration.
+  static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
+                               ArrayRef<RefComponent> refComponents,
+                               MutableArrayRef<TypeLoc> inherited,
+                               DeclContext *parent,
+                               ClangNode clangNode = ClangNode());
+
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLoc() const { return ExtensionLoc; }
   SourceRange getSourceRange() const {
@@ -1495,11 +1507,21 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  GenericParamList *getGenericParams() const { return GenericParams; }
+  /// Retrieve the reference components in the
+  ArrayRef<RefComponent> getRefComponents() const {
+    return { reinterpret_cast<const RefComponent *>(this + 1),
+             ExtensionDeclBits.NumRefComponents };
+  }
 
-  /// Provide the set of parameters to a generic type, or null if
-  /// this function is not generic.
-  void setGenericParams(GenericParamList *params);
+  MutableArrayRef<RefComponent> getRefComponents() {
+    return { reinterpret_cast<RefComponent *>(this + 1),
+             ExtensionDeclBits.NumRefComponents };
+  }
+
+  /// Retrieve the innermost generic parameter list.
+  GenericParamList *getGenericParams() const {
+    return getRefComponents().back().GenericParams;
+  }
 
   /// Retrieve the generic signature for this extension.
   GenericSignature *getGenericSignature() const { return GenericSig; }
@@ -1507,8 +1529,14 @@ public:
   /// Set the generic signature of this extension.
   void setGenericSignature(GenericSignature *sig);
 
-  Type getExtendedType() const { return ExtendedType.getType(); }
-  TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
+  /// Retrieve the type being extended.
+  Type getExtendedType() const { return ExtendedType; }
+
+  /// Set the type being extended.
+  void setExtendedType(Type extended) { ExtendedType = extended; }
+
+  /// Compute the source range that covers the extended type.
+  SourceRange getExtendedTypeRange() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).

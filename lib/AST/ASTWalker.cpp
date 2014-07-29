@@ -622,9 +622,7 @@ public:
           return true;
 
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      if (ED->getExtendedTypeLoc().getTypeRepr())
-        if (doIt(ED->getExtendedTypeLoc().getTypeRepr()))
-          return true;
+      // FIXME: Walk ref-components?
       for (auto Inherit : ED->getInherited()) {
         if (TypeRepr *T = Inherit.getTypeRepr())
           if (doIt(T))
