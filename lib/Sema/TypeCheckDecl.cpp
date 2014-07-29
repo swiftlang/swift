@@ -4626,7 +4626,7 @@ public:
       }
 
       // If we have an explicit ownership modifier and our parent doesn't,
-      // complain. Otherwise, clone down our parent's attr.
+      // complain.
       auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
       if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
         Ownership parentOwnership;
