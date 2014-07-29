@@ -186,7 +186,10 @@ ElementwiseBridging:
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   source: [SourceElement]
 ) -> [TargetElement]? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
+  _sanityCheck(
+    _isClassOrObjCExistential(SourceElement.self),
+    "Conditional cast from array of value types not prevented at compile-time"
+  )
   if _isBridgedVerbatimToObjectiveC(TargetElement.self) {
     return _arrayDownCastConditional(source)
   }
