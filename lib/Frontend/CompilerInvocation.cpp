@@ -871,6 +871,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_playground))
     Opts.Playground = true;
+
+  if (Args.hasArg(OPT_use_jit))
+    Opts.UseJIT = true;
   
   return false;
 }

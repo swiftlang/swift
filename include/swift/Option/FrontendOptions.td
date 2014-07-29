@@ -156,6 +156,9 @@ def print_stats : Flag<["-"], "print-stats">,
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground transformation">;
 
+def use_jit : Flag<["-"], "use-jit">,
+  HelpText<"Register Objective-C classes as if the JIT were in use">;
+
 def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
