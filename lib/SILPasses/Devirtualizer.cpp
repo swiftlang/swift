@@ -858,22 +858,10 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
                              Ret, AI->isTransparent());
 }
 
-/// Specialize virtual dispatch.
-static bool insertInlineCaches(ApplyInst *AI,
-                                          ClassHierarchyAnalysis *CHA) {
-  ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
-  assert(CMI && "Invalid class method instruction");
-
-  SILValue ClassInstance = CMI->getOperand();
-  SILType InstanceType = ClassInstance.stripCasts().getType();
+static bool insertMonomorphicInlineCaches(ApplyInst *AI, SILType InstanceType,
+                                          SILValue ClassInstance) {
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
-  if (CHA->inheritedInModule(CD)) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-          " Not inserting monomorphic inline caches.\n");
-    return false;
-  }
-  if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
-    return false;
 
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
@@ -883,7 +871,7 @@ static bool insertInlineCaches(ApplyInst *AI,
   SILFunction *F = AI->getFunction();
   SILBasicBlock *Entry = AI->getParent();
 
-  // Iden is the basic block containing the early binding code.
+  // Iden is the basic block containing the direct call.
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
@@ -934,6 +922,29 @@ static bool insertInlineCaches(ApplyInst *AI,
   // Devirtualize the apply instruction on the identical path.
   optimizeClassMethod(IdenAI, CMI, CD);
   return true;
+}
+
+/// Specialize virtual dispatch.
+static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
+  ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
+  assert(CMI && "Invalid class method instruction");
+
+  SILValue ClassInstance = CMI->getOperand();
+  SILType InstanceType = ClassInstance.stripCasts().getType();
+  ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+  // Check if it is legal to insert inline caches.
+  if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
+    return false;
+
+  if (!CHA->inheritedInModule(CD)) {
+    DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
+          CD->getName() << "\n");
+    return insertMonomorphicInlineCaches(AI, InstanceType, ClassInstance);
+  }
+
+  DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
+        " Not inserting monomorphic inline caches.\n");
+  return false;
 }
 
 namespace {
