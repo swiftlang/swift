@@ -292,7 +292,7 @@ if Process.arguments.count == 1 {
     println("isSwiftTrap: \(status.isSwiftTrap)")
 // CHECK: stdout: [child started
 // CHECK: stderr: [fatal error: this should crash: file
-// CHECK: CRASHED: SIGILL
+// CHECK: CRASHED: {{SIGILL|SIGTRAP}}
 // CHECK: ]
 // CHECK: status: Exit(0)
 // CHECK: isSwiftTrap: false
