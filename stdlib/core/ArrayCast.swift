@@ -21,7 +21,7 @@
 /// Implements the semantics of `x as [Derived]` where `x` has type
 /// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
-public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
+internal func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
 
@@ -40,7 +40,7 @@ public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
 /// Convert a to its corresponding bridged array type.
 /// Precondition: T is bridged non-verbatim to objective C
 /// O(N), because each element must be bridged separately.
-public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
+internal func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   source: Array<BridgesToDerived>
 ) -> Array<Base> {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
@@ -62,7 +62,7 @@ public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
 /// Precondition: Base is a class type.
 /// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
 /// O(n), because each element must be bridged separately.
-public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
+internal func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
   source: Array<Base>
 ) -> Array<BridgesToDerived> {
   let result: Array<BridgesToDerived>?
@@ -105,7 +105,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 /// Returns an Array<Derived> containing the same elements as a in
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
-public func _arrayDownCastConditional<Base, Derived>(
+internal func _arrayDownCastConditional<Base, Derived>(
   a: Array<Base>
 ) -> [Derived]? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
@@ -144,7 +144,7 @@ public func _arrayDownCastConditional<Base, Derived>(
 /// Precondition: Base is a class type.
 /// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
 /// O(n), because each element must be bridged separately.
-public func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
+internal func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
        source: Array<Base>
      ) -> Array<BridgesToDerived>? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))

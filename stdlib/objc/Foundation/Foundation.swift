@@ -610,7 +610,7 @@ extension Array : _ObjectiveCBridgeable {
       return Array(_fromNSArray: source)
     }
 
-    return _arrayBridgeFromObjectiveC([AnyObject](_fromNSArray: source))
+    return _arrayForceCast([AnyObject](_fromNSArray: source))
   }
 
   public static func _conditionallyBridgeFromObjectiveC(

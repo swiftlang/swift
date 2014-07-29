@@ -19,13 +19,8 @@
 #  define FUNC_DECL(Name, Id)
 #endif
 
-FUNC_DECL(ArrayUpCast, "_arrayUpCast")
-FUNC_DECL(ArrayBridgeToObjectiveC, "_arrayBridgeToObjectiveC")
-FUNC_DECL(ArrayDownCast, "_arrayDownCast")
-FUNC_DECL(ArrayDownCastConditional, "_arrayDownCastConditional")
-FUNC_DECL(ArrayBridgeFromObjectiveC, "_arrayBridgeFromObjectiveC")
-FUNC_DECL(ArrayBridgeFromObjectiveCConditional, 
-          "_arrayBridgeFromObjectiveCConditional")
+FUNC_DECL(ArrayForceCast, "_arrayForceCast")
+FUNC_DECL(ArrayConditionalCast, "_arrayConditionalCast")
 
 FUNC_DECL(DictionaryUpCast, "_dictionaryUpCast")
 FUNC_DECL(DictionaryBridgeToObjectiveC, "_dictionaryBridgeToObjectiveC")

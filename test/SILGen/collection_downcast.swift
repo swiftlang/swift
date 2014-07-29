@@ -37,7 +37,7 @@ func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 // CHECK-LABEL: sil @_TF19collection_downcast17testArrayDowncast
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
 func testArrayDowncast(array: [AnyObject]) -> [BridgedObjC] {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs14_arrayDownCastU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs15_arrayForceCastU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   return array as [BridgedObjC]
 }
@@ -64,7 +64,7 @@ func testArrayDowncastFromNSArray(obj: NSArray) -> [BridgedObjC] {
 // CHECK-LABEL: sil @_TF19collection_downcast28testArrayDowncastConditional
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
 func testArrayDowncastConditional(array: [AnyObject]) -> [BridgedObjC]? {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs25_arrayDownCastConditionalU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs21_arrayConditionalCastU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   // CHECK-NEXT:  apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   return array as? [BridgedObjC]
 }
@@ -72,7 +72,7 @@ func testArrayDowncastConditional(array: [AnyObject]) -> [BridgedObjC]? {
 // CHECK-LABEL: sil @_TF19collection_downcast12testArrayIsa
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>)
 func testArrayIsa(array: [AnyObject]) -> Bool {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs25_arrayDownCastConditionalU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs21_arrayConditionalCastU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   return array is [BridgedObjC] ? true : false
 }
@@ -80,7 +80,7 @@ func testArrayIsa(array: [AnyObject]) -> Bool {
 // CHECK-LABEL: sil @_TF19collection_downcast24testArrayDowncastBridged
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
 func testArrayDowncastBridged(array: [AnyObject]) -> [BridgedSwift] {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs26_arrayBridgeFromObjectiveCU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs15_arrayForceCastU___FGSaQ__GSaQ0__ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
   return array as [BridgedSwift]
 }
@@ -88,7 +88,7 @@ func testArrayDowncastBridged(array: [AnyObject]) -> [BridgedSwift] {
 // CHECK-LABEL: sil @_TF19collection_downcast35testArrayDowncastBridgedConditional
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
 func testArrayDowncastBridgedConditional(array: [AnyObject]) -> [BridgedSwift]?{
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs37_arrayBridgeFromObjectiveCConditionalU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs21_arrayConditionalCastU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   return array as? [BridgedSwift]
 }
@@ -96,7 +96,7 @@ func testArrayDowncastBridgedConditional(array: [AnyObject]) -> [BridgedSwift]?{
 // CHECK-LABEL: sil @_TF19collection_downcast19testArrayIsaBridged
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>)
 func testArrayIsaBridged(array: [AnyObject]) -> Bool {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs37_arrayBridgeFromObjectiveCConditionalU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs21_arrayConditionalCastU___FGSaQ__GSqGSaQ0___ : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@thin <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
   return array is [BridgedSwift] ? true : false
 }

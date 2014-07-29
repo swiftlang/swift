@@ -991,8 +991,7 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = E->bridgesToObjC() ? ctx.getArrayBridgeToObjectiveC(nullptr)
-                            : ctx.getArrayUpCast(nullptr);
+    fn = ctx.getArrayForceCast(nullptr);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
     fn = E->bridgesToObjC() ? ctx.getDictionaryBridgeToObjectiveC(nullptr)
                             : ctx.getDictionaryUpCast(nullptr);
@@ -1040,11 +1039,8 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = bridgesFromObjC
-           ? (conditional ? ctx.getArrayBridgeFromObjectiveCConditional(nullptr)
-                          : ctx.getArrayBridgeFromObjectiveC(nullptr))
-           : (conditional ? ctx.getArrayDownCastConditional(nullptr)
-                          : ctx.getArrayDownCast(nullptr));
+    fn = conditional ? ctx.getArrayConditionalCast(nullptr)
+                          : ctx.getArrayForceCast(nullptr);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
     fn = bridgesFromObjC
            ? (conditional 
