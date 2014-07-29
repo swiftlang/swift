@@ -859,7 +859,7 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
 }
 
 /// Specialize virtual dispatch.
-static bool specializeClassMethodDispatch(ApplyInst *AI,
+static bool insertInlineCaches(ApplyInst *AI,
                                           ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
   assert(CMI && "Invalid class method instruction");
@@ -960,7 +960,7 @@ namespace {
 
       // Create the inline caches.
       for (auto AI : ToSpecialize)
-        Changed |= specializeClassMethodDispatch(AI, CHA);
+        Changed |= insertInlineCaches(AI, CHA);
 
       if (Changed) {
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
