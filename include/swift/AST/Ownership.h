@@ -22,6 +22,8 @@
 namespace swift {
 
 /// Different kinds of reference ownership supported by Swift.
+// This enum is used in diagnostics. If you add a case here, the diagnostics
+// must be updated as well.
 enum class Ownership {
   /// \brief a strong reference (the default semantics)
   Strong,

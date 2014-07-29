@@ -961,3 +961,61 @@ class rdar16941124Derived : rdar16941124Base {
       }
    }
 }
+
+
+// Overrides of properties with custom ownership.
+class OwnershipBase {
+  class var defaultObject: AnyObject { return self }
+
+  var strongVar: AnyObject? // expected-note{{overridden declaration is here}}
+  weak var weakVar: AnyObject?
+
+  // FIXME: These should be optional to properly test overriding.
+  unowned var unownedVar: AnyObject = defaultObject
+  unowned(unsafe) var unownedUnsafeVar: AnyObject = defaultObject // expected-note{{overridden declaration is here}}
+}
+
+class OwnershipExplicitSub : OwnershipBase {
+  override var strongVar: AnyObject? {
+    didSet {}
+  }
+  override weak var weakVar: AnyObject? {
+    didSet {}
+  }
+  override unowned var unownedVar: AnyObject {
+    didSet {}
+  }
+  override unowned(unsafe) var unownedUnsafeVar: AnyObject {
+    didSet {}
+  }
+}
+
+class OwnershipImplicitSub : OwnershipBase {
+  override var strongVar: AnyObject? {
+    didSet {}
+  }
+  override weak var weakVar: AnyObject? {
+    didSet {}
+  }
+  override unowned var unownedVar: AnyObject {
+    didSet {}
+  }
+  override unowned(unsafe) var unownedUnsafeVar: AnyObject {
+    didSet {}
+  }
+}
+
+class OwnershipBadSub : OwnershipBase {
+  override weak var strongVar: AnyObject? { // expected-error {{cannot override strong property with weak property}}
+    didSet {}
+  }
+  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' cannot be applied to non-class type 'AnyObject?'}}
+    didSet {}
+  }
+  override weak var unownedVar: AnyObject { // expected-error {{'weak' variable should have optional type 'AnyObject?'}}
+    didSet {}
+  }
+  override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override unowned(unsafe) property with unowned property}}
+    didSet {}
+  }
+}

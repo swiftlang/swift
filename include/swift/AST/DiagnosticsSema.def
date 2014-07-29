@@ -760,6 +760,10 @@ ERROR(override_argument_name_mismatch,sema_tcd,none,
       "argument names for %select{method|initializer}0 %1 do not match those "
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
+ERROR(override_ownership_mismatch,sema_tcd,none,
+      "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
+      "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
+      (/*Ownership*/unsigned, /*Ownership*/unsigned))
 
 ERROR(override_mutable_covariant_property,sema_tcd,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
@@ -1361,11 +1365,12 @@ ERROR(dot_protocol_on_non_existential,sema_tct,none,
 
 // Ownership
 ERROR(invalid_ownership_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' cannot be applied to "
-      "non-class type %1", (unsigned, Type))
+      "'%select{strong|weak|unowned|unowned}0' cannot be applied to "
+      "non-class type %1", (/*Ownership*/unsigned, Type))
 ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' cannot be applied to "
-      "non-class type %1; consider adding a class bound", (unsigned, Type))
+      "'%select{strong|weak|unowned|unowned}0' cannot be applied to "
+      "non-class type %1; consider adding a class bound",
+      (/*Ownership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,attribute_parsing,none,

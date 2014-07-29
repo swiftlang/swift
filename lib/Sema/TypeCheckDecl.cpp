@@ -4445,10 +4445,11 @@ public:
 
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
-    auto uncurriedDeclTy = declTy;
     if (method) {
       declTy = declTy->getWithoutNoReturn(2);
-      uncurriedDeclTy = declTy->castTo<AnyFunctionType>()->getResult();
+      declTy = declTy->castTo<AnyFunctionType>()->getResult();
+    } else {
+      declTy = declTy->getReferenceStorageReferent();
     }
 
     // If the method is an Objective-C method, compute its selector.
@@ -4522,15 +4523,15 @@ public:
       // FIXME: It's wrong to use the uncurried types here for methods.
       auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy)
                             ->getUnlabeledType(TC.Context);
-      auto uncurriedParentDeclTy = parentDeclTy;
       if (method) {
         parentDeclTy = parentDeclTy->getWithoutNoReturn(2);
-        uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
-                                  ->getResult();
+        parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
+      } else {
+        parentDeclTy = parentDeclTy->getReferenceStorageReferent();
       }
 
-      if (uncurriedDeclTy->isEqual(uncurriedParentDeclTy)) {
-        matches.push_back({parentDecl, true, uncurriedParentDeclTy});
+      if (declTy->isEqual(parentDeclTy)) {
+        matches.push_back({parentDecl, true, parentDeclTy});
         hadExactMatch = true;
         continue;
       }
@@ -4539,15 +4540,14 @@ public:
       // the types don't line up, since you can't overload properties based on
       // types.
       if (isa<VarDecl>(parentDecl)) {
-        matches.push_back({parentDecl, false, uncurriedParentDeclTy});
+        matches.push_back({parentDecl, false, parentDeclTy});
         continue;
       }
 
       // Failing that, check for subtyping.
-      if (uncurriedDeclTy->canOverride(uncurriedParentDeclTy,
-                                       parentDecl->isObjC(), &TC)) {
+      if (declTy->canOverride(parentDeclTy, parentDecl->isObjC(), &TC)) {
         // If the Objective-C selectors match, always call it exact.
-        matches.push_back({parentDecl, objCMatch, uncurriedParentDeclTy});
+        matches.push_back({parentDecl, objCMatch, parentDeclTy});
         hadExactMatch |= objCMatch;
         continue;
       }
@@ -4556,13 +4556,13 @@ public:
       if (objCMatch) {
         if (method) {
           TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                      *methodSelector, uncurriedDeclTy);
+                      *methodSelector, declTy);
         } else {
           TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
-                      static_cast<unsigned>(subscriptKind), uncurriedDeclTy);
+                      static_cast<unsigned>(subscriptKind), declTy);
         }
         TC.diagnose(parentDecl, diag::overridden_here_with_type,
-                    uncurriedParentDeclTy);
+                    parentDeclTy);
         return true;
       }
     }
@@ -4606,6 +4606,23 @@ public:
                                     matchDecl->getFullName());
       }
 
+      // If we have an explicit ownership modifier and our parent doesn't,
+      // complain. Otherwise, clone down our parent's attr.
+      auto parentAttr = matchDecl->getAttrs().getAttribute<OwnershipAttr>();
+      if (auto ownershipAttr = decl->getAttrs().getAttribute<OwnershipAttr>()) {
+        Ownership parentOwnership;
+        if (parentAttr)
+          parentOwnership = parentAttr->get();
+        else
+          parentOwnership = Ownership::Strong;
+        if (parentOwnership != ownershipAttr->get()) {
+          TC.diagnose(decl, diag::override_ownership_mismatch,
+                      (unsigned)parentOwnership,
+                      (unsigned)ownershipAttr->get());
+          TC.diagnose(matchDecl, diag::overridden_here);
+        }
+      }
+
       // Check accessibility.
       // FIXME: Copied from TypeCheckProtocol.cpp.
       Accessibility requiredAccess =
@@ -4641,7 +4658,7 @@ public:
       }
 
       // If this is an exact type match, we're successful!
-      if (uncurriedDeclTy->isEqual(matchType)) {
+      if (declTy->isEqual(matchType)) {
         // Nothing to do.
         
       } else if (auto subscript =
@@ -4651,7 +4668,7 @@ public:
         auto parentSubscript = cast<SubscriptDecl>(matchDecl);
         if (parentSubscript->getSetter()) {
           TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
-                      uncurriedDeclTy, matchType);
+                      declTy, matchType);
           TC.diagnose(matchDecl, diag::subscript_override_here);
           return true;
         }

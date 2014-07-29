@@ -839,6 +839,12 @@ public:
   OwnershipAttr(Ownership kind) : OwnershipAttr(SourceRange(), kind) {}
 
   Ownership get() const { return ownership; }
+
+  /// Returns a copy of this attribute without any source information.
+  OwnershipAttr *clone(ASTContext &context) const {
+    return new (context) OwnershipAttr(get());
+  }
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Ownership;
   }
