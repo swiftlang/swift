@@ -118,12 +118,6 @@ class LSBBForwarder {
   /// The basic block that we are optimizing.
   SILBasicBlock *BB;
 
-  /// The alias analysis that we are using for alias queries.
-  AliasAnalysis *AA;
-
-  /// The post dominance analysis that we use for dead store elimination.
-  PostDominanceInfo *PDI;
-
   /// The current list of store instructions that stored to memory locations
   /// that were not read/written to since the store was executed.
   llvm::SmallPtrSet<StoreInst *, 8> Stores;
@@ -135,21 +129,14 @@ class LSBBForwarder {
   // of the loop below.
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
-  /// During the last run of the forwarder, did we make any changes.
-  bool Changed;
-
 public:
   LSBBForwarder() = default;
 
-  void init(SILBasicBlock *NewBB, AliasAnalysis *NewAA,
-            PostDominanceInfo *NewPDI) {
+  void init(SILBasicBlock *NewBB) {
     BB = NewBB;
-    AA = NewAA;
-    PDI = NewPDI;
-    Changed = false;
   }
 
-  bool optimize();
+  bool optimize(AliasAnalysis *AA, PostDominanceInfo *PDI);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -161,7 +148,6 @@ public:
   void clear() {
     Stores.clear();
     Loads.clear();
-    Changed = false;
   }
 
   /// Add this load to our tracking list.
@@ -198,7 +184,7 @@ public:
   }
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
-  void invalidateAliasingLoads(SILInstruction *Inst) {
+  void invalidateAliasingLoads(SILInstruction *Inst, AliasAnalysis *AA) {
     llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
     for (auto *LI : Loads)
       if (AA->mayWriteToMemory(Inst, LI->getOperand()))
@@ -210,7 +196,7 @@ public:
     }
   }
 
-  void invalidateWriteToStores(SILInstruction *Inst) {
+  void invalidateWriteToStores(SILInstruction *Inst, AliasAnalysis *AA) {
     llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
     for (auto *SI : Stores)
       if (AA->mayWriteToMemory(Inst, SI->getDest()))
@@ -222,7 +208,7 @@ public:
     }
   }
 
-  void invalidateReadFromStores(SILInstruction *Inst) {
+  void invalidateReadFromStores(SILInstruction *Inst, AliasAnalysis *AA) {
     llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
     for (auto *SI : Stores)
       if (AA->mayReadFromMemory(Inst, SI->getDest()))
@@ -237,11 +223,12 @@ public:
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
-  void tryToEliminateDeadStores(StoreInst *SI);
+  bool tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
+                                PostDominanceInfo *PDI);
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
-  void tryToForwardLoad(LoadInst *LI);
+  bool tryToForwardLoad(LoadInst *LI);
 
 private:
 
@@ -251,7 +238,8 @@ private:
 
 } // end anonymous namespace
 
-void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
+bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
+                                             PostDominanceInfo *PDI) {
   // If we are storing a value that is available in the load list then we
   // know that no one clobbered that address and the current store is
   // redundant and we can remove it.
@@ -259,21 +247,21 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
     // Check that the loaded value is live and that the destination address
     // is the same as the loaded address.
     if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {
-      Changed = true;
       deleteInstruction(SI);
       NumDeadStores++;
-      return;
+      return true;
     }
   }
 
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
-  invalidateAliasingLoads(SI);
+  invalidateAliasingLoads(SI, AA);
 
   // If we are storing to a previously stored address that this store post
   // dominates, delete the old store.
   llvm::SmallVector<StoreInst *, 4> StoresToDelete;
   llvm::SmallVector<StoreInst *, 4> StoresToStopTracking;
+  bool Changed = false;
   for (auto *PrevStore : Stores) {
     if (SI->getDest() != PrevStore->getDest())
       continue;
@@ -306,6 +294,7 @@ void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
 
   // Insert SI into our store list.
   startTrackingStore(SI);
+  return Changed;
 }
 
 /// Given an unchecked_addr_cast with various address projections using it,
@@ -392,7 +381,7 @@ static SILValue tryToForwardAddressValueToLoad(SILValue Address,
                                                LI->getOperand());
 }
 
-void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
+bool LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
   // If we are loading a value that we just stored, forward the stored value.
   for (auto *PrevStore : Stores) {
     SILValue Result = tryToForwardAddressValueToLoad(PrevStore->getDest(),
@@ -404,9 +393,8 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     DEBUG(llvm::dbgs() << "        Forwarding store from: " << *PrevStore);
     SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
-    Changed = true;
     NumForwardedLoads++;
-    return;
+    return true;
   }
 
   // Search the previous loads and replace the current load with one of the
@@ -421,18 +409,19 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
                        << *Result);
     SILValue(LI, 0).replaceAllUsesWith(Result);
     deleteInstruction(LI);
-    Changed = true;
     NumDupLoads++;
-    return;
+    return true;
   }
 
   startTrackingLoad(LI);
+  return false;
 }
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-bool LSBBForwarder::optimize() {
+bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI) {
   auto II = BB->begin(), E = BB->end();
+  bool Changed = false;
   while (II != E) {
     SILInstruction *Inst = II++;
 
@@ -440,14 +429,14 @@ bool LSBBForwarder::optimize() {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      tryToEliminateDeadStores(SI);
+      Changed |= tryToEliminateDeadStores(SI, AA, PDI);
       continue;
     }
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      tryToForwardLoad(LI);
+      Changed |= tryToForwardLoad(LI);
       continue;
     }
 
@@ -469,7 +458,7 @@ bool LSBBForwarder::optimize() {
     // All other instructions that read from the memory location of the store
     // invalidates the store.
     if (Inst->mayReadFromMemory()) {
-      invalidateReadFromStores(Inst);
+      invalidateReadFromStores(Inst, AA);
     }
 
     // If we have an instruction that may write to memory and we can not prove
@@ -478,10 +467,10 @@ bool LSBBForwarder::optimize() {
     if (Inst->mayWriteToMemory()) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
-      invalidateAliasingLoads(Inst);
+      invalidateAliasingLoads(Inst, AA);
 
       // Invalidate our store if Inst writes to the destination location.
-      invalidateWriteToStores(Inst);
+      invalidateWriteToStores(Inst, AA);
     }
   }
 
@@ -627,7 +616,7 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
     for (SILBasicBlock *BB : ReversePostOrder) {
       unsigned count = BBToBBIDMap.size();
       BBToBBIDMap[BB] = count;
-      BBIDToForwarderMap[count].init(BB, AA, PDI);
+      BBIDToForwarderMap[count].init(BB);
     }
 
     bool Changed = false;
@@ -650,7 +639,7 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
         Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
 
         // Remove dead stores, merge duplicate loads, and forward stores to loads.
-        ChangedDuringIteration = Forwarder.optimize();
+        ChangedDuringIteration = Forwarder.optimize(AA, PDI);
         Changed |= ChangedDuringIteration;
       }
     } while (ChangedDuringIteration);
