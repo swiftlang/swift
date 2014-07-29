@@ -69,7 +69,6 @@ public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
     = _arrayBridgeFromObjectiveCConditional(source);
   _precondition(result != nil, "array cannot be bridged from Objective-C")
   return result!
-  /*return Array(_fromCocoaArray: source._buffer._asCocoaArray())*/
 }
 
 /// Implements `source as [TargetElement]`.
