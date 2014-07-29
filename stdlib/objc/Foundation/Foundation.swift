@@ -571,6 +571,18 @@ public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 }
 
 extension Array : _ObjectiveCBridgeable {
+  /// Construct from the given `NSArray`.  If `noCopy` is `true`,
+  /// either `source` must be known to be immutable, or the resulting
+  /// `Array` must not survive across code that could mutate `source`.
+  init(_fromNSArray source: NSArray, noCopy: Bool = false) {
+    // _CocoaArrayType has selectors compatible with those of NSArray;
+    // we use it to decouple the core stdlib from Foundation.
+    // Bit-cast our NSArray to _CocoaArrayType so it can be adopted by
+    // an _ArrayBuffer.
+    let cocoa = unsafeBitCast(source, _CocoaArrayType.self)
+    self = Array(_ArrayBuffer(noCopy ? cocoa : cocoa.copyWithZone(nil)))
+  }
+  
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)
   }
@@ -595,19 +607,17 @@ extension Array : _ObjectiveCBridgeable {
     
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
-      return Array(_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
+      return Array(_fromNSArray: source)
     }
 
-    var anyObjectArr: [AnyObject]
-    = [AnyObject](_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
-    return _arrayBridgeFromObjectiveC(anyObjectArr)
+    return _arrayBridgeFromObjectiveC([AnyObject](_fromNSArray: source))
   }
 
   public static func _conditionallyBridgeFromObjectiveC(source: NSArray)
       -> Array? {
     // Construct the result array by conditionally bridging each element.
-    var anyObjectArr 
-    = [AnyObject](_ArrayBuffer(unsafeBitCast(source, _CocoaArrayType.self)))
+    var anyObjectArr = [AnyObject](_fromNSArray: source)
+
     if _isBridgedVerbatimToObjectiveC(T.self) {
       return _arrayDownCastConditional(anyObjectArr)
     }

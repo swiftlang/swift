@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+import Foundation
+
 println("testing...")
 // CHECK: testing
 
@@ -113,6 +115,15 @@ func testArrayOfVoid() {
   println()
 }
 testArrayOfVoid()
+
+func testMutableArray() {
+  var m = NSMutableArray(array: ["fu", "bar", "buzz"])
+  let a = m as NSArray as [NSString]
+  println(a) // CHECK-NEXT: [fu, bar, buzz]
+  m.addObject("goop")
+  println(a) // CHECK-NEXT: [fu, bar, buzz]
+}
+testMutableArray()
 
 println("done!") // CHECK-NEXT: {{^done!$}}
 
