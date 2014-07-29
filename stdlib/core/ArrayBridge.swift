@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+//===--- Forced casts: [T] as [U] -----------------------------------------===//
+
 /// Implements the semantics of `x as [Derived]` where `x` has type
 /// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
@@ -38,6 +40,67 @@ public func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
   _precondition(result != nil, "array cannot be downcast to array of derived")
   return result!
 }
+
+/// Convert a to its corresponding bridged array type.
+/// Precondition: T is bridged non-verbatim to objective C
+/// O(N), because each element must be bridged separately.
+public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
+  source: Array<BridgesToDerived>
+) -> Array<Base> {
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
+  var buf = _ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
+  var p = buf._unsafeElementStorage
+  for value in source {
+    let bridged: AnyObject? = _bridgeToObjectiveC(value)
+    _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
+    p++.initialize(unsafeBitCast(bridged!, Base.self))
+  }
+  return Array(_ArrayBuffer(buf))
+}
+
+/// Try to convert the source array of objects to an array of values
+/// produced by bridging the objects from Objective-C to \c
+/// BridgesToDerived.
+///
+/// Precondition: Base is a class type.
+/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
+/// O(n), because each element must be bridged separately.
+public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
+  source: Array<Base>
+) -> Array<BridgesToDerived> {
+  let result: Array<BridgesToDerived>?
+    = _arrayBridgeFromObjectiveCConditional(source);
+  _precondition(result != nil, "array cannot be bridged from Objective-C")
+  return result!
+}
+
+/// Implements `source as [TargetElement]`.
+///
+/// Requires: At least one of `SourceElement` and `TargetElement` is a
+/// class type or ObjC existential.  May trap for other "valid" inputs
+/// when `TargetElement` is not bridged verbatim, if an element can't
+/// be converted.
+public func _arrayForceCast<SourceElement, TargetElement>(
+  source: Array<SourceElement>
+) -> Array<TargetElement> {
+  if _isClassOrObjCExistential(SourceElement.self) {
+    if _isBridgedVerbatimToObjectiveC(TargetElement.self) {
+      return _arrayDownCast(source)
+    }
+    else {
+      return _arrayBridgeFromObjectiveC(source)
+    }
+  }
+  else if _isClassOrObjCExistential(TargetElement.self) {
+    return _arrayBridgeToObjectiveC(source)
+  }
+  _fatalError(
+    "Force-casting between Arrays of value types not prevented at compile-time"
+  )
+}
+
+//===--- Conditional casts: [T] as? [U] -----------------------------------===//
 
 /// Implements the semantics of `x as? [Derived]` where `x` has type
 /// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
@@ -78,40 +141,6 @@ public func _arrayDownCastConditional<Base, Derived>(
   return []
 }
 
-/// Convert a to its corresponding bridged array type.
-/// Precondition: T is bridged non-verbatim to objective C
-/// O(N), because each element must be bridged separately.
-public func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
-  source: Array<BridgesToDerived>
-) -> Array<Base> {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
-  var buf = _ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
-  var p = buf._unsafeElementStorage
-  for value in source {
-    let bridged: AnyObject? = _bridgeToObjectiveC(value)
-    _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
-    p++.initialize(unsafeBitCast(bridged!, Base.self))
-  }
-  return Array(_ArrayBuffer(buf))
-}
-
-/// Try to convert the source array of objects to an array of values
-/// produced by bridging the objects from Objective-C to \c
-/// BridgesToDerived.
-///
-/// Precondition: Base is a class type.
-/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
-/// O(n), because each element must be bridged separately.
-public func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
-  source: Array<Base>
-) -> Array<BridgesToDerived> {
-  let result: Array<BridgesToDerived>?
-    = _arrayBridgeFromObjectiveCConditional(source);
-  _precondition(result != nil, "array cannot be bridged from Objective-C")
-  return result!
-}
-
 /// Try to convert the source array of objects to an array of values
 /// produced by bridging the objects from Objective-C to \c
 /// BridgesToDerived.
@@ -147,4 +176,21 @@ ElementwiseBridging:
   
   // Report failure
   return nil
+}
+
+/// Implements `source as? [TargetElement]`: convert each element of
+/// `source` to a `TargetElement` and return the resulting array, or
+/// return `nil` if any element fails to convert.
+///
+/// Requires: `SourceElement` is a class or ObjC existential type
+public func _arrayConditionalCast<SourceElement, TargetElement>(
+  source: [SourceElement]
+) -> [TargetElement]? {
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
+  if _isBridgedVerbatimToObjectiveC(TargetElement.self) {
+    return _arrayDownCastConditional(source)
+  }
+  else {
+    return _arrayBridgeFromObjectiveCConditional(source)
+  }
 }

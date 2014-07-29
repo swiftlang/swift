@@ -613,16 +613,13 @@ extension Array : _ObjectiveCBridgeable {
     return _arrayBridgeFromObjectiveC([AnyObject](_fromNSArray: source))
   }
 
-  public static func _conditionallyBridgeFromObjectiveC(source: NSArray)
-      -> Array? {
+  public static func _conditionallyBridgeFromObjectiveC(
+    source: NSArray
+  ) -> Array? {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr = [AnyObject](_fromNSArray: source)
-
-    if _isBridgedVerbatimToObjectiveC(T.self) {
-      return _arrayDownCastConditional(anyObjectArr)
-    }
-
-    return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
+    
+    return _arrayConditionalCast(anyObjectArr)
   }
 }
 
