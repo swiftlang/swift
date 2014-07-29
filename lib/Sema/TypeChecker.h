@@ -280,7 +280,6 @@ private:
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
-  Type NSStringType;
   Type StringType;
   Type Int8Type;
   Type UInt8Type;
@@ -325,7 +324,6 @@ public:
   Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
-  Type getNSStringType(DeclContext *dc);
   Type getStringType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);

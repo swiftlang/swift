@@ -69,27 +69,6 @@ Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type element
   return ImplicitlyUnwrappedOptionalType::get(elementType);
 }
 
-Type TypeChecker::getNSStringType(DeclContext *dc) {
-  
-  if (NSStringType.isNull()) {
-    Module *M = Context.LoadedModules.lookup(FOUNDATION_MODULE_NAME);
-    
-    if (M) {
-      auto NSStringName = StringRef("NSString");
-      auto identifier = Context.getIdentifier(NSStringName);
-      
-      LookupTypeResult lookup =
-                          lookupMemberType(ModuleType::get(M), identifier, dc);
-      
-      if (lookup) {
-        NSStringType = lookup.back().second;
-      }
-    }
-  }
-  
-  return NSStringType;
-}
-
 static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                           StringRef name) {
   if (cached.isNull()) {
