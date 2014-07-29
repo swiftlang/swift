@@ -456,8 +456,8 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     
     if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(Cleanups, CleanupLocation(S->getIncrement().get()));
-      // Don't bother loading the result of the increment expression.
-      emitRValue(S->getIncrement().get(), SGFContext::AllowPlusZero);
+      // Ignore the result of the increment expression.
+      emitIgnoredExpr(S->getIncrement().get());
     }
     
     if (B.hasValidInsertionPoint()) {

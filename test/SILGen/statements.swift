@@ -144,6 +144,9 @@ func for_loops(var x: Int, c: Bool) {
   for var i = 0; i < 100; ++i {
   }
   
+  for var i = 0; i < 100; i {
+  }
+  
   return 
 }
 // CHECK-LABEL: sil  @{{.*}}for_loops
