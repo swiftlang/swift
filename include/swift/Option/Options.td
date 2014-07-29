@@ -219,12 +219,13 @@ def Xlinker : Separate<["-"], "Xlinker">,
 
 def O_Group : OptionGroup<"<optimization level options>">;
 
-def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>;
-def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
+def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
+  HelpText<"Compile without any optimization">;
+def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
+  HelpText<"Compile with optimizations">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
   Flags<[FrontendOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
-def Ofast : Flag<["-"], "Ofast">, Group<O_Group>, Alias<Ounchecked>;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
