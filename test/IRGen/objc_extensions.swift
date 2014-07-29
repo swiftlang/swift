@@ -132,4 +132,12 @@ extension SwiftOnly {
   @objc func wibble() { }
 }
 
+class Wotsit: Hoozit {}
 
+extension Hoozit {
+  @objc func overriddenByExtensionInSubclass() {}
+}
+
+extension Wotsit {
+  @objc override func overriddenByExtensionInSubclass() {}
+}

@@ -388,8 +388,8 @@ bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
 bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
                                 AbstractFunctionDecl *theMethod) {
   auto theClass = dyn_cast<ClassDecl>(theMethod->getDeclContext());
+  // Extension methods don't get vtable entries.
   if (!theClass) {
-    assert(theMethod->hasClangNode() && "overriding a non-imported method");
     return false;
   }
   return hasKnownSwiftImplementation(IGM, theClass);
