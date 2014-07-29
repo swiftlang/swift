@@ -561,3 +561,27 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
 RuntimeFoundationWrappers.run()
 // CHECK: {{^}}RuntimeFoundationWrappers: All tests passed
 
+var Reflection = TestCase("Reflection")
+
+Reflection.test("dumpToAStream") {
+  var output = ""
+  dump([ 42, 4242 ], &output)
+  expectEqual("▿ 2 elements\n  - [0]: 42\n  - [1]: 4242\n", output)
+}
+
+Reflection.test("TupleMirror/NoLeak") {
+  nsObjectCanaryCount = 0
+  if true {
+    var tuple = (1, NSObjectCanary())
+    expectEqual(1, nsObjectCanaryCount)
+    var output = ""
+    dump(tuple, &output)
+  }
+  // FIXME: this leaks now.
+  //expectEqual(0, nsObjectCanaryCount)
+}
+
+Reflection.run()
+// CHECK: {{^}}Reflection: All tests passed
+
+

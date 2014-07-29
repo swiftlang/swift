@@ -204,14 +204,15 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>,
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStreamType>(
-    x: T, name: String? = nil, indent: Int = 0,
-    maxDepth: Int = .max, maxItems: Int = .max,
-    inout targetStream: TargetStream
+    x: T, inout targetStream: TargetStream,
+    name: String? = nil, indent: Int = 0,
+    maxDepth: Int = .max, maxItems: Int = .max
 ) -> T {
   var maxItemCounter = maxItems
   var visitedItems = [ObjectIdentifier : Int]()
-  _dumpWithMirror(reflect(x), name, indent, maxDepth,
-                  &maxItemCounter, &visitedItems, &targetStream)
+  _dumpWithMirror(
+    reflect(x), name, indent, maxDepth, &maxItemCounter, &visitedItems,
+    &targetStream)
   return x
 }
 
@@ -219,8 +220,9 @@ public func dump<T, TargetStream : OutputStreamType>(
 public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
              maxDepth: Int = .max, maxItems: Int = .max) -> T {
   var stdoutStream = _Stdout()
-  return dump(x, name: name, indent: indent, maxDepth: maxDepth,
-              maxItems: maxItems, &stdoutStream)
+  return dump(
+    x, &stdoutStream, name: name, indent: indent, maxDepth: maxDepth,
+    maxItems: maxItems)
 }
 
 /// Dump an object's contents using a mirror. User code should use dump().
@@ -233,7 +235,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
   if maxItemCounter <= 0 { return }
   --maxItemCounter
 
-  for _ in 0..<indent { print(" ") }
+  for _ in 0..<indent { print(" ", &targetStream) }
 
   let count = mirror.count
   let bullet = count == 0    ? "-"
@@ -243,7 +245,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
   if let nam = name {
     print("\(nam): ", &targetStream)
   }
-  print(mirror.summary)
+  print(mirror.summary, &targetStream)
 
   if let id = mirror.objectIdentifier {
     if let previous = visitedItems[id] {
@@ -261,7 +263,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
 
   for i in 0..<count {
     if maxItemCounter <= 0 {
-      for _ in 0..<(indent+4) { print(" ") }
+      for _ in 0..<(indent+4) { print(" ", &targetStream) }
       let remainder = count - i
       print("(\(remainder)", &targetStream)
       if i > 0 { print(" more", &targetStream) }
