@@ -70,6 +70,22 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
     : loc(loc), component(std::move(comp)), base(base), temp(temp) {
   }
 
+  void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
+    // If the two writebacks we're comparing are of different kinds (e.g.
+    // ownership conversion vs a computed property) then they aren't the
+    // same and thus cannot conflict.
+    if (component->getKind() != rhs.component->getKind())
+      return;
+
+    // If the lvalues don't have the same base value, then they aren't the same.
+    // Note that this is the primary source of false negative for this
+    // diagnostic.
+    if (base.getValue() != rhs.base.getValue())
+      return;
+
+    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,SGF);
+  }
+
   void performWriteback(SILGenFunction &gen) {
     ManagedValue mv = temp.claim(gen, loc);
     auto formalTy = component->getSubstFormalType();
@@ -188,38 +204,6 @@ SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
     return gen.emitMaterialize(loc, value).address;
   }
 
-  // Check to see if we have already emitted a materialize for this lvalue in
-  // the current writeback stack.  Uniquing these is good for performance, but
-  // is also important for correctness: if we have two writebacks to the same
-  // location, one writeback will clobber the other one.
-  std::vector<LValueWriteback> &writebackStack = gen.getWritebackStack();
-
-  for (unsigned i = gen.ActiveWritebackScopeBase, e = writebackStack.size();
-       i != e; ++i) {
-    auto &existing = writebackStack[i];
-
-    // If the two writebacks we're comparing are of different kinds (e.g.
-    // ownership conversion vs a computed property) then they aren't the
-    // same and thus cannot conflict.
-    if (getKind() != existing.component->getKind())
-      continue;
-
-    // If the lvalues don't have the same base value, then they aren't the same.
-    // Note that this is the primary source of false negative for this match,
-    // and could be made more aggressive by doing some semantic-level uniquing
-    // of SIL values.
-    if (base.getValue() != existing.base.getValue())
-      continue;
-
-    // If the underlying structure of the lvalue component differs, then this
-    // isn't the same.
-    if (!isIdentical(*existing.component, gen))
-      continue;
-
-    // Otherwise, it is the same, reuse the existing address.
-    return existing.temp.address;
-  }
-
   // Otherwise, we need to emit a get and set.  The get operation will consume
   // the base's +1, so copy the base for the setter.
   ManagedValue getterBase = base;
@@ -251,8 +235,7 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
 
 WritebackScope::WritebackScope(SILGenFunction &g)
   : gen(&g), wasInWritebackScope(g.InWritebackScope),
-    savedDepth(g.getWritebackStack().size()),
-    savedWritebackScopeBase(g.ActiveWritebackScopeBase)
+    savedDepth(g.getWritebackStack().size())
 {
   // If we're in an inout conversion scope, disable nested writeback scopes.
   if (g.InInOutConversionScope) {
@@ -260,24 +243,29 @@ WritebackScope::WritebackScope(SILGenFunction &g)
     return;
   }
   g.InWritebackScope = true;
-  g.ActiveWritebackScopeBase = g.getWritebackStack().size();
 }
 
 WritebackScope::~WritebackScope() {
   if (!gen)
     return;
 
-  // Pop the InWritebackScope bit & restore ActiveWritebackScopeBase.
+  // Pop the InWritebackScope bit.
   gen->InWritebackScope = wasInWritebackScope;
-  gen->ActiveWritebackScopeBase = savedWritebackScopeBase;
 
   // Check to see if there is anything going on here.
   auto i = gen->getWritebackStack().end(),
        deepest = gen->getWritebackStack().begin() + savedDepth;
-  if (i == deepest)
-    return;
+  if (i == deepest) return;
 
   while (i-- > deepest) {
+    // Attempt to diagnose problems where obvious aliasing introduces illegal
+    // code.  We do a simple N^2 comparison here to detect this because it is
+    // extremely unlikely more than a few writebacks are active at once.
+    if (i != deepest) {
+      for (auto j = i-1; j >= deepest; --j)
+        i->diagnoseConflict(*j, *gen);
+    }
+
     // Claim the address of each and then perform the writeback from the
     // temporary allocation to the source we copied from.
     i->performWriteback(*gen);
@@ -289,7 +277,7 @@ WritebackScope::~WritebackScope() {
 WritebackScope::WritebackScope(WritebackScope &&o)
   : gen(o.gen),
     wasInWritebackScope(o.wasInWritebackScope),
-    savedDepth(o.savedDepth), savedWritebackScopeBase(o.savedWritebackScopeBase)
+    savedDepth(o.savedDepth)
 {
   o.gen = nullptr;
 }
@@ -298,7 +286,6 @@ WritebackScope &WritebackScope::operator=(WritebackScope &&o) {
   gen = o.gen;
   wasInWritebackScope = o.wasInWritebackScope;
   savedDepth = o.savedDepth;
-  savedWritebackScopeBase = o.savedWritebackScopeBase;
   o.gen = nullptr;
   return *this;
 }
@@ -690,42 +677,61 @@ namespace {
     }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-    /// the same dynamic PathComponent type as the receiver) to see if they can
-    /// be proven to be identical.  It is always conservatively safe to return
-    /// false.
-    bool isIdentical(LogicalPathComponent &RHS,
-                     SILGenFunction &gen) const override {
-      auto &rhs = (GetterSetterComponent&)RHS;
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      auto &rhs = (GetterSetterComponent&)*RHS;
 
-      // If the decls mismatch, or if one is a superclass reference and the
-      // other isn't, then they aren't the same.
-      if (decl != rhs.decl || IsSuper != rhs.IsSuper) return false;
+      // If the decls match, then this could conflict.
+      if (decl != rhs.decl || IsSuper != rhs.IsSuper) return;
 
-      // If this is a simple property access, then we they really are the same.
+      // If this is a simple property access, then we must have a conflict.
       if (!subscriptIndexExpr) {
         assert(isa<VarDecl>(decl));
-        return true;
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_property,decl->getName())
+           .highlight(loc1.getSourceRange());
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+           .highlight(loc2.getSourceRange());
+        return;
       }
 
       // Otherwise, it is a subscript, check the index values.
       // If we haven't emitted the lvalue for some reason, just ignore this.
-      if (!origSubscripts || !rhs.origSubscripts)
-        return false;
+      if (!origSubscripts || !rhs.origSubscripts) return;
+      
+      // If the indices are literally identical SILValue's, then there is
+      // clearly a conflict.
+      if (!origSubscripts.isObviouslyEqual(rhs.origSubscripts)) {
+        // If the index value doesn't lower to literally the same SILValue's,
+        // do some fuzzy matching to catch the common case.
+        if (!areCertainlyEqualIndices(subscriptIndexExpr,
+                                      rhs.subscriptIndexExpr))
+          return;
+      }
 
-      // If the index value doesn't lower to literally the same SILValue's,
-      // do some fuzzy matching to catch the common case.
-      if (areCertainlyEqualIndices(subscriptIndexExpr, rhs.subscriptIndexExpr))
-        return true;
+      // The locations for the subscripts are almost certainly SubscriptExprs.
+      // If so, dig into them to produce better location info in the
+      // diagnostics and be able to do more precise analysis.
+      auto expr1 = loc1.getAsASTNode<SubscriptExpr>();
+      auto expr2 = loc2.getAsASTNode<SubscriptExpr>();
 
-      // If the indices are literally identical SILValue's, then they are equal.
-      if (origSubscripts.isObviouslyEqual(rhs.origSubscripts))
-        return true;
+      if (expr1 && expr2) {
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
+           .highlight(expr1->getBase()->getSourceRange());
 
-      // Otherwise, we don't know.  TODO: Could strengthen this with SIL-level
-      // equality checks.
-      return false;
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+           .highlight(expr2->getBase()->getSourceRange());
+
+      } else {
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_subscript)
+           .highlight(loc1.getSourceRange());
+        gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
+           .highlight(loc2.getSourceRange());
+      }
     }
-
   };
 } // end anonymous namespace.
 
@@ -773,12 +779,14 @@ namespace {
     }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-    /// the same dynamic PathComponent type as the receiver) to see if they can
-    /// be proven to be identical.  It is always conservatively safe to return
-    /// false.
-    bool isIdentical(LogicalPathComponent &rhs,
-                     SILGenFunction &gen) const override {
-      return false; // Conservative.  TODO: make more aggressive.
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      //      auto &rhs = (GetterSetterComponent&)*RHS;
+
     }
 
     void print(raw_ostream &OS) const override {
@@ -794,6 +802,7 @@ namespace {
     OwnershipComponent(LValueTypeData typeData)
       : LogicalPathComponent(typeData, OwnershipKind) {
     }
+
 
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
                      ManagedValue base, SGFContext c) const override {
@@ -823,12 +832,14 @@ namespace {
     }
 
     /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-    /// the same dynamic PathComponent type as the receiver) to see if they can
-    /// be proven to be identical.  It is always conservatively safe to return
-    /// false.
-    bool isIdentical(LogicalPathComponent &rhs,
-                     SILGenFunction &gen) const override {
-      return false; // Conservative.  TODO: make more aggressive.
+    /// the same dynamic PathComponent type as the receiver) to see if they are
+    /// identical.  If so, there is a conflicting writeback happening, so emit a
+    /// diagnostic.
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      //      auto &rhs = (GetterSetterComponent&)*RHS;
+
     }
 
     void print(raw_ostream &OS) const override {

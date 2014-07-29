@@ -185,10 +185,12 @@ public:
                            ManagedValue base, SGFContext c) const = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-  /// the same dynamic PathComponent type as the receiver) to see if they can be
-  /// proven to be identical.  It is always conservatively safe to return false.
-  virtual bool isIdentical(LogicalPathComponent &rhs,
-                           SILGenFunction &gen) const = 0;
+  /// the same dynamic PathComponent type as the receiver) to see if they are
+  /// identical.  If so, there is a conflicting writeback happening, so emit a
+  /// diagnostic.
+  virtual void diagnoseWritebackConflict(LogicalPathComponent *rhs,
+                                         SILLocation loc1, SILLocation loc2,
+                                         SILGenFunction &gen) = 0;
 
 
   /// Get the property, materialize a temporary lvalue for it, and if
@@ -284,7 +286,7 @@ public:
 class WritebackScope {
   SILGenFunction *gen;
   bool wasInWritebackScope;
-  size_t savedDepth, savedWritebackScopeBase;
+  size_t savedDepth;
 public:
   WritebackScope(SILGenFunction &gen);
   ~WritebackScope();

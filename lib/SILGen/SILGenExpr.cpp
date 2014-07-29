@@ -5354,11 +5354,13 @@ public:
   }
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
-  /// the same dynamic PathComponent type as the receiver) to see if they can be
-  /// proven to be identical.  It is always conservatively safe to return false.
-  bool isIdentical(LogicalPathComponent &rhs,
-                   SILGenFunction &gen) const override {
-    return false; // Conservative.  TODO: make more aggressive.
+  /// the same dynamic PathComponent type as the receiver) to see if they are
+  /// identical.  If so, there is a conflicting writeback happening, so emit a
+  /// diagnostic.
+  void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                 SILLocation loc1, SILLocation loc2,
+                                 SILGenFunction &gen) override {
+    //      auto &rhs = (GetterSetterComponent&)*RHS;
   }
 
   void print(raw_ostream &OS) const override {

@@ -208,13 +208,11 @@ public:
       return false;
 
     return std::equal(values.begin(), values.end(), rhs.values.begin(),
-        [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
-          return lhs.getValue() == rhs.getValue() &&
-                 lhs.getCleanup() == rhs.getCleanup();
-        });
-
+                  [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
+                    return lhs.getValue() == rhs.getValue() &&
+                    lhs.getCleanup() == rhs.getCleanup();
+                  });
   }
-
 };
 
 /// A means of generating an r-value.

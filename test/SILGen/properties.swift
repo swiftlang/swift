@@ -841,20 +841,3 @@ func genericPropsInGenericContext<U>(x: GenericClass<U>) {
   let _ = x.z
 }
 
-// CHECK-LABEL: sil @_TF10properties17inoutWriteBackCSEFT_T_
-func inoutWriteBackCSE() {
-  var property : (Int, Int) {
-  get { return (1,2) }
-  set {}
-  }
-
-  swap(&property.0, &property.1)
-  // CHECK: [[SWAP:%.*]] = function_ref @_TFSs4swapU__FTRQ_RQ__T_
-
-  // CHECK: [[TMP:%.*]] = alloc_stack $(Int, Int)
-  // CHECK: store {{.*}} to %3#1 : $*(Int, Int)
-  // CHECK: [[V0:%.*]] = tuple_element_addr [[TMP]]#1 : $*(Int, Int), 0
-  // CHECK: [[V1:%.*]] = tuple_element_addr [[TMP]]#1 : $*(Int, Int), 1
-  // CHECK: apply [[SWAP]]<Int>([[V0]], [[V1]]) : $@thin <τ_0_0> (@inout τ_0_0, @inout τ_0_0) -> ()
-}
-
