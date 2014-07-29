@@ -2702,7 +2702,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   } Bindings(*this);
 
   bool HasAccessors = false;  // Syntactically has accessor {}'s.
-  bool HasStorage = false;    // True if any parsed variables have storage.
   ParserStatus Status;
 
   do {
@@ -2827,7 +2826,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->setParentPattern(PBD);
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
-      HasStorage |= VD->hasStorage();
     });
     
     // Propagate back types for simple patterns, like "var A, B : T".
