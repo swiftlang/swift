@@ -4,7 +4,17 @@ protocol P1 { typealias AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
-struct X<T : P1, U : P2, V> { }
+struct X<T : P1, U : P2, V> { 
+  struct Inner<A, B : P3> { }
+
+  struct NonGenericInner { } // expected-note{{extended type 'X<T, U, V>.NonGenericInner' declared here}}
+}
+
+struct Y { // expected-note{{extended type 'Y' declared here}}
+  struct Inner<A, B : P3> { }
+
+  struct NonGenericInner { } 
+}
 
 // Okay: exact match.
 extension X<T : P1, U : P2, V> { } // expected-error{{generic arguments are not allowed on an extension}}
@@ -39,3 +49,16 @@ func f1<A, B, C>(x: X<A, B, C>, a: A, assoc: A.AssocType) {
   var (b, c): (B, C) = x.foo(a)
   x.bar(assoc)
 }
+
+// Good: Extensions of nested generics.
+extension X<T, U, V>.Inner<A, B> { } // FIXME: expected-error{{extension of generic type 'X<T, U, V>.Inner' cannot add requirements}}
+
+// Bad: Extensions of nested generics with wrong number of arguments.
+extension X<T, U, V>.Inner<A> { } // expected-error{{extension of generic type 'X<T, U, V>.Inner' has too few generic parameters (have 1, expected 2)}}
+extension X<T, U, V>.Inner<A, B, C> { } // expected-error{{extension of generic type 'X<T, U, V>.Inner' has too many generic parameters (have 3, expected 2)}}
+
+// Bad: Extensions with generic parameter lists in the wrong places.
+extension X<T, U, V>.NonGenericInner<A> { } // expected-error{{'X<T, U, V>.NonGenericInner' does not have any generic parameters}}
+extension Y<T>.Inner<A, B> { } // expected-error{{'Y' does not have any generic parameters}}
+// expected-error @-1{{generic arguments are not allowed on an extension}}
+

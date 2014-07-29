@@ -187,7 +187,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   auto dc = ED->getDeclContext();
 
   // Synthesize a type representation for the extended type.
-  // FIXME: We want to do this more incrementally to handle generic parameters.
   SmallVector<ComponentIdentTypeRepr *, 2> components;
   for (auto &ref : ED->getRefComponents()) {
     // A reference to ".Type" is an attempt to extend the metatype.
@@ -203,12 +202,83 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 
   // Validate the representation.
-  // FIXME: Stop allowing unbound generics.
   TypeLoc typeLoc(IdentTypeRepr::create(TC.Context, components));
   if (TC.validateType(typeLoc, dc, TR_AllowUnboundGenerics)) {
     ED->setInvalid();
     ED->setExtendedType(ErrorType::get(TC.Context));
     return;
+  }
+
+  // Check the generic parameter lists for each of the components.
+  for (unsigned i = 0, n = components.size(); i != n; ++i) {
+    // Find the type declaration to which the identifier type actually referred.
+    auto ident = components[i];
+    NominalTypeDecl *typeDecl = nullptr;
+    if (auto type = ident->getBoundType()) {
+      if (auto unbound = dyn_cast<UnboundGenericType>(type.getPointer()))
+        typeDecl = unbound->getDecl();
+      else if (auto nominal = dyn_cast<NominalType>(type.getPointer()))
+        typeDecl = nominal->getDecl();
+    } else if (auto decl = ident->getBoundDecl()) {
+      typeDecl = dyn_cast<NominalTypeDecl>(decl);
+    }
+
+    // FIXME: There are more restrictions on what we can refer to, e.g.,
+    // we can't look through a typealias to a bound generic type of any form.
+
+    // We aren't referring to a type declaration, so make sure we don't have
+    // generic arguments.
+    auto &ref = ED->getRefComponents()[i];
+    if (!typeDecl) {
+      // FIXME: This diagnostic is awful. It should point at what we did find,
+      // e.g., a type, module, etc.
+      if (ref.GenericParams) {
+        TC.diagnose(ref.NameLoc, diag::extension_generic_params_for_non_generic,
+                    ref.Name);
+        ref.GenericParams = nullptr;
+      }
+
+      continue;
+    }
+
+    // The extended type is generic but the extension does not have generic
+    // parameters.
+    // FIXME: This will eventually become a Fix-It.
+    if (typeDecl->getGenericParams() && !ref.GenericParams) {
+      continue;
+    }
+
+    // The extended type is non-generic but the extension has generic
+    // parameters. Complain and drop them.
+    if (!typeDecl->getGenericParams() && ref.GenericParams) {
+      TC.diagnose(ref.NameLoc,
+                  diag::extension_generic_params_for_non_generic_type,
+                  typeDecl->getDeclaredType())
+        .highlight(ref.GenericParams->getSourceRange());
+      TC.diagnose(typeDecl, diag::extended_type_here,
+                  typeDecl->getDeclaredType());
+      ref.GenericParams = nullptr;
+      continue;
+    }
+
+    // If neither has generic parameters, we're done.
+    if (!ref.GenericParams)
+      continue;
+
+    // Both have generic parameters: check that we have the right number of
+    // parameters. Semantic checks will wait for extension validation.
+    if (ref.GenericParams->size() != typeDecl->getGenericParams()->size()) {
+      unsigned numHave = ref.GenericParams->size();
+      unsigned numExpected = typeDecl->getGenericParams()->size();
+      TC.diagnose(ref.NameLoc,
+                  diag::extension_generic_wrong_number_of_parameters,
+                  typeDecl->getDeclaredType(), numHave > numExpected,
+                  numHave, numExpected)
+        .highlight(ref.GenericParams->getSourceRange());
+      ED->setInvalid();
+      ED->setExtendedType(ErrorType::get(TC.Context));
+      return;
+    }
   }
 
   // Check whether we extended something that is not a nominal type.

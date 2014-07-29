@@ -5767,19 +5767,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    // Make sure we have the right number of generic parameters.
-    if (genericParams->size() != nominal->getGenericParams()->size()) {
-      unsigned numHave = genericParams->size();
-      unsigned numExpected = nominal->getGenericParams()->size();
-      diagnose(ext->getLoc(),
-               diag::extension_generic_wrong_number_of_parameters,
-               nominal->getDeclaredType(), numHave > numExpected,
-               numHave, numExpected);
-      ext->setInvalid();
-      ext->setExtendedType(ErrorType::get(Context));
-      return;
-    }
-
     // Validate the generic type signature.
     if (validateGenericTypeSignature(ext)) {
       ext->setInvalid();
