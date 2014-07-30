@@ -1581,7 +1581,7 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     void *obj = classContainer->Value;
-    return swift_unknownTypeOf(reinterpret_cast<HeapObject*>(obj));
+    return swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
   } else {
     auto opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);

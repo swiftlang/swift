@@ -546,8 +546,8 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
 /// by KVO.
 ///
 /// The object pointer may be a tagged pointer, but cannot be null.
-const Metadata *swift::swift_getObjectType(id object) {
-  auto theClass = object_getClass(object);
+const Metadata *swift::swift_getObjectType(HeapObject *object) {
+  auto theClass = object_getClass((id) object);
   auto classAsMetadata = reinterpret_cast<ClassMetadata*>(theClass);
   if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
   

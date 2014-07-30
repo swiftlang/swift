@@ -37,7 +37,6 @@ using namespace metadataimpl;
 extern "C" const ClassMetadata* object_getClass(const void *);
 extern "C" const char* class_getName(const ClassMetadata*);
 extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
-extern "C" const Metadata *swift_getObjectType(const void *);
 
 // Aliases for Swift runtime entry points for Objective-C types.
 extern "C" const void *swift_dynamicCastObjCProtocolConditional(
@@ -287,7 +286,7 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     // TODO: avoid unnecessary repeat lookup of
     // ObjCClassWrapper/ForeignClass when the type matches.
     outValue = value;
-    outType = swift_getObjectType(*reinterpret_cast<void**>(value));
+    outType = swift_getObjectType(*reinterpret_cast<HeapObject**>(value));
     return;
   }
 
@@ -297,7 +296,7 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
       auto existential =
         reinterpret_cast<ClassExistentialContainer*>(value);
       outValue = (OpaqueValue*) &existential->Value;
-      outType = swift_getObjectType(existential->Value);
+      outType = swift_getObjectType((HeapObject*) existential->Value);
       return;
     } else {
       auto existential =
@@ -333,6 +332,14 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
     return;
   }
   _failCorruptType(type);
+}
+
+extern "C" const Metadata *
+swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self) {
+  OpaqueValue *outValue;
+  const Metadata *outType;
+  findDynamicValueAndType(value, self, outValue, outType);
+  return outType;
 }
 
 /// Given a possibly-existential value, deallocate any buffer in its storage.
@@ -737,7 +744,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
       reinterpret_cast<const ClassExistentialContainer*>(src);
     srcValue = (OpaqueValue*) &classContainer->Value;
     void *obj = classContainer->Value;
-    srcCapturedType = swift_unknownTypeOf(reinterpret_cast<HeapObject*>(obj));
+    srcCapturedType = swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
     isOutOfLine = false;
   } else {
     auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
@@ -789,7 +796,7 @@ static bool _dynamicCastUnknownClassToMetatype(OpaqueValue *dest,
     return _dynamicCastMetatypeToMetatype(dest, metatype, targetType, flags);
 
   if (flags & DynamicCastFlags::Unconditional)
-    _dynamicCastFailure(swift_getObjectType(object), targetType);
+    _dynamicCastFailure(swift_getObjectType((HeapObject*) object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
     swift_release((HeapObject*) object);
   return false;
@@ -928,7 +935,7 @@ static bool _dynamicCastUnknownClassToExistentialMetatype(OpaqueValue *dest,
   
   // Class values are currently never metatypes (?).
   if (flags & DynamicCastFlags::Unconditional)
-    _dynamicCastFailure(swift_getObjectType(object), targetType);
+    _dynamicCastFailure(swift_getObjectType((HeapObject*) object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
     swift_release((HeapObject*) object);
   return false;

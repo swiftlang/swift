@@ -1986,32 +1986,20 @@ extern "C" const ClassMetadata *
 swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
                                                 const ClassMetadata *targetType);
   
-/// \brief Standard 'typeof' value witness for types with static metatypes.
+/// \brief Return the dynamic type of an opaque value.
 ///
-/// \param obj  A pointer to the object. Ignored.
-/// \param self The type metadata for the object.
-///
-/// \returns self.
+/// \param value An opaque value.
+/// \param self  The static type metadata for the opaque value.
 extern "C" const Metadata *
-swift_staticTypeof(OpaqueValue *obj, const Metadata *self);
+swift_getDynamicType(OpaqueValue *value, const Metadata *self);
 
-/// \brief Standard 'typeof' value witness for heap object references.
+/// \brief Fetch the type metadata associated with the formal dynamic
+/// type of the given (possibly Objective-C) object.  The formal
+/// dynamic type ignores dynamic subclasses such as those introduced
+/// by KVO.
 ///
-/// \param obj  A pointer to the object reference.
-/// \param self The static type metadata for the object. Ignored.
-///
-/// \returns The dynamic type metadata for the object.
-extern "C" const Metadata *
-swift_objectTypeof(OpaqueValue *obj, const Metadata *self);
-
-/// \brief Standard 'typeof' value witness for ObjC object references.
-///
-/// \param obj  A pointer to the object reference.
-/// \param self The static type metadata for the object. Ignored.
-///
-/// \returns The dynamic type metadata for the object.
-extern "C" const Metadata *
-swift_objcTypeof(OpaqueValue *obj, const Metadata *self);
+/// The object pointer may be a tagged pointer, but cannot be null.
+extern "C" const Metadata *swift_getObjectType(HeapObject *object);
 
 /// \brief Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
@@ -2034,15 +2022,6 @@ OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
                                               const OpaqueValue *src,
                                               const Metadata *type);
   
-/// \brief Standard 'typeof' value witness for heap object references that may
-/// not be native Swift objects.
-///
-/// \param obj  The object reference.
-///
-/// \returns The dynamic type metadata for the object.
-extern "C"
-const Metadata *swift_unknownTypeOf(HeapObject *obj);
-
 /// Calculate the numeric index of an extra inhabitant of a heap object
 /// pointer in memory.
 int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src);

@@ -36,12 +36,6 @@ template <class T> static T *copy(T *dest, T *src, const Metadata *self) {
   return dest;
 }
 
-/// A function which returns back a static metatype.
-const Metadata *swift::swift_staticTypeof(OpaqueValue *src,
-                                          const Metadata *self) {
-  return self;
-}
-
 // Work around a Xcode 4.5 bug (rdar://12288058) by explicitly
 // instantiating this function template at the types we'll need.
 #define INSTANTIATE(TYPE) \
@@ -95,18 +89,6 @@ const ValueWitnessTable swift::_TWVBi64_ =
 const ValueWitnessTable swift::_TWVBi128_ =
   ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
 
-/// A function to get the dynamic class type of a Swift heap object.
-const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
-                                          const Metadata *self) {
-  auto *heapRef = *reinterpret_cast<HeapObject**>(obj);
-  auto *classMetadata = static_cast<const ClassMetadata*>(heapRef->metadata);
-  // If the heap metadata for the object is not a type, give up and return the
-  // static type.
-  if (!classMetadata->isTypeMetadata())
-    return self;
-  return classMetadata;
-}
-
 /// Store an invalid pointer value as an extra inhabitant of a heap object.
 void swift::swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
                                                  int index) {
@@ -157,27 +139,6 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
 
 // This section can reasonably be suppressed in builds that don't
 // need to support Objective-C.
-
-// ObjC runtime entrypoints.
-extern "C" const void *object_getClass(void *);
-
-/// A function to get the Swift type metadata wrapper for an ObjC object's
-/// dynamic type.
-
-const Metadata *swift::swift_objcTypeof(OpaqueValue *src, const Metadata *self)
-{
-  auto object = *reinterpret_cast<HeapObject**>(src);
-  return swift_unknownTypeOf(object);
-}
-
-const Metadata *swift::swift_unknownTypeOf(HeapObject *object)
-{
-  auto theClass = object_getClass(object);
-  auto classAsMetadata = reinterpret_cast<const ClassMetadata*>(theClass);
-  if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
-  
-  return swift_getObjCClassMetadata(classAsMetadata);
-}
 
 /// The basic value-witness table for ObjC object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBO =

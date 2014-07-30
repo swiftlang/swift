@@ -296,7 +296,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
 
   template <class Container, class... A>
   static const Metadata *typeOf(Container *value,  A... args) {
-    return swift_unknownTypeOf((HeapObject*) value->getValueSlot());
+    return swift_getObjectType((HeapObject*) value->getValueSlot());
   }
 
   template <class Container, class... A>
@@ -340,7 +340,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
   static constexpr size_t isPOD = false;
 
   static const Metadata *typeOf(Container *value, const Metadata *self) {
-    return swift_unknownTypeOf((HeapObject*) *value->getValueSlot());
+    return swift_getObjectType((HeapObject*) *value->getValueSlot());
   }
 };
 

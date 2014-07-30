@@ -2,10 +2,7 @@
 
 // CHECK: define %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
-  // CHECK: [[TYPEOF_WITNESS_ADDR:%.*]] = getelementptr inbounds i8** {{%.*}}, i32 12
-  // CHECK: [[TYPEOF_WITNESS:%.*]] = load i8** [[TYPEOF_WITNESS_ADDR]], align 8
-  // CHECK: %typeof = bitcast i8* [[TYPEOF_WITNESS]] to %swift.type* (%swift.opaque*, %swift.type*)*
-  // CHECK: [[METATYPE:%.*]] = call %swift.type* %typeof(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
+  // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
   return x.dynamicType
 }
@@ -49,13 +46,7 @@ func protocolTypeof(x: Bas) -> Bas.Type {
   // CHECK: [[PROJECT_PTR:%.*]] = load i8** [[PROJECT_ADDR]], align 8
   // CHECK: [[PROJECT:%.*]] = bitcast i8* [[PROJECT_PTR]] to %swift.opaque* ([24 x i8]*, %swift.type*)*
   // CHECK: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([24 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
-  // CHECK: [[METADATA_I8:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK: [[VW_ADDR:%.*]] = getelementptr inbounds i8*** [[METADATA_I8]], i64 -1
-  // CHECK: [[VW:%.*]] = load i8*** [[VW_ADDR]]
-  // CHECK: [[TYPEOF_ADDR:%.*]] = getelementptr inbounds i8** [[VW]], i32 12
-  // CHECK: [[TYPEOF_PTR:%.*]] = load i8** [[TYPEOF_ADDR]], align 8
-  // CHECK: [[TYPEOF:%.*]] = bitcast i8* [[TYPEOF_PTR]] to %swift.type* (%swift.opaque*, %swift.type*)*
-  // CHECK: [[METATYPE:%.*]] = call %swift.type* [[TYPEOF]](%swift.opaque* [[PROJECTION]], %swift.type* [[METADATA]])
+  // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[PROJECTION]], %swift.type* [[METADATA]])
   // CHECK: ret %swift.type* [[METATYPE]]
   return x.dynamicType
 }

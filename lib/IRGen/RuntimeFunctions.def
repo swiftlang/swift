@@ -434,24 +434,6 @@ FUNCTION(StoreEnumTagSinglePayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
-// Metadata *swift_staticTypeof(opaque_t *obj, Metadata *self);
-FUNCTION(StaticTypeof, swift_staticTypeof, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
-// Metadata *swift_objectTypeof(opaque_t *obj, Metadata *self);
-FUNCTION(ObjectTypeof, swift_objectTypeof, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
-// Metadata *swift_objcTypeof(opaque_t *obj, Metadata *self);
-FUNCTION(ObjCTypeof, swift_objcTypeof, RuntimeCC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
 // Class object_getClass(id object);
 //
 // This is readonly instead of readnone because isa-rewriting can have
@@ -470,6 +452,12 @@ FUNCTION(GetObjectType, swift_getObjectType, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getDynamicType(opaque_t *obj, Metadata *self);
+FUNCTION(GetDynamicType, swift_getDynamicType, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastClass(void*, void*);
 FUNCTION(DynamicCastClass, swift_dynamicCastClass, RuntimeCC,

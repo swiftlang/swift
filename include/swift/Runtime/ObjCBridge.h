@@ -23,14 +23,6 @@ namespace swift {
 
 struct Metadata;
 
-/// \brief Fetch the type metadata associated with the formal dynamic
-/// type of the given (possibly Objective-C) object.  The formal
-/// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO.
-///
-/// The object pointer may be a tagged pointer, but cannot be null.
-extern "C" const Metadata *swift_getObjectType(id object);
-
 } // end namespace swift
 
 #endif /* SWIFT_ABI_OBJCBRIDGE_H */

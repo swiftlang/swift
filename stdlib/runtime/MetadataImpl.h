@@ -303,7 +303,7 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
   }
 
   static const Metadata *typeOf(void **src, const Metadata *self) {
-    return swift_objcTypeof((OpaqueValue*) src, self);
+    return swift_getDynamicType((OpaqueValue*) src, self);
   }
 };
 
@@ -318,7 +318,7 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
   }
 
   static const Metadata *typeOf(void **src, const Metadata *self) {
-    return swift_unknownTypeOf((HeapObject*) *src);
+    return swift_getObjectType((HeapObject*) *src);
   }
 };
 

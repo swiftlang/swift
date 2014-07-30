@@ -125,11 +125,6 @@ namespace irgen {
                                 llvm::Value *metadata,
                                 Address buffer);
   
-  /// Emit a call to the 'typeof' operation.
-  llvm::Value *emitTypeofCall(IRGenFunction &IGF,
-                              llvm::Value *metadata,
-                              llvm::Value *object);
-  
   /// Emit a call to the 'getExtraInhabitantIndex' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,

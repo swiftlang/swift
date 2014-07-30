@@ -2733,16 +2733,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::TypeOf:
-    /// Class types require dynamic type lookup.
-    if (ClassDecl *cd = concreteType.getClassOrBoundGenericClass()) {
-      if (hasKnownSwiftMetadata(IGM, cd))
-        return asOpaquePtr(IGM, IGM.getObjectTypeofFn());
-      return asOpaquePtr(IGM, IGM.getObjCTypeofFn());
-    } else if (!concreteType.isAnyExistentialType()) {
-      // Other non-existential types have static metadata.
-      return asOpaquePtr(IGM, IGM.getStaticTypeofFn());
-    }
-    goto standard;
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
       
   case ValueWitness::Size: {
     if (auto value = concreteTI.getStaticSize(IGM))
@@ -4715,9 +4706,8 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = IGF.getLocalTypeData(archetype,
                                                LocalTypeData::Metatype);
-
-  // Call the 'typeof' value witness.
-  return emitTypeofCall(IGF, metadata, addr.getAddress());
+  return IGF.Builder.CreateCall2(IGF.IGM.getGetDynamicTypeFn(),
+                                 addr.getAddress(), metadata);
 }
 
 llvm::Value *irgen::emitDynamicTypeOfOpaqueExistential(IRGenFunction &IGF,
@@ -4734,7 +4724,8 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueExistential(IRGenFunction &IGF,
   // Project the buffer and apply the 'typeof' value witness.
   Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
   llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
-  return emitTypeofCall(IGF, metadata, object);
+  return IGF.Builder.CreateCall2(IGF.IGM.getGetDynamicTypeFn(),
+                                 object, metadata);
 }
 
 llvm::Value *irgen::emitDynamicTypeOfClassExistential(IRGenFunction &IGF,

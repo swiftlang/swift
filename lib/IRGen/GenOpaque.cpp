@@ -521,19 +521,6 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
   setHelperAttributes(call);
 }
 
-/// Emit a call to the 'typeof' operation.
-llvm::Value *irgen::emitTypeofCall(IRGenFunction &IGF,
-                                   llvm::Value *metadata,
-                                   llvm::Value *object) {
-  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
-                                   ValueWitness::TypeOf);
-  llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, object, metadata);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  setHelperAttributes(call);
-  return call;
-}
-
 /// Emit a call to the 'getExtraInhabitantIndex' operation.
 /// The type must be dynamically known to have extra inhabitant witnesses.
 llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
