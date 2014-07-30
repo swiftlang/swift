@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %swift -parse -module-name generics %s -verify
 
 protocol P1 { typealias AssocType }
 protocol P2 : P1 { }
@@ -52,6 +52,7 @@ func f1<A, B, C>(x: X<A, B, C>, a: A, assoc: A.AssocType) {
 
 // Good: Extensions of nested generics.
 extension X<T, U, V>.Inner<A, B> { } // FIXME: expected-error{{extension of generic type 'X<T, U, V>.Inner' cannot add requirements}}
+extension generics.X<T, U, V>.Inner<A, B> { } // FIXME: expected-error{{extension of generic type 'X<T, U, V>.Inner' cannot add requirements}}
 
 // Bad: Extensions of nested generics with wrong number of arguments.
 extension X<T, U, V>.Inner<A> { } // expected-error{{extension of generic type 'X<T, U, V>.Inner' has too few generic parameters (have 1, expected 2)}}
@@ -60,5 +61,7 @@ extension X<T, U, V>.Inner<A, B, C> { } // expected-error{{extension of generic 
 // Bad: Extensions with generic parameter lists in the wrong places.
 extension X<T, U, V>.NonGenericInner<A> { } // expected-error{{'X<T, U, V>.NonGenericInner' does not have any generic parameters}}
 extension Y<T>.Inner<A, B> { } // expected-error{{'Y' does not have any generic parameters}}
+// expected-error @-1{{generic arguments are not allowed on an extension}}
+extension generics<T>.X<A, B, C> { } // expected-error{{'generics' does not have any generic parameters}}
 // expected-error @-1{{generic arguments are not allowed on an extension}}
 
