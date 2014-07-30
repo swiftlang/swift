@@ -1,7 +1,7 @@
 // RUN: not %swift_driver -integrated-repl -emit-module 2>&1 | FileCheck -check-prefix=IMMEDIATE_NO_MODULE %s
 // RUN: not %swift_driver -emit-module 2>&1 | FileCheck -check-prefix=IMMEDIATE_NO_MODULE %s
 // REQUIRES: swift_interpreter
-// IMMEDIATE_NO_MODULE: this mode does not support emitting modules
+// IMMEDIATE_NO_MODULE: error: unsupported option '-emit-module'
 
 // RUN: %swift_driver -### %s | FileCheck -check-prefix INTERPRET %s
 // INTERPRET: -interpret

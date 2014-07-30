@@ -120,7 +120,7 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>, Alias<I>;
 
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
 def import_objc_header : Separate<["-"], "import-objc-header">,
@@ -131,20 +131,21 @@ def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
 def output_file_map : Separate<["-"], "output-file-map">,
+  Flags<[NoInteractiveOption]>,
   HelpText<"A file which specifies the location of outputs">,
   MetaVarName<"<path>">;
 def output_file_map_EQ : Joined<["-"], "output-file-map=">,
   Alias<output_file_map>;
 
-def save_temps : Flag<["-"], "save-temps">,
+def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
   HelpText<"Save intermediate compilation results">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit Make-compatible dependencies files">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Serialize diagnostics in a binary format">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
@@ -165,31 +166,34 @@ def autolink_force_load : Flag<["-"], "autolink-force-load">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Force ld to link against this module even if no symbols are used">;
 
-def emit_module : Flag<["-"], "emit-module">, Flags<[FrontendOption]>,
+def emit_module : Flag<["-"], "emit-module">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
-  Flags<[FrontendOption]>, HelpText<"Emit an importable module to <path>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
-  Flags<[FrontendOption]>, Alias<emit_module_path>;
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_module_path>;
 
-def emit_objc_header : Flag<["-"], "emit-objc-header">, Flags<[FrontendOption]>,
+def emit_objc_header : Flag<["-"], "emit-objc-header">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
-  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<path>">,
   HelpText<"Emit an Objective-C header file to <path>">;
 
 def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
-  Flags<[FrontendOption,HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
 def import_cf_types : Flag<["-"], "import-cf-types">,
-  Flags<[FrontendOption,HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
 
 // Linker options
@@ -278,22 +282,25 @@ def S: Flag<["-"], "S">, Alias<emit_assembly>,
 
 // No Output Modes
 def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
-  Flags<[FrontendOption]>, ModeOpt;
-def dump_parse : Flag<["-"], "dump-parse">, Flags<[FrontendOption]>, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
+def dump_parse : Flag<["-"], "dump-parse">,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
   HelpText<"Parse input file(s) and dump AST(s)">;
-def dump_ast : Flag<["-"], "dump-ast">, Flags<[FrontendOption]>, ModeOpt,
+def dump_ast : Flag<["-"], "dump-ast">,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">;
-def print_ast : Flag<["-"], "print-ast">, Flags<[FrontendOption]>, ModeOpt,
+def print_ast : Flag<["-"], "print-ast">,
+  Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">;
 
 // Other Modes
 def repl : Flag<["-"], "repl">,
   HelpText<"REPL mode (the default if there is no input file)">,
-  Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
+  Flags<[FrontendOption, NoBatchOption, HelpHidden]>, ModeOpt;
 def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
-  Flags<[NoBatchOption]>, ModeOpt;
+  Flags<[NoBatchOption, HelpHidden]>, ModeOpt;
 def integrated_repl : Flag<["-"], "integrated-repl">,
-  Flags<[FrontendOption, NoBatchOption]>,
+  Flags<[FrontendOption, NoBatchOption, HelpHidden]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
@@ -302,16 +309,16 @@ def force_single_frontend_invocation :
   HelpText<"Compile the module using a single frontend invocation">,
   Flags<[HelpHidden]>;
 
-def Xfrontend : Separate<["-"], "Xfrontend">,
+def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
 def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
-def Xllvm : Separate<["-"], "Xllvm">, Flags<[FrontendOption]>,
-  MetaVarName<"<arg>">,
-  HelpText<"Pass <arg> to LLVM.">;
+def Xllvm : Separate<["-"], "Xllvm">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -325,7 +332,8 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
   HelpText<"Generate code for a particular CPU variant">;
-def target_feature : Separate<["-"], "target-feature">, Flags<[FrontendOption]>,
+def target_feature : Separate<["-"], "target-feature">,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Generate code with a particular CPU feature enabled or disabled">,
   MetaVarName<"[+-]<feature-name>">;
 
