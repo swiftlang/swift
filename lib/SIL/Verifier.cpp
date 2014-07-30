@@ -1023,6 +1023,7 @@ public:
                                                     F.getModule());
     require(loweredFieldTy == EI->getType(),
             "result of ref_element_addr does not match type of field");
+    EI->getFieldNo();  // Make sure we can access the field without crashing.
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
