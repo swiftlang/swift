@@ -165,3 +165,10 @@ class ClassWithDtor : NSObject {
     noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
   }
 }
+
+// <rdar://problem/17584531>
+var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
+var dict2 = dict["people"][0] as NSDictionary
+println(dict2["id"])
+// CHECK: 255
+

@@ -970,6 +970,7 @@ namespace {
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
         base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
         if (!base) return nullptr;
+        baseTy = base->getType();
       }
 
       // Figure out the index and result types.
