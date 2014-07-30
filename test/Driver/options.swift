@@ -89,7 +89,7 @@
 // LLDB_REPL: lldb
 // LLDB_REPL-NOT: warning
 
-// RUN: %swift_driver -integrated-repl -### 2>&1 | FileCheck -check-prefix=INTEGRATED_REPL %s
+// RUN: %swift_driver -deprecated-integrated-repl -### 2>&1 | FileCheck -check-prefix=INTEGRATED_REPL %s
 // INTEGRATED_REPL-NOT: warning
 // INTEGRATED_REPL: -repl
 // INTEGRATED_REPL-NOT: warning
@@ -116,8 +116,8 @@
 // REPL_MODE_SWIFTC: error: unsupported option '-repl'
 // RUN: not %swiftc_driver -### -lldb-repl 2>&1 | FileCheck -check-prefix=LLDB_REPL_MODE_SWIFTC %s
 // LLDB_REPL_MODE_SWIFTC: error: unsupported option '-lldb-repl'
-// RUN: not %swiftc_driver -### -integrated-repl 2>&1 | FileCheck -check-prefix=INT_REPL_MODE_SWIFTC %s
-// INT_REPL_MODE_SWIFTC: error: unsupported option '-integrated-repl'
+// RUN: not %swiftc_driver -### -deprecated-integrated-repl 2>&1 | FileCheck -check-prefix=INT_REPL_MODE_SWIFTC %s
+// INT_REPL_MODE_SWIFTC: error: unsupported option '-deprecated-integrated-repl'
 
 // RUN: %swift_driver -g -### %s 2>&1 | FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g

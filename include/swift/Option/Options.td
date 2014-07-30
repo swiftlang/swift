@@ -299,9 +299,8 @@ def repl : Flag<["-"], "repl">,
   Flags<[FrontendOption, NoBatchOption, HelpHidden]>, ModeOpt;
 def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
   Flags<[NoBatchOption, HelpHidden]>, ModeOpt;
-def integrated_repl : Flag<["-"], "integrated-repl">,
-  Flags<[FrontendOption, NoBatchOption, HelpHidden]>,
-  HelpText<"Integrated REPL mode">, ModeOpt;
+def deprecated_integrated_repl : Flag<["-"], "deprecated-integrated-repl">,
+  Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
 def force_single_frontend_invocation :

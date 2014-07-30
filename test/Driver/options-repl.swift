@@ -1,12 +1,12 @@
 // RUN: not %swift -repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -lldb-repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
-// RUN: not %swift_driver -integrated-repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
+// RUN: not %swift_driver -deprecated-integrated-repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
 
 // REPL_NO_FILES: REPL mode requires no input files
 
 
-// RUN: %swift_driver -integrated-repl -### | FileCheck -check-prefix=INTEGRATED %s
+// RUN: %swift_driver -deprecated-integrated-repl -### | FileCheck -check-prefix=INTEGRATED %s
 
 // INTEGRATED: swift -frontend -repl
 // INTEGRATED: -module-name REPL

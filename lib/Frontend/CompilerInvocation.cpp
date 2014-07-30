@@ -179,7 +179,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_print_ast)) {
       Action = FrontendOptions::PrintAST;
-    } else if (Opt.matches(OPT_repl) || Opt.matches(OPT_integrated_repl)) {
+    } else if (Opt.matches(OPT_repl) ||
+               Opt.matches(OPT_deprecated_integrated_repl)) {
       Action = FrontendOptions::REPL;
     } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;

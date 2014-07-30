@@ -572,7 +572,7 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       break;
 
     case options::OPT_repl:
-    case options::OPT_integrated_repl:
+    case options::OPT_deprecated_integrated_repl:
     case options::OPT_lldb_repl:
       OI.CompilerOutputType = types::TY_Nothing;
       OI.CompilerMode = OutputInfo::Mode::REPL;
@@ -770,7 +770,7 @@ void Driver::buildActions(const ToolChain &TC,
 
     REPLJobAction::Mode Mode = REPLJobAction::Mode::PreferLLDB;
     if (const Arg *A = Args.getLastArg(options::OPT_lldb_repl,
-                                       options::OPT_integrated_repl)) {
+                                       options::OPT_deprecated_integrated_repl)) {
       if (A->getOption().matches(options::OPT_lldb_repl))
         Mode = REPLJobAction::Mode::RequireLLDB;
       else
