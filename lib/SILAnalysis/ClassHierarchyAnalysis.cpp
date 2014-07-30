@@ -33,4 +33,22 @@ void ClassHierarchyAnalysis::init() {
   }
 }
 
+void ClassHierarchyAnalysis::collectSubClasses(ClassDecl *C,
+                                               std::vector<ClassDecl*> &Sub) {
+  // TODO: Cache this search.
+  assert(Sub.empty() && "Incoming list is not empty");
+  for (auto &VT : M->getVTableList()) {
+    ClassDecl *CD = VT.getClass();
+    // Ignore classes that are at the top of the class hierarchy:
+    if (!CD->hasSuperclass())
+      continue;
+
+    // Add the superclass to the list of inherited classes.
+    ClassDecl *Super = CD->getSuperclass()->getClassOrBoundGenericClass();
+    if (Super == C) {
+      Sub.push_back(CD);
+    }
+  }
+}
+
 ClassHierarchyAnalysis::~ClassHierarchyAnalysis() {}

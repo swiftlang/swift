@@ -43,6 +43,9 @@ STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
 STATISTIC(NumAMI, "Number of witness_method devirtualzied");
 
+// The number of subclasses to allow when placing polymorphic inline caches.
+static const int MaxNumPolymorphicInlineCaches = 2;
+
 //===----------------------------------------------------------------------===//
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
@@ -84,7 +87,7 @@ static ClassDecl *findClassDeclForOperand(SILValue S) {
   return instTy.getClassOrBoundGenericClass();
 }
 
-/// Optimize a class_method and alloc_ref pair into a direct function
+/// \brief Optimize a class_method and alloc_ref pair into a direct function
 /// reference:
 ///
 /// \code
@@ -104,19 +107,23 @@ static ClassDecl *findClassDeclForOperand(SILValue S) {
 /// %YY = function_ref @...
 /// apply %YY(...)
 ///
-static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
+/// \p AI is the apply to devirtualize.
+/// \p Member is the class member to devirtualize.
+/// \p ClassInstance is the operand for the ClassMethodInst or an alternative
+///    reference (duch as downcasted class reference).
+/// \p KnownClass (can be null) is a specific class type to devirtualize to.
+static bool optimizeClassMethod(ApplyInst *AI, SILDeclRef Member,
+                                SILValue ClassInstance,
                                 ClassDecl *KnownClass) {
-  DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
-  SILValue Origin = CMI->getOperand().stripCasts();
-  DEBUG(llvm::dbgs() << "        Origin: " << Origin);
+  DEBUG(llvm::dbgs() << "        Origin: " << ClassInstance);
 
   // Then attempt to lookup the class for origin.
-  ClassDecl *Class = KnownClass;
-  if (!Class)
-    Class = findClassDeclForOperand(Origin);
+  ClassDecl *Class = KnownClass ? KnownClass :
+                     findClassDeclForOperand(ClassInstance);
 
   // If we are unable to lookup a class decl for origin there is nothing here
   // that we can deserialize.
@@ -128,8 +135,8 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
 
   // Otherwise lookup from the module the least derived implementing method from
   // the module vtables.
-  SILModule &Mod = CMI->getModule();
-  SILFunction *F = Mod.lookUpSILFunctionFromVTable(Class, CMI->getMember());
+  SILModule &Mod = AI->getModule();
+  SILFunction *F = Mod.lookUpSILFunctionFromVTable(Class, Member);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -165,7 +172,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   // Grab the self type from the function ref and the self type from the class
   // method inst.
   SILType FuncSelfTy = paramTypes[paramTypes.size() - 1];
-  SILType OriginTy = Origin.getType();
+  SILType OriginTy = ClassInstance.getType();
   SILBuilder B(AI);
 
   // Then compare the two types and if they are unequal...
@@ -175,11 +182,11 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
            " class.");
 
     // Otherwise, upcast origin to the appropriate type.
-    Origin = B.createUpcast(CMI->getLoc(), Origin, FuncSelfTy);
+    ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
   }
 
   // Success! Perform the devirtualization.
-  FunctionRefInst *FRI = B.createFunctionRef(CMI->getLoc(), F);
+  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
 
   // Construct a new arg list. First process all non-self operands, ref, addr
   // casting them to the appropriate types for F so that we allow for covariant
@@ -216,7 +223,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
     }
   }
   // Add in self to the end.
-  NewArgs.push_back(Origin);
+  NewArgs.push_back(ClassInstance);
 
   // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty
@@ -250,8 +257,6 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
   }
 
   AI->eraseFromParent();
-  if (CMI->use_empty())
-    CMI->eraseFromParent();
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumDevirtualized++;
@@ -781,7 +786,8 @@ static bool optimizeApplyInst(ApplyInst *AI) {
   ///
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee()))
-    return optimizeClassMethod(AI, CMI, nullptr);
+    return optimizeClassMethod(AI, CMI->getMember(),
+                               CMI->getOperand().stripCasts(), nullptr);
 
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
@@ -858,10 +864,12 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
                              Ret, AI->isTransparent());
 }
 
-static bool insertMonomorphicInlineCaches(ApplyInst *AI, SILType InstanceType,
-                                          SILValue ClassInstance) {
+/// Insert monomorphic inline caches for a specific class type \p SubClassTy.
+static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
+                                                SILType SubClassTy) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
-  ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+  SILValue ClassInstance = CMI->getOperand();
+  ClassDecl *CD = SubClassTy.getClassOrBoundGenericClass();
 
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
@@ -875,15 +883,17 @@ static bool insertMonomorphicInlineCaches(ApplyInst *AI, SILType InstanceType,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createArgument(InstanceType);
+  Iden->createArgument(SubClassTy);
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
   SILBuilder Builder(Entry);
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
+  assert(SubClassTy.getClassOrBoundGenericClass() &&
+         "Dest type must be a class type");
   It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
-                                       ClassInstance, InstanceType, Iden, Virt);
+                                       ClassInstance, SubClassTy, Iden, Virt);
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
@@ -919,9 +929,12 @@ static bool insertMonomorphicInlineCaches(ApplyInst *AI, SILType InstanceType,
   // Update the stats.
   NumInlineCaches++;
 
+  // This is the class reference downcasted into subclass SubClassTy.
+  SILValue DownCastedClassInstance = Iden->getBBArg(0);
+
   // Devirtualize the apply instruction on the identical path.
-  optimizeClassMethod(IdenAI, CMI, CD);
-  return true;
+  optimizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
+  return VirtAI;
 }
 
 /// Specialize virtual dispatch.
@@ -939,12 +952,31 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (!CHA->inheritedInModule(CD)) {
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
-    return insertMonomorphicInlineCaches(AI, InstanceType, ClassInstance);
+    return insertMonomorphicInlineCaches(AI, InstanceType);
+  }
+
+  std::vector<ClassDecl*> Subs;
+  CHA->collectSubClasses(CD, Subs);
+
+  if (Subs.size() > MaxNumPolymorphicInlineCaches) {
+    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has " <<  Subs.size()
+          << " subclasses. Not inserting polymorphic inline caches.\n");
   }
 
   DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-        " Not inserting monomorphic inline caches.\n");
-  return false;
+        "Inserting monomorphic inline caches.\n");
+
+  for (auto S : Subs) {
+    CanType CanClassType = S->getDeclaredType()->getCanonicalType();
+    SILType InstanceType = SILType::getPrimitiveObjectType(CanClassType);
+    if (!InstanceType.getClassOrBoundGenericClass())
+      continue;
+
+    AI = insertMonomorphicInlineCaches(AI, InstanceType);
+    assert(AI && "Unable to insert inline caches!");
+  }
+
+  return true;
 }
 
 namespace {

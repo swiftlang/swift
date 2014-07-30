@@ -44,6 +44,10 @@ public:
     }
   }
 
+  /// \brief Collect all of the known direct subclasses of a class \p C in the
+  /// current module.
+  void collectSubClasses(ClassDecl *C, std::vector<ClassDecl*> &Sub);
+
   /// \returns True if the class is inherited by another class in this module.
   bool inheritedInModule(ClassDecl *CD) {
     return InheritedClasses.count(CD); 

@@ -22,7 +22,8 @@ sil @_TFC4main3ABC7member2fS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
 sil @_TFC4main3ABCCfMS0_FT1ySi_S0_ : $@thin (Int64, @thick ABC.Type) -> @owned ABC
 
 //CHECK:@_TF4main3fooFT_T_
-//CHECK-NOT: class_method
+//CHECK: function_ref @_TFC4main3ABC6memberfS0_FT_T_
+//CHECK: function_ref @_TFC4main3ABC7member2fS0_FT_T_
 //CHECK: return
 sil @_TF4main3fooFT_T_ : $@thin () -> () {
 bb0:

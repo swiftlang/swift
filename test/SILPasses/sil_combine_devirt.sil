@@ -21,7 +21,7 @@ class Foo {
 }
 
 //CHECK: _TF4main4mainFT_T_
-//CHECK-NOT: class_method
+//CHECK: function_ref @_TFC4main3Foo3getfS0_FT_Si
 //CHECK: return
 sil @_TF4main4mainFT_T_ : $@thin () -> () {
 bb0:
