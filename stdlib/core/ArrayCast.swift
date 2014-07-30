@@ -80,66 +80,70 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 
 //===--- Conditional casts: [T] as? [U] -----------------------------------===//
 
-/// Implements the semantics of `x as? [Derived]` where `x` has type
-/// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
-/// `Base`.
+/// Implements the semantics of `x as? [TargetElement]` where `x` has type
+/// `[SourceElement]` and `TargetElement` is a verbatim-bridged trivial subtype of
+/// `SourceElement`.
 ///
-/// Returns an Array<Derived> containing the same elements as a in
-/// O(1) iff a's buffer elements are dynamically known to have
-/// type Derived or a type derived from Derived.
-internal func _arrayDownCastConditional<Base, Derived>(
-  a: Array<Base>
-) -> [Derived]? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
+/// Returns an Array<TargetElement> containing the same elements as a
+///
+/// O(1) if a's buffer elements are dynamically known to have type
+/// TargetElement or a type derived from TargetElement.  O(N)
+/// otherwise.
+internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
+  a: Array<SourceElement>
+) -> [TargetElement]? {
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(TargetElement.self))
   
   if _fastPath(!a.isEmpty) {
     let native = a._buffer.requestNativeBuffer()
     
     if _fastPath(native != nil) {
-      if native!.storesOnlyElementsOfType(Derived.self) {
-        return Array(a._buffer.castToBufferOf(Derived.self))
+      if native!.storesOnlyElementsOfType(TargetElement.self) {
+        return Array(a._buffer.castToBufferOf(TargetElement.self))
       }
       return nil
     }
     
     // slow path: we store an NSArray
     
-    // We can skip the check if Derived happens to be AnyObject
-    if !(AnyObject.self is Derived.Type) {
+    // We can skip the check if TargetElement happens to be AnyObject
+    if !(AnyObject.self is TargetElement.Type) {
       for element in a {
         // FIXME: unsafeBitCast works around <rdar://problem/16953026>
-        if !(unsafeBitCast(element, AnyObject.self) is Derived) {
+        if !(unsafeBitCast(element, AnyObject.self) is TargetElement) {
           return nil
         }
       }
     }
-    return Array(a._buffer.castToBufferOf(Derived.self))
+    return Array(a._buffer.castToBufferOf(TargetElement.self))
   }
   return []
 }
 
 /// Try to convert the source array of objects to an array of values
 /// produced by bridging the objects from Objective-C to \c
-/// BridgesToDerived.
+/// TargetElement.
 ///
-/// Precondition: Base is a class type.
-/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
+/// Precondition: SourceElement is a class type.
+/// Precondition: TargetElement is bridged non-verbatim to Objective-C.
 /// O(n), because each element must be bridged separately.
-internal func _arrayBridgeFromObjectiveCConditional<Base, BridgesToDerived>(
-       source: Array<Base>
-     ) -> Array<BridgesToDerived>? {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
-  var buf = _ContiguousArrayBuffer<BridgesToDerived>(count: source.count, 
-                                                    minimumCapacity: 0)
+internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
+       source: Array<SourceElement>
+     ) -> Array<TargetElement>? {
+  _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
+  _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
+  
+  var buf = _ContiguousArrayBuffer<TargetElement>(
+    count: source.count, minimumCapacity: 0)
+  
   var p = buf._unsafeElementStorage
   
 ElementwiseBridging:
   do {
-    for object: Base in source {
+    for object: SourceElement in source {
       let value = Swift._conditionallyBridgeFromObjectiveC(
-        unsafeBitCast(object, AnyObject.self), BridgesToDerived.self)
+        unsafeBitCast(object, AnyObject.self), TargetElement.self)
       if _slowPath(value == nil) {
         break ElementwiseBridging
       }
@@ -161,17 +165,17 @@ ElementwiseBridging:
 /// return `nil` if any element fails to convert.
 ///
 /// Requires: `SourceElement` is a class or ObjC existential type
-public func _arrayConditionalCast<SourceElement, TargetElement>(
+/// O(n), because each element must be checked.
+public func _arrayConditionalCast<SourceElement: class, TargetElement>(
   source: [SourceElement]
 ) -> [TargetElement]? {
-  _sanityCheck(
-    _isClassOrObjCExistential(SourceElement.self),
-    "Conditional cast from array of value types not prevented at compile-time"
-  )
-  if _isBridgedVerbatimToObjectiveC(TargetElement.self) {
-    return _arrayDownCastConditional(source)
-  }
-  else {
-    return _arrayBridgeFromObjectiveCConditional(source)
+  switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
+  case (.Value, _): 
+    _fatalError(
+      "Conditional cast from array of value types not prevented at compile-time")
+  case (.Reference, .Verbatim):
+    return _arrayConditionalDownCastElements(source)
+  case (.Reference, .Explicit):
+    return _arrayConditionalBridgeElements(source)
   }
 }
