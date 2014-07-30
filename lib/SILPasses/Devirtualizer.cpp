@@ -960,11 +960,13 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   if (Subs.size() > MaxNumPolymorphicInlineCaches) {
     DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has " <<  Subs.size()
           << " subclasses. Not inserting polymorphic inline caches.\n");
+    return false;
   }
 
   DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-        "Inserting monomorphic inline caches.\n");
+        "Inserting polymorphic inline caches.\n");
 
+  // Generate the polymorphic inline cache using multiple monomorphic caches.
   for (auto S : Subs) {
     CanType CanClassType = S->getDeclaredType()->getCanonicalType();
     SILType InstanceType = SILType::getPrimitiveObjectType(CanClassType);
