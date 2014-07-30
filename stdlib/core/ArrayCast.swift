@@ -16,60 +16,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+enum _ValueOrReference {
+case Reference, Value
+  init<T>(_: T.Type) {
+    self = _isClassOrObjCExistential(T.self) ? .Reference : .Value
+  }
+}
+
+enum _BridgeStyle {
+case Verbatim, Explicit
+  init<T>(_: T.Type) {
+   self = _isBridgedVerbatimToObjectiveC(T.self) ? .Verbatim : .Explicit
+  }
+}
+
+
 //===--- Forced casts: [T] as [U] -----------------------------------------===//
-
-/// Implements the semantics of `x as [Derived]` where `x` has type
-/// `[Base]` and `Derived` is a verbatim-bridged trivial subtype of
-/// `Base`.
-internal func _arrayDownCast<Base, Derived>(a: Array<Base>) -> [Derived] {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Derived.self))
-
-  let native = a._buffer.requestNativeBuffer()
-    
-  // Fast path: a native buffer that already stores elements of the
-  // Derived type.
-  if _fastPath(native != nil) {
-    if _fastPath(native!.storesOnlyElementsOfType(Derived.self)) {
-      return Array(a._buffer.castToBufferOf(Derived.self))
-    }
-  }
-  return Array(_fromCocoaArray: a._asCocoaArray())
-}
-
-/// Convert a to its corresponding bridged array type.
-/// Precondition: T is bridged non-verbatim to objective C
-/// O(N), because each element must be bridged separately.
-internal func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
-  source: Array<BridgesToDerived>
-) -> Array<Base> {
-  _sanityCheck(_isBridgedVerbatimToObjectiveC(Base.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
-  var buf = _ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
-  var p = buf._unsafeElementStorage
-  for value in source {
-    let bridged: AnyObject? = _bridgeToObjectiveC(value)
-    _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
-    p++.initialize(unsafeBitCast(bridged!, Base.self))
-  }
-  return Array(_ArrayBuffer(buf))
-}
-
-/// Try to convert the source array of objects to an array of values
-/// produced by bridging the objects from Objective-C to \c
-/// BridgesToDerived.
-///
-/// Precondition: Base is a class type.
-/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
-/// O(n), because each element must be bridged separately.
-internal func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
-  source: Array<Base>
-) -> Array<BridgesToDerived> {
-  let result: Array<BridgesToDerived>?
-    = _arrayBridgeFromObjectiveCConditional(source);
-  _precondition(result != nil, "array cannot be bridged from Objective-C")
-  return result!
-}
 
 /// Implements `source as [TargetElement]`.
 ///
@@ -80,20 +42,40 @@ internal func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(
 public func _arrayForceCast<SourceElement, TargetElement>(
   source: Array<SourceElement>
 ) -> Array<TargetElement> {
-  if _isClassOrObjCExistential(SourceElement.self) {
-    if _isBridgedVerbatimToObjectiveC(TargetElement.self) {
-      return _arrayDownCast(source)
+  switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
+  case (.Reference, .Verbatim):
+    let native = source._buffer.requestNativeBuffer()
+    
+    // Fast path: a native buffer that already stores elements of the
+    // Derived type.
+    if _fastPath(native != nil) {
+      if _fastPath(native!.storesOnlyElementsOfType(TargetElement.self)) {
+        return Array(source._buffer.castToBufferOf(TargetElement.self))
+      }
     }
-    else {
-      return _arrayBridgeFromObjectiveC(source)
+    // This result has deferred element typechecking
+    return Array(_fromCocoaArray: source._asCocoaArray())
+    
+  case (.Reference, .Explicit):
+    let result: [TargetElement]? = _arrayBridgeFromObjectiveCConditional(source)
+    _precondition(result != nil, "array cannot be bridged from Objective-C")
+    return result!
+    
+  case (.Value, .Verbatim):
+    var buf = _ContiguousArrayBuffer<TargetElement>(count: source.count, minimumCapacity: 0)
+    var p = buf._unsafeElementStorage
+    for value in source {
+      let bridged: AnyObject? = _bridgeToObjectiveC(value)
+      _precondition(bridged != nil, "array element cannot be bridged to Objective-C")
+      p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
     }
+    return Array(_ArrayBuffer(buf))
+    
+  case (.Value, .Explicit):
+    _fatalError(
+      "Force-casting between Arrays of value types not prevented at compile-time"
+    )
   }
-  else if _isClassOrObjCExistential(TargetElement.self) {
-    return _arrayBridgeToObjectiveC(source)
-  }
-  _fatalError(
-    "Force-casting between Arrays of value types not prevented at compile-time"
-  )
 }
 
 //===--- Conditional casts: [T] as? [U] -----------------------------------===//
