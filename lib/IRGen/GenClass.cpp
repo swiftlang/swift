@@ -376,7 +376,6 @@ namespace {
                               "non-fixed class layout in ObjC-derived classes");
             complainedAboutUnimplementedLayout = true;
           }
-          continue;
         }
         
         Elements.push_back(ElementLayout::getIncomplete(eltType));
