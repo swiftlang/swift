@@ -69,8 +69,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   vwtable->size = size;
   vwtable->flags = payloadWitnesses->flags
     .withExtraInhabitants(unusedExtraInhabitants > 0)
-    .withInlineStorage(ValueWitnessTable::isValueInline(size, align,
-                                        payloadWitnesses->isBitwiseTakable()));
+    .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
   vwtable->stride = llvm::RoundUpToAlignment(size, align);
                        
   // If the payload has extra inhabitants left over after the ones we used,

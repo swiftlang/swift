@@ -214,6 +214,8 @@ public:
   virtual llvm::Value *getSize(IRGenFunction &IGF, CanType T) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, CanType T) const = 0;
+  virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
+                                                 CanType T) const = 0;
 
   /// Return the statically-known size of this type, or null if it is
   /// not known.

@@ -1630,25 +1630,13 @@ static void emitDynamicPackingOperation(IRGenFunction &IGF,
                                         CanType T,
                                         const TypeInfo &type,
                                         DynamicPackingOperation &operation) {
-  llvm::Value *size = type.getSize(IGF, T);
-  llvm::Value *alignMask = type.getAlignmentMask(IGF, T);
-
   auto indirectBB = IGF.createBasicBlock("dynamic-packing.indirect");
   auto directBB = IGF.createBasicBlock("dynamic-packing.direct");
   auto contBB = IGF.createBasicBlock("dynamic-packing.cont");
 
-  // Check whether the type is either over-sized or over-aligned.
-  // Note that, since alignof(FixedBuffer) is a power of 2 and
-  // alignMask is one less than one, alignMask > alignof(FixedBuffer)
-  // is equivalent to alignMask+1 > alignof(FixedBuffer).
-  auto bufferSize = IGF.IGM.getSize(getFixedBufferSize(IGF.IGM));
-  auto oversize = IGF.Builder.CreateICmpUGT(size, bufferSize, "oversized");
-  auto bufferAlign = IGF.IGM.getSize(getFixedBufferAlignment(IGF.IGM).asSize());
-  auto overalign = IGF.Builder.CreateICmpUGT(alignMask, bufferAlign, "overaligned");
-
   // Branch.
-  llvm::Value *cond = IGF.Builder.CreateOr(oversize, overalign, "indirect");
-  IGF.Builder.CreateCondBr(cond, indirectBB, directBB);
+  auto isInline = type.isDynamicallyPackedInline(IGF, T);
+  IGF.Builder.CreateCondBr(isInline, directBB, indirectBB);
 
   // Emit the indirect path.
   IGF.Builder.emitBlock(indirectBB);

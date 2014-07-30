@@ -64,11 +64,6 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   if (!fixedTI)
     return FixedPacking::Dynamic;
   
-  // Never store types that aren't bitwise-takable inline. This allows the
-  // existential container itself to be bitwise-takable.
-  if (!fixedTI->isBitwiseTakable(ResilienceScope::Local))
-    return FixedPacking::Allocate;
-  
   Size bufferSize = getFixedBufferSize(IGM);
   Size requiredSize = fixedTI->getFixedSize();
   
@@ -410,6 +405,15 @@ llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, CanType T) const {
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
+}
+
+llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
+                                                      CanType T) const {
+  auto packing = getFixedPacking(IGF.IGM);
+  assert(packing == FixedPacking::Allocate ||
+         packing == FixedPacking::OffsetZero);
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                packing == FixedPacking::OffsetZero);
 }
 
 unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {

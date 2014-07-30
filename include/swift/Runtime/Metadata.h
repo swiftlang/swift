@@ -535,12 +535,8 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  ///
-  /// TODO: Instead of storing all non-bitwise-takable types out-of-line, we
-  /// should have an initializeBufferWithTakeOfBuffer value witness.
-  static bool isValueInline(size_t size, size_t alignment, bool bitwiseTakable) {
-    return (bitwiseTakable &&
-            size <= sizeof(ValueBuffer) &&
+  static bool isValueInline(size_t size, size_t alignment) {
+    return (size <= sizeof(ValueBuffer) &&
             alignment <= alignof(ValueBuffer));
   }
 

@@ -125,6 +125,12 @@ public:
     return emitLoadOfStride(IGF, wtable);
   }
 
+  llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
+                                         CanType T) const override {
+    auto wtable = getValueWitnessTable(IGF, T);
+    return emitLoadOfIsInline(IGF, wtable);
+  }
+
   /// FIXME: Dynamic extra inhabitant lookup.
   bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,

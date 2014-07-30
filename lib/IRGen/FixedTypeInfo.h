@@ -88,6 +88,8 @@ public:
   llvm::Value *getSize(IRGenFunction &IGF, CanType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, CanType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, CanType T) const override;
+  llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
+                                         CanType T) const override;
 
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
   llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;

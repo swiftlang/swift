@@ -1104,8 +1104,7 @@ void performBasicLayout(BasicLayout &layout,
     if (!eltVWT->isPOD()) isPOD = false;
     if (!eltVWT->isBitwiseTakable()) isBitwiseTakable = false;
   }
-  bool isInline = ValueWitnessTable::isValueInline(size, alignment,
-                                                   isBitwiseTakable);
+  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
   
   layout.size = size;
   layout.flags = ValueWitnessFlags().withAlignment(alignment)
