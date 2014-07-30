@@ -754,56 +754,29 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   return false;
 }
 
-bool TypeChecker::validateGenericTypeSignature(Decl *nominalOrExtension) {
-  ExtensionDecl *ext = dyn_cast<ExtensionDecl>(nominalOrExtension);
-  NominalTypeDecl *type;
-  if (ext)
-    type = ext->getExtendedType()->getAnyNominal();
-  else
-    type = cast<NominalTypeDecl>(nominalOrExtension);
-
-  GenericParamList *genericParams = nullptr;
-  if (ext) {
-    // FIXME: Do the same thing for all levels of generic parameters.
-    genericParams = ext->getRefComponents().back().GenericParams;
-  } else {
-    genericParams = type->getGenericParams();
-  }
-
+GenericSignature *TypeChecker::validateGenericSignature(
+                    GenericParamList *genericParams,
+                    DeclContext *dc,
+                    std::function<bool(ArchetypeBuilder &)> inferRequirements,
+                    bool &invalid) {
   assert(genericParams && "Missing generic parameters?");
 
   // Create the archetype builder.
-  Module *module = nominalOrExtension->getModuleContext();
+  Module *module = dc->getParentModule();
   ArchetypeBuilder builder = createArchetypeBuilder(module);
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver;
-  bool invalid = false;
-  
-  DeclContext *dc = nominalOrExtension->getDeclContext();
+  DependentGenericTypeResolver dependentResolver;  
   if (checkGenericParameters(*this, &builder, genericParams, dc,
                              dependentResolver)) {
     invalid = true;
   }
 
-  // Compute the extended type with generic parameters as its generic arguments.
-  TypeLoc extendedType;
-  if (ext) {
-    SmallVector<Type, 2> genericArgs;
-    for (auto gp : *genericParams) {
-      genericArgs.push_back(gp->getDeclaredInterfaceType());
-    }
-
-    extendedType.setType(BoundGenericType::get(type, /*FIXME:*/Type(),
-                                               genericArgs));
+  /// Perform any necessary requirement inference.
+  if (inferRequirements && inferRequirements(builder)) {
+    invalid = true;
   }
-
-  // Infer requirements from the extended type. This allows an extension to
-  // avoid repeating the requirements placed on the generic parameters in the
-  // original type definition.
-  if (!extendedType.isNull())
-    builder.inferRequirements(extendedType);
 
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
@@ -815,11 +788,10 @@ bool TypeChecker::validateGenericTypeSignature(Decl *nominalOrExtension) {
     invalid = true;
   }
 
-  // Infer requirements from the extended type. This allows an extension to
-  // avoid repeating the requirements placed on the generic parameters in the
-  // original type definition.
-  if (!extendedType.isNull())
-    builder.inferRequirements(extendedType);
+  /// Perform any necessary requirement inference.
+  if (inferRequirements && inferRequirements(builder)) {
+    invalid = true;
+  }
 
   // The generic function signature is complete and well-formed. Gather
   // the generic parameter types at this level.
@@ -833,12 +805,15 @@ bool TypeChecker::validateGenericTypeSignature(Decl *nominalOrExtension) {
   collectRequirements(builder, allGenericParams, requirements);
 
   // Record the generic type parameter types and the requirements.
-  auto sig = GenericSignature::get(allGenericParams, requirements);
-  if (ext)
-    ext->setGenericSignature(sig);
-  else
-    type->setGenericSignature(sig);
+  return GenericSignature::get(allGenericParams, requirements);
+}
 
+bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
+  bool invalid = false;
+  auto sig = validateGenericSignature(nominal->getGenericParams(),
+                                      nominal->getDeclContext(),
+                                      nullptr, invalid);
+  nominal->setGenericSignature(sig);
   return invalid;
 }
 

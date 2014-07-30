@@ -5766,20 +5766,44 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       ext->setExtendedType(nominal->getDeclaredTypeInContext());
       return;
     }
+    
+    // Local function used to infer requirements from the extended type.
+    TypeLoc extendedTypeInfer;
+    auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
+      if (extendedTypeInfer.isNull()) {
+        SmallVector<Type, 2> genericArgs;
+        for (auto gp : *genericParams) {
+          genericArgs.push_back(gp->getDeclaredInterfaceType());
+        }
+        
+        extendedTypeInfer.setType(BoundGenericType::get(nominal, 
+                                                        /*FIXME:*/Type(),
+                                                        genericArgs));
+      }
+      
+      return builder.inferRequirements(extendedTypeInfer);
+    };
 
     // Validate the generic type signature.
-    if (validateGenericTypeSignature(ext)) {
+    bool invalid = false;
+    GenericSignature *sig = validateGenericSignature(genericParams,
+                                                     ext->getDeclContext(),
+                                                     inferExtendedTypeReqs,
+                                                     invalid);
+    if (invalid) {
       ext->setInvalid();
       ext->setExtendedType(ErrorType::get(Context));
       return;
     }
+
+    ext->setGenericSignature(sig);
 
     // If the generic extension signature is not equivalent to that of the
     // nominal type, there are extraneous requirements.
     // Note that we cannot have missing requirements due to requirement
     // inference.
     // FIXME: Figure out an extraneous requirement to point to.
-    if (ext->getGenericSignature()->getCanonicalSignature() !=
+    if (sig->getCanonicalSignature() !=
           nominal->getGenericSignature()->getCanonicalSignature()) {
       diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
                nominal->getDeclaredType())
@@ -5791,25 +5815,13 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // Validate the generic parameters for the last time.
     revertGenericParamList(genericParams);
-
     ArchetypeBuilder builder = createArchetypeBuilder(ext->getModuleContext());
     checkGenericParamList(builder, genericParams, *this, ext->getDeclContext());
-
-    // Compute the extended type so that we can infer requirements from it.
-    // FIXME: Copied from validateGenericTypeSignature(). This is silly.
-    SmallVector<Type, 2> genericArgs;
-    for (auto gp : *genericParams) {
-      genericArgs.push_back(gp->getDeclaredType());
-    }
-    extendedType = BoundGenericType::get(nominal, /*FIXME:*/Type(),
-                                         genericArgs);
-    builder.inferRequirements(TypeLoc::withoutLoc(extendedType));
-
-    // ... final step to assign archetypes.
+    inferExtendedTypeReqs(builder);
     finalizeGenericParamList(builder, genericParams, ext, *this);
 
     // Compute the final extended type.
-    genericArgs.clear();
+    SmallVector<Type, 2> genericArgs;
     for (auto gp : *genericParams) {
       genericArgs.push_back(gp->getArchetype());
     }

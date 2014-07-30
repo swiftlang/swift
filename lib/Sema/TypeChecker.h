@@ -554,12 +554,33 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
-  /// Validate the signature of a generic type or extension thereof.
+  /// Validate the given generic parameters to produce a generic
+  /// signature.
   ///
-  /// \param nominalOrExtension The generic type or extension.
+  /// \param genericParams The generic parameters to validate.
+  ///
+  /// \param dc The declaration context in which to perform the validation.
+  ///
+  /// \param inferRequirements When non-empty, callback that will be invoked
+  /// to perform any additional requirement inference that contributes to the
+  /// generic signature. Returns true if an error occurred.
+  ///
+  /// \param invalid Will be set true if an error occurs during validation.
+  ///
+  /// \returns the generic signature that captures the generic
+  /// parameters and inferred requirements.
+  GenericSignature *validateGenericSignature(
+                      GenericParamList *genericParams,
+                      DeclContext *dc,
+                      std::function<bool(ArchetypeBuilder &)> inferRequirements,
+                      bool &invalid);
+                        
+  /// Validate the signature of a generic type.
+  ///
+  /// \param nominal The generic type.
   ///
   /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericTypeSignature(Decl *nominalOrExtension);
+  bool validateGenericTypeSignature(NominalTypeDecl *nominal);
 
   /// Given a type that was produced within the given generic declaration
   /// context, produce the corresponding interface type.
