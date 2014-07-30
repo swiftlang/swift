@@ -3024,10 +3024,10 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
   Address val;
+  SILType destTy = i->getCastType();
   if (i->isExact()) {
     auto operand = i->getOperand();
     Explosion source = getLoweredExplosion(operand);
-    SILType destTy = i->getCastType();
     llvm::Value *result =
       emitClassIdenticalCast(*this, source.claimNext(), operand.getType(),
                              destTy, CheckedCastMode::Conditional);
@@ -3043,7 +3043,9 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
      llvm::ConstantPointerNull::get(val.getType()));
   
   auto &successBB = getLoweredBB(i->getSuccessBB());
-  
+  llvm::Type *toTy = IGM.getTypeInfo(destTy).StorageType;
+  llvm::Value *toValue = Builder.CreateBitCast(val.getAddress(), toTy);
+
   Builder.CreateCondBr(isNonnull,
                        successBB.bb,
                        getLoweredBB(i->getFailureBB()).bb);
@@ -3054,7 +3056,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     addIncomingAddressToPHINodes(*this, successBB, phiIndex, val);
   else {
     Explosion ex(ResilienceExpansion::Maximal);
-    ex.add(val.getAddress());
+    ex.add(toValue);
     addIncomingExplosionToPHINodes(*this, successBB, phiIndex, ex);
   }
 }
