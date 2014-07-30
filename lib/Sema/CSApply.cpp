@@ -5125,10 +5125,27 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   // general name via the witness table.
   auto witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC);
   if (!witnesses) {
+    auto protocolType = protocol->getType()->
+                        getAs<MetatypeType>()->getInstanceType();
+    
     // Find the witness we need to use.
-    auto witness =
-        findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(), protocol,
-                                 generalName, brokenProtocolDiag);
+    ValueDecl *witness = nullptr;
+    
+    if (!protocolType->isEqual(type)) {
+      witness = findNamedPropertyWitness(tc, cs.DC, type -> getRValueType(),
+                                         protocol, generalName,
+                                         brokenProtocolDiag);
+    } else {
+      // If the expression is already typed to the protocol, lookup the protocol
+      // method directly.
+      witnesses = tc.lookupMember(type->getRValueType(), generalName, cs.DC);
+      if (!witnesses) {
+        tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
+        return nullptr;
+      }
+      witness = witnesses[0];
+    }
+    
     // Form a reference to this member.
     Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
                                               witness, expr->getEndLoc(),
