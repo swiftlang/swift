@@ -76,3 +76,14 @@ func f1<A, B, C, D, E>(x: X<A, B, C>, a: A, assoc: A.AssocType,
   x.bar(assoc)
   inner.honk(d, y: e)
 }
+
+// Lvalue check when the archetypes are not the same.
+struct LValueCheck<T> {
+  let x = 0
+}
+
+extension LValueCheck<A> { // expected-error{{generic arguments are not allowed on an extension}}
+  init(newY: Int) {
+    x = 42
+  }
+}
