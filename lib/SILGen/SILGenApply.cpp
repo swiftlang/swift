@@ -1904,21 +1904,20 @@ namespace {
     void emitInOut(RValueSource &&arg,
                    CanType loweredSubstArgType, CanType loweredSubstParamType,
                    AbstractionPattern origType, CanType substType) {
+      SILLocation loc = arg.getLocation();
+      ManagedValue address;
       if (arg.isRValue()) {
-        emitInOut(arg.getKnownRValueLocation(), std::move(arg).asKnownRValue(),
-                  loweredSubstArgType, loweredSubstParamType,
-                  origType, substType);
+        // If the argument is already lowered to an RValue, it must be the
+        // receiver of a self argument, which will be the first inout.
+        address = std::move(arg).asKnownRValue().getScalarValue();
       } else {
-        Expr *e = std::move(arg).asKnownExpr();
-        emitInOut(e, SGF.emitRValue(e),
-                  loweredSubstArgType, loweredSubstParamType,
-                  origType, substType);
-      }
-    }
+        auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
+                                     getSemanticsProvidingExpr());
 
-    void emitInOut(SILLocation loc, RValue &&rvalue,
-                   CanType loweredSubstArgType, CanType loweredSubstParamType,
-                   AbstractionPattern origType, CanType substType) {
+        LValue lv = SGF.emitLValue(e->getSubExpr());
+        address = SGF.emitAddressOfLValue(e->getSubExpr(), lv);
+      }
+
       if (hasAbstractionDifference(CC, loweredSubstParamType,
                                    loweredSubstArgType)) {
         // This could actually just be type-bridging.  In any case,
@@ -1929,7 +1928,6 @@ namespace {
         abort();
       }
 
-      
       // We know that the rvalue has a single ManagedValue.  Check to see if we
       // have an obvious alias with a previously emitted argument.  Note that we
       // could do this in a later SILDiagnostics pass as well: this would be
@@ -1938,10 +1936,8 @@ namespace {
       
       // TODO: This uses exact SILValue equivalence to detect aliases, we could
       // do something stronger here to catch other obvious cases.
-      SILValue pointer = rvalue.peekScalarValue();
-
       for (auto prev : InOutArguments) {
-        if (prev.first == pointer) {
+        if (prev.first == address.getValue()) {
           SGF.SGM.diagnose(loc, diag::inout_argument_alias)
             .highlight(loc.getSourceRange());
           SGF.SGM.diagnose(prev.second, diag::previous_inout_alias)
@@ -1949,9 +1945,8 @@ namespace {
         }
       }
       
-      InOutArguments.push_back({pointer, loc});
-      
-      std::move(rvalue).getAll(Args);
+      InOutArguments.push_back({address.getValue(), loc});
+      Args.push_back(address);
       return;
     }
 
@@ -2040,10 +2035,8 @@ namespace {
       return SubstResultType;
     }
     
-    void emit(SILGenFunction &gen,
-              AbstractionPattern origParamType,
-              ParamLowering &lowering,
-              SmallVectorImpl<ManagedValue> &args) && {
+    void emit(SILGenFunction &gen, AbstractionPattern origParamType,
+              ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType());
 
       ArgEmitter emitter(gen, lowering.CC, params, args);
