@@ -14,8 +14,11 @@ public protocol _ExtensibleCollectionType : CollectionType {
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
+  ///
   /// This works as an optimization to avoid multiple reallocations of
-  /// linear data structures like Array
+  /// linear data structures like Array.  Concrete implementations of
+  /// `ExtensibleCollectionType` may reserve more than `n`, exactly `n`, less
+  /// than `n` elements of storage, or even ignore the request completely.
   mutating func reserveCapacity(n: Index.Distance)
 
   /*
@@ -109,22 +112,6 @@ public func +<
   lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
   lhs.extend(rhs)
   return lhs
-}
-
-extension String : ExtensibleCollectionType {
-  public mutating func reserveCapacity(n: Int) {
-    // FIXME: implement.
-    // <rdar://problem/16970908> Implement String.reserveCapacity
-  }
-
-  public mutating func extend<
-      S : SequenceType
-      where S.Generator.Element == Character
-  >(seq: S) {
-    for c in seq {
-      self += c
-    }
-  }
 }
 
 /// Creates and returns a collection of type `C` that is the result of

@@ -518,6 +518,25 @@ extension String : Sliceable {
   }
 }
 
+extension String : ExtensibleCollectionType {
+  /// Reserve enough space to store `n` ASCII characters in O(N).
+  ///
+  /// If current capacity is sufficient, has no effect.
+  public mutating func reserveCapacity(n: Int) {
+    // FIXME: implement.
+    // <rdar://problem/16970908> Implement String.reserveCapacity
+  }
+
+  public mutating func extend<
+      S : SequenceType
+      where S.Generator.Element == Character
+  >(seq: S) {
+    for c in seq {
+      self += c
+    }
+  }
+}
+
 // Algorithms
 extension String {
   public func join<
