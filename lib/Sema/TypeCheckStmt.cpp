@@ -426,9 +426,13 @@ public:
       if (!getGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
+      std::string name;
+      if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
+        name = "$"+np->getBoundName().str().str();
+      name += "$generator";
       generator = new (TC.Context)
         VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
-                TC.Context.getIdentifier("$generator"), generatorTy, DC);
+                TC.Context.getIdentifier(name), generatorTy, DC);
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
