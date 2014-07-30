@@ -295,9 +295,7 @@ def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
 def integrated_repl : Flag<["-"], "integrated-repl">,
   Flags<[FrontendOption, NoBatchOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
-def i : Flag<["-"], "i">, Flags<[HelpHidden]>,
-  HelpText<"Immediate mode (the default if there is an input file)">,
-  ModeOpt;
+def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
