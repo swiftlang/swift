@@ -220,16 +220,16 @@ void ARCBBState::initPredTopDown(ARCBBState &PredBB) {
 
 bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   auto NewState = MergeTopDownLatticeStates(LatState, Other.LatState);
-  DEBUG(llvm::dbgs() << "            Performing TopDown Merge.\n");
-  DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
+  DEBUG(llvm::dbgs() << "        Performing TopDown Merge.\n");
+  DEBUG(llvm::dbgs() << "            Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
-  DEBUG(llvm::dbgs() << "                V: ";
-        if (getValue())
+  DEBUG(llvm::dbgs() << "            V: ";
+        if (hasValue())
           getValue()->dump();
         else
           llvm::dbgs() << "\n";
-        llvm::dbgs() << "                OtherV: ";
-        if (Other.getValue())
+        llvm::dbgs() << "            OtherV: ";
+        if (Other.hasValue())
           Other.getValue()->dump();
         else
           llvm::dbgs() << "\n");
@@ -272,12 +272,12 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
   DEBUG(llvm::dbgs() << "                V: ";
-        if (getValue())
+        if (hasValue())
           getValue()->dump();
         else
           llvm::dbgs() << "\n";
         llvm::dbgs() << "                OtherV: ";
-        if (Other.getValue())
+        if (Other.hasValue())
           Other.getValue()->dump();
         else
           llvm::dbgs() << "\n");

@@ -173,7 +173,13 @@ struct RefCountState {
   /// Return the value with reference semantics that is the operand of our
   /// increment.
   SILValue getValue() const {
+    assert(Value && "Value should never be null here");
     return Value;
+  }
+
+  /// Returns true if we have a valid value that we are tracking.
+  bool hasValue() const {
+    return Value.isValid();
   }
 
   /// The latest point we can move the increment without bypassing instructions
