@@ -163,3 +163,8 @@ void UnimplementedTypeInfo::initializeMetadata(IRGenFunction &IGF,
                                                CanType T) const {
   
 }
+
+llvm::Value *UnimplementedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
+                                                              CanType T) const {
+  return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+}

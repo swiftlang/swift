@@ -73,6 +73,9 @@ public:
                           llvm::Value *vwtable,
                           CanType T) const override;
   
+  llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
+                                         CanType T) const override;
+  
   static bool classof(const TypeInfo *type) {
     return type->getSpecialTypeInfoKind() <= STIK_Unimplemented;
   }
