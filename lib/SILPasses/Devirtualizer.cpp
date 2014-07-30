@@ -936,7 +936,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   return VirtAI;
 }
 
-/// Specialize virtual dispatch.
+/// \brief Try to insert inline cahces for the call \p AI. This function
+/// returns true if a change was made.
 static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
   assert(CMI && "Invalid class method instruction");
@@ -958,8 +959,8 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   CHA->collectSubClasses(CD, Subs);
 
   if (Subs.size() > MaxNumPolymorphicInlineCaches) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has " <<  Subs.size()
-          << " subclasses. Not inserting polymorphic inline caches.\n");
+    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many (" <<
+          Subs.size() << ") subclasses. Not inserting inline caches.\n");
     return false;
   }
 
