@@ -37,17 +37,20 @@ void ClassHierarchyAnalysis::collectSubClasses(ClassDecl *C,
                                                std::vector<ClassDecl*> &Sub) {
   // TODO: Cache this search.
   assert(Sub.empty() && "Incoming list is not empty");
+  SmallVector<ClassDecl*, 4> Path;
   for (auto &VT : M->getVTableList()) {
     ClassDecl *CD = VT.getClass();
-    // Ignore classes that are at the top of the class hierarchy:
-    if (!CD->hasSuperclass())
-      continue;
-
-    // Add the superclass to the list of inherited classes.
-    ClassDecl *Super = CD->getSuperclass()->getClassOrBoundGenericClass();
-    if (Super == C) {
-      Sub.push_back(CD);
+    while (CD->hasSuperclass()) {
+      Path.push_back(CD);
+      // Add the superclass to the list of inherited classes.
+      ClassDecl *Super = CD->getSuperclass()->getClassOrBoundGenericClass();
+      if (Super == C) {
+        Sub.insert(Sub.end(), Path.begin(), Path.end());
+        break;
+      }
+      CD = Super;
     }
+    Path.clear();
   }
 }
 
