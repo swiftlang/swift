@@ -140,6 +140,7 @@ public:
 
   SILBasicBlock *getBB() const { return BB; }
 
+  /// Merge in the states of all predecessors.
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
                               std::vector<LSBBForwarder> &BBIDToForwarderMap);
@@ -488,9 +489,7 @@ bool LSBBForwarder::optimize(AliasAnalysis *AA, PostDominanceInfo *PDI) {
   return Changed;
 }
 
-void
-LSBBForwarder::
-mergePredecessorState(LSBBForwarder &OtherState) {
+void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
   // Merge in the predecessor state.
   DEBUG(llvm::dbgs() << "        Initial Stores:\n");
   llvm::SmallVector<SILInstruction *, 8> DeleteList;
@@ -534,7 +533,14 @@ LSBBForwarder::
 mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                       unsigned> &BBToBBIDMap,
                        std::vector<LSBBForwarder> &BBIDToForwarderMap) {
+  // Clear the state if the basic block has no predecessor.
+  if (BB->getPreds().empty())
+    clear();
+
   bool HasAtLeastOnePred = false;
+  // If we have a self cycle, we keep the old state and merge in states
+  // of other predecessors. Otherwise, we initialize the state with the first
+  // predecessor's state and merge in states of other predecessors.
   bool HasSelfCycle = false;
   for (auto Pred : BB->getPreds())
     if (Pred == BB) {
@@ -632,13 +638,14 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
 
         DEBUG(llvm::dbgs() << "Visiting BB #" << ID << "\n");
 
-        // Clear forwarder.
-        Forwarder.clear();
-
-        // Merge the predecessors.
+        // Merge the predecessors. After merging, LSBBForwarder now contains
+        // lists of stores|loads that reach the beginning of the basic block
+        // along all paths.
         Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
 
-        // Remove dead stores, merge duplicate loads, and forward stores to loads.
+        // Remove dead stores, merge duplicate loads, and forward stores to
+        // loads. We also update lists of stores|loads to reflect the end
+        // of the basic block.
         ChangedDuringIteration = Forwarder.optimize(AA, PDI);
         Changed |= ChangedDuringIteration;
       }
