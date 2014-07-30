@@ -151,17 +151,17 @@ namespace irgen {
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
   
-  /// Given an opaque class instance pointer, produce the type metadata reference
-  /// as a %type*.
-  llvm::Value *emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
-                                                      llvm::Value *object);
+  /// Given an opaque class instance pointer, produce the type
+  /// metadata reference as a %type*.
+  llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
+                                                 llvm::Value *object);
 
   /// Given a heap-object instance, with some heap-object type,
   /// produce a reference to its type metadata.
-  llvm::Value *emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
-                                            llvm::Value *object,
-                                            SILType objectType,
-                                            bool suppressCast = false);
+  llvm::Value *emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
+                                           llvm::Value *object,
+                                           SILType objectType,
+                                           bool suppressCast = false);
 
   /// Given a heap-object instance, with some heap-object type,
   /// produce a reference to its heap metadata.

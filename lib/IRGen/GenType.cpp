@@ -1783,7 +1783,7 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjCMetatype:
     return emitObjCMetadataRefForMetadata(*this, LocalSelf);
   case ObjectReference:
-    return emitTypeMetadataRefForOpaqueHeapObject(*this, LocalSelf);
+    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
   }
 }
 

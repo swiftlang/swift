@@ -173,30 +173,20 @@ namespace irgen {
                                    ProtocolDecl *protocol);
 
   /// Emit a dynamic metatype lookup for the given archetype.
-  llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
-                                               Address archetypeAddr,
-                                               SILType archetypeType);
+  llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
+                                                Address archetypeAddr,
+                                                SILType archetypeType);
   
   /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF,
-                                                 Address addr,
-                                                 SILType type);
-  
-  /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF,
-                                                 Address addr,
-                                                 CanType type);
+  llvm::Value *emitDynamicTypeOfOpaqueExistential(IRGenFunction &IGF,
+                                                  Address addr,
+                                                  SILType type);
   
   /// Emit a dynamic metatype lookup for the given class existential.
-  llvm::Value *emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
-                                                             Explosion &value,
-                                                             SILType type);
+  llvm::Value *emitDynamicTypeOfClassExistential(IRGenFunction &IGF,
+                                                 Explosion &value,
+                                                 SILType type);
   
-  /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
-                                                             Explosion &value,
-                                                             CanType type);
-
   std::pair<Address, llvm::Value*>
   emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
                                                 Address base,

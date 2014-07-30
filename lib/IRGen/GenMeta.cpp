@@ -3205,9 +3205,8 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
-llvm::Value *irgen::emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
-                                                           llvm::Value *object)
-{
+llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
+                                                      llvm::Value *object) {
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
                                          object,
@@ -3220,10 +3219,10 @@ llvm::Value *irgen::emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
 
 /// Given an object of class type, produce the type metadata reference
 /// as a %type*.
-llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
-                                                     llvm::Value *object,
-                                                     SILType objectType,
-                                                     bool suppressCast) {
+llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
+                                                llvm::Value *object,
+                                                SILType objectType,
+                                                bool suppressCast) {
   // If it is known to have swift metadata, just load.
   if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
     return emitLoadOfHeapMetadataRef(IGF, object,
@@ -3233,7 +3232,7 @@ llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
 
   // Okay, ask the runtime for the type metadata of this
   // potentially-ObjC object.
-  return emitTypeMetadataRefForOpaqueHeapObject(IGF, object);
+  return emitDynamicTypeOfOpaqueHeapObject(IGF, object);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

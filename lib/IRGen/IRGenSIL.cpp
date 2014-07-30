@@ -1487,7 +1487,7 @@ static llvm::Value *getClassMetatype(IRGenFunction &IGF,
     llvm_unreachable("Class metatypes are never thin");
     
   case MetatypeRepresentation::Thick:
-    return emitTypeMetadataRefForHeapObject(IGF, baseValue, instanceType);
+    return emitDynamicTypeOfHeapObject(IGF, baseValue, instanceType);
       
   case MetatypeRepresentation::ObjC:
     return emitHeapMetadataRefForHeapObject(IGF, baseValue, instanceType);
@@ -1518,8 +1518,8 @@ void IRGenSILFunction::visitValueMetatypeInst(
                              metaTy->getRepresentation(), instanceTy));
     } else {
       Address base = getLoweredAddress(i->getOperand());
-      e.add(emitTypeMetadataRefForArchetype(*this, base,
-                                            i->getOperand().getType()));
+      e.add(emitDynamicTypeOfOpaqueArchetype(*this, base,
+                                             i->getOperand().getType()));
       // FIXME: We need to convert this back to an ObjC class for an
       // ObjC metatype representation.
       if (metaTy->getRepresentation() == MetatypeRepresentation::ObjC)
@@ -1538,12 +1538,12 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   llvm::Value *metatype;
   if (i->getOperand().getType().isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());
-    metatype = emitTypeMetadataRefForClassExistential(*this, existential,
-                                                     i->getOperand().getType());
+    metatype = emitDynamicTypeOfClassExistential(*this, existential,
+                                                 i->getOperand().getType());
   } else {
     Address existential = getLoweredAddress(i->getOperand());
-    metatype = emitTypeMetadataRefForOpaqueExistential(*this, existential,
-                                                 i->getOperand().getType());
+    metatype = emitDynamicTypeOfOpaqueExistential(*this, existential,
+                                                  i->getOperand().getType());
   }
   Explosion result(ResilienceExpansion::Maximal);
   result.add(metatype);

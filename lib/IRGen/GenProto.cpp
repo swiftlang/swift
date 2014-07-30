@@ -4640,20 +4640,6 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   getWitnessMethodValue(IGF, fn, fnProto, wtable, nullptr, out);
 }
 
-llvm::Value *
-irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
-                                       Address addr,
-                                       SILType type) {
-  auto archetype = type.castTo<ArchetypeType>();
-  
-  // Acquire the archetype's static metadata.
-  llvm::Value *metadata = IGF.getLocalTypeData(archetype,
-                                               LocalTypeData::Metatype);
-
-  // Call the 'typeof' value witness.
-  return emitTypeofCall(IGF, metadata, addr.getAddress());
-}
-
 /// Extract the method pointer and metadata from a protocol witness table
 /// as a function value.
 void
@@ -4715,33 +4701,31 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
   // TODO: Load the metadata from the class reference. This is redundant,
   // but for simplicity in bringing up @cc(witness_method) we always provide
   // a metadata argument.
-  llvm::Value *metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, object);
+  llvm::Value *metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, object);
   
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
-llvm::Value *
-irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
-                                               SILType type) {
-  return emitTypeMetadataRefForOpaqueExistential(IGF, addr,
-                                           type.getSwiftRValueType());
-}
-
-llvm::Value *
-irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
-                                                     Explosion &value,
+llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
+                                                     Address addr,
                                                      SILType type) {
-  return emitTypeMetadataRefForClassExistential(IGF, value,
-                                                 type.getSwiftRValueType());
+  auto archetype = type.castTo<ArchetypeType>();
+  
+  // Acquire the archetype's static metadata.
+  llvm::Value *metadata = IGF.getLocalTypeData(archetype,
+                                               LocalTypeData::Metatype);
+
+  // Call the 'typeof' value witness.
+  return emitTypeofCall(IGF, metadata, addr.getAddress());
 }
 
-llvm::Value *
-irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
-                                               CanType type) {
+llvm::Value *irgen::emitDynamicTypeOfOpaqueExistential(IRGenFunction &IGF,
+                                                       Address addr,
+                                                       SILType type) {
   assert(type.isExistentialType());
-  assert(!type->isClassExistentialType());
-  auto &baseTI = IGF.getTypeInfoForLowered(type).as<OpaqueExistentialTypeInfo>();
+  assert(!type.isClassExistentialType());
+  auto &baseTI = IGF.getTypeInfo(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
   auto existLayout = baseTI.getLayout();
@@ -4753,17 +4737,16 @@ irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
   return emitTypeofCall(IGF, metadata, object);
 }
 
-llvm::Value *
-irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
-                                                     Explosion &value,
-                                                     CanType type) {
-  assert(type->isClassExistentialType());
-  auto &baseTI = IGF.getTypeInfoForLowered(type).as<ClassExistentialTypeInfo>();
+llvm::Value *irgen::emitDynamicTypeOfClassExistential(IRGenFunction &IGF,
+                                                      Explosion &value,
+                                                      SILType type) {
+  assert(type.isClassExistentialType());
+  auto &baseTI = IGF.getTypeInfo(type).as<ClassExistentialTypeInfo>();
   
   // Extract the class instance pointer.
   llvm::Value *instance = baseTI.getValue(IGF, value);
   // Get the type metadata.
-  return emitTypeMetadataRefForOpaqueHeapObject(IGF, instance);
+  return emitDynamicTypeOfOpaqueHeapObject(IGF, instance);
 }
 
 /// Emit a projection from an existential container to its concrete value
@@ -4784,7 +4767,7 @@ irgen::emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
     auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
+    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.
@@ -4850,7 +4833,7 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   ArrayRef<llvm::Value*> wtables;
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
-  auto metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
+  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
   IGF.bindArchetype(openedArchetype, metadata, wtables);
 
   return value;

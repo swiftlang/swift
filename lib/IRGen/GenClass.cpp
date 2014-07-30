@@ -691,7 +691,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 
   // Otherwise, get them from the metadata.
   llvm::Value *metadata =
-    emitTypeMetadataRefForHeapObject(IGF, selfValue, selfType);
+    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
     = emitClassFragileInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
