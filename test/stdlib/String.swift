@@ -92,6 +92,83 @@ StringTests.test("hasPrefix") {
   expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
 }
 
+func getIdentity(s: String) -> UWord {
+  return unsafeBitCast(s._core._owner, UWord.self)
+}
+
+StringTests.test("appendToSubstring") {
+  for initialSize in 1..<16 {
+    for sliceStart in [ 0, 2, 8, initialSize ] {
+      for sliceEnd in [ 0, 2, 8, sliceStart + 1 ] {
+        if sliceStart > initialSize || sliceEnd > initialSize ||
+          sliceEnd < sliceStart {
+          continue
+        }
+        var s0 = String(count: initialSize, repeatedValue: UnicodeScalar("x"))
+        let originalIdentity = getIdentity(s0)
+        s0 = s0[
+          advance(s0.startIndex, sliceStart)..<advance(s0.startIndex, sliceEnd)]
+        expectEqual(originalIdentity, getIdentity(s0))
+        s0 += "x"
+        // For a small string size, the allocator could round up the allocation
+        // and we could get some unused capacity in the buffer.  In that case,
+        // the identity would not change.
+        if sliceEnd != initialSize {
+          expectNotEqual(originalIdentity, getIdentity(s0))
+        }
+        expectEqual(
+          String(
+            count: sliceEnd - sliceStart + 1,
+            repeatedValue: UnicodeScalar("x")),
+          s0)
+      }
+    }
+  }
+}
+
+StringTests.test("appendToSubstringBug") {
+  // String used to have a heap overflow bug when one attempted to append to a
+  // substring that pointed to the end of a string buffer.
+  //
+  //                           Unused capacity
+  //                           VVV
+  // String buffer [abcdefghijk   ]
+  //                      ^    ^
+  //                      +----+
+  // Substring -----------+
+  //
+  // In the example above, there are only three elements of unused capacity.
+  // The bug was that the implementation mistakenly assumed 9 elements of
+  // unused capacity (length of the prefix "abcdef" plus truly unused elements
+  // at the end).
+
+  let size = 1024 * 16
+  let suffixSize = 16
+  let prefixSize = size - suffixSize
+  for i in 1..<10 {
+    // We will be overflowing s0 with s1.
+    var s0 = String(count: size, repeatedValue: UnicodeScalar("x"))
+    let s1 = String(count: prefixSize, repeatedValue: UnicodeScalar("x"))
+    let originalIdentity = getIdentity(s0)
+
+    // Turn s0 into a slice that points to the end.
+    s0 = s0[advance(s0.startIndex, prefixSize)..<s0.endIndex]
+
+    // Slicing should not reallocate.
+    expectEqual(originalIdentity, getIdentity(s0))
+
+    // Overflow.
+    s0 += s1
+
+    // We should correctly determine that the storage is too small and
+    // reallocate.
+    expectNotEqual(originalIdentity, getIdentity(s0))
+
+    expectEqual(
+      String(count: suffixSize + prefixSize, repeatedValue: UnicodeScalar("x")), s0)
+  }
+}
+
 StringTests.run()
 // CHECK: {{^}}StringTests: All tests passed
 

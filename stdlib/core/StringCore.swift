@@ -324,23 +324,25 @@ public struct _StringCore {
   /// Note: if unsuccessful because of insufficient space in an
   /// existing buffer, the suggested new capacity will at least double
   /// the existing buffer's storage
-  mutating func _claimCapacity(newSize: Int, 
-                               minElementWidth: Int) -> (Int, COpaquePointer) {
+  mutating func _claimCapacity(
+    newSize: Int, minElementWidth: Int) -> (Int, COpaquePointer) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
-      // The buffer's "used" field must match this in order to be
-      // grown.  Otherwise, some other String is using parts of
-      // the buffer beyond our last byte.
-      let matchUsed = _pointerToNth(count)
+      // In order to grow the substring in place, this _StringCore should point
+      // at the substring at the end of a _StringBuffer.  Otherwise, some other
+      // String is using parts of the buffer beyond our last byte.
+      let usedStart = _pointerToNth(0)
+      let usedEnd = _pointerToNth(count)
 
       // Attempt to claim unused capacity in the buffer
       if _fastPath(buffer.grow(
-          UnsafeMutablePointer<RawByte>(matchUsed.value),
+          oldUsedStart: UnsafeMutablePointer(usedStart),
+          oldUsedEnd: UnsafeMutablePointer(usedEnd),
           newUsedCount: newSize)
       ) {
         count = newSize
-        return (0, matchUsed)
+        return (0, usedEnd)
       }
       else if newSize > buffer.capacity {
         // Growth failed because of insufficient storage; double the size
