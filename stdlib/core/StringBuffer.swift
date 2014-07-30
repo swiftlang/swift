@@ -154,23 +154,31 @@ public struct _StringBuffer {
     return elementShift + 1
   }
 
-  mutating func grow(oldUsedEnd: UnsafeMutablePointer<RawByte>,
-                     newUsedCount: Int) -> Bool {
+  /// Attempt to claim unused capacity in the buffer.
+  ///
+  /// Operation succeeds if there is sufficient capacity, and either:
+  /// - the buffer is uniquely-refereced, or
+  /// - `oldUsedEnd` points to the end of the currently used capacity.
+  ///
+  /// :param: oldUsedEnd one-past-end pointer to the substring that the caller
+  ///   tries to extend.
+  mutating func grow(
+    oldUsedEnd: UnsafeMutablePointer<RawByte>, newUsedCount: Int) -> Bool {
+
     if _slowPath(newUsedCount > capacity) {
       return false
     }
 
     let newUsedEnd = start + (newUsedCount << elementShift)
 
-    if _fastPath(
-      self._storage.isUniquelyReferenced()
-    ) {
+    if _fastPath(self._storage.isUniquelyReferenced()) {
       usedEnd = newUsedEnd
       return true
     }
 
     // FIXME: this function is currently NOT THREADSAFE.  The test +
     // assignment below should be replaced by a CAS
+    // <rdar://problem/17855614> _StringBuffer.grow() is racy
     if usedEnd == oldUsedEnd {
       usedEnd = newUsedEnd
       return true
