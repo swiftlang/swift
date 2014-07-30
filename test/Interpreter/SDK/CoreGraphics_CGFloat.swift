@@ -2,37 +2,88 @@
 
 import CoreGraphics
 import Foundation
+import StdlibUnittest
 
-// CGFloat initialization
-func initialization() {
-  // CHECK-LABEL: initialization test
-  println("initialization test")
+var CGFloatTestCase = TestCase("CGFloat")
 
-  // CHECK-NEXT: 0.0
-  var flt = CGFloat()
-  println(flt)
+CGFloatTestCase.test("literals") {
+  var flt: CGFloat = 4.125
+  expectEqual(4.125, flt)
 
-  // CHECK-NEXT: 3.14
-  let f: Float = 3.14159
-  flt = CGFloat(f)
-  println(flt)
-
-  // CHECK-NEXT: 3.14
-  let d: Double = 3.14159
-  flt = CGFloat(d)
-  println(flt)
-
-  // CHECK-NEXT: 3
-  var i: Int = 3
-  flt = CGFloat(i)
-  println(flt)
-
-  // CHECK-NEXT: 24
-  let i8: Int8 = 24
-  flt = CGFloat(i8)
-  println(flt)
+  flt = 42
+  expectEqual(42, flt)
 }
-initialization()
+
+CGFloatTestCase.test("init") {
+  expectEqual(0.0, CGFloat())
+  expectEqual(4.125, CGFloat(Float(4.125)))
+  expectEqual(4.125, CGFloat(Double(4.125)))
+
+  expectEqual(42, CGFloat(Int(42)))
+  expectEqual(42, CGFloat(Int8(42)))
+  expectEqual(42, CGFloat(Int16(42)))
+  expectEqual(42, CGFloat(Int32(42)))
+  expectEqual(42, CGFloat(Int64(42)))
+  expectEqual(42, CGFloat(UInt(42)))
+  expectEqual(42, CGFloat(UInt8(42)))
+  expectEqual(42, CGFloat(UInt16(42)))
+  expectEqual(42, CGFloat(UInt32(42)))
+  expectEqual(42, CGFloat(UInt64(42)))
+}
+
+CGFloatTestCase.test("initOtherTypesFromCGFloat") {
+  let flt: CGFloat = 4.125
+
+  expectEqual(4.125, Float(flt))
+  expectEqual(4.125, Double(flt))
+
+  expectEqual(4, Int(flt))
+  expectEqual(4, Int8(flt))
+  expectEqual(4, Int16(flt))
+  expectEqual(4, Int32(flt))
+  expectEqual(4, Int64(flt))
+  expectEqual(4, UInt(flt))
+  expectEqual(4, UInt8(flt))
+  expectEqual(4, UInt16(flt))
+  expectEqual(4, UInt32(flt))
+  expectEqual(4, UInt64(flt))
+}
+
+CGFloatTestCase.test("comparisons") {
+  let x = 3.14
+  let y = 3.14
+  let z = 2.71
+
+  expectTrue(x == y)
+  expectFalse(x != y)
+  checkHashable(true, x, y)
+
+  expectFalse(x == z)
+  expectTrue(x != z)
+  checkHashable(false, x, z)
+
+  expectFalse(x < z)
+  expectFalse(x <= z)
+  expectTrue(x >= z)
+  expectTrue(x > z)
+  checkComparable(.GT, x, z)
+
+  expectTrue(z < x)
+  expectTrue(z <= x)
+  expectFalse(z >= x)
+  expectFalse(z > x)
+  checkComparable(.LT, z, x)
+
+  expectFalse(x < y)
+  expectTrue(x <= y)
+  expectTrue(x >= y)
+  expectFalse(x > y)
+  checkComparable(.EQ, x, y)
+}
+
+CGFloatTestCase.run()
+// CHECK: {{^}}CGFloat: All tests passed
+
 
 // CGFloat hashing
 func hashing() {
@@ -45,78 +96,6 @@ func hashing() {
   
 }
 hashing()
-
-// CGFloat literal conversion
-func literals() {
-  // CHECK-LABEL: literals test
-  println("literals test")
-
-  // CHECK-NEXT: 3.14
-  var flt: CGFloat = 3.14159
-  println(flt)
-
-  // CHECK-NEXT: 3
-  flt = 3
-  println(flt)
-}
-literals()
-
-// Initialization of other numeric types from CGFloat
-func otherInitializations() {
-  // CHECK-LABEL: initialization of other numeric types test
-  println("initialization of other numeric types test")
-  
-  let flt: CGFloat = 3.14159
-
-  // CHECK-NEXT: 3
-  let i = Int(flt)
-  println(i)
-
-  // CHECK-NEXT: 3.14
-  let f = Float(flt)
-  println(f)
-
-  // CHECK-NEXT: 3.14
-  let d = Double(flt)
-  println(d)  
-
-  // CHECK-NEXT: 3
-  let u8 = UInt8(flt)
-  println(u8)
-
-  // CHECK-NEXT: 3
-  let ui = UInt(flt)
-  println(ui)
-}
-otherInitializations()
-
-// Comparisons
-func comparisons() {
-  // CHECK-LABEL: comparisons test
-  println("comparisons test")
-
-  let x = 3.14
-  let y = 3.14
-  let z = 2.71
-
-  // Equality
-  assert(x == y)
-  assert(!(x == z))
-  assert(x != z)
-  assert(!(x != y))
-
-  assert(z < x)
-  assert(!(x < z))
-  assert(z <= x)
-  assert(x <= x)
-  assert(!(x <= z))
-  assert(x > z)
-  assert(!(z > x))
-  assert(x >= z)
-  assert(x >= x)
-  assert(!(z >= x))
-}
-comparisons()
 
 // Arithmetic
 func arithmetic() {

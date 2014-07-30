@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- CGFloat.swift.gyb ------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+
+from SwiftIntTypes import *
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+}%
+
 @exported import CoreGraphics
 import Darwin
 
-public struct CGFloat : Reflectable {
+public struct CGFloat {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
   /// 32-bit architectures and Double on 64-bit architectures.
@@ -28,56 +37,12 @@ public struct CGFloat : Reflectable {
     self.native = 0.0
   }
 
-  @transparent public init(_ value: Int) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: UInt) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: Int8) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: UInt8) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: Int16) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: UInt16) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: Int32) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: UInt32) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: Int64) {
-    self.native = NativeType(value)
-  }
-
-  @transparent public init(_ value: UInt64) {
-    self.native = NativeType(value)
-  }
-
   @transparent public init(_ value: Float) {
     self.native = NativeType(value)
   }
 
   @transparent public init(_ value: Double) {
     self.native = NativeType(value)
-  }
-  
-  public func getMirror() -> MirrorType {
-    return reflect(native)
   }
 
   /// The native value.
@@ -88,13 +53,21 @@ public struct CGFloat : Reflectable {
   public typealias _BitsType = UInt
 
   public static func _fromBitPattern(bits: UInt) -> CGFloat {
-    return CGFloat(
-             NativeType._fromBitPattern(NativeType._BitsType(bits)))
+    return CGFloat(NativeType._fromBitPattern(NativeType._BitsType(bits)))
   }
 
   public func _toBitPattern() -> UInt {
     return UInt(native._toBitPattern())
   }
+
+% for (name, bits, signed) in all_integer_types(word_bits):
+%   int_type_name = int_name(name, signed)
+
+  @transparent public init(_ value: ${int_type_name}) {
+    self.native = NativeType(value)
+  }
+
+% end
 
   public static var infinity: CGFloat {
     return CGFloat(NativeType.infinity)
@@ -169,6 +142,12 @@ public let CGFLOAT_MIN = CGFloat.min
 @availability(*,unavailable,message="use CGFloat.max")
 public let CGFLOAT_MAX = CGFloat.max
 
+extension CGFloat : Reflectable {
+  public func getMirror() -> MirrorType {
+    return reflect(native)
+  }
+}
+
 @transparent extension CGFloat : Printable {
   public var description: String {
     return native.description
@@ -202,17 +181,17 @@ public let CGFLOAT_MAX = CGFloat.max
   }
 }
 
-@transparent extension Int {
-  public init(_ value: CGFloat) { 
-    self = Int(value.native) 
+% for (name, bits, signed) in all_integer_types(word_bits):
+%   int_type_name = int_name(name, signed)
+
+@transparent extension ${int_type_name} {
+  public init(_ value: CGFloat) {
+    self = ${int_type_name}(value.native)
   }
 }
 
-@transparent extension UInt {
-  public init(_ value: CGFloat) { 
-    self = UInt(value.native) 
-  }
-}
+% end
+
 
 @transparent extension Double {
   public init(_ value: CGFloat) { 
@@ -223,54 +202,6 @@ public let CGFLOAT_MAX = CGFloat.max
 @transparent extension Float {
   public init(_ value: CGFloat) { 
     self = Float(value.native) 
-  }
-}
-
-@transparent extension Int8 {
-  public init(_ value: CGFloat) { 
-    self = Int8(value.native) 
-  }
-}
-
-@transparent extension UInt8 {
-  public init(_ value: CGFloat) { 
-    self = UInt8(value.native) 
-  }
-}
-
-@transparent extension Int16 {
-  public init(_ value: CGFloat) { 
-    self = Int16(value.native) 
-  }
-}
-
-@transparent extension UInt16 {
-  public init(_ value: CGFloat) { 
-    self = UInt16(value.native) 
-  }
-}
-
-@transparent extension Int32 {
-  public init(_ value: CGFloat) { 
-    self = Int32(value.native) 
-  }
-}
-
-@transparent extension UInt32 {
-  public init(_ value: CGFloat) { 
-    self = UInt32(value.native) 
-  }
-}
-
-@transparent extension Int64 {
-  public init(_ value: CGFloat) { 
-    self = Int64(value.native) 
-  }
-}
-
-@transparent extension UInt64 {
-  public init(_ value: CGFloat) { 
-    self = UInt64(value.native) 
   }
 }
 
@@ -292,7 +223,7 @@ func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   func distanceTo(other: CGFloat) -> CGFloat {
     return CGFloat(other.native - self.native)
   }
-  
+
   @transparent public
   func advancedBy(amount: CGFloat) -> CGFloat {
     return CGFloat(self.native + amount.native)

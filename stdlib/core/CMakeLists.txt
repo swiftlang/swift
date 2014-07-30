@@ -43,7 +43,7 @@ set(SWIFTLIB_ESSENTIAL
   Filter.swift.gyb
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
-  FloatingPointOperations.swift
+  FloatingPointOperations.swift.gyb
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift

@@ -367,6 +367,73 @@ public func checkHashable<T : Hashable>(
   }
 }
 
+public func checkHashable<T : Hashable>(
+  expectedEqual: Bool, lhs: T, rhs: T,
+  _ collectMoreInfo: (()->String)? = nil,
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  checkHashable(
+    expectedEqual, lhs, rhs, SourceLocStack(SourceLoc(file, line)),
+    collectMoreInfo)
+}
+
+public enum ExpectedComparisonResult {
+  case LT, EQ, GT
+
+  public func isLT() -> Bool {
+    return self == .LT
+  }
+
+  public func isEQ() -> Bool {
+    return self == .EQ
+  }
+
+  public func isGT() -> Bool {
+    return self == .GT
+  }
+
+  public func isLE() -> Bool {
+    return isLT() || isEQ()
+  }
+
+  public func isGE() -> Bool {
+    return isGT() || isEQ()
+  }
+
+  public func isNE() -> Bool {
+    return !isEQ()
+  }
+
+  public func flip() -> ExpectedComparisonResult {
+    switch self {
+    case .LT:
+      return .GT
+    case .EQ:
+      return .EQ
+    case .GT:
+      return .LT
+    }
+  }
+}
+
+public func checkComparable<T : Comparable>(
+  expected: ExpectedComparisonResult,
+  lhs: T, rhs: T, stackTrace: SourceLocStack
+) {
+  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
+  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
+}
+
+public func checkComparable<T : Comparable>(
+  expected: ExpectedComparisonResult,
+  lhs: T, rhs: T,
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  checkComparable(expected, lhs, rhs, SourceLocStack(SourceLoc(file, line)))
+}
+
 public
 func checkGenerator<
     Element : Equatable, G : GeneratorType

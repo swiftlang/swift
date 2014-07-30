@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- FloatingPointOperations.swift.gyb --------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,15 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+%{
+
+from SwiftIntTypes import *
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+}%
 
 public enum FloatingPointClassification {
   case SignalingNaN
@@ -49,6 +58,13 @@ public protocol FloatingPointType : Strideable {
   typealias _BitsType
   class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType
+
+% for (name, bits, signed) in all_integer_types(word_bits):
+%   int_type_name = int_name(name, signed)
+
+  init(_ value: ${int_type_name})
+
+% end
 
   /// The positive infinity.
   class var infinity: Self { get }

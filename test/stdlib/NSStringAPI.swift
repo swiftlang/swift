@@ -1218,45 +1218,6 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   // FIXME
 }
 
-enum ExpectedComparisonResult {
-  case LT, EQ, GT
-
-  func isLT() -> Bool {
-    return self == .LT
-  }
-
-  func isEQ() -> Bool {
-    return self == .EQ
-  }
-
-  func isGT() -> Bool {
-    return self == .GT
-  }
-
-  func isLE() -> Bool {
-    return isLT() || isEQ()
-  }
-
-  func isGE() -> Bool {
-    return isGT() || isEQ()
-  }
-
-  func isNE() -> Bool {
-    return !isEQ()
-  }
-
-  func flip() -> ExpectedComparisonResult {
-    switch self {
-    case .LT:
-      return .GT
-    case .EQ:
-      return .EQ
-    case .GT:
-      return .LT
-    }
-  }
-}
-
 struct ComparisonTest {
   let expectedUnicodeCollation: ExpectedComparisonResult
   let lhs: String
@@ -1341,16 +1302,6 @@ let comparisonTests = [
   ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
   ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
 ]
-
-func checkComparable<T : Comparable>(
-  expected: ExpectedComparisonResult,
-  lhs: T, rhs: T, stackTrace: SourceLocStack
-) {
-  expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
-  expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
-  expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
-}
 
 func checkStringComparison(
   expected: ExpectedComparisonResult,
