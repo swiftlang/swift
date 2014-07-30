@@ -993,7 +993,7 @@ bb3:
   return %1 : $()
 }
 
-/// CHECK-LABEL: sil @diamond12 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @diamond12 : $@thin (Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: cond_br
