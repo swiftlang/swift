@@ -177,6 +177,7 @@ println(dict2["id"])
 
 func staticAssertType<T>(_: T.Type, inout value: T) {}
 
+#if os(OSX)
 FoundationTestCase.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.
   //
@@ -203,6 +204,7 @@ FoundationTestCase.test("NSRectEdge/constants") {
     expectEqual(3, NSMaxYEdge)
   }
 }
+#endif
 
 FoundationTestCase.run()
 // CHECK: {{^}}Foundation: All tests passed

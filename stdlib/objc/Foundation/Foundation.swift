@@ -1000,6 +1000,8 @@ public func NSLog(format: String, args: CVarArgType...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
+#if os(OSX)
+
 //===----------------------------------------------------------------------===//
 // NSRectEdge
 //===----------------------------------------------------------------------===//
@@ -1021,6 +1023,8 @@ public var NSMaxXEdge: NSRectEdge {
 public var NSMaxYEdge: NSRectEdge {
   return NSRectEdge(CGRectEdge.MaxYEdge.toRaw())
 }
+
+#endif
 
 //===----------------------------------------------------------------------===//
 // NSError (as an out parameter).
