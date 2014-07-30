@@ -258,9 +258,13 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
 
   Increments.insert(Other.Increments.begin(), Other.Increments.end());
 
+  Partial |= Other.Partial;
   Partial |= InsertPts.size() != Other.InsertPts.size();
   for (auto *SI : Other.InsertPts)
     Partial |= InsertPts.insert(SI);
+
+  DEBUG(llvm::dbgs() << "            Partial: " << (Partial?"yes":"no")
+        << "\n");
 
   return true;
 }
@@ -298,10 +302,13 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 
   Decrements.insert(Other.Decrements.begin(), Other.Decrements.end());
 
+  Partial |= Other.Partial;
   Partial |= InsertPts.size() != Other.InsertPts.size();
   for (auto *SI : Other.InsertPts)
     Partial |= InsertPts.insert(SI);
 
+  DEBUG(llvm::dbgs() << "                Partial: " << (Partial?"yes":"no")
+        << "\n");
   return true;
 }
 

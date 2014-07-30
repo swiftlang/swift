@@ -134,6 +134,7 @@ struct RefCountState {
   void clear() {
     Value = SILValue();
     KnownSafe = false;
+    Partial = false;
     InsertPts.clear();
   }
 
