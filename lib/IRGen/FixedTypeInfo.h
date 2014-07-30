@@ -123,12 +123,6 @@ public:
     return getSpareBitExtraInhabitantCount();
   }
 
-  /// Returns the fixed width in bits that must be initialized for an extra
-  /// inhabitant.
-  virtual unsigned getFixedExtraInhabitantBitWidth(IRGenModule &IGM) const {
-    return getSpareBitExtraInhabitantCount();
-  }
-
   /// Returns the number of extra inhabitants available by exercising spare
   /// bits.
   unsigned getSpareBitExtraInhabitantCount() const;
