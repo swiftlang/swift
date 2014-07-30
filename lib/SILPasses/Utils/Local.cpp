@@ -263,3 +263,47 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
     // Otherwise, conservatively stick it at the beginning of the block.
     FuncRef->moveBefore(DomBB->begin());
 }
+
+/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// block \p Dest. Return a new instruction and do not erase the old
+/// instruction.
+TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
+                                     TermInst *Branch) {
+  SILBuilder Builder(Branch);
+
+  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
+    SmallVector<SILValue, 8> TrueArgs;
+    SmallVector<SILValue, 8> FalseArgs;
+
+    for (auto A : CBI->getTrueArgs())
+      TrueArgs.push_back(A);
+
+    for (auto A : CBI->getFalseArgs())
+      FalseArgs.push_back(A);
+
+    if (Dest == CBI->getTrueBB()) {
+      TrueArgs.push_back(Val);
+      assert(TrueArgs.size() == Dest->getNumBBArg());
+    } else {
+      FalseArgs.push_back(Val);
+      assert(FalseArgs.size() == Dest->getNumBBArg());
+    }
+
+    return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
+                                    CBI->getTrueBB(), TrueArgs,
+                                    CBI->getFalseBB(), FalseArgs);
+  }
+
+  if (BranchInst *BI = dyn_cast<BranchInst>(Branch)) {
+    SmallVector<SILValue, 8> Args;
+
+    for (auto A : BI->getArgs())
+      Args.push_back(A);
+
+    Args.push_back(Val);
+    assert(Args.size() == Dest->getNumBBArg());
+    return Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
+  }
+
+  llvm_unreachable("unsupported terminator");
+}

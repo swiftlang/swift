@@ -90,6 +90,12 @@ namespace swift {
 
   /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
   void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
+
+  /// \brief Add an argument, \p val, to the branch-edge that is pointing into
+  /// block \p Dest. Return a new instruction and do not erase the old
+  /// instruction.
+  TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
+                                TermInst *Branch);
 } // end namespace swift
 
 #endif
