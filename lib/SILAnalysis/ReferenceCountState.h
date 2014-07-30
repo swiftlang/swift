@@ -132,7 +132,6 @@ struct RefCountState {
 
   /// Uninitialize the current state.
   void clear() {
-    asImpl()->clear();
     Value = SILValue();
     KnownSafe = false;
     InsertPts.clear();
@@ -260,7 +259,7 @@ struct RefCountState {
 //===----------------------------------------------------------------------===//
 
 struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
-  using Super = RefCountState<BottomUpRefCountState>;
+  using SuperTy = RefCountState<BottomUpRefCountState>;
 
   /// Sequence of states that a value with reference semantics can go through
   /// when visiting decrements bottom up. The reason why I have this separate
@@ -288,7 +287,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
            "strong_release and release_value are only supported.");
 
-    bool NestingDetected = Super::initWithInst(I);
+    bool NestingDetected = SuperTy::initWithInst(I);
 
     // If we know that there is another decrement on the same pointer that has
     // not been matched up to an increment, then the pointer must have a
@@ -310,6 +309,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
   void clear() {
     Decrements.clear();
     LatState = LatticeState::None;
+    SuperTy::clear();
   }
 
   /// Can we gaurantee that the given reference counted value has been modified?
@@ -418,7 +418,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 //===----------------------------------------------------------------------===//
 
 struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
-  using Super = RefCountState<TopDownRefCountState>;
+  using SuperTy = RefCountState<TopDownRefCountState>;
 
   /// Sequence of states that a value with reference semantics can go through
   /// when visiting decrements bottom up. The reason why I have this separate
@@ -445,7 +445,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     assert((isa<StrongRetainInst>(I) || isa<RetainValueInst>(I)) &&
            "strong_retain and retain_value are only supported.");
 
-    bool NestingDetected = Super::initWithInst(I);
+    bool NestingDetected = SuperTy::initWithInst(I);
 
     // Clear our tracked set of increments and add I to the list.
     Argument = nullptr;
@@ -472,6 +472,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     Argument = nullptr;
     Increments.clear();
     LatState = LatticeState::None;
+    SuperTy::clear();
   }
 
   /// Can we gaurantee that the given reference counted value has been modified?

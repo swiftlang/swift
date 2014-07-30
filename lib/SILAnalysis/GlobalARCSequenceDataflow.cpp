@@ -242,7 +242,7 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   // elimination. If the branch predicates for the two merge differ, mixing
   // them is unsafe since they are not control dependent.
   if (LatState == TopDownRefCountState::LatticeState::None) {
-    RefCountState<TopDownRefCountState>::clear();
+    clear();
     DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
                           "Clearing State!\n");
     return false;
@@ -250,10 +250,10 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
 
   // We should never have an argument path merge with a non-argument path.
   if (Argument.isNull() != Other.Argument.isNull()) {
-      RefCountState<TopDownRefCountState>::clear();
-      DEBUG(llvm::dbgs() << "            Can not merge Argument with "
-            "Non-Argument path... Bailing!\n");
-      return false;
+    clear();
+    DEBUG(llvm::dbgs() << "            Can not merge Argument with "
+          "Non-Argument path... Bailing!\n");
+    return false;
   }
 
   Increments.insert(Other.Increments.begin(), Other.Increments.end());
@@ -292,7 +292,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   if (LatState == BottomUpRefCountState::LatticeState::None) {
     DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
                           "Clearing State!\n");
-    RefCountState<BottomUpRefCountState>::clear();
+    clear();
     return false;
   }
 
