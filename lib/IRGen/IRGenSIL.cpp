@@ -2687,7 +2687,7 @@ void IRGenSILFunction::visitUncheckedAddrCastInst(
   setLoweredAddress(SILValue(i, 0), result);
 }
 
-static void emitValueBitCast(IRGenFunction &IGF,
+static void emitValueBitCast(IRGenSILFunction &IGF,
                              SourceLoc loc,
                              Explosion &in,
                              const LoadableTypeInfo &inTI,
@@ -2696,7 +2696,17 @@ static void emitValueBitCast(IRGenFunction &IGF,
   // Unfortunately, we can't check this invariant until we get to IRGen, since
   // the AST and SIL don't know anything about type layout.
   if (inTI.getFixedSize() != outTI.getFixedSize()) {
-    IGF.unimplemented(loc, "bitcast between types of different size");
+    
+    // We can hit this case in specialized functions even for correct user code.
+    // If the user dynamically checks for correct type sizes in the generic
+    // function, a specialized function can contain the (not executed) bitcast
+    // with mismatching fixed sizes.
+    // Usually llvm can eliminate this code again because the user's safety
+    // check should be constant foldable on llvm level.
+    llvm::BasicBlock *failBB = IGF.getFailBB();
+    IGF.Builder.CreateBr(failBB);
+    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    IGF.Builder.emitBlock(contBB);
     in.claimAll();
     for (auto schema : outTI.getSchema(out.getKind()))
       out.add(llvm::UndefValue::get(schema.getScalarType()));
