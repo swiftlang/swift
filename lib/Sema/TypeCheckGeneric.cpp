@@ -781,14 +781,7 @@ bool TypeChecker::validateGenericTypeSignature(Decl *nominalOrExtension) {
   DependentGenericTypeResolver dependentResolver;
   bool invalid = false;
   
-  DeclContext *dc;
-  // Ignore the decl context of protocol declarations. Protocols aren't valid
-  // in nested generic contexts.
-  if (isa<ProtocolDecl>(nominalOrExtension))
-    dc = nullptr;
-  else
-    dc = nominalOrExtension->getDeclContext();
-  
+  DeclContext *dc = nominalOrExtension->getDeclContext();
   if (checkGenericParameters(*this, &builder, genericParams, dc,
                              dependentResolver)) {
     invalid = true;
