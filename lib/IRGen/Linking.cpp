@@ -46,7 +46,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeBufferWithTake: return "Tk";
   case ValueWitness::InitializeWithTake: return "tk";
   case ValueWitness::ProjectBuffer: return "pr";
-  case ValueWitness::TypeOf: return "ty";
+  case ValueWitness::InitializeBufferWithTakeOfBuffer: return "TK";
   case ValueWitness::InitializeArrayWithCopy: return "Cc";
   case ValueWitness::InitializeArrayWithTakeFrontToBack: return "Tt";
   case ValueWitness::InitializeArrayWithTakeBackToFront: return "tT";

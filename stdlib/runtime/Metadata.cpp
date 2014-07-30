@@ -981,10 +981,23 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                             metatype);
 }
 
+/// Generic tuple value witness for 'initializeBufferWithTakeOfBuffer'.
 template <bool IsPOD, bool IsInline>
-static const Metadata *tuple_typeOf(OpaqueValue *obj,
-                                    const Metadata *metatype) {
-  return metatype;
+static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
+                                                           ValueBuffer *src,
+                                                     const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline) {
+    return tuple_initializeWithTake<IsPOD, IsInline>(
+                      tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
+                      tuple_projectBuffer<IsPOD, IsInline>(src, metatype),
+                      metatype);
+  } else {
+    dest->PrivateData[0] = src->PrivateData[0];
+    return (OpaqueValue*) dest->PrivateData[0];
+  }
 }
 
 static void tuple_storeExtraInhabitant(OpaqueValue *tuple,

@@ -940,10 +940,10 @@ Value Witnesses
   value-witness-kind ::= 'CP'           // initializeBufferWithCopyOfBuffer
   value-witness-kind ::= 'Cp'           // initializeBufferWithCopy
   value-witness-kind ::= 'cp'           // initializeWithCopy
+  value-witness-kind ::= 'TK'           // initializeBufferWithTakeOfBuffer
   value-witness-kind ::= 'Tk'           // initializeBufferWithTake
   value-witness-kind ::= 'tk'           // initializeWithTake
   value-witness-kind ::= 'pr'           // projectBuffer
-  value-witness-kind ::= 'ty'           // typeof
   value-witness-kind ::= 'xs'           // storeExtraInhabitant
   value-witness-kind ::= 'xg'           // getExtraInhabitantIndex
   value-witness-kind ::= 'ug'           // getEnumTag

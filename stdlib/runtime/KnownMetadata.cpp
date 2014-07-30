@@ -61,7 +61,7 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::initializeWithTake*) &copy<TYPE>,               \
   (value_witness_types::assignWithTake*) &copy<TYPE>,                   \
   (value_witness_types::allocateBuffer*) &projectBuffer,                \
-  (value_witness_types::typeOf*) &swift_staticTypeof,                   \
+  (value_witness_types::initializeBufferWithTakeOfBuffer*) &copy<TYPE>, \
   (value_witness_types::size) (SIZE),                                   \
   ValueWitnessFlags().withAlignment(SIZE).withPOD(true)                 \
                      .withInlineStorage(true),                          \

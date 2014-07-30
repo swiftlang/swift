@@ -77,7 +77,6 @@ namespace metadataimpl {
 //   static T *initializeWithTake(T *dest, T *src);
 //   static T *assignWithCopy(T *dest, T *src);
 //   static T *assignWithTake(T *dest, T *src);
-//   static const Metadata *typeOf(T *obj, const Metadata *self);
 //   static void destroyArray(T *arr, size_t n);
 //   static T *initializeArrayWithCopy(T *dest, T *src, size_t n);
 //   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n);
@@ -182,11 +181,6 @@ struct NativeBox {
     return dest;
   }
 
-  /// By default, assume that C++ types are not polymorphic.
-  static const Metadata *typeOf(T *src, const Metadata *self) {
-    return self;
-  }
-  
 private:
   static T *next(T *ptr, size_t n = 1) {
     return (T*)((char*)ptr + stride * n);
@@ -280,10 +274,6 @@ struct SwiftRetainableBox :
   static void release(HeapObject *obj) {
     swift_release(obj);
   }
-
-  static const Metadata *typeOf(HeapObject **src, const Metadata *self) {
-    return (*src)->metadata;
-  }
 };
 
 extern "C" void *objc_retain(void *obj);
@@ -301,10 +291,6 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
   static void release(void *obj) {
     objc_release(obj);
   }
-
-  static const Metadata *typeOf(void **src, const Metadata *self) {
-    return swift_getDynamicType((OpaqueValue*) src, self);
-  }
 };
 
 /// A box implementation class for unknown-retainable object pointers.
@@ -315,10 +301,6 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
 
   static void release(void *obj) {
     swift_unknownRelease(obj);
-  }
-
-  static const Metadata *typeOf(void **src, const Metadata *self) {
-    return swift_getObjectType((HeapObject*) *src);
   }
 };
 
@@ -502,11 +484,6 @@ struct AggregateBox {
     }
     return r;
   }
-  
-  /// By default, assume that C++ types are not polymorphic.
-  static const Metadata *typeOf(char *src, const Metadata *self) {
-    return self;
-  }
 };
   
 /// A template for using the Swift allocation APIs with a known size
@@ -596,6 +573,13 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
   static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
     return reinterpret_cast<OpaqueValue*>(buffer);
   }
+  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
+                                    reinterpret_cast<OpaqueValue*>(src),
+                                    self);
+  }
   static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {}
 };
 
@@ -617,6 +601,12 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
   }
   static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
     SwiftAllocator<Size, Alignment>::dealloc(buffer->PrivateData[0]);
+  }
+  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    dest->PrivateData[0] = src->PrivateData[0];
+    return (OpaqueValue*) dest->PrivateData[0];
   }
 };
 
@@ -652,6 +642,20 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
     if (IsKnownAllocated || !vwtable->isValueInline()) {
       swift_slowDealloc(buffer->PrivateData[0], vwtable->size,
                         vwtable->getAlignmentMask());
+    }
+  }
+
+  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    auto vwtable = self->getValueWitnesses();
+    if (!IsKnownAllocated && !vwtable->isValueInline()) {
+      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
+                                      reinterpret_cast<OpaqueValue*>(src),
+                                      self);
+    } else {
+      dest->PrivateData[0] = src->PrivateData[0];
+      return (OpaqueValue*) dest->PrivateData[0];
     }
   }
 };
@@ -710,10 +714,6 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
                                               (typename Box::type*) src);
   }
 
-  static const Metadata *typeOf(OpaqueValue *src, const Metadata *self) {
-    return Box::typeOf((typename Box::type*) src, self);
-  }
-  
   static void destroyArray(OpaqueValue *array, size_t n, const Metadata *self) {
     return Box::destroyArray((typename Box::type*)array, n);
   }
@@ -844,10 +844,6 @@ struct NonFixedValueWitnesses :
     return (OpaqueValue*) Box::assignWithTake((typename Box::type*) dest,
                                               (typename Box::type*) src,
                                               self);
-  }
-
-  static const Metadata *typeOf(OpaqueValue *src, const Metadata *self) {
-    return Box::typeOf((typename Box::type*) src, self);
   }
 
   // These should not get instantiated if the type doesn't have extra

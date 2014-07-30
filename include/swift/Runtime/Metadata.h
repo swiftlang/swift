@@ -81,7 +81,7 @@ constexpr inline bool canBeInline() {
 
 struct ValueWitnessTable;
 
-/// Types stored in the value-witness table.
+/// Flags stored in the value-witness table.
 class ValueWitnessFlags {
   typedef size_t int_type;
   
@@ -165,6 +165,7 @@ public:
   }
 };
   
+/// Flags stored in a value-witness table with extra inhabitants.
 class ExtraInhabitantFlags {
   typedef size_t int_type;
   enum : int_type {
@@ -364,13 +365,33 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
                                     const Metadata *self);
 
   
-/// Given an initialized object, return the metadata pointer for its dynamic
-/// type.
+/// Given an unallocated buffer and an initialized buffer, move the
+/// value from one buffer to the other, leaving the source buffer
+/// unallocated.
+///
+/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// Therefore this can be decomposed as:
+///
+///   self->initalizeBufferWithTake(dest, self->projectBuffer(src), self)
+///   self->deallocateBuffer(src, self)
+///
+/// However, it may be more efficient because values stored out-of-line
+/// may be moved by simply moving the buffer.
+///
+/// If the value is bitwise-takable or stored out of line, this is
+/// equivalent to a memcpy of the buffers.
+///
+/// Returns the dest object.
 ///
 /// Preconditions:
-///   'src' is an initialized object
-typedef const Metadata *typeOf(OpaqueValue *src,
-                               const Metadata *self);
+///   'dest' is an unallocated buffer
+///   'src' is an initialized buffer
+/// Postconditions:
+///   'dest' is an initialized buffer
+///   'src' is an unallocated buffer
+typedef OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
+                                                      ValueBuffer *src,
+                                                      const Metadata *self);
   
 /// Given an initialized array of objects, destroy it.
 ///
@@ -489,7 +510,7 @@ extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
   MACRO(allocateBuffer) \
-  MACRO(typeOf) \
+  MACRO(initializeBufferWithTakeOfBuffer) \
   MACRO(destroyArray) \
   MACRO(initializeArrayWithCopy) \
   MACRO(initializeArrayWithTakeFrontToBack) \

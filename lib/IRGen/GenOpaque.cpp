@@ -80,7 +80,9 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
   }
 
   // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
-  case ValueWitness::InitializeBufferWithCopyOfBuffer: {
+  // T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
+  case ValueWitness::InitializeBufferWithCopyOfBuffer:
+  case ValueWitness::InitializeBufferWithTakeOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(IGM.OpaquePtrTy, args, /*isVarArg*/ false)
@@ -130,15 +132,6 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *args[] = { ptrTy, ptrTy, IGM.SizeTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
-      ->getPointerTo();
-  }
-      
-  // M *(*typeof)(T *src, M *self);
-  case ValueWitness::TypeOf: {
-    llvm::Type *ptrTy = IGM.OpaquePtrTy;
-    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
-    llvm::Type *args[] = { ptrTy, metaTy };
-    return llvm::FunctionType::get(metaTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
       
@@ -237,8 +230,8 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "initializeWithCopy";
   case ValueWitness::InitializeWithTake:
     return "initializeWithTake";
-  case ValueWitness::TypeOf:
-    return "typeof";
+  case ValueWitness::InitializeBufferWithTakeOfBuffer:
+    return "initializeBufferWithTakeOfBuffer";
   case ValueWitness::Size:
     return "size";
   case ValueWitness::Flags:
@@ -345,6 +338,22 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
                                                      Address srcBuffer) {
   llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                              ValueWitness::InitializeBufferWithCopyOfBuffer);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
+                            srcBuffer.getAddress(), metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributesForAggResult(call, false);
+
+  return call;
+}
+
+/// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
+llvm::Value *irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
+                                                     llvm::Value *metadata,
+                                                     Address destBuffer,
+                                                     Address srcBuffer) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                             ValueWitness::InitializeBufferWithTakeOfBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
                             srcBuffer.getAddress(), metadata);

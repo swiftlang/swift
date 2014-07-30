@@ -418,7 +418,7 @@ private:
     InitializeBufferWithTake,
     InitializeWithTake,
     ProjectBuffer,
-    Typeof,
+    InitializeBufferWithTakeOfBuffer,
     DestroyArray,
     InitializeArrayWithCopy,
     InitializeArrayWithTakeFrontToBack,
@@ -456,8 +456,8 @@ private:
       return "initializeWithTake";
     case ValueWitnessKind::ProjectBuffer:
       return "projectBuffer";
-    case ValueWitnessKind::Typeof:
-      return "typeof";
+    case ValueWitnessKind::InitializeBufferWithTakeOfBuffer:
+      return "initializeBufferWithTakeOfBuffer";
     case ValueWitnessKind::DestroyArray:
       return "destroyArray";
     case ValueWitnessKind::InitializeArrayWithCopy:
@@ -507,6 +507,8 @@ private:
       return ValueWitnessKind::InitializeWithCopy;
     if (c1 == 'C' && c2 == 'c')
       return ValueWitnessKind::InitializeArrayWithCopy;
+    if (c1 == 'T' && c2 == 'K')
+      return ValueWitnessKind::InitializeBufferWithTakeOfBuffer;
     if (c1 == 'T' && c2 == 'k')
       return ValueWitnessKind::InitializeBufferWithTake;
     if (c1 == 't' && c2 == 'k')
@@ -517,8 +519,6 @@ private:
       return ValueWitnessKind::InitializeArrayWithTakeBackToFront;
     if (c1 == 'p' && c2 == 'r')
       return ValueWitnessKind::ProjectBuffer;
-    if (c1 == 't' && c2 == 'y')
-      return ValueWitnessKind::Typeof;
     if (c1 == 'X' && c2 == 'x')
       return ValueWitnessKind::DestroyArray;
     if (c1 == 'x' && c2 == 's')

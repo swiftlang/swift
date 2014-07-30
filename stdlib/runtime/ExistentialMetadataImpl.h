@@ -104,10 +104,9 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
-    auto type = src->getType();
     src->copyTypeInto(dest, args...);
-    OpaqueValue *srcValue = type->vw_projectBuffer(src->getBuffer(args...));
-    type->vw_initializeBufferWithTake(dest->getBuffer(args...), srcValue); 
+    src->getType()->vw_initializeBufferWithTakeOfBuffer(dest->getBuffer(args...),
+                                                        src->getBuffer(args...));
     return dest;
   }
   
@@ -141,12 +140,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
       destType->vw_destroyBuffer(dest->getBuffer(args...));
       return initializeWithTake(dest, src, args...);
     }
-  }
-
-  template <class Container, class... A>
-  static const Metadata *typeOf(Container *value, A... args) {
-    auto type = value->getType();
-    return type->vw_typeOf(type->vw_projectBuffer(value->getBuffer(args...)));
   }
 };
 
@@ -192,11 +185,6 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
   static constexpr unsigned numExtraInhabitants = 0;
-
-  static const Metadata *typeOf(Container *value, const Metadata *self) {
-    auto type = value->getType();
-    return type->vw_typeOf(type->vw_projectBuffer(value->getBuffer()));
-  }
 };
 
 /// A non-fixed box implementation class for an opaque existential
@@ -295,11 +283,6 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
   }
 
   template <class Container, class... A>
-  static const Metadata *typeOf(Container *value,  A... args) {
-    return swift_getObjectType((HeapObject*) value->getValueSlot());
-  }
-
-  template <class Container, class... A>
   static void storeExtraInhabitant(Container *dest, int index, A... args) {
     swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
                                          index);
@@ -338,10 +321,6 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
   static constexpr size_t alignment = alignof(Container);
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
-
-  static const Metadata *typeOf(Container *value, const Metadata *self) {
-    return swift_getObjectType((HeapObject*) *value->getValueSlot());
-  }
 };
 
 /// A non-fixed box implementation class for an class existential

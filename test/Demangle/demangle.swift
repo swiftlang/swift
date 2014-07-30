@@ -91,10 +91,10 @@
 ; CHECK: _TwCPC3foo3bar ---> initializeBufferWithCopyOfBuffer value witness for foo.bar
 ; CHECK: _TwCpC3foo3bar ---> initializeBufferWithCopy value witness for foo.bar
 ; CHECK: _TwcpC3foo3bar ---> initializeWithCopy value witness for foo.bar
+; CHECK: _TwTKC3foo3bar ---> initializeBufferWithTakeOfBuffer value witness for foo.bar
 ; CHECK: _TwTkC3foo3bar ---> initializeBufferWithTake value witness for foo.bar
 ; CHECK: _TwtkC3foo3bar ---> initializeWithTake value witness for foo.bar
 ; CHECK: _TwprC3foo3bar ---> projectBuffer value witness for foo.bar
-; CHECK: _TwtyC3foo3bar ---> typeof value witness for foo.bar
 ; CHECK: _TWVC3foo3bar ---> value witness table for foo.bar
 ; CHECK: _TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas (Swift.Int) -> Swift.Int
 ; CHECK: _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int

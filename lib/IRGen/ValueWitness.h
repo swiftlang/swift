@@ -153,11 +153,12 @@ enum class ValueWitness : unsigned {
   /// that object.
   AllocateBuffer,
   
-  ///   M *(*typeof)(T *obj, M *self);
-  ///
-  /// Given a valid object of this type, returns the metatype pointer for
-  /// the dynamic type of the value of the object.
-  TypeOf,
+  ///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
+  /// Given an invalid buffer, initialize it by taking the value out of
+  /// the source buffer.  This can be (inefficiently) decomposed as:
+  ///   initalizeBufferWithTake(dest, self->projectBuffer(src), self)
+  ///   deallocateBuffer(src, self)
+  InitializeBufferWithTakeOfBuffer,
   
   ///   void (*destroyArray)(T *object, size_t n, witness_t *self);
   ///
