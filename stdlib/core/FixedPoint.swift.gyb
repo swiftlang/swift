@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 %{
+
+from SwiftIntTypes import *
+
 #
 # Utility code for later in this template
 #
@@ -24,47 +27,24 @@ def hexify(n):
         z = z[:-4]
     return '0x' + '_'.join(r)
 
-
-# Bit counts for all int types
-allNames = [8, 16, 32, 64, 'Int']
-
-# Number of bits in the biggest int type
-maxBits = 64
-
 # Number of bits in the Builtin.Word type
-wordBits = int(CMAKE_SIZEOF_VOID_P) * 8
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
 # FIXME: checked and unchecked conversions of Word types
-CastFromWord = 'zextOrBitCast_Word_Int64' if wordBits==64 else 'truncOrBitCast_Word_Int32'
-CastToWord = 'truncOrBitCast_Int64_Word' if wordBits==64 else 'zextOrBitCast_Int32_Word'
+CastFromWord = 'zextOrBitCast_Word_Int64' if word_bits==64 else 'truncOrBitCast_Word_Int32'
+CastToWord = 'truncOrBitCast_Int64_Word' if word_bits==64 else 'zextOrBitCast_Int32_Word'
 
 def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
 
-def allInts():
-    for name in allNames:
-        for signed in False, True:
-            yield str(name), int(wordBits if name=='Int' else name), signed
-
-def baseIntName(name):
-    return 'Int' if name == 'Int' else 'Int' + str(name)
-
-def builtinIntName(name):
-    return 'Word' if name == 'Int' else 'Int' + str(name)
-
-def intName(name, signed):
-    return ('' if signed else 'U') + baseIntName(name)
-
-def otherIntName(name, signed):
-    return ('U' if signed else '') + baseIntName(name)
 }%
 
-public typealias IntMax = Int${maxBits}
-public typealias UIntMax = UInt${maxBits}
+public typealias IntMax = Int${int_max_bits}
+public typealias UIntMax = UInt${int_max_bits}
 
 public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
@@ -121,11 +101,11 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
   return .from(IntMax(x.toUIntMax()))
 }
 
-% for (name, bits, signed) in allInts():
+% for (name, bits, signed) in all_integer_types(word_bits):
 %   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
-%   BuiltinName = builtinIntName(name)
-%   Self = intName(name, signed)
-%   OtherSelf = otherIntName(name, signed)
+%   BuiltinName = builtin_int_name(name)
+%   Self = int_name(name, signed)
+%   OtherSelf = other_int_name(name, signed)
 %   ConstructIntType = 'Int' if Self != 'Int' else ''
 
 public struct ${Self}
@@ -135,7 +115,7 @@ public struct ${Self}
   @transparent public
   init() {
     var maxWidthZero: IntMax = 0
-    value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(
+    value = Builtin.truncOrBitCast_Int${int_max_bits}_${BuiltinName}(
        maxWidthZero.value)
   }
 
@@ -182,9 +162,9 @@ public struct ${Self}
   }
   @transparent public
   func _getBuiltinArrayBoundValue() -> Builtin.Word {
-%  if bits < wordBits:
+%  if bits < word_bits:
     return Builtin.${ext}OrBitCast_${BuiltinName}_Word(self.value)
-%  elif bits > wordBits:
+%  elif bits > word_bits:
     return Builtin.truncOrBitCast_${BuiltinName}_Word(self.value)
 %  elif BuiltinName == 'Word':
     return self.value
@@ -237,9 +217,9 @@ public struct ${Self}
 
 extension ${Self} : Hashable {
   public var hashValue: Int {
-% if bits < wordBits: 
+% if bits < word_bits:
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
-% elif bits > wordBits:
+% elif bits > word_bits:
     var result: Int = 0
     for var i = 0; i < ${bits}; i += Int._sizeInBits {
       result ^= Int(self >> ${Self}(i)) & ~0
@@ -330,7 +310,7 @@ extension ${Self} {
 % U = '' if signed else 'U'
   @transparent public
   func to${U}IntMax() -> ${U}IntMax {
-    return ${'self' if Self == U+'Int%s'%maxBits else U+'IntMax(self)'}
+    return ${'self' if Self == U+'Int%s'%int_max_bits else U+'IntMax(self)'}
   }
 % if not signed:
   @transparent public
@@ -340,7 +320,7 @@ extension ${Self} {
 % end
   @transparent public
   static func from(x: ${U}IntMax) -> ${Self} {
-    return ${'x' if Self == U+'Int%s'%maxBits else Self+'(x)'}
+    return ${'x' if Self == U+'Int%s'%int_max_bits else Self+'(x)'}
   }
 }
 
@@ -353,9 +333,9 @@ extension ${Self} : SignedNumberType {}
 // construction from other integer types
 @transparent
 extension ${Self} {
-% for (srcName, srcBits, srcSigned) in allInts():
-%    Src = intName(srcName, srcSigned)
-%    srcBuiltinName = builtinIntName(srcName)
+% for (srcName, srcBits, srcSigned) in all_integer_types(word_bits):
+%    Src = int_name(srcName, srcSigned)
+%    srcBuiltinName = builtin_int_name(srcName)
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
   public init(_ v: ${Src}) {
