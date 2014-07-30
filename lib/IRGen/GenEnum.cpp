@@ -48,6 +48,7 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
+#include "UnimplementedTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -77,6 +78,203 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
 }
 
 namespace {
+  /// Implementation strategy for unimplemented enums.
+  /// Does nothing but produce stub 'undef' values for enum operations.
+  class UnimplementedEnumImplStrategy final : public EnumImplStrategy
+  {
+  public:
+    UnimplementedEnumImplStrategy(IRGenModule &IGM)
+      : EnumImplStrategy(IGM, EnumImplStrategy::TypeInfoKind::Opaque,
+                         0, {}, {}, {})
+    {}
+    
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                     CanType type,
+                                     EnumDecl *theEnum,
+                                     llvm::StructType *enumTy) {
+      llvm_unreachable("should not call this");
+    }
+    
+    llvm::BitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+      return {};
+    }
+    
+    llvm::BitVector
+    getBitPatternForNoPayloadElement(IRGenModule &IGM,
+                                     EnumElementDecl *theCase) const override {
+      return {};
+    }
+    
+    llvm::BitVector
+    getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      return {};
+    }
+    
+    Address projectDataForStore(IRGenFunction &IGF,
+                                EnumElementDecl *elt,
+                                Address enumAddr) const override {
+      return Address(llvm::UndefValue::get(IGF.IGM.OpaquePtrTy), Alignment(1));
+    }
+    
+    void emitIsTag(IRGenFunction &IGF,
+                   Explosion &data,
+                   EnumElementDecl *elt,
+                   Explosion &out,
+                   SILType ty) const override {
+      out.add(llvm::UndefValue::get(IGF.IGM.Int1Ty));
+    }
+    
+    void storeTag(IRGenFunction &IGF,
+                  EnumElementDecl *elt,
+                  Address enumAddr,
+                  CanType T) const override {
+    }
+    
+    Address destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                          EnumElementDecl *elt,
+                                          Address enumAddr) const override {
+      return Address(llvm::UndefValue::get(IGF.IGM.OpaquePtrTy), Alignment(1));
+    }
+    
+    void emitIndirectSwitch(IRGenFunction &IGF,
+                            CanType T,
+                            Address enumAddr,
+                            ArrayRef<std::pair<EnumElementDecl*,
+                                               llvm::BasicBlock*>> dests,
+                            llvm::BasicBlock *defaultDest) const override {
+      IGF.Builder.CreateUnreachable();
+    }
+    
+    void emitValueInjection(IRGenFunction &IGF,
+                            EnumElementDecl *elt,
+                            Explosion &params,
+                            Explosion &out) const override {
+      llvm_unreachable("unimplemented enums shouldn't be loadable");
+    }
+
+    void emitValueSwitch(IRGenFunction &IGF,
+                         Explosion &value,
+                         ArrayRef<std::pair<EnumElementDecl*,
+                                            llvm::BasicBlock*>> dests,
+                         llvm::BasicBlock *defaultDest) const override {
+      IGF.Builder.CreateUnreachable();
+    }
+    
+    void emitValueProject(IRGenFunction &IGF,
+                          Explosion &inEnum,
+                          EnumElementDecl *theCase,
+                          Explosion &out) const override {
+      llvm_unreachable("unimplemented enums shouldn't be loadable");
+    }
+                                                
+    void getSchema(ExplosionSchema &schema) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    
+    bool isIndirectArgument(ResilienceExpansion kind) const {
+      return TIK < Loadable;
+    }
+    
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                      Address dest, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void assignWithCopy(IRGenFunction &IGF, Address dest,
+                        Address src, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void assignWithTake(IRGenFunction &IGF, Address dest,
+                        Address src, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void initializeWithCopy(IRGenFunction &IGF, Address dest,
+                            Address src, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void initializeWithTake(IRGenFunction &IGF, Address dest,
+                            Address src, CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    
+    void initializeMetadata(IRGenFunction &IGF,
+                            llvm::Value *metadata,
+                            llvm::Value *vwtable,
+                            CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                                 Address src,
+                                         CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                                      llvm::Value *index,
+                                      Address dest,
+                              CanType T) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    llvm::ConstantInt *
+    getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                 unsigned bits,
+                                 unsigned index) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    unsigned getExplosionSize(ResilienceExpansion kind) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void assign(IRGenFunction &IGF, Explosion &e,
+                Address addr) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void initialize(IRGenFunction &IGF, Explosion &e,
+                    Address addr) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void reexplode(IRGenFunction &IGF, Explosion &src,
+                   Explosion &dest) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void copy(IRGenFunction &IGF, Explosion &src,
+              Explosion &dest) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void consume(IRGenFunction &IGF, Explosion &src) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    llvm::Value *packEnumPayload(IRGenFunction &IGF,
+                                 Explosion &in,
+                                 unsigned bitWidth,
+                                 unsigned offset) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+    void unpackEnumPayload(IRGenFunction &IGF,
+                                  llvm::Value *payload,
+                                  Explosion &dest,
+                           unsigned offset) const override {
+      llvm_unreachable("unimplemented enums shouldn't delegate type info");
+    }
+  };
+  
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
     const TypeInfo *getSingleton() const {
@@ -3505,9 +3703,20 @@ namespace {
 } // end anonymous namespace
 
 const EnumImplStrategy &
+IRGenModule::getUnimplementedEnumImplStrategy() {
+  if (!TheUnimplementedEnumImplStrategy) {
+    TheUnimplementedEnumImplStrategy = std::unique_ptr<EnumImplStrategy>(
+      new UnimplementedEnumImplStrategy(*this));
+  }
+  return *TheUnimplementedEnumImplStrategy;
+}
+
+const EnumImplStrategy &
 irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
   assert(ty->getEnumOrBoundGenericEnum() && "not an enum");
   auto *ti = &IGM.getTypeInfoForLowered(ty);
+  if (isa<UnimplementedTypeInfo>(ti))
+    return IGM.getUnimplementedEnumImplStrategy();
   if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
     return loadableTI->as<LoadableEnumTypeInfo>().Strategy;
   if (auto *fti = dyn_cast<FixedTypeInfo>(ti))
@@ -3747,8 +3956,9 @@ namespace {
                                                   llvm::StructType *enumTy) {
     // TODO Dynamic layout for multi-payload enums.
     if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && TIK < Fixed) {
-      TC.IGM.fatal_unimplemented(theEnum->getLoc(),
-                                 "non-fixed multi-payload enum layout");
+      TC.IGM.unimplemented(theEnum->getLoc(),
+                           "non-fixed multi-payload enum layout");
+      return new UnimplementedTypeInfo(TC.IGM, enumTy);
     }
 
     // We need tags for each of the payload types, which we may be able to form

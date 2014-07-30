@@ -25,6 +25,7 @@ add_swift_library(swiftIRGen
   Linking.cpp
   SwiftTargetInfo.cpp
   StructLayout.cpp
+  UnimplementedTypeInfo.cpp
   DEPENDS LLVMMC LLVMProfileData LLVMSupport LLVMCore swiftAST swiftOptimizeARC)
 
 # Clang dependencies.

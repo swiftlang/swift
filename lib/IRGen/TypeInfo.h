@@ -69,6 +69,8 @@ class TypeInfo {
 
 protected:
   enum SpecialTypeInfoKind {
+    STIK_Unimplemented,
+    
     STIK_None,
 
     /// Everything after this is statically fixed-size.

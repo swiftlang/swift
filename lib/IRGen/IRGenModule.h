@@ -97,6 +97,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class ClangTypeConverter;
+  class EnumImplStrategy;
   class ExplosionSchema;
   class FormalType;
   class IRGenDebugInfo;
@@ -222,6 +223,8 @@ private:
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
   
   llvm::DenseMap<llvm::Type *, llvm::BitVector> SpareBitsForTypes;
+  
+  std::unique_ptr<const EnumImplStrategy> TheUnimplementedEnumImplStrategy;
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -256,6 +259,8 @@ public:
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
+  
+  const EnumImplStrategy &getUnimplementedEnumImplStrategy();
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
