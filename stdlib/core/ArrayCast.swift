@@ -57,7 +57,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return Array(_fromCocoaArray: source._asCocoaArray())
     
   case (.Reference, .Explicit):
-    let result: [TargetElement]? = _arrayBridgeFromObjectiveCConditional(source)
+    let result: [TargetElement]? = _arrayConditionalBridgeElements(source)
     _precondition(result != nil, "array cannot be bridged from Objective-C")
     return result!
     
@@ -166,7 +166,7 @@ ElementwiseBridging:
 ///
 /// Requires: `SourceElement` is a class or ObjC existential type
 /// O(n), because each element must be checked.
-public func _arrayConditionalCast<SourceElement: class, TargetElement>(
+public func _arrayConditionalCast<SourceElement, TargetElement>(
   source: [SourceElement]
 ) -> [TargetElement]? {
   switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
