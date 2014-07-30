@@ -210,6 +210,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 
   // Check the generic parameter lists for each of the components.
+  GenericParamList *outerGenericParams = nullptr;
   for (unsigned i = 0, n = components.size(); i != n; ++i) {
     // Find the type declaration to which the identifier type actually referred.
     auto ident = components[i];
@@ -279,6 +280,10 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       ED->setExtendedType(ErrorType::get(TC.Context));
       return;
     }
+
+    // Chain the generic parameters together.
+    ref.GenericParams->setOuterParameters(outerGenericParams);
+    outerGenericParams = ref.GenericParams;
   }
 
   // Check whether we extended something that is not a nominal type.

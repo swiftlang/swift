@@ -5731,6 +5731,98 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   assert(D->hasType());  
 }
 
+static Type checkExtensionGenericParams(
+              TypeChecker &tc, ExtensionDecl *ext,
+              ArrayRef<ExtensionDecl::RefComponent> refComponents,
+              Type type, GenericSignature *&sig) {
+  // Find the nominal type declaration and its parent type.
+  // FIXME: This scheme doesn't work well with type aliases.
+  Type parentType;
+  NominalTypeDecl *nominal;
+  if (auto unbound = type->getAs<UnboundGenericType>()) {
+    parentType = unbound->getParent();
+    nominal = unbound->getDecl();
+  } else if (auto bound = type->getAs<BoundGenericType>()) {
+    parentType = bound->getParent();
+    nominal = bound->getDecl();
+  } else {
+    auto nominalType = type->castTo<NominalType>();
+    parentType = nominalType->getParent();
+    nominal = nominalType->getDecl();
+  }
+
+  // Recurse to check the parent type, if there is one.
+  if (parentType) {
+    parentType = checkExtensionGenericParams(tc, ext, refComponents.drop_back(),
+                                             parentType, sig);
+    if (!parentType)
+      return Type();
+  }
+
+  // If we don't need generic parameters, just rebuild the result type with the
+  // new parent.
+  if (!nominal->getGenericParams()) {
+    assert(!refComponents.back().GenericParams);
+    return NominalType::get(nominal, parentType, tc.Context);
+  }
+
+  // We have generic parameters that need to be checked.
+  auto genericParams = refComponents.back().GenericParams;
+
+  // Local function used to infer requirements from the extended type.
+  TypeLoc extendedTypeInfer;
+  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
+    if (extendedTypeInfer.isNull()) {
+      SmallVector<Type, 2> genericArgs;
+      for (auto gp : *genericParams) {
+        genericArgs.push_back(gp->getDeclaredInterfaceType());
+      }
+      
+      extendedTypeInfer.setType(BoundGenericType::get(nominal, 
+                                                      parentType,
+                                                      genericArgs));
+    }
+    
+    return builder.inferRequirements(extendedTypeInfer);
+  };
+
+  // Validate the generic type signature.
+  bool invalid = false;
+  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(), 
+                                    inferExtendedTypeReqs, invalid);
+  if (invalid) {
+    return nullptr;
+  }
+
+  // If the generic extension signature is not equivalent to that of the
+  // nominal type, there are extraneous requirements.
+  // Note that we cannot have missing requirements due to requirement
+  // inference.
+  // FIXME: Figure out an extraneous requirement to point to.
+  if (sig->getCanonicalSignature() !=
+        nominal->getGenericSignature()->getCanonicalSignature()) {
+    tc.diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
+                nominal->getDeclaredType())
+      .highlight(genericParams->getSourceRange());
+    return nullptr;
+  }
+
+  // Validate the generic parameters for the last time.
+  tc.revertGenericParamList(genericParams);
+  ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
+  checkGenericParamList(builder, genericParams, tc, ext->getModuleContext());
+  inferExtendedTypeReqs(builder);
+  finalizeGenericParamList(builder, genericParams, ext, tc);
+
+  // Compute the final extended type.
+  SmallVector<Type, 2> genericArgs;
+  for (auto gp : *genericParams) {
+    genericArgs.push_back(gp->getArchetype());
+  }
+  return BoundGenericType::get(nominal, parentType, genericArgs);
+}
+  
+
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // If we already validated this extension, there's nothing more to do.
   if (ext->validated())
@@ -5744,6 +5836,10 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   // If the type being extended is an unbound generic type, complain and
   // conjure up generic parameters for it.
+
+  // FIXME: We need to check whether anything is specialized, because
+  // the innermost extended type might itself be a non-generic type
+  // within a generic type.
   auto extendedType = ext->getExtendedType();
   if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
     // Validate the nominal type declaration being extended.
@@ -5757,7 +5853,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     auto genericParams = ext->getRefComponents().back().GenericParams;
     if (!genericParams) {
       // FIXME: Create new generic parameters with the same signature.
-      auto genericParams = nominal->getGenericParams();
+      genericParams = nominal->getGenericParams();
       ext->getRefComponents().back().GenericParams = genericParams;
       ext->setGenericSignature(nominal->getGenericSignature());
 
@@ -5766,67 +5862,19 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       ext->setExtendedType(nominal->getDeclaredTypeInContext());
       return;
     }
-    
-    // Local function used to infer requirements from the extended type.
-    TypeLoc extendedTypeInfer;
-    auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
-      if (extendedTypeInfer.isNull()) {
-        SmallVector<Type, 2> genericArgs;
-        for (auto gp : *genericParams) {
-          genericArgs.push_back(gp->getDeclaredInterfaceType());
-        }
-        
-        extendedTypeInfer.setType(BoundGenericType::get(nominal, 
-                                                        /*FIXME:*/Type(),
-                                                        genericArgs));
-      }
-      
-      return builder.inferRequirements(extendedTypeInfer);
-    };
 
-    // Validate the generic type signature.
-    bool invalid = false;
-    GenericSignature *sig = validateGenericSignature(genericParams,
-                                                     ext->getDeclContext(),
-                                                     inferExtendedTypeReqs,
-                                                     invalid);
-    if (invalid) {
+    // Check generic parameters.
+    GenericSignature *sig = nullptr;
+    extendedType = checkExtensionGenericParams(*this, ext, 
+                                               ext->getRefComponents(),
+                                               extendedType, sig);
+    if (!extendedType) {
       ext->setInvalid();
       ext->setExtendedType(ErrorType::get(Context));
       return;
     }
 
     ext->setGenericSignature(sig);
-
-    // If the generic extension signature is not equivalent to that of the
-    // nominal type, there are extraneous requirements.
-    // Note that we cannot have missing requirements due to requirement
-    // inference.
-    // FIXME: Figure out an extraneous requirement to point to.
-    if (sig->getCanonicalSignature() !=
-          nominal->getGenericSignature()->getCanonicalSignature()) {
-      diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
-               nominal->getDeclaredType())
-        .highlight(genericParams->getSourceRange());
-      ext->setInvalid();
-      ext->setExtendedType(ErrorType::get(Context));
-      return;
-    }
-
-    // Validate the generic parameters for the last time.
-    revertGenericParamList(genericParams);
-    ArchetypeBuilder builder = createArchetypeBuilder(ext->getModuleContext());
-    checkGenericParamList(builder, genericParams, *this, ext->getDeclContext());
-    inferExtendedTypeReqs(builder);
-    finalizeGenericParamList(builder, genericParams, ext, *this);
-
-    // Compute the final extended type.
-    SmallVector<Type, 2> genericArgs;
-    for (auto gp : *genericParams) {
-      genericArgs.push_back(gp->getArchetype());
-    }
-    extendedType = BoundGenericType::get(nominal, /*FIXME:*/Type(),
-                                         genericArgs);
     ext->setExtendedType(extendedType);
 
     // ... now complain about this, because it probably doesn't work yet.
