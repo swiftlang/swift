@@ -2595,20 +2595,17 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredExplosion(SILValue(i, 0), box);
   setLoweredAddress(SILValue(i, 1), addr.getAddress());
 
-  if (IGM.DebugInfo && !isAvailableExternally()) {
+  if (IGM.DebugInfo && Decl && !isAvailableExternally()) {
     auto Indirection = IndirectValue;
     // LValues are implicitly indirect because of their type.
-    if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
+    if (Decl->getType()->getKind() == TypeKind::LValue)
       Indirection = DirectValue;
     // FIXME: inout arguments that are not promoted are emitted as
     // arguments and also boxed and thus may show up twice. This may
     // or may not be bad.
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
-       emitShadowCopy(addr.getAddress(), Name),
-       Decl ? DebugTypeInfo(Decl, type)
-       : DebugTypeInfo(i->getElementType().getSwiftType(), type,
-                       i->getFunction()->getDeclContext()),
+       emitShadowCopy(addr.getAddress(), Name), DebugTypeInfo(Decl, type),
        i->getDebugScope(), Name, Indirection);
   }
 }
