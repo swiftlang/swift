@@ -23,8 +23,6 @@ import CoreGraphics
 // for CF bridging)
 public let kCFStringEncodingASCII: CFStringEncoding = 0x0600
 
-public typealias NSRectEdge = CGRectEdge
-
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
 public typealias NSStringEncoding = UInt
 public let NSASCIIStringEncoding: UInt = 1
@@ -1000,6 +998,28 @@ struct _ObjCSuperMirror: MirrorType {
 
 public func NSLog(format: String, args: CVarArgType...) {
   withVaList(args) { NSLogv(format, $0) }
+}
+
+//===----------------------------------------------------------------------===//
+// NSRectEdge
+//===----------------------------------------------------------------------===//
+
+// In the SDK, the following NS*Edge constants are defined as macros for the
+// corresponding CGRectEdge enumerators.  Thus, in the SDK, NS*Edge constants
+// have CGRectEdge type.  This is not correct for Swift (as there is no
+// implicit conversion to NSRectEdge).
+
+public var NSMinXEdge: NSRectEdge {
+  return NSRectEdge(CGRectEdge.MinXEdge.toRaw())
+}
+public var NSMinYEdge: NSRectEdge {
+  return NSRectEdge(CGRectEdge.MinYEdge.toRaw())
+}
+public var NSMaxXEdge: NSRectEdge {
+  return NSRectEdge(CGRectEdge.MaxXEdge.toRaw())
+}
+public var NSMaxYEdge: NSRectEdge {
+  return NSRectEdge(CGRectEdge.MaxYEdge.toRaw())
 }
 
 //===----------------------------------------------------------------------===//

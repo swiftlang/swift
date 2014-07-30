@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 import Foundation
+import StdlibUnittest
+
+var FoundationTestCase = TestCase("Foundation")
 
 func asNSString(s: String) -> NSString { return s }
 func asString(ns: NSString) -> String { return ns }
@@ -171,4 +174,36 @@ var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "fi
 var dict2 = dict["people"][0] as NSDictionary
 println(dict2["id"])
 // CHECK: 255
+
+func staticAssertType<T>(_: T.Type, inout value: T) {}
+
+FoundationTestCase.test("NSRectEdge/constants") {
+  // Check that the following constants have the correct type and value.
+  //
+  // It is valid to hardcode the value in the test.  The way they are currently
+  // defined in the SDK makes them ABI for Objective-C code.
+  if true {
+    var x = NSMinXEdge
+    staticAssertType(NSRectEdge.self, &x)
+    expectEqual(0, NSMinXEdge)
+  }
+  if true {
+    var x = NSMinYEdge
+    staticAssertType(NSRectEdge.self, &x)
+    expectEqual(1, NSMinYEdge)
+  }
+  if true {
+    var x = NSMaxXEdge
+    staticAssertType(NSRectEdge.self, &x)
+    expectEqual(2, NSMaxXEdge)
+  }
+  if true {
+    var x = NSMaxYEdge
+    staticAssertType(NSRectEdge.self, &x)
+    expectEqual(3, NSMaxYEdge)
+  }
+}
+
+FoundationTestCase.run()
+// CHECK: {{^}}Foundation: All tests passed
 
