@@ -125,85 +125,14 @@ extern "C" void swift_deallocPOD(HeapObject *obj);
 /// such that destroying the heap object destroys the contained value.
 extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 
-// Allocate plain old memory, this is the generalized entry point
-//
-// The default API will wait for available memory and return zero filled.
-//
-// The "try" flag tells the runtime to not wait for memory
-// When no flag is needed, pass zero.
+// Allocate plain old memory. This is the generalized entry point
+// Never returns nil. The returned memory is uninitialized. 
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
-#define SWIFT_TRYALLOC 0x0001
-extern "C" void *swift_slowAlloc(size_t bytes, size_t alignMask,
-                                 uintptr_t flags);
-
-// These exist as fast entry points for the above slow API.
-//
-// When the compiler knows that the bytes to be allocated are constant and the
-// value is <= 4KB then the compiler precomputes an offset that the runtime uses
-// to quickly allocate/free from a per-thread cache.
-//
-// The algorithm is like so:
-//
-// if (!__builtin_constant_p(bytes) || (bytes > 0x1000)) {
-//   return swift_slowAlloc(bytes, 0);
-// }
-// if (bytes == 0) {
-//   tinyIndex = 0;
-// } else {
-//   --bytes;
-// #ifdef __LP64__
-//   if      (bytes < 0x80)   { idx = (bytes >> 3);        }
-//   else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;  }
-//   else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10; }
-//   else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18; }
-//   else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20; }
-//   else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28; }
-// #else
-//   if      (bytes < 0x40)   { idx = (bytes >> 2);        }
-//   else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;  }
-//   else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10; }
-//   else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18; }
-//   else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20; }
-//   else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28; }
-//   else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30; }
-// #endif
-//   else                     { __builtin_trap();          }
-// }
-// return swift_alloc(tinyIndex);
-typedef unsigned long AllocIndex;
-
-/// The largest size which can have an AllocIndex.
-constexpr size_t MaxSizeForAllocIndex = 0x1000;
-
-/// Given that a size can have an AllocIndex, return that index.
-constexpr AllocIndex getAllocIndexForSize(size_t bytes) {
-#ifdef __LP64__
-  return (bytes ==     0 ? 0 :
-          bytes <=  0x80 ? ((bytes - 1) >> 3) + 0x0  :
-          bytes <= 0x100 ? ((bytes - 1) >> 4) + 0x8  :
-          bytes <= 0x200 ? ((bytes - 1) >> 5) + 0x10 :
-          bytes <= 0x400 ? ((bytes - 1) >> 6) + 0x18 :
-          bytes <= 0x800 ? ((bytes - 1) >> 7) + 0x20 :
-                           ((bytes - 1) >> 8) + 0x28);
-#else
-  return (bytes ==     0 ? 0 :
-          bytes <=  0x40 ? ((bytes - 1) >> 2) + 0x0  :
-          bytes <=  0x80 ? ((bytes - 1) >> 3) + 0x8  :
-          bytes <= 0x100 ? ((bytes - 1) >> 4) + 0x10 :
-          bytes <= 0x200 ? ((bytes - 1) >> 5) + 0x18 :
-          bytes <= 0x400 ? ((bytes - 1) >> 6) + 0x20 :
-          bytes <= 0x800 ? ((bytes - 1) >> 7) + 0x28 :
-                           ((bytes - 1) >> 8) + 0x30);
-#endif
-}
-
-extern "C" void *swift_alloc(AllocIndex idx);
-extern "C" void *swift_tryAlloc(AllocIndex idx);
+extern "C" void *swift_slowAlloc(size_t bytes, size_t alignMask);
 
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
-extern "C" void swift_dealloc(void *ptr, AllocIndex idx);
 extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 
 /// Atomically increments the retain count of an object.

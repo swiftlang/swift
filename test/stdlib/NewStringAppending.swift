@@ -65,7 +65,7 @@ println("--- Appending ---")
 
 var s = "⓪" // start non-empty
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 4)) = "⓪1"
+// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
 s += "1"
 println("\(repr(s))")
 

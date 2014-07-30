@@ -178,7 +178,7 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (struct _NSZone *)zone {
-  return (struct _NSZone *)_swift_zone_get_shims();
+  return (struct _NSZone *)malloc_zone_from_ptr(self);
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
@@ -630,7 +630,7 @@ extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
   // gives a unique name to the ObjC runtime.
   size_t baseLen = strlen(basename);
   size_t alignMask = alignof(char) - 1;
-  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask, 0);
+  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask);
   snprintf(fullName, baseLen + 17, "%s%016llX", basename,
            (unsigned long long)clas);
   return fullName;

@@ -488,30 +488,14 @@ struct AggregateBox {
   
 /// A template for using the Swift allocation APIs with a known size
 /// and alignment.
-template <size_t Size, size_t Alignment,
-          bool HasAllocIndex = (Size <= MaxSizeForAllocIndex)>
+template <size_t Size, size_t Alignment>
 struct SwiftAllocator {
   static void *alloc() {
-    return swift_slowAlloc(Size, Alignment-1, 0);
+    return swift_slowAlloc(Size, Alignment-1);
   }
 
   static void dealloc(void *addr) {
     swift_slowDealloc(addr, Size, Alignment-1);
-  }
-};
-
-/// A partial specialization of SwiftAllocator for sizes that can use
-/// the AllocIndex optimization.
-template <size_t Size, size_t Alignment>
-struct SwiftAllocator<Size, Alignment, true> {
-  static constexpr AllocIndex Index = getAllocIndexForSize(Size);
-
-  static void *alloc() {
-    return swift_alloc(Index);
-  }
-
-  static void dealloc(void *addr) {
-    swift_dealloc(addr, Index);
   }
 };
 
@@ -621,8 +605,7 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
     } else {
       OpaqueValue *value =
         static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size,
-                                                  vwtable->getAlignmentMask(),
-                                                  0));
+                                                  vwtable->getAlignmentMask()));
       buffer->PrivateData[0] = value;
       return value;
     }

@@ -48,7 +48,7 @@ _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
                     size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
-                  swift_slowAlloc(requiredSize, requiredAlignmentMask, 0));
+                  swift_slowAlloc(requiredSize, requiredAlignmentMask));
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
   object->weakRefCount = WRC_INTERVAL;
@@ -310,8 +310,8 @@ void swift::swift_weakRelease(HeapObject *object) {
     assert(metadata->isClassType());
     auto classMetadata = static_cast<const ClassMetadata*>(metadata);
     assert(classMetadata->isTypeMetadata());
-    _swift_slowDealloc(object, classMetadata->getInstanceSize(),
-                       classMetadata->getInstanceAlignMask());
+    swift_slowDealloc(object, classMetadata->getInstanceSize(),
+                      classMetadata->getInstanceAlignMask());
   }
 }
 

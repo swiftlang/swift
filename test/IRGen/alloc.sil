@@ -20,6 +20,6 @@ struct Huge {
 // CHECK-NEXT: ret void
 
 // CHECK:    define linkonce_odr hidden [[OPAQUE:%swift.opaque]]* @_TwalV4main4Huge(
-// CHECK:      [[T0:%.*]] = call noalias i8* @swift_slowAlloc([[SIZE_T]] 4097, [[SIZE_T]] 7, [[SIZE_T]] 2)
+// CHECK:      [[T0:%.*]] = call noalias i8* @swift_slowAlloc([[SIZE_T]] 4097, [[SIZE_T]] 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[BUFFER]]* {{%.*}} to i8**
 // CHECK-NEXT: store i8* [[T0]], i8** [[T1]]

@@ -17,16 +17,10 @@
 #ifndef SWIFT_RUNTIME_FASTENTRYPOINTS_H
 #define SWIFT_RUNTIME_FASTENTRYPOINTS_H
 
+// Note: This file is #included in assembly files.
+
 #include <TargetConditionals.h>
 #include "../../../stdlib/shims/RefCount.h"
-
-#ifdef __LP64__
-#define ALLOC_CACHE_COUNT 56
-#else
-#define ALLOC_CACHE_COUNT 64
-#endif
-
-// Note: This file is #included in assembly files.
 
 #define RC_OFFSET 0x8
 #define RC_MASK 0xfffffffc
@@ -35,12 +29,12 @@
 #define WRC_OFFSET 0xc
 #define WRC_INTERVAL 1
 #define WRC_MASK 0xffffffff
-#define SWIFT_TRYALLOC 0x0001
 
 #ifdef SWIFT_HAVE_FAST_ENTRY_POINTS
 #error "Do not try to override SWIFT_HAVE_FAST_ENTRY_POINTS"
 #endif
 
+// FIXME: Test and reenable this.
 //#if __x86_64__ && !TARGET_IPHONE_SIMULATOR
 //# define SWIFT_HAVE_FAST_ENTRY_POINTS 1
 //#endif

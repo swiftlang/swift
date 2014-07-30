@@ -695,7 +695,7 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 
   auto wtable = tuple_getValueWitnesses(metatype);
   auto value = (OpaqueValue*) swift_slowAlloc(wtable->size,
-                                              wtable->getAlignmentMask(), 0);
+                                              wtable->getAlignmentMask());
 
   *reinterpret_cast<OpaqueValue**>(buffer) = value;
   return value;

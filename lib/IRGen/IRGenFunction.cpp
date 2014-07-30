@@ -77,34 +77,6 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, llvm::Value *size) {
              std::min(dest.getAlignment(), src.getAlignment()));
 }
 
-/// Given a size, try to turn it into an alloc token.
-typedef unsigned AllocToken;
-const AllocToken InvalidAllocToken = ~0U;
-static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
-  // This is meant to exactly match the algorithm in the runtime's Alloc.h.
-  if (size >= 0x1000) return InvalidAllocToken;
-  if (size == 0) return 0;
-  --size;
-  if (IGM.getPointerSize() == Size(8)) {
-    if      (size < 0x80)   return (size >> 3);
-    else if (size < 0x100)  return (size >> 4) + 0x8;
-    else if (size < 0x200)  return (size >> 5) + 0x10;
-    else if (size < 0x400)  return (size >> 6) + 0x18;
-    else if (size < 0x800)  return (size >> 7) + 0x20;
-    else if (size < 0x1000) return (size >> 8) + 0x28;
-  } else {
-    assert(IGM.getPointerSize() == Size(4));
-    if      (size < 0x40)   return (size >> 2);
-    else if (size < 0x80)   return (size >> 3) + 0x8;
-    else if (size < 0x100)  return (size >> 4) + 0x10;
-    else if (size < 0x200)  return (size >> 5) + 0x18;
-    else if (size < 0x400)  return (size >> 6) + 0x20;
-    else if (size < 0x800)  return (size >> 7) + 0x28;
-    else if (size < 0x1000) return (size >> 8) + 0x30;
-  }
-  llvm_unreachable("everything is terrible");
-}
-
 static llvm::AttributeSet getAllocAttrs(llvm::LLVMContext &ctx) {
   auto attrs = llvm::AttributeSet::get(ctx,
                                        llvm::AttributeSet::ReturnIndex,
@@ -132,22 +104,9 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
 llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                                              llvm::Value *alignMask,
                                              const llvm::Twine &name) {
-
-  // Try to use swift_alloc.
-  if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
-    AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
-    if (allocToken != InvalidAllocToken) {
-      return emitAllocatingCall(*this, IGM.getAllocFn(),
-                                {IGM.getSize(Size(allocToken))},
-                                name);
-    }
-  }
-
-  // Okay, fall back to swift_slowAlloc.  The flags here are:
-  //  0x1 - 'try', i.e. returning null is acceptable
-  //  0x2 - 'raw', i.e. returning uninitialized memory is acceptable
+  // For now, all we have is swift_slowAlloc.
   return emitAllocatingCall(*this, IGM.getSlowAllocFn(),
-                            {size, alignMask, IGM.getSize(Size(2))},
+                            {size, alignMask},
                             name);
 }
 
@@ -190,16 +149,7 @@ static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
 void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                                        llvm::Value *size,
                                        llvm::Value *alignMask) {
-  // Try to use swift_dealloc.
-  if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
-    AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
-    if (allocToken != InvalidAllocToken) {
-      return emitDeallocatingCall(*this, IGM.getDeallocFn(),
-                                  {pointer, IGM.getSize(Size(allocToken))});
-    }
-  }
-
-  // Okay, fall back to swift_slowDealloc.
+  // For now, all we have is swift_slowDelloc.
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
                               {pointer, size, alignMask});
 }

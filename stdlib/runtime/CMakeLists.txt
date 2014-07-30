@@ -1,13 +1,14 @@
-if (XCODE)
-  # Assembly files with Xcode generator require cmake 2.8.10.
-  cmake_minimum_required(VERSION 2.8.10)
-  set(CMAKE_ASM_COMPILER_ID "Clang")
-  enable_language(ASM)
-else ()
-  # FIXME: CMake assembler rules don't pass things 
-  # like architecture flags with the makefile generator.
-  SET_SOURCE_FILES_PROPERTIES(FastEntryPoints.s PROPERTIES LANGUAGE C)
-endif()
+# Re-enable this if you add assembly files to this target again.
+# if (XCODE)
+#   # Assembly files with Xcode generator require cmake 2.8.10.
+#   cmake_minimum_required(VERSION 2.8.10)
+#   set(CMAKE_ASM_COMPILER_ID "Clang")
+#   enable_language(ASM)
+# else ()
+#   # FIXME: CMake assembler rules don't pass things 
+#   # like architecture flags with the makefile generator.
+#   SET_SOURCE_FILES_PROPERTIES(FastEntryPoints.s PROPERTIES LANGUAGE C)
+# endif()
 
 if (SWIFT_OPTIMIZED)
   set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT OFF)
@@ -27,7 +28,6 @@ endif()
 add_swift_library(swiftRuntime 
   Casting.cpp
   Demangle.cpp
-  FastEntryPoints.s
   HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp

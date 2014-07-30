@@ -26,21 +26,22 @@ extern "C" HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
 
 extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
+extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
+extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
+extern "C" void (*_swift_release)(HeapObject *object);
+
+
+// liboainject on iOS 8 patches the function pointers below if present. 
+// Do not reuse these names unless you do what oainject expects you to do.
+typedef size_t AllocIndex;
 extern "C" void *(*_swift_alloc)(AllocIndex idx);
 extern "C" void *(*_swift_tryAlloc)(AllocIndex idx);
 extern "C" void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask,
                                      uintptr_t flags);
 extern "C" void (*_swift_dealloc)(void *ptr, AllocIndex idx);
 extern "C" void (*_swift_slowDealloc)(void *ptr, size_t bytes, size_t alignMask);
-
-extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
-extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
-extern "C" void (*_swift_release)(HeapObject *object);
-
-
-extern "C" size_t _swift_indexToSize(unsigned idx);
+extern "C" size_t _swift_indexToSize(AllocIndex idx);
 extern "C" int _swift_sizeToIndex(size_t size);
-
 extern "C" void _swift_zone_init(void);
 
 };

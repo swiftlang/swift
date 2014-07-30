@@ -176,51 +176,6 @@ BEGIN_FUNC _swift_release
   ret
 END_FUNC
 
-BEGIN_FUNC _swift_dealloc
-  add   __swiftAllocOffset(%rip), %rsi
-  mov   %gs:(,%rsi,8), %r11
-  mov   %r11, (%rdi)
-  mov   %rdi, %gs:(,%rsi,8)
-  sub   __swiftAllocOffset(%rip), %rsi
-  ret
-END_FUNC
-
-.macro ALLOC_FUNC
-BEGIN_FUNC $0
-1:
-  add   __swiftAllocOffset(%rip), %rdi
-  mov   %gs:(,%rdi,8), %rax
-  test  %rax, %rax
-  je    2f
-  mov   (%rax), %r11
-  mov   %r11, %gs:(,%rdi,8)
-  sub   __swiftAllocOffset(%rip), %rdi
-  ret
-2:
-  sub   __swiftAllocOffset(%rip), %rdi
-  SaveRegisters
-.if $2 == 0
-  xor   %esi, %esi
-.else
-  mov   $$$2, %esi
-.endif
-  call  __swift_refillThreadAllocCache
-  RestoreRegisters
-.if $2 == SWIFT_TRYALLOC
-  mov   __swiftAllocOffset(%rip), %r11
-  shl   $$3, %r11
-  cmpq  $$0, %gs:(%r11,%rdi,8)
-  jnz   1b
-  ret
-.else
-  jmp   1b
-.endif
-END_FUNC
-.endmacro
-
-ALLOC_FUNC _swift_alloc, SWIFT_TSD_RAW_ALLOC_BASE, 0
-ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYALLOC
-
 BEGIN_FUNC _swift_tryRetain
   test  %rdi, %rdi
   jz    2f
