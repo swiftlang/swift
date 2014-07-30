@@ -44,7 +44,7 @@ STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
 STATISTIC(NumAMI, "Number of witness_method devirtualzied");
 
 // The number of subclasses to allow when placing polymorphic inline caches.
-static const int MaxNumPolymorphicInlineCaches = 2;
+static const int MaxNumPolymorphicInlineCaches = 6;
 
 //===----------------------------------------------------------------------===//
 //                         Class Method Optimization
@@ -897,6 +897,8 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
+  // This is the class reference downcasted into subclass SubClassTy.
+  SILValue DownCastedClassInstance = Iden->getBBArg(0);
 
   // Try sinking the retain of the class instance into the diamond. This may
   // allow additional ARC optimizations on the fast path.
@@ -907,7 +909,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
       SRI = dyn_cast<StrongRetainInst>(--It);
     if (SRI && SRI->getOperand() == ClassInstance) {
       VirtBuilder.createStrongRetain(SRI->getLoc(), ClassInstance);
-      IdenBuilder.createStrongRetain(SRI->getLoc(), ClassInstance);
+      IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance);
       SRI->eraseFromParent();
     }
   }
@@ -928,9 +930,6 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   // Update the stats.
   NumInlineCaches++;
-
-  // This is the class reference downcasted into subclass SubClassTy.
-  SILValue DownCastedClassInstance = Iden->getBBArg(0);
 
   // Devirtualize the apply instruction on the identical path.
   optimizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
