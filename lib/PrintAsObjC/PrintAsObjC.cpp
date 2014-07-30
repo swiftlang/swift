@@ -1044,6 +1044,8 @@ public:
            "#  define OBJC_DESIGNATED_INITIALIZER\n"
            "# endif\n"
            "#endif\n"
+           "#pragma clang diagnostic push\n"
+           "#pragma clang diagnostic ignored \"-Wproperty-attribute-mismatch\"\n"
            "\n";
   }
 
@@ -1196,7 +1198,7 @@ public:
     writePrologue(out);
     writeImports(out);
     out << os.str();
-
+    out << "#pragma clang diagnostic pop\n";
     return false;
   }
 };

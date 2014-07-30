@@ -194,3 +194,4 @@ SWIFT_CLASS("_TtC8comments15A260_BlockQuote")
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
+#pragma clang diagnostic pop
