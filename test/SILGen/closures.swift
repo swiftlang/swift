@@ -85,29 +85,31 @@ func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
   // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil  @_TF8closures18capture_local_func
+/* TODO: Full support for references between local functions
+// C/HECK-LABEL: sil  @_TF8closures18capture_local_func
 func capture_local_func(var x: Int) -> () -> () -> Int {
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // C/HECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   func aleph() -> Int { return x }
-  // CHECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
-  // CHECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]]#0, [[XBOX]]#1)
+  // C/HECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
+  // C/HECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]]#0, [[XBOX]]#1)
 
   func beth() -> () -> Int { return aleph }
-  // CHECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int
-  // CHECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[ALEPH_CLOSURE]])
+  // C/HECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int
+  // C/HECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[ALEPH_CLOSURE]])
 
   return beth
-  // CHECK: release [[ALEPH_CLOSURE]]
-  // CHECK: release [[XBOX]]#0
-  // CHECK: return [[BETH_CLOSURE]]
+  // C/HECK: release [[ALEPH_CLOSURE]]
+  // C/HECK: release [[XBOX]]#0
+  // C/HECK: return [[BETH_CLOSURE]]
 }
-// CHECK: sil shared @[[ALEPH_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// C/HECK: sil shared @[[ALEPH_NAME]]
+// C/HECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 
-// CHECK: sil shared @[[BETH_NAME]]
-// CHECK: bb0([[ALEPH:%[0-9]+]] : $@callee_owned () -> Int):
-// CHECK: return [[ALEPH]]
+// C/HECK: sil shared @[[BETH_NAME]]
+// C/HECK: bb0([[ALEPH:%[0-9]+]] : $@callee_owned () -> Int):
+// C/HECK: return [[ALEPH]]
+   */
 
 // CHECK-LABEL: sil  @_TF8closures22anon_read_only_capture
 func anon_read_only_capture(var x: Int) -> Int {

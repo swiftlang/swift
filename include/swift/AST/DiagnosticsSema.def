@@ -1217,6 +1217,8 @@ ERROR(implicit_use_of_self_in_closure,tce_sema,none,
       " capture semantics explicit", ())
 ERROR(capture_before_declaration,tce_sema,none,
       "cannot capture %0 before it is declared", (Identifier))
+ERROR(unsupported_local_function_reference,tce_sema,none,
+      "cannot reference a local function from another local function", ())
 
 WARNING(recursive_accessor_reference,tce_sema,none,
         "attempting to %select{access|modify}1 %0 within its own "
