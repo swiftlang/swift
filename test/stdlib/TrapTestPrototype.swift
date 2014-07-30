@@ -35,6 +35,9 @@ func WTERMSIG(status: CInt) -> CInt {
   return _WSTATUS(status)
 }
 
+@asmname("_NSGetEnviron")
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+
 /// Compute the prefix sum of `seq`.
 func scan<
   S : SequenceType, U
@@ -122,7 +125,8 @@ func spawnChild(args: [String])
 
   var pid: pid_t = -1
   let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] + args) {
-    posix_spawn(&pid, Process.arguments[0], &fileActions, nil, $0, nil)
+    posix_spawn(
+      &pid, Process.arguments[0], &fileActions, nil, $0, _NSGetEnviron().memory)
   }
   if spawnResult != 0 {
     println(String.fromCString(strerror(spawnResult)))
