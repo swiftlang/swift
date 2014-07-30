@@ -86,7 +86,10 @@ Classes:
         NullabilityOfRet: O
       - Selector:        'beginAnimations:context:'
         MethodKind:      Class
-        Nullability:     [ N, O ]
+        Nullability:     [ O, O ]
+      - Selector:        'setAnimationDelegate:'
+        MethodKind:      Class
+        Nullability:     [ O ]
       - Selector:        'animateWithDuration:delay:options:animations:completion:'
         MethodKind:      Class
         Nullability:     [ S, S, S, N, O ]
@@ -157,13 +160,13 @@ Protocols:
     Methods:
       - Selector:        'application:willFinishLaunchingWithOptions:'
         MethodKind:      Instance
-        Nullability:     [ N, O ]
+        Nullability:     [ N, N ]
       - Selector:        'application:didFinishLaunchingWithOptions:'
         MethodKind:      Instance
-        Nullability:     [ N, O ]
+        Nullability:     [ N, N ]
       - Selector:        'application:openURL:sourceApplication:annotation:'
         MethodKind:      Instance
-        Nullability:     [ N, N, U ]
+        Nullability:     [ N, N, N, O ]
       - Selector:        'application:handleActionWithIdentifier:forLocalNotification:completionHandler:'
         MethodKind:      Instance
         Nullability:     [ N, O ]
