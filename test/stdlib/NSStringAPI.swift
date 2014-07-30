@@ -183,6 +183,7 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
     up[i] = b
     i++
   }
+  up[i] = 0
   expectOptionalEqual(s, String.stringWithUTF8String(UnsafePointer(up)))
   up.dealloc(100)
 }
