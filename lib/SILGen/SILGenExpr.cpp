@@ -1790,12 +1790,10 @@ static RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
   // Handle collection downcasts directly; they have specific library
   // entry points.
   if (castKind == CheckedCastKind::ArrayDowncast ||
-      castKind == CheckedCastKind::ArrayDowncastBridged ||
       castKind == CheckedCastKind::DictionaryDowncast ||
       castKind == CheckedCastKind::DictionaryDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
-         castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
     return emitCollectionDowncastExpr(SGF, operand, loc, targetType, C,
                                       /*conditional=*/false,
                                       bridgesFromObjC);
@@ -1872,12 +1870,10 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   // entry points.
   auto castKind = E->getCastKind();
   if (castKind == CheckedCastKind::ArrayDowncast ||
-      castKind == CheckedCastKind::ArrayDowncastBridged ||
       castKind == CheckedCastKind::DictionaryDowncast ||
       castKind == CheckedCastKind::DictionaryDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
-         castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
     return emitCollectionDowncastExpr(SGF, E->getSubExpr(), SILLocation(E), 
                                       E->getCastTypeLoc().getType(), C,
                                       /*conditional=*/true,
@@ -1986,12 +1982,10 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   // Handle collection downcasts separately.
   auto castKind = E->getCastKind();
   if (castKind == CheckedCastKind::ArrayDowncast ||
-      castKind == CheckedCastKind::ArrayDowncastBridged ||
       castKind == CheckedCastKind::DictionaryDowncast ||
       castKind == CheckedCastKind::DictionaryDowncastBridged) {
     bool bridgesFromObjC
-      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
-         castKind == CheckedCastKind::DictionaryDowncastBridged);
+      = (castKind == CheckedCastKind::DictionaryDowncastBridged);
     SILLocation loc(E);
     ManagedValue optValue = emitCollectionDowncastExpr(
                               SGF, E->getSubExpr(), loc,

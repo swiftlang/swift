@@ -2346,7 +2346,6 @@ namespace {
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::Downcast:
@@ -2624,7 +2623,6 @@ namespace {
 
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::Downcast:
@@ -2705,7 +2703,6 @@ namespace {
 
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::Downcast:

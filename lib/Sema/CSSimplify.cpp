@@ -2362,8 +2362,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
-  case CheckedCastKind::ArrayDowncast:
-  case CheckedCastKind::ArrayDowncastBridged: {
+  case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
     auto toBaseType = getBaseTypeForArrayType(toType.getPointer());
     

@@ -2168,12 +2168,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
   if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
-    auto toEltType 
-      = cs.getBaseTypeForArrayType(
-        toType->lookThroughAllAnyOptionalTypes().getPointer());
-    return toEltType->isBridgeableObjectType() 
-             ? CheckedCastKind::ArrayDowncast
-             : CheckedCastKind::ArrayDowncastBridged;
+    return CheckedCastKind::ArrayDowncast;
   }
 
   if (auto toDict = cs.isDictionaryType(toType)) {

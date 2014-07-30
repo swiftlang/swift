@@ -2441,8 +2441,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "concrete_to_unrelated_existential";
   case CheckedCastKind::ArrayDowncast:
     return "array_downcast";
-  case CheckedCastKind::ArrayDowncastBridged:
-    return "array_downcast_bridged";
   case CheckedCastKind::DictionaryDowncast:
     return "dictionary_downcast";
   case CheckedCastKind::DictionaryDowncastBridged:

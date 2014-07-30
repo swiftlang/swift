@@ -942,7 +942,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       return nullptr;
 
     case CheckedCastKind::ArrayDowncast:
-    case CheckedCastKind::ArrayDowncastBridged:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::DictionaryDowncastBridged:
       return coercePatternViaConditionalDowncast(
