@@ -444,6 +444,17 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
+  case XREF_PROTOCOL_CONFORMANCE: {
+    lastRecordOffset.reset();
+    DeclID protoID;
+    DeclID typeID;
+    ModuleID moduleID;
+    XRefProtocolConformanceLayout::readRecord(scratch, protoID, typeID,
+                                              moduleID);
+    return readReferencedConformance(cast<ProtocolDecl>(getDecl(protoID)),
+                                     typeID, moduleID, Cursor);
+  }
+
   case NO_CONFORMANCE: {
     lastRecordOffset.reset();
     DeclID protoID;
