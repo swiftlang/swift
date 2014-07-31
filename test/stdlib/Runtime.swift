@@ -596,8 +596,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var output = ""
       dump(tuple, &output)
     }
-    // FIXME: this leaks now.
-    expectEqual(1, nsObjectCanaryCount)
+    expectEqual(0, nsObjectCanaryCount)
   }
   if true {
     nsObjectCanaryCount = 0
@@ -607,8 +606,7 @@ Reflection.test("TupleMirror/NoLeak") {
       var output = ""
       dump(tuple, &output)
     }
-    // FIXME: this leaks now.
-    expectEqual(1, nsObjectCanaryCount)
+    expectEqual(0, nsObjectCanaryCount)
   }
   if true {
     swiftObjectCanaryCount = 0

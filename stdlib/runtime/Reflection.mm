@@ -454,7 +454,9 @@ static bool usesNativeSwiftReferenceCounting(void *object) {
   assert(object);
   return [(id) object __usesNativeSwiftReferenceCounting];
 }
-  
+
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 extern "C"
 StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
                                               HeapObject *owner,
@@ -571,7 +573,9 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
   }
 }
 #endif
-  
+
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 extern "C"
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
@@ -599,6 +603,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
 #else
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
+  swift_release(owner);
   return 0;
 #endif
 }
@@ -809,7 +814,9 @@ static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
   
   return witness;
 }
-  
+
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
                                      HeapObject *owner,
                                      const OpaqueValue *value,
@@ -830,7 +837,9 @@ static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
   
   return resultBuf;
 }
-  
+
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           HeapObject *owner,
                                           const OpaqueValue *value,
