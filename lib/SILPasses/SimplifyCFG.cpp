@@ -399,6 +399,43 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
   return false;
 }
 
+/// If V is only used in a single block (optionally ignoring uses in the
+/// given ignore block), then return that single other block.
+static SILBasicBlock *getBlockWithAllOtherUses(SILValue V,
+                                               SILBasicBlock *IgnoreBB) {
+  SILBasicBlock *BB = nullptr;
+  for (auto UI : V.getUses()) {
+    auto *UseBB = UI->getUser()->getParent();
+    if (UseBB == IgnoreBB)
+      continue;
+    if (!BB) {
+      BB = UseBB;
+      continue;
+    }
+    if (UI->getUser()->getParent() != BB)
+      return nullptr;
+  }
+  return BB;
+}
+
+/// Replaces all uses of a value with another, but only if that use is in the
+/// given BB.
+static void replaceAllUsesInBB(SILValue OrigV, SILValue NewV,
+                               SILBasicBlock *InBB) {
+  assert(OrigV != NewV && "Cannot RAUW a value with itself");
+  assert(OrigV->getNumTypes() == NewV->getNumTypes() &&
+         "An instruction and the value base that it is being replaced by "
+         "must have the same number of types");
+
+  for (auto UseIt = OrigV.use_begin(); UseIt != OrigV.use_end(); ) {
+    auto ThisUse = UseIt;
+    ++UseIt;
+    if (ThisUse->getUser()->getParent() != InBB)
+      continue;
+    ThisUse->set(NewV);
+  }
+}
+
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
@@ -474,11 +511,27 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (isa<ReturnInst>(DestBB->getTerminator()))
     return false;
 
-  // This code is intentionally simple, and cannot thread if the BBArgs of the
-  // destination are used outside the DestBB.
-  for (auto Arg : DestBB->getBBArgs())
-    if (isUsedOutsideOfBlock(Arg, DestBB))
+  // This code is intentionally simple.  It can thread arguments used outside
+  // of this block, only if they are used entirely in one of the blocks we
+  // are jumping to, and that block has no other predecessors.
+  typedef std::pair<SILArgument*, SILBasicBlock*> ArgUsePair;
+  SmallVector<ArgUsePair, 1> ArgsNeedingSSA;
+  for (auto Arg : DestBB->getBBArgs()) {
+    if (!isUsedOutsideOfBlock(Arg, DestBB))
+      // Used only in this block, so all is good.
+      continue;
+    SILBasicBlock *UseBB = getBlockWithAllOtherUses(Arg, DestBB);
+    if (!UseBB)
       return false;
+    // All users (except those in DestBB) are in a single BB.  We need to make
+    // sure that the use BB is only entered directly from this BB.  Other cases
+    // require construcing SSA.
+    if (!isa<CondBranchInst>(DestBB->getTerminator()))
+      return false;
+    if (UseBB->getSinglePredecessor() != DestBB)
+      return false;
+    ArgsNeedingSSA.push_back(std::make_pair(Arg, UseBB));
+  }
 
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
@@ -520,6 +573,32 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     if (isUsedOutsideOfBlock(&Inst, DestBB)) return false;
   }
 
+  // If any of the arguments are live out of this BB, then we need to add them
+  // as arguments to the successor BB.  We do this before cloning as that
+  // way the clone will also have the argument.
+  if (ArgsNeedingSSA.size()) {
+    // Note that we must have cond_br as the terminator of this BB.  This was
+    // checked earlier when adding the live out BBs.
+    auto *CondBr = dyn_cast<CondBranchInst>(DestBB->getTerminator());
+    for (auto &ArgPair : ArgsNeedingSSA) {
+      // Find the successor of the branch which corresponds to the UseBB for
+      // this argument.
+      SILArgument *Arg = ArgPair.first;
+      SILBasicBlock *UseBB = ArgPair.second;
+      for (auto& Succ : CondBr->getSuccessors()) {
+        if (Succ != UseBB)
+          continue;
+        // Add an argument to the target BB.
+        auto *NewArg = UseBB->createArgument(Arg->getType());
+        replaceAllUsesInBB(Arg, NewArg, UseBB);
+
+        // Add the argument to the conditional instruction.
+        auto *NewTI = addArgumentToBranch(Arg, UseBB, CondBr);
+        CondBr->eraseFromParent();
+        CondBr = cast<CondBranchInst>(NewTI);
+      }
+    }
+  }
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
