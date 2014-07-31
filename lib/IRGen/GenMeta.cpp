@@ -54,6 +54,9 @@
 using namespace swift;
 using namespace irgen;
 
+static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
+                                                  llvm::Value *object);
+
 /// Produce a constant to place in a metatype's isa field
 /// corresponding to the given metadata kind.
 static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
@@ -2573,14 +2576,18 @@ namespace {
       // superclass field of the metaclass.
       if (HasDependentSuperclass) {
         // The superclass of the metaclass is the metaclass of the superclass.
+
+        // Call object_getClass() to read the superclass's metaclass.
+        llvm::Value *superMetaClass = 
+            emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
+        superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
+                                                   IGF.IGM.TypeMetadataPtrTy);
+
+        // Write to the new metaclass's superclass field.
         Address metaSuperField
           = emitAddressOfSuperclassRefInClassMetadata(IGF, Target, metaclass);
 
-        Address superMetaField(IGF.Builder.CreateBitCast(superMetadata,
-                                      IGM.TypeMetadataPtrTy->getPointerTo()),
-                               IGM.getPointerAlignment());
-        IGF.Builder.CreateStore(IGF.Builder.CreateLoad(superMetaField),
-                                metaSuperField);
+        IGF.Builder.CreateStore(superMetaClass, metaSuperField);
       }
       
       // If we have any ancestor generic parameters or field offset vectors,
