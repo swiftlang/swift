@@ -5016,7 +5016,8 @@ public:
           
         recordOverride(overridingGetter, baseASD->getGetter());
       }
-      if (baseASD->getSetter() && overridingASD->getSetter()) {
+      if (baseASD->getSetter() && overridingASD->getSetter() &&
+          baseASD->isSetterAccessibleFrom(override->getDeclContext())) {
         auto overridingSetter = overridingASD->getSetter();
         if (!overridingSetter->getAttrs().hasAttribute<OverrideAttr>()) {
           // FIXME: Egregious hack to set 'override'.
