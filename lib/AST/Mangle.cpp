@@ -259,7 +259,8 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
 
     auto decl = ExtTy->getAnyNominal();
     assert(decl && "extension of non-nominal type?");
-    mangleNominalType(decl, ResilienceExpansion::Minimal, shouldBind);
+    mangleNominalType(decl, ResilienceExpansion::Minimal, shouldBind,
+                      ExtD->getGenericParams());
     return;
   }
 
@@ -1103,11 +1104,15 @@ static char getSpecifierForNominalType(NominalTypeDecl *decl) {
 
 void Mangler::mangleNominalType(NominalTypeDecl *decl,
                                 ResilienceExpansion explosion,
-                                BindGenerics shouldBind) {
+                                BindGenerics shouldBind,
+                                GenericParamList *extGenericParams) {
   auto bindGenericsIfDesired = [&] {
-    if (shouldBind == BindGenerics::All)
-      if (auto generics = decl->getGenericParams())
+    if (shouldBind == BindGenerics::All) {
+      GenericParamList *generics = extGenericParams ? extGenericParams
+                                                    : decl->getGenericParams();
+      if (generics)
         bindGenericParameters(generics, /*mangle*/ false);
+    }
   };
 
   // Check for certain standard types.

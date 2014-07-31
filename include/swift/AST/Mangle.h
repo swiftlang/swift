@@ -101,7 +101,8 @@ public:
   void mangleClosureEntity(AbstractClosureExpr *closure,
                            ResilienceExpansion explosion, unsigned uncurryingLevel);
   void mangleNominalType(NominalTypeDecl *decl, ResilienceExpansion expansion,
-                         BindGenerics shouldBind);
+                         BindGenerics shouldBind,
+                         GenericParamList *extGenericParams = nullptr);
   void mangleProtocolDecl(ProtocolDecl *protocol);
   void mangleType(CanType type, ResilienceExpansion expansion,
                   unsigned uncurryingLevel);
