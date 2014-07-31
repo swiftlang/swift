@@ -52,8 +52,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
   SourceLoc InOutLoc;
-  if (Tok.getKind() == tok::identifier && Tok.isContextualKeyword("inout"))
-      InOutLoc = consumeToken(tok::identifier);
+  consumeIf(tok::kw_inout, InOutLoc);
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier: {
@@ -500,11 +500,10 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
-    // If this is an "inout" marker in an argument list, consume the inout.
+    // If this is an inout marker in an argument list, consume the inout.
     SourceLoc InOutLoc;
-    if (Tok.isContextualKeyword("inout"))
-      InOutLoc = consumeToken(tok::identifier);
-                                    
+    consumeIf(tok::kw_inout, InOutLoc);
+
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
@@ -977,9 +976,8 @@ bool Parser::canParseTypeTupleBody() {
       Tok.isNotEllipsis() && !isStartOfDecl()) {
     do {
       // The contextual inout marker is part of argument lists.
-      if (Tok.isContextualKeyword("inout"))
-        consumeToken(tok::identifier);
-      
+      consumeIf(tok::kw_inout);
+
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
       if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {

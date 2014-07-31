@@ -45,7 +45,7 @@ slice[7] = f // expected-error{{'Y' is not convertible to 'X'}}
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
 func value(x: Int) {}
-func inout(inout x: Int) {}
-inout(&_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
+func value2(inout x: Int) {}
+value2(&_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 value(_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

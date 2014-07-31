@@ -814,7 +814,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
-      Tok.isNot(tok::kw_in)) {
+      Tok.isNot(tok::kw_in) &&
+      Tok.isNot(tok::kw_inout)) {
     diagnose(Tok, diag::expected_attribute_name);
     return true;
   }
@@ -850,7 +851,9 @@ bool Parser::canParseTypeAttribute() {
 ///   no need to actually record the attribute
 bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // If this not an identifier, the attribute is malformed.
-  if (Tok.isNot(tok::identifier) && !Tok.is(tok::kw_in)) {
+  if (Tok.isNot(tok::identifier) &&
+      // These are keywords that we accept as attribute names.
+      Tok.isNot(tok::kw_in) && Tok.isNot(tok::kw_inout)) {
     if (!justChecking)
       diagnose(Tok, diag::expected_attribute_name);
     return true;

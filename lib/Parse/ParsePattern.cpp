@@ -160,7 +160,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
     // ('inout' | 'let' | 'var')?
-    if (Tok.isContextualKeyword("inout")) {
+    if (Tok.is(tok::kw_inout)) {
       param.LetVarInOutLoc = consumeToken();
       param.SpecifierKind = ParsedParameter::InOut;
     } else if (Tok.is(tok::kw_let)) {
@@ -173,8 +173,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     // Redundant specifiers are fairly common, recognize, reject, and recover
     // from this gracefully.
-    if (Tok.isContextualKeyword("inout") || Tok.is(tok::kw_let) ||
-        Tok.is(tok::kw_var)) {
+    if (Tok.is(tok::kw_inout) || Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) {
       diagnose(Tok, diag::parameter_inout_var_let)
         .fixItRemove(Tok.getLoc());
       consumeToken();
@@ -845,9 +844,9 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList) {
   // Function argument lists can have "inout" applied to TypedPatterns in their
   // arguments.
   SourceLoc InOutLoc;
-  if (isArgumentList && Tok.isContextualKeyword("inout"))
-    InOutLoc = consumeToken(tok::identifier);
-  
+  if (isArgumentList)
+    consumeIf(tok::kw_inout, InOutLoc);
+
   // Parse the pattern.
   ParserResult<Pattern> pattern;
 
@@ -1051,8 +1050,7 @@ bool Parser::canParsePatternTuple() {
   if (Tok.isNot(tok::r_paren)) {
     do {
       // The contextual inout marker is part of argument lists.
-      if (Tok.isContextualKeyword("inout"))
-        consumeToken(tok::identifier);
+      consumeIf(tok::kw_inout);
 
       if (!canParsePattern()) return false;
 
