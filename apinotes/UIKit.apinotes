@@ -129,6 +129,8 @@ Classes:
         Nullability:     O
       - Name:            'maskView'
         Nullability:     O
+      - Name:            'motionEffects'
+        Nullability:     O
       - Name:            'tintColor'
         Nullability:     U
       - Name:            'restorationIdentifier'
