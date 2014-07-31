@@ -274,16 +274,15 @@ bool Parser::skipExtraTopLevelRBraces() {
 
 
 
-static StringRef getStringLiteralIfNotInterpolated(Parser &P,
-                                                   SourceLoc Loc,
-                                                   const Token &Tok,
-                                                   StringRef DiagText) {
+static Optional<StringRef>
+getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
+                                  StringRef DiagText) {
   SmallVector<Lexer::StringSegment, 1> Segments;
   P.L->getStringLiteralSegments(Tok, Segments);
   if (Segments.size() != 1 ||
       Segments.front().Kind == Lexer::StringSegment::Expr) {
    P.diagnose(Loc, diag::attr_interpolated_string, DiagText);
-   return StringRef();
+   return Nothing;
   }
 
   return P.SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
@@ -477,12 +476,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    StringRef AsmName =
+    Optional<StringRef> AsmName =
       getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
 
     consumeToken(tok::string_literal);
 
-    if (!AsmName.empty())
+    if (AsmName.hasValue())
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
     else
       DiscardAttribute = true;
@@ -502,8 +501,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange,
-                                               /*Implicit=*/false));
+      Attributes.add(new (Context) AsmnameAttr(AsmName.getValue(), AtLoc,
+                                               AttrRange, /*Implicit=*/false));
 
     break;
   }
@@ -519,12 +518,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    StringRef Value = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                        AttrName);
+    auto Value = getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
 
     consumeToken(tok::string_literal);
 
-    if (!Value.empty())
+    if (Value.hasValue())
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
     else
       DiscardAttribute = true;
@@ -544,7 +542,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SemanticsAttr(Value, AtLoc, AttrRange,
+      Attributes.add(new (Context) SemanticsAttr(Value.getValue(), AtLoc,
+                                                 AttrRange,
                                                  /*Implicit=*/false));
     break;
   }
@@ -563,6 +562,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         !(Tok.isAnyOperator() && Tok.getText() == "*")) {
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
         .highlight(SourceRange(Tok.getLoc()));
+      consumeIf(tok::r_paren);
       return false;
     }
 
@@ -572,81 +572,170 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     consumeToken();
 
-    // Parse the kind, looking for 'unavailable'.  This needs to be
-    // relaxed later, but this is strict now for bringup.
-
-    if (!consumeIf(tok::comma)) {
-      diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    if (!Tok.is(tok::identifier) || Tok.getText() != "unavailable") {
-      diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
-               AttrName)
-        .highlight(SourceRange(Tok.getLoc()));
-      return false;
-    }
-
-    consumeToken();
-
     StringRef Message, Renamed;
+    clang::VersionTuple Introduced, Deprecated, Obsoleted;
+    bool Unavailable = false;
+    bool AnyAnnotations = false;
 
-    if (consumeIf(tok::comma)) {
+    while (consumeIf(tok::comma)) {
+      AnyAnnotations = true;
       StringRef ArgumentKindStr = Tok.getText();
 
       enum {
-        IsMessage, IsRenamed, IsInvalid
+        IsMessage, IsRenamed,
+        IsIntroduced, IsDeprecated, IsObsoleted,
+        IsUnavailable,
+        IsInvalid
       } ArgumentKind = IsInvalid;
 
       if (Tok.is(tok::identifier)) {
-        if (ArgumentKindStr == "message")
-          ArgumentKind = IsMessage;
-        else if (ArgumentKindStr == "renamed")
-          ArgumentKind = IsRenamed;
+        ArgumentKind =
+          llvm::StringSwitch<decltype(ArgumentKind)>(ArgumentKindStr)
+            .Case("message", IsMessage)
+            .Case("renamed", IsRenamed)
+            .Case("introduced", IsIntroduced)
+            .Case("deprecated", IsDeprecated)
+            .Case("obsoleted", IsObsoleted)
+            .Case("unavailable", IsUnavailable)
+            .Default(IsInvalid);
       }
 
       if (ArgumentKind == IsInvalid) {
+        DiscardAttribute = true;
         diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
                  AttrName)
-        .highlight(SourceRange(Tok.getLoc()));
-        return false;
+          .highlight(SourceRange(Tok.getLoc()));
+        consumeIf(tok::identifier);
+        break;
       }
 
       consumeToken();
 
-      if (!consumeIf(tok::equal)) {
-        diagnose(Tok.getLoc(), diag::attr_availability_expected_equal, AttrName,
-                 ArgumentKindStr);
-        return false;
-      }
-
-      if (Tok.isNot(tok::string_literal)) {
-        diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-        return false;
-      }
-
-      auto Value =
-        getStringLiteralIfNotInterpolated(*this, Loc, Tok, ArgumentKindStr);
-      // FIXME: an empty message is still possible if parsing was valid.
-      // We need to updategetStringLiteralIfNotInterpolated().
-      if (Value.empty())
-        return false;
-
       switch (ArgumentKind) {
-      case IsInvalid: assert(0 && "Unreachable");
-      case IsMessage: Message = Value; break;
-      case IsRenamed: Renamed = Value; break;
+      case IsMessage:
+      case IsRenamed: {
+        // Items with string arguments.
+        if (!consumeIf(tok::equal)) {
+          diagnose(Tok, diag::attr_availability_expected_equal,
+                   AttrName, ArgumentKindStr);
+          DiscardAttribute = true;
+          if (peekToken().isAny(tok::r_paren, tok::comma))
+            consumeToken();
+          continue;
+        }
+
+        if (!Tok.is(tok::string_literal)) {
+          diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+          DiscardAttribute = true;
+          if (peekToken().isAny(tok::r_paren, tok::comma))
+            consumeToken();
+          continue;
+        }
+
+        auto Value =
+          getStringLiteralIfNotInterpolated(*this, Loc, Tok, ArgumentKindStr);
+        consumeToken();
+        if (!Value) {
+          DiscardAttribute = true;
+          continue;
+        }
+
+        StringRef &ArgField = ((ArgumentKind == IsMessage) ? Message : Renamed);
+        ArgField = Value.getValue();
+        break;
       }
 
-      consumeToken(tok::string_literal);
+      case IsIntroduced:
+      case IsDeprecated:
+      case IsObsoleted: {
+        // Items with version arguments.
+        if (!consumeIf(tok::equal)) {
+          diagnose(Tok, diag::attr_availability_expected_equal,
+                   AttrName, ArgumentKindStr);
+          DiscardAttribute = true;
+          if (peekToken().isAny(tok::r_paren, tok::comma))
+            consumeToken();
+          continue;
+        }
+
+        // A version number is either an integer (8), a float (8.1), or a
+        // float followed by a dot and an integer (8.1.0).
+        if (!Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+          diagnose(Tok, diag::attr_availability_expected_version, AttrName);
+          DiscardAttribute = true;
+          if (peekToken().isAny(tok::r_paren, tok::comma))
+            consumeToken();
+          continue;
+        }
+
+        auto &VersionArg = (ArgumentKind == IsIntroduced) ? Introduced :
+                           (ArgumentKind == IsDeprecated) ? Deprecated :
+                                                            Obsoleted;
+        if (Tok.is(tok::integer_literal)) {
+          unsigned major = 0;
+          if (Tok.getText().getAsInteger(10, major)) {
+            // Maybe the literal was in hex. Reject that.
+            diagnose(Tok, diag::attr_availability_expected_version, AttrName);
+            DiscardAttribute = true;
+          }
+          VersionArg = clang::VersionTuple(major);
+          consumeToken();
+          continue;
+        }
+
+        unsigned major = 0, minor = 0, micro = 0;
+        StringRef majorPart, minorPart;
+        std::tie(majorPart, minorPart) = Tok.getText().split('.');
+        if (majorPart.getAsInteger(10, major) ||
+            minorPart.getAsInteger(10, minor)) {
+          // Reject things like 0.1e5 and hex literals.
+          diagnose(Tok, diag::attr_availability_expected_version, AttrName);
+          DiscardAttribute = true;
+          consumeToken();
+          continue;
+        }
+
+        consumeToken();
+        if (consumeIf(tok::period)) {
+          if (!Tok.is(tok::integer_literal) ||
+              Tok.getText().getAsInteger(10, micro)) {
+            // Reject things like 0.1e5 and hex literals.
+            diagnose(Tok, diag::attr_availability_expected_version, AttrName);
+            DiscardAttribute = true;
+            if (Tok.is(tok::integer_literal) ||
+                peekToken().isAny(tok::r_paren, tok::comma))
+              consumeToken();
+            continue;
+          }
+          consumeToken();
+        }
+
+        VersionArg = clang::VersionTuple(major, minor, micro);
+        break;
+      }
+
+      case IsUnavailable:
+        Unavailable = true;
+        break;
+
+      case IsInvalid:
+        llvm_unreachable("handled above");
+      }
+    }
+
+    if (!AnyAnnotations) {
+      diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      DiscardAttribute = true;
     }
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
-      diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+      if (!DiscardAttribute) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
+                 DeclAttribute::isDeclModifier(DK));
+      }
       return false;
     }
 
@@ -657,10 +746,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                        AvailabilityAttr(AtLoc, AttrRange,
                                         PlatformKind.getValue(),
                                         Message, Renamed,
-                                        clang::VersionTuple(),
-                                        clang::VersionTuple(),
-                                        clang::VersionTuple(),
-                                        true,
+                                        Introduced,
+                                        Deprecated,
+                                        Obsoleted,
+                                        Unavailable,
                                         /*Implicit=*/false));
       }
       else {
@@ -1890,11 +1979,13 @@ ParserStatus Parser::parseLineDirective() {
     return makeParserError();
   }
 
+  auto Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
+  if (!Filename.hasValue())
+    return makeParserError();
+
   // FIXME: This will be incorrect if there is trailing whitespace at the end
   // of the #line.
   SourceLoc Begin = Lexer::getSourceLoc(Tok.getText().end()).getAdvancedLoc(1);
-  StringRef Filename =
-    getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#line");
   int LineOffset = StartLine - SourceMgr.getLineNumber(Begin);
 
   consumeToken(tok::string_literal);
@@ -1904,7 +1995,8 @@ ParserStatus Parser::parseLineDirective() {
   }
 
   // Create a new virtual file for the region started by the #line marker.
-  bool isNewFile = SourceMgr.openVirtualFile(Begin, Filename, LineOffset);
+  bool isNewFile = SourceMgr.openVirtualFile(Begin, Filename.getValue(),
+                                             LineOffset);
   assert(isNewFile);
   (void)isNewFile;
 

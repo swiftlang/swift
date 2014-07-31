@@ -942,6 +942,9 @@ ERROR(attr_availability_expected_option,attribute_parsing,none,
 ERROR(attr_availability_expected_equal,attribute_parsing,none,
 "expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
 
+ERROR(attr_availability_expected_version,attribute_parsing,none,
+      "expected version number in '%0' attribute", (StringRef))
+
 // cc
 ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'cc' attribute", ())
