@@ -97,7 +97,7 @@ class T {
 // Used an optional in a conditional expression
 class C {}
 var co: C? = nil
-var ciuo: C! = nil
+var ciuo: C! = nil 
 
 if co {} // expected-error{{type 'C?' does not conform to protocol 'BooleanType.Protocol'}} expected-note{{optional type 'C?' can not be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
-if ciuo {} // expected-note{{optional type 'C!' can not be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
+if ciuo {} // expected-error{{type 'C!' does not conform to protocol 'BooleanType.Protocol'}} expected-note{{optional type 'C!' can not be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}

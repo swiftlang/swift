@@ -17,7 +17,7 @@
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
 /// library intrinsics below.
 public enum ImplicitlyUnwrappedOptional<T>
-  : BooleanType, Reflectable, NilLiteralConvertible {
+  : Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 

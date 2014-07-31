@@ -1841,9 +1841,9 @@ func test_BridgedFromObjC_Verbatim_DictionaryIsCopied() {
   }
 
   // Delete the key from the NSMutableDictionary.
-  assert(nsd[TestObjCKeyTy(10)])
+  assert(nsd[TestObjCKeyTy(10)] != nil)
   nsd.removeObjectForKey(TestObjCKeyTy(10))
-  assert(!nsd[TestObjCKeyTy(10)])
+  assert(nsd[TestObjCKeyTy(10)] == nil)
 
   // Find an existing key, again.
   if true {
@@ -1870,9 +1870,9 @@ func test_BridgedFromObjC_Nonverbatim_DictionaryIsCopied() {
   }
 
   // Delete the key from the NSMutableDictionary.
-  assert(nsd[TestBridgedKeyTy(10)])
+  assert(nsd[TestBridgedKeyTy(10)] != nil)
   nsd.removeObjectForKey(TestBridgedKeyTy(10))
-  assert(!nsd[TestBridgedKeyTy(10)])
+  assert(nsd[TestBridgedKeyTy(10)] == nil)
 
   // Find an existing key, again.
   if true {
@@ -3102,7 +3102,7 @@ test_BridgedToObjC_Count()
 func test_BridgedToObjC_ObjectForKey() {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  assert(!d.objectForKey(nil))
+  assert(d.objectForKey(nil) == nil)
 
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
   assert((v as TestObjCValueTy).value == 1010)
@@ -3113,7 +3113,7 @@ func test_BridgedToObjC_ObjectForKey() {
   v = d.objectForKey(TestObjCKeyTy(30))
   assert((v as TestObjCValueTy).value == 1030)
 
-  assert(!d.objectForKey(TestObjCKeyTy(40)))
+  assert(d.objectForKey(TestObjCKeyTy(40)) == nil)
 
   println("test_BridgedToObjC_ObjectForKey done")
 }
@@ -3132,9 +3132,9 @@ func test_BridgedToObjC_KeyEnumerator_NextObject() {
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
-  assert(!enumerator.nextObject())
-  assert(!enumerator.nextObject())
-  assert(!enumerator.nextObject())
+  assert(enumerator.nextObject() == nil)
+  assert(enumerator.nextObject() == nil)
+  assert(enumerator.nextObject() == nil)
 
   println("test_BridgedToObjC_KeyEnumerator_NextObject done")
 }
@@ -3145,9 +3145,9 @@ func test_BridgedToObjC_KeyEnumerator_NextObject_Empty() {
   let d = getBridgedEmptyNSDictionary()
   let enumerator = d.keyEnumerator()
 
-  assert(!enumerator.nextObject())
-  assert(!enumerator.nextObject())
-  assert(!enumerator.nextObject())
+  assert(enumerator.nextObject() == nil)
+  assert(enumerator.nextObject() == nil)
+  assert(enumerator.nextObject() == nil)
 
   println("test_BridgedToObjC_KeyEnumerator_NextObject_Empty done")
 }

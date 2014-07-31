@@ -128,6 +128,6 @@ class TestComputedOutlet {
   }
 
   func foo() {
-    !_disclosedView ? () : self.disclosedView.foo()
+    _disclosedView != nil ? () : self.disclosedView.foo()
   }
 }
