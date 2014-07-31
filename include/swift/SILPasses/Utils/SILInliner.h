@@ -67,7 +67,7 @@ private:
     if (IKind == InlineKind::MandatoryInline)
       // Transparent functions are inheriting the location of the call
       // site. No soup, err, debugging for you!
-      Cloned->setDebugScope(Orig->getDebugScope());
+      Cloned->setDebugScope(CallSiteScope);
     else
       // Create an inlined version of the scope.
       Cloned->setDebugScope(getOrCreateInlineScope(Orig));
@@ -93,7 +93,7 @@ private:
 
   /// \brief The location representing the inlined instructions.
   ///
-  /// This location wrapps the call site AST node that is being inlined.
+  /// This location wraps the call site AST node that is being inlined.
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
