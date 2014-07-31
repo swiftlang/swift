@@ -939,17 +939,18 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 /// \brief Try to insert inline cahces for the call \p AI. This function
 /// returns true if a change was made.
 static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
-  ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
   assert(CMI && "Invalid class method instruction");
 
   SILValue ClassInstance = CMI->getOperand();
   SILType InstanceType = ClassInstance.stripCasts().getType();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+
   // Check if it is legal to insert inline caches.
   if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
     return false;
 
-  if (!CHA->inheritedInModule(CD)) {
+  if (!CHA->hasKnownSubclasses(CD)) {
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
     return insertMonomorphicInlineCaches(AI, InstanceType);

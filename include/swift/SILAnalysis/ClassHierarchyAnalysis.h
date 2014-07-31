@@ -55,7 +55,7 @@ public:
   ClassList& getSubClasses(ClassDecl *C) { return SubclassesCache[C]; }
 
   /// \returns True if the class is inherited by another class in this module.
-  bool inheritedInModule(ClassDecl *CD) {
+  bool hasKnownSubclasses(ClassDecl *CD) {
     return SubclassesCache.count(CD);
   }
 
