@@ -22,6 +22,7 @@ public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     }
   }
 
+  @semantics("readonly")
   public static func convertFromExtendedGraphemeClusterLiteral(
       value: String) -> UnicodeScalar {
     let unicodeScalars = value.unicodeScalars

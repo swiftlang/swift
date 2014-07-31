@@ -62,6 +62,7 @@ extension String {
 }
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
+  @semantics("readonly")
   public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,

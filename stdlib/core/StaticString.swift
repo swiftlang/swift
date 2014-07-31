@@ -55,8 +55,8 @@ public struct StaticString
     self._isASCII = isASCII
   }
 
-  public
-  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
+  @semantics("readonly")
+  public static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) -> StaticString {
@@ -65,20 +65,21 @@ public struct StaticString
         start, byteSize: byteSize, isASCII: isASCII)
   }
 
+  @semantics("readonly")
   public static func convertFromExtendedGraphemeClusterLiteral(
       value: StaticString) -> StaticString {
     return value
   }
 
-  public
-  static func _convertFromBuiltinStringLiteral(
+  @semantics("readonly")
+  public static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) -> StaticString {
     return StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
 
-  public
-  static func convertFromStringLiteral(value: StaticString) -> StaticString {
+  @semantics("readonly")
+  public static func convertFromStringLiteral(value: StaticString) -> StaticString {
     return value
   }
 }
