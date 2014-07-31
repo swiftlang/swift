@@ -788,7 +788,11 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     auto conf = cast<NormalProtocolConformance>(conformance);
 
     // If the conformance comes from another module, write a reference to it.
-    if (conformance->getDeclContext()->getParentModule() != M) {
+    // We don't do this for Clang modules because there might not be
+    // anywhere to store the conformance. It will simply be regenerated.
+    if (conformance->getDeclContext()->getParentModule() != M &&
+        !ClangModuleUnit::hasClangModule(
+           conformance->getDeclContext()->getParentModule())) {
       unsigned abbrCode = abbrCodes[XRefProtocolConformanceLayout::Code];
       DeclID protoID = addDeclRef(conf->getProtocol());
       DeclID typeID = addDeclRef(conf->getType()->getAnyNominal());
