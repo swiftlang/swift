@@ -18,6 +18,7 @@
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
@@ -26,6 +27,10 @@ class SILModule;
 class ClassDecl;
 class ClassHierarchyAnalysis : public SILAnalysis {
 public:
+  typedef llvm::SmallVector<ClassDecl*, 8> ClassList;
+  typedef llvm::SmallPtrSet<ClassDecl *, 32>  ClassSet;
+
+
   ClassHierarchyAnalysis(SILModule *Mod) :
   SILAnalysis(AnalysisKind::ClassHierarchyAnalysis), M(Mod) {
       init(); 
@@ -39,18 +44,19 @@ public:
 
   virtual void invalidate(InvalidationKind K) {
     if (K >= InvalidationKind::All) {
-      InheritedClasses.clear();
+      SubclassesCache.clear();
       init(); 
     }
   }
 
-  /// \brief Collect all of the known direct subclasses of a class \p C in the
-  /// current module.
-  void collectSubClasses(ClassDecl *C, std::vector<ClassDecl*> &Sub);
+
+  /// \returns a list of the known direct subclasses of a class \p C in
+  /// the current module.
+  ClassList& getSubClasses(ClassDecl *C) { return SubclassesCache[C]; }
 
   /// \returns True if the class is inherited by another class in this module.
   bool inheritedInModule(ClassDecl *CD) {
-    return InheritedClasses.count(CD); 
+    return SubclassesCache.count(CD);
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
@@ -58,16 +64,15 @@ public:
   }
 
 private:
-  // Compute inheritance properties.
+  /// Compute inheritance properties.
   void init();
 
-  // The module
+  /// The module
   SILModule *M;
 
-  // Stores the set of inherited classes.
-  llvm::SmallPtrSet<ClassDecl *, 32> InheritedClasses;
+  /// A cache that maps a class to all of its known subclasses.
+  llvm::DenseMap<ClassDecl*, ClassList> SubclassesCache;
 };
 
 }
-
 #endif

@@ -955,8 +955,8 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     return insertMonomorphicInlineCaches(AI, InstanceType);
   }
 
-  std::vector<ClassDecl*> Subs;
-  CHA->collectSubClasses(CD, Subs);
+  // Collect the subclasses for the class.
+  ClassHierarchyAnalysis::ClassList &Subs = CHA->getSubClasses(CD);
 
   if (Subs.size() > MaxNumPolymorphicInlineCaches) {
     DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many (" <<
@@ -969,6 +969,9 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
 
   // Generate the polymorphic inline cache using multiple monomorphic caches.
   for (auto S : Subs) {
+    DEBUG(llvm::dbgs() << "Inserting a cache for class " << CD->getName() <<
+          " and subclass " << S->getName() << "\n");
+
     CanType CanClassType = S->getDeclaredType()->getCanonicalType();
     SILType InstanceType = SILType::getPrimitiveObjectType(CanClassType);
     if (!InstanceType.getClassOrBoundGenericClass())
