@@ -334,15 +334,14 @@ public struct _MagicMirrorData {
   public var objcValueType: Any.Type {
     @asmname("swift_MagicMirrorData_objcValueType")get
   }
-  
+
   var summary: String {
-    var resultPtr = UnsafeMutablePointer<String>.alloc(1)
-    _swift_MagicMirrorData_summaryImpl(metadata, resultPtr)
-    let result = resultPtr.memory
-    resultPtr.dealloc(1)
+    var (_, result) = _withUninitializedString {
+      _swift_MagicMirrorData_summaryImpl(self.metadata, $0)
+    }
     return result
   }
-  
+
   public func _loadValue<T>() -> T {
     return Builtin.load(ptr) as T
   }

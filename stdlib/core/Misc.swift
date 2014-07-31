@@ -26,6 +26,21 @@ func _putchar(value: Int32) -> Int32
   Builtin.autorelease(x)
 }
 
+/// Invoke `body` with an allocated, but uninitialized memory suitable for a
+/// `String` value.
+///
+/// This function is primarily useful to call various runtime functions
+/// written in C++.
+func _withUninitializedString<R>(
+  body: (UnsafeMutablePointer<String>) -> R
+) -> (R, String) {
+  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  let bodyResult = body(stringPtr)
+  let stringResult = stringPtr.move()
+  stringPtr.dealloc(1)
+  return (bodyResult, stringResult)
+}
+
 /// Check if a given object (of value or reference type) conforms to the given
 /// protocol.
 ///
@@ -60,11 +75,10 @@ func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
 
 /// Returns the mangled type name for the given value.
 public func _stdlib_getTypeName<T>(value: T) -> String {
-  var resultPtr = UnsafeMutablePointer<String>.alloc(1)
-  _stdlib_getTypeNameImpl(value, resultPtr)
-  let result = resultPtr.memory
-  resultPtr.dealloc(1)
-  return result
+  let (_, typeName) = _withUninitializedString {
+    _stdlib_getTypeNameImpl(value, $0)
+  }
+  return typeName
 }
 
 /// Returns the human-readable type name for the given value.
@@ -79,13 +93,15 @@ func _stdlib_demangleNameImpl(
     demangledName: UnsafeMutablePointer<String>)
 
 public func _stdlib_demangleName(mangledName: String) -> String {
-  var resultPtr = UnsafeMutablePointer<String>.alloc(1)
   var mangledNameUTF8 = Array(mangledName.utf8)
-  mangledNameUTF8.withUnsafeBufferPointer {
-    _stdlib_demangleNameImpl($0.baseAddress, UWord($0.endIndex), resultPtr)
+  return mangledNameUTF8.withUnsafeBufferPointer {
+    (mangledNameUTF8) in
+    let (_, demangledName) = _withUninitializedString {
+      _stdlib_demangleNameImpl(
+        mangledNameUTF8.baseAddress, UWord(mangledNameUTF8.endIndex),
+        $0)
+    }
+    return demangledName
   }
-  let result = resultPtr.memory
-  resultPtr.dealloc(1)
-  return result
 }
 

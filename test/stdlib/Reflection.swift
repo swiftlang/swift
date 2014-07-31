@@ -429,6 +429,7 @@ println(reflect(randomUnsafeMutablePointerString).summary)
 var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
 sanePointerString.initialize("Hello panda")
 println(reflect(sanePointerString.memory).summary)
+sanePointerString.destroy()
 sanePointerString.dealloc(1)
 
 let o = NSObject(), p = NSObject()
