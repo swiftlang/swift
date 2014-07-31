@@ -226,12 +226,22 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   func <loc>swiftUnavailable()</loc></decl>
   <decl:Func>@availability(*, unavailable, message="x")
   func <loc>deprecated()</loc></decl>
-  <decl:Func>func <loc>availabilityIntroduced()</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
+  <decl:Func>@availability(OSX, introduced=10.1)
+  func <loc>availabilityIntroduced()</loc></decl>
+  <decl:Func>@availability(OSX, unavailable, deprecated=10.1, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
   func <loc>availabilityDeprecated()</loc></decl>
-  <decl:Func>func <loc>availabilityObsoleted()</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="x")
+  <decl:Func>@availability(OSX, obsoleted=10.1)
+  func <loc>availabilityObsoleted()</loc></decl>
+  <decl:Func>@availability(OSX, unavailable)
   func <loc>availabilityUnavailable()</loc></decl>
+  <decl:Func>@availability(OSX, introduced=10.1, message="x")
+  func <loc>availabilityIntroducedMsg()</loc></decl>
+  <decl:Func>@availability(OSX, unavailable, deprecated=10.1, message="x")
+  func <loc>availabilityDeprecatedMsg()</loc></decl>
+  <decl:Func>@availability(OSX, obsoleted=10.1, message="x")
+  func <loc>availabilityObsoletedMsg()</loc></decl>
+  <decl:Func>@availability(OSX, unavailable, message="x")
+  func <loc>availabilityUnavailableMsg()</loc></decl>
   <decl:Func>@availability(*, unavailable, message="'performSelector' methods are unavailable")
   func <loc>performSelectorWithMagic(cmd: <ref:Struct>COpaquePointer</ref>)</loc></decl>
   <decl:Constructor><loc>init()</loc></decl>

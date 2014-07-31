@@ -4796,41 +4796,41 @@ void ClangImporter::Implementation::importAttributes(
           !PlatformAvailabilityFilter(Platform))
         continue;
 
-      // Is this declaration marked unconditionally unavailable?
-      if (avail->getUnavailable()) {
-        auto Message = avail->getMessage();
-        auto attr = AvailabilityAttr::createUnavailableAttr(C, Message);
-        MappedDecl->getAttrs().add(attr);
-        IsUnavailable = true;
+      // Translate from Clang platform strings to known Swift platforms.
+      auto platformK =
+        llvm::StringSwitch<Optional<AvailabilityAttr::PlatformKind>>(Platform)
+          .Case("ios", AvailabilityAttr::iOS)
+          .Case("macosx", AvailabilityAttr::OSX)
+          .Case("ios_app_extension", AvailabilityAttr::iOSApplicationExtension)
+          .Case("macosx_app_extension",
+                AvailabilityAttr::OSXApplicationExtension)
+          .Default(Nothing);
+      if (!platformK)
         continue;
-      }
+
+      // Is this declaration marked unconditionally unavailable?
+      IsUnavailable = avail->getUnavailable();
+      StringRef message = avail->getMessage();
 
       const auto &deprecated = avail->getDeprecated();
       if (!deprecated.empty()) {
         if (DeprecatedAsUnavailableFilter &&
             DeprecatedAsUnavailableFilter(deprecated.getMajor(),
                                           deprecated.getMinor())) {
-          auto attr = AvailabilityAttr::createUnavailableAttr(C,
-                         DeprecatedAsUnavailableMessage);
-          MappedDecl->getAttrs().add(attr);
           IsUnavailable = true;
-          continue;
+          if (message.empty())
+            message = DeprecatedAsUnavailableMessage;
         }
       }
 
-      auto platformK = AvailabilityAttr::platformFromString(Platform);
-      if (!platformK)
-        continue;
-
-      const auto &introduced = avail->getIntroduced();
       const auto &obsoleted = avail->getObsoleted();
+      const auto &introduced = avail->getIntroduced();
 
-      auto AvAttr = new (C) AvailabilityAttr(
-        SourceLoc(), SourceRange(), platformK.getValue(),
-        avail->getMessage(), /*rename*/StringRef(),
-        introduced, deprecated, obsoleted,
-        false /* FIXME: Adjust for minimum deployment target. */,
-        /*implicit=*/false);
+      auto AvAttr = new (C) AvailabilityAttr(SourceLoc(), SourceRange(),
+                                             platformK.getValue(),
+                                             message, /*rename*/StringRef(),
+                                             introduced, deprecated, obsoleted,
+                                             IsUnavailable, /*implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }

@@ -244,10 +244,15 @@ struct _InternalStruct {
 - (void)swiftUnavailable __attribute__((annotate("swift1_unavailable")));
 - (void)deprecated __attribute__((deprecated("x")));
 
-- (void)availabilityIntroduced __attribute__((availability(macosx, introduced=10.1, message="x")));
-- (void)availabilityDeprecated __attribute__((availability(macosx, deprecated=10.1, message="x")));
-- (void)availabilityObsoleted __attribute__((availability(macosx, obsoleted=10.1, message="x")));
-- (void)availabilityUnavailable __attribute__((availability(macosx, unavailable, message="x")));
+- (void)availabilityIntroduced __attribute__((availability(macosx, introduced=10.1)));
+- (void)availabilityDeprecated __attribute__((availability(macosx, deprecated=10.1)));
+- (void)availabilityObsoleted __attribute__((availability(macosx, obsoleted=10.1)));
+- (void)availabilityUnavailable __attribute__((availability(macosx, unavailable)));
+
+- (void)availabilityIntroducedMsg __attribute__((availability(macosx, introduced=10.1, message="x")));
+- (void)availabilityDeprecatedMsg __attribute__((availability(macosx, deprecated=10.1, message="x")));
+- (void)availabilityObsoletedMsg __attribute__((availability(macosx, obsoleted=10.1, message="x")));
+- (void)availabilityUnavailableMsg __attribute__((availability(macosx, unavailable, message="x")));
 
 - (void)performSelectorWithMagic:(SEL)cmd;
 @end
