@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public protocol _ExtensibleCollectionType : CollectionType {
+  /// Create an empty collection
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
