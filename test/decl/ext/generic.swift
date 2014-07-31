@@ -5,13 +5,13 @@ protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { }
+  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
 
-  struct NonGenericInner { } // expected-note{{extended type 'X<T, U, V>.NonGenericInner' declared here}}
+  struct NonGenericInner { } // expected-note{{extended type 'X<T, U, V>.NonGenericInner' declared here}} expected-error{{nested in generic type}}
 }
 
 struct Y { // expected-note{{extended type 'Y' declared here}}
-  struct Inner<A, B : P3> { }
+  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
 
   struct NonGenericInner { } 
 }

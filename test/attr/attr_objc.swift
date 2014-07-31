@@ -291,16 +291,16 @@ func genericContext1<T>() {
 
 class GenericContext2<T> {
   @objc
-  class subject_inGenericContext {}
+  class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
   @objc
   func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
 class GenericContext3<T> {
-  class MoreNested {
+  class MoreNested { // expected-error{{nested in generic type}}
     @objc
-    class subject_inGenericContext {}
+    class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
     @objc
     func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}

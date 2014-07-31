@@ -167,12 +167,12 @@ struct HasNested<T> {
   init<U>(_ t: T, _ u: U) {}
   func f<U>(t: T, u: U) -> (T, U) {}
 
-  struct InnerGeneric<U> {
+  struct InnerGeneric<U> { // expected-error{{generic type 'InnerGeneric' nested}}
     init() {}
     func g<V>(t: T, u: U, v: V) -> (T, U, V) {}
   }
 
-  struct Inner {
+  struct Inner { // expected-error{{nested in generic type}}
     init (_ x: T) {}
     func identity(x: T) -> T { return x }
   }

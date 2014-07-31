@@ -30,7 +30,7 @@ protocol Bad {
 }
 
 struct Gen<T> {
-  struct Bar {
+  struct Bar { // expected-error{{nested in generic type}}
     init() {}
     static var prop: Int { return 0 }
     static func meth() {}

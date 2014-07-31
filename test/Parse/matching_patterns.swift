@@ -13,7 +13,7 @@ var x:Int
 func square(x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { }
+  struct C<D> { } // expected-error{{generic type 'C' nested in type}}
 }
 
 switch x {
@@ -143,7 +143,7 @@ case .Foo: // expected-error{{enum case pattern cannot match values of the non-e
 }
 
 struct ContainsEnum {
-  enum Possible<T> {
+  enum Possible<T> { // expected-error{{generic type 'Possible' nested in type}}
     case Naught
     case Mere(T)
     case Twain(T, T)

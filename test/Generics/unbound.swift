@@ -9,7 +9,7 @@
 // --------------------------------------------------
 
 struct Foo<T> { // expected-note{{generic type 'Foo' declared here}} expected-note{{generic type 'Foo' declared here}}
-  struct Wibble { }
+  struct Wibble { } // expected-error{{nested in generic type}}
 }
 
 class Dict<K, V> { } // expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}}
@@ -41,14 +41,14 @@ struct GS<T> {
     return gs
   }
 
-  struct Nested {
+  struct Nested { // expected-error{{nested in generic type}}
     func ff() -> GS {
       var gs = GS()
       return gs
     }
   }
 
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}}
+  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' nested in type}}
     func fff() -> (GS, NestedGeneric) {
       var gs = GS()
       var ns = NestedGeneric()

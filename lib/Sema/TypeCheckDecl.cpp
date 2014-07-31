@@ -3339,6 +3339,26 @@ public:
     return nullptr;
   }
   
+  bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD,
+                                     bool diagnose) {
+    // We don't support nested types in generics yet.
+    if (NTD->getDeclContext()->isTypeContext()
+        && NTD->isGenericContext()) {
+      if (diagnose) {
+        if (NTD->getGenericParams())
+          TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
+                NTD->getName(),
+                cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
+        else
+          TC.diagnose(NTD->getLoc(), diag::unsupported_type_nested_in_generic_type,
+                NTD->getName(),
+                cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
+      }
+      return true;
+    }
+    return false;
+  }
+  
   void visitEnumDecl(EnumDecl *ED) {
     // This enum declaration is technically a parse error, so do not type
     // check.
@@ -3349,6 +3369,8 @@ public:
     computeAccessibility(TC, ED);
 
     if (!IsSecondPass) {
+      checkUnsupportedNestedGeneric(ED, /*diagnose*/ !IsSecondPass);
+
       TC.validateDecl(ED);
 
       TC.ValidatedTypes.remove(ED);
@@ -3513,6 +3535,8 @@ public:
     computeAccessibility(TC, SD);
 
     if (!IsSecondPass) {
+      checkUnsupportedNestedGeneric(SD, /*diagnose*/ !IsSecondPass);
+
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
 
@@ -3676,6 +3700,8 @@ public:
     computeAccessibility(TC, CD);
 
     if (!IsSecondPass) {
+      checkUnsupportedNestedGeneric(CD, /*diagnose*/ !IsSecondPass);
+
       TC.validateDecl(CD);
 
       TC.ValidatedTypes.remove(CD);

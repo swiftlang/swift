@@ -24,7 +24,7 @@ GInt.static_bar(0)
 
 // <rdar://problem/12895793>
 struct AnyStream<T : SequenceType> {
-  struct StreamRange<S : GeneratorType> {
+  struct StreamRange<S : GeneratorType> { // expected-error{{generic type 'StreamRange' nested}}
     var index : Int
     var elements : S
 
