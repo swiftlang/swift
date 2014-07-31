@@ -590,8 +590,6 @@ ERROR(non_func_decl_pattern_init,pattern_parsing,none,
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
-ERROR(inout_varpattern,pattern_parsing,none,
-      "'inout' arguments may not also be marked 'var' or 'let'", ())
 ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
 ERROR(inout_must_appear_before_param,pattern_parsing,none,
@@ -608,8 +606,10 @@ ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
       "expected parameter name after '#'", ())
 ERROR(parameter_backtick_empty_name,decl_parsing,none,
       "expected non-empty parameter name after '#'", ())
-ERROR(parameter_backtick_to_pound,decl_parsing,none,
-      "the back-tick ('`') has been replaced by '#'", ())
+ERROR(parameter_inout_var_let,decl_parsing,none,
+      "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
+      ())
+
 WARNING(parameter_backtick_two_names,decl_parsing,none,
       "extraneous '#' in parameter; keyword argument and parameter name "
       "already specified separately", ())

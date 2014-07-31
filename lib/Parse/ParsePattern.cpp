@@ -159,33 +159,32 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
-    // 'inout'?
-    if (Tok.isContextualKeyword("inout"))
-      param.InOutLoc = consumeToken();
-
-    // ('let' | 'var')?
-    if (Tok.is(tok::kw_let)) {
-      param.LetVarLoc = consumeToken();
-      param.IsLet = true;
+    // ('inout' | 'let' | 'var')?
+    if (Tok.isContextualKeyword("inout")) {
+      param.LetVarInOutLoc = consumeToken();
+      param.SpecifierKind = ParsedParameter::InOut;
+    } else if (Tok.is(tok::kw_let)) {
+      param.LetVarInOutLoc = consumeToken();
+      param.SpecifierKind = ParsedParameter::Let;
     } else if (Tok.is(tok::kw_var)) {
-      param.LetVarLoc = consumeToken();
-      param.IsLet = false;
+      param.LetVarInOutLoc = consumeToken();
+      param.SpecifierKind = ParsedParameter::Var;
     }
 
-    // '`'?
-    // FIXME: Accepting temporarily.
-    if (Tok.is(tok::backtick)) {
-      param.BackTickLoc = consumeToken(tok::backtick);
-      diagnose(param.BackTickLoc, diag::parameter_backtick_to_pound)
-        .fixItReplace(param.BackTickLoc, "#");
+    // Redundant specifiers are fairly common, recognize, reject, and recover
+    // from this gracefully.
+    if (Tok.isContextualKeyword("inout") || Tok.is(tok::kw_let) ||
+        Tok.is(tok::kw_var)) {
+      diagnose(Tok, diag::parameter_inout_var_let)
+        .fixItRemove(Tok.getLoc());
+      consumeToken();
     }
 
     // '#'?
-    if (Tok.is(tok::pound)) {
-      param.BackTickLoc = consumeToken(tok::pound);
-    }
+    if (Tok.is(tok::pound))
+      param.PoundLoc = consumeToken(tok::pound);
 
-    if (param.BackTickLoc.isValid() || startsParameterName(*this, isClosure)) {
+    if (param.PoundLoc.isValid() || startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::identifier)) {
         param.FirstName = Context.getIdentifier(Tok.getText());
@@ -193,26 +192,26 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // Operators can not have API names.
         if (paramContext == ParameterContextKind::Operator &&
-            param.BackTickLoc.isValid()) {
-          diagnose(param.BackTickLoc, 
+            param.PoundLoc.isValid()) {
+          diagnose(param.PoundLoc, 
                    diag::parameter_operator_keyword_argument)
-            .fixItRemove(param.BackTickLoc);
-          param.BackTickLoc = SourceLoc();
+            .fixItRemove(param.PoundLoc);
+          param.PoundLoc = SourceLoc();
         }
       } else if (Tok.is(tok::kw__)) {
         // A back-tick cannot precede an empty name marker.
-        if (param.BackTickLoc.isValid()) {
+        if (param.PoundLoc.isValid()) {
           diagnose(Tok, diag::parameter_backtick_empty_name)
-            .fixItRemove(param.BackTickLoc);
-          param.BackTickLoc = SourceLoc();
+            .fixItRemove(param.PoundLoc);
+          param.PoundLoc = SourceLoc();
         }
 
         param.FirstNameLoc = consumeToken();
       } else {
-        assert(param.BackTickLoc.isValid() && "startsParameterName() lied");
+        assert(param.PoundLoc.isValid() && "startsParameterName() lied");
         diagnose(Tok, diag::parameter_backtick_missing_name);
-        param.FirstNameLoc = param.BackTickLoc;
-        param.BackTickLoc = SourceLoc();
+        param.FirstNameLoc = param.PoundLoc;
+        param.PoundLoc = SourceLoc();
       }
 
       // identifier-or-none? for the second name
@@ -236,10 +235,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       // Cannot have a back-tick and two names.
-      if (param.BackTickLoc.isValid() && param.SecondNameLoc.isValid()) {
-        diagnose(param.BackTickLoc, diag::parameter_backtick_two_names)
-          .fixItRemove(param.BackTickLoc);
-        param.BackTickLoc = SourceLoc();
+      if (param.PoundLoc.isValid() && param.SecondNameLoc.isValid()) {
+        diagnose(param.PoundLoc, diag::parameter_backtick_two_names)
+          .fixItRemove(param.PoundLoc);
+        param.PoundLoc = SourceLoc();
       }
 
       // If we have two equivalent names, suggest using the back-tick.
@@ -294,10 +293,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
       // A default argument implies that the name is API, making the
       // back-tick redundant.
-      if (param.BackTickLoc.isValid()) {
-        diagnose(param.BackTickLoc, diag::parameter_backtick_default_arg)
-          .fixItRemove(param.BackTickLoc);
-        param.BackTickLoc = SourceLoc();
+      if (param.PoundLoc.isValid()) {
+        diagnose(param.PoundLoc, diag::parameter_backtick_default_arg)
+          .fixItRemove(param.PoundLoc);
+        param.PoundLoc = SourceLoc();
       }
 
       if (param.EllipsisLoc.isValid()) {
@@ -338,8 +337,8 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParamPattern = [&](SourceLoc &inOutLoc, bool isLet,
-                                SourceLoc letVarLoc,
+  auto createParamPattern = [&](SourceLoc &letVarInOutLoc,
+                        Parser::ParsedParameter::SpecifierKindTy &specifierKind,
                                 Identifier argName, SourceLoc argNameLoc,
                                 Identifier paramName, SourceLoc paramNameLoc,
                                 TypeRepr *type) -> Pattern * {
@@ -347,7 +346,8 @@ mapParsedParameters(Parser &parser,
     Pattern *param;
     ParamDecl *var = nullptr;
     // Create a variable to capture this.
-    var = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+    var = new (ctx) ParamDecl(specifierKind == Parser::ParsedParameter::Let,
+                              argNameLoc, argName,
                               paramNameLoc, paramName, Type(),
                               parser.CurDeclContext);
     if (argNameLoc.isInvalid() && paramNameLoc.isInvalid())
@@ -357,24 +357,20 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the typed pattern.
     if (type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (inOutLoc.isValid()) {
-        type = new (ctx) InOutTypeRepr(type, inOutLoc);
-      }
+      if (specifierKind == Parser::ParsedParameter::InOut)
+        type = new (ctx) InOutTypeRepr(type, letVarInOutLoc);
 
       param = new (ctx) TypedPattern(param, type);
-    } else if (inOutLoc.isValid()) {
-      parser.diagnose(inOutLoc, diag::inout_must_have_type);
-      inOutLoc = SourceLoc();
+    } else if (specifierKind == Parser::ParsedParameter::InOut) {
+      parser.diagnose(letVarInOutLoc, diag::inout_must_have_type);
+      letVarInOutLoc = SourceLoc();
+      specifierKind = Parser::ParsedParameter::Let;
     }
 
     // If 'var' or 'let' was specified explicitly, create a pattern for it.
-    if (letVarLoc.isValid()) {
-      if (inOutLoc.isValid()) {
-        parser.diagnose(inOutLoc, diag::inout_varpattern);
-        inOutLoc = SourceLoc();
-      } else {
-        param = new (ctx) VarPattern(letVarLoc, param);
-      }
+    if (specifierKind != Parser::ParsedParameter::InOut &&
+        letVarInOutLoc.isValid()) {
+      param = new (ctx) VarPattern(letVarInOutLoc, param);
     }
 
     if (var)
@@ -447,8 +443,8 @@ mapParsedParameters(Parser &parser,
           diag.fixItInsert(param.FirstNameLoc, replacementText);
 
           // If there was a back-tick, remove it: we have two names now.
-          if (param.BackTickLoc.isValid())
-            diag.fixItRemove(param.BackTickLoc);
+          if (param.PoundLoc.isValid())
+            diag.fixItRemove(param.PoundLoc);
         } else if (!param.SecondName.empty() &&
                    param.SecondName.str() == remainingName) {
           // Both names were specified and the second one matches what we get
@@ -481,8 +477,7 @@ mapParsedParameters(Parser &parser,
                                                    param.SecondName);
 
       // Both names were provided, so pass them in directly.
-      pattern = createParamPattern(param.InOutLoc,
-                                   param.IsLet, param.LetVarLoc,
+      pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
                                    argName, param.FirstNameLoc,
                                    paramName, param.SecondNameLoc,
                                    param.Type);
@@ -500,21 +495,20 @@ mapParsedParameters(Parser &parser,
     } else {
       // If it's an API name by default, or there was a back-tick, we have an
       // API name.
-      if (isKeywordArgumentByDefault || param.BackTickLoc.isValid()) {
+      if (isKeywordArgumentByDefault || param.PoundLoc.isValid()) {
         argName = param.FirstName;
 
         // If both are true, warn that the back-tick is unnecessary.
-        if (isKeywordArgumentByDefault && param.BackTickLoc.isValid()) {
-          parser.diagnose(param.BackTickLoc,
+        if (isKeywordArgumentByDefault && param.PoundLoc.isValid()) {
+          parser.diagnose(param.PoundLoc,
                           diag::parameter_extraneous_backtick, argName)
-            .fixItRemove(param.BackTickLoc);
+            .fixItRemove(param.PoundLoc);
         }
       }
 
       std::tie(argName, paramName) = checkArgNames(argName, param.FirstName);
 
-      pattern = createParamPattern(param.InOutLoc,
-                                   param.IsLet, param.LetVarLoc,
+      pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
                                    argName, SourceLoc(),
                                    param.FirstName, param.FirstNameLoc,
                                    param.Type);
@@ -880,7 +874,7 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList) {
       LocInfo = TypeLoc(new (Context) InOutTypeRepr(LocInfo.getTypeRepr(),
                                                     InOutLoc));
     } else if (isa<VarPattern>(pattern.get())) {
-      diagnose(InOutLoc, diag::inout_varpattern);
+      diagnose(InOutLoc, diag::parameter_inout_var_let);
     } else {
       diagnose(InOutLoc, diag::inout_must_have_type);
     }

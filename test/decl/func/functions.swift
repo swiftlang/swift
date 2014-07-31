@@ -111,8 +111,8 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(var let c: Int) -> () { // expected-error {{expected ',' separator}} expected-error {{expected parameter type following ':'}}
-  c = 42 // expected-error {{cannot assign to 'let' value 'c'}}
+func rdar16786220(var let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+  c = 42
 }
 
 
@@ -124,4 +124,7 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 [1] !!! [1]  // expected-error {{ambiguous use of operator '!!!'}}
 
 
+// <rdar://problem/16786168> Functions currently permit 'var inout' parameters
+func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 

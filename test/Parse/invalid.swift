@@ -10,8 +10,8 @@ func foo(a: Int) {
 }
 
 // rdar://15946844
-func test1(inout var x : Int) {}  // expected-error {{'inout' arguments may not also be marked 'var' or 'let'}}
-func test2(inout let x : Int) {}  // expected-error {{'inout' arguments may not also be marked 'var' or 'let'}}
+func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 
 // rdar://16601779
 func foo() {

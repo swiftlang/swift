@@ -300,7 +300,7 @@ func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
   ++y  // expected-error {{'Int' is not convertible to '@lvalue UInt8'}}
 }
 
-func invalid_inout(inout var x : Int) { // expected-error {{'inout' arguments may not also be marked 'var' or 'let'}}
+func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 }
 
 

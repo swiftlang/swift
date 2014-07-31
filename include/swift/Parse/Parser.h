@@ -829,16 +829,20 @@ public:
 
   /// Describes a parsed parameter.
   struct ParsedParameter {
-    /// The location of the 'inout' keyword, if present.
-    SourceLoc InOutLoc;
-
-    /// The location of the 'let' or 'var' keyword, if present.
+    /// The location of the 'let', 'var', or 'inout' keyword, if present.
     ///
-    /// \p IsLet indicates whether this was 'let'.
-    SourceLoc LetVarLoc;
+    SourceLoc LetVarInOutLoc;
 
+    enum SpecifierKindTy {
+      Let,
+      Var,
+      InOut
+    };
+    SpecifierKindTy SpecifierKind = Let; // Defaults to let.
+
+    
     /// The location of the back-tick preceding the first name, if any.
-    SourceLoc BackTickLoc;
+    SourceLoc PoundLoc;
 
     /// The location of the first name.
     ///
@@ -869,9 +873,6 @@ public:
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
-
-    /// Whether this parameter is a 'let' parameter.
-    bool IsLet = true;
 
     /// The default argument for this parameter.
     ExprHandle *DefaultArg = nullptr;
