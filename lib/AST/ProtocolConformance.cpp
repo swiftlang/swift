@@ -225,6 +225,17 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   Mapping[requirement] = witness;
 }
 
+SpecializedProtocolConformance::SpecializedProtocolConformance(
+    Type conformingType,
+    ProtocolConformance *genericConformance,
+    ArrayRef<Substitution> substitutions)
+  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
+    GenericConformance(genericConformance),
+    GenericSubstitutions(substitutions)
+{
+  assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
+}
+
 const Substitution &SpecializedProtocolConformance::getTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {

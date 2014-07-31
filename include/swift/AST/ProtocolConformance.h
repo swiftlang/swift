@@ -439,13 +439,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions)
-    : ProtocolConformance(ProtocolConformanceKind::Specialized,
-                          conformingType),
-      GenericConformance(genericConformance),
-      GenericSubstitutions(substitutions)
-  {
-  }
+                                 ArrayRef<Substitution> substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,

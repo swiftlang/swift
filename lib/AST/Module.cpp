@@ -836,7 +836,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
       explicitConformanceType = nominal->getDeclaredTypeInContext();
     } else {
       explicitConformanceType = cast<ExtensionDecl>(declaresConformance)
-        ->getDeclaredTypeInContext();
+        ->getExtendedType()->getAnyNominal()->getDeclaredTypeInContext();
     }
 
     // If the explicit conformance is associated with a type that is different
