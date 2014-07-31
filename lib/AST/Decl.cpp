@@ -1049,13 +1049,14 @@ bool swift::conflicting(const OverloadSignature& sig1,
 
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
+                                     bool isMethod,
                                      unsigned curryLevels);
 
 /// Map a type within the signature of a declaration.
 static Type mapSignatureType(ASTContext &ctx, Type type) {
   return type.transform([&](Type type) -> Type {
       if (type->is<FunctionType>()) {
-        return mapSignatureFunctionType(ctx, type, false, 1);
+        return mapSignatureFunctionType(ctx, type, false, false, 1);
       }
       
       return type;
@@ -1063,7 +1064,14 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 }
 
 /// Map a signature type for a parameter.
-static Type mapSignatureParamType(ASTContext &ctx, Type type) {
+static Type mapSignatureParamType(ASTContext &ctx, Type type,
+                                  bool isMethodSelf) {
+  if (isMethodSelf) {
+    // Strip 'inout' on 'self' parameter, so that mutating and nonmutating
+    // methods have the same overload signature.
+    type = type->getInOutObjectType();
+  }
+
   /// Translate implicitly unwrapped optionals into strict optionals.
   if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
     type = OptionalType::get(uncheckedOptOf);
@@ -1074,9 +1082,11 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 
 /// Map a function's type to the type used for computing signatures,
 /// which involves stripping noreturn, stripping default arguments,
-/// transforming implicitly unwrapped optionals into strict optionals, etc.
+/// transforming implicitly unwrapped optionals into strict optionals,
+/// stripping 'inout' on the 'self' parameter etc.
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
+                                     bool isMethod,
                                      unsigned curryLevels) {
   if (curryLevels == 0) {
     /// Translate implicitly unwrapped optionals into strict optionals.
@@ -1095,7 +1105,8 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     bool anyChanged = false;
     unsigned idx = 0;
     for (const auto &elt : tupleTy->getFields()) {
-      Type eltTy = mapSignatureParamType(ctx, elt.getType());
+      Type eltTy = mapSignatureParamType(ctx, elt.getType(),
+                                         /*isMethodSelf=*/false);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
           elt.hasInit()) {
         if (!anyChanged) {
@@ -1120,12 +1131,12 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       argTy = TupleType::get(elements, ctx);
     }
   } else {
-    argTy = mapSignatureParamType(ctx, argTy);
+    argTy = mapSignatureParamType(ctx, argTy, /*isMethodSelf=*/isMethod);
   }
 
   // Map the result type.
-  auto resultTy = mapSignatureFunctionType(ctx, funcTy->getResult(),
-                                           topLevelFunction, curryLevels - 1);
+  auto resultTy = mapSignatureFunctionType(
+      ctx, funcTy->getResult(), topLevelFunction, false, curryLevels - 1);
 
   // At the top level, none of the extended information is relevant.
   AnyFunctionType::ExtInfo info;
@@ -1149,11 +1160,13 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   // interface types in their signatures as well as whether they are
   // instance members.
   if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
-    signature.InterfaceType
-      = mapSignatureFunctionType(getASTContext(), getInterfaceType(),
-                                 /*topLevelFunction=*/true,
-                                 afd->getNumParamPatterns())
-          ->getCanonicalType();
+    signature.InterfaceType =
+        mapSignatureFunctionType(
+            getASTContext(), getInterfaceType(),
+            /*topLevelFunction=*/true,
+            /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
+            afd->getNumParamPatterns())->getCanonicalType();
+
     signature.IsInstanceMember = isInstanceMember();
     // Unary operators also include prefix/postfix.
     if (auto func = dyn_cast<FuncDecl>(this)) {

@@ -233,3 +233,37 @@ func optional_2(#x: (Int!) -> Int) { } // expected-error{{invalid redeclaration 
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
+
+// mutating / nonmutating
+protocol ProtocolWithMutating {
+  mutating func test1() // expected-note {{previously declared}}
+  func test1() // expected-error{{invalid redeclaration of 'test1()'}}
+
+  mutating func test2(a: Int?) // expected-note {{previously declared}}
+  func test2(a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
+
+  @noreturn
+  mutating func test3() // expected-note {{previously declared}}
+  func test3() // expected-error {{invalid redeclaration of 'test3()'}}
+
+  mutating class func classTest1() // expected-error {{static functions may not be declared mutating}} expected-note {{previously declared}}
+  class func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
+}
+
+struct StructWithMutating {
+  mutating func test1() { } // expected-note {{previously declared}}
+  func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
+
+  mutating func test2(a: Int?) { } // expected-note {{previously declared}}
+  func test2(a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
+
+  @noreturn
+  mutating func test3() { } // expected-note {{previously declared}}
+  func test3() { } // expected-error {{invalid redeclaration of 'test3()'}}
+}
+
+enum EnumWithMutating {
+  mutating func test1() { } // expected-note {{previously declared}}
+  func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
+}
+
