@@ -16,13 +16,18 @@ struct Y { // expected-note{{extended type 'Y' declared here}}
   struct NonGenericInner { } 
 }
 
+struct Z<T : P1 where T.AssocType : P3> { }
+
 // Okay: exact match.
 extension X<T : P1, U : P2, V> { } // expected-error{{generic arguments are not allowed on an extension}}
+extension Z<T : P1 where T.AssocType : P3> { } // expected-error{{generic arguments are not allowed on an extension}}
 
 // Okay: infer missing requirements
 extension X<T, U, V> { } // expected-error{{generic arguments are not allowed on an extension}}
 extension X<T : P1, U, V> { } // expected-error{{generic arguments are not allowed on an extension}}
 extension X<T, U : P2, V> { } // expected-error{{generic arguments are not allowed on an extension}}
+extension Z<T : P1> { } // expected-error{{generic arguments are not allowed on an extension}}
+extension Z<T> { } // expected-error{{generic arguments are not allowed on an extension}}
 
 // Bad: extra requirements.
 extension X<T : P2, U, V> { } // expected-error{{extension of generic type 'X' cannot add requirements}}

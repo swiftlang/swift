@@ -778,7 +778,8 @@ public:
     if (!boundGeneric)
       return Action::Continue; 
 
-    auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
+    auto genericParams = boundGeneric->getDecl()->getGenericParams();
+    auto params = genericParams->getParams();
     auto args = boundGeneric->getGenericArgs();
     for (unsigned i = 0, n = params.size(); i != n; ++i) {
       auto arg = args[i];
@@ -797,6 +798,83 @@ public:
           HadError = true;
           return Action::Stop;
         }
+      }
+    }
+
+    // Capture the archetype -> generic parameter type mapping.
+    TypeSubstitutionMap substitutions;
+    for (auto params = genericParams; params;
+         params = params->getOuterParameters()) {
+      for (auto param : *params) {
+        substitutions[param->getArchetype()] = param->getDeclaredType();
+      }
+    }
+    
+    // Handle the 'where' clause.
+    for (const auto &req : genericParams->getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementKind::WitnessMarker:
+        break;
+
+      case RequirementKind::SameType: {
+        auto firstType = req.getFirstType().subst(&Builder.getModule(), 
+                                                  substitutions,
+                                                  true, nullptr);
+        if (!firstType)
+          break;
+
+        auto firstPA = Builder.resolveArchetype(firstType);
+
+        auto secondType = req.getSecondType().subst(&Builder.getModule(), 
+                                                    substitutions,
+                                                    true, nullptr);
+        if (!secondType)
+          break;
+        auto secondPA = Builder.resolveArchetype(secondType);
+
+        if (firstPA && secondPA) {
+          if (Builder.addSameTypeRequirementBetweenArchetypes(firstPA, 
+                                                              SourceLoc(),
+                                                              secondPA)) {
+            HadError = true;
+            return Action::Stop;
+          }
+        } else if (firstPA || secondPA) {
+          auto PA = firstPA ? firstPA : secondPA;
+          auto concrete = firstPA ? firstType : secondType;
+          if (Builder.addSameTypeRequirementToConcrete(PA, SourceLoc(), 
+                                                       concrete)) {
+            HadError = true;
+            return Action::Stop;
+          }
+        }
+        break;
+      }
+
+      case RequirementKind::Conformance: {
+        auto subjectType = req.getSubject().subst(&Builder.getModule(), 
+                                                  substitutions,
+                                                  true, nullptr);
+        if (!subjectType)
+          break;
+
+        auto subjectPA = Builder.resolveArchetype(subjectType);
+        if (!subjectPA) {
+          break;
+        }
+        
+        if (auto proto = req.getConstraint()->getAs<ProtocolType>()) {
+          if (Builder.addConformanceRequirement(subjectPA, proto->getDecl())) {
+            HadError = true;
+            return Action::Stop;
+          }
+        } else if (Builder.addSuperclassRequirement(subjectPA, SourceLoc(),
+                                                    req.getConstraint())) {
+          HadError = true;
+          return Action::Stop;
+        }
+        break;
+      }
       }
     }
 
