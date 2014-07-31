@@ -466,21 +466,13 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
-/// Diagnose specific availability for a declaration.
-///
-/// Returns true if no further availability checking is needed to reject
-/// the use of this declaration.
-static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
-                             const ValueDecl *D, SourceRange R,
-                             const DeclContext *DC) {
+/// Diagnose uses of unavailable declarations.
+static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
+                             SourceRange R, const DeclContext *DC) {
+  if (!D)
+    return;
 
-
-  // FIXME: Implement matching on the platform.  For now just
-  // do the '*' platform (all platforms).
-  if (Attr->hasPlatform())
-    return false;
-
-  if (Attr->IsUnvailable) {
+  if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
     auto Name = D->getFullName();
     SourceLoc Loc = R.Start;
 
@@ -502,20 +494,6 @@ static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
       TC.diagnose(DLoc, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
   }
-
-  return false;
-}
-
-/// Diagnose uses of unavailable declarations.
-static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
-                             SourceRange R, const DeclContext *DC) {
-  if (!D)
-    return;
-
-  for (auto Attr : D->getAttrs())
-    if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
-      if (diagAvailability(TC, AvailAttr, D, R, DC))
-        return;
 }
 
 

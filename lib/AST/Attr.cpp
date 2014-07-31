@@ -152,10 +152,17 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_Availability: {
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
-    Printer << Attr->platformString() << ", unavailable";
-    if (!Attr->Message.empty()) {
+    Printer << Attr->platformString();
+    if (Attr->IsUnvailable)
+      Printer << ", unavailable";
+    if (Attr->Introduced)
+      Printer << ", introduced=" << Attr->Introduced.getValue().getAsString();
+    if (Attr->Deprecated)
+      Printer << ", deprecated=" << Attr->Deprecated.getValue().getAsString();
+    if (Attr->Obsoleted)
+      Printer << ", obsoleted=" << Attr->Obsoleted.getValue().getAsString();
+    if (!Attr->Message.empty())
       Printer << ", message=\"" << Attr->Message << "\"";
-    }
     Printer << ")";
     break;
   }
@@ -373,11 +380,43 @@ AvailabilityAttr::platformFromString(StringRef Name) {
     .Default(Optional<AvailabilityAttr::PlatformKind>());
 }
 
+bool AvailabilityAttr::isActivePlatform(ASTContext &ctx) const {
+  if (!hasPlatform())
+    return true;
+
+  if (Platform == OSXApplicationExtension ||
+      Platform == iOSApplicationExtension)
+    if (!ctx.LangOpts.EnableAppExtensionRestrictions)
+      return false;
+
+  // FIXME: This is an awful way to get the current OS.
+  switch (Platform) {
+  case OSX:
+  case OSXApplicationExtension:
+    return ctx.LangOpts.getTargetConfigOption("os") == "OSX";
+  case iOS:
+  case iOSApplicationExtension:
+    return ctx.LangOpts.getTargetConfigOption("os") == "iOS";
+  case none:
+    llvm_unreachable("handled above");
+  }
+}
+
 const AvailabilityAttr *AvailabilityAttr::isUnavailable(const Decl *D) {
-  for (auto Attr : D->getAttrs())
-    if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
-      if (AvailAttr->IsUnvailable)
-        return AvailAttr;
+  ASTContext &ctx = D->getASTContext();
+  for (auto Attr : D->getAttrs()) {
+    if (Attr->isInvalid())
+      continue;
+    auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
+    if (!AvailAttr)
+      continue;
+    if (!AvailAttr->isActivePlatform(ctx))
+      continue;
+    if (AvailAttr->IsUnvailable)
+      return AvailAttr;
+    // FIXME: We should check the 'obsoleted' value here too, but the ASTContext
+    // doesn't give us a full deployment target.
+  }
 
   return nullptr;
 }

@@ -393,18 +393,6 @@ StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(*CurrentResults.Allocator, Str);
 }
 
-static bool isDeclUnavailable(const Decl *D) {
-  auto Attr = D->getAttrs().getUnavailable();
-  if (!Attr)
-    return false;
-
-  // FIXME: match platform.
-  if (Attr->hasPlatform())
-    return false;
-
-  return Attr->IsUnvailable;
-}
-
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   void *CCSMem = Sink.Allocator
       ->Allocate(sizeof(CodeCompletionString) +
@@ -1621,7 +1609,7 @@ public:
     // Hide private stdlib declarations.
     if (D->isPrivateStdlibDecl())
       return;
-    if (isDeclUnavailable(D))
+    if (AvailabilityAttr::isUnavailable(D))
       return;
 
     if (!D->hasType())

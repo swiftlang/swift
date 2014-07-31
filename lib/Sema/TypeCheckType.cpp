@@ -795,32 +795,29 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl,
                                       IdentTypeRepr *IdType,
                                       SourceLoc Loc,
                                       TypeChecker &TC) {
-  for (auto anAttr : TypeDecl->getAttrs()) {
-    auto Attr = dyn_cast<AvailabilityAttr>(anAttr);
-    if (!Attr) continue;
-
-    // FIXME: unify this checking with declarations.
-    if (Attr->hasPlatform())
-      continue;
-
-    if (Attr->IsUnvailable) {
-      if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-        if (!Attr->Rename.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                      CI->getIdentifier(), Attr->Rename)
-          .fixItReplace(Loc, Attr->Rename);
-        } else if (Attr->Message.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable,
-                      CI->getIdentifier())
-          .highlight(SourceRange(Loc, Loc));
-        }
-        else {
-          TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                      CI->getIdentifier(), Attr->Message)
-          .highlight(SourceRange(Loc, Loc));
-        }
-        return true;
+  if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
+    if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+      if (!Attr->Rename.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                    CI->getIdentifier(), Attr->Rename)
+        .fixItReplace(Loc, Attr->Rename);
+      } else if (Attr->Message.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable,
+                    CI->getIdentifier())
+        .highlight(SourceRange(Loc, Loc));
       }
+      else {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                    CI->getIdentifier(), Attr->Message)
+        .highlight(SourceRange(Loc, Loc));
+      }
+
+      auto DLoc = TypeDecl->getLoc();
+      if (DLoc.isValid())
+        TC.diagnose(DLoc, diag::availability_marked_unavailable,
+                    CI->getIdentifier())
+          .highlight(Attr->getRange());
+      return true;
     }
   }
 

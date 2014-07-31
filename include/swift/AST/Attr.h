@@ -608,6 +608,13 @@ public:
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
 
+
+  /// Determine if a given declaration should be considered unavailable given
+  /// the current settings.
+  ///
+  /// \returns The attribute responsible for making the declaration unavailable.
+  static const AvailabilityAttr *isUnavailable(const Decl *D);
+
   /// Returns true if the availability applies to a specific
   /// platform.
   bool hasPlatform() const {
@@ -622,6 +629,9 @@ public:
     return platformString(Platform);
   }
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(ASTContext &ctx) const;
+
   /// Returns the PlatformKind for a given string.
   static Optional<PlatformKind> platformFromString(StringRef);
 
@@ -633,10 +643,6 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;
   }
-
-  /// Determine if a given declaration has been marked unavailable.
-  static const AvailabilityAttr *isUnavailable(const Decl *D);
-
 };
 
 /// Indicates that the given declaration is visible to Objective-C.

@@ -24,10 +24,10 @@ func availabilityUnknownPlatform() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias
 @availability(*, unavailable, message="oh no you dont")
-typealias int = Int
+typealias int = Int // expected-note {{'int' has been explicitly marked unavailable here}}
 
 @availability(*, unavailable, renamed="Float")
-typealias float = Float
+typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
 
 
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}

@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -target x86_64-apple-macosx10.9 -verify
 
 @availability(*, unavailable)
 func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
@@ -7,10 +7,8 @@ func test() {
   unavailable_foo() // expected-error {{'unavailable_foo()' is unavailable}}
 }
 
-// FIXME: This will be moved to the Foundation overlay
-// once @availability is properly serialized.
 @availability(*,unavailable,message="use 'Int' instead")
-struct NSUInteger {}
+struct NSUInteger {} // expected-note 2 {{explicitly marked unavailable here}}
 
 func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
      let y : NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'Int' instead}}
@@ -61,3 +59,33 @@ func testString() {
   }
 }
  */
+
+@availability(OSX, unavailable)
+let unavailableOnOSX: Int = 0 // expected-note{{explicitly marked unavailable here}}
+@availability(iOS, unavailable)
+let unavailableOniOS: Int = 0
+@availability(iOS, unavailable) @availability(OSX, unavailable)
+let unavailableOnBothA: Int = 0 // expected-note{{explicitly marked unavailable here}}
+@availability(OSX, unavailable)
+let unavailableOnBothB: Int = 0 // expected-note{{explicitly marked unavailable here}}
+
+@availability(OSX, unavailable)
+typealias UnavailableOnOSX = Int // expected-note{{explicitly marked unavailable here}}
+@availability(iOS, unavailable)
+typealias UnavailableOniOS = Int
+@availability(iOS, unavailable) @availability(OSX, unavailable)
+typealias UnavailableOnBothA = Int // expected-note{{explicitly marked unavailable here}}
+@availability(OSX, unavailable) @availability(iOS, unavailable)
+typealias UnavailableOnBothB = Int // expected-note{{explicitly marked unavailable here}}
+
+func testPlatforms() {
+  _ = unavailableOnOSX // expected-error{{unavailable}}
+  _ = unavailableOniOS
+  _ = unavailableOnBothA // expected-error{{unavailable}}
+  _ = unavailableOnBothB // expected-error{{unavailable}}
+
+  let _: UnavailableOnOSX = 0 // expected-error{{unavailable}}
+  let _: UnavailableOniOS = 0
+  let _: UnavailableOnBothA = 0 // expected-error{{unavailable}}
+  let _: UnavailableOnBothB = 0 // expected-error{{unavailable}}
+}
