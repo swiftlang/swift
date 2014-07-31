@@ -1613,20 +1613,26 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
           static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
 }
 
+/// \param value passed at +1, consumed.
 extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
   OpaqueValue *value, const Metadata *T
 ) {
   assert(!swift_isClassOrObjCExistentialImpl(T));
 
   if (const auto *bridgeWitness = findBridgeWitness(T)) {
-      if (!bridgeWitness->isBridgedToObjectiveC(T, T))
-        return nullptr;
+    if (!bridgeWitness->isBridgedToObjectiveC(T, T)) {
+      // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
+      T->vw_destroy(value);
+      return nullptr;
+    }
     auto result = bridgeWitness->bridgeToObjectiveC(value, T);
     // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
     T->vw_destroy(value);
     return result;
   }
 
+  // Consume the +1 argument.
+  T->vw_destroy(value);
   return nullptr;
 }
 

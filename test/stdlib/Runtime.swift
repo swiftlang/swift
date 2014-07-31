@@ -5,6 +5,34 @@ import Swift
 import StdlibUnittest
 import Foundation
 
+var nsObjectCanaryCount = 0
+@objc class NSObjectCanary : NSObject {
+  override init() {
+    ++nsObjectCanaryCount
+  }
+  deinit {
+    --nsObjectCanaryCount
+  }
+}
+
+struct NSObjectCanaryStruct {
+  var ref = NSObjectCanary()
+}
+
+var swiftObjectCanaryCount = 0
+class SwiftObjectCanary {
+  init() {
+    ++swiftObjectCanaryCount
+  }
+  deinit {
+    --swiftObjectCanaryCount
+  }
+}
+
+struct SwiftObjectCanaryStruct {
+  var ref = SwiftObjectCanary()
+}
+
 @objc class ClassA {
   init(value: Int) {
     self.value = value
@@ -15,10 +43,14 @@ import Foundation
 
 struct NotBridgedValueType {
   // Keep it pointer-sized.
-  var a: ClassA = ClassA(value: 4242)
+  var canaryRef = SwiftObjectCanary()
 }
 
 struct BridgedValueType : _ObjectiveCBridgeable {
+  init(value: Int) {
+    self.value = value
+  }
+
   static func _getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
@@ -46,6 +78,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
   }
 
   var value: Int
+  var canaryRef = SwiftObjectCanary()
 }
 
 struct BridgedLargeValueType : _ObjectiveCBridgeable {
@@ -94,10 +127,15 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   var (value0, value1, value2, value3): (Int, Int, Int, Int)
   var (value4, value5, value6, value7): (Int, Int, Int, Int)
+  var canaryRef = SwiftObjectCanary()
 }
 
 
 struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
+  init(value: Int) {
+    self.value = value
+  }
+
   static func _getObjectiveCType() -> Any.Type {
     return ClassA.self
   }
@@ -126,9 +164,29 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
   }
 
   var value: Int
+  var canaryRef = SwiftObjectCanary()
 }
 
-class BridgedVerbatimRefType {}
+class BridgedVerbatimRefType {
+  var value: Int = 42
+  var canaryRef = SwiftObjectCanary()
+}
+
+func withSwiftObjectCanary<T>(
+  createValue: () -> T,
+  check: (T) -> (),
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  let stackTrace = SourceLocStack(SourceLoc(file, line))
+
+  swiftObjectCanaryCount = 0
+  if true {
+    var valueWithCanary = createValue()
+    expectEqual(1, swiftObjectCanaryCount, stackTrace: stackTrace)
+    check(valueWithCanary)
+  }
+  expectEqual(0, swiftObjectCanaryCount, stackTrace: stackTrace)
+}
 
 var Runtime = TestCase("Runtime")
 
@@ -145,6 +203,32 @@ Runtime.test("bridgeToObjectiveC") {
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
   expectTrue(_bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
+}
+
+Runtime.test("bridgeToObjectiveC/NoLeak") {
+  withSwiftObjectCanary(
+    { NotBridgedValueType() },
+    { expectEmpty(_bridgeToObjectiveC($0)) })
+
+  withSwiftObjectCanary(
+    { BridgedValueType(value: 42) },
+    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+
+  withSwiftObjectCanary(
+    { BridgedLargeValueType(value: 42) },
+    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+
+  withSwiftObjectCanary(
+    { ConditionallyBridgedValueType<Int>(value: 42) },
+    { expectEqual(42, (_bridgeToObjectiveC($0) as ClassA).value) })
+
+  withSwiftObjectCanary(
+    { ConditionallyBridgedValueType<String>(value: 42) },
+    { expectEmpty(_bridgeToObjectiveC($0)) })
+
+  withSwiftObjectCanary(
+    { BridgedVerbatimRefType() },
+    { expectTrue(_bridgeToObjectiveC($0) === $0) })
 }
 
 Runtime.test("forceBridgeFromObjectiveC") {
@@ -471,34 +555,6 @@ Runtime.run()
 // CHECK: {{^}}Runtime: All tests passed
 
 var RuntimeFoundationWrappers = TestCase("RuntimeFoundationWrappers")
-
-var nsObjectCanaryCount = 0
-@objc class NSObjectCanary : NSObject {
-  override init() {
-    ++nsObjectCanaryCount
-  }
-  deinit {
-    --nsObjectCanaryCount
-  }
-}
-
-struct NSObjectCanaryStruct {
-  var ref = NSObjectCanary()
-}
-
-var swiftObjectCanaryCount = 0
-class SwiftObjectCanary {
-  init() {
-    ++swiftObjectCanaryCount
-  }
-  deinit {
-    --swiftObjectCanaryCount
-  }
-}
-
-struct SwiftObjectCanaryStruct {
-  var ref = SwiftObjectCanary()
-}
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
   nsObjectCanaryCount = 0
