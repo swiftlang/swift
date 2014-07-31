@@ -184,6 +184,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr size_t alignment = alignof(Container);
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
+  static constexpr bool isBitwiseTakable = false;
   static constexpr unsigned numExtraInhabitants = 0;
 };
 
@@ -321,6 +322,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
   static constexpr size_t alignment = alignof(Container);
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
+  static constexpr size_t isBitwiseTakable = true;
 };
 
 /// A non-fixed box implementation class for an class existential

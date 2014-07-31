@@ -328,3 +328,96 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
   ASSERT_EQ(4 * sizeof(void*) + sizeof(HeapMetadataHeader),
             inst->getClassAddressPoint());
 }
+
+static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
+  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
+                           .withClassConstraint(ProtocolClassConstraint::Any)
+};
+static ProtocolDescriptor OpaqueProto2 = { "OpaqueProto2", nullptr,
+  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
+                           .withClassConstraint(ProtocolClassConstraint::Any)
+};
+static ProtocolDescriptor OpaqueProto3 = { "OpaqueProto3", nullptr,
+  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
+                           .withClassConstraint(ProtocolClassConstraint::Any)
+};
+static ProtocolDescriptor ClassProto1 = { "ClassProto1", nullptr,
+  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
+                           .withClassConstraint(ProtocolClassConstraint::Class)
+};
+
+TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
+  const ProtocolDescriptor *protoList1[] = {
+    &OpaqueProto1
+  };
+  auto ex1a = swift_getExistentialTypeMetadata(1, protoList1);
+  auto ex1b = swift_getExistentialTypeMetadata(1, protoList1);
+  ASSERT_EQ(ex1a, ex1b);
+  ASSERT_EQ(MetadataKind::Existential, ex1a->getKind());
+  ASSERT_EQ(5 * sizeof(void*), ex1a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex1a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex1a->getValueWitnesses()->isPOD());
+  ASSERT_FALSE(ex1a->getValueWitnesses()->isBitwiseTakable());
+
+  const ProtocolDescriptor *protoList2[] = {
+    &OpaqueProto1, &OpaqueProto2
+  };
+  auto ex2a = swift_getExistentialTypeMetadata(2, protoList2);
+  auto ex2b = swift_getExistentialTypeMetadata(2, protoList2);
+  ASSERT_EQ(ex2a, ex2b);
+  ASSERT_EQ(MetadataKind::Existential, ex2a->getKind());
+  ASSERT_EQ(6 * sizeof(void*), ex2a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex2a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex2a->getValueWitnesses()->isPOD());
+  ASSERT_FALSE(ex2a->getValueWitnesses()->isBitwiseTakable());
+
+  const ProtocolDescriptor *protoList3[] = {
+    &OpaqueProto1, &OpaqueProto2, &OpaqueProto3
+  };
+  auto ex3a = swift_getExistentialTypeMetadata(3, protoList3);
+  auto ex3b = swift_getExistentialTypeMetadata(3, protoList3);
+  ASSERT_EQ(ex3a, ex3b);
+  ASSERT_EQ(MetadataKind::Existential, ex3a->getKind());
+  ASSERT_EQ(7 * sizeof(void*), ex3a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex3a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex3a->getValueWitnesses()->isPOD());
+  ASSERT_FALSE(ex3a->getValueWitnesses()->isBitwiseTakable());
+}
+
+TEST(MetadataTest, getExistentialTypeMetadata_class) {
+  const ProtocolDescriptor *protoList1[] = {
+    &ClassProto1
+  };
+  auto ex1a = swift_getExistentialTypeMetadata(1, protoList1);
+  auto ex1b = swift_getExistentialTypeMetadata(1, protoList1);
+  ASSERT_EQ(ex1a, ex1b);
+  ASSERT_EQ(MetadataKind::Existential, ex1a->getKind());
+  ASSERT_EQ(2 * sizeof(void*), ex1a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex1a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex1a->getValueWitnesses()->isPOD());
+  ASSERT_TRUE(ex1a->getValueWitnesses()->isBitwiseTakable());
+
+  const ProtocolDescriptor *protoList2[] = {
+    &OpaqueProto1, &ClassProto1
+  };
+  auto ex2a = swift_getExistentialTypeMetadata(2, protoList2);
+  auto ex2b = swift_getExistentialTypeMetadata(2, protoList2);
+  ASSERT_EQ(ex2a, ex2b);
+  ASSERT_EQ(MetadataKind::Existential, ex2a->getKind());
+  ASSERT_EQ(3 * sizeof(void*), ex2a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex2a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex2a->getValueWitnesses()->isPOD());
+  ASSERT_TRUE(ex2a->getValueWitnesses()->isBitwiseTakable());
+
+  const ProtocolDescriptor *protoList3[] = {
+    &OpaqueProto1, &OpaqueProto2, &ClassProto1
+  };
+  auto ex3a = swift_getExistentialTypeMetadata(3, protoList3);
+  auto ex3b = swift_getExistentialTypeMetadata(3, protoList3);
+  ASSERT_EQ(ex3a, ex3b);
+  ASSERT_EQ(MetadataKind::Existential, ex3a->getKind());
+  ASSERT_EQ(4 * sizeof(void*), ex3a->getValueWitnesses()->getSize());
+  ASSERT_EQ(alignof(void*), ex3a->getValueWitnesses()->getAlignment());
+  ASSERT_FALSE(ex3a->getValueWitnesses()->isPOD());
+  ASSERT_TRUE(ex3a->getValueWitnesses()->isBitwiseTakable());
+}

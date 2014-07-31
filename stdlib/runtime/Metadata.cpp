@@ -26,7 +26,6 @@
 #include <cctype>
 #include <dispatch/dispatch.h>
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "ExistentialMetadataImpl.h"
 #include "Debug.h"
@@ -1497,6 +1496,7 @@ getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
   vwt->flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
     .withPOD(false)
+    .withBitwiseTakable(false)
     .withInlineStorage(false)
     .withExtraInhabitants(false);
   vwt->stride = Box::Container::getStride(numWitnessTables);
@@ -1547,6 +1547,7 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   vwt->flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
     .withPOD(false)
+    .withBitwiseTakable(true)
     .withInlineStorage(false)
     .withExtraInhabitants(true);
   vwt->stride = Box::Container::getStride(numWitnessTables);

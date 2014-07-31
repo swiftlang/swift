@@ -103,6 +103,7 @@ struct NativeBox {
   static constexpr size_t alignment = Alignment;
   static constexpr size_t stride = Stride;
   static constexpr size_t isPOD = std::is_pod<T>::value;
+  static constexpr bool isBitwiseTakable = isPOD;
   static constexpr unsigned numExtraInhabitants = 0;
 
   static void destroy(T *value) {
@@ -197,6 +198,7 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t alignment = alignof(T);
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
+  static constexpr bool isBitwiseTakable = true;
 
   static void destroy(T *addr) {
     Impl::release(*addr);
@@ -339,6 +341,7 @@ public:
   static constexpr size_t endOffset = StartOffset;
   static constexpr size_t alignment = 1;
   static constexpr bool isPOD = true;
+  static constexpr bool isBitwiseTakable = true;
 
 public:
 #define COPY_OP(OP)                        \
@@ -370,6 +373,8 @@ public:
     (NextHelper::alignment > EltBox::alignment
    ? NextHelper::alignment : EltBox::alignment);
   static constexpr bool isPOD = EltBox::isPOD && NextHelper::isPOD;
+  static constexpr bool isBitwiseTakable =
+    EltBox::isBitwiseTakable && NextHelper::isBitwiseTakable;
 
 private:
   static constexpr size_t eltToNextOffset = (nextOffset - eltOffset);
@@ -412,6 +417,7 @@ struct AggregateBox {
   static constexpr size_t alignment = Helper::alignment;
   static constexpr size_t stride = roundUpToAlignment(size, alignment);
   static constexpr bool isPOD = Helper::isPOD;
+  static constexpr bool isBitwiseTakable = Helper::isBitwiseTakable;
 
   /// Don't collect extra inhabitants from the members by default.
   static constexpr unsigned numExtraInhabitants = 0;
@@ -659,12 +665,14 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
   static constexpr size_t stride = Box::stride;
   static constexpr size_t alignment = Box::alignment;
   static constexpr bool isPOD = Box::isPOD;
+  static constexpr bool isBitwiseTakable = Box::isBitwiseTakable;
   static constexpr unsigned numExtraInhabitants = Box::numExtraInhabitants;
   static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
   static constexpr ValueWitnessFlags flags =
     ValueWitnessFlags().withAlignmentMask(alignment - 1)
                        .withInlineStorage(Base::isInline)
                        .withPOD(isPOD)
+                       .withBitwiseTakable(isBitwiseTakable)
                        .withExtraInhabitants(hasExtraInhabitants);
   static constexpr ExtraInhabitantFlags extraInhabitantFlags =
     ExtraInhabitantFlags().withNumExtraInhabitants(numExtraInhabitants);
