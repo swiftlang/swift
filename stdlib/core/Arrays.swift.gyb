@@ -605,6 +605,18 @@ extension ${Self} {
   ) {
     _arrayReplace(&self._buffer, subRange, newValues) 
   }
+  
+  public mutating func splice<
+    S: CollectionType where S.Generator.Element == T
+  >(s: S, atIndex i: Int) {
+    // FIXME: <rdar://problem/17866066> 
+    // Swift.splice(&self, s, atIndex: i)
+    self.replaceRange(i..<i, with: s)
+  }
+  
+  public mutating func removeRange(subRange: Range<Int>) {
+    Swift.removeRange(&self, subRange)
+  }
 }
 
 public

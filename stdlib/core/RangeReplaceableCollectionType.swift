@@ -36,8 +36,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   mutating func removeAtIndex(_: Index) -> Generator.Element
   mutating func removeRange(_: Range<Index>)
 
-  mutating func removeAll()
-  mutating func removeAll(#keepCapacity: Bool)
+  mutating func removeAll(#keepCapacity: Bool /*= false*/)
 }
 
 /// Insert an element at index `i` in O(N).

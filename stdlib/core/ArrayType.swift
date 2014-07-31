@@ -12,7 +12,7 @@
 
 internal protocol ArrayType
   : _ArrayType,
-    ExtensibleCollectionType,
+    RangeReplaceableCollectionType,
     MutableSliceable,
     ArrayLiteralConvertible
 {
