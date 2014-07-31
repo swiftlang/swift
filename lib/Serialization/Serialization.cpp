@@ -299,8 +299,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::XREF_PROTOCOL_CONFORMANCE);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NO_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
@@ -786,19 +784,6 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto conf = cast<NormalProtocolConformance>(conformance);
-
-    // If the conformance comes from another module, write a reference to it.
-    if (conformance->getDeclContext()->getParentModule() != M) {
-      unsigned abbrCode = abbrCodes[XRefProtocolConformanceLayout::Code];
-      DeclID protoID = addDeclRef(conf->getProtocol());
-      DeclID typeID = addDeclRef(conf->getType()->getAnyNominal());
-      ModuleID moduleID
-        = addModuleRef(conf->getDeclContext()->getParentModule());
-      assert(moduleID != serialization::BUILTIN_MODULE_ID);
-      XRefProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                protoID, typeID, moduleID);
-      break;
-    }
 
     SmallVector<DeclID, 16> data;
     unsigned numValueWitnesses = 0;
@@ -2606,7 +2591,6 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
     registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
 
-    registerDeclTypeAbbr<XRefProtocolConformanceLayout>();
     registerDeclTypeAbbr<NoConformanceLayout>();
     registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
     registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();

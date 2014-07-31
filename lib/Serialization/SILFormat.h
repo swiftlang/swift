@@ -139,7 +139,6 @@ namespace sil_block {
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
-    XREF_PROTOCOL_CONFORMANCE = decls_block::XREF_PROTOCOL_CONFORMANCE,
     BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
     NO_CONFORMANCE = decls_block::NO_CONFORMANCE,
     NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,

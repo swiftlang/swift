@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 125;
+const uint16_t VERSION_MINOR = 126;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -928,13 +928,6 @@ namespace decls_block {
   using LastGenericRequirementLayout = BCRecordLayout<
     LAST_GENERIC_REQUIREMENT,
     BCFixed<1>                 // dummy
-  >;
-
-  using XRefProtocolConformanceLayout = BCRecordLayout<
-    XREF_PROTOCOL_CONFORMANCE,
-    DeclIDField,    // protocol
-    DeclIDField,    // nominal type
-    ModuleIDField   // module
   >;
 
   /// A placeholder for lack of conformance information. Conformances are

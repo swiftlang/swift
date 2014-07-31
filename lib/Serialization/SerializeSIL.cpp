@@ -1513,7 +1513,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
   // SIL-specific records.
   registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
-  registerSILAbbr<decls_block::XRefProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NoConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
