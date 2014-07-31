@@ -15,6 +15,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -914,6 +916,11 @@ namespace {
       llvm_unreachable("type is not loadable!");
     }
   };
+  
+  /// A class that acts as a stand-in for unimplemented types.
+  class UnimplementedTypeLowering : public AddressOnlyTypeLowering {
+    using AddressOnlyTypeLowering::AddressOnlyTypeLowering;
+  };
 
   /// Build the appropriate TypeLowering subclass for the given type.
   class LowerType
@@ -1031,9 +1038,6 @@ namespace {
                                                       elt->getArgumentType())
           ->getCanonicalType();
         
-        if (substEltType == enumType)
-          continue;
-
         switch (classifyType(substEltType->getCanonicalType(), TC.M)) {
         case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(enumType);
@@ -1090,9 +1094,21 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
   auto found = Types.find(k);
   if (found == Types.end())
     return nullptr;
-  // In debug builds we place a null placeholder in the hashtable to catch
-  // reentrancy bugs.
-  assert(found->second && "reentered TypeLowering");
+  // We place a null placeholder in the hashtable to catch
+  // reentrancy, which arises as a result of improper recursion.
+  // TODO: We should diagnose nonterminating recursion in Sema, and implement
+  // terminating recursive enums, instead of diagnosing here.
+  if (!found->second) {
+    // Try to complain about a nominal type.
+    if (auto nomTy = k.SubstType.getAnyNominal())
+      M.getASTContext().Diags.diagnose(nomTy->getLoc(),
+                                       diag::unsupported_recursive_type,
+                                       k.SubstType);
+    else
+      assert(false && "non-nominal types should not be recursive");
+    found->second = new (*this, k.isDependent()) UnimplementedTypeLowering(
+                                SILType::getPrimitiveAddressType(k.SubstType));
+  }
   return found->second;
 }
 
@@ -1389,10 +1405,10 @@ getTypeLoweringForUncachedLoweredFunctionType(TypeKey key) {
   assert(isa<AnyFunctionType>(key.SubstType));
   assert(key.UncurryLevel == 0);
 
-#ifndef NDEBUG
-  // Catch reentrancy bugs.
+  // Catch recursions.
+  // FIXME: These should be bugs, so we shouldn't need to do this in release
+  // builds.
   insert(key, nullptr);
-#endif
   
   // Generic functions aren't first-class values and shouldn't end up lowered
   // through this interface.
@@ -1418,10 +1434,10 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   assert(!find(key) && "re-entrant or already cached");
   assert(isLoweredType(key.SubstType) && "didn't lower out l-value type?");
 
-#ifndef NDEBUG
   // Catch reentrancy bugs.
+  // FIXME: These should be bugs, so we shouldn't need to do this in release
+  // builds.
   insert(key, nullptr);
-#endif
 
   CanType contextType = key.SubstType;
   if (contextType->isDependentType())

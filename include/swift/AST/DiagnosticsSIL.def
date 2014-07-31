@@ -76,8 +76,8 @@ ERROR(inout_argument_alias,sil_gen,none,
 NOTE(previous_inout_alias,sil_gen,none,
       "previous aliasing argument", ())
 
-
-
+ERROR(unsupported_recursive_type,sil_gen,none,
+      "recursive value type %0 is not allowed", (Type))
 
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,
