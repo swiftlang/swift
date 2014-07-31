@@ -3597,7 +3597,7 @@ namespace {
         auto conformance
           = ctx.getConformance(dc->getDeclaredTypeOfContext(),
                                allProtocols[i], SourceLoc(),
-                               dc->getModuleScopeContext(),
+                               dc,
                                ProtocolConformanceState::Incomplete);
         finishProtocolConformance(conformance);
         allConformances[i] = conformance;

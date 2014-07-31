@@ -391,14 +391,14 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getProtocol(), getDeclContext()->getParentModule());
+    Profile(ID, getType(), getProtocol(), getDeclContext());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
-                      ProtocolDecl *protocol, Module *module) {
+                      ProtocolDecl *protocol, DeclContext *dc) {
     ID.AddPointer(type->getCanonicalType().getPointer());
     ID.AddPointer(protocol);
-    ID.AddPointer(module);
+    ID.AddPointer(dc);
   }
 
   static bool classof(const ProtocolConformance *conformance) {

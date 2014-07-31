@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 124;
+const uint16_t VERSION_MINOR = 125;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -947,7 +947,7 @@ namespace decls_block {
   using NormalProtocolConformanceLayout = BCRecordLayout<
     NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
-    ModuleIDField,
+    DeclIDField, // the decl that provided this conformance
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count

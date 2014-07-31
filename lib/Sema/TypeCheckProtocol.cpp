@@ -2075,8 +2075,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         DeclContext *DC,
                         Decl *ExplicitConformance,
                         SourceLoc ComplainLoc) {
-  DeclContext *conformingDC
-    = ExplicitConformance->getDeclContext()->getModuleScopeContext();
+  DeclContext *conformingDC;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(ExplicitConformance))
+    conformingDC = nominal;
+  else
+    conformingDC = cast<ExtensionDecl>(ExplicitConformance);
 
   // Find or create the conformance for this type.
   NormalProtocolConformance *conformance;

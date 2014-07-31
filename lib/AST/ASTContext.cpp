@@ -1184,10 +1184,9 @@ ASTContext::getConformance(Type conformingType,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
   llvm::FoldingSetNodeID id;
-  NormalProtocolConformance::Profile(id, conformingType, protocol,
-                                     dc->getParentModule());
+  NormalProtocolConformance::Profile(id, conformingType, protocol, dc);
 
-  // Did we already record the specialized conformance?
+  // Did we already record the normal conformance?
   void *insertPos;
   auto &normalConformances =
     Impl.getArena(AllocationArena::Permanent).NormalConformances;

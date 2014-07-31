@@ -841,9 +841,13 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
-    auto moduleID = addModuleRef(conf->getDeclContext()->getParentModule());
+    DeclID ownerID;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(conf->getDeclContext()))
+      ownerID = addDeclRef(nominal);
+    else
+      ownerID = addDeclRef(cast<ExtensionDecl>(conf->getDeclContext()));
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                addDeclRef(protocol), moduleID,
+                                                addDeclRef(protocol), ownerID,
                                                 numValueWitnesses,
                                                 numTypeWitnesses,
                                                 numInheritedConformances,
