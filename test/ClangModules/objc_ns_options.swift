@@ -27,8 +27,6 @@ var nothing: NSRuncingOptions = NSRuncingOptions()
 var nothing2: NSRuncingOptions = nil
 let nothing3: NSRuncingOptions = .allZeros
 
-if noMince {}
-
 // Strip leading 'k' in "kConstant".
 let calendarUnit: CFCalendarUnit = .Year | .Weekday
 

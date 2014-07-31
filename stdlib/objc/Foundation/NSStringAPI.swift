@@ -363,7 +363,7 @@ extension String {
     : range != nil ? _ns.compare(
       aString, options: mask, range: _toNSRange(range != nil ? range! : indices(self)))
       
-    : mask ? _ns.compare(aString, options: mask)
+    : mask != nil ? _ns.compare(aString, options: mask)
       
     : _ns.compare(aString)
   }
@@ -1134,7 +1134,7 @@ extension String {
       : searchRange != nil ? _ns.rangeOfString(
         aString, options: mask, range: _toNSRange(searchRange!)
       )
-      : mask ? _ns.rangeOfString(aString, options: mask)
+      : mask != nil ? _ns.rangeOfString(aString, options: mask)
       : _ns.rangeOfString(aString)
     )
   }

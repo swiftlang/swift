@@ -7,9 +7,10 @@ Latest
   are equivalent to force-casts from [NSArray], this makes certain
   Array round-trips through Objective-C code O(1) instead of O(N).
 
-* 'RawOptionSetType' now implements to 'BitwiseOperationsType', so imported
+* 'RawOptionSetType' now implements 'BitwiseOperationsType', so imported
   NS_OPTIONS now support the bitwise assignment operators '|=', '&=',
-  and '^='
+  and '^='. It also no longer implements 'BooleanType'; to check if an option
+  set is empty, compare it to 'nil'.
 
 * Types implementing 'BitwiseOperationsType' now automatically support
   the bitwise assignment operators '|=', '&=', and '^='.

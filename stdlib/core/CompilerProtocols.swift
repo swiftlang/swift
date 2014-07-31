@@ -193,8 +193,7 @@ public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-public protocol RawOptionSetType : _RawOptionSetType, BooleanType,
-    BitwiseOperationsType,
+public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
     NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
   // implementations in protocols)

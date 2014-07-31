@@ -78,7 +78,6 @@
 // FOUNDATION-NEXT: {{^}}  static func fromMask(raw: UInt) -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}  static func fromRaw(raw: UInt) -> NSRuncingOptions?{{$}}
 // FOUNDATION-NEXT: {{^}}  func toRaw() -> UInt{{$}}
-// FOUNDATION-NEXT: {{^}}  var boolValue: Bool { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var allZeros: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}

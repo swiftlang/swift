@@ -596,94 +596,6 @@ getOperatorRef(ASTContext &C, Identifier name) {
 }
 
 
-/// Build the 'boolValue' property for an option set.
-/// \code
-/// struct NSSomeOptionSet : RawOptionSet {
-///   var value: RawType
-///   var boolValue: Bool {
-///     return self.value != 0
-///   }
-/// }
-/// \endcode
-static void makeOptionSetBoolValueProperty(StructDecl *optionSetDecl,
-                                           ValueDecl *valueDecl,
-                                           SmallVectorImpl<Decl *> &NewDecls) {
-  ASTContext &C = optionSetDecl->getASTContext();
-  auto boolType = C.getGetBoolDecl(nullptr)
-                      ->getType()
-                      ->castTo<AnyFunctionType>()
-                      ->getResult();
-
-  // Create the getter.
-  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*NotStaticMethod*/ false);
-  Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(), {}, SourceLoc());
-  methodParam->setType(TupleType::getEmpty(C));
-  Pattern *params[] = {selfParam, methodParam};
-
-  auto *getterDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       Identifier(), SourceLoc(), nullptr, Type(), params,
-                       TypeLoc::withoutLoc(boolType), optionSetDecl);
-  getterDecl->setImplicit();
-
-  Type GetterType = FunctionType::get(TupleType::getEmpty(C), boolType);
-  GetterType =
-      FunctionType::get(optionSetDecl->getDeclaredTypeInContext(), GetterType);
-  getterDecl->setType(GetterType);
-  getterDecl->setBodyResultType(boolType);
-  getterDecl->setAccessibility(Accessibility::Public);
-
-  // Fill in the body of the getter.
-  {
-    auto selfRef =
-        new (C) DeclRefExpr(selfDecl, SourceLoc(), /*Implicit=*/true);
-    auto valueRef =
-        new (C) MemberRefExpr(selfRef, SourceLoc(), valueDecl, SourceLoc(),
-                              /*Implicit=*/true);
-
-    auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(), /*Implicit=*/true);
-
-    auto neRef = getOperatorRef(C, C.Id_NotEqualsOperator);
-
-    Expr *args[] = {valueRef, zero};
-    auto argsTuple = TupleExpr::createImplicit(C, args, {});
-    auto apply = new (C) BinaryExpr(neRef, argsTuple, /*Implicit=*/true);
-    auto ret = new (C) ReturnStmt(SourceLoc(), apply);
-
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                  /*Implicit=*/true);
-    getterDecl->setBody(body);
-  }
-
-  // Add as an external definition.
-  C.addedExternalDecl(getterDecl);
-
-  NewDecls.push_back(getterDecl);
-
-  // Create the property.
-  auto *PropertyDecl =
-      new (C) VarDecl(/*IsStatic=*/false, /*IsLet=*/false, SourceLoc(),
-                      C.Id_BoolValue, boolType, optionSetDecl);
-  PropertyDecl->setImplicit();
-  PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
-  PropertyDecl->setAccessibility(optionSetDecl->getAccessibility());
-  NewDecls.push_back(PropertyDecl);
-
-  Pattern *PropertyPattern =
-      new (C) NamedPattern(PropertyDecl, /*Implicit=*/true);
-  PropertyPattern->setType(boolType);
-  PropertyPattern = new (C) TypedPattern(
-      PropertyPattern, TypeLoc::withoutLoc(boolType), /*Implicit=*/true);
-  PropertyPattern->setType(boolType);
-
-  auto *PatternBinding = new (C) PatternBindingDecl(
-      SourceLoc(), StaticSpellingKind::None, SourceLoc(), PropertyPattern,
-      nullptr, /*IsConditional=*/false, optionSetDecl);
-  PatternBinding->setImplicit();
-  NewDecls.push_back(PatternBinding);
-}
-
 /// Build the 'allZeros' property for an option set.
 /// \code
 /// struct NSSomeOptionSet : RawOptionSet {
@@ -1736,7 +1648,6 @@ namespace {
                 makeOptionSetFactoryMethod(structDecl, var,
                                            OptionSetFactoryMethod::FromRaw));
             NewDecls.push_back(makeOptionSetToRawMethod(structDecl, var));
-            makeOptionSetBoolValueProperty(structDecl, var, NewDecls);
             makeOptionSetAllZerosProperty(structDecl, NewDecls);
             NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
           }

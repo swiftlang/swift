@@ -40,7 +40,6 @@ struct <loc>FooRuncingOptions</loc> : <ref:Protocol>RawOptionSetType</ref> {
   <decl:Func>static func <loc>fromMask(raw: <ref:Struct>Int</ref>)</loc> -> <ref:Struct>FooRuncingOptions</ref></decl>
   <decl:Func>static func <loc>fromRaw(raw: <ref:Struct>Int</ref>)</loc> -> <ref:Struct>FooRuncingOptions</ref>?</decl>
   <decl:Func>func <loc>toRaw()</loc> -> <ref:Struct>Int</ref></decl>
-  <decl:Var>var <loc>boolValue</loc>: <ref:Struct>Bool</ref> { get }</decl>
   <decl:Var>static var <loc>allZeros</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Func>static func <loc>convertFromNilLiteral()</loc> -> <ref:Struct>FooRuncingOptions</ref></decl>
 }</decl>

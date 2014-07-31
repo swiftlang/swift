@@ -51,7 +51,6 @@ struct FooRuncingOptions : RawOptionSetType {
   static func fromMask(raw: Int) -> FooRuncingOptions
   static func fromRaw(raw: Int) -> FooRuncingOptions?
   func toRaw() -> Int
-  var boolValue: Bool { get }
   static var allZeros: FooRuncingOptions { get }
   static func convertFromNilLiteral() -> FooRuncingOptions
 }

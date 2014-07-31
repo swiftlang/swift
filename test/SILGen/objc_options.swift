@@ -4,7 +4,7 @@
 import Foundation
 
 func foo(a: NSKeyValueObservingOptions) -> Bool {
-  return a || true
+  return (a ^ a) == nil
 }
 
-// CHECK: sil_witness_table shared NSKeyValueObservingOptions: BooleanType module Foundation
+// CHECK: sil_witness_table shared NSKeyValueObservingOptions: BitwiseOperationsType module Foundation
