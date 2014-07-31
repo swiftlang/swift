@@ -27,12 +27,32 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 // bool-specific operators.  BLOCKED ON: <rdar://problem/11510876>
 // [Implement overload resolution].
 
+public func && <T: BooleanType, U: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> U
+) -> Bool {
+  return lhs.boolValue ? rhs().boolValue : false
+}
+
+public func || <T: BooleanType, U: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> U
+) -> Bool {
+  return lhs.boolValue ? true : rhs().boolValue
+}
+
+// FIXME: We can't make the above @transparent due to
+// rdar://problem/17872402, so here are some @transparent overloads
+// for Bool.  We've done the same for ObjCBool
 @transparent public
-func &&(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
+func && <T: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> Bool
+) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent public
-func ||(lhs: BooleanType, rhs: @autoclosure () -> BooleanType) -> Bool {
+func || <T: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> Bool
+) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }
+

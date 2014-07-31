@@ -45,7 +45,7 @@ extension Bool : BooleanType {
   @transparent public var boolValue: Bool { return self }
 
   // Bool can be constructed from BooleanType
-  public init(_ v : BooleanType) {
+  public init<T: BooleanType>(_ v: T) {
     self = v.boolValue
   }
 }

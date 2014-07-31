@@ -27,6 +27,7 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   Bool.swift
+  BooleanType.swift
   BridgeObjectiveC.swift
   Builtin.swift
   BuiltinMath.swift.gyb
@@ -53,7 +54,6 @@ set(SWIFTLIB_ESSENTIAL
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
-  LogicValue.swift
   Map.swift.gyb
   Mirrors.swift.gyb
   Misc.swift

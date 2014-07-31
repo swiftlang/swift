@@ -177,3 +177,20 @@ let YES = ObjCBool(true)
 @availability(*, unavailable, message="Use 'Bool' value 'false' instead") public
 let NO = ObjCBool(false)
 
+// FIXME: We can't make the fully-generic versions @transparent due to
+// rdar://problem/17872402, so here are some @transparent overloads
+// for ObjCBool
+@transparent public
+func && <T: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> ObjCBool
+) -> Bool {
+  return lhs.boolValue ? rhs().boolValue : false
+}
+
+@transparent public
+func || <T: BooleanType>(
+  lhs: T, rhs: @autoclosure () -> ObjCBool
+) -> Bool {
+  return lhs.boolValue ? true : rhs().boolValue
+}
+

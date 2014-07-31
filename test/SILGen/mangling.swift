@@ -106,7 +106,7 @@ struct HasVarInit {
   static var state = true && false
 }
 // CHECK-LABEL: // function_ref mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
-// CHECK-NEXT:  function_ref @_TFIvV8mangling10HasVarInit5stateSbiu_KT_PSs11BooleanType_
+// CHECK-NEXT:  function_ref @_TFIvV8mangling10HasVarInit5stateSbiu_KT_Sb
 
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
