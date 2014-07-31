@@ -87,6 +87,29 @@ bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
+/// FIXME: This should be an independent property of the conformance.
+/// Assuming a BoundGenericType conformance is always for the
+/// DeclaredTypeInContext is unsound if we ever add constrained extensions.
+static GenericParamList *genericParamListForType(Type ty) {
+  while (ty) {
+    if (auto nt = ty->getAs<NominalType>())
+      ty = nt->getParent();
+    else
+      break;
+  }
+
+  if (!ty)
+    return nullptr;
+
+  if (auto bgt = ty->getAs<BoundGenericType>()) {
+    auto decl = bgt->getDecl();
+    assert(bgt->isEqual(decl->getDeclaredTypeInContext()) &&
+           "conformance for constrained generic type not implemented");
+    return decl->getGenericParams();
+  }
+  return nullptr;
+}
+
 /// Return the list of generic params that were substituted if this conformance
 /// was specialized somewhere along the inheritence chain.
 GenericParamList *ProtocolConformance::getSubstitutedGenericParams() const {
@@ -117,8 +140,7 @@ GenericParamList *ProtocolConformance::getSubstitutedGenericParams() const {
 
       // Otherwise, this must be the original conformance containing the
       // specialized generic parameters.  Attempt to create the param list.
-      return cast<NormalProtocolConformance>(C)->getDeclContext()
-               ->getGenericParamsOfContext();
+      return genericParamListForType(C->getType());
     }
   }
 }
@@ -141,8 +163,7 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
     case ProtocolConformanceKind::Normal:
       // If we have a normal protocol conformance, attempt to look up its open
       // generic type variables.
-      return cast<NormalProtocolConformance>(C)->getDeclContext()
-               ->getGenericParamsOfContext();
+      return genericParamListForType(C->getType());
     }
   }
 }
