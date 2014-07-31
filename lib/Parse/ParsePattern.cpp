@@ -807,7 +807,7 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
 ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    return parsePatternTuple(isLet, /*IsArgList*/false);
+    return parsePatternTuple(isLet);
 
   case tok::kw__:
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
@@ -839,19 +839,9 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
 }
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
-Parser::parsePatternTupleElement(bool isLet, bool isArgumentList) {
-  
-  // Function argument lists can have "inout" applied to TypedPatterns in their
-  // arguments.
-  SourceLoc InOutLoc;
-  if (isArgumentList)
-    consumeIf(tok::kw_inout, InOutLoc);
-
+Parser::parsePatternTupleElement(bool isLet) {
   // Parse the pattern.
-  ParserResult<Pattern> pattern;
-
-  // Parse the pattern.
-  pattern = parsePattern(isLet);
+  ParserResult<Pattern>  pattern = parsePattern(isLet);
   if (pattern.hasCodeCompletion())
     return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
   if (pattern.isNull())
@@ -863,32 +853,15 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList) {
   if (Tok.is(tok::equal))
     parseDefaultArgument(*this, nullptr, 0, init);
 
-  // If this is an inout function argument, validate that the sub-pattern is
-  // a TypedPattern.
-  if (InOutLoc.isValid()) {
-    if (auto *TP = dyn_cast<TypedPattern>(pattern.get())) {
-      // Change the TypeRep of the underlying typed pattern to be an inout
-      // typerep.
-      TypeLoc &LocInfo = TP->getTypeLoc();
-      LocInfo = TypeLoc(new (Context) InOutTypeRepr(LocInfo.getTypeRepr(),
-                                                    InOutLoc));
-    } else if (isa<VarPattern>(pattern.get())) {
-      diagnose(InOutLoc, diag::parameter_inout_var_let);
-    } else {
-      diagnose(InOutLoc, diag::inout_must_have_type);
-    }
-  }
-  
   return std::make_pair(
       makeParserSuccess(),
         TuplePatternElt(pattern.get(), nullptr, DefaultArgumentKind::None));
 }
 
-ParserResult<Pattern> Parser::parsePatternTuple(bool isLet,
-                                                bool isArgumentList) {
+ParserResult<Pattern> Parser::parsePatternTuple(bool isLet) {
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
-  return parsePatternTupleAfterLP(isLet, isArgumentList, LPLoc);
+  return parsePatternTupleAfterLP(isLet, LPLoc);
 }
 
 /// Parse a tuple pattern.  The leading left paren has already been consumed and
@@ -899,22 +872,19 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool isLet,
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern>
-Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
-                                 SourceLoc LPLoc) {
+Parser::parsePatternTupleAfterLP(bool isLet, SourceLoc LPLoc) {
   SourceLoc RPLoc, EllipsisLoc;
 
-  auto diagToUse = isArgumentList ? diag::expected_rparen_parameter
-                                  : diag::expected_rparen_tuple_pattern_list;
-  
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   ParserStatus ListStatus =
     parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
-              /*AllowSepAfterLast=*/false, diagToUse, [&] () -> ParserStatus {
+              /*AllowSepAfterLast=*/false,
+              diag::expected_rparen_tuple_pattern_list, [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement(isLet, isArgumentList);
+    std::tie(EltStatus, elt) = parsePatternTupleElement(isLet);
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (!elt)

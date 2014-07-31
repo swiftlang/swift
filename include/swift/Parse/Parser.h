@@ -947,10 +947,9 @@ public:
   ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool isLet, bool isArgumentList);
-  ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList);
-  ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,
-                                                 SourceLoc LPLoc);
+  parsePatternTupleElement(bool isLet);
+  ParserResult<Pattern> parsePatternTuple(bool isLet);
+  ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet, SourceLoc LPLoc);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
   ParserResult<Pattern> parsePatternVarOrLet();
   
