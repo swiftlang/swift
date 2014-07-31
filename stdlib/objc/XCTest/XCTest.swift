@@ -196,6 +196,11 @@ func _XCTCheckEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Fl
     && (abs(value1 - value2) <= accuracy)
 }
 
+func _XCTCheckEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, accuracy: CGFloat) -> Bool {
+  return (!value1.isNaN && !value2.isNaN)
+    && (abs(value1 - value2) <= accuracy)
+}
+
 public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
@@ -211,6 +216,9 @@ public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @autoc
     
   case let (expressionValue1Float as Float, expressionValue2Float as Float, accuracyFloat as Float):
     equalWithAccuracy = _XCTCheckEqualWithAccuracy_Float(expressionValue1Float, expressionValue2Float, accuracyFloat)
+    
+  case let (expressionValue1CGFloat as CGFloat, expressionValue2CGFloat as CGFloat, accuracyCGFloat as CGFloat):
+    equalWithAccuracy = _XCTCheckEqualWithAccuracy_CGFloat(expressionValue1CGFloat, expressionValue2CGFloat, accuracyCGFloat)
     
   default:
     // unknown type, fail with prejudice
@@ -242,6 +250,11 @@ func _XCTCheckNotEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy:
     || (abs(value1 - value2) > accuracy)
 }
 
+func _XCTCheckNotEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, accuracy: CGFloat) -> Bool {
+  return (value1.isNaN || value2.isNaN)
+    || (abs(value1 - value2) > accuracy)
+}
+
 public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @autoclosure () -> T, expression2: @autoclosure () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
@@ -257,6 +270,9 @@ public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @au
     
   case let (expressionValue1Float as Float, expressionValue2Float as Float, accuracyFloat as Float):
     notEqualWithAccuracy = _XCTCheckNotEqualWithAccuracy_Float(expressionValue1Float, expressionValue2Float, accuracyFloat)
+    
+  case let (expressionValue1CGFloat as CGFloat, expressionValue2CGFloat as CGFloat, accuracyCGFloat as CGFloat):
+    notEqualWithAccuracy = _XCTCheckNotEqualWithAccuracy_CGFloat(expressionValue1CGFloat, expressionValue2CGFloat, accuracyCGFloat)
     
   default:
     // unknown type, fail with prejudice
