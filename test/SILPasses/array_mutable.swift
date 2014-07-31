@@ -13,7 +13,6 @@
 // CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: [[VOID:%[^ ]+]] = tuple ()
 // CHECK: return [[VOID]]
-// CHECK-NEXT: {{^[}]}}
 func inoutarr(inout a: [Int]) {
   for i in 0..<a.count {
     a[i] = 0
@@ -32,7 +31,6 @@ struct S {
 // CHECK-NOT: _swift_isUniquelyReferenced
 // CHECK: [[VOID:%[^ ]+]] = tuple ()
 // CHECK: return [[VOID]]
-// CHECK-NEXT: {{^[}]}}
 func arrelt(inout s: S) {
   for i in 0..<s.a.count {
     s.a[i] = 0
