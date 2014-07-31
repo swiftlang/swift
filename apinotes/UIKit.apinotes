@@ -110,7 +110,7 @@ Classes:
         Nullability:     [ N, N, S, S, O ]
       - Selector:        'performSystemAnimation:onViews:options:animations:completion:'
         MethodKind:      Class
-        Nullability:     [ S, N, S, N, O ]
+        Nullability:     [ S, N, S, O, O ]
       - Selector:        'animateKeyframesWithDuration:delay:options:animations:completion:'
         MethodKind:      Class
         Nullability:     [ S, S, S, N, O ]
@@ -129,6 +129,8 @@ Classes:
         Nullability:     O
       - Name:            'maskView'
         Nullability:     O
+      - Name:            'tintColor'
+        Nullability:     U
       - Name:            'restorationIdentifier'
         Nullability:     O        
   - Name:            UIViewController
