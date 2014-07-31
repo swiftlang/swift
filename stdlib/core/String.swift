@@ -251,6 +251,7 @@ extension String : Hashable {
 }
 
 extension String : StringInterpolationConvertible {
+  @semantics("readonly")
   public
   static func convertFromStringInterpolation(strings: String...) -> String {
     var result = String()
@@ -260,6 +261,7 @@ extension String : StringInterpolationConvertible {
     return result
   }
 
+  @semantics("readonly")
   public
   static func convertFromStringInterpolationSegment<T>(expr: T) -> String {
     return toString(expr)
