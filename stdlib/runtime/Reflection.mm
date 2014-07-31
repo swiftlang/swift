@@ -201,7 +201,7 @@ static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
 /// metadata to walk an arbitrary object.
 ///
 /// This type is layout-compatible with a Swift existential
-/// container for the Mirror protocol.
+/// container for the MirrorType protocol.
 class MagicMirror {
 public:
   // The data for the mirror.
@@ -344,7 +344,9 @@ intptr_t swift_TupleMirror_count(HeapObject *owner,
   swift_release(owner);
   return Tuple->NumElements;
 }
-  
+
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 extern "C"
 StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
                                               HeapObject *owner,
@@ -368,10 +370,9 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
   
+  // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, eltData, elt.Type);
 
-  // 'owner' is passed using normal Swift +1 convention for in arguments.
-  swift_release(owner);
   return result;
 }
   
@@ -915,6 +916,8 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
 }
   
 /// MagicMirror ownership-taking whole-value constructor.
+///
+/// \param owner passed at +1, consumed.
 MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
                          bool take) {
   // Put value types into a box so we can take stable interior pointers.
@@ -932,6 +935,8 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
 }
   
 /// MagicMirror ownership-sharing subvalue constructor.
+///
+/// \param owner passed at +1, consumed.
 MagicMirror::MagicMirror(HeapObject *owner,
                          const OpaqueValue *value, const Metadata *T) {
   std::tie(T, Self, MirrorWitness) = getImplementationForType(T, value);
@@ -1046,6 +1051,9 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 /// Produce a mirror for any value, like swift_reflectAny, but do not consume
 /// the value, so we can produce a mirror for a subobject of a value already
 /// owned by a mirror.
+///
+/// \param owner passed at +1, consumed.
+/// \param value passed unowned.
 Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
                                      const OpaqueValue *value,
                                      const Metadata *T) {
@@ -1057,9 +1065,13 @@ Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
   
   // Use the Reflectable conformance if the object has one.
   if (witness) {
-    return witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
+    auto result =
+        witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
+    swift_release(owner);
+    return result;
   }
   // Otherwise, fall back to MagicMirror.
+  // Consumes 'owner'.
   Mirror result;
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;

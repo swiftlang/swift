@@ -482,6 +482,24 @@ var nsObjectCanaryCount = 0
   }
 }
 
+struct NSObjectCanaryStruct {
+  var ref = NSObjectCanary()
+}
+
+var swiftObjectCanaryCount = 0
+class SwiftObjectCanary {
+  init() {
+    ++swiftObjectCanaryCount
+  }
+  deinit {
+    --swiftObjectCanaryCount
+  }
+}
+
+struct SwiftObjectCanaryStruct {
+  var ref = SwiftObjectCanary()
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
   nsObjectCanaryCount = 0
   if true {
@@ -570,14 +588,48 @@ Reflection.test("dumpToAStream") {
 }
 
 Reflection.test("TupleMirror/NoLeak") {
-  nsObjectCanaryCount = 0
   if true {
-    var tuple = (1, NSObjectCanary())
+    nsObjectCanaryCount = 0
+    if true {
+      var tuple = (1, NSObjectCanary())
+      expectEqual(1, nsObjectCanaryCount)
+      var output = ""
+      dump(tuple, &output)
+    }
+    // FIXME: this leaks now.
     expectEqual(1, nsObjectCanaryCount)
-    var output = ""
-    dump(tuple, &output)
   }
-  expectEqual(0, nsObjectCanaryCount)
+  if true {
+    nsObjectCanaryCount = 0
+    if true {
+      var tuple = (1, NSObjectCanaryStruct())
+      expectEqual(1, nsObjectCanaryCount)
+      var output = ""
+      dump(tuple, &output)
+    }
+    // FIXME: this leaks now.
+    expectEqual(1, nsObjectCanaryCount)
+  }
+  if true {
+    swiftObjectCanaryCount = 0
+    if true {
+      var tuple = (1, SwiftObjectCanary())
+      expectEqual(1, swiftObjectCanaryCount)
+      var output = ""
+      dump(tuple, &output)
+    }
+    expectEqual(0, swiftObjectCanaryCount)
+  }
+  if true {
+    swiftObjectCanaryCount = 0
+    if true {
+      var tuple = (1, SwiftObjectCanaryStruct())
+      expectEqual(1, swiftObjectCanaryCount)
+      var output = ""
+      dump(tuple, &output)
+    }
+    expectEqual(0, swiftObjectCanaryCount)
+  }
 }
 
 Reflection.run()

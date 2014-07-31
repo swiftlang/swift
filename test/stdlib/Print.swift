@@ -651,6 +651,21 @@ test_DictionaryPrinting()
 // CHECK: test_DictionaryPrinting done
 
 func test_TuplePrinting() {
+  var tuple1 = (42, ())
+  printedIs(tuple1, "(42, ())")
+
+  var tuple2 = ((), 42)
+  printedIs(tuple2, "((), 42)")
+
+  var tuple3 = (42, StructPrintable(3))
+  printedIs(tuple3, "(42, ►3◀︎)")
+
+  var tuple4 = (42, LargeStructPrintable(10, 20, 30, 40))
+  printedIs(tuple4, "(42, <10 20 30 40>)")
+
+  var tuple5 = (42, ClassPrintable(3))
+  printedIs(tuple3, "(42, ►3◀︎)")
+
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
@@ -664,9 +679,8 @@ func test_TuplePrinting() {
 
   println("test_TuplePrinting done")
 }
-// FIXME: <rdar://17855302> Memory error in tuple reflection or printing
-// fixme test_TuplePrinting()
-// CHfixmeECK: test_TuplePrinting done
+test_TuplePrinting()
+// CHECK: test_TuplePrinting done
 
 func test_ArbitraryStructPrinting() {
   var arrayOfArbitraryStructs =
