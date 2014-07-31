@@ -962,6 +962,11 @@ public:
     assert(getKind() == RequirementKind::SameType);
     return SeparatorLoc;
   }
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  void print(raw_ostream &OS) const;
 };
   
 template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>

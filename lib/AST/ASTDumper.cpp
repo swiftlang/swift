@@ -41,6 +41,32 @@ DEF_COLOR(TypeRepr, GREEN)
 //  Generic param list printing.
 //===----------------------------------------------------------------------===//
 
+void RequirementRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void RequirementRepr::print(raw_ostream &out) const {
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+    getSubject().print(out);
+    out << " : ";
+    getConstraint().print(out);
+    break;
+
+  case RequirementKind::SameType:
+    getFirstType().print(out);
+    out << " == ";
+    getSecondType().print(out);
+    break;
+
+  case RequirementKind::WitnessMarker:
+    out << "witness marker for ";
+    getFirstType().print(out);
+    break;
+  }
+}
+
 void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '<';
   bool First = true;
@@ -55,6 +81,15 @@ void GenericParamList::print(llvm::raw_ostream &OS) {
       OS << " : ";
       P->getInherited()[0].getType().print(OS);
     }
+  }
+
+  if (!getRequirements().empty()) {
+    OS << " where ";
+    interleave(getRequirements(),
+               [&](const RequirementRepr &req) {
+                 req.print(OS);
+               },
+               [&] { OS << ", "; });
   }
   OS << '>';
 }
