@@ -131,16 +131,22 @@ GenericParamList *ProtocolConformance::getSubstitutedGenericParams() const {
       C = cast<SpecializedProtocolConformance>(C)->getGenericConformance();
       FoundSpecializedConformance = true;
       continue;
-    case ProtocolConformanceKind::Normal:
+    case ProtocolConformanceKind::Normal: {
       // If we have a normal protocol conformance and we have not seen a
       // specialized protocol conformance yet, we know that the normal protocol
       // conformance can only contain open types. Bail.
       if (!FoundSpecializedConformance)
         return nullptr;
 
+
       // Otherwise, this must be the original conformance containing the
       // specialized generic parameters.  Attempt to create the param list.
+      auto normal = cast<NormalProtocolConformance>(C);
+      if (auto ext = dyn_cast<ExtensionDecl>(normal->getDeclContext()))
+        return ext->getGenericParams();
+
       return genericParamListForType(C->getType());
+    }
     }
   }
 }
@@ -160,10 +166,15 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
       // currently partial specialization, we know that it can not have any open
       // type variables.
       return nullptr;
-    case ProtocolConformanceKind::Normal:
+    case ProtocolConformanceKind::Normal: {
       // If we have a normal protocol conformance, attempt to look up its open
       // generic type variables.
+      auto normal = cast<NormalProtocolConformance>(C);
+      if (auto ext = dyn_cast<ExtensionDecl>(normal->getDeclContext()))
+        return ext->getGenericParams();
+
       return genericParamListForType(C->getType());
+    }
     }
   }
 }
