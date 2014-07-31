@@ -299,7 +299,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
-  : Equatable, BooleanType, NilLiteralConvertible, _PointerType {
+  : Equatable, NilLiteralConvertible, _PointerType {
   let value: Builtin.RawPointer
 
   @transparent
@@ -312,11 +312,6 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     return UnsafeMutablePointer<T>(self)._isNull
   }
   
-  @transparent
-  public var boolValue: Bool {
-    return !_isNull
-  }
-
   /// Access the underlying raw memory, getting and
   /// setting values.
   public var memory : T {
