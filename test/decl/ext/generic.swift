@@ -87,3 +87,25 @@ extension LValueCheck<A> { // expected-error{{generic arguments are not allowed 
     x = 42
   }
 }
+
+// Member type references into another extension.
+struct MemberTypeCheckA<T> { }
+
+protocol MemberTypeProto {
+  typealias AssocType
+
+  func foo(a: AssocType)
+  init(_ assoc: MemberTypeCheckA<AssocType>)
+}
+
+struct MemberTypeCheckB<T> : MemberTypeProto {
+  func foo(a: T) {}
+}
+
+extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+  typealias Underlying = MemberTypeCheckA<T>
+}
+
+extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+  init(_ x: Underlying) { }
+}

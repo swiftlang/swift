@@ -2195,6 +2195,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
 Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
                                LazyResolver *resolver, Type memberType) {
   // If no member type was provided, use the member's type.
+  // FIXME: Use interface type here.
   if (!memberType)
     memberType = member->getType();
 
@@ -2240,11 +2241,12 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 
   // Gather all of the substitutions for all levels of generic arguments.
   TypeSubstitutionMap substitutions;
+  GenericParamList *curGenericParams = memberDC->getGenericParamsOfContext();
   while (baseTy) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
-      auto params = boundGeneric->getDecl()->getGenericParams()->getParams();
+      auto params = curGenericParams->getParams();
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         // FIXME: Shouldn't need both archetype and generic parameter mappings.
@@ -2256,6 +2258,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 
       // Continue looking into the parent.
       baseTy = boundGeneric->getParent();
+      curGenericParams = curGenericParams->getOuterParameters();
       continue;
     }
 
