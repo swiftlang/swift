@@ -160,7 +160,7 @@ public struct _StringCore {
   
   /// Create the implementation of an empty string.
   /// NOTE: there is no null terminator in an empty string!
-  init() {
+  public init() {
     self._baseAddress = _emptyStringBase
     self._countAndFlags = 0
     self._owner = .None
@@ -398,36 +398,35 @@ public struct _StringCore {
   }
 
   mutating func append(c: UnicodeScalar) {
+    let width = UTF16.width(c)
+    append(
+      width == 2 ? UTF16.leadSurrogate(c) : UTF16.CodeUnit(c.value),
+      width == 2 ? UTF16.trailSurrogate(c) : nil
+    )
+  }
+  
+  mutating func append(u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit? = nil) {
     _invariantCheck()
-     // How many bytes does it take to encode each UTF-16 code unit of
-     // c if ASCII storage is available?
-    let minBytesPerCodeUnit = c.value <= 0x7f ? 1 : 2
-    // How many UTF-16 code units does it take to encode c?
-    let utf16Width = c.value <= 0xFFFF ? 1 : 2
+    let minBytesPerCodeUnit = u0 <= 0x7f ? 1 : 2
+    let utf16Width = u1 == nil ? 1 : 2
     
-    let destination = _growBuffer(count + utf16Width, 
-                                  minElementWidth: minBytesPerCodeUnit)
+    let destination = _growBuffer(
+      count + utf16Width, minElementWidth: minBytesPerCodeUnit)
 
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
         _pointerToNth(count) 
         == COpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
 
-      UnsafeMutablePointer<UTF8.CodeUnit>(destination).memory
-        = UTF8.CodeUnit(c.value)
+      UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
     }
     else {
-      let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(
-        destination.value)
-      
-      if _fastPath(utf16Width == 1) {
-        _sanityCheck(_pointerToNth(count) == COpaquePointer(destination16 + 1))
-        destination16.memory = UTF16.CodeUnit(c.value)
-      }
-      else {
-        _sanityCheck(_pointerToNth(count) == COpaquePointer(destination16 + 2))
-        destination16.memory = UTF16.leadSurrogate(c)
-        (destination16 + 1).memory = UTF16.trailSurrogate(c)
+      let destination16
+        = UnsafeMutablePointer<UTF16.CodeUnit>(destination.value)
+
+      destination16[0] = u0
+      if u1 != nil {
+        destination16[1] = u1!
       }
     }
     _invariantCheck()
@@ -440,8 +439,9 @@ public struct _StringCore {
       ? elementWidth
       : rhs.representableAsASCII() ? 1 : 2
 
-    let destination = _growBuffer(count + rhs.count, 
-                                  minElementWidth: minElementWidth)
+    let destination = _growBuffer(
+      count + rhs.count, minElementWidth: minElementWidth)
+
     if _fastPath(rhs.hasContiguousStorage) {
       _StringCore._copyElements(
         rhs._baseAddress, srcElementWidth: rhs.elementWidth, 
@@ -489,6 +489,54 @@ extension _StringCore : CollectionType {
 }
 
 extension _StringCore : Sliceable {}
+
+extension _StringCore : ExtensibleCollectionType {
+  public mutating func reserveCapacity(n: Int) {
+    let oldCount = self.count
+    if n > oldCount {
+      _growBuffer(n, minElementWidth: 1)
+      self.count = oldCount
+    }
+  }
+
+  public mutating func extend<
+    S : SequenceType
+      where S.Generator.Element == UTF16.CodeUnit
+  >(s: S) {
+    var width = elementWidth
+    if width == 1 {
+      if let hasNonAscii = s~>_preprocessingPass({
+          s in contains(s) { $0 > 0x7f }
+        }) {
+        width = hasNonAscii ? 2 : 1
+      }
+    }
+    
+    let growth = s~>_underestimateCount()
+    var g = s.generate()
+
+    if _fastPath(growth > 0) {
+      let newSize = count + growth
+      let destination = _growBuffer(newSize, minElementWidth: width)
+      if elementWidth == 1 {
+        let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)
+        for i in 0..<growth {
+          destination8[i] = UTF8.CodeUnit(g.next()!)
+        }
+      }
+      else {
+        let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(destination)
+        for i in 0..<growth {
+          destination16[i] = g.next()!
+        }
+      }
+    }
+    // Append any remaining elements
+    for u in GeneratorSequence(g) {
+      self.append(u)
+    }
+  }
+}
 
 // Used to support a tighter invariant: all strings with contiguous
 // storage have a non-NULL base address.

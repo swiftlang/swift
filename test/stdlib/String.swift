@@ -169,6 +169,28 @@ StringTests.test("appendToSubstringBug") {
   }
 }
 
+import Foundation
+StringTests.test("stringCoreExtensibility") {
+  let nsx: NSString = "r"
+  let ascii = UTF16.CodeUnit("X".value)
+  let nonAscii = UTF16.CodeUnit("é".value)
+  
+  for length in 1..<16 {
+    for boundary in 0..<length {
+      var x = _StringCore()
+      for i in 0..<length {
+        x.extend(Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
+      }
+
+      expectEqualSequence(
+        Array(Repeat(count: 3*boundary, repeatedValue: ascii))
+        + Repeat(count: 3*(length - boundary), repeatedValue: nonAscii),
+        x
+      )
+    }
+  }
+}
+
 StringTests.run()
 // CHECK: {{^}}StringTests: All tests passed
 
@@ -395,4 +417,3 @@ func testCompareUnicode() {
   // CHECK: testCompareUnicode done
 }
 testCompareUnicode()
-
