@@ -353,11 +353,16 @@ public:
     /// with an @.
     DeclModifier = 1 << 1,
 
+    /// True if this is a long attribute that should be printed on its own line.
+    ///
+    /// Currently has no effect on DeclModifier attributes.
+    LongAttribute = 1 << 2,
+
     /// True if this shouldn't be serialized.
-    NotSerialized = 1 << 2,
+    NotSerialized = 1 << 3,
     
     /// True if this attribute is only valid when parsing a .sil file.
-    SILOnly = 1 << 3,
+    SILOnly = 1 << 4,
 
     // There is one entry for each DeclKind here, and some higher level buckets
     // down below.  These are used in Attr.def to control which kinds of
@@ -433,7 +438,7 @@ public:
   }
 
   /// Print the attribute to the provided ASTPrinter.
-  void print(ASTPrinter &Printer) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   /// Print the attribute to the provided stream.
   void print(llvm::raw_ostream &OS) const;
@@ -450,6 +455,13 @@ public:
   /// can appear on a delcaration.
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
+  }
+
+  bool isLongAttribute() const {
+    return isLongAttribute(getKind());
+  }
+  static bool isLongAttribute(DeclAttrKind DK) {
+    return getOptions(DK) & LongAttribute;
   }
 
   bool isDeclModifier() const {

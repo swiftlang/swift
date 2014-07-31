@@ -90,11 +90,14 @@ void DeclAttributes::print(ASTPrinter &Printer,
   if (!DeclAttrs)
     return;
 
-  SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());
+  using AttributeVector = SmallVector<const DeclAttribute *, 8>;
+  AttributeVector orderedAttributes(begin(), end());
   std::reverse(orderedAttributes.begin(), orderedAttributes.end());
 
-  // Process decl modifiers in a second pass, after the attributes.
-  SmallVector<const DeclAttribute *, 8> modifiers;
+  // Process attributes in passes.
+  AttributeVector longAttributes;
+  AttributeVector attributes;
+  AttributeVector modifiers;
 
   for (auto DA : orderedAttributes) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
@@ -109,20 +112,23 @@ void DeclAttributes::print(ASTPrinter &Printer,
                     DA->getKind()) == Options.ExclusiveAttrList.end())
         continue;
     }
-    
-    if (DA->isDeclModifier()) {
-      modifiers.push_back(DA);
-      continue;
-    }
 
-    DA->print(Printer);
+    AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             DA->isLongAttribute() ? longAttributes :
+                             attributes;
+    which.push_back(DA);
   }
 
+  for (auto DA : longAttributes)
+    DA->print(Printer, Options);
+  for (auto DA : attributes)
+    DA->print(Printer, Options);
   for (auto DA : modifiers)
-    DA->print(Printer);
+    DA->print(Printer, Options);
 }
 
-void DeclAttribute::print(ASTPrinter &Printer) const {
+void DeclAttribute::print(ASTPrinter &Printer,
+                          const PrintOptions &Options) const {
   switch (getKind()) {
     // Handle all of the SIMPLE_DECL_ATTRs.
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
@@ -173,12 +179,16 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
-  Printer << " ";
+
+  if (isLongAttribute() && Options.PrintLongAttrsOnSeparateLines)
+    Printer.printNewline();
+  else
+    Printer << " ";
 }
 
 void DeclAttribute::print(llvm::raw_ostream &OS) const {
   StreamPrinter P(OS);
-  print(P);
+  print(P, PrintOptions());
 }
 
 unsigned DeclAttribute::getOptions(DeclAttrKind DK) {

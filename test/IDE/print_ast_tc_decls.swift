@@ -467,7 +467,8 @@ protocol d0150_TestClassProtocol : class {}
 
 
 @noreturn @asmname("exit") func d0160_testNoReturn()
-// PASS_COMMON-LABEL: {{^}}@noreturn @asmname("exit") func d0160_testNoReturn(){{$}}
+// PASS_COMMON-LABEL: {{^}}@asmname("exit"){{$}}
+// PASS_COMMON-NEXT: {{^}}@noreturn func d0160_testNoReturn(){{$}}
 
 @noreturn func d0161_testNoReturn() { d0160_testNoReturn() }
 // PASS_COMMON-LABEL: {{^}}@noreturn func d0161_testNoReturn(){{$}}
@@ -488,16 +489,20 @@ class d0170_TestAvailability {
 
   @availability(*, unavailable)
   func f1() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable) final func f1(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  final func f1(){{$}}
 
   @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
   func f2() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee") final func f2(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee"){{$}}
+// PASS_COMMON-NEXT: {{^}}  final func f2(){{$}}
 
   @availability(iOS, unavailable)
   @availability(OSX, unavailable)
   func f3() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable) @availability(OSX, unavailable) final func f3(){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  @availability(OSX, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  final func f3(){{$}}
 }
 
 @objc class d0180_TestIBAttrs {

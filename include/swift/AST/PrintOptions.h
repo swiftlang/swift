@@ -87,6 +87,10 @@ struct PrintOptions {
   /// Whether to print keywords like 'func'.
   bool SkipIntroducerKeywords = false;
 
+  /// Whether to print a long attribute like '\@availability' on a separate line
+  /// from the declaration or other attributes.
+  bool PrintLongAttrsOnSeparateLines = false;
+
   bool PrintImplicitAttrs = true;
 
   /// List of attribute kinds that should not be printed.
@@ -146,12 +150,14 @@ struct PrintOptions {
     result.PrintDefaultParameterPlaceholder = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
+    result.PrintLongAttrsOnSeparateLines = true;
     return result;
   }
 
   /// Retrieve the set of options suitable for printing SIL functions.
   static PrintOptions printSIL() {
     PrintOptions result;
+    result.PrintLongAttrsOnSeparateLines = true;
     result.PrintStorageRepresentationAttrs = true;
     result.PrintForSIL = true;
     return result;
