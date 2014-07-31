@@ -426,9 +426,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     } else {
       BriefComment = AssociatedDecl->getBriefComment();
     }
-    bool NotRecommended = isDeclUnavailable(AssociatedDecl);
     return new (*Sink.Allocator) CodeCompletionResult(
-        SemanticContext, NumBytesToErase, CCS, AssociatedDecl, NotRecommended,
+        SemanticContext, NumBytesToErase, CCS, AssociatedDecl,
+        /*NotRecommended=*/false,
         copyString(*Sink.Allocator, BriefComment));
   }
 
@@ -1620,6 +1620,8 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
     if (D->isPrivateStdlibDecl())
+      return;
+    if (isDeclUnavailable(D))
       return;
 
     if (!D->hasType())
