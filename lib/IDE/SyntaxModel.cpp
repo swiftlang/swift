@@ -25,12 +25,11 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Regex.h"
 #include <vector>
+#include <regex>
 
 using namespace swift;
 using namespace ide;
-using llvm::Regex;
 
 void SyntaxModelWalker::anchor() {}
 
@@ -150,9 +149,10 @@ class ModelASTWalker : public ASTWalker {
   unsigned BufferID;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
-  Regex URLRxs[3] = { { RegexStrURL, Regex::Newline },
-                      { RegexStrMailURL, Regex::Newline },
-                      { RegexStrRadarURL, Regex::Newline } };
+  std::regex URLRxs[3] = {
+    std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
+    std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
+    std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }};
 
 public:
   SyntaxModelWalker &Walker;
@@ -854,15 +854,16 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
 
   StringRef Text = OrigText;
   while (1) {
-    SmallVector<StringRef, 4> Matches;
+    std::match_results<StringRef::iterator> Matches;
     for (auto &Rx : URLRxs) {
-      bool HadMatch = Rx.match(Text, &Matches);
+      bool HadMatch = std::regex_search(Text.begin(), Text.end(), Matches, Rx);
       if (HadMatch)
         break;
     }
     if (Matches.empty())
       break;
-    StringRef Match = Matches[0];
+    auto &RxMatch = Matches[0];
+    StringRef Match(RxMatch.first, RxMatch.second - RxMatch.first);
     SourceLoc Loc = OrigLoc.getAdvancedLoc(Match.data() - OrigText.data());
     CharSourceRange Range(Loc, Match.size());
     SyntaxNode Node{ SyntaxNodeKind::CommentURL, Range };

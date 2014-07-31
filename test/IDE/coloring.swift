@@ -286,3 +286,6 @@ func test5() -> Int {
 // CHECK: <comment-line>// <comment-url>http://whatever.com?ee=2&yy=1</comment-url> and <comment-url>radar://123456</comment-url></comment-line>
 // CHECK: <comment-block>/* <comment-url>http://whatever.com</comment-url> <comment-marker>FIXME: see in <comment-url>http://whatever.com/fixme</comment-url></comment-marker>
 // CHECK:  <comment-url>http://whatever.com</comment-url> */</comment-block>
+
+// CHECK: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
+// http://whatever.com/what-ever
