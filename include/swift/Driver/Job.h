@@ -160,8 +160,9 @@ public:
   const JobList &getInputs() const { return *Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
 
-  /// Print the command line for this Command to the given \p stream.
-  void printCommandLine(raw_ostream &Stream) const;
+  /// Print the command line for this Command to the given \p stream,
+  /// terminating output with the given \p terminator.
+  void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);

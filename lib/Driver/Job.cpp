@@ -99,10 +99,10 @@ void Command::printArguments(llvm::raw_ostream &os,
              [&] { os << ' '; });
 }
 
-
-void Command::printCommandLine(llvm::raw_ostream &os) const {
+void Command::printCommandLine(llvm::raw_ostream &os,
+                               StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
   printArguments(os, Arguments);
-  os << '\n';
+  os << Terminator;
 }
