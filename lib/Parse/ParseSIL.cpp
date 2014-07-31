@@ -737,6 +737,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 
 /// Find the ValueDecl given a type and a member name.
 static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
+                               SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
   unsigned options = NL_QualifiedDefault;
@@ -745,18 +746,11 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
     options = options & ~NL_VisitSupertypes;
   P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
 
-  assert(Lookup.size() >= 1 && "Can't find member for a given type!");
-  if (!ExpectMultipleResults)
-    assert(Lookup.size() == 1 && "Expect a single lookup result!");
+  if (Lookup.empty() || (!ExpectMultipleResults && Lookup.size() != 1)) {
+    P.diagnose(Loc, diag::sil_member_decl_not_found);
+    return nullptr;
+  }
   return Lookup[0];
-}
-
-/// Find the ValueDecl given a type and a member name. This helper function
-/// expects a single lookup result.
-static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
-  SmallVector<ValueDecl *, 4> values;
-  return lookupMember(P, Ty, Name, values,
-                      false/*ExpectMultipleResults*/);
 }
 
 bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
@@ -867,7 +861,9 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
   // Handle sil-dotted-path.
   Identifier Id;
   SmallVector<Identifier, 4> FullName;
+  SmallVector<SourceLoc, 4> Locs;
   do {
+    Locs.push_back(P.Tok.getLoc());
     if (parseSILIdentifier(Id, diag::expected_sil_constant))
       return true;
     FullName.push_back(Id);
@@ -882,15 +878,15 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
     assert(FullName.size() > 1 &&
            "A single module is not a full path to SILDeclRef");
     auto Mod = Res.get<Module*>();
-    VD = lookupMember(P, ModuleType::get(Mod), FullName[1], values,
+    VD = lookupMember(P, ModuleType::get(Mod), FullName[1], Locs[1], values,
                       FullName.size() == 2/*ExpectMultipleResults*/);
     for (unsigned I = 2, E = FullName.size(); I < E; I++)
-      VD = lookupMember(P, VD->getType(), FullName[I], values,
+      VD = lookupMember(P, VD->getType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
   } else {
     VD = Res.get<ValueDecl*>();
     for (unsigned I = 1, E = FullName.size(); I < E; I++)
-      VD = lookupMember(P, VD->getType(), FullName[I], values,
+      VD = lookupMember(P, VD->getType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
   }
   Decl = VD;
@@ -3218,7 +3214,12 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
   SourceLoc DeclLoc;
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
     return nullptr;
-  auto VD = lookupMember(P, proto->getType(), DeclName);
+  // We can return multiple decls, for now, we use the first lookup result.
+  // One example is two decls when searching for Generator of SequenceType:
+  // one from SequenceType, the other from _Sequence_Type.
+  SmallVector<ValueDecl *, 4> values;
+  auto VD = lookupMember(P, proto->getType(), DeclName, DeclLoc,
+                         values, true/*ExpectMultipleResults*/);
   if (!VD) {
     P.diagnose(DeclLoc, diag::sil_witness_assoc_not_found, DeclName);
     return nullptr;

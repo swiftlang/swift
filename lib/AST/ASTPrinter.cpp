@@ -583,6 +583,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // If we are printing StoredWithTrivialAccessors in sil, print get|set
   // to differentiate from stored property.
   if (!ASD->hasAccessorFunctions() ||
+      (Options.PrintForSIL && !ASD->getSetter()) ||
       (!Options.PrintForSIL &&
        ASD->getStorageKind()
        == AbstractStorageDecl::StoredWithTrivialAccessors)){

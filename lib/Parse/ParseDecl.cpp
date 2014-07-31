@@ -2574,7 +2574,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     return nullptr;
   
   // Reject accessors on 'let's after parsing them (for better recovery).
-  if (PrimaryVar->isLet()) {
+  if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
     if (WillSet || DidSet)
       diagnose(LBLoc, diag::let_cannot_be_observing_property);
     else
@@ -2636,11 +2636,12 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     diagnose(Set->getLoc(), diag::var_set_without_get);
   }
 
-  // Turn this into a computed variable.
   if (Set || Get) {
     if (Attributes.hasAttribute<SILStoredAttr>())
+      // Turn this into a stored property with trivial accessors.
       PrimaryVar->makeStoredWithTrivialAccessors(Get, Set);
     else
+      // Turn this into a computed variable.
       PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
   } else {
     // Otherwise this decl is invalid and the accessors have been rejected above.
