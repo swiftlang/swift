@@ -227,7 +227,7 @@ class FooUnavailableMembers : FooClassBase {
   @availability(*, unavailable, message="x")
   func deprecated()
   func availabilityIntroduced()
-  @availability(*, unavailable, message="APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift")
+  @availability(*, unavailable, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
   func availabilityDeprecated()
   func availabilityObsoleted()
   @availability(*, unavailable, message="x")

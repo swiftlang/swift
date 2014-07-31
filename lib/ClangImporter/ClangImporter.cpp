@@ -707,7 +707,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
         return minor.hasValue() && minor.getValue() <= 9;
     };
     DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift";
+      "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
 }
 
