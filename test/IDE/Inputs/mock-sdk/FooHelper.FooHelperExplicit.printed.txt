@@ -1,2 +1,2 @@
-import FooHelper.FooHelperExplicit
-@exported import FooHelper.FooHelperSub
+
+func fooHelperExplicitFrameworkFunc1(a: Int32) -> Int32

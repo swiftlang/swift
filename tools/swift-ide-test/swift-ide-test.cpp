@@ -1122,22 +1122,36 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     Printer.reset(new StreamPrinter(llvm::outs()));
 
   for (StringRef ModuleToPrint : ModulesToPrint) {
+    if (ModuleToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    // Get the (sub)module to print.
+    auto *M = getModuleByFullName(Context, ModuleToPrint);
+    if (!M) {
+      ExitCode = 1;
+      continue;
+    }
+
+    // Split the module path.
     std::vector<StringRef> ModuleName;
     while (!ModuleToPrint.empty()) {
       StringRef SubModuleName;
       std::tie(SubModuleName, ModuleToPrint) = ModuleToPrint.split('.');
       ModuleName.push_back(SubModuleName);
     }
+    assert(!ModuleName.empty());
 
-    if (ModuleName.empty()) {
-      ExitCode = 1;
-      continue;
-    }
-
-    auto *M = getModuleByFullName(Context, ModuleName[0]);
-    if (!M) {
-      ExitCode = 1;
-      continue;
+    // FIXME: If ModuleToPrint is a submodule, get its top-level module, which
+    // will be the DeclContext for all of its Decls since we don't have first-
+    // class submodules.
+    if (ModuleName.size() > 1) {
+      M = getModuleByFullName(Context, ModuleName[0]);
+      if (!M) {
+        ExitCode = 1;
+        continue;
+      }
     }
 
     printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options);

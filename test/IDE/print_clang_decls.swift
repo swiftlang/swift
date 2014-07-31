@@ -16,8 +16,10 @@
 // RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=AppKit -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
+
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=ctypes.bits -sdk %S/../Inputs/clang-importer-sdk -I %t -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS:      {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
@@ -102,3 +104,8 @@
 // APPKIT-NEXT: weak var target: @sil_weak AnyObject!
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
+
+// CTYPESBITS-NOT: FooStruct1
+// CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
+// CTYPESBITS-NEXT: {{^}}var MY_INT: Int32 { get }{{$}}
+// CTYPESBITS-NOT: FooStruct1

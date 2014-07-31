@@ -17,8 +17,7 @@
 // RUN: diff -u %t/FooHelper.FooHelperSub.printed.txt %S/Inputs/mock-sdk/FooHelper.FooHelperSub.printed.txt
 
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper.FooHelperExplicit -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperExplicit.printed.txt
-// FIXME: diff
-// FIXME: we cannot yet print explicit submodules because we don't import them.
+// RUN: diff -u %t/FooHelper.FooHelperExplicit.printed.txt %S/Inputs/mock-sdk/FooHelper.FooHelperExplicit.printed.txt
 
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true -annotate-print > %t/Foo.annotated.txt
 // RUN: diff -u %t/Foo.annotated.txt %S/Inputs/mock-sdk/Foo.annotated.txt
