@@ -206,6 +206,45 @@ static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
   BI->eraseFromParent();
 }
 
+/// Given Term, which is dominated by PredTerm, try simply them if
+/// they are the case where an enum_is_tag is conditionally branching to
+/// a switch_enum_inst on the same enum.
+static bool trySimplifySwitchEnumWithKnownElement(TermInst *Term,
+                                                  TermInst *PredTerm,
+                                                  SILBasicBlock *DomBB) {
+  SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(Term);
+  if (!SEI)
+    return false;
+  CondBranchInst *PredCondBr = dyn_cast<CondBranchInst>(PredTerm);
+  if (!PredCondBr)
+    return false;
+  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(PredCondBr->getCondition());
+  if (!EITI)
+    return false;
+  // Ensure the enum_is_tag and switch_enum are on the same enum
+  if (EITI->getOperand() != SEI->getOperand())
+    return false;
+
+  // We now have:
+  // bb1:
+  // %2 = enum_is_tag %1, EnumElt
+  // cond_br bb2, bb3
+  // ...
+  // bb2 (or 3):
+  // switch_enum_inst %1, ...
+
+  // Now we need to work out which switch case would be taken, based on whether
+  // the enum is of the given tag or not.
+  bool BranchTaken = getBranchTaken(PredCondBr, DomBB);
+  // TODO: Handle the case where we jump to the switch if we don't match the
+  // tag.  This may not always be possible to completely eliminate the switch.
+  if (!BranchTaken)
+    return false;
+
+  simplifySwitchEnumInst(SEI, EITI->getElement(), DomBB);
+  return true;
+}
+
 bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
   assert(isConditional(Term) && "Expected conditional terminator!");
 
@@ -220,6 +259,14 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       continue;
 
     auto *PredTerm = Pred->getTerminator();
+
+    // First handle the case where a switch_enum is dominated by a known
+    // element try, ie, an enum_is_tag makes the element known here.
+    // The Kinds of those instructions differ which would make it messy to
+    // handle below.
+    if (trySimplifySwitchEnumWithKnownElement(Term, PredTerm, DomBB))
+      return true;
+
     if (PredTerm->getKind() != Kind || PredTerm->getOperand(0) != Condition)
       continue;
 
