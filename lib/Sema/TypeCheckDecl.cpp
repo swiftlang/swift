@@ -3339,21 +3339,18 @@ public:
     return nullptr;
   }
   
-  bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD,
-                                     bool diagnose) {
+  bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
     // We don't support nested types in generics yet.
     if (NTD->getDeclContext()->isTypeContext()
         && NTD->isGenericContext()) {
-      if (diagnose) {
-        if (NTD->getGenericParams())
-          TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                NTD->getName(),
-                cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
-        else
-          TC.diagnose(NTD->getLoc(), diag::unsupported_type_nested_in_generic_type,
-                NTD->getName(),
-                cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
-      }
+      if (NTD->getGenericParams())
+        TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
+              NTD->getName(),
+              cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
+      else
+        TC.diagnose(NTD->getLoc(), diag::unsupported_type_nested_in_generic_type,
+              NTD->getName(),
+              cast<NominalTypeDecl>(NTD->getDeclContext())->getName());
       return true;
     }
     return false;
@@ -3369,7 +3366,7 @@ public:
     computeAccessibility(TC, ED);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(ED, /*diagnose*/ !IsSecondPass);
+      checkUnsupportedNestedGeneric(ED);
 
       TC.validateDecl(ED);
 
@@ -3535,7 +3532,7 @@ public:
     computeAccessibility(TC, SD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(SD, /*diagnose*/ !IsSecondPass);
+      checkUnsupportedNestedGeneric(SD);
 
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
@@ -3700,7 +3697,7 @@ public:
     computeAccessibility(TC, CD);
 
     if (!IsSecondPass) {
-      checkUnsupportedNestedGeneric(CD, /*diagnose*/ !IsSecondPass);
+      checkUnsupportedNestedGeneric(CD);
 
       TC.validateDecl(CD);
 
