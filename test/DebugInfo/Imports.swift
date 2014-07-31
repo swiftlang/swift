@@ -7,7 +7,7 @@
 // CHECK-DAG: ![[THISFILE]] = metadata {{.*}}[ DW_TAG_file_type ] [{{.*}}test/DebugInfo/Imports.swift]
 // CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = {{.*}}[ DW_TAG_file_type ]{{.*}}Swift.swiftmodule
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = {{.*}}[ DW_TAG_module ] [Swift]
-// CHECK-DAG: metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE]], i32 1} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE]], i32 0} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: metadata ![[BASICFILE:[0-9]+]], metadata ![[BASICMODULE:[0-9]+]], i32 [[@LINE+3]]} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: ![[BASICFILE]] = {{.*}}basic.swift
 // CHECK-DAG: ![[BASICMODULE]] = {{.*}}[ DW_TAG_module ] [basic]

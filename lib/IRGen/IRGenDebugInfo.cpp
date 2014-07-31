@@ -231,7 +231,7 @@ Location getDeserializedLoc(Decl* D)  {
   const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
   if (const char *Filename = getFilenameFromDC(DC)) {
     L.Filename = Filename;
-    L.Line = 1;
+    L.Line = 0;
   }
   return L;
 }

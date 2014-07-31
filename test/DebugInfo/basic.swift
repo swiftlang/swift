@@ -63,7 +63,7 @@ func foo(var a: Int, var b: Int) -> Int {
 
 // Import of the swift standard library.
 // CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = {{.*}}DW_TAG_file_type{{.*}}Swift.swiftmodule
-// CHECK-DAG: metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE:[0-9]+]], i32 1} ; [ DW_TAG_imported_module ]
+// CHECK-DAG: metadata ![[SWIFTFILE]], metadata ![[SWIFTMODULE:[0-9]+]], i32 0} ; [ DW_TAG_imported_module ]
 // CHECK-DAG: ![[SWIFTMODULE]] = {{.*}}[ DW_TAG_module ] [Swift]
 
 // Filenames
