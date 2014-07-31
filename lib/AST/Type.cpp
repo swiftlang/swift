@@ -2157,7 +2157,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     auto key = substOrig->getCanonicalType()->castTo<SubstitutableType>();
     auto known = substitutions.find(key);
     if (known != substitutions.end() && known->second)
-      return SubstitutedType::get(substOrig, known->second,
+      return SubstitutedType::get(type, known->second,
                                   module->getASTContext());
 
     // If we don't have a substitution for this type and it doesn't have a

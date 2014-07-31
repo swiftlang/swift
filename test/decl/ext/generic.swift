@@ -105,6 +105,9 @@ protocol MemberTypeProto {
 
 struct MemberTypeCheckB<T> : MemberTypeProto {
   func foo(a: T) {}
+
+  typealias Element = T
+  var t1: T
 }
 
 extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
@@ -113,4 +116,8 @@ extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not all
 
 extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
   init(_ x: Underlying) { }
+}
+
+extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+  var t2: Element { return t1 }  
 }
