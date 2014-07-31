@@ -86,6 +86,53 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
   return %19 : $Int64                             // id: %21
 }
 
+// func testThread2(a : Int) -> Int {
+//   enum b = (a ? _true : _false)
+//   if b == _true { return 42 } else { return 17 }
+//
+/// CHECK-LABEL: sil @testThread
+sil @testThread2 : $@thin (Builtin.Int1) -> Int64 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:                                              // Preds: bb0
+/// CHECK: bb1:
+/// CHECK: [[ENUM1:%.*]] = enum_is_tag
+/// CHECK: cond_br [[ENUM1]], bb3, bb4
+  %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
+  br bb3(%4 : $BoolLike)                      // id: %5
+
+bb2:                                              // Preds: bb0
+/// CHECK: bb2:
+/// CHECK: [[ENUM2:%.*]] = enum_is_tag
+/// CHECK: cond_br [[ENUM2]], bb3, bb4
+  %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
+  br bb3(%8 : $BoolLike)                      // id: %9
+
+bb3(%6 : $BoolLike):                          // Preds: bb3 bb1
+/// CHECK: bb3:
+  %100 = enum_is_tag $Builtin.Int1, %6 : $BoolLike, #BoolLike.true_!enumelt
+  br bb4                                          // id: %7
+
+bb4:                                              // Preds: bb2
+  cond_br %100, bb5, bb6                            // id: %10
+
+bb5:                                              // Preds: bb4
+  %11 = metatype $@thin Int64.Type
+  %12 = integer_literal $Builtin.Int64, 42        // user: %13
+  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
+  br bb7(%13 : $Int64)                            // id: %14
+
+bb6:                                              // Preds: bb4
+  %15 = metatype $@thin Int64.Type
+  %16 = integer_literal $Builtin.Int64, 17        // user: %17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
+  br bb7(%17 : $Int64)                            // id: %18
+
+bb7(%19 : $Int64):                                // Preds: bb6 bb5
+  return %19 : $Int64                             // id: %21
+}
+
 /// CHECK-LABEL: sil @testCondBrFold
 /// CHECK-NEXT: bb0(
 /// CHECK-NEXT: return %1 : $Int64

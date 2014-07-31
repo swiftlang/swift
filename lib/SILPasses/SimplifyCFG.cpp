@@ -367,7 +367,7 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
 
   for (auto UI : BBArg->getUses()) {
     auto *User = UI->getUser();
-    if (isa<SwitchEnumInst>(User))
+    if (isa<SwitchEnumInst>(User) || isa<EnumIsTagInst>(User))
       return true;
   }
   return false;
