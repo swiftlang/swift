@@ -27,16 +27,27 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   )
 
   //===--- Derivable Requirements (see free functions below) --------------===//
-  mutating func insert(newElement: Generator.Element, atIndex i: Index)
+  mutating func insert(newElement: Generator.Element, atIndex i: Index) /* {
+    Swift.insert(&self, newElement, atIndex: i)
+  } */
   
   mutating func splice<
     S : CollectionType where S.Generator.Element == Generator.Element
-  >(newValues: S, atIndex i: Index)
+  >(newValues: S, atIndex i: Index) /* {
+    Swift.splice(&self, newValues, atIndex: i)
+  } */
 
-  mutating func removeAtIndex(_: Index) -> Generator.Element
-  mutating func removeRange(_: Range<Index>)
+  mutating func removeAtIndex(i: Index) -> Generator.Element /* {
+    return Swift.removeAtIndex(&self, i)
+  } */
+  
+  mutating func removeRange(subRange: Range<Index>) /* {
+    Swift.removeRange(&self, subRange)
+  } */
 
-  mutating func removeAll(#keepCapacity: Bool /*= false*/)
+  mutating func removeAll(#keepCapacity: Bool /*= false*/) /* {
+    Swift.removeAll(&self, keepCapacity: keepCapacity)
+  } */
 }
 
 /// Insert an element at index `i` in O(N).
