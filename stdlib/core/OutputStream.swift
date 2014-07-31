@@ -174,6 +174,7 @@ public func println() {
 }
 
 /// Returns the result of `debugPrint`\ 'ing `x` into a `String`
+@semantics("readonly")
 public func toString<T>(x: T) -> String {
   var result = ""
   print(x, &result)
