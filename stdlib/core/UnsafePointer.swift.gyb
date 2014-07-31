@@ -22,9 +22,18 @@
 %  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 
-/// This type stores a pointer to an object of type T. It provides no
-/// automated memory management, and therefore the user must take care
-/// to allocate and free memory appropriately.
+/// A pointer to an object of type `T`.  This type provides no automated
+/// memory management, and therefore the user must take care to allocate
+/// and free memory appropriately.
+///
+/// The pointer can be in one of the following states:
+///
+/// - memory is not allocated (for example, pointer is null, or memory has
+/// been deallocated previously);
+///
+/// - memory is allocated, but value has not been initialized;
+///
+/// - memory is allocated and value is initialized.
 public struct ${Self}<T>
   : BidirectionalIndexType, Comparable, Hashable,
     NilLiteralConvertible, _PointerType {
@@ -88,12 +97,24 @@ public struct ${Self}<T>
   }
 
 %  if mutable:
+  /// Allocate memory for `num` objects of type `T`.
+  ///
+  /// Postcondition: the memory is allocated, but not initialized.
   public static func alloc(num: Int) -> ${Self} {
     // Don't bother with overflow checking.
     var size = strideof(T.self) * num
     return ${Self}(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
 
+  /// Deallocate `num` objects.
+  ///
+  /// :param: num number of objects to deallocate.  Should match exactly
+  /// the value that was passed to `alloc()` (partial deallocations are not
+  /// possible).
+  ///
+  /// Precondition: the memory is not initialized.
+  ///
+  /// Postcondition: the memory has been deallocated.
   public func dealloc(num: Int) {
     // Overflow checking is actually not required here.
     var size = strideof(T.self) * num
@@ -117,6 +138,11 @@ public struct ${Self}<T>
 %  if mutable:
   /// Initialize the value the pointer points to, to construct
   /// an object where there was no object previously stored.
+  ///
+  /// Precondition: the memory is not initialized.
+  ///
+  /// Postcondition: the memory is initalized; the value should eventually
+  /// be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: T) {
     Builtin.initialize(newvalue, value)
   }
@@ -124,7 +150,12 @@ public struct ${Self}<T>
   /// Retrieve the value the pointer points to, moving it away
   /// from the location referenced in memory.
   ///
-  /// Postcondition: The value has been destroyed and the memory must
+  /// Equivalent to reading `memory` property and calling `destroy()`,
+  /// but more efficient.
+  ///
+  /// Precondition: the memory is initialized.
+  ///
+  /// Postcondition: the value has been destroyed and the memory must
   /// be initialized before being used again.
   public func move() -> T {
     return Builtin.take(value)
@@ -176,6 +207,8 @@ public struct ${Self}<T>
   }
 
   /// Copy count values beginning at source into raw memory.
+  ///
+  /// Precondition: the memory is not initialized.
   public func initializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
@@ -188,6 +221,8 @@ public struct ${Self}<T>
   }
 
   /// Copy the elements of `C` into raw memory.
+  ///
+  /// Precondition: the memory is not initialized.
   public func initializeFrom<
     C: CollectionType where C._Element == T
   >(
@@ -204,11 +239,20 @@ public struct ${Self}<T>
   }
 
   /// Destroy the object the pointer points to.
+  ///
+  /// Precondition: the memory is initialized.
+  ///
+  /// Postcondition: the value has been destroyed and the memory must
+  /// be initialized before being used again.
   public func destroy() {
     Builtin.destroy(T.self, value)
   }
 
   /// Destroy the `count` objects the pointer points to.
+  /// Precondition: the memory is initialized.
+  ///
+  /// Postcondition: the value has been destroyed and the memory must
+  /// be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(T.self, value, count.value)
