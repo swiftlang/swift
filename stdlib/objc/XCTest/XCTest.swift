@@ -12,6 +12,8 @@
 
 @exported import XCTest // Clang module
 
+import CoreGraphics
+
 /// Returns the current test case, so we can use free functions instead of methods for the overlay.
 @asmname("_XCTCurrentTestCase") func _XCTCurrentTestCase() -> XCTestCase
 
