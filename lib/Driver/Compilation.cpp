@@ -233,10 +233,13 @@ static const Command *getOnlyCommandInList(const JobList *List) {
   }
 }
 
-static int performSingleCommand(const Command *Cmd) {
+int Compilation::performSingleCommand(const Command *Cmd) {
   assert(Cmd->getInputs().empty() &&
          "This can only be used to run a single Command with no inputs");
-  
+
+  if (Level == OutputLevel::Verbose)
+    Cmd->printCommandLine(llvm::errs());
+
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
   Argv.append(Cmd->getArguments().begin(), Cmd->getArguments().end());

@@ -135,6 +135,16 @@ private:
   int performJobsInList(const JobList &JL,
                         llvm::DenseSet<const Command *> &ScheduledCommands,
                         llvm::DenseSet<const Command *> &FinishedCommands);
+
+  /// \brief Performs a single Command by executing in place, if possible.
+  ///
+  /// \param Cmd the Command which should be performed.
+  ///
+  /// \returns Typically, this function will not return, as the current process
+  /// will no longer exist, or it will call exit() if the program was
+  /// successfully executed. In the event of an error, this function will return
+  /// a negative value indicating a failure to execute.
+  int performSingleCommand(const Command *Cmd);
 };
 
 } // end namespace driver
