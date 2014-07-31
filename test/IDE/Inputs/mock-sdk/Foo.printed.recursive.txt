@@ -216,6 +216,30 @@ class FooClassPropertyOwnership : FooClassBase {
   init()
   convenience init(float f: Float)
 }
+class FooUnavailableMembers : FooClassBase {
+  convenience init(int i: Int32)
+  @availability(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
+  class func unavailableMembersWithInt(i: Int32) -> Self!
+  @availability(*, unavailable, message="x")
+  func unavailable()
+  @availability(*, unavailable, message="Not available in Swift")
+  func swiftUnavailable()
+  @availability(*, unavailable, message="x")
+  func deprecated()
+  func availabilityIntroduced()
+  @availability(*, unavailable, message="APIs deprecated as of OSX 10.9 and earlier are unavailable in Swift")
+  func availabilityDeprecated()
+  func availabilityObsoleted()
+  @availability(*, unavailable, message="x")
+  func availabilityUnavailable()
+  @availability(*, unavailable, message="'performSelector' methods are unavailable")
+  func performSelectorWithMagic(cmd: COpaquePointer)
+  init()
+  convenience init(float f: Float)
+}
+typealias FooCFTypeRef = FooCFType
+@availability(*, unavailable, message="Core Foundation objects are automatically memory managed")
+func FooCFTypeRelease(_: FooCFType!)
 func fooSubFunc1(a: Int32) -> Int32
 struct FooSubEnum1 {
   init(_ value: UInt32)

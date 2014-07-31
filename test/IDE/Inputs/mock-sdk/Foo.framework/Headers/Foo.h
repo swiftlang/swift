@@ -235,4 +235,24 @@ struct _InternalStruct {
 @property (assign) int scalar;
 @end
 
+#define FOO_NIL ((id)0)
+
+@interface FooUnavailableMembers : FooClassBase
++ (instancetype)unavailableMembersWithInt:(int)i;
+
+- (void)unavailable __attribute__((unavailable("x")));
+- (void)swiftUnavailable __attribute__((annotate("swift1_unavailable")));
+- (void)deprecated __attribute__((deprecated("x")));
+
+- (void)availabilityIntroduced __attribute__((availability(macosx, introduced=10.1, message="x")));
+- (void)availabilityDeprecated __attribute__((availability(macosx, deprecated=10.1, message="x")));
+- (void)availabilityObsoleted __attribute__((availability(macosx, obsoleted=10.1, message="x")));
+- (void)availabilityUnavailable __attribute__((availability(macosx, unavailable, message="x")));
+
+- (void)performSelectorWithMagic:(SEL)cmd;
+@end
+
+typedef struct __FooCFType *FooCFTypeRef;
+void FooCFTypeRelease(FooCFTypeRef);
+
 #endif /* ! __FOO_H__ */

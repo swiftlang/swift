@@ -626,10 +626,9 @@ public:
   static Optional<PlatformKind> platformFromString(StringRef);
 
   /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
-  /// This attribute is considered "implicit".
-  static AvailabilityAttr *createImplicitUnavailableAttr(ASTContext &C,
-                                                         StringRef Message,
-                                                         StringRef Rename = "");
+  static AvailabilityAttr *createUnavailableAttr(ASTContext &C,
+                                                 StringRef Message,
+                                                 StringRef Rename = "");
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;
