@@ -3042,7 +3042,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
   auto &successBB = getLoweredBB(i->getSuccessBB());
   llvm::Type *toTy = IGM.getTypeInfo(destTy).StorageType;
   llvm::Value *toValue = val.getAddress();
-  if (i->getCastType().isAddress())
+  if (toTy->isPointerTy())
     toValue = Builder.CreateBitCast(toValue, toTy);
 
   Builder.CreateCondBr(isNonnull,
