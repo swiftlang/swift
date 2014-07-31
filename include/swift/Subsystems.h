@@ -135,8 +135,11 @@ namespace swift {
   ///
   /// \param M The module
   ///
+  /// \param Primary The primary source file
+  ///
   /// \param WholeModuleCompilation Whether we're doing whole-module compilation
-  void performWholeModuleChecks(Module *M, bool WholeModuleCompilation);
+  void performWholeModuleChecks(Module *M, const SourceFile *Primary,
+                                bool WholeModuleCompilation);
 
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);

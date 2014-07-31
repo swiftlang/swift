@@ -98,21 +98,21 @@ import gizmo
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
 
 public class RootGeneric<T> {
-  var x : UInt8
+  public var x : UInt8
 
   init()
 
   // Test that declaration order doesn't cause the field offset vector to end
   // up interleaved with the vtable.
-  func foo()
+  public func foo()
 
-  var y : T
+  public var y : T
 
-  func bar()
+  public func bar()
 
-  var z : UInt8
+  public var z : UInt8
 
-  func bas()
+  public func bas()
 }
 sil @_TFC15generic_classes11RootGenericD : $@cc(method) @thin <T> (RootGeneric<T>) -> ()
 
@@ -135,11 +135,11 @@ class RootNonGeneric {
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
 public class GenericInheritsGeneric<A, B> : RootGeneric<A> {
-  var w : B
+  public var w : B
 
-  func zippity()
-  func doo()
-  func dah()
+  public func zippity()
+  public func doo()
+  public func dah()
 
   override init()
 }

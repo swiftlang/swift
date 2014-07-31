@@ -11,8 +11,8 @@ class infer_instanceVar1 {
 
   var var_ClangEnum: FooEnum1
   var var_ClangStruct: FooStruct1
-// CHECK-LABEL: @objc var var_ClangEnum: FooEnum1
-// CHECK-LABEL: @objc var var_ClangStruct: FooStruct1
+// CHECK-LABEL: @objc final var var_ClangEnum: FooEnum1
+// CHECK-LABEL: @objc final var var_ClangStruct: FooStruct1
 
   init(fe: FooEnum1, fs: FooStruct1) {
     var_ClangEnum = fe
@@ -37,16 +37,16 @@ func ==(lhs: ObjC_Class2, rhs: ObjC_Class2) -> Bool {
 }
 
 @objc class DictionaryTest {
-  // CHECK-LABEL: @objc func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  // CHECK-LABEL: @objc final func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>)
   func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
-  // CHECK-LABEL: @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>)
+  // CHECK-LABEL: @objc final func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>)
   @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
-  // CHECK-LABEL: @objc func func_dictionary2a(x: Dictionary<ObjC_Class1, ObjC_Class2>)
+  // CHECK-LABEL: @objc final func func_dictionary2a(x: Dictionary<ObjC_Class1, ObjC_Class2>)
   func func_dictionary2a(x: Dictionary<ObjC_Class1, ObjC_Class2>) { }
 
-  // CHECK-LABEL: @objc func func_dictionary2b(x: Dictionary<ObjC_Class1, ObjC_Class2>)
+  // CHECK-LABEL: @objc final func func_dictionary2b(x: Dictionary<ObjC_Class1, ObjC_Class2>)
   @objc func func_dictionary2b(x: Dictionary<ObjC_Class1, ObjC_Class2>) { }
 
   // FIXME: Should be okay.

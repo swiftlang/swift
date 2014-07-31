@@ -562,21 +562,35 @@ private:
     // we can see the entire module
     auto Access = ValD->getAccessibility();
     if (Access == Accessibility::Public)
-      return false;
+      return true;
     if (Access == Accessibility::Internal && !WholeModComp)
       return true;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(ValD)) {
       // We can add final if we're overridden and we're in a class
-      if (!ASD->isOverridden() && isInClass(ASD->getDeclContext()))
+      if (!ASD->isOverridden() && isInClass(ASD->getDeclContext())) {
         addFinal(ASD);
+      }
       return true;
     }
 
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(ValD)) {
       // We can add final if we're overridden and we're in a class
-      if (!AFD->isOverridden() && isInClass(AFD->getDeclContext()))
+      if (!AFD->isOverridden() && isInClass(AFD->getDeclContext())) {
+        // FIXME: Remove this the below workaround no longer applies
+        //
+        // Work-around for a problem in how we override individual accessors: we
+        // currently will consider a derived setter to be override even if the
+        // base setter is not accessible to the derived class.
+        //
+        // For now, we work around it by not letting setters be final if the
+        // property is not final
+        if (auto FD = dyn_cast<FuncDecl>(AFD))
+          if (FD->isSetter() && !FD->getAccessorStorageDecl()->isFinal())
+            return true;
+
         addFinal(AFD);
+      }
       return true;
     }
 
@@ -584,10 +598,11 @@ private:
     // can't do anything.
     if (auto CD = dyn_cast<ClassDecl>(ValD)) {
       if (CD->isObjC())
-        return false;
+        return true;
+
+      // TODO: Also add final to classes
       return true;
     }
-    // TODO: Also add final to classes
 
     return true;
   }
@@ -606,12 +621,15 @@ private:
 };
 } // end namespace
 
-void swift::performWholeModuleChecks(Module *M, bool WholeModuleComp) {
+void swift::performWholeModuleChecks(Module *M,
+                                     const SourceFile *PrimarySourceFile,
+                                     bool WholeModuleComp) {
   TryAddFinal tryFinal(M, WholeModuleComp);
   for (auto File : M->getFiles())
     if (auto SF = dyn_cast<SourceFile>(File))
-      for (auto D : SF->Decls)
-        tryFinal(D);
+      if (WholeModuleComp || SF == PrimarySourceFile)
+        for (auto D : SF->Decls)
+          tryFinal(D);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,

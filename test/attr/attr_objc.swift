@@ -441,199 +441,199 @@ class infer_instanceFunc1 {
 // CHECK-LABEL: @objc class infer_instanceFunc1 {
 
   func func1() {}
-// CHECK-LABEL: @objc func func1() {
+// CHECK-LABEL: @objc final func func1() {
 
   @objc func func1_() {} // no-error
 
   func func2(a: Int) {}
-// CHECK-LABEL: @objc func func2(a: Int) {
+// CHECK-LABEL: @objc final func func2(a: Int) {
 
   @objc func func2_(a: Int) {} // no-error
 
   func func3(a: Int) -> Int {}
-// CHECK-LABEL: @objc func func3(a: Int) -> Int {
+// CHECK-LABEL: @objc final func func3(a: Int) -> Int {
 
   @objc func func3_(a: Int) -> Int {} // no-error
 
   func func4(a: Int, b: Double) {}
-// CHECK-LABEL: @objc func func4(a: Int, b: Double) {
+// CHECK-LABEL: @objc final func func4(a: Int, b: Double) {
 
   @objc func func4_(a: Int, b: Double) {} // no-error
 
   func func5(a: String) {}
-// CHECK-LABEL: @objc func func5(a: String) {
+// CHECK-LABEL: @objc final func func5(a: String) {
 
   @objc func func5_(a: String) {} // no-error
 
   func func6() -> String {}
-// CHECK-LABEL: @objc func func6() -> String {
+// CHECK-LABEL: @objc final func func6() -> String {
 
   @objc func func6_() -> String {} // no-error
 
   func func7(a: PlainClass) {}
-// CHECK-LABEL: {{^}} func func7(a: PlainClass) {
+// CHECK-LABEL: {{^}} final func func7(a: PlainClass) {
 
   @objc func func7_(a: PlainClass) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   func func7m(a: PlainClass.Type) {}
-// CHECK-LABEL: {{^}} func func7m(a: PlainClass.Type) {
+// CHECK-LABEL: {{^}} final func func7m(a: PlainClass.Type) {
 
   @objc func func7m_(a: PlainClass.Type) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 
   func func8() -> PlainClass {}
-// CHECK-LABEL: {{^}} func func8() -> PlainClass {
+// CHECK-LABEL: {{^}} final func func8() -> PlainClass {
 
   @objc func func8_() -> PlainClass {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   func func8m() -> PlainClass.Type {}
-// CHECK-LABEL: {{^}} func func8m() -> PlainClass.Type {
+// CHECK-LABEL: {{^}} final func func8m() -> PlainClass.Type {
 
   @objc func func8m_() -> PlainClass.Type {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   func func9(a: PlainStruct) {}
-// CHECK-LABEL: {{^}} func func9(a: PlainStruct) {
+// CHECK-LABEL: {{^}} final func func9(a: PlainStruct) {
 
   @objc func func9_(a: PlainStruct) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func10() -> PlainStruct {}
-// CHECK-LABEL: {{^}} func func10() -> PlainStruct {
+// CHECK-LABEL: {{^}} final func func10() -> PlainStruct {
 
   @objc func func10_() -> PlainStruct {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func11(a: PlainEnum) {}
-// CHECK-LABEL: {{^}} func func11(a: PlainEnum) {
+// CHECK-LABEL: {{^}} final func func11(a: PlainEnum) {
 
   @objc func func11_(a: PlainEnum) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift enums cannot be represented in Objective-C}}
 
   func func12(a: PlainProtocol) {}
-// CHECK-LABEL: {{^}} func func12(a: PlainProtocol) {
+// CHECK-LABEL: {{^}} final func func12(a: PlainProtocol) {
 
   @objc func func12_(a: PlainProtocol) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   func func13(a: Class_ObjC1) {}
-// CHECK-LABEL: @objc func func13(a: Class_ObjC1) {
+// CHECK-LABEL: @objc final func func13(a: Class_ObjC1) {
 
   @objc func func13_(a: Class_ObjC1) {} // no-error
 
   func func14(a: Protocol_Class1) {}
-// CHECK-LABEL: {{^}} func func14(a: Protocol_Class1) {
+// CHECK-LABEL: {{^}} final func func14(a: Protocol_Class1) {
 
   @objc func func14_(a: Protocol_Class1) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   func func15(a: Protocol_ObjC1) {}
-// CHECK-LABEL: @objc func func15(a: Protocol_ObjC1) {
+// CHECK-LABEL: @objc final func func15(a: Protocol_ObjC1) {
   @objc func func15_(a: Protocol_ObjC1) {} // no-error
 
   func func16(a: AnyObject) {}
-// CHECK-LABEL: @objc func func16(a: AnyObject) {
+// CHECK-LABEL: @objc final func func16(a: AnyObject) {
 
   @objc func func16_(a: AnyObject) {} // no-error
 
   func func17(a: () -> ()) {}
-// CHECK-LABEL: {{^}}  @objc func func17(a: () -> ()) {
+// CHECK-LABEL: {{^}}  @objc final func func17(a: () -> ()) {
 
   @objc func func17_(a: () -> ()) {}
 
   func func18(a: (Int) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func18(a: (Int) -> (), b: Int)
+// CHECK-LABEL: {{^}}  @objc final func func18(a: (Int) -> (), b: Int)
 
   @objc func func18_(a: (Int) -> (), b: Int) {}
 
   func func19(a: (String) -> (), b: Int) {}
-// CHECK-LABEL: {{^}}  @objc func func19(a: (String) -> (), b: Int) {
+// CHECK-LABEL: {{^}}  @objc final func func19(a: (String) -> (), b: Int) {
 
   @objc func func19_(a: (String) -> (), b: Int) {}
 
   func func_FunctionReturn1() -> () -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn1() -> () -> () {
+// CHECK-LABEL: {{^}}  @objc final func func_FunctionReturn1() -> () -> () {
 
   @objc func func_FunctionReturn1_() -> () -> () {}
 
   func func_FunctionReturn2() -> (Int) -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn2() -> (Int) -> () {
+// CHECK-LABEL: {{^}}  @objc final func func_FunctionReturn2() -> (Int) -> () {
 
   @objc func func_FunctionReturn2_() -> (Int) -> () {}
 
   func func_FunctionReturn3() -> () -> Int {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn3() -> () -> Int {
+// CHECK-LABEL: {{^}}  @objc final func func_FunctionReturn3() -> () -> Int {
 
   @objc func func_FunctionReturn3_() -> () -> Int {}
 
   func func_FunctionReturn4() -> (String) -> () {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn4() -> (String) -> () {
+// CHECK-LABEL: {{^}}  @objc final func func_FunctionReturn4() -> (String) -> () {
 
   @objc func func_FunctionReturn4_() -> (String) -> () {}
 
   func func_FunctionReturn5() -> () -> String {}
-// CHECK-LABEL: {{^}}  @objc func func_FunctionReturn5() -> () -> String {
+// CHECK-LABEL: {{^}}  @objc final func func_FunctionReturn5() -> () -> String {
 
   @objc func func_FunctionReturn5_() -> () -> String {}
 
 
   func func_ZeroParams1() {}
-// CHECK-LABEL: @objc func func_ZeroParams1() {
+// CHECK-LABEL: @objc final func func_ZeroParams1() {
 
   @objc func func_ZeroParams1a() {} // no-error
 
 
   func func_OneParam1(a: Int) {}
-// CHECK-LABEL: @objc func func_OneParam1(a: Int) {
+// CHECK-LABEL: @objc final func func_OneParam1(a: Int) {
 
   @objc func func_OneParam1a(a: Int) {} // no-error
 
 
   func func_TupleStyle1(a: Int, b: Int) {}
-  // CHECK-LABEL: {{^}} @objc func func_TupleStyle1(a: Int, b: Int) {
+  // CHECK-LABEL: {{^}} @objc final func func_TupleStyle1(a: Int, b: Int) {
 
   @objc func func_TupleStyle1a(a: Int, b: Int) {}
 
   func func_TupleStyle2(a: Int, b: Int, c: Int) {}
-// CHECK-LABEL: {{^}} @objc func func_TupleStyle2(a: Int, b: Int, c: Int) {
+// CHECK-LABEL: {{^}} @objc final func func_TupleStyle2(a: Int, b: Int, c: Int) {
 
   @objc func func_TupleStyle2a(a: Int, b: Int, c: Int) {}
 
   func func_Curried1()() {}
-// CHECK-LABEL: {{^}} func func_Curried1()() {
+// CHECK-LABEL: {{^}} final func func_Curried1()() {
 
   @objc func func_Curried1_()() {}
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
 
   func func_Curried2()(a: Int) {}
-// CHECK-LABEL: {{^}} func func_Curried2()(a: Int) {
+// CHECK-LABEL: {{^}} final func func_Curried2()(a: Int) {
 
   @objc func func_Curried2_()(a: Int) {}
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
 
   func func_Curried3()() -> Int {}
-// CHECK-LABEL: {{^}} func func_Curried3()() -> Int {
+// CHECK-LABEL: {{^}} final func func_Curried3()() -> Int {
 
   @objc func func_Curried3_()() -> Int {}
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
 
   func func_Curried4()(a: String) {}
-// CHECK-LABEL: {{^}} func func_Curried4()(a: String) {
+// CHECK-LABEL: {{^}} final func func_Curried4()(a: String) {
 
   @objc func func_Curried4_()(a: String) {}
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
 
   func func_Curried5()() -> String {}
-// CHECK-LABEL: {{^}} func func_Curried5()() -> String {
+// CHECK-LABEL: {{^}} final func func_Curried5()() -> String {
 
   @objc func func_Curried5_()() -> String {}
   // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
@@ -691,40 +691,40 @@ class infer_instanceVar1 {
   init() {}
 
   var instanceVar1: Int
-  // CHECK: @objc var instanceVar1: Int
+  // CHECK: @objc final var instanceVar1: Int
 
   var (instanceVar2, instanceVar3): (Int, PlainProtocol)
-  // CHECK: @objc var instanceVar2: Int
-  // CHECK: {{^}}  var instanceVar3: PlainProtocol
+  // CHECK: @objc final var instanceVar2: Int
+  // CHECK: {{^}}  final var instanceVar3: PlainProtocol
 
   @objc var (instanceVar1_, instanceVar2_): (Int, PlainProtocol)
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var intstanceVar4: Int {
-  // CHECK: @objc var intstanceVar4: Int {
+  // CHECK: @objc final var intstanceVar4: Int {
     get {}
-    // CHECK-NEXT: @objc get {}
+    // CHECK-NEXT: @objc final get {}
   }
 
   var intstanceVar5: Int {
-  // CHECK: @objc var intstanceVar5: Int {
+  // CHECK: @objc final var intstanceVar5: Int {
     get {}
-    // CHECK-NEXT: @objc get {}
+    // CHECK-NEXT: @objc final get {}
     set {}
-    // CHECK-NEXT: @objc set {}
+    // CHECK-NEXT: @objc final set {}
   }
 
   @objc var instanceVar5_: Int {
-  // CHECK: @objc var instanceVar5_: Int {
+  // CHECK: @objc final var instanceVar5_: Int {
     get {}
-    // CHECK-NEXT: @objc get {}
+    // CHECK-NEXT: @objc final get {}
     set {}
-    // CHECK-NEXT: @objc set {}
+    // CHECK-NEXT: @objc final set {}
   }
 
   var observingAccesorsVar1: Int {
-  // CHECK: @objc var observingAccesorsVar1: Int {
+  // CHECK: @objc final var observingAccesorsVar1: Int {
     willSet {}
     // CHECK-NEXT: {{^}} final willSet {}
     didSet {}
@@ -732,7 +732,7 @@ class infer_instanceVar1 {
   }
 
   @objc var observingAccesorsVar1_: Int {
-  // CHECK: {{^}} @objc var observingAccesorsVar1_: Int {
+  // CHECK: {{^}} @objc final var observingAccesorsVar1_: Int {
     willSet {}
     // CHECK-NEXT: {{^}} final willSet {}
     didSet {}
@@ -741,48 +741,48 @@ class infer_instanceVar1 {
 
 
   var var_Int: Int
-// CHECK-LABEL: @objc var var_Int: Int
+// CHECK-LABEL: @objc final var var_Int: Int
 
   var var_Bool: Bool
-// CHECK-LABEL: @objc var var_Bool: Bool
+// CHECK-LABEL: @objc final var var_Bool: Bool
 
   var var_CBool: CBool
-// CHECK-LABEL: @objc var var_CBool: CBool
+// CHECK-LABEL: @objc final var var_CBool: CBool
 
   var var_String: String
-// CHECK-LABEL: @objc var var_String: String
+// CHECK-LABEL: @objc final var var_String: String
 
   var var_Float: Float
   var var_Double: Double
-// CHECK-LABEL: @objc var var_Float: Float
-// CHECK-LABEL: @objc var var_Double: Double
+// CHECK-LABEL: @objc final var var_Float: Float
+// CHECK-LABEL: @objc final var var_Double: Double
 
   var var_Char: UnicodeScalar
-// CHECK-LABEL: @objc var var_Char: UnicodeScalar
+// CHECK-LABEL: @objc final var var_Char: UnicodeScalar
 
   //===--- Tuples.
 
   var var_tuple1: ()
-// CHECK-LABEL: {{^}} var var_tuple1: ()
+// CHECK-LABEL: {{^}} final var var_tuple1: ()
 
   @objc var var_tuple1_: ()
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple2: Void
-// CHECK-LABEL: {{^}} var var_tuple2: Void
+// CHECK-LABEL: {{^}} final var var_tuple2: Void
 
   @objc var var_tuple2_: Void
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple3: (Int)
-// CHECK-LABEL: @objc var var_tuple3: (Int)
+// CHECK-LABEL: @objc final var var_tuple3: (Int)
 
   @objc var var_tuple3_: (Int) // no-error
 
   var var_tuple4: (Int, Int)
-// CHECK-LABEL: {{^}} var var_tuple4: (Int, Int)
+// CHECK-LABEL: {{^}} final var var_tuple4: (Int, Int)
 
   @objc var var_tuple4_: (Int, Int)
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -794,182 +794,182 @@ class infer_instanceVar1 {
   var var_Int16: Int16
   var var_Int32: Int32
   var var_Int64: Int64
-// CHECK-LABEL: @objc var var_Int8: Int8
-// CHECK-LABEL: @objc var var_Int16: Int16
-// CHECK-LABEL: @objc var var_Int32: Int32
-// CHECK-LABEL: @objc var var_Int64: Int64
+// CHECK-LABEL: @objc final var var_Int8: Int8
+// CHECK-LABEL: @objc final var var_Int16: Int16
+// CHECK-LABEL: @objc final var var_Int32: Int32
+// CHECK-LABEL: @objc final var var_Int64: Int64
 
   var var_UInt8: UInt8
   var var_UInt16: UInt16
   var var_UInt32: UInt32
   var var_UInt64: UInt64
-// CHECK-LABEL: @objc var var_UInt8: UInt8
-// CHECK-LABEL: @objc var var_UInt16: UInt16
-// CHECK-LABEL: @objc var var_UInt32: UInt32
-// CHECK-LABEL: @objc var var_UInt64: UInt64
+// CHECK-LABEL: @objc final var var_UInt8: UInt8
+// CHECK-LABEL: @objc final var var_UInt16: UInt16
+// CHECK-LABEL: @objc final var var_UInt32: UInt32
+// CHECK-LABEL: @objc final var var_UInt64: UInt64
 
   var var_COpaquePointer: COpaquePointer
-// CHECK-LABEL: @objc var var_COpaquePointer: COpaquePointer
+// CHECK-LABEL: @objc final var var_COpaquePointer: COpaquePointer
 
   var var_PlainClass: PlainClass
-// CHECK-LABEL: {{^}}  var var_PlainClass: PlainClass
+// CHECK-LABEL: {{^}}  final var var_PlainClass: PlainClass
 
   @objc var var_PlainClass_: PlainClass
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   var var_PlainStruct: PlainStruct
-// CHECK-LABEL: {{^}}  var var_PlainStruct: PlainStruct
+// CHECK-LABEL: {{^}}  final var var_PlainStruct: PlainStruct
 
   @objc var var_PlainStruct_: PlainStruct
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
-// CHECK-LABEL: {{^}}  var var_PlainEnum: PlainEnum
+// CHECK-LABEL: {{^}}  final var var_PlainEnum: PlainEnum
 
   @objc var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift enums cannot be represented in Objective-C}}
 
   var var_PlainProtocol: PlainProtocol
-// CHECK-LABEL: {{^}}  var var_PlainProtocol: PlainProtocol
+// CHECK-LABEL: {{^}}  final var var_PlainProtocol: PlainProtocol
 
   @objc var var_PlainProtocol_: PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_ClassObjC: Class_ObjC1
-// CHECK-LABEL: @objc var var_ClassObjC: Class_ObjC1
+// CHECK-LABEL: @objc final var var_ClassObjC: Class_ObjC1
 
   @objc var var_ClassObjC_: Class_ObjC1 // no-error
 
   var var_ProtocolClass: Protocol_Class1
-// CHECK-LABEL: {{^}}  var var_ProtocolClass: Protocol_Class1
+// CHECK-LABEL: {{^}}  final var var_ProtocolClass: Protocol_Class1
 
   @objc var var_ProtocolClass_: Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_ProtocolObjC: Protocol_ObjC1
-// CHECK-LABEL: @objc var var_ProtocolObjC: Protocol_ObjC1
+// CHECK-LABEL: @objc final var var_ProtocolObjC: Protocol_ObjC1
 
   @objc var var_ProtocolObjC_: Protocol_ObjC1 // no-error
 
 
   var var_PlainClassMetatype: PlainClass.Type
-// CHECK-LABEL: {{^}}  var var_PlainClassMetatype: PlainClass.Type
+// CHECK-LABEL: {{^}}  final var var_PlainClassMetatype: PlainClass.Type
 
   @objc var var_PlainClassMetatype_: PlainClass.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainStructMetatype: PlainStruct.Type
-// CHECK-LABEL: {{^}}  var var_PlainStructMetatype: PlainStruct.Type
+// CHECK-LABEL: {{^}}  final var var_PlainStructMetatype: PlainStruct.Type
 
   @objc var var_PlainStructMetatype_: PlainStruct.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainEnumMetatype: PlainEnum.Type
-// CHECK-LABEL: {{^}}  var var_PlainEnumMetatype: PlainEnum.Type
+// CHECK-LABEL: {{^}}  final var var_PlainEnumMetatype: PlainEnum.Type
 
   @objc var var_PlainEnumMetatype_: PlainEnum.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainExistentialMetatype: PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_PlainExistentialMetatype: PlainProtocol.Type
+// CHECK-LABEL: {{^}}  final var var_PlainExistentialMetatype: PlainProtocol.Type
 
   @objc var var_PlainExistentialMetatype_: PlainProtocol.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ClassObjCMetatype: Class_ObjC1.Type
-// CHECK-LABEL: @objc var var_ClassObjCMetatype: Class_ObjC1.Type
+// CHECK-LABEL: @objc final var var_ClassObjCMetatype: Class_ObjC1.Type
 
   @objc var var_ClassObjCMetatype_: Class_ObjC1.Type // no-error
 
   var var_ProtocolClassMetatype: Protocol_Class1.Type
-// CHECK-LABEL: {{^}}  var var_ProtocolClassMetatype: Protocol_Class1.Type
+// CHECK-LABEL: {{^}}  final var var_ProtocolClassMetatype: Protocol_Class1.Type
 
   @objc var var_ProtocolClassMetatype_: Protocol_Class1.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
-// CHECK-LABEL: @objc var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
+// CHECK-LABEL: @objc final var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
 
   @objc var var_ProtocolObjCMetatype1_: Protocol_ObjC1.Type // no-error
 
   var var_ProtocolObjCMetatype2: Protocol_ObjC2.Type
-// CHECK-LABEL: @objc var var_ProtocolObjCMetatype2: Protocol_ObjC2.Type
+// CHECK-LABEL: @objc final var var_ProtocolObjCMetatype2: Protocol_ObjC2.Type
 
   @objc var var_ProtocolObjCMetatype2_: Protocol_ObjC2.Type // no-error
 
   var var_AnyObject1: AnyObject
   var var_AnyObject2: AnyObject.Type
-// CHECK-LABEL: @objc var var_AnyObject1: AnyObject
-// CHECK-LABEL: @objc var var_AnyObject2: AnyObject.Type
+// CHECK-LABEL: @objc final var var_AnyObject1: AnyObject
+// CHECK-LABEL: @objc final var var_AnyObject2: AnyObject.Type
 
   var var_Existential0: protocol<>
-// CHECK-LABEL: {{^}}  var var_Existential0: protocol<>
+// CHECK-LABEL: {{^}}  final var var_Existential0: protocol<>
 
   @objc var var_Existential0_: protocol<>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{'protocol<>' is not considered '@objc'; use 'AnyObject' instead}}
 
   var var_Existential1: protocol<PlainProtocol>
-// CHECK-LABEL: {{^}}  var var_Existential1: PlainProtocol
+// CHECK-LABEL: {{^}}  final var var_Existential1: PlainProtocol
 
   @objc var var_Existential1_: protocol<PlainProtocol>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential2: protocol<PlainProtocol, PlainProtocol>
-// CHECK-LABEL: {{^}}  var var_Existential2: PlainProtocol
+// CHECK-LABEL: {{^}}  final var var_Existential2: PlainProtocol
 
   @objc var var_Existential2_: protocol<PlainProtocol, PlainProtocol>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential3: protocol<PlainProtocol, Protocol_Class1>
-// CHECK-LABEL: {{^}}  var var_Existential3: protocol<PlainProtocol, Protocol_Class1>
+// CHECK-LABEL: {{^}}  final var var_Existential3: protocol<PlainProtocol, Protocol_Class1>
 
   @objc var var_Existential3_: protocol<PlainProtocol, Protocol_Class1>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential4: protocol<PlainProtocol, Protocol_ObjC1>
-// CHECK-LABEL: {{^}}  var var_Existential4: protocol<PlainProtocol, Protocol_ObjC1>
+// CHECK-LABEL: {{^}}  final var var_Existential4: protocol<PlainProtocol, Protocol_ObjC1>
 
   @objc var var_Existential4_: protocol<PlainProtocol, Protocol_ObjC1>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'PlainProtocol' is not '@objc'}}
 
   var var_Existential5: protocol<Protocol_Class1>
-// CHECK-LABEL: {{^}}  var var_Existential5: Protocol_Class1
+// CHECK-LABEL: {{^}}  final var var_Existential5: Protocol_Class1
 
   @objc var var_Existential5_: protocol<Protocol_Class1>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_Existential6: protocol<Protocol_Class1, Protocol_Class2>
-// CHECK-LABEL: {{^}}  var var_Existential6: protocol<Protocol_Class1, Protocol_Class2>
+// CHECK-LABEL: {{^}}  final var var_Existential6: protocol<Protocol_Class1, Protocol_Class2>
 
   @objc var var_Existential6_: protocol<Protocol_Class1, Protocol_Class2>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_Existential7: protocol<Protocol_Class1, Protocol_ObjC1>
-// CHECK-LABEL: {{^}}  var var_Existential7: protocol<Protocol_Class1, Protocol_ObjC1>
+// CHECK-LABEL: {{^}}  final var var_Existential7: protocol<Protocol_Class1, Protocol_ObjC1>
 
   @objc var var_Existential7_: protocol<Protocol_Class1, Protocol_ObjC1>
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol 'Protocol_Class1' is not '@objc'}}
 
   var var_Existential8: protocol<Protocol_ObjC1>
-// CHECK-LABEL: @objc var var_Existential8: Protocol_ObjC1
+// CHECK-LABEL: @objc final var var_Existential8: Protocol_ObjC1
 
   @objc var var_Existential8_: protocol<Protocol_ObjC1> // no-error
 
   var var_Existential9: protocol<Protocol_ObjC1, Protocol_ObjC2>
-// CHECK-LABEL: @objc var var_Existential9: protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc final var var_Existential9: protocol<Protocol_ObjC1, Protocol_ObjC2>
 
   @objc var var_Existential9_: protocol<Protocol_ObjC1, Protocol_ObjC2> // no-error
 
@@ -984,16 +984,16 @@ class infer_instanceVar1 {
   var var_ExistentialMetatype7: protocol<Protocol_Class1, Protocol_ObjC1>.Type
   var var_ExistentialMetatype8: protocol<Protocol_ObjC1>.Type
   var var_ExistentialMetatype9: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: protocol<>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype1: PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: protocol<PlainProtocol, Protocol_Class1>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: protocol<PlainProtocol, Protocol_ObjC1>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: Protocol_Class1.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: protocol<Protocol_Class1, Protocol_Class2>.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: protocol<Protocol_Class1, Protocol_ObjC1>.Type
-// CHECK-LABEL: @objc var var_ExistentialMetatype8: Protocol_ObjC1.Type
-// CHECK-LABEL: @objc var var_ExistentialMetatype9: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype0: protocol<>.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype1: PlainProtocol.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype2: PlainProtocol.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype3: protocol<PlainProtocol, Protocol_Class1>.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype4: protocol<PlainProtocol, Protocol_ObjC1>.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype5: Protocol_Class1.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype6: protocol<Protocol_Class1, Protocol_Class2>.Type
+// CHECK-LABEL: {{^}}  final var var_ExistentialMetatype7: protocol<Protocol_Class1, Protocol_ObjC1>.Type
+// CHECK-LABEL: @objc final var var_ExistentialMetatype8: Protocol_ObjC1.Type
+// CHECK-LABEL: @objc final var var_ExistentialMetatype9: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type
 
 
   var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
@@ -1012,22 +1012,22 @@ class infer_instanceVar1 {
   var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
   var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
   var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer2: UnsafeMutablePointer<Bool>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer3: UnsafeMutablePointer<CBool>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
-// CHECK-LABEL: @objc var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
-// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
-// CHECK-LABEL: {{^}} @objc var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
-// CHECK-LABEL: {{^}}  var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer1: UnsafeMutablePointer<Int>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer2: UnsafeMutablePointer<Bool>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer3: UnsafeMutablePointer<CBool>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer4: UnsafeMutablePointer<String>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer5: UnsafeMutablePointer<Float>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer6: UnsafeMutablePointer<Double>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer7: UnsafeMutablePointer<COpaquePointer>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer8: UnsafeMutablePointer<PlainClass>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer9: UnsafeMutablePointer<PlainStruct>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer10: UnsafeMutablePointer<PlainEnum>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer11: UnsafeMutablePointer<PlainProtocol>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer12: UnsafeMutablePointer<AnyObject>
+// CHECK-LABEL: @objc final var var_UnsafeMutablePointer13: UnsafeMutablePointer<AnyObject.Type>
+// CHECK-LABEL: {{^}} @objc final var var_UnsafeMutablePointer100: UnsafeMutablePointer<()>
+// CHECK-LABEL: {{^}} @objc final var var_UnsafeMutablePointer101: UnsafeMutablePointer<Void>
+// CHECK-LABEL: {{^}}  final var var_UnsafeMutablePointer102: UnsafeMutablePointer<(Int, Int)>
 
   var var_Optional1: Class_ObjC1?
   var var_Optional2: Protocol_ObjC1?
@@ -1041,17 +1041,17 @@ class infer_instanceVar1 {
   var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
   var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
 
-// CHECK-LABEL: @objc var var_Optional1: Class_ObjC1?
-// CHECK-LABEL: @objc var var_Optional2: Protocol_ObjC1?
-// CHECK-LABEL: @objc var var_Optional3: Class_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional4: Protocol_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional5: AnyObject?
-// CHECK-LABEL: @objc var var_Optional6: AnyObject.Type?
-// CHECK-LABEL: @objc var var_Optional7: String?
-// CHECK-LABEL: @objc var var_Optional8: Protocol_ObjC1?
-// CHECK-LABEL: @objc var var_Optional9: Protocol_ObjC1.Type?
-// CHECK-LABEL: @objc var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
-// CHECK-LABEL: @objc var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
+// CHECK-LABEL: @objc final var var_Optional1: Class_ObjC1?
+// CHECK-LABEL: @objc final var var_Optional2: Protocol_ObjC1?
+// CHECK-LABEL: @objc final var var_Optional3: Class_ObjC1.Type?
+// CHECK-LABEL: @objc final var var_Optional4: Protocol_ObjC1.Type?
+// CHECK-LABEL: @objc final var var_Optional5: AnyObject?
+// CHECK-LABEL: @objc final var var_Optional6: AnyObject.Type?
+// CHECK-LABEL: @objc final var var_Optional7: String?
+// CHECK-LABEL: @objc final var var_Optional8: Protocol_ObjC1?
+// CHECK-LABEL: @objc final var var_Optional9: Protocol_ObjC1.Type?
+// CHECK-LABEL: @objc final var var_Optional10: protocol<Protocol_ObjC1, Protocol_ObjC2>?
+// CHECK-LABEL: @objc final var var_Optional11: protocol<Protocol_ObjC1, Protocol_ObjC2>.Type?
 
 
   var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
@@ -1064,15 +1064,15 @@ class infer_instanceVar1 {
   var var_ImplicitlyUnwrappedOptional8: protocol<Protocol_ObjC1>!
   var var_ImplicitlyUnwrappedOptional9: protocol<Protocol_ObjC1, Protocol_ObjC2>!
 
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional2: Protocol_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional3: Class_ObjC1.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional4: Protocol_ObjC1.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional5: AnyObject!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional6: AnyObject.Type!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional7: String!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
-// CHECK-LABEL: @objc var var_ImplicitlyUnwrappedOptional9: protocol<Protocol_ObjC1, Protocol_ObjC2>!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional2: Protocol_ObjC1!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional3: Class_ObjC1.Type!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional4: Protocol_ObjC1.Type!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional5: AnyObject!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional6: AnyObject.Type!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional7: String!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional8: Protocol_ObjC1!
+// CHECK-LABEL: @objc final var var_ImplicitlyUnwrappedOptional9: protocol<Protocol_ObjC1, Protocol_ObjC2>!
 
   var var_Optional_fail1: PlainClass?
   var var_Optional_fail2: PlainClass.Type?
@@ -1095,11 +1095,11 @@ class infer_instanceVar1 {
   var var_Optional_fail21: AnyObject.Type??
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
-  // CHECK-LABEL: @objc var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
+  // CHECK-LABEL: @objc final var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
   var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
-  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
+  // CHECK-LABEL: {{^}} final var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
   var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
-  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
+  // CHECK-LABEL: {{^}} final var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
   var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
 
   weak var var_Weak1: Class_ObjC1?
@@ -1112,11 +1112,11 @@ class infer_instanceVar1 {
   weak var var_Weak7: protocol<Protocol_ObjC1>?
   weak var var_Weak8: protocol<Protocol_ObjC1, Protocol_ObjC2>?
 
-// CHECK-LABEL: @objc weak var var_Weak1: @sil_weak Class_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
-// CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc weak final var var_Weak1: @sil_weak Class_ObjC1
+// CHECK-LABEL: @objc weak final var var_Weak2: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak final var var_Weak5: @sil_weak AnyObject
+// CHECK-LABEL: @objc weak final var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak final var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
 
 
   weak var var_Weak_fail1: PlainClass?
@@ -1139,11 +1139,11 @@ class infer_instanceVar1 {
   unowned var var_Unowned7: protocol<Protocol_ObjC1>
   unowned var var_Unowned8: protocol<Protocol_ObjC1, Protocol_ObjC2>
 
-// CHECK-LABEL: @objc unowned var var_Unowned1: @sil_unowned Class_ObjC1
-// CHECK-LABEL: @objc unowned var var_Unowned2: @sil_unowned Protocol_ObjC1
-// CHECK-LABEL: @objc unowned var var_Unowned5: @sil_unowned AnyObject
-// CHECK-LABEL: @objc unowned var var_Unowned7: @sil_unowned Protocol_ObjC1
-// CHECK-LABEL: @objc unowned var var_Unowned8: @sil_unowned protocol<Protocol_ObjC1, Protocol_ObjC2>
+// CHECK-LABEL: @objc unowned final var var_Unowned1: @sil_unowned Class_ObjC1
+// CHECK-LABEL: @objc unowned final var var_Unowned2: @sil_unowned Protocol_ObjC1
+// CHECK-LABEL: @objc unowned final var var_Unowned5: @sil_unowned AnyObject
+// CHECK-LABEL: @objc unowned final var var_Unowned7: @sil_unowned Protocol_ObjC1
+// CHECK-LABEL: @objc unowned final var var_Unowned8: @sil_unowned protocol<Protocol_ObjC1, Protocol_ObjC2>
 
 
   unowned var var_Unowned_fail1: PlainClass
@@ -1157,22 +1157,22 @@ class infer_instanceVar1 {
 
 
   var var_FunctionType1: () -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType1: () -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType1: () -> ()
 
   var var_FunctionType2: (Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType2: (Int) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType2: (Int) -> ()
 
   var var_FunctionType3: (Int) -> Int
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType3: (Int) -> Int
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType3: (Int) -> Int
 
   var var_FunctionType4: (Int, Double) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType4: (Int, Double) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType4: (Int, Double) -> ()
 
   var var_FunctionType5: (String) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType5: (String) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType5: (String) -> ()
 
   var var_FunctionType6: () -> String
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType6: () -> String
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType6: () -> String
 
   var var_FunctionType7: (PlainClass) -> ()
 // CHECK-NOT: @objc var var_FunctionType7: (PlainClass) -> ()
@@ -1181,88 +1181,88 @@ class infer_instanceVar1 {
 // CHECK-NOT: @objc var var_FunctionType8: () -> PlainClass
 
   var var_FunctionType9: (PlainStruct) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType9: (PlainStruct) -> ()
+// CHECK-LABEL: {{^}}  final var var_FunctionType9: (PlainStruct) -> ()
 
   var var_FunctionType10: () -> PlainStruct
-// CHECK-LABEL: {{^}}  var var_FunctionType10: () -> PlainStruct
+// CHECK-LABEL: {{^}}  final var var_FunctionType10: () -> PlainStruct
 
   var var_FunctionType11: (PlainEnum) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType11: (PlainEnum) -> ()
+// CHECK-LABEL: {{^}}  final var var_FunctionType11: (PlainEnum) -> ()
 
   var var_FunctionType12: (PlainProtocol) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType12: (PlainProtocol) -> ()
+// CHECK-LABEL: {{^}}  final var var_FunctionType12: (PlainProtocol) -> ()
 
   var var_FunctionType13: (Class_ObjC1) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType13: (Class_ObjC1) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType13: (Class_ObjC1) -> ()
 
   var var_FunctionType14: (Protocol_Class1) -> ()
-// CHECK-LABEL: {{^}}  var var_FunctionType14: (Protocol_Class1) -> ()
+// CHECK-LABEL: {{^}}  final var var_FunctionType14: (Protocol_Class1) -> ()
 
   var var_FunctionType15: (Protocol_ObjC1) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType15: (Protocol_ObjC1) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType15: (Protocol_ObjC1) -> ()
 
   var var_FunctionType16: (AnyObject) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType16: (AnyObject) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType16: (AnyObject) -> ()
 
   var var_FunctionType17: (() -> ()) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType17: (() -> ()) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType17: (() -> ()) -> ()
 
   var var_FunctionType18: ((Int) -> (), Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType18: ((Int) -> (), Int) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType18: ((Int) -> (), Int) -> ()
 
   var var_FunctionType19: ((String) -> (), Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionType19: ((String) -> (), Int) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionType19: ((String) -> (), Int) -> ()
 
 
   var var_FunctionTypeReturn1: () -> () -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn1: () -> () -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionTypeReturn1: () -> () -> ()
 
   @objc var var_FunctionTypeReturn1_: () -> () -> () // no-error
 
   var var_FunctionTypeReturn2: () -> (Int) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn2: () -> (Int) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionTypeReturn2: () -> (Int) -> ()
 
   @objc var var_FunctionTypeReturn2_: () -> (Int) -> () // no-error
 
   var var_FunctionTypeReturn3: () -> () -> Int
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn3: () -> () -> Int
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionTypeReturn3: () -> () -> Int
 
   @objc var var_FunctionTypeReturn3_: () -> () -> Int // no-error
 
   var var_FunctionTypeReturn4: () -> (String) -> ()
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn4: () -> (String) -> ()
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionTypeReturn4: () -> (String) -> ()
 
   @objc var var_FunctionTypeReturn4_: () -> (String) -> () // no-error
 
   var var_FunctionTypeReturn5: () -> () -> String
-// CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn5: () -> () -> String
+// CHECK-LABEL: {{^}}  @objc final var var_FunctionTypeReturn5: () -> () -> String
 
   @objc var var_FunctionTypeReturn5_: () -> () -> String // no-error
 
 
   var var_BlockFunctionType1: @objc_block () -> ()
-// CHECK-LABEL: @objc var var_BlockFunctionType1: @objc_block () -> ()
+// CHECK-LABEL: @objc final var var_BlockFunctionType1: @objc_block () -> ()
 
   @objc var var_BlockFunctionType1_: @objc_block () -> () // no-error
 
   var var_ArrayType1: [AnyObject]
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType1: [AnyObject]
+  // CHECK-LABEL: {{^}}  @objc final var var_ArrayType1: [AnyObject]
 
   @objc var var_ArrayType1_: [AnyObject] // no-error
 
   var var_ArrayType2: [@objc_block AnyObject -> AnyObject] // no-error
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@objc_block AnyObject -> AnyObject]
+  // CHECK-LABEL: {{^}}  @objc final var var_ArrayType2: [@objc_block AnyObject -> AnyObject]
 
   @objc var var_ArrayType2_: [@objc_block AnyObject -> AnyObject] // no-error
 
   var var_ArrayType3: [PlainStruct]
-  // CHECK-LABEL: {{^}}  var var_ArrayType3: [PlainStruct]
+  // CHECK-LABEL: {{^}}  final var var_ArrayType3: [PlainStruct]
 
   @objc var var_ArrayType3_: [PlainStruct]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType4: [AnyObject -> AnyObject] // no-error
-  // CHECK-LABEL: {{^}}  var var_ArrayType4: [AnyObject -> AnyObject]
+  // CHECK-LABEL: {{^}}  final var var_ArrayType4: [AnyObject -> AnyObject]
 
   @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
@@ -1280,49 +1280,49 @@ class infer_instanceVar2<
   init() {}
 
   var var_GP_Unconstrained: GP_Unconstrained
-// CHECK-LABEL: {{^}}  var var_GP_Unconstrained: GP_Unconstrained
+// CHECK-LABEL: {{^}}  final var var_GP_Unconstrained: GP_Unconstrained
 
   @objc var var_GP_Unconstrained_: GP_Unconstrained
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainClass: GP_PlainClass
-// CHECK-LABEL: {{^}}  var var_GP_PlainClass: GP_PlainClass
+// CHECK-LABEL: {{^}}  final var var_GP_PlainClass: GP_PlainClass
 
   @objc var var_GP_PlainClass_: GP_PlainClass
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainProtocol: GP_PlainProtocol
-// CHECK-LABEL: {{^}}  var var_GP_PlainProtocol: GP_PlainProtocol
+// CHECK-LABEL: {{^}}  final var var_GP_PlainProtocol: GP_PlainProtocol
 
   @objc var var_GP_PlainProtocol_: GP_PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Class_ObjC: GP_Class_ObjC
-// CHECK-LABEL: {{^}}  var var_GP_Class_ObjC: GP_Class_ObjC
+// CHECK-LABEL: {{^}}  final var var_GP_Class_ObjC: GP_Class_ObjC
 
   @objc var var_GP_Class_ObjC_: GP_Class_ObjC
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_Class: GP_Protocol_Class
-// CHECK-LABEL: {{^}}  var var_GP_Protocol_Class: GP_Protocol_Class
+// CHECK-LABEL: {{^}}  final var var_GP_Protocol_Class: GP_Protocol_Class
 
   @objc var var_GP_Protocol_Class_: GP_Protocol_Class
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_ObjC: GP_Protocol_ObjC
-// CHECK-LABEL: {{^}}  var var_GP_Protocol_ObjC: GP_Protocol_ObjC
+// CHECK-LABEL: {{^}}  final var var_GP_Protocol_ObjC: GP_Protocol_ObjC
 
   @objc var var_GP_Protocol_ObjCa: GP_Protocol_ObjC
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   func func_GP_Unconstrained(a: GP_Unconstrained) {}
-// CHECK-LABEL: {{^}} func func_GP_Unconstrained(a: GP_Unconstrained) {
+// CHECK-LABEL: {{^}} final func func_GP_Unconstrained(a: GP_Unconstrained) {
 
   @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
@@ -1334,7 +1334,7 @@ class infer_instanceVar3 : Class_ObjC1 {
 // CHECK-LABEL: @objc class infer_instanceVar3 : Class_ObjC1 {
 
   var v1: Int = 0
-// CHECK-LABEL: @objc var v1: Int
+// CHECK-LABEL: @objc final var v1: Int
 }
 
 
@@ -1365,7 +1365,7 @@ class infer_staticVar1 {
 // CHECK-LABEL: @objc class infer_staticVar1 {
 
   class var staticVar1: Int = 42 // expected-error {{class variables not yet supported}}
-  // CHECK: @objc class var staticVar1: Int
+  // CHECK: @objc final class var staticVar1: Int
 }
 
 // @!objc
@@ -1561,25 +1561,25 @@ class HasNSManaged {
 @objc class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
   func constUnsafeMutablePointer(p: UnsafePointer<Int>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: UnsafePointer<Int>) {
+  // CHECK-LABEL: @objc final func constUnsafeMutablePointer(p: UnsafePointer<Int>) {
 
   func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {
+  // CHECK-LABEL: @objc final func constUnsafeMutablePointerToAnyObject(p: UnsafePointer<AnyObject>) {
 
   func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {}
-  // CHECK-LABEL: @objc func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {
+  // CHECK-LABEL: @objc final func constUnsafeMutablePointerToClass(p: UnsafePointer<TakesCPointers>) {
 
   func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {}
-  // CHECK-LABEL: @objc func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {
+  // CHECK-LABEL: @objc final func mutableUnsafeMutablePointer(p: UnsafeMutablePointer<Int>) {
 
   func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {
+  // CHECK-LABEL: {{^}} @objc final func mutableStrongUnsafeMutablePointerToAnyObject(p: UnsafeMutablePointer<AnyObject>) {
 
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
-  // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
+  // CHECK-LABEL: {{^}} @objc final func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
 
   func cFunctionPointer(p: CFunctionPointer<() -> ()>) {}
-  // CHECK-LABEL: {{^}} @objc func cFunctionPointer(p: CFunctionPointer<() -> ()>)
+  // CHECK-LABEL: {{^}} @objc final func cFunctionPointer(p: CFunctionPointer<() -> ()>)
 }
 
 // @objc with nullary names
@@ -1589,7 +1589,7 @@ class Class_ObjC2 {
 
   @objc(isFoo)
   func foo() -> Bool {}
-  // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
+  // CHECK-LABEL: @objc(isFoo) final func foo() -> Bool {
 }
 
 @objc() // expected-error{{expected name within parentheses of '@objc' attribute}}
@@ -1695,25 +1695,25 @@ struct NotObjCStruct {}
 // Closure arguments can only be @objc if their parameters and returns are.
 // CHECK-LABEL: @objc class ClosureArguments
 @objc class ClosureArguments {
-  // CHECK: @objc func foo
+  // CHECK: @objc final func foo
   @objc func foo(f: Int -> ()) {}
-  // CHECK: @objc func bar
+  // CHECK: @objc final func bar
   @objc func bar(f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  // CHECK: @objc func bas
+  // CHECK: @objc final func bas
   @objc func bas(f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  // CHECK: @objc func zim
+  // CHECK: @objc final func zim
   @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  // CHECK: @objc func zang
+  // CHECK: @objc final func zang
   @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  // CHECK: @objc func fooImplicit
+  // CHECK: @objc final func fooImplicit
   func fooImplicit(f: Int -> ()) {}
-  // CHECK: {{^}}  func barImplicit
+  // CHECK: {{^}}  final func barImplicit
   func barImplicit(f: NotObjCEnum -> NotObjCStruct) {}
-  // CHECK: {{^}}  func basImplicit
+  // CHECK: {{^}}  final func basImplicit
   func basImplicit(f: NotObjCEnum -> ()) {}
-  // CHECK: {{^}}  func zimImplicit
+  // CHECK: {{^}}  final func zimImplicit
   func zimImplicit(f: () -> NotObjCStruct) {}
-  // CHECK: {{^}}  func zangImplicit
+  // CHECK: {{^}}  final func zangImplicit
   func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
 }
 
@@ -1722,10 +1722,10 @@ typealias BadBlock = @objc_block NotObjCEnum -> () // expected-error{{@objc_bloc
 
 
 @objc class AccessControl {
-  // CHECK: @objc func foo
+  // CHECK: @objc final func foo
   func foo() {}
-  // CHECK: {{^}} private func bar
+  // CHECK: {{^}} private final func bar
   private func bar() {}
-  // CHECK: @objc private func baz
+  // CHECK: @objc private final func baz
   @objc private func baz() {}
 }

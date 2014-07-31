@@ -17,8 +17,8 @@ public class C : B {
 
   public required init(int i: Int) { }
 
-  func flopsy() {}
-  func mopsy() {}
+  public func flopsy() {}
+  public func mopsy() {}
 }
 // CHECK: sil_vtable C {
 // CHECK:   #A.foo!1: _TFC7vtables1B3foofS0_FT_T_
@@ -36,7 +36,7 @@ public class C : B {
 public class A {
   func foo() {}
   func bar() {}
-  func bas() {}
+  public func bas() {}
   func qux() {}
 }
 
@@ -56,7 +56,7 @@ public class B : A {
   // bas inherited from A
   override func qux() {}
 
-  func zim() {}
+  public func zim() {}
   func zang() {}
 }
 
@@ -73,13 +73,13 @@ public class B : A {
 
 // Test ObjC base class
 
-class Hoozit : Gizmo {
+public class Hoozit : Gizmo {
   // Overrides Gizmo.frob
-  override func frob() {}
+  override public func frob() {}
   // Overrides Gizmo.funge
-  override func funge() {}
+  override public func funge() {}
 
-  func anse() {}
+  public func anse() {}
   func incorrige() {}
 }
 
@@ -110,7 +110,7 @@ class Wotsit : Hoozit {
 // CHECK: sil_vtable Derived {
 // CHECK:   #Derived.identify!1: _TFC7vtables7Derived8identifyfS0_FT_Si
 // CHECK: }
-@objc class Base {}
+@objc public class Base {}
 
 extension Base {
   func identify() -> Int {
@@ -118,8 +118,8 @@ extension Base {
   }
 }
 
-class Derived : Base {
-  override func identify() -> Int {
+public class Derived : Base {
+  override public func identify() -> Int {
     return 1
   }
 }

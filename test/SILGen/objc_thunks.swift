@@ -309,9 +309,11 @@ func useHoozit(h: Hoozit) {
 func useWotsit(w: Wotsit<String>) {
 // sil @_TF11objc_thunks9useWotsitFT1wGCSo6WotsitSS__T_
   w.plain()
-  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.plain!1 :
+  // CHECK: // function_ref objc_thunks.Wotsit.plain
+  // CHECK-NEXT: function_ref @_TFC11objc_thunks6Wotsit5plainU__fGS0_Q__FT_T_
   w.generic(2)
-  // CHECK: class_method {{%.*}} : {{.*}}, #Wotsit.generic!1 :
+  // CHECK: // function_ref objc_thunks.Wotsit.generic
+  // CHECK-NEXT: function_ref @_TFC11objc_thunks6Wotsit7genericU__fGS0_Q__U__FQ_T_
 
   // Inherited methods only have objc entry points
   w.clone()

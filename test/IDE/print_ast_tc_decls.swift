@@ -504,7 +504,7 @@ class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @IBAction @objc final func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -516,10 +516,10 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBOutlet @objc weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBOutlet @objc weak final var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc final var inspectableProp: Int{{$}}
 }
 
 struct d0190_LetVarDecls {

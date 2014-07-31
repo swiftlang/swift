@@ -9,7 +9,7 @@ import gizmo
 //
 
 public class Purebred {
-  func method() {}
+  public func method() {}
 }
 
 // CHECK-LABEL: define void @purebred_method(%C18class_isa_pointers8Purebred*) {
@@ -29,7 +29,7 @@ entry(%0 : $Purebred):
 //
 
 public class Mongrel: Gizmo {
-  func method() {}
+  public func method() {}
 }
 
 // CHECK-LABEL: define void @mongrel_method(%C18class_isa_pointers7Mongrel*) {

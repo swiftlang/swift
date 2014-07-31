@@ -374,7 +374,7 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Bool, b : Bool) {
     // x is a superclass member.  It cannot be used before we are initialized.
-    x = 17  // expected-error {{use of property 'x' in base object before super.init}}
+    x = 17 // expected-error {{'self' used before super.init call}}
     y = 42
     super.init()
   }
@@ -398,7 +398,7 @@ class SomeDerivedClass : SomeClass {
   init(a : Bool, b : Bool, c : Bool, d : Bool, e : Bool, f : Bool) {
     y = 11
     if a { super.init() }
-    x = 42        // expected-error {{use of property 'x' in base object before super.init}}
+    x = 42        // expected-error {{'self' used before super.init call}}
   }               // expected-error {{super.init isn't called before returning from initializer}}
   
   func someMethod() {}
@@ -416,12 +416,12 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Int, b : Int) {
     y = 42
-    baseMethod()  // expected-error {{use of method 'baseMethod' in base object before super.init initializes it}}
+    baseMethod()  // expected-error {{'self' used before super.init call}}
     super.init()
   }
   
   init(a : Int, b : Int, c : Int) {
-    y = computedProperty  // expected-error {{use of property 'computedProperty' in base object before super.init initializes it}}
+    y = computedProperty  // expected-error {{'self' used before super.init call}}
     super.init()
   }
 
@@ -538,7 +538,7 @@ class RequiresInitsDerived : Gizmo {
   } // expected-error{{super.init isn't called before returning from initializer}}
 
   init(d: Double) {
-    f() // expected-error 2{{'self' used before super.init call}}
+    f() // expected-error {{'self' used before super.init call}}
     super.init()
   }
 
