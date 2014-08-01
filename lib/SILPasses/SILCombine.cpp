@@ -1082,14 +1082,16 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
 static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
                                                SILInstruction *Inst) {
   Uses.push_back(Inst);
-  for (auto Inst : Inst->getUses()) {
-    if (isa<RefCountingInst>(Inst->getUser()) ||
-        isa<StoreInst>(Inst->getUser())       ||
-        isa<DebugValueInst>(Inst->getUser())) {
-      Uses.push_back(Inst->getUser());
+  for (auto Op : Inst->getUses()) {
+    if (isa<RefCountingInst>(Op->getUser()) ||
+        // The store must not store the array but only to the array.
+        (isa<StoreInst>(Op->getUser()) &&
+         dyn_cast<StoreInst>(Op->getUser())->getSrc().getDef() != Inst) ||
+        isa<DebugValueInst>(Op->getUser())) {
+      Uses.push_back(Op->getUser());
       continue;
     }
-    if (auto SI = dyn_cast<IndexAddrInst>(Inst->getUser()))
+    if (auto SI = dyn_cast<IndexAddrInst>(Op->getUser()))
       if (recursivelyCollectArrayWritesInstr(Uses, SI))
         continue;
 
