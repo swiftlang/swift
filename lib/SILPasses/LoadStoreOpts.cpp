@@ -402,16 +402,9 @@ forwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   return ExtractPath;
 }
 
-/// Given an address \p Address and a value \p Value stored there that is then
-/// loaded or partially loaded by \p LI, forward the value with the appropriate
-/// extracts.
-static SILValue tryToForwardAddressValueToLoad(SILValue Address,
-                                               SILValue StoredValue,
-                                               LoadInst *LI) {
-  ForwardingFeasibility CheckResult;
-  if (!canForwardAddressValueToLoad(Address, LI, CheckResult))
-    return SILValue();
-
+static SILValue forwardAddressValueToLoad(SILValue Address,
+                                          SILValue StoredValue, LoadInst *LI,
+                                          ForwardingFeasibility &CheckResult) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
   if (CheckResult.Kind == UncheckedAddress)
@@ -425,6 +418,19 @@ static SILValue tryToForwardAddressValueToLoad(SILValue Address,
   return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI,
                                                LI->getOperand(),
                                                CheckResult.ProjectionPath);
+}
+
+/// Given an address \p Address and a value \p Value stored there that is then
+/// loaded or partially loaded by \p LI, forward the value with the appropriate
+/// extracts.
+static SILValue tryToForwardAddressValueToLoad(SILValue Address,
+                                               SILValue StoredValue,
+                                               LoadInst *LI) {
+  ForwardingFeasibility CheckResult;
+  if (!canForwardAddressValueToLoad(Address, LI, CheckResult))
+    return SILValue();
+
+  return forwardAddressValueToLoad(Address, StoredValue, LI, CheckResult);
 }
 
 bool LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
