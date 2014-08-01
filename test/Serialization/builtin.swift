@@ -12,4 +12,4 @@ var a : TheBuiltinInt64
 
 // Check that it really is Builtin.Int64.
 var wrapped = Int64(a) // okay
-var badWrapped = Int32(a) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+var badWrapped = Int32(a) // expected-error{{cannot invoke 'init' with an argument of type '@lvalue TheBuiltinInt64'}}

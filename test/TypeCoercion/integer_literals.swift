@@ -63,5 +63,5 @@ func chaining() {
 func memberaccess() {
   Int32(5.value)
   // FIXME: This should work
-  var x : Int32 = 7.value // expected-error{{'Int32' is not convertible to 'Int32'}}
+  var x : Int32 = 7.value // expected-error{{could not find member 'value'}}
 }

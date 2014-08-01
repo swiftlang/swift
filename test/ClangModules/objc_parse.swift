@@ -66,7 +66,7 @@ func classMethods(b: B, other: NSObject) {
   // Both class and instance methods exist.
   B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
-  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{'NSObject' is not convertible to 'Float'}}
+  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument of type 'NSObject'}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning

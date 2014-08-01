@@ -61,4 +61,4 @@ enum Complex {
   case B
 }
 
-if Complex.A(1) == .B { } // expected-error{{'Complex' is not convertible to 'CustomHashable'}}
+if Complex.A(1) == .B { } // expected-error{{could not find member 'B'}}

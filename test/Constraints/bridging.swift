@@ -119,7 +119,7 @@ func dictionaryToNSDictionary() {
 struct NotEquatable {}
 func notEquatableError(d: Dictionary<Int, NotEquatable>) -> Bool {
   // FIXME: Another awful diagnostic.
-  return d == d // expected-error{{'Dictionary<Int, NotEquatable>' is not convertible to 'BridgedStruct'}}
+  return d == d // expected-error{{cannot invoke '==' with an argument list of type '(Dictionary<Int, NotEquatable>, Dictionary<Int, NotEquatable>)'}}
 }
 
 // NSString -> String

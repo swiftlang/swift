@@ -40,7 +40,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{'Float' is not convertible to 'Int'}}
+  twoIdentical(x, y) // expected-error{{cannot invoke function with an argument list of type '(@lvalue Int, @lvalue Float)'}}
 }
 
 func mySwap<T>(inout x: T,
@@ -66,7 +66,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{'Float' is not convertible to 'Int'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot convert the expression's type '((Int, Float), (Int, Float))' to type 'Float'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -76,16 +76,16 @@ func acceptFunction<T, U>(f: (T) -> U, t: T, u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{'Float' is not convertible to 'Int'}}
+   acceptFunction(f, y, y) // expected-error{{cannot convert the expression's type '((Int) -> Float, Float, Float)' to type 'Float'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { }
 
 func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot convert the expression's type '(T, U)' to type 'T'}}
+  returnTuple(x) // expected-error{{cannot convert the expression's type 'Int' to type 'T'}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{'Float' is not convertible to 'Int'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type 'U' to type 'Float'}}
 }
 
 
@@ -222,7 +222,7 @@ protocol Addable {
   func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
-  u + u // expected-error{{'U' is not convertible to 'UInt8'}}
+  u + u // expected-error{{cannot invoke '+' with an argument list of type '(U, U)'}}
   return x+y
 }
 

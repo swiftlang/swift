@@ -56,7 +56,7 @@ for item in [AnyObject]() {  // No warning in for-each loop.
 
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
-var ptr = nil // expected-error {{cannot convert the expression's type '$T0' to type 'NilLiteralConvertible'}}
+var ptr = nil // expected-error {{cannot convert the expression's type 'UnsafeMutablePointer' to type 'NilLiteralConvertible'}}
 
 func testAnyObjectOptional() -> AnyObject? {
   var x = testAnyObjectOptional() // expected-warning {{variable 'x' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}{{8-8=: AnyObject?}}

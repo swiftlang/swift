@@ -108,7 +108,7 @@ func checkInitWithCoder(coder: NSCoder) {
   NSTableViewController(coder: coder)
   MyViewController(coder: coder)
   MyTableViewController(coder: coder)
-  MyOtherTableViewController(coder: coder) // expected-error{{cannot convert the expression's type 'MyOtherTableViewController' to type '(int: Int)'}}
+  MyOtherTableViewController(coder: coder) // expected-error{{cannot convert the expression's type '(coder: NSCoder)' to type '(int: Int)'}}
   MyThirdTableViewController(coder: coder)
 }
 

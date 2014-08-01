@@ -67,6 +67,12 @@ TypeBase *TypeVariableType::getBaseBeingSubstituted() {
       if (auto anchorType = anchor->getType())
         if (!anchorType->getAs<TypeVariableType>())
           return anchorType.getPointer();
+  
+  if (auto proto = impl.literalConformanceProto) {
+    return proto->getType()->
+           getAs<MetatypeType>()->
+           getInstanceType().getPointer();
+  }
 
   return this;
 }

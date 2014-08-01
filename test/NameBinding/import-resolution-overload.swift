@@ -30,11 +30,11 @@ ambiguousWithVar(true)   // no-warning
 var localVar : Bool
 localVar = false
 localVar = 42 // expected-error {{type 'Bool' does not conform to protocol 'IntegerLiteralConvertible'}}
-localVar(42)  // expected-error {{'($T1) -> $T2' is not identical to 'Bool'}}
+localVar(42)  // expected-error {{'(IntegerLiteralConvertible) -> $T2' is not identical to 'Bool'}}
 var _ : localVar // should still work
 
 var _ = scopedVar // no-warning
-scopedVar(42) // expected-error {{'($T1) -> $T2' is not identical to 'Int'}}
+scopedVar(42) // expected-error {{'(IntegerLiteralConvertible) -> $T2' is not identical to 'Int'}}
 
 var _ : Bool = scopedFunction(true)
 var _ : Int  = scopedFunction(42)

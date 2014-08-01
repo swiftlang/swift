@@ -296,8 +296,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
 }
 
 func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
-  ++x  // expected-error {{'Int' is not convertible to '@lvalue UInt8'}}
-  ++y  // expected-error {{'Int' is not convertible to '@lvalue UInt8'}}
+  ++x  // expected-error {{cannot invoke '++' with an argument of type 'Int'}}
+  ++y  // expected-error {{cannot invoke '++' with an argument of type 'Int'}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}

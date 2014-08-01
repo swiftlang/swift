@@ -16,12 +16,12 @@ func acceptsInt(_: Int) {}
 func acceptsInt(_: UInt) {}
 
 func badImplicitProperties(obj: BadImplicitProperties) {
-  acceptsInt(obj.nonVoidReturn) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
-  acceptsInt(obj.nonMatchingType) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
-  acceptsInt(obj.wrongGetterArgs) // expected-error {{'(Int32) -> Int32' is not convertible to 'Int'}}
-  acceptsInt(obj.wrongSetterArgs) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
-  acceptsInt(obj.wrongSetterArgs2) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
-  acceptsInt(obj.getterOnly) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.nonVoidReturn) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '() -> Int32'}}
+  acceptsInt(obj.nonMatchingType) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '() -> Int32'}}
+  acceptsInt(obj.wrongGetterArgs) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '(Int32) -> Int32'}}
+  acceptsInt(obj.wrongSetterArgs) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '() -> Int32'}}
+  acceptsInt(obj.wrongSetterArgs2) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '() -> Int32'}}
+  acceptsInt(obj.getterOnly) // expected-error {{cannot invoke 'acceptsInt' with an argument of type '() -> Int32'}}
   acceptsInt(obj.setterOnly) // expected-error {{'BadImplicitProperties' does not have a member named 'setterOnly'}}
 
   // But we should still import all of the methods as methods.

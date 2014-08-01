@@ -93,7 +93,7 @@ b as Derived
 //  are special cased in the library.
 Int(i) // no-warning
 i as Int
-Z(z) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+Z(z) // expected-error{{cannot invoke 'init' with an argument of type '@lvalue Z'}}
 z as Z
 
 // Construction from inouts.

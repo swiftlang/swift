@@ -65,10 +65,10 @@ func test_static_method_value_coerce(a: A) {
 func test_mixed_overload(a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
-  var y1 = a.mixed(y: y) // expected-error{{cannot convert the expression's type '$T3' to type '$T4'}}
+  var y1 = a.mixed(y: y) // expected-error{{cannot convert the expression's type '(y: Y)' to type '$T3'}}
 
   
-  A.mixed(x) // expected-error{{'X' is not convertible to 'A'}}
+  A.mixed(x) // expected-error{{cannot invoke 'mixed' with an argument of type 'X'}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
   var y2 = A.mixed(y: y)
@@ -146,7 +146,7 @@ extension A {
   }
 
   class func test_mixed_overload_static(#a: A, x: X, y: Y) {
-    mixed(x) // expected-error{{'X' is not convertible to 'A'}}
+    mixed(x) // expected-error{{cannot invoke 'mixed' with an argument of type 'X'}}
     var x2 = mixed(a)(x: x)
     x2 = x
     var y2 = mixed(y: y)

@@ -215,7 +215,7 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'($T0) -> $T3' is not identical to 'ZeroOneTwoThree'}}
+  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'(IntegerLiteralConvertible) -> $T3' is not identical to 'ZeroOneTwoThree'}}
   var t2 : ZeroOneTwoThree = .One // expected-error {{'(Int) -> ZeroOneTwoThree' is not convertible to 'ZeroOneTwoThree'}}
   var t3 : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
   var t4 : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}

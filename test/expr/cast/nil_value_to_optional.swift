@@ -2,8 +2,8 @@
 
 var t = true
 var f = false
-println(t != nil) // expected-error{{'Bool' is not convertible to 'UInt8'}}
-println(f != nil) // expected-error{{'Bool' is not convertible to 'UInt8'}}
+println(t != nil) // expected-error{{could not find an overload for 'println' that accepts the supplied arguments}}
+println(f != nil) // expected-error{{could not find an overload for 'println' that accepts the supplied arguments}}
 
 class C : Equatable {}
 
@@ -21,6 +21,6 @@ var d = D()
 var dopt: D? = nil
 var diuopt: D! = nil
 
-d == nil // expected-error{{'D' is not convertible to 'C'}}
+d == nil // expected-error{{cannot invoke '==' with an argument list of type '(@lvalue D, NilLiteralConvertible)'}}
 dopt == nil
 diuopt == nil

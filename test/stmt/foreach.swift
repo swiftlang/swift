@@ -124,7 +124,7 @@ func testForEachInference() {
   for d: Double in getOvlSeq() { }
 
   // Overloaded sequence not resolved contextually
-  for v in getOvlSeq() { } // expected-error{{could not find an overload for 'getOvlSeq' that accepts the supplied arguments}}
+  for v in getOvlSeq() { } // expected-error{{cannot invoke 'getOvlSeq' with an argument list of type '()'}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }

@@ -38,7 +38,7 @@ func funcdecl5(a: Int, y: Int) {
   (x) = y
 
   // FIXME: Can we provide nicer diagnostics for this case?
-  1 = x        // expected-error {{cannot convert the expression's type '()' to type '@lvalue Int'}}
+  1 = x        // expected-error {{cannot convert the expression's type '()' to type 'Int'}}
   (1) = x      // expected-error {{cannot assign to the result of this expression}}
   (x:1).x = 1 // expected-error {{cannot convert the expression's type '()' to type 'IntegerLiteralConvertible'}}
   var tup : (x:Int, y:Int)
@@ -143,7 +143,7 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}
-  var y = w'g'        // expected-error{{consecutive statements}} {{12-12=;}} // expected-error {{cannot convert the expression's type '$T0' to type 'CharacterLiteralConvertible'}}
+  var y = w'g'        // expected-error{{consecutive statements}} {{12-12=;}} // expected-error {{expression does not conform to type 'CharacterLiteralConvertible'}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}

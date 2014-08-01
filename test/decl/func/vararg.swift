@@ -15,7 +15,7 @@ var t3d: (Int, Int, Int, Int...) = (1,2) // expected-error {{different number of
 
 var t4: (Int...) -> Int
 var t5: (a: Int...) -> Int = t4
-var t6: (a: [Int]) -> Int = t4 // expected-error {{cannot convert the expression's type '@lvalue (Int...) -> Int' to type '(a: [Int]) -> Int'}}
+var t6: (a: [Int]) -> Int = t4 // expected-error {{cannot convert the expression's type '(Int...) -> Int' to type '(a: [Int]) -> Int'}}
 
 var t7: Int
 var t8: (Int, String...) = (t7)

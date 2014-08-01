@@ -103,7 +103,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{'Ovl.A' is not convertible to 'OtherOvl.A'}}
+  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument of type '@lvalue Ovl.A'}}
   
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3 // expected-error{{partial application of generic method is not allowed}}

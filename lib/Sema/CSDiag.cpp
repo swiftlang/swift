@@ -979,10 +979,56 @@ Constraint *getComponentConstraint(Constraint *constraint) {
   return constraint->getNestedConstraints().front();
 }
 
+/// For a given expression type, extract the appropriate type for a constraint-
+/// based diagnostic.
+static Type getDiagnosticTypeFromExpr(Expr *expr) {
+  
+  // For an unresolved checked cast expression, use the type of the
+  // sub-expression.
+  if (auto ucc = dyn_cast<UnresolvedCheckedCastExpr>(expr)) {
+    auto subExpr = ucc->getSubExpr();
+    
+    return subExpr->getType();
+  }
+  
+  // For an application expression, use the argument type.
+  if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
+    return applyExpr->getArg()->getType();
+  }
+  
+  // For a subscript expression, use the index type.
+  if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr)) {
+    return subscriptExpr->getIndex()->getType();
+  }
+  
+  return expr->getType();
+}
+
+/// If a type variable was created for an opened literal expression, substitute
+/// in the default literal for the type variable's literal conformance.
+static Type substituteLiteralForTypeVariable(ConstraintSystem *CS,
+                                             TypeVariableType *tv) {
+  if (auto proto = tv->getImpl().literalConformanceProto) {
+    
+    auto kind = proto->getKnownProtocolKind();
+    
+    if (kind.hasValue()) {
+      auto altLits = CS->getAlternativeLiteralTypes(kind.getValue());
+      if (!altLits.empty()) {
+        if (auto altType = altLits[0]) {
+          return altType;
+        }
+      }
+    }
+  }
+  
+  return tv;
+}
+
 static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
                                                          Expr *expr,
                                                          Constraint *constraint) {
-  auto type1 = expr->getType();
+  auto type1 = getDiagnosticTypeFromExpr(expr);
   auto type2 = constraint->getSecondType();
   
   if (type1->isEqual(type2))
@@ -1027,7 +1073,16 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
     }
   }
   
-  return std::pair<Type, Type>(type1, type2);
+  // If we still have a literal type variable, substitute in the default type.
+  if (auto tv1 = type1->getAs<TypeVariableType>()) {
+    type1 = substituteLiteralForTypeVariable(CS, tv1);
+  }
+  if (auto tv2 = type2->getAs<TypeVariableType>()) {
+    type2 = substituteLiteralForTypeVariable(CS, tv2);
+  }
+  
+  return std::pair<Type, Type>(type1->getLValueOrInOutObjectType(),
+                               type2->getLValueOrInOutObjectType());
 }
 
 bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
@@ -1058,7 +1113,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // Capture the first non-disjunction constraint we find. We'll use this
     // if we can't find a clearer reason for the failure.
-    if (!fallbackConstraint &&
+    if ((!fallbackConstraint || constraint->isFavored()) &&
         (constraint->getKind() != ConstraintKind::Disjunction) &&
         (constraint->getKind() != ConstraintKind::Conjunction)) {
       fallbackConstraint = constraint;
@@ -1066,14 +1121,14 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // Store off conversion constraints, favoring existing conversion
     // constraints.
-    if (!activeConformanceConstraint &&
-        !conformanceConstraint &&
+    if ((!(activeConformanceConstraint ||
+        conformanceConstraint) || constraint->isFavored()) &&
         constraint->getKind() == ConstraintKind::ConformsTo) {
       conformanceConstraint = constraint;
     }
     
     // Failed binding constraints point to a missing member.
-    if (!valueMemberConstraint &&
+    if ((!valueMemberConstraint || constraint->isFavored()) &&
         (constraint->getKind() == ConstraintKind::ValueMember
          || constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
       valueMemberConstraint = constraint;
@@ -1081,7 +1136,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // A missed argument conversion can result in better error messages when
     // a user passes the wrong arguments to a function application.
-    if (!argumentConstraint) {
+    if ((!argumentConstraint || constraint->isFavored())) {
       argumentConstraint = getConstraintChoice(constraint,
                                                 ConstraintKind::
                                                     ArgumentTupleConversion);
@@ -1089,14 +1144,14 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // Overload resolution failures are often nicely descriptive, so store
     // off the first one we find.
-    if (!overloadConstraint) {
+    if ((!overloadConstraint || constraint->isFavored())) {
       overloadConstraint = getConstraintChoice(constraint,
                                                 ConstraintKind::BindOverload);
     }
     
     // Conversion constraints are also nicely descriptive, so we'll grab the
     // first one of those as well.
-    if (!conversionConstraint &&
+    if ((!conversionConstraint || constraint->isFavored()) &&
         (constraint->getKind() == ConstraintKind::Conversion ||
          constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
           conversionConstraint = constraint;
@@ -1104,7 +1159,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     
     // When all else fails, inspect a potential conjunction or disjunction for a
     // consituent conversion.
-    if (!disjunctionConversionConstraint) {
+    if (!disjunctionConversionConstraint || constraint->isFavored()) {
       disjunctionConversionConstraint = getConstraintChoice(constraint,
                                                              ConstraintKind::
                                                                 Conversion,
@@ -1113,8 +1168,13 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   }
   
   // If no more descriptive constraint was found, use the fallback constraint.
-  if (!(conversionConstraint || overloadConstraint)) {
-    conversionConstraint = fallbackConstraint;
+  if (fallbackConstraint &&
+      !(conversionConstraint || overloadConstraint || argumentConstraint)) {
+    
+    if (fallbackConstraint->getKind() == ConstraintKind::ArgumentConversion)
+      argumentConstraint = fallbackConstraint;
+    else
+      conversionConstraint = fallbackConstraint;
   }
   
   // If there's still no conversion to diagnose, use the disjunction conversion.
@@ -1159,11 +1219,28 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   if (overloadConstraint) {
     auto overloadChoice = overloadConstraint->getOverloadChoice();
     auto overloadName = overloadChoice.getDecl()->getName();
-    TC.diagnose(expr->getLoc(),
-                diag::cannot_find_appropriate_overload,
-                overloadName.str())
-    .highlight(expr->getSourceRange());
+    Type argType = getDiagnosticTypeFromExpr(expr);
     
+    if (!argType.isNull() &&
+        !argType->getAs<TypeVariableType>() &&
+        dyn_cast<ApplyExpr>(expr)) {
+      if (argType->getAs<TupleType>()) {
+        TC.diagnose(expr->getLoc(),
+                    diag::cannot_find_appropriate_overload_with_type_list,
+                    overloadName.str(), argType)
+        .highlight(expr->getSourceRange());
+      } else {
+        TC.diagnose(expr->getLoc(),
+                    diag::cannot_find_appropriate_overload_with_type,
+                    overloadName.str(), argType)
+        .highlight(expr->getSourceRange());
+      }
+    } else {
+      TC.diagnose(expr->getLoc(),
+                  diag::cannot_find_appropriate_overload,
+                  overloadName.str())
+      .highlight(expr->getSourceRange());
+    }
     return true;
   }
   
@@ -1171,7 +1248,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   // the diagnostic.
   if (conversionConstraint || argumentConstraint) {
     auto constraint = argumentConstraint ?
-                          argumentConstraint :conversionConstraint;
+                        argumentConstraint : conversionConstraint;
     
     if (conformanceConstraint) {
       if (conformanceConstraint->getTypeVariables().size() <
@@ -1189,14 +1266,24 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     if (argumentConstraint) {
       TC.diagnose(expr->getLoc(),
                   diag::could_not_convert_argument,
-                  types.first,
-                  types.second).
+                  types.first).
       highlight(anchor->getSourceRange());
     } else {
-      TC.diagnose(anchor->getLoc(),
-                  diag::cannot_find_conversion,
-                  types.first, types.second)
-      .highlight(anchor->getSourceRange());
+      
+      // If it's a type variable failing a conformance, avoid printing the type
+      // variable and just print the conformance.
+      if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
+          types.first->getAs<TypeVariableType>()) {
+        TC.diagnose(anchor->getLoc(),
+                    diag::single_expression_conformance_failure,
+                    types.first)
+        .highlight(anchor->getSourceRange());
+      } else {
+        TC.diagnose(anchor->getLoc(),
+                    diag::cannot_find_conversion,
+                    types.first, types.second)
+        .highlight(anchor->getSourceRange());
+      }
     }
     
     return true;
@@ -1226,6 +1313,20 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
       return true;
     }
   }
+  
+  return false;
+}
+
+/// Given an expression and a failure, determine if we should emit a diagnostic
+/// based on the recorded failure, or instead emit a diagnostic based on the
+/// system's failed constraints.
+static bool shouldDiagnoseFromConstraints(Expr * expr, Failure &failure) {
+  
+  // For applications and unresolved 'dot' expressions, we can produce a better
+  // diagnostic than 'cannot convert type' by mining the inactive constraints.
+  if (dyn_cast<ApplyExpr>(expr) ||
+      dyn_cast<UnresolvedDotExpr>(expr))
+    return failure.getKind() == Failure::FailureKind::TypesNotConvertible;
   
   return false;
 }
@@ -1316,8 +1417,12 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
   if (failures.size()) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
-    if (diagnoseFailure(*this, failure, expr, failures.size() > 1))
-      return true;
+    
+    if (!unavoidableFailures.empty() ||
+        !shouldDiagnoseFromConstraints(expr, failure)) {
+      if (diagnoseFailure(*this, failure, expr, failures.size() > 1))
+        return true;
+    }
   }
   
   // If all else fails, attempt to diagnose the failure by looking through the

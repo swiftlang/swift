@@ -63,11 +63,20 @@ ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
       "arguments", (StringRef))
 
+ERROR(cannot_find_appropriate_overload_with_type,sema,none,
+      "cannot invoke '%0' with an argument of type %1", (StringRef, Type))
+
+ERROR(cannot_find_appropriate_overload_with_type_list,sema,none,
+      "cannot invoke '%0' with an argument list of type %1", (StringRef, Type))
+
 ERROR(could_not_find_member,sema,none,
       "could not find member %0", (Identifier))
 
 ERROR(could_not_convert_argument,sema,none,
-      "argument type %0 does not convert to %1", (Type, Type))
+      "cannot invoke function with an argument list of type %0", (Type))
+
+ERROR(single_expression_conformance_failure,sema,none,
+      "expression does not conform to type %0", (Type))
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------
@@ -1111,7 +1120,7 @@ NOTE(silence_inject_forced_downcast,sema_tce,none,
      "add parentheses around the cast to silence this warning", ())
 
 NOTE(optional_used_as_boolean,sema_tce,none,
-     "optional type %0 can not be used as a boolean; "
+     "optional type %0 cannot be used as a boolean; "
      "test for '!= nil' instead", (Type))
 
 

@@ -44,8 +44,8 @@ func basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{'Int8' is not convertible to 'UInt8'}}
-  var x9 : Int16 = x8 + 1 // expected-error{{'Int8' is not convertible to 'UInt8'}}
+  1.0 + x8 // expected-error{{cannot invoke '+' with an argument list of type '(FloatLiteralConvertible, @lvalue Int8)'}}
+  var x9 : Int16 = x8 + 1 // expected-error{{cannot invoke '+' with an argument list of type '(@lvalue Int8, IntegerLiteralConvertible)'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -245,7 +245,7 @@ func test_floating_point() {
 
 func test_nonassoc(x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{'Int' is not convertible to 'union1'}}
+  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{cannot invoke '==' with an argument list of type '($T4, Int)'}}
 }
 
 // More realistic examples.
@@ -542,7 +542,7 @@ class C {
   init(other: C?) { x = other }
 }
 
-var c = C(3) // expected-error {{cannot convert the expression's type 'C' to type 'IntegerLiteralConvertible'}}
+var c = C(3) // expected-error {{cannot convert the expression's type 'UInt8' to type 'IntegerLiteralConvertible'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -554,7 +554,7 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   --i8
 
   // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{'Int64' is not convertible to '@lvalue UInt8'}}
+  ++Int64(5) // expected-error{{cannot invoke '++' with an argument of type 'Int64'}}
 }
 
 //===----------------------------------------------------------------------===//

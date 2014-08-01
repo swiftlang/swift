@@ -19,7 +19,7 @@ func ovlLitB(_: Int64) -> Int64 {}
 func testLiteralOverloadinovlLitB() {
   var y32 : Int32 = ovlLitA(ovlLitB(0))
   var y64 : Int64 = ovlLitA(ovlLitB(0))
-  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{'Int' is not convertible to 'Int32'}}
+  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{could not find an overload for 'ovlLitA' that accepts the supplied arguments}}
 }
 
 func literalOverloadSameReturn(i: Int) -> Int {}

@@ -22,7 +22,7 @@ f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{'X' is not convertible to 'Float'}}
+f0(x) // expected-error{{cannot invoke 'f0' with an argument of type '@lvalue X'}}
 
 f + 1
 f2(i)
