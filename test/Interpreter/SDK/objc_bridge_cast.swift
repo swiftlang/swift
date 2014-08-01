@@ -15,9 +15,37 @@ func genericConditionalCast<T, U>(a: T) -> U? {
 func testForcedValueToObjectBridging() {
   // CHECK: ---Forced value to object bridging---
   println("---Forced value to object bridging---")
-  
+
   let array: [String] = ["Hello", "World"]
-  
+
+  // Forced bridging (exact)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  println(genericForcedCast(array) as NSArray)
+
+  // Forced bridging (superclass)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  println(genericForcedCast(array) as NSObject)
+
+  // FIXME: Forced bridging (AnyObject)
+  // FIXME: Forced bridging (existential success)
+
+  println("Done")
+}
+// CHECK: Done
+testForcedValueToObjectBridging()
+
+func testConditionalValueToObjectBridging() {
+  // CHECK: ---Conditional value to object bridging---
+  println("---Conditional value to object bridging---")
+
+  let array: [String] = ["Hello", "World"]
+
   // Conditional bridging (exact)
   // CHECK-NEXT: (
   // CHECK-NEXT:   Hello,
@@ -52,24 +80,7 @@ func testForcedValueToObjectBridging() {
     println("Not an NSString")
   }
 
-  // Forced bridging (exact)
-  // CHECK-NEXT: (
-  // CHECK-NEXT:   Hello,
-  // CHECK-NEXT:   World
-  // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSArray)
-
-  // Forced bridging (superclass)
-  // CHECK-NEXT: (
-  // CHECK-NEXT:   Hello,
-  // CHECK-NEXT:   World
-  // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSObject)
-
-  // FIXME: Forced bridging (AnyObject)
-  // FIXME: Forced bridging (existential success)
-
   println("Done")
 }
 // CHECK: Done
-testForcedValueToObjectBridging()
+testConditionalValueToObjectBridging()
