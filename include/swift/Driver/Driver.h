@@ -130,6 +130,9 @@ class Driver {
   /// Indicates whether the driver should suppress the "no input files" error.
   bool SuppressNoInputFilesError = false;
 
+  /// Indicates whether the driver should check that the input files exist.
+  bool CheckInputFilesExist = true;
+
   /// \brief Cache of all the ToolChains in use by the driver.
   ///
   /// This maps from the string representation of a triple to a ToolChain
@@ -151,6 +154,10 @@ public:
   const std::string &getSwiftProgramPath() const {
     return DriverExecutable;
   }
+
+  bool getCheckInputFilesExist() const { return CheckInputFilesExist; }
+
+  void setCheckInputFilesExist(bool Value) { CheckInputFilesExist = Value; }
 
   /// Construct a compilation object for a command line argument vector.
   ///

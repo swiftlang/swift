@@ -404,7 +404,8 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
 /// issue a diagnostic and return false.
 static bool diagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
                                    DiagnosticEngine &Diags, StringRef Input) {
-  // FIXME: provide opt-out for checking input file existence
+  if (!D.getCheckInputFilesExist())
+    return true;
 
   // stdin always exists.
   if (Input == "-")
