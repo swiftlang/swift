@@ -76,7 +76,7 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
 
 // Walk backwards in BB looking for strong_release or dealloc_box of
 // the given value, and add it to Releases.
-static void addLastRelease(SILValue V, SILBasicBlock *BB,
+static bool addLastRelease(SILValue V, SILBasicBlock *BB,
                            llvm::SmallVectorImpl<SILInstruction*> &Releases) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I)) {
@@ -84,20 +84,17 @@ static void addLastRelease(SILValue V, SILBasicBlock *BB,
         continue;
 
       Releases.push_back(&*I);
-      return;
+      return true;
     }
-    assert((!isa<StrongRetainInst>(*I) || I->getOperand(0) != V) &&
-           "Did not expect retain after final release/dealloc!");
-
   }
 
-  llvm_unreachable("Did not find release/dealloc!");
+  return false;
 }
 
 // Find the final releases of the alloc_box along any given path.
 // These can include paths from a release back to the alloc_box in a
 // loop.
-static void getFinalReleases(AllocBoxInst *ABI,
+static bool getFinalReleases(AllocBoxInst *ABI,
                              llvm::SmallVectorImpl<SILInstruction*> &Releases) {
   llvm::SmallPtrSet<SILBasicBlock*, 16> LiveIn;
   llvm::SmallPtrSet<SILBasicBlock*, 16> UseBlocks;
@@ -136,7 +133,7 @@ static void getFinalReleases(AllocBoxInst *ABI,
   // Only a single release/dealloc? We're done!
   if (OneRelease) {
     Releases.push_back(OneRelease);
-    return;
+    return true;
   }
 
   propagateLiveness(LiveIn, DefBB);
@@ -146,7 +143,10 @@ static void getFinalReleases(AllocBoxInst *ABI,
   // release/dealloc.
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
-      addLastRelease(Box, BB, Releases);
+      if (!addLastRelease(Box, BB, Releases))
+        return false;
+
+  return true;
 }
 
 /// \brief Returns True if the operand or one of its users is captured.
@@ -403,12 +403,13 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
 
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
 /// new alloc_stack, but do not delete the alloc_box yet.
-static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
+static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
                                    llvm::SmallVectorImpl<TermInst *> &Returns) {
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   llvm::SmallVector<SILInstruction*, 4> FinalReleases;
-  getFinalReleases(ABI, FinalReleases);
+  if (!getFinalReleases(ABI, FinalReleases))
+    return false;
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
   // at the beginning of the funtion.
@@ -463,6 +464,8 @@ static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
 
     User->eraseFromParent();
   }
+
+  return true;
 }
 
 namespace {
@@ -698,7 +701,7 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   }
 }
 
-static void
+static unsigned
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
                      llvm::SmallVectorImpl<Operand *> &ElidedOperands,
                      llvm::SmallVectorImpl<TermInst *> &Returns) {
@@ -706,19 +709,23 @@ rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
   // box container pointer from the operands.
   rewritePartialApplies(ElidedOperands);
 
+  unsigned Count = 0;
   auto rend = Promoted.rend();
   for (auto I = Promoted.rbegin(); I != rend; ++I) {
     auto *ABI = *I;
-    rewriteAllocBoxAsAllocStack(ABI, Returns);
-    ABI->eraseFromParent();
+    if (rewriteAllocBoxAsAllocStack(ABI, Returns)) {
+      ++Count;
+      ABI->eraseFromParent();
+    }
   }
+  return Count;
 }
 
 namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    llvm::SmallVector<AllocBoxInst *, 8> Promoted;
+    llvm::SmallVector<AllocBoxInst *, 8> Promotable;
     llvm::SmallVector<Operand *, 8> ElidedOperands;
     llvm::SmallVector<TermInst *, 8> Returns;
 
@@ -731,12 +738,12 @@ class AllocBoxToStack : public SILFunctionTransform {
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
           if (canPromoteAllocBox(ABI, ElidedOperands))
-            Promoted.push_back(ABI);
+            Promotable.push_back(ABI);
     }
 
-    if (!Promoted.empty()) {
-      rewritePromotedBoxes(Promoted, ElidedOperands, Returns);
-      NumStackPromoted += Promoted.size();
+    if (!Promotable.empty()) {
+      auto Count = rewritePromotedBoxes(Promotable, ElidedOperands, Returns);
+      NumStackPromoted += Count;
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

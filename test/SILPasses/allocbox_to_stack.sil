@@ -399,3 +399,19 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   strong_release %0 : $Builtin.NativeObject      // id: %7
   return %5 : $Int                                // id: %8
 }
+
+sil @closure : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+
+sil @no_final_release : $@thin (Int) -> Bool {
+bb0(%0 : $Int):
+  %1 = alloc_box $Int
+  store %0 to %1#1 : $*Int
+  // function_ref main.(newFoo (Swift.Int) -> Swift.Bool).(modify #1) (())()
+  %3 = function_ref @closure : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  strong_retain %1#0 : $Builtin.NativeObject
+  %5 = partial_apply %3(%1#0, %1#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  strong_retain %5 : $@callee_owned () -> ()
+  %7 = apply %5() : $@callee_owned () -> ()
+  strong_release %5 : $@callee_owned () -> ()
+  unreachable
+}
