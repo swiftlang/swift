@@ -171,22 +171,36 @@ StringTests.test("appendToSubstringBug") {
 
 import Foundation
 StringTests.test("stringCoreExtensibility") {
-  let nsx: NSString = "r"
   let ascii = UTF16.CodeUnit("X".value)
   let nonAscii = UTF16.CodeUnit("é".value)
-  
-  for length in 1..<16 {
-    for boundary in 0..<length {
-      var x = _StringCore()
-      for i in 0..<length {
-        x.extend(Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
-      }
 
-      expectEqualSequence(
-        Array(Repeat(count: 3*boundary, repeatedValue: ascii))
-        + Repeat(count: 3*(length - boundary), repeatedValue: nonAscii),
-        x
-      )
+  for k in 0..<3 {
+    for length in 1..<16 {
+      for boundary in 0..<length {
+        
+        var x = (
+            k == 0 ? String() + ("b" as Character)
+          : k == 1 ? String("b" as NSString)
+          : String("b" as NSMutableString)
+        )._core
+
+        if k == 0 { expectEqual(1, x.elementWidth) }
+        
+        for i in 0..<length {
+          x.extend(
+            Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
+        }
+        // Make sure we can extend wide storage with pure ASCII
+        x.extend(Repeat(count: 2, repeatedValue: ascii))
+        
+        expectEqualSequence(
+          [UTF16.CodeUnit("b".value)]
+          + Array(Repeat(count: 3*boundary, repeatedValue: ascii))
+          + Repeat(count: 3*(length - boundary), repeatedValue: nonAscii)
+          + Repeat(count: 2, repeatedValue: ascii),
+          x
+        )
+      }
     }
   }
 }
