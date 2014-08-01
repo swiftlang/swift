@@ -70,12 +70,33 @@ func _reportUnimplementedInitializer(
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
-@noreturn internal
-func _assertionFailed(prefix: StaticString, message: StaticString,
-                        file: StaticString, line: UWord) {
+@noreturn
+func _assertionFailed(
+  prefix: StaticString, message: StaticString,
+  file: StaticString, line: UWord
+) {
   _reportFatalErrorInFile(
-      prefix.start, prefix.byteSize, message.start, message.byteSize,
+    prefix.start, prefix.byteSize, message.start, message.byteSize,
+    file.start, file.byteSize, line)
+
+  Builtin.int_trap()
+}
+
+/// This function should be used only in the implementation of user-level
+/// assertions.
+@noreturn
+func _assertionFailed(
+  prefix: StaticString, message: String,
+  file: StaticString, line: UWord
+) {
+  let messageUTF8 = message.nulTerminatedUTF8
+  messageUTF8.withUnsafeBufferPointer {
+    (messageUTF8) in
+    _reportFatalErrorInFile(
+      prefix.start, prefix.byteSize,
+      messageUTF8.baseAddress, UWord(messageUTF8.count),
       file.start, file.byteSize, line)
+  }
 
   Builtin.int_trap()
 }

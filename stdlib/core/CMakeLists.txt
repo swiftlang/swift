@@ -24,7 +24,7 @@ set(SWIFTLIB_ESSENTIAL
   ArrayCast.swift
   ArrayType.swift
   Arrays.swift.gyb
-  Assert.swift
+  Assert.swift.gyb
   AssertCommon.swift
   Bool.swift
   BooleanType.swift

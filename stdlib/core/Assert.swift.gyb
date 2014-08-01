@@ -16,7 +16,27 @@
 /// release or fast mode these checks are disabled. This means they may have no
 /// effect on program semantics, depending on the assert configuration.
 
+% for (generic_params, closure_type, message_param, message_eval) in [
+%     ( '',
+%       'Bool',
+%       '_ message: StaticString = StaticString()',
+%       'message' ),
+%     ( '<Str : AssertStringType>',
+%       'Bool',
+%       'message: @autoclosure () -> Str',
+%       'message().stringValue' ),
+%     ( '<T : BooleanType, Str : StaticStringType>',
+%       'T',
+%       'message: @autoclosure () -> Str',
+%       'message().stringValue' ),
+%     ( '<T : BooleanType, Str : AssertStringType>',
+%       'T',
+%       'message: @autoclosure () -> Str',
+%       'message().stringValue' ),
+%   ]:
+
 /// Traditional C-style assert with an optional message.
+///
 /// When assertions are enabled and `condition` is false, stop program
 /// execution in a debuggable state after printing a message.  When
 /// assertions are disabled in release and fast builds, `condition` is not even
@@ -25,30 +45,40 @@
 /// When assertions are turned off, the optimizer can assume that the
 /// `condition` is true.
 @transparent
-public func assert(
-  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+public func assert${generic_params}(
+  condition: @autoclosure () -> ${closure_type}, ${message_param},
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("assertion failed", message, file, line)
+      _assertionFailed("assertion failed", ${message_eval}, file, line)
     }
   }
 }
 
+/// Ensure that the `condition` is true.
+///
+/// If the `condition` is false, in debug and release modes the program stops.
+///
+/// In unchecked mode the optimizer can assume that the `condition` is true.
 @transparent
-public func assert<T : BooleanType>(
-  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
+public func precondition${generic_params}(
+  condition: @autoclosure () -> ${closure_type}, ${message_param},
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  // Only assert in debug mode.
+  // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFailed("assertion failed", message, file, line)
+      _assertionFailed("precondition failed", ${message_eval}, file, line)
     }
+  } else if _isReleaseAssertConfiguration() {
+    let error = !condition()
+    Builtin.condfail(error.value)
   }
 }
+
+% end
 
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
@@ -61,43 +91,6 @@ public func assertionFailure(
     _assertionFailed("fatal error", message, file, line)
   }
   _conditionallyUnreachable()
-}
-
-/// Ensure that the `condition` is true.
-///
-/// If the `condition` is false, in debug and release modes the program stops.
-///
-/// In unchecked mode the optimizer can assume that the `condition` is true.
-@transparent
-public func precondition(
-  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  // Only check in debug and release mode.  In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      _assertionFailed("precondition failed", message, file, line)
-    }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail(error.value)
-  }
-}
-
-@transparent
-public func precondition<T : BooleanType>(
-  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  // Only check in debug and release mode.  In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      _assertionFailed("precondition failed", message, file, line)
-    }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail(error.value)
-  }
 }
 
 /// A fatal error occurred and program execution should stop in debug mode and

@@ -10,6 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol AssertStringType
+  : ExtendedGraphemeClusterLiteralConvertible,
+    StringLiteralConvertible {
+  var stringValue: String { get }
+}
+
+/// `StaticStringType` refines `AssertStringType` to make it more specific for
+/// overload resolution.
+public protocol StaticStringType : AssertStringType {}
+
 // Implementation Note: Because StaticString is used in the
 // implementation of assert() and fatal(), we keep it extremely close
 // to the bare metal.  In particular, because we use only Builtin
@@ -17,12 +27,13 @@
 // construction.  This feature is crucial for preventing infinite
 // recursion even in non-asserting cases.
 
+
 /// An extremely simple string designed to represent something
 /// "statically knowable".
 public struct StaticString
-  : _BuiltinExtendedGraphemeClusterLiteralConvertible,
-    ExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinStringLiteralConvertible, StringLiteralConvertible {
+  : StaticStringType,
+    _BuiltinExtendedGraphemeClusterLiteralConvertible,
+    _BuiltinStringLiteralConvertible {
   var _start: Builtin.RawPointer
   var _byteSize: Builtin.Word
   var _isASCII: Builtin.Int1
@@ -43,10 +54,17 @@ public struct StaticString
   }
 
   @transparent
+  public var stringValue: String {
+    return String._convertFromBuiltinStringLiteral(
+      start.value, byteSize: byteSize.value, isASCII: isASCII.value)
+  }
+
+  @transparent
   public init() {
     self = ""
   }
 
+  @transparent
   init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
@@ -56,22 +74,26 @@ public struct StaticString
   }
 
   @semantics("readonly")
+  @transparent
   public static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
-    isASCII: Builtin.Int1) -> StaticString {
-
+    isASCII: Builtin.Int1
+  ) -> StaticString {
     return _convertFromBuiltinStringLiteral(
-        start, byteSize: byteSize, isASCII: isASCII)
+      start, byteSize: byteSize, isASCII: isASCII)
   }
 
   @semantics("readonly")
+  @transparent
   public static func convertFromExtendedGraphemeClusterLiteral(
-      value: StaticString) -> StaticString {
+    value: StaticString
+  ) -> StaticString {
     return value
   }
 
   @semantics("readonly")
+  @transparent
   public static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) -> StaticString {
@@ -79,7 +101,63 @@ public struct StaticString
   }
 
   @semantics("readonly")
-  public static func convertFromStringLiteral(value: StaticString) -> StaticString {
+  @transparent
+  public static func convertFromStringLiteral(
+    value: StaticString
+  ) -> StaticString {
     return value
   }
 }
+
+/// A String-like type that can be constructed from string interpolation, and
+/// is considered less specific than `StaticString` in overload resolution.
+public struct AssertString : AssertStringType, StringInterpolationConvertible {
+
+  public var stringValue: String
+
+  @transparent
+  public init() {
+    self.stringValue = ""
+  }
+
+  @transparent
+  public init(_ value: String) {
+    self.stringValue = value
+  }
+
+  @semantics("readonly")
+  @transparent
+  public static func convertFromExtendedGraphemeClusterLiteral(
+    value: String
+  ) -> AssertString {
+    return AssertString(value)
+  }
+
+  @semantics("readonly")
+  @transparent
+  public static func convertFromStringLiteral(
+    value: String
+  ) -> AssertString {
+    return AssertString(value)
+  }
+
+  @semantics("readonly")
+  public static func convertFromStringInterpolation(
+    strings: AssertString...
+  ) -> AssertString {
+    var result = String()
+    for str in strings {
+      result += str.stringValue
+    }
+    return AssertString(result)
+  }
+
+  @semantics("readonly")
+  @transparent
+  public static func convertFromStringInterpolationSegment<T>(
+    expr: T
+  ) -> AssertString {
+    return AssertString(String.convertFromStringInterpolationSegment(expr))
+  }
+}
+

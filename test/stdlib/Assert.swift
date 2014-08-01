@@ -6,10 +6,12 @@
 // RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Unchecked -Ounchecked
 //
 // RUN: %target-run %t/Assert_Debug Debug Assert 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug Debug AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug AssertionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 //
 // RUN: %target-run %t/Assert_Debug Debug Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug Debug PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug PreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug PreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 //
@@ -29,10 +31,12 @@
 //
 //
 // RUN: %target-run %t/Assert_Release Release Assert 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
+// RUN: %target-run %t/Assert_Release Release AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
 // RUN: %target-run %t/Assert_Release Release AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
 // RUN: %target-run %t/Assert_Release Release AssertionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 //
 // RUN: %target-run %t/Assert_Release Release Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
+// RUN: %target-run %t/Assert_Release Release PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 // RUN: %target-run %t/Assert_Release Release PreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 // RUN: %target-run %t/Assert_Release Release PreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 //
@@ -122,6 +126,21 @@ if (Process.arguments[2] == "Assert") {
   }
 }
 
+func testAssertInterpolation() {
+  var should = "should"
+  var x = 2
+  assert(x * 21 == 42, "\(should) not fail")
+  println("OK")
+  assert(x == 42, "this \(should) fail")
+}
+if (Process.arguments[2] == "AssertInterpolation") {
+  testAssertInterpolation()
+  println("did not trap")
+  if !isDebugAssertConfiguration() {
+    exit(0)
+  }
+}
+
 func testAssertBooleanType() {
   assert(truthie, "should not fail")
   println("OK")
@@ -129,6 +148,20 @@ func testAssertBooleanType() {
 }
 if (Process.arguments[2] == "AssertBooleanType") {
   testAssertBooleanType()
+  println("did not trap")
+  if !isDebugAssertConfiguration() {
+    exit(0)
+  }
+}
+
+func testAssertBooleanTypeInterpolation() {
+  var should = "should"
+  assert(truthie, "\(should) not fail")
+  println("OK")
+  assert(falsie, "this \(should) fail")
+}
+if (Process.arguments[2] == "AssertBooleanTypeInterpolation") {
+  testAssertBooleanTypeInterpolation()
   println("did not trap")
   if !isDebugAssertConfiguration() {
     exit(0)
@@ -153,6 +186,17 @@ if (Process.arguments[2] == "Precondition") {
   testPrecondition()
 }
 
+func testPreconditionInterpolation() {
+  var should = "should"
+  var x = 2
+  precondition(x * 21 == 42, "\(should) not fail")
+  println("OK")
+  precondition(x == 42, "this \(should) fail")
+}
+if (Process.arguments[2] == "PreconditionInterpolation") {
+  testPreconditionInterpolation()
+}
+
 func testPreconditionBooleanType() {
   precondition(truthie, "should not fail")
   println("OK")
@@ -160,6 +204,16 @@ func testPreconditionBooleanType() {
 }
 if (Process.arguments[2] == "PreconditionBooleanType") {
   testPreconditionBooleanType()
+}
+
+func testPreconditionBooleanTypeInterpolation() {
+  var should = "should"
+  precondition(truthie, "\(should) not fail")
+  println("OK")
+  precondition(falsie, "this \(should) fail")
+}
+if (Process.arguments[2] == "PreconditionBooleanTypeInterpolation") {
+  testPreconditionBooleanTypeInterpolation()
 }
 
 func testPreconditionFailure() {
