@@ -11,17 +11,8 @@ class Foo {
   func ping()
 }
 
-sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@owned Foo) -> () {
-bb0(%0 : $Foo):
-  strong_release %0 : $Foo                        // id: %1
-  %2 = tuple ()                                   // user: %3
-  return %2 : $()                                 // id: %3
-}
-
-sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo {
-bb0(%0 : $Foo):
-  return %0 : $Foo                                // id: %1
-}
+sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@owned Foo) -> ()
+sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo
 
 sil @_TF8testcase7my_mainFCS_3FooT_ : $@thin (@owned Foo) -> () {
 bb0(%0 : $Foo):
