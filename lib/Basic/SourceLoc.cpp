@@ -67,7 +67,17 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
 
 void SourceManager::closeVirtualFile(SourceLoc end) {
   auto *virtualFile = const_cast<VirtualFile *>(getVirtualFile(end));
-  assert(virtualFile && "no open virtual file for this location");
+  if (!virtualFile) {
+#ifndef NDEBUG
+    unsigned bufferID = findBufferContainingLoc(end);
+    CharSourceRange fullRange = getRangeForBuffer(bufferID);
+    assert((fullRange.getByteLength() == 0 ||
+            getVirtualFile(end.getAdvancedLoc(-1))) &&
+           "no open virtual file for this location");
+    assert(fullRange.getEnd() == end);
+#endif
+    return;
+  }
   CachedVFile = {};
 
   CharSourceRange oldRange = virtualFile->Range;

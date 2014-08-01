@@ -7,3 +7,5 @@ typedef int conflict2;
 
 #define I __extension__ conflict
 int I;
+
+int lastLineOfFileWithoutSemicolon
