@@ -43,7 +43,6 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
-  const unsigned int LineOffset = 7;
 
   struct BracePair {
   public:
@@ -551,8 +550,7 @@ public:
       }
     }
 
-    if ((Context.SourceMgr.getLineAndColumn(SR.Start).first >= LineOffset) &&
-        !TopLevel) {
+    if (!TopLevel) {
       Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
     }
@@ -737,12 +735,10 @@ public:
     char *start_column_buf = (char*)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char*)Context.Allocate(buf_size, 1);
 
-    ::snprintf(start_line_buf, buf_size, "%d",
-               (StartLC.first < LineOffset) ? 0 : (StartLC.first - LineOffset));
-    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second - 1);
-    ::snprintf(end_line_buf, buf_size, "%d",
-               (EndLC.first < LineOffset) ?  0 : (EndLC.first - LineOffset));
-    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second - 1);
+    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first);
+    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second);
+    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
+    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
 
     Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
                                                        SR.End, true);
