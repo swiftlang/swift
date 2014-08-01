@@ -21,7 +21,7 @@ import MissingDependencyFromSwift
 import MissingDependencyFromClang
 // CHECK: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1:9: error: module 'Dependency' not found
 // CHECK: broken-modules.swift:[[@LINE-2]]:8: error: could not build Objective-C module 'MissingDependencyFromClang'
-// CHECK-NOT: no such module 'MissingDependencyFromClang'
+// CHECK: error: no such module 'MissingDependencyFromClang'
 
 import BrokenClangModule
 // CLANG-CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2:13: error: redefinition of 'conflict' as different kind of symbol
@@ -32,7 +32,7 @@ import BrokenClangModule
 // CLANG-CHECK: a-fake-file.h:45:11: note: expanded from macro 'I'
 
 // CHECK: broken-modules.swift:[[@LINE-8]]:8: error: could not build Objective-C module 'BrokenClangModule'
-// CHECK-NOT: no such module 'BrokenClangModule'
+// CHECK: error: no such module 'BrokenClangModule'
 // CHECK-BRIDGING-HEADER: error: failed to import bridging header '{{.*}}/BrokenClangModule.h'
 
 

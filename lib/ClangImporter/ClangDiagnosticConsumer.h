@@ -29,7 +29,6 @@ class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
       assert(import);
       assert(!Consumer->CurrentImport);
       Consumer->CurrentImport = import;
-      Consumer->CurrentImportNotFound = false;
     }
 
     LoadModuleRAII(LoadModuleRAII &) = delete;
@@ -56,7 +55,6 @@ private:
   ClangImporter::Implementation &ImporterImpl;
   const clang::IdentifierInfo *CurrentImport = nullptr;
   SourceLoc DiagLoc;
-  bool CurrentImportNotFound;
   bool DumpToStderr;
 
 public:
@@ -68,16 +66,6 @@ public:
                               SourceLoc diagLoc) {
     DiagLoc = diagLoc;
     return LoadModuleRAII(*this, name);
-  }
-
-  bool isCurrentImportMissing() const {
-    assert(CurrentImport && "nothing being loaded");
-    return CurrentImportNotFound;
-  }
-
-  void setCurrentImportMissing() {
-    assert(CurrentImport && "nothing being loaded");
-    CurrentImportNotFound = true;
   }
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level diagLevel,

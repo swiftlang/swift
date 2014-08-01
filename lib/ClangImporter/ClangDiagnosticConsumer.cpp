@@ -146,7 +146,6 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   // we're looking for.
   if (clangDiag.getID() == clang::diag::err_module_not_found &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
-    setCurrentImportMissing();
     return;
   }
 

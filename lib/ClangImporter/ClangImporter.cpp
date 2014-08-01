@@ -588,15 +588,8 @@ Module *ClangImporter::loadModule(
                                             clang::Module::AllVisible,
                                             /*IsInclusionDirective=*/false);
 
-    if (!clangModule) {
-      if (diagClient.isCurrentImportMissing())
-        return nullptr;
-
-      // Otherwise, the module is present, but we've failed to load it for some
-      // reason. Create an empty module to serve as a placeholder.
-      Identifier name = path.back().first;
-      return Module::create(name, Impl.SwiftContext);
-    }
+    if (!clangModule)
+      return nullptr;
   }
 
   return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
