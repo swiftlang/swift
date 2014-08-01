@@ -13,6 +13,7 @@ Contents
    LangRefNew
    AccessControl
    DriverInternals
+   DriverParseableOutput
    Generics
    LogicalObjects
    Namespace Level Vars and Top Level Code
