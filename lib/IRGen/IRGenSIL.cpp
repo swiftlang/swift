@@ -1360,7 +1360,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       }
 
       auto DS = I.getDebugScope();
-      // FIXME: This should be an assertion.
+      assert((!DS || (DS->SILFn == CurSILFn || DS->InlinedCallSite)) &&
+             "insn was not inlined, but belongs to a different function");
       if (DS && DS->SILFn != CurSILFn && !DS->InlinedCallSite) {
         DS = CurSILFn->getDebugScope();
         assert(DS->SILFn == CurSILFn);
