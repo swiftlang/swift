@@ -820,7 +820,7 @@ class GenericClass<T> {
   var y: Int
   final let z: T
 
-  init() { debugTrap("scaffold") }
+  init() { fatalError("scaffold") }
 }
 
 // CHECK-LABEL: sil @_TF10properties12genericPropsFGCS_12GenericClassSS_T_

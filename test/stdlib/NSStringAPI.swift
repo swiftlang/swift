@@ -14,7 +14,7 @@ import Foundation
 // about.
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder!) {
-    debugTrap("don't call this initializer")
+    fatalError("don't call this initializer")
   }
 
   init(_ value: [UInt16]) {
@@ -1054,7 +1054,7 @@ func getHomeDir() -> String {
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
 #else
-  trap("implement")
+  preconditionFailed("implement")
 #endif
 }
 

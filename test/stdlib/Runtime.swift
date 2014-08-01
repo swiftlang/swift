@@ -574,7 +574,7 @@ var nsStringCanaryCount = 0
     super.init()
   }
   required init(coder: NSCoder!) {
-    debugTrap("don't call this initializer")
+    fatalError("don't call this initializer")
   }
   deinit {
     --nsStringCanaryCount
@@ -583,7 +583,7 @@ var nsStringCanaryCount = 0
     return 0
   }
   @objc override func characterAtIndex(index: Int) -> unichar {
-    debugTrap("out-of-bounds access")
+    fatalError("out-of-bounds access")
   }
 }
 

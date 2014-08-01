@@ -21,6 +21,9 @@
 /// execution in a debuggable state after printing a message.  When
 /// assertions are disabled in release and fast builds, `condition` is not even
 /// evaluated.
+///
+/// When assertions are turned off, the optimizer can assume that the
+/// `condition` is true.
 @transparent
 public func assert(
   condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
@@ -50,7 +53,7 @@ public func assert<T : BooleanType>(
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
 @transparent @noreturn
-public func debugTrap(
+public func assertionFailure(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
@@ -60,14 +63,52 @@ public func debugTrap(
   _conditionallyUnreachable()
 }
 
+/// Ensure that the `condition` is true.
+///
+/// If the `condition` is false, in debug and release modes the program stops.
+///
+/// In unchecked mode the optimizer can assume that the `condition` is true.
+@transparent
+public func precondition(
+  condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  // Only check in debug and release mode.  In release mode just trap.
+  if _isDebugAssertConfiguration() {
+    if !_branchHint(condition(), true) {
+      _assertionFailed("precondition failed", message, file, line)
+    }
+  } else if _isReleaseAssertConfiguration() {
+    let error = !condition()
+    Builtin.condfail(error.value)
+  }
+}
+
+@transparent
+public func precondition<T : BooleanType>(
+  condition: @autoclosure () -> T, _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  // Only check in debug and release mode.  In release mode just trap.
+  if _isDebugAssertConfiguration() {
+    if !_branchHint(condition(), true) {
+      _assertionFailed("precondition failed", message, file, line)
+    }
+  } else if _isReleaseAssertConfiguration() {
+    let error = !condition()
+    Builtin.condfail(error.value)
+  }
+}
+
 /// A fatal error occurred and program execution should stop in debug mode and
-/// in optimized mode.  In unchecked builds this is a noop.
+/// in optimized mode.  In unchecked builds this is a noop, but the
+/// optimizer can still assume that the call is unreachable.
 @transparent @noreturn
-public func trap(
+public func preconditionFailure(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  // Only check in debug and release mode. In release mode just trap.
+  // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message, file, line)
   } else if _isReleaseAssertConfiguration() {
@@ -76,6 +117,15 @@ public func trap(
   _conditionallyUnreachable()
 }
 
+/// A fatal error occurred and program execution should stop in debug,
+/// optimized and unchecked modes.
+@transparent @noreturn
+public func fatalError(
+  message: StaticString,
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  _assertionFailed("fatal error", message, file, line)
+}
 
 /// Library precondition checks
 ///
@@ -109,7 +159,7 @@ public func _precondition<T : BooleanType>(
       _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
-    let error = !condition().boolValue;
+    let error = !condition().boolValue
     Builtin.condfail(error.value)
   }
 }
@@ -223,5 +273,5 @@ public func _fatalError(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   _sanityCheck(false, message, file: file, line: line)
-  _conditionallyUnreachable();
+  _conditionallyUnreachable()
 }

@@ -23,7 +23,7 @@ func _isDebugAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
-  return Int32(Builtin.assert_configuration()) == 0;
+  return Int32(Builtin.assert_configuration()) == 0
 }
 
 @transparent internal
@@ -32,7 +32,7 @@ func _isReleaseAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
-  return Int32(Builtin.assert_configuration()) == 1;
+  return Int32(Builtin.assert_configuration()) == 1
 }
 
 @transparent internal
@@ -41,7 +41,7 @@ func _isFastAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
-  return Int32(Builtin.assert_configuration()) == 2;
+  return Int32(Builtin.assert_configuration()) == 2
 }
 
 @asmname("swift_reportFatalErrorInFile")

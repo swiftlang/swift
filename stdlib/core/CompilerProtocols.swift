@@ -58,7 +58,7 @@ public protocol GeneratorType /* : SequenceType */ {
   /// Note: after `next()` on an arbitrary generator has returned
   /// `nil`, subsequent calls to `next()` have unspecified behavior.
   /// Specific implementations of this protocol are encouraged to
-  /// respond by calling `trap("...")`.
+  /// respond by calling `preconditionFailure("...")`.
   mutating func next() -> Element?
 }
 

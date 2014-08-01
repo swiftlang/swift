@@ -185,7 +185,7 @@ class CodecTest<Codec: TestableUnicodeCodec> {
     case .Result(let us):
       decoded = us
     default:
-      debugTrap("decoding failed")
+      fatalError("decoding failed")
     }
     if decoded != scalar {
       println("Decoding failed: \(hex(scalar.value)) => \(hex(nsEncoded)) => \(hex(decoded.value))")
@@ -2271,7 +2271,7 @@ import Foundation
 // about.
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder!) {
-    debugTrap("don't call this initializer")
+    fatalError("don't call this initializer")
   }
 
   convenience init(_ utf8: [UInt8]) {

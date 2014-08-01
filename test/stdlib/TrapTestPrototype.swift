@@ -82,7 +82,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
     (fds) in
     let ptr = fds.baseAddress
     if pipe(ptr) != 0 {
-      trap("pipe() failed")
+      preconditionFailure("pipe() failed")
     }
   }
   return (fds[0], fds[1])
@@ -94,33 +94,33 @@ func spawnChild(args: [String])
   -> (pid: pid_t, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
   if posix_spawn_file_actions_init(&fileActions) != 0 {
-    trap("posix_spawn_file_actions_init() failed")
+    preconditionFailure("posix_spawn_file_actions_init() failed")
   }
 
   let childStdout = posixPipe()
   // Close the read end of the pipe on the child side.
   if posix_spawn_file_actions_addclose(
     &fileActions, childStdout.readFD) != 0 {
-    trap("posix_spawn_file_actions_addclose() failed")
+    preconditionFailure("posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stdout.
   if posix_spawn_file_actions_adddup2(
     &fileActions, childStdout.writeFD, STDOUT_FILENO) != 0 {
-    trap("posix_spawn_file_actions_adddup2() failed")
+    preconditionFailure("posix_spawn_file_actions_adddup2() failed")
   }
 
   let childStderr = posixPipe()
   // Close the read end of the pipe on the child side.
   if posix_spawn_file_actions_addclose(
     &fileActions, childStderr.readFD) != 0 {
-    trap("posix_spawn_file_actions_addclose() failed")
+    preconditionFailure("posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stderr.
   if posix_spawn_file_actions_adddup2(
     &fileActions, childStderr.writeFD, STDERR_FILENO) != 0 {
-    trap("posix_spawn_file_actions_adddup2() failed")
+    preconditionFailure("posix_spawn_file_actions_adddup2() failed")
   }
 
   var pid: pid_t = -1
@@ -130,21 +130,21 @@ func spawnChild(args: [String])
   }
   if spawnResult != 0 {
     println(String.fromCString(strerror(spawnResult)))
-    trap("posix_spawn() failed")
+    preconditionFailure("posix_spawn() failed")
   }
 
   if posix_spawn_file_actions_destroy(&fileActions) != 0 {
-    trap("posix_spawn_file_actions_destroy() failed")
+    preconditionFailure("posix_spawn_file_actions_destroy() failed")
   }
 
   // Close the write end of the pipe on the parent side.
   if close(childStdout.writeFD) != 0 {
-    trap("close() failed")
+    preconditionFailure("close() failed")
   }
 
   // Close the write end of the pipe on the parent side.
   if close(childStderr.writeFD) != 0 {
-    trap("close() failed")
+    preconditionFailure("close() failed")
   }
 
   return (pid, childStdout.readFD, childStderr.readFD)
@@ -166,7 +166,7 @@ func readAll(fd: CInt) -> String {
     if readResult == 0 {
       break
     }
-    trap("read() failed")
+    preconditionFailure("read() failed")
   }
   return String._fromCodeUnitSequenceWithRepair(
     UTF8.self, input: buffer[0..<usedBytes]).0
@@ -211,7 +211,7 @@ enum ProcessTerminationStatus : Printable {
 func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
   if waitpid(pid, &status, 0) < 0 {
-    trap("waitpid() failed")
+    preconditionFailure("waitpid() failed")
   }
   if (WIFEXITED(status)) {
     return .Exit(Int(WEXITSTATUS(status)))
@@ -219,7 +219,7 @@ func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   if (WIFSIGNALED(status)) {
     return .Signal(Int(WTERMSIG(status)))
   }
-  trap("did not understand what happened to child process")
+  preconditionFailure("did not understand what happened to child process")
 }
 
 func runChild(args: [String])
@@ -233,10 +233,10 @@ func runChild(args: [String])
   let stderr = readAll(stderrFD)
 
   if close(stdoutFD) != 0 {
-    trap("close() failed")
+    preconditionFailure("close() failed")
   }
   if close(stderrFD) != 0 {
-    trap("close() failed")
+    preconditionFailure("close() failed")
   }
   let status = posixWaitpid(pid)
   return (stdout, stderr, status)
@@ -325,7 +325,7 @@ if Process.arguments.count == 1 {
     println("child started")
     fflush(stdout)
     fflush(stderr)
-    trap("this should crash")
+    preconditionFailure("this should crash")
   }
 
   if arg == "testInterceptedTrap" {
@@ -333,7 +333,7 @@ if Process.arguments.count == 1 {
     _stdlib_installTrapInterceptor()
     fflush(stdout)
     fflush(stderr)
-    trap("this should crash")
+    preconditionFailure("this should crash")
   }
 
   if arg == "testNoTrap" {

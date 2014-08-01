@@ -290,9 +290,3 @@ infix operator  |= { associativity right precedence 90 assignment }
 // from users.
 infix operator ~> { associativity left precedence 255 }
 
-@availability(*,unavailable,renamed="debugTrap")
-public func fatalError(
-  message: StaticString,
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {}
-

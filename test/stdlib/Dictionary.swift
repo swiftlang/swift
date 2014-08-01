@@ -1786,9 +1786,9 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   required init(coder aDecoder: NSCoder) {
-    debugTrap("init(coder:) not implemented by ParallelArrayDictionary")
+    fatalError("init(coder:) not implemented by ParallelArrayDictionary")
   }
-  
+
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
     // Ensure that copying this dictionary does not produce a CoreFoundation
     // object.
