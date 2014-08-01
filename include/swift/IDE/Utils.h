@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include <memory>
 #include <string>
+#include <functional>
 
 namespace llvm {
   class MemoryBuffer;
@@ -23,10 +24,12 @@ namespace llvm {
 
 namespace clang {
   class Module;
+  class NamedDecl;
 }
 
 namespace swift {
   class Module;
+  class ValueDecl;
 
 namespace ide {
 
@@ -57,6 +60,12 @@ SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> M
 SourceCompleteResult isSourceInputComplete(StringRef Text);
 
 const clang::Module *findUnderlyingClangModule(const Module *M);
+
+/// Visits all overridden declarations exhaustively from VD, including protocol
+/// conformances and clang declarations.
+void walkOverriddenDecls(const ValueDecl *VD,
+                         std::function<void(llvm::PointerUnion<
+                             const ValueDecl*, const clang::NamedDecl*>)> Fn);
 
 } // namespace ide
 } // namespace swift

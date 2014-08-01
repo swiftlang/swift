@@ -17,6 +17,8 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -196,4 +198,31 @@ const clang::Module *ide::findUnderlyingClangModule(const Module *M) {
   if (!CMU)
     return nullptr;
   return CMU->getClangModule();
+}
+
+template <typename FnTy>
+static void walkOverriddenClangDecls(const clang::NamedDecl *D, const FnTy &Fn){
+  SmallVector<const clang::NamedDecl *, 8> OverDecls;
+  D->getASTContext().getOverriddenMethods(D, OverDecls);
+  for (auto Over : OverDecls)
+    Fn(Over);
+  for (auto Over : OverDecls)
+    walkOverriddenClangDecls(Over, Fn);
+}
+
+void
+ide::walkOverriddenDecls(const ValueDecl *VD,
+                         std::function<void(llvm::PointerUnion<
+                             const ValueDecl*, const clang::NamedDecl*>)> Fn) {
+  for (auto CurrOver = VD; CurrOver; CurrOver = CurrOver->getOverriddenDecl()) {
+    if (CurrOver != VD)
+      Fn(CurrOver);
+    if (auto ClangD =
+        dyn_cast_or_null<clang::NamedDecl>(CurrOver->getClangDecl())) {
+      walkOverriddenClangDecls(ClangD, Fn);
+      return;
+    }
+    for (auto Conf: const_cast<ValueDecl*>(CurrOver)->getConformances())
+      Fn(Conf);
+  }
 }
