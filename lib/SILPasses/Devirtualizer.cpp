@@ -933,6 +933,11 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
 
   // Devirtualize the apply instruction on the identical path.
   optimizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
+
+  // Sink class_method instructions down to their single user.
+  if (CMI->hasOneUse())
+    CMI->moveBefore(CMI->use_begin()->getUser());
+
   return VirtAI;
 }
 
