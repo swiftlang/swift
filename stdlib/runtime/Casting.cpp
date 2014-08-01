@@ -59,6 +59,13 @@ static void _failCorruptType(const Metadata *type) {
   swift::crash("Corrupt Swift type object");
 }
 
+// Objective-c bridging helpers.
+namespace {
+  struct _ObjectiveCBridgeableWitnessTable;
+}
+static const _ObjectiveCBridgeableWitnessTable *
+findBridgeWitness(const Metadata *T);
+
 /// A convenient method for failing out of a dynamic cast.
 static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
                   const Metadata *targetType, DynamicCastFlags flags) {
@@ -1001,6 +1008,16 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   _failCorruptType(srcType);
 }
 
+/// Bridge a value type that conforms to the _ObjectiveCBridgeable protocol to
+/// a class type and dynamic cast the result to the given class type.
+static bool _dynamicCastValueToClassViaObjCBridgeable(
+              OpaqueValue *dest,
+              OpaqueValue *src,
+              const Metadata *srcType,
+              const Metadata *targetType,
+              const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
+              DynamicCastFlags flags);
+
 /// Perform a dynamic cast to an arbitrary type.
 bool swift::swift_dynamicCast(OpaqueValue *dest,
                               OpaqueValue *src,
@@ -1030,18 +1047,30 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                        targetType, flags);
     }
 
+    case MetadataKind::Enum:
+    case MetadataKind::Struct: {
+      // If the source type is bridged to Objective-C, try to bridge.
+      if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+        return _dynamicCastValueToClassViaObjCBridgeable(dest, src, srcType,
+                                                         targetType,
+                                                         srcBridgeWitness,
+                                                         flags);
+      }
+
+      // FIXME: _fail?
+      return false;
+    }
+
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::Block:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
-    case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
-    case MetadataKind::Struct:
     case MetadataKind::Tuple:
-      return nullptr;
+      return false;
     }
     break;
 
@@ -1592,6 +1621,42 @@ struct _ObjectiveCBridgeableWitnessTable {
 } // unnamed namespace
 
 extern "C" const ProtocolDescriptor _TMpSs21_ObjectiveCBridgeable;
+
+/// Dynamic cast from a value type that conforms to the _ObjectiveCBridgeable
+/// protocol to a class type, first by bridging the value to its Objective-C
+/// object represntation and then by dynamic casting that object to the
+/// resulting target type.
+static bool _dynamicCastValueToClassViaObjCBridgeable(
+               OpaqueValue *dest,
+               OpaqueValue *src,
+               const Metadata *srcType,
+               const Metadata *targetType,
+               const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
+               DynamicCastFlags flags) {
+  // Check whether the source is bridged to Objective-C.
+  if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType)) {
+    return _fail(src, srcType, targetType, flags);
+  }
+
+  // Bridge the source value to an object.
+  auto srcBridgedObject = srcBridgeWitness->bridgeToObjectiveC(src, srcType);
+
+  // Dynamic cast the object to the resulting class type. We pass on
+  // responsibility
+  DynamicCastFlags classCastFlags = flags | DynamicCastFlags::TakeOnSuccess
+                                  | DynamicCastFlags::DestroyOnFailure;
+  bool success = _dynamicCastUnknownClass(dest, srcBridgedObject, targetType,
+                                          classCastFlags);
+
+  // Clean up the source if we're supposed to.
+  if ((success && (flags & DynamicCastFlags::TakeOnSuccess)) ||
+      (!success && (flags & DynamicCastFlags::DestroyOnFailure))) {
+    srcType->vw_destroy(src);
+  }
+
+  // We're done.
+  return success;
+}
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
