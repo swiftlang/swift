@@ -49,6 +49,9 @@ enum class OutputLevel {
 
   /// Indicates that verbose output should be produced. (-v)
   Verbose,
+
+  /// Indicates that parseable output should be produced.
+  Parseable,
 };
 
 class Compilation {

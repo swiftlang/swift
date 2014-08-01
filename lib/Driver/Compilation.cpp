@@ -133,6 +133,11 @@ int Compilation::performJobsInList(const JobList &JL,
     // For verbose output, print out each command as it begins execution.
     if (Level == OutputLevel::Verbose)
       BeganCmd->printCommandLine(llvm::errs());
+    else if (Level == OutputLevel::Parseable) {
+      // TODO: emit real parseable output.
+      llvm::errs() << "Command: ";
+      BeganCmd->printCommandLine(llvm::errs());
+    }
   };
 
   // Set up a callback which will be called immediately after a task has
@@ -252,8 +257,8 @@ int Compilation::performSingleCommand(const Command *Cmd) {
 }
 
 int Compilation::performJobs() {
-  // TODO: determine if an option requires buffered output; right now, none do
-  bool RequiresBufferedOutput = false;
+  // We require buffered output if Parseable output was requested.
+  bool RequiresBufferedOutput = (Level == OutputLevel::Parseable);
   if (!RequiresBufferedOutput) {
     if (const Command *OnlyCmd = getOnlyCommandInList(Jobs.get()))
       return performSingleCommand(OnlyCmd);

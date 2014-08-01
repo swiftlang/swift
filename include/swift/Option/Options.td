@@ -92,6 +92,10 @@ def v : Flag<["-"], "v">,
 def version : Flag<["-", "--"], "version">,
   HelpText<"Print version information and exit">;
 
+def parseable_output : Flag<["-"], "parseable-output">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Emit textual output in a parseable format">;
+
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption]>;

@@ -215,8 +215,15 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   OutputLevel Level = OutputLevel::Normal;
-  if (TranslatedArgList->hasArg(options::OPT_v))
-    Level = OutputLevel::Verbose;
+  if (const Arg *A = ArgList->getLastArg(options::OPT_v,
+                                         options::OPT_parseable_output)) {
+    if (A->getOption().matches(options::OPT_v))
+      Level = OutputLevel::Verbose;
+    else if (A->getOption().matches(options::OPT_parseable_output))
+      Level = OutputLevel::Parseable;
+    else
+      llvm_unreachable("Unknown OutputLevel argument!");
+  }
 
   std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags, Level,
                                                  std::move(ArgList),
