@@ -261,6 +261,162 @@ bb3:
   return %5 : $FakeOptional
 }
 
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_1 : $@thin (FakeOptional) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: function_ref blocker
+// CHECK-NEXT: function_ref @blocker
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: apply
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: cond_br
+// CHECK: bb1({{.*}}):
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: retain_value
+// CHECK: bb2:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_enum_is_tag_1 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @blocker : $@thin () -> ()
+  retain_value %0 : $FakeOptional
+  apply %1() : $@thin () -> ()
+  %3 = alloc_stack $Builtin.Int32
+  retain_value %0 : $FakeOptional
+  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  cond_br %100, bb1, bb2
+
+bb1(%2 : $Builtin.Int32):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_2 : $@thin (FakeOptional) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: function_ref blocker
+// CHECK-NEXT: function_ref @blocker
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb4:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_enum_is_tag_2 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @blocker : $@thin () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  cond_br %100, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_3 : $@thin (FakeOptional) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: function_ref blocker
+// CHECK-NEXT: function_ref @blocker
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb4:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_enum_is_tag_3 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @blocker : $@thin () -> ()
+  cond_br undef, bb1, bb3
+
+bb1:
+  retain_value %0 : $FakeOptional
+  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  cond_br %100, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_4 : $@thin (FakeOptional) -> FakeOptional {
+// CHECK: bb0({{.*}}):
+// CHECK-NOT: retain_value
+// CHECK: enum_is_tag
+// CHECK: cond_br
+// CHECK: bb1:
+// CHECK: unchecked_enum_data
+// CHECK: retain_value
+// CHECK: bb2:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_enum_is_tag_4 : $@thin (FakeOptional) -> FakeOptional {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @blocker : $@thin () -> ()
+  %2 = alloc_stack $FakeOptional
+  %3 = function_ref @optional_user : $@thin (FakeOptional) -> ()
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %4 : $Builtin.Int32
+  retain_value %5 : $FakeOptional
+  apply %1() : $@thin () -> ()
+  apply %3(%0) : $@thin (FakeOptional) -> ()
+  %100 = enum_is_tag $Builtin.Int1, %5 : $FakeOptional, #FakeOptional.Some!enumelt
+  cond_br %100, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2#0 : $*@local_storage FakeOptional
+  return %5 : $FakeOptional
+}
+
 // Sink the struct instruction
 // CHECK-LABEL: sil @sink_struct : $@thin (FakeOptional) -> Bool {
 // CHECK: bb0({{.*}}):

@@ -427,10 +427,89 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *S, SILInstruction *I,
   return true;
 }
 
+/// Sink retain_value, release_value before enum_is_tag to be retain_value,
+/// release_value on the payload of the switch_enum in the destination BBs. We
+/// only do this if the destination BBs have only the switch enum as its
+/// predecessor.
+static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
+                                             SILInstruction *I,
+                                             AliasAnalysis *AA) {
+  // If this instruction is not a retain_value, there is nothing left for us to
+  // do... bail...
+  if (!isa<RetainValueInst>(I))
+    return false;
+
+  SILValue Ptr = I->getOperand(0);
+
+  // Make sure the condition comes from an enum_is_tag
+
+
+  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
+  if (!EITI)
+    return false;
+
+  // If the retain value's argument is not the switch's argument, we can't do
+  // anything with our simplistic analysis... bail...
+  if (Ptr != EITI->getOperand())
+    return false;
+
+  // Next go over all instructions after I in the basic block. If none of them
+  // can decrement our ptr value, we can move the retain over the ref count
+  // inst. If any of them do potentially decrement the ref count of Ptr, we can
+  // not move it.
+  SILBasicBlock::iterator II = I;
+  if (valueHasARCDecrementsInInstructionRange(Ptr, std::next(II),
+                                              SILBasicBlock::iterator(EITI),
+                                              AA))
+    return false;
+
+  // Work out which enum element is the true branch, and which is false.
+  // If the enum only has 2 values and its tag isn't the true branch, then we
+  // know the true branch must be the other tag.
+  EnumElementDecl *Elts[2] = { EITI->getElement(), nullptr };
+  const auto &Operand = EITI->getOperand();
+  if (EnumDecl *E = Operand.getType().getEnumOrBoundGenericEnum()) {
+    // Look for a single other element on this enum.
+    EnumElementDecl *OtherElt = nullptr;
+    for (EnumElementDecl *Elt : E->getAllElements()) {
+      // Skip the case where we find the enum_is_tag element
+      if (Elt == EITI->getElement())
+        continue;
+      // If we find another element, then we must have more than 2, so bail.
+      if (OtherElt)
+        return false;
+      OtherElt = Elt;
+    }
+    // Only a single enum element?  How would this even get here?  We should
+    // handle it in SILCombine.
+    if (!OtherElt)
+      return false;
+    Elts[1] = OtherElt;
+  } else
+    return false;
+
+  SILBuilder Builder(EITI);
+
+  // Ok, we have a ref count instruction, sink it!
+  for (unsigned i = 0; i != 2; ++i) {
+    EnumElementDecl *Enum = Elts[i];
+    SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
+    Builder.setInsertionPoint(&*Succ->begin());
+    createRefCountOpForPayload(Builder, I, Enum);
+  }
+
+  I->eraseFromParent();
+  NumSunk++;
+  return true;
+}
+
 static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
                                   AliasAnalysis *AA) {
   if (auto *S = dyn_cast<SwitchEnumInst>(T))
     return tryToSinkRefCountAcrossSwitch(S, I, AA);
+  if (auto *CondBr = dyn_cast<CondBranchInst>(T))
+    if (tryToSinkRefCountAcrossEnumIsTag(CondBr, I, AA))
+      return true;
 
   // We currently handle checked_cast_br and cond_br.
   if (!isa<CheckedCastBranchInst>(T) && !isa<CondBranchInst>(T))
