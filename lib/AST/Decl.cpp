@@ -1761,7 +1761,7 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
     os << "_Tt";
 
     // Mangle the type.
-    Mangle::Mangler mangler(os);
+    Mangle::Mangler mangler(os, false/*dwarf*/, false/*punycode*/);
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
       mangler.mangleNominalType(NTD,

@@ -86,16 +86,17 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   StringRef str = ident.str();
   assert(!str.empty() && "mangling an empty identifier!");
 
-  // If the identifier contains non-ASCII character, we mangle with an initial
-  // X and Punycode the identifier string.
-  std::string punycodeBuf;
-
-  if (isNonAscii(str)) {
-    Buffer << 'X';
-    Punycode::encodePunycodeUTF8(str, punycodeBuf);
-    str = punycodeBuf;
+  if (UsePunycode) {
+    // If the identifier contains non-ASCII character, we mangle 
+    // with an initial X and Punycode the identifier string.
+    if (isNonAscii(str)) {
+      Buffer << 'X';
+      std::string punycodeBuf;
+      Punycode::encodePunycodeUTF8(str, punycodeBuf);
+      str = punycodeBuf;
+    }
   }
-  
+
   // Mangle normal identifiers as
   //   count identifier-char+
   // where the count is the number of characters in the identifier,

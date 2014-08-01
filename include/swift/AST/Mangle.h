@@ -46,6 +46,8 @@ class Mangler {
   DeclContext *DeclCtx = nullptr;
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
+  /// If enabled, non-ASCII names are encoded in modified Punycode.
+  bool UsePunycode;
 
 public:
   enum BindGenerics : unsigned {
@@ -79,8 +81,10 @@ public:
 
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.
-  Mangler(raw_ostream &buffer, bool DWARFMangling = false)
-    : Buffer(buffer), DWARFMangling(DWARFMangling) {}
+  /// \param usePunycode - emit modified Punycode instead of UTF-8.
+  Mangler(raw_ostream &buffer, bool DWARFMangling = false, 
+          bool usePunycode = true)
+    : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(ValueDecl *decl, BindGenerics shouldBind);
   void mangleContext(DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(Module *module);
