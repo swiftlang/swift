@@ -274,8 +274,8 @@ final class _NSOpaqueString : NSString {
 //
 
 extension String {
-  init(_cocoaString: NSString) {
-    if let wrapped = (_cocoaString as AnyObject) as? _NSContiguousString {
+  public init(_ cocoaString: NSString) {
+    if let wrapped = (cocoaString as AnyObject) as? _NSContiguousString {
       self._core = wrapped._core
       return
     }
@@ -283,7 +283,7 @@ extension String {
     // Treat it as a CF object because presumably that's what these
     // things tend to be, and CF has a fast path that avoids
     // objc_msgSend
-    let cfValue = unsafeBitCast(_cocoaString, CFString.self)
+    let cfValue = unsafeBitCast(cocoaString, CFString.self)
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
@@ -333,7 +333,7 @@ extension String : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(x: NSString) -> String {
-    return String(_cocoaString: unsafeBitCast(x, NSString.self))
+    return String(unsafeBitCast(x, NSString.self))
   }
   
   public static func _conditionallyBridgeFromObjectiveC(
