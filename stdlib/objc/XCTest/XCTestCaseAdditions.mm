@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <XCTest/XCTest.h>
+#import "XCTestCaseAdditions.h"
 #include "swift/Runtime/Metadata.h"
 
 // NOTE: This is a temporary workaround.
@@ -39,3 +40,38 @@
 }
 
 @end
+
+
+// Since Swift doesn't natively support exceptions, but Objective-C code can
+// still throw them, use a helper to evaluate a block that may result in an
+// exception being thrown that passes back the most important information about
+// it.
+//
+// If no exception is thrown by the block, returns an empty dictionary.
+
+NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
+{
+    NSDictionary *result;
+    
+    @try {
+        block();
+        result = @{};
+    }
+    
+    @catch (NSException *exception) {
+        result = @{
+                   @"type": @"objc",
+                   @"className": NSStringFromClass(exception.class),
+                   @"name": exception.name,
+                   @"reason": exception.reason,
+                   };
+    }
+    
+    @catch (...) {
+        result = @{
+                   @"type": @"unknown",
+                   };
+    }
+    
+    return result;
+}
