@@ -1083,8 +1083,14 @@ public:
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory.  We access this with the project_existential instruction, or
     // just pass in the address since archetypes are address-only.
-    auto baseVal = gen.emitRValueAsSingleValue(e->getBase(),
-                                               SGFContext::AllowPlusZero);
+    //
+    // FIXME: This is hideous. We should be letting emitRawApply figure this
+    // out.
+    SGFContext allowPlusZero = SGFContext::AllowPlusZero;
+    if (cast<ProtocolDecl>(fd->getDeclContext())->requiresClass())
+      allowPlusZero = SGFContext();
+    
+    auto baseVal = gen.emitRValueAsSingleValue(e->getBase(), allowPlusZero);
 
     auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
     auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
