@@ -6,6 +6,7 @@ add_swift_library(swiftBasic
   DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
+  JSONSerialization.cpp
   LangOptions.cpp
   Platform.cpp
   PrettyStackTrace.cpp
