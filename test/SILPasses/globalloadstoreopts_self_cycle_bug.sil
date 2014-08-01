@@ -1,7 +1,7 @@
+// Verifies that we can correctly handle self cycles in control flow.
 // RUN: %sil-opt %s -global-load-store-opts -verify | FileCheck %s
 // Make sure we can move load of end out of loop even though we have store of start inside loop.
 // RUN: %sil-opt %s -licm -verify | FileCheck %s --check-prefix=LICM
-// Verifies that we can correctly handle self cycles in control flow.
 
 import Builtin
 import Swift
@@ -53,11 +53,11 @@ bb0:
   %17 = apply %14(%15, %16) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   cond_br %17, bb3, bb1
 
+// CHECK: {{bb[0-9]+}}(%{{[0-9]+}} : $Builtin.Word, [[Phi1:%[0-9]+]] : $Int, [[Phi2:%[0-9]+]] : $Int):
 // LICM: [[ID1:bb[0-9]+]](
 bb2(%20 : $Builtin.Word):
-  // We should not forward the value in bb0 directly to the load since we store
-  // to the address inside the loop.
-  // CHECK: load
+  // We forward the BBArgument to the load.
+  // CHECK: struct_extract [[Phi1]]
   // LICM: load
   %21 = load %12 : $*Builtin.Word
   %22 = integer_literal $Builtin.Word, 1
@@ -71,7 +71,7 @@ bb2(%20 : $Builtin.Word):
   %29 = struct $Int (%26 : $Builtin.Word)
   store %29 to %8 : $*Int
   %31 = struct_element_addr %0 : $*Int, #Int.value
-  // CHECK: load
+  // CHECK: struct_extract [[Phi2]]
   // LICM: load
   %32 = load %31 : $*Builtin.Word
   %33 = apply %23(%32, %21, %24) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
