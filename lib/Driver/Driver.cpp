@@ -619,6 +619,12 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
+    if (OI.LinkAction == LinkKind::DynamicLibrary &&
+        !llvm::sys::path::extension(A->getValue()).empty() &&
+        StringRef(OI.ModuleName).startswith("lib")) {
+      // Chop off a "lib" prefix if we're building a library.
+      OI.ModuleName.erase(0, strlen("lib"));
+    }
   } else if (Inputs.size() == 1) {
     OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
   }
@@ -1022,6 +1028,15 @@ static StringRef getOutputFilename(const JobAction *JA,
   if (JA->getType() == types::TY_Image) {
     if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
       BaseName = llvm::sys::path::stem(BaseInput);
+    if (auto link = dyn_cast<LinkJobAction>(JA)) {
+      if (link->getKind() == LinkKind::DynamicLibrary) {
+        // FIXME: This should be platform-specific.
+        Buffer = "lib";
+        Buffer.append(BaseName);
+        Buffer.append(".dylib");
+        return Buffer.str();
+      }
+    }
     return BaseName;
   }
 
