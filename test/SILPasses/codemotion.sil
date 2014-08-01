@@ -290,7 +290,7 @@ bb0(%0 : $FakeOptional):
   %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
   cond_br %100, bb1, bb2
 
-bb1(%2 : $Builtin.Int32):
+bb1:
   br bb3
 
 bb2:
