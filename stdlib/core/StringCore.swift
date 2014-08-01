@@ -197,7 +197,7 @@ public struct _StringCore {
   }
 
   /// are we using an NSString for storage?
-  var hasCocoaBuffer: Bool {
+  public var hasCocoaBuffer: Bool {
     return Word((_countAndFlags << 1).value) < 0
   }
 

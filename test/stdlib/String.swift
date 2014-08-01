@@ -93,8 +93,11 @@ StringTests.test("hasPrefix") {
   expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
 }
 
-func getIdentity(s: String) -> UWord {
-  return unsafeBitCast(s._core._owner, UWord.self)
+
+extension String {
+  var bufferID: UWord {
+    return unsafeBitCast(_core._owner, UWord.self)
+  }
 }
 
 StringTests.test("appendToSubstring") {
@@ -106,16 +109,16 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(count: initialSize, repeatedValue: UnicodeScalar("x"))
-        let originalIdentity = getIdentity(s0)
+        let originalIdentity = s0.bufferID
         s0 = s0[
           advance(s0.startIndex, sliceStart)..<advance(s0.startIndex, sliceEnd)]
-        expectEqual(originalIdentity, getIdentity(s0))
+        expectEqual(originalIdentity, s0.bufferID)
         s0 += "x"
         // For a small string size, the allocator could round up the allocation
         // and we could get some unused capacity in the buffer.  In that case,
         // the identity would not change.
         if sliceEnd != initialSize {
-          expectNotEqual(originalIdentity, getIdentity(s0))
+          expectNotEqual(originalIdentity, s0.bufferID)
         }
         expectEqual(
           String(
@@ -150,23 +153,25 @@ StringTests.test("appendToSubstringBug") {
     // We will be overflowing s0 with s1.
     var s0 = String(count: size, repeatedValue: UnicodeScalar("x"))
     let s1 = String(count: prefixSize, repeatedValue: UnicodeScalar("x"))
-    let originalIdentity = getIdentity(s0)
+    let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
     s0 = s0[advance(s0.startIndex, prefixSize)..<s0.endIndex]
 
     // Slicing should not reallocate.
-    expectEqual(originalIdentity, getIdentity(s0))
+    expectEqual(originalIdentity, s0.bufferID)
 
     // Overflow.
     s0 += s1
 
     // We should correctly determine that the storage is too small and
     // reallocate.
-    expectNotEqual(originalIdentity, getIdentity(s0))
+    expectNotEqual(originalIdentity, s0.bufferID)
 
     expectEqual(
-      String(count: suffixSize + prefixSize, repeatedValue: UnicodeScalar("x")), s0)
+      String(
+        count: suffixSize + prefixSize,
+        repeatedValue: UnicodeScalar("x")), s0)
   }
 }
 
@@ -214,18 +219,13 @@ StringTests.test("stringCoreExtensibility") {
   }
 }
 
-extension _StringCore {
-  var bufferID: Word {
-    return unsafeBitCast(_owner, Word.self)
-  }
-}
-
 StringTests.test("stringCoreReserve") {
   for k in 0...5 {
     var base: String
     var startedNative: Bool
     let shared: String = "X"
-    
+
+    println("k: \(k)")
     switch k {
     case 0: (base, startedNative) = (String(), true)
     case 1: (base, startedNative) = (asciiString("x"), true)
@@ -236,31 +236,39 @@ StringTests.test("stringCoreReserve") {
     default:
       fatalError("case unhandled!")
     }
-/*
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
-    let originalBuffer = base._core.bufferID
-    let startedUnique = _isUniquelyReferenced(&base._core._owner)
+    var originalBuffer = base.bufferID
+    println("originalBuffer = \(String(originalBuffer, radix: 16))")
+    let startedUnique = startedNative && _isUniquelyReferenced(&originalBuffer)
     
+    println(".0")
     base._core.reserveCapacity(0)
     // Now it's unique
+    println(".1")
     
     // If it was already native and unique, no reallocation
     if startedUnique && startedNative {
-      expectEqual(originalBuffer, base._core.bufferID)
+      expectEqual(originalBuffer, base.bufferID)
     }
     else {
-      expectNotEqual(originalBuffer, base._core.bufferID)
+      expectNotEqual(originalBuffer, base.bufferID)
     }
+    println(".2")
 
     // Reserving up to the capacity in a unique native buffer is a no-op
-    let nativeBuffer = base._core.bufferID
-    base._core.reserveCapacity(base._core.capacity)
-    expectEqual(nativeBuffer, base._core.bufferID)
+    let nativeBuffer = base.bufferID
+    let currentCapacity = base._core.nativeBuffer!.capacity
+    println(".3")
+    base._core.reserveCapacity(currentCapacity)
+    println(".4")
+    expectEqual(nativeBuffer, base.bufferID)
 
     // Reserving more capacity should reallocate
-    base._core.reserveCapacity(base._core.capacity + 1)
-    expectNotEqual(nativeBuffer, base._core.bufferID)
+    println(".5")
+    base._core.reserveCapacity(currentCapacity + 1)
+    println(".6")
+    expectNotEqual(nativeBuffer, base.bufferID)
 
     // None of this should change the string contents
     var expected: String
@@ -272,8 +280,8 @@ StringTests.test("stringCoreReserve") {
     default:
       fatalError("case unhandled!")
     }
+    println(".7")
     expectEqual(expected, base)
-    */
   }
 }
 
