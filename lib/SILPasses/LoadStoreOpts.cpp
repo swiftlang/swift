@@ -43,14 +43,8 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 /// insts and return the last such inst.
 static SILValue
 findExtractPathFromAddressValueToLoad(SILValue Address, SILValue StoredValue,
-                                      SILInstruction *Inst, SILValue InstOp) {
-  // Attempt to find the projection path from Address -> Load->getOperand().
-  llvm::SmallVector<Projection, 4> ProjectionPath;
-
-  // If we failed to find the path, return an empty value early.
-  if (!findAddressProjectionPathBetweenValues(Address, InstOp, ProjectionPath))
-    return SILValue();
-
+                          SILInstruction *Inst, SILValue InstOp,
+                          llvm::SmallVectorImpl<Projection> &ProjectionPath) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (ProjectionPath.empty())
@@ -111,6 +105,17 @@ static bool isLSForwardingInertInstruction(SILInstruction *Inst) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+enum ForwardingKind {
+  Normal,
+  UncheckedAddress
+};
+
+struct ForwardingFeasibility {
+  ForwardingKind Kind;
+  UncheckedAddrCastInst *UADCI;
+  llvm::SmallVector<Projection, 4> ProjectionPath;
+};
 
 /// State of the load store forwarder in one basic block.
 class LSBBForwarder {
@@ -299,13 +304,12 @@ bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
 }
 
 /// Given an unchecked_addr_cast with various address projections using it,
-/// rewrite the forwarding stored value to a bitcast + the relevant extract
-/// operations.
-static SILValue
-tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
-                                              SILValue StoredValue,
-                                              LoadInst *LI,
-                                              UncheckedAddrCastInst *UADCI) {
+/// check if we can forward the stored value.
+static bool
+canForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
+                                            LoadInst *LI,
+                                            UncheckedAddrCastInst *UADCI,
+                                            ForwardingFeasibility &Result) {
   assert(LI->getOperand().stripAddressProjections() == UADCI &&
          "We assume that the UADCI is the load's address stripped of "
          "address projections.");
@@ -315,7 +319,7 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
 
   // Make sure that this is equal to our address. If not, bail.
   if (UADCIOp != Address)
-    return SILValue();
+    return false;
 
   // Construct the relevant bitcast.
   SILModule &Mod = UADCI->getModule();
@@ -327,12 +331,50 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
 
   // If either are generic, bail.
   if (InputTy.hasArchetype() || OutputTy.hasArchetype())
-    return SILValue();
+    return false;
 
   // If we have a trivial input and a non-trivial output bail.
   if (InputIsTrivial && !OutputIsTrivial) {
-    return SILValue();
+    return false;
   }
+
+  Result.Kind = UncheckedAddress;
+  Result.UADCI = UADCI;
+  // Attempt to find the projection path from UADCI -> Load->getOperand().
+  // If we failed to find the path, return false.
+  return findAddressProjectionPathBetweenValues(UADCI, LI->getOperand(),
+                                                Result.ProjectionPath);
+}
+
+static bool canForwardAddressValueToLoad(SILValue Address, LoadInst *LI,
+                                         ForwardingFeasibility &Result) {
+  // First if we have a store + unchecked_addr_cast + load, try to forward the
+  // value the store using a bitcast.
+  SILValue LIOpWithoutProjs = LI->getOperand().stripAddressProjections();
+  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LIOpWithoutProjs))
+    return canForwardAddressValueToUncheckedAddrToLoad(Address, LI, UADCI,
+                                                       Result);
+
+  Result.Kind = Normal;
+  // Attempt to find the projection path from Address -> Load->getOperand().
+  // If we failed to find the path, return an empty value early.
+  return findAddressProjectionPathBetweenValues(Address, LI->getOperand(),
+                                                Result.ProjectionPath);
+}
+
+/// Given an unchecked_addr_cast with various address projections using it,
+/// rewrite the forwarding stored value to a bitcast + the relevant extract
+/// operations.
+static SILValue
+forwardAddressValueToUncheckedAddrToLoad(SILValue Address,
+                                    SILValue StoredValue,
+                                    LoadInst *LI,
+                                    UncheckedAddrCastInst *UADCI,
+                                    llvm::SmallVectorImpl<Projection> &Path) {
+  // Construct the relevant bitcast.
+  SILModule &Mod = UADCI->getModule();
+  SILType OutputTy = UADCI->getType();
+  bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
   SILBuilder B(LI);
   SILValue CastValue;
@@ -351,12 +393,9 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
   // Then try to construct an extract path from the UADCI to the Address.
   SILValue ExtractPath =
     findExtractPathFromAddressValueToLoad(UADCI, CastValue,
-                                          LI, LI->getOperand());
+                                          LI, LI->getOperand(), Path);
 
-  // If we can not construct the extract path, bail.
-  if (!ExtractPath)
-    return SILValue();
-
+  assert(ExtractPath && "Already checked the feasibility.");
   assert(ExtractPath.getType() == LI->getType().getObjectType() &&
          "Must have same types here.");
 
@@ -369,17 +408,23 @@ tryToForwardAddressValueToUncheckedAddrToLoad(SILValue Address,
 static SILValue tryToForwardAddressValueToLoad(SILValue Address,
                                                SILValue StoredValue,
                                                LoadInst *LI) {
+  ForwardingFeasibility CheckResult;
+  if (!canForwardAddressValueToLoad(Address, LI, CheckResult))
+    return SILValue();
+
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
-  SILValue LIOpWithoutProjs = LI->getOperand().stripAddressProjections();
-  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LIOpWithoutProjs))
-    return tryToForwardAddressValueToUncheckedAddrToLoad(Address, StoredValue,
-                                                         LI, UADCI);
+  if (CheckResult.Kind == UncheckedAddress)
+    return forwardAddressValueToUncheckedAddrToLoad(Address, StoredValue,
+                                                    LI, CheckResult.UADCI,
+                                                    CheckResult.ProjectionPath);
 
+  assert(CheckResult.Kind == Normal && "The default kind is Normal.");
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
   return findExtractPathFromAddressValueToLoad(Address, StoredValue, LI,
-                                               LI->getOperand());
+                                               LI->getOperand(),
+                                               CheckResult.ProjectionPath);
 }
 
 bool LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
