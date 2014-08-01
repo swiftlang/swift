@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -393,6 +394,44 @@ StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(*CurrentResults.Allocator, Str);
 }
 
+bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
+  // Avoid trying to generate a USR for some declaration types.
+  if (isa<AbstractTypeParamDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
+    return false;
+  if (isa<ParamDecl>(VD))
+    return false;
+  if (VD->hasClangNode() && !VD->getClangDecl())
+    return false;
+
+  return true;
+}
+
+ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
+                                       const Decl* D) {
+  llvm::SmallVector<unsigned, 4> USREndOffsets;
+  llvm::SmallString<128> SS;
+  auto *VD = dyn_cast<ValueDecl>(D);
+  while (VD && shouldCopyAssociatedUSRForDecl(VD)) {
+    {
+      llvm::raw_svector_ostream OS(SS);
+      printDeclUSR(VD, OS);
+    }
+    USREndOffsets.push_back(SS.size());
+    VD = VD->getOverriddenDecl();
+  }
+  if (SS.empty())
+    return ArrayRef<StringRef>();
+
+  StringRef USRString = copyString(Allocator, SS);
+  llvm::SmallVector<StringRef, 4> USRs;
+  unsigned Start = 0;
+  for (unsigned End : USREndOffsets) {
+    USRs.push_back(USRString.slice(Start, End));
+    Start = End;
+  }
+  return ArrayRef<StringRef>(USRs).copy(Allocator);
+}
+
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   void *CCSMem = Sink.Allocator
       ->Allocate(sizeof(CodeCompletionString) +
@@ -417,7 +456,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl,
         /*NotRecommended=*/false,
-        copyString(*Sink.Allocator, BriefComment));
+        copyString(*Sink.Allocator, BriefComment),
+        copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl));
   }
 
   case CodeCompletionResult::ResultKind::Keyword:

@@ -370,6 +370,7 @@ public:
 private:
   CodeCompletionString *const CompletionString;
   StringRef BriefDocComment;
+  ArrayRef<StringRef> AssociatedUSRs;
 
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
@@ -387,13 +388,15 @@ private:
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl,
                        bool NotRecommended,
-                       StringRef BriefDocComment)
+                       StringRef BriefDocComment,
+                       ArrayRef<StringRef> AssociatedUSRs)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
         NotRecommended(NotRecommended),
         NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment) {
+        BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
@@ -425,6 +428,10 @@ public:
 
   StringRef getBriefDocComment() const {
     return BriefDocComment;
+  }
+
+  ArrayRef<StringRef> getAssociatedUSRs() const {
+    return AssociatedUSRs;
   }
 
   /// Print a debug representation of the code completion result to \p OS.
