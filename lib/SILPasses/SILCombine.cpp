@@ -1134,7 +1134,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
       // Erase all of the reference counting instructions and the Apply itself.
       for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-        return eraseInstFromFunction(**rit);
+        eraseInstFromFunction(**rit);
     }
 
     // We found a user that we can't handle.
@@ -1211,7 +1211,7 @@ SILInstruction *SILCombiner::visitAllocArrayInst(AllocArrayInst *AAI) {
     // Erase all of the reference counting instructions and the array
     // allocation instruction.
     for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-      return eraseInstFromFunction(**rit);
+      eraseInstFromFunction(**rit);
   }
 
   return nullptr;
