@@ -173,8 +173,8 @@ public:
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
 
-  /// LoadedModules - The set of modules we have loaded.
-  llvm::StringMap<Module*> LoadedModules;
+  /// The set of top-level modules we have loaded.
+  llvm::DenseMap<Identifier, Module*> LoadedModules;
 
   /// The builtin module.
   Module * const TheBuiltinModule;

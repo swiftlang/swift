@@ -201,7 +201,7 @@ void CompilerInstance::performSema() {
   const SourceFileKind Kind = Invocation.getInputKind();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   MainModule = Module::create(ID, *Context);
-  Context->LoadedModules[ID.str()] = MainModule;
+  Context->LoadedModules[ID] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
 
@@ -399,7 +399,7 @@ void CompilerInstance::performParseOnly() {
   const SourceFileKind Kind = Invocation.getInputKind();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   MainModule = Module::create(ID, *Context);
-  Context->LoadedModules[ID.str()] = MainModule;
+  Context->LoadedModules[ID] = MainModule;
 
   assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
   assert(BufferIDs.size() == 1 && "only supports parsing a single file");

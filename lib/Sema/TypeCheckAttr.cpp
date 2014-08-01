@@ -867,7 +867,7 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
   SmallVector<ValueDecl*, 4> results;
   UIKit->lookupValue({}, C.getIdentifier("UIApplicationMain"),
                      NLKind::QualifiedLookup, results);
-  auto Foundation = TC.Context.LoadedModules.lookup("Foundation");
+  auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
   Foundation->lookupValue({}, C.getIdentifier("NSStringFromClass"),
                           NLKind::QualifiedLookup, results);
   for (auto D : results)

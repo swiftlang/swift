@@ -1026,7 +1026,7 @@ Module *ASTContext::getLoadedModule(
 }
 
 Module *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return LoadedModules.lookup(ModuleName.str());
+  return LoadedModules.lookup(ModuleName);
 }
 
 Module *

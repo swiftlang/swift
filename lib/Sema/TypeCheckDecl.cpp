@@ -2827,14 +2827,15 @@ public:
     TC.HasCheckedBridgeFunctions = true;
     
     #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
-    if (Module *module = TC.Context.LoadedModules.lookup(#BRIDGED_MOD)) {\
+    Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
+    if (Module *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
       checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
       "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
       "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
     }
     #include "swift/SIL/BridgedTypes.def"
     
-    if (Module *module = TC.Context.LoadedModules.lookup("Foundation")) {
+    if (Module *module = TC.Context.getLoadedModule(ID_Foundation)) {
       checkObjCBridgingFunctions(module, "NSArray",
                                  "_convertNSArrayToArray",
                                  "_convertArrayToNSArray");

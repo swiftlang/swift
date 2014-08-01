@@ -157,8 +157,8 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
     topLevelModule = M;
   } else {
     // If we imported a submodule, import the top-level module as well.
-    StringRef topLevelName = ID->getModulePath().front().first.str();
-    topLevelModule = Context.LoadedModules[topLevelName];
+    Identifier topLevelName = ID->getModulePath().front().first;
+    topLevelModule = Context.getLoadedModule(topLevelName);
     assert(topLevelModule && "top-level module missing");
     imports.push_back({
       { ID->getDeclPath(), topLevelModule },

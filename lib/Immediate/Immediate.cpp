@@ -280,7 +280,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   // FIXME: And re-doing SILGen, SIL-linking, SIL diagnostics, and IRGen is
   // expensive, because it's not properly being limited to new things right now.
   for (auto &entry : CI.getASTContext().LoadedModules) {
-    swift::Module *import = entry.getValue();
+    swift::Module *import = entry.second;
     if (!ImportedModules.insert(import))
       continue;
 

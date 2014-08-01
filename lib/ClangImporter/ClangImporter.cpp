@@ -647,7 +647,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
   } else {
-    Module *&loaded = SwiftContext.LoadedModules[result->Name.str()];
+    Module *&loaded = SwiftContext.LoadedModules[result->Name];
     if (!loaded)
       loaded = result;
   }
@@ -2427,7 +2427,7 @@ Module *ClangModuleUnit::getAdapterModule() const {
     if (adapter == M) {
       adapter = nullptr;
     } else {
-      auto &sharedModuleRef = Ctx.LoadedModules[M->Name.str()];
+      auto &sharedModuleRef = Ctx.LoadedModules[M->Name];
       assert(!sharedModuleRef || sharedModuleRef == adapter ||
              sharedModuleRef == M);
       sharedModuleRef = adapter;

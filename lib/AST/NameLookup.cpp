@@ -622,7 +622,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
     forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
-      if (import.second == desired) {
+      if (import.second == desiredModule) {
         Results.push_back(Result::getModuleName(import.second));
         return false;
       }
@@ -634,12 +634,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 Optional<UnqualifiedLookup>
 UnqualifiedLookup::forModuleAndName(ASTContext &C,
                                     StringRef Mod, StringRef Name) {
-  auto foundModule = C.LoadedModules.find(Mod);
-  if (foundModule == C.LoadedModules.end())
-    return Nothing;
-
-  Module *m = foundModule->second;
-  return UnqualifiedLookup(C.getIdentifier(Name), m, nullptr);
+  if (Module *m = C.getLoadedModule(C.getIdentifier(Mod)))
+    return UnqualifiedLookup(C.getIdentifier(Name), m, nullptr);
+  return Nothing;
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {

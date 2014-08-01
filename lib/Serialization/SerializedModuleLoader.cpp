@@ -311,7 +311,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   assert(moduleInputBuffer);
 
   auto M = Module::create(moduleID.first, Ctx);
-  Ctx.LoadedModules[moduleID.first.str()] = M;
+  Ctx.LoadedModules[moduleID.first] = M;
 
   (void)loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
                 std::move(moduleDocInputBuffer), isFramework);

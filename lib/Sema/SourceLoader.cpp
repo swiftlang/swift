@@ -106,7 +106,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
   auto *importMod = Module::create(moduleID.first, Ctx);
-  Ctx.LoadedModules[moduleID.first.str()] = importMod;
+  Ctx.LoadedModules[moduleID.first] = importMod;
 
   auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
   if (!Ctx.getStdlibModule())
