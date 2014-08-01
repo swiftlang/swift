@@ -2874,7 +2874,7 @@ For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
 is guaranteed to have no side effects; the enum value will not be invalidated.
 
 enum_is_tag
-````
+```````````
 ::
 
   sil-instruction ::= 'enum_is_tag' sil-type, sil-operand ',' sil-decl-ref
