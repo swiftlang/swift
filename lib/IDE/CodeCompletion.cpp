@@ -35,6 +35,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
+#include "clang/Index/USRGeneration.h"
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -385,6 +386,13 @@ static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
   return StringRef(Mem, Str.size());
 }
 
+static ArrayRef<StringRef> copyStringArray(llvm::BumpPtrAllocator &Allocator,
+                                           ArrayRef<StringRef> Arr) {
+  StringRef *Buff = Allocator.Allocate<StringRef>(Arr.size());
+  std::copy(Arr.begin(), Arr.end(), Buff);
+  return llvm::makeArrayRef(Buff, Arr.size());
+}
+
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
   addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
@@ -406,30 +414,38 @@ bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   return true;
 }
 
-ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
-                                       const Decl* D) {
-  llvm::SmallVector<unsigned, 4> USREndOffsets;
-  llvm::SmallString<128> SS;
-  auto *VD = dyn_cast<ValueDecl>(D);
-  while (VD && shouldCopyAssociatedUSRForDecl(VD)) {
-    {
-      llvm::raw_svector_ostream OS(SS);
-      printDeclUSR(VD, OS);
-    }
-    USREndOffsets.push_back(SS.size());
-    VD = VD->getOverriddenDecl();
+template <typename FnTy>
+static void walkValueDeclAndOverriddenDecls(const Decl *D, const FnTy &Fn) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    Fn(VD);
+    walkOverriddenDecls(VD, Fn);
   }
-  if (SS.empty())
-    return ArrayRef<StringRef>();
+}
 
-  StringRef USRString = copyString(Allocator, SS);
+ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
+                                       const Decl *D) {
   llvm::SmallVector<StringRef, 4> USRs;
-  unsigned Start = 0;
-  for (unsigned End : USREndOffsets) {
-    USRs.push_back(USRString.slice(Start, End));
-    Start = End;
-  }
-  return ArrayRef<StringRef>(USRs).copy(Allocator);
+  walkValueDeclAndOverriddenDecls(D, [&](llvm::PointerUnion<const ValueDecl*,
+                                                  const clang::NamedDecl*> OD) {
+    llvm::SmallString<128> SS;
+    bool Ignored = true;
+    if (auto *OVD = OD.dyn_cast<const ValueDecl*>()) {
+      if (shouldCopyAssociatedUSRForDecl(OVD)) {
+        llvm::raw_svector_ostream OS(SS);
+        Ignored = printDeclUSR(OVD, OS);
+      }
+    } else if (auto *OND = OD.dyn_cast<const clang::NamedDecl*>()) {
+      Ignored = clang::index::generateUSRForDecl(OND, SS);
+    }
+    
+    if (!Ignored)
+      USRs.push_back(copyString(Allocator, SS));
+  });
+
+  if (!USRs.empty())
+    return copyStringArray(Allocator, USRs);
+
+  return ArrayRef<StringRef>();
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
