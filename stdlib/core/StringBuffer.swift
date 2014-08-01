@@ -166,13 +166,12 @@ public struct _StringBuffer {
   ///   tries to extend.
   /// :param: newUsedCount the desired size of the substring.
   mutating func grow(
-    #oldUsedStart: UnsafeMutablePointer<RawByte>,
-    oldUsedEnd: UnsafeMutablePointer<RawByte>, var newUsedCount: Int) -> Bool {
-
+    subRange: Range<UnsafePointer<RawByte>>, var newUsedCount: Int
+  ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount += (oldUsedStart - start) >> elementShift
+    newUsedCount += (subRange.startIndex - UnsafePointer(start)) >> elementShift
 
     if _slowPath(newUsedCount > capacity) {
       return false
@@ -188,7 +187,7 @@ public struct _StringBuffer {
     // FIXME: this function is currently NOT THREADSAFE.  The test +
     // assignment below should be replaced by a CAS
     // <rdar://problem/17855614> _StringBuffer.grow() is racy
-    if usedEnd == oldUsedEnd {
+    if usedEnd == subRange.endIndex {
       usedEnd = newUsedEnd
       return true
     }

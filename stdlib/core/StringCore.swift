@@ -336,9 +336,9 @@ public struct _StringCore {
       let usedEnd = _pointerToNth(count)
 
       // Attempt to claim unused capacity in the buffer
-      if _fastPath(buffer.grow(
-          oldUsedStart: UnsafeMutablePointer(usedStart),
-          oldUsedEnd: UnsafeMutablePointer(usedEnd),
+      if _fastPath(
+        buffer.grow(
+          UnsafePointer(usedStart)..<UnsafePointer(usedEnd),
           newUsedCount: newSize)
       ) {
         count = newSize
