@@ -271,7 +271,7 @@ bb3:
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: enum_is_tag
 // CHECK-NEXT: cond_br
-// CHECK: bb1({{.*}}):
+// CHECK: bb1:
 // CHECK-NEXT: unchecked_enum_data
 // CHECK-NEXT: retain_value
 // CHECK: bb2:
