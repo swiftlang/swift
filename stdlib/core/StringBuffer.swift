@@ -54,6 +54,7 @@ public struct _StringBuffer {
 
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
+    _sanityCheck(initialSize <= capacity)
     let elementShift = elementWidth - 1
 
     // We need at least 1 extra byte if we're storing 8-bit elements,
@@ -154,6 +155,21 @@ public struct _StringBuffer {
     return elementShift + 1
   }
 
+  // Return true iff we have the given capacity for the indicated
+  // substring.  This is what we need to do so that users can call
+  // reserveCapacity on String and subsequently use that capacity, in
+  // two separate phases.  Operations with one-phase growth should use
+  // "grow()," below.  
+  func hasCapacity(
+    cap: Int, forSubRange r: Range<UnsafePointer<RawByte>>
+  ) -> Bool {
+    // The substring to be grown could be pointing in the middle of this
+    // _StringBuffer.  
+    let offset = (r.startIndex - UnsafePointer(start)) >> elementShift
+    return cap + offset <= capacity
+  }
+
+  
   /// Attempt to claim unused capacity in the buffer.
   ///
   /// Operation succeeds if there is sufficient capacity, and either:

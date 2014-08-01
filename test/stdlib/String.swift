@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 import StdlibUnittest
+import Foundation
 
 var StringTests = TestCase("StringTests")
 
@@ -169,7 +170,15 @@ StringTests.test("appendToSubstringBug") {
   }
 }
 
-import Foundation
+func asciiString<
+  S: SequenceType where S.Generator.Element == Character
+>(content: S) -> String {
+  var s = String()
+  s.extend(content)
+  expectEqual(1, s._core.elementWidth)
+  return s
+}
+
 StringTests.test("stringCoreExtensibility") {
   let ascii = UTF16.CodeUnit("X".value)
   let nonAscii = UTF16.CodeUnit("é".value)
@@ -179,7 +188,7 @@ StringTests.test("stringCoreExtensibility") {
       for boundary in 0..<length {
         
         var x = (
-            k == 0 ? String() + ("b" as Character)
+            k == 0 ? asciiString("b")
           : k == 1 ? String("b" as NSString)
           : String("b" as NSMutableString)
         )._core
@@ -202,6 +211,69 @@ StringTests.test("stringCoreExtensibility") {
         )
       }
     }
+  }
+}
+
+extension _StringCore {
+  var bufferID: Word {
+    return unsafeBitCast(_owner, Word.self)
+  }
+}
+
+StringTests.test("stringCoreReserve") {
+  for k in 0...5 {
+    var base: String
+    var startedNative: Bool
+    let shared: String = "X"
+    
+    switch k {
+    case 0: (base, startedNative) = (String(), true)
+    case 1: (base, startedNative) = (asciiString("x"), true)
+    case 2: (base, startedNative) = ("Ξ", true)
+    case 3: (base, startedNative) = ("x" as NSString as String, false)
+    case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
+    case 5: (base, startedNative) = (shared, true)
+    default:
+      fatalError("case unhandled!")
+    }
+/*
+    expectEqual(!base._core.hasCocoaBuffer, startedNative)
+    
+    let originalBuffer = base._core.bufferID
+    let startedUnique = _isUniquelyReferenced(&base._core._owner)
+    
+    base._core.reserveCapacity(0)
+    // Now it's unique
+    
+    // If it was already native and unique, no reallocation
+    if startedUnique && startedNative {
+      expectEqual(originalBuffer, base._core.bufferID)
+    }
+    else {
+      expectNotEqual(originalBuffer, base._core.bufferID)
+    }
+
+    // Reserving up to the capacity in a unique native buffer is a no-op
+    let nativeBuffer = base._core.bufferID
+    base._core.reserveCapacity(base._core.capacity)
+    expectEqual(nativeBuffer, base._core.bufferID)
+
+    // Reserving more capacity should reallocate
+    base._core.reserveCapacity(base._core.capacity + 1)
+    expectNotEqual(nativeBuffer, base._core.bufferID)
+
+    // None of this should change the string contents
+    var expected: String
+    switch k {
+    case 0: expected = ""
+    case 1,3,4: expected = "x"
+    case 2: expected = "Ξ"
+    case 5: expected = shared
+    default:
+      fatalError("case unhandled!")
+    }
+    expectEqual(expected, base)
+    */
   }
 }
 

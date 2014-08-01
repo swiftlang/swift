@@ -363,10 +363,30 @@ public struct _StringCore {
     let (newCapacity, existingStorage)
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
 
-    if _fastPath(!existingStorage._isNull) {
+    if _fastPath(existingStorage != nil) {
       return existingStorage
     }
+    
+    let oldCount = count
+    
+    _copyInPlace(
+      newSize: newSize,
+      newCapacity: newCapacity,
+      minElementWidth: minElementWidth)
+    
+    return _pointerToNth(oldCount)
+  }
 
+  /// Replace the storage of self with a native _StringBuffer having a
+  /// capacity of at least newCapacity elements of at least the given
+  /// width.  Effectively appends garbage to the String until it has
+  /// newSize UTF-16 code units.
+  mutating func _copyInPlace(
+    #newSize: Int, newCapacity: Int, minElementWidth: Int
+  ) {
+    _sanityCheck(newCapacity >= newSize)
+    var oldCount = count
+    
     // Allocate storage.
     let newElementWidth =
       minElementWidth >= elementWidth
@@ -376,7 +396,6 @@ public struct _StringCore {
     var newStorage = _StringBuffer(capacity: newCapacity, initialSize: newSize,
                                    elementWidth: newElementWidth)
 
-    var oldCount = count
     if hasContiguousStorage {
       _StringCore._copyElements(
         _baseAddress, srcElementWidth: elementWidth,
@@ -394,7 +413,6 @@ public struct _StringCore {
     }
     
     self = _StringCore(newStorage)
-    return _pointerToNth(oldCount)
   }
 
   mutating func append(c: UnicodeScalar) {
@@ -491,12 +509,20 @@ extension _StringCore : CollectionType {
 extension _StringCore : Sliceable {}
 
 extension _StringCore : ExtensibleCollectionType {
+  
   public mutating func reserveCapacity(n: Int) {
-    let oldCount = self.count
-    if n > oldCount {
-      _growBuffer(n, minElementWidth: 1)
-      self.count = oldCount
+    if _fastPath(!hasCocoaBuffer) {
+      if _fastPath(_isUniquelyReferenced(&_owner)) {
+        
+        let subRange: Range<UnsafePointer<RawByte>>
+          = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
+
+        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: subRange)) {
+          return
+        }
+      }
     }
+    _copyInPlace(newSize: count, newCapacity: max(count, n), minElementWidth: 1)
   }
 
   public mutating func extend<
