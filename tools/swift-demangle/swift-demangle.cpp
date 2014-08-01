@@ -50,7 +50,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     name = name.substr(1);
   swift::Demangle::NodePointer pointer =
       swift::demangle_wrappers::demangleSymbolAsNode(name);
-  if (ExpandMode) {
+  if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
   }
