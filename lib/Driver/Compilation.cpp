@@ -16,10 +16,14 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Driver/Action.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/Tool.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
@@ -93,6 +97,12 @@ int Compilation::performJobsInList(const JobList &JL,
   // This will mark the Command as both scheduled and finished, which meets the
   // definitions of Commands which should be in those sets.
   auto handleCommandWhichDoesNotNeedToExecute = [&] (const Command *Cmd) {
+    if (Level == OutputLevel::Parseable) {
+      // Provide output indicating this command was skipped if parseable output
+      // was requested.
+      parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+    }
+
     ScheduledCommands.insert(Cmd);
     FinishedCommands.insert(Cmd);
   };
@@ -133,11 +143,8 @@ int Compilation::performJobsInList(const JobList &JL,
     // For verbose output, print out each command as it begins execution.
     if (Level == OutputLevel::Verbose)
       BeganCmd->printCommandLine(llvm::errs());
-    else if (Level == OutputLevel::Parseable) {
-      // TODO: emit real parseable output.
-      llvm::errs() << "Command: ";
-      BeganCmd->printCommandLine(llvm::errs());
-    }
+    else if (Level == OutputLevel::Parseable)
+      parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
   };
 
   // Set up a callback which will be called immediately after a task has
@@ -147,12 +154,18 @@ int Compilation::performJobsInList(const JobList &JL,
   // to run.
   auto taskFinished = [&] (ProcessId Pid, int ReturnCode, StringRef Output,
                            void *Context) -> TaskFinishedResponse {
-    // First, send the buffered output to stderr, though only if we support
-    // getting buffered output.
-    if (TaskQueue::supportsBufferingOutput())
-      llvm::errs() << Output;
-
     const Command *FinishedCmd = (const Command *)Context;
+
+    if (Level == OutputLevel::Parseable) {
+      // Parseable output was requested.
+      parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
+                                            ReturnCode, Output);
+    } else {
+      // Otherwise, send the buffered output to stderr, though only if we
+      // support getting buffered output.
+      if (TaskQueue::supportsBufferingOutput())
+        llvm::errs() << Output;
+    }
 
     if (ReturnCode != 0) {
       // The task failed, so return true without performing any further
@@ -196,18 +209,25 @@ int Compilation::performJobsInList(const JobList &JL,
 
   auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
                             void *Context) -> TaskFinishedResponse {
-    // First, send the buffered output to stderr, though only if we support
-    // getting buffered output.
-    if (TaskQueue::supportsBufferingOutput())
-      llvm::errs() << Output;
+    const Command *SignalledCmd = (const Command *)Context;
+
+    if (Level == OutputLevel::Parseable) {
+      // Parseable output was requested.
+      parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd, Pid,
+                                             ErrorMsg, Output);
+    } else {
+      // Otherwise, send the buffered output to stderr, though only if we
+      // support getting buffered output.
+      if (TaskQueue::supportsBufferingOutput())
+        llvm::errs() << Output;
+    }
 
     if (!ErrorMsg.empty())
       Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
                      ErrorMsg);
 
-    const Command *FailedCmd = (const Command *)Context;
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                   FailedCmd->getCreator().getNameForDiagnostics());
+                   SignalledCmd->getCreator().getNameForDiagnostics());
 
     // Since the task signalled, so unconditionally set result to -2.
     Result = -2;
