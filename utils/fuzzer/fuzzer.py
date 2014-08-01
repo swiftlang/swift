@@ -22,7 +22,10 @@ def getexpr():
 
    if (maybe() and inLoop): return "break"
    if (maybe() and inLoop): return "continue"
-   if (maybe()): return "swap(&" + getvarvalue(True)  +",&" + getvarvalue(True) + ")"
+   var1 = getvarvalue(True)
+   var2 = var1
+   while (var1 == var2): var2 = getvarvalue(True)
+   if (maybe()): return "swap(&" + var1  +",&" + var2 + ")"
 
    if (maybe()):
      ptObj = getptvar()
@@ -60,7 +63,7 @@ def getrangeexpr():
   if (maybe()): return "switch d {\n case .Up: \n" + getexpr() + "\n\n case .Down: \n" + getexpr() + "\n\n}\n"
   if (maybe()): return "switch b {\n case let .Str(ss): \n" + " k += ss " + "\n\n case let .Num(ii): \n" + " y2 = ii\n" + "\n case .None:\n" + getexpr() + "\n}\n"
 
-  nextOperator = ".." if maybe() else "..."
+  nextOperator = "..<" if maybe() else "..."
   oldInLoop = inLoop
   inLoop = True
   loopStr = "for i in 0" + nextOperator + getvarvalue(True) + " {\n" + getexpr() + "\n}\n"
@@ -81,7 +84,7 @@ var k : String = "hi"
   return sb + "}\n"
 
 
-decl = random.choice(["struct ","@final class ", "class "])
+decl = random.choice(["struct ","final class ", "class "])
 print decl + """ Point { init(_ x : Int, _ y : Int) {\nX=x\nY=y\n}\nvar X : Int\nvar Y: Int}
 enum Barcode {\ncase Str(String)\ncase Num(Int)\ncase None}
 enum Direction {\ncase Up\ncase Down\n}
