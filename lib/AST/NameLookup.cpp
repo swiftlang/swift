@@ -608,20 +608,27 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (!Results.empty())
     return;
 
+  if (!Name.isSimpleName())
+    return;
+
   // Look for a module with the given name.
   if (Name.isSimpleName(M.Name)) {
     Results.push_back(Result::getModuleName(&M));
     return;
   }
 
-  forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
-    if (Name.isSimpleName(import.second->Name)) {
-      Results.push_back(Result::getModuleName(import.second));
-      return false;
-    }
-    return true;
-  });
-
+  Module *desiredModule = Ctx.getLoadedModule(Name.getBaseName());
+  if (!desiredModule && Name == Ctx.TheBuiltinModule->Name)
+    desiredModule = Ctx.TheBuiltinModule;
+  if (desiredModule) {
+    forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
+      if (import.second == desired) {
+        Results.push_back(Result::getModuleName(import.second));
+        return false;
+      }
+      return true;
+    });
+  }
 }
 
 Optional<UnqualifiedLookup>

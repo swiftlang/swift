@@ -4,7 +4,7 @@
 // RUN: ls -lR %t/clang-module-cache | FileCheck %s
 // CHECK: ctypes{{.*}}.pcm
 
-// RUN: %swift %clang-importer-sdk -emit-module-path %t/submodules.swiftmodule -module-cache-path %t/clang-module-cache %s
+// RUN: %swift %clang-importer-sdk -emit-module-path %t/submodules.swiftmodule -module-cache-path %t/clang-module-cache %s -DNO_ERRORS
 // RUN: echo 'import submodules; println("\(x), \(y)")' | %swift %clang-importer-sdk -parse - -I %t
 // RUN: echo 'import submodules; println("\(x), \(y)")' | not %swift -parse - -I %t 2>&1 | FileCheck -check-prefix=MISSING %s
 
@@ -23,3 +23,8 @@ public var y : CInt = x
 
 let _: ctypes.DWORD = ctypes.MY_INT
 let _: ctypes.Color? = nil
+
+// Error: "bits" should not be a valid name in this scope.
+#if !NO_ERRORS
+let _: bits.DWORD = 0 // expected-error {{use of undeclared type 'bits'}}
+#endif

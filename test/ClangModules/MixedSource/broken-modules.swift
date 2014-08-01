@@ -37,4 +37,4 @@ import BrokenClangModule
 
 
 let _ = BrokenClangModule.x
-// CHECK: broken-modules.swift:[[@LINE-1]]:9: error: module 'BrokenClangModule' has no member named 'x'
+// CHECK: broken-modules.swift:[[@LINE-1]]:9: error: use of unresolved identifier 'BrokenClangModule'
