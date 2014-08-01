@@ -35,7 +35,7 @@
 ///
 /// - memory is allocated and value is initialized.
 public struct ${Self}<T>
-  : BidirectionalIndexType, Comparable, Hashable,
+  : RandomAccessIndexType, Hashable,
     NilLiteralConvertible, _PointerType {
 
   /// The underlying raw (untyped) pointer.
@@ -319,6 +319,12 @@ public struct ${Self}<T>
   }
   public func predecessor() -> ${Self} {
     return self - 1
+  }
+  public func distanceTo(x: ${Self}) -> Int {
+    return x - self
+  }
+  public func advancedBy(n: Int) -> ${Self} {
+    return self + n
   }
 }
 
