@@ -2,14 +2,7 @@ set(SHARED_LIBRARY ON)
 set(DISABLE_APPLICATION_EXTENSION ON)
 set(SWIFTXCTEST_SOURCES
     XCTestCaseAdditions.mm
-    XCTestCaseAdditions.h
     XCTest.swift
-)
-
-# There is some SPI implemented in ObjC for this overlay; import its headers.
-
-list(APPEND SWIFT_EXTRA_FLAGS
-  "-import-objc-header" "${CMAKE_CURRENT_SOURCE_DIR}/XCTestCaseAdditions.h"
 )
 
 # XCTest.framework is provided by Xcode in the platforms, though that's recent

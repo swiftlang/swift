@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #import <XCTest/XCTest.h>
-#import "XCTestCaseAdditions.h"
 #include "swift/Runtime/Metadata.h"
 
 // NOTE: This is a temporary workaround.
@@ -48,8 +47,15 @@
 // it.
 //
 // If no exception is thrown by the block, returns an empty dictionary.
+//
+// Note that this function needs Swift calling conventions, hence the use of
+// NS_RETURNS_RETAINED and Block_release. (The argument should also be marked
+// NS_RELEASES_ARGUMENT, but clang doesn't realize that a block parameter
+// should be treated as an Objective-C parameter here.)
 
-NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
+XCT_EXPORT NS_RETURNS_RETAINED NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
+
+NS_RETURNS_RETAINED NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
 {
     NSDictionary *result;
     
@@ -73,5 +79,6 @@ NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
                    };
     }
     
-    return result;
+    Block_release(block);
+    return [result retain];
 }
