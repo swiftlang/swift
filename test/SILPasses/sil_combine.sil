@@ -1636,3 +1636,29 @@ sil_vtable ZZZ {
   #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ
 }
 
+//CHECK-LABEL: remove_int_array
+//CHECK: b0
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+sil private @remove_int_array : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1           // users: %1, %10
+  %1 = struct $Int (%0 : $Builtin.Word)           // user: %9
+  %2 = integer_literal $Builtin.Word, 2           // users: %3, %12
+  %3 = struct $Int (%2 : $Builtin.Word)           // user: %11
+  %4 = integer_literal $Builtin.Word, 3           // users: %5, %14
+  %5 = struct $Int (%4 : $Builtin.Word)           // user: %13
+  %6 = integer_literal $Builtin.Word, 4           // users: %7, %8#0
+  %7 = struct $Int (%6 : $Builtin.Word)           // user: %15
+  %8 = alloc_array $Int, %6 : $Builtin.Word       // users: %9, %10, %12, %14, %16
+  store %1 to %8#1 : $*Int                        // id: %9
+  %10 = index_addr %8#1 : $*Int, %0 : $Builtin.Word // user: %11
+  store %3 to %10 : $*Int                         // id: %11
+  %12 = index_addr %8#1 : $*Int, %2 : $Builtin.Word // user: %13
+  store %5 to %12 : $*Int                         // id: %13
+  %14 = index_addr %8#1 : $*Int, %4 : $Builtin.Word // user: %15
+  store %7 to %14 : $*Int                         // id: %15
+  strong_release %8#0 : $Builtin.NativeObject     // id: %16
+  %17 = tuple ()                                  // user: %18
+  return %17 : $()                                // id: %18
+}

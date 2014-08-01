@@ -1,7 +1,7 @@
 // RUN: %swift %s -O -emit-sil | FileCheck %s
 
 //CHECK-LABEL: @_TF17unused_containers16empty_array_testFT_T_
-//CHECK: strong_release
+//CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 func empty_array_test() {
@@ -9,7 +9,7 @@ func empty_array_test() {
 }
 
 //CHECK-LABEL: @_TF17unused_containers14empty_dic_testFT_T_
-//CHECK: strong_release
+//CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 func empty_dic_test() {
@@ -22,4 +22,12 @@ func empty_dic_test() {
 //CHECK-NEXT: return
 func unused_string_test() {
   let unused : String = ""
+}
+
+//CHECK-LABEL: array_of_strings_test
+//CHECK: bb0:
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+func array_of_strings_test() {
+  let x = [""]
 }

@@ -345,6 +345,7 @@ public:
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitAllocArrayInst(AllocArrayInst *AAI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -1076,6 +1077,28 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
   return true;
 }
 
+/// \brief Returns a list of instructions that only write into
+// / the the array \p Inst.
+static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
+                                               SILInstruction *Inst) {
+  Uses.push_back(Inst);
+  for (auto Inst : Inst->getUses()) {
+    if (isa<RefCountingInst>(Inst->getUser()) ||
+        isa<StoreInst>(Inst->getUser())       ||
+        isa<DebugValueInst>(Inst->getUser())) {
+      Uses.push_back(Inst->getUser());
+      continue;
+    }
+    if (auto SI = dyn_cast<IndexAddrInst>(Inst->getUser()))
+      if (recursivelyCollectArrayWritesInstr(Uses, SI))
+        continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -1099,7 +1122,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
   if (FRI && FRI->getReferencedFunction()->hasSemanticsString("readonly")) {
     UserListTy Users;
-
     if (recursivelyCollectARCUsers(Users, AI)) {
       // When deleting Apply instructions make sure to release any owned
       // arguments.
@@ -1112,7 +1134,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
       // Erase all of the reference counting instructions and the Apply itself.
       for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-        eraseInstFromFunction(**rit);
+        return eraseInstFromFunction(**rit);
     }
 
     // We found a user that we can't handle.
@@ -1177,6 +1199,19 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                             m_ValueBase(), m_IntegerLiteralInst()))) {
     AI->swapOperands(1, 2);
     return AI;
+  }
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitAllocArrayInst(AllocArrayInst *AAI) {
+  UserListTy Users;
+  // If the array alloc is only written into then it can be removed.
+  if (recursivelyCollectArrayWritesInstr(Users, AAI)) {
+    // Erase all of the reference counting instructions and the array
+    // allocation instruction.
+    for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+      return eraseInstFromFunction(**rit);
   }
 
   return nullptr;
