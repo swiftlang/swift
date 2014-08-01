@@ -21,6 +21,11 @@ module CoreCooling {
   export *
 }
 
+module ctypes_bits_exported {
+  header "ctypes_bits_exported.h"
+  export *
+}
+
 module ExternIntX { header "x.h" }
 
 module HasSubmodule {

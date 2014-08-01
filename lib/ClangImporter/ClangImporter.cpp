@@ -2165,8 +2165,21 @@ void ClangModuleUnit::getImportedModules(
     auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
 
     auto actualMod = wrapper->getAdapterModule();
-    if (!actualMod || actualMod == topLevelAdapter)
+    if (!actualMod) {
+      // HACK: Deal with imports of submodules by importing the top-level module
+      // as well.
+      auto importTopLevel = importMod->getTopLevelModule();
+      if (importTopLevel != importMod &&
+          importTopLevel != clangModule->getTopLevelModule()) {
+        auto topLevelWrapper = owner.Impl.getWrapperForModule(owner,
+                                                              importTopLevel);
+        imports.push_back({ Module::AccessPathTy(),
+                            topLevelWrapper->getParentModule() });
+      }
       actualMod = wrapper->getParentModule();
+    } else if (actualMod == topLevelAdapter) {
+      actualMod = wrapper->getParentModule();
+    }
 
     assert(actualMod && "Missing imported adapter module");
     imports.push_back({Module::AccessPathTy(), actualMod});
