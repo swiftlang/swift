@@ -5002,6 +5002,10 @@ public:
     } else if (auto overridingASD = dyn_cast<AbstractStorageDecl>(override)) {
       auto *baseASD = cast<AbstractStorageDecl>(base);
       overridingASD->setOverriddenDecl(baseASD);
+
+      // Make sure we get consistent overrides for the accessors as well.
+      if (!baseASD->hasAccessorFunctions())
+        addAccessorsToStoredVar(cast<VarDecl>(baseASD), TC);
       
       // If there is a getter and/or setter, set their overrides as well.  This
       // is not done for observing accessors, since they are never dynamicly
