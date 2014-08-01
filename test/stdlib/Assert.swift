@@ -33,7 +33,8 @@
 // RUN: %target-run %t/Assert_Release Release Assert 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
 // RUN: %target-run %t/Assert_Release Release AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
 // RUN: %target-run %t/Assert_Release Release AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// RUN: %target-run %t/Assert_Release Release AssertionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
+// Skip because the optimizer assumes that the code path is unreachable.
+// SKIP:            %t/Assert_Release Release AssertionFailure
 //
 // RUN: %target-run %t/Assert_Release Release Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 // RUN: %target-run %t/Assert_Release Release PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
@@ -48,7 +49,8 @@
 //
 // RUN: %target-run %t/Assert_Release Release StdlibDebugPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
 // RUN: %target-run %t/Assert_Release Release StdlibDebugPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// RUN: %target-run %t/Assert_Release Release StdlibDebugPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
+// Skip because the optimizer assumes that the code path is unreachable.
+// SKIP:            %t/Assert_Release Release StdlibDebugPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
 //
 // RUN: %target-run %t/Assert_Release Release StdlibSanityCheck 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Release Release StdlibSanityCheckBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
@@ -65,7 +67,7 @@
 
 // CHECK_NO_MESSAGE: OK
 // CHECK_NO_MESSAGE-NOT: this should fail
-// CHECK_NO_MESSAGE: CRASHED: SIG{{ILL|TRAP|ABRT|SEGV}}
+// CHECK_NO_MESSAGE: CRASHED: SIG{{ILL|TRAP|ABRT}}
 
 // CHECK_NO_TRAP: did not trap
 
