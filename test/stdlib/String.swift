@@ -225,7 +225,6 @@ StringTests.test("stringCoreReserve") {
     var startedNative: Bool
     let shared: String = "X"
 
-    println("k: \(k)")
     switch k {
     case 0: (base, startedNative) = (String(), true)
     case 1: (base, startedNative) = (asciiString("x"), true)
@@ -239,13 +238,10 @@ StringTests.test("stringCoreReserve") {
     expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
     var originalBuffer = base.bufferID
-    println("originalBuffer = \(String(originalBuffer, radix: 16))")
     let startedUnique = startedNative && _isUniquelyReferenced(&originalBuffer)
     
-    println(".0")
     base._core.reserveCapacity(0)
     // Now it's unique
-    println(".1")
     
     // If it was already native and unique, no reallocation
     if startedUnique && startedNative {
@@ -254,20 +250,15 @@ StringTests.test("stringCoreReserve") {
     else {
       expectNotEqual(originalBuffer, base.bufferID)
     }
-    println(".2")
 
     // Reserving up to the capacity in a unique native buffer is a no-op
     let nativeBuffer = base.bufferID
     let currentCapacity = base._core.nativeBuffer!.capacity
-    println(".3")
     base._core.reserveCapacity(currentCapacity)
-    println(".4")
     expectEqual(nativeBuffer, base.bufferID)
 
     // Reserving more capacity should reallocate
-    println(".5")
     base._core.reserveCapacity(currentCapacity + 1)
-    println(".6")
     expectNotEqual(nativeBuffer, base.bufferID)
 
     // None of this should change the string contents
@@ -280,7 +271,6 @@ StringTests.test("stringCoreReserve") {
     default:
       fatalError("case unhandled!")
     }
-    println(".7")
     expectEqual(expected, base)
   }
 }
