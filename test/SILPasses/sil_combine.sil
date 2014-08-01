@@ -1602,3 +1602,37 @@ bb0:
 // CHECK: return [[ZERO]]
   return %3 : $Builtin.Int1
 }
+
+
+class ZZZ {
+  @objc deinit 
+  init()
+}
+
+sil @_TFC4main3ZZZd : $@cc(method) @thin (@owned ZZZ) -> @owned Builtin.NativeObject
+sil @_TFC4main3ZZZD : $@cc(method) @thin (@owned ZZZ) -> ()
+sil @_TFC4main3ZZZcfMS0_FT_S0_ : $@cc(method) @thin (@owned ZZZ) -> @owned ZZZ
+sil @_TFC4main3ZZZCfMS0_FT_S0_ : $@thin (@thick ZZZ.Type) -> @owned ZZZ
+
+//CHECK-LABLE: test_delete_readonly_function
+//CHECK-NOT: apply 
+//CHECK: strong_release %0
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+sil @test_delete_readonly_function : $@thin (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  debug_value %0 : $ZZZ  // let x                 // id: %1
+  %2 = function_ref @_TF4main3barFCS_3ZZZT_ : $@thin (@owned ZZZ) -> () // user: %4
+  strong_retain %0 : $ZZZ                         // id: %3
+  %4 = apply %2(%0) : $@thin (@owned ZZZ) -> ()
+  strong_release %0 : $ZZZ                        // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+sil [semantics "readonly"] @_TF4main3barFCS_3ZZZT_ : $@thin (@owned ZZZ) -> ()
+
+sil_vtable ZZZ {
+  #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ
+}
+

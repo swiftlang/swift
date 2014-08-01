@@ -1101,6 +1101,15 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     UserListTy Users;
 
     if (recursivelyCollectARCUsers(Users, AI)) {
+      // When deleting Apply instructions make sure to release any owned
+      // arguments.
+      auto FT = FRI->getFunctionType();
+      for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
+        SILParameterInfo PI = FT->getParameters()[i];
+        if (PI.isConsumed())
+          Builder->emitReleaseValueOperation(AI->getLoc(), AI->getArgument(i));
+      }
+
       // Erase all of the reference counting instructions and the Apply itself.
       for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
         eraseInstFromFunction(**rit);
