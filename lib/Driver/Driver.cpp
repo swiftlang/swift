@@ -764,14 +764,18 @@ void Driver::buildActions(const ToolChain &TC,
   }
   case OutputInfo::Mode::SingleCompile:
   case OutputInfo::Mode::Immediate: {
-    std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
-    for (const InputPair &Input : Inputs) {
-      types::ID InputType = Input.first;
-      const Arg *InputArg = Input.second;
+    if (!Inputs.empty()) {
+      // Create a single CompileJobAction for all of the driver's inputs.
+      // Don't create a CompileJobAction if there are no inputs, though.
+      std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
+      for (const InputPair &Input : Inputs) {
+        types::ID InputType = Input.first;
+        const Arg *InputArg = Input.second;
 
-      CA->addInput(new InputAction(*InputArg, InputType));
+        CA->addInput(new InputAction(*InputArg, InputType));
+      }
+      CompileActions.push_back(CA.release());
     }
-    CompileActions.push_back(CA.release());
     break;
   }
   case OutputInfo::Mode::REPL: {
