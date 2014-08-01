@@ -1094,7 +1094,8 @@ public:
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-        return !baseClass || !printer.shouldInclude(baseClass);
+        return !baseClass || !printer.shouldInclude(baseClass) ||
+               baseClass->isForeign();
       }
       return true;
     });

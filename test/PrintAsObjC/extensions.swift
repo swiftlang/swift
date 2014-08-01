@@ -48,6 +48,11 @@ extension A3 {
   var more: Int { return 10 }
 }
 
+// NEGATIVE-NOT: CGColor
+extension CGColor {
+  func anyOldMethod() {}
+}
+
 // NEGATIVE-NOT: NotObjC
 class NotObjC {}
 extension NotObjC {}
@@ -71,3 +76,4 @@ extension NSString {
 
   class func fromColor(color: NSColor) -> NSString? { return nil; }
 }
+
