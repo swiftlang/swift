@@ -31,3 +31,12 @@ func unused_string_test() {
 func array_of_strings_test() {
   let x = [""]
 }
+
+//CHECK-LABEL: string_escape
+//CHECK: bb0:
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+func string_escape() {
+  "\(2)"
+}
+

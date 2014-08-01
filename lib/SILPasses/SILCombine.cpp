@@ -1128,8 +1128,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       auto FT = FRI->getFunctionType();
       for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
         SILParameterInfo PI = FT->getParameters()[i];
-        if (PI.isConsumed())
-          Builder->emitReleaseValueOperation(AI->getLoc(), AI->getArgument(i));
+        auto Arg = AI->getArgument(i);
+        if (PI.isConsumed() && !Arg.getType().isAddress())
+          Builder->emitReleaseValueOperation(AI->getLoc(), Arg);
       }
 
       // Erase all of the reference counting instructions and the Apply itself.
