@@ -234,6 +234,35 @@ bb3:
   return %9999 : $()
 }
 
+// Note, this is the same as test9, but for enums
+// CHECK-LABEL: sil @test9_enums : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
+// CHECK: bb1:
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
+// CHECK-NEXT: strong_retain [[PAYLOAD]]
+// CHECK: bb2:
+// CHECK-NOT: retain
+// CHECK: bb3:
+// CHECK-NEXT: retain_value [[INPUT]]
+sil @test9_enums : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  cond_br %1, bb1, bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb2:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb3:
+  retain_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 ////////////////
 // Loop Tests //
 ////////////////

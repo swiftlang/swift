@@ -159,20 +159,15 @@ public:
   mergePredecessorStates(PreallocatedMap &BBToStateMap);
   bool
   moveReleasesUpCFGIfCasesCovered();
-  void handlePredSwitchEnum(TermInst *TI);
+  void handlePredSwitchEnum(SwitchEnumInst *S);
+  void handlePredCondEnumIsTag(CondBranchInst *CondBr);
 };
 
 } // end anonymous namespace
 
-void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
-  // Check if the predecessor BB ends in a switch_enum statement...
-  auto *S = dyn_cast<SwitchEnumInst>(TI);
+void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
 
-  // If it does not, we are done...
-  if (!S)
-    return;
-
-  // Otherwise, find the tag associated with our BB and set the state of the
+  // Find the tag associated with our BB and set the state of the
   // enum we switch on to that value. This is important so we can determine
   // covering switches for enums that have cases without payload.
 
@@ -204,6 +199,49 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(TermInst *TI) {
   }
   llvm_unreachable("A successor of a switch_enum terminated BB should be in "
                    "the switch_enum.");
+}
+
+void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
+
+  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
+  if (!EITI)
+    return;
+
+  // Find the tag associated with our BB and set the state of the
+  // enum we switch on to that value. This is important so we can determine
+  // covering switches for enums that have cases without payload.
+
+  // Check if we are the true case, ie, we know that we are the given tag.
+  const auto &Operand = EITI->getOperand();
+  if (CondBr->getTrueBB() == getBB()) {
+    ValueToCaseMap[Operand] = EITI->getElement();
+    return;
+  }
+
+  // If the enum only has 2 values and its tag isn't the true branch, then we
+  // know the true branch must be the other tag.
+  if (EnumDecl *E = Operand.getType().getEnumOrBoundGenericEnum()) {
+    // Look for a single other element on this enum.
+    EnumElementDecl *OtherElt = nullptr;
+    for (EnumElementDecl *Elt : E->getAllElements()) {
+      // Skip the case where we find the enum_is_tag element
+      if (Elt == EITI->getElement())
+        continue;
+      // If we find another element, then we must have more than 2, so bail.
+      if (OtherElt)
+        return;
+      OtherElt = Elt;
+    }
+    // Only a single enum element?  How would this even get here?  We should
+    // handle it in SILCombine.
+    if (!OtherElt)
+      return;
+    // FIXME: Can we ever not be the false BB here?
+    if (CondBr->getTrueBB() != getBB()) {
+      ValueToCaseMap[Operand] = OtherElt;
+      return;
+    }
+  }
 }
 
 void
@@ -247,6 +285,8 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
     TermInst *PredTerm = OtherBB->getTerminator();
     if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm))
       handlePredSwitchEnum(S);
+    else if (auto *CondBr = dyn_cast<CondBranchInst>(PredTerm))
+      handlePredCondEnumIsTag(CondBr);
 
     // There are no other predecessors to merge in. return.
     return;
