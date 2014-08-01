@@ -691,7 +691,7 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
         // Remove dead stores, merge duplicate loads, and forward stores to
         // loads. We also update lists of stores|loads to reflect the end
         // of the basic block.
-        ChangedDuringIteration = Forwarder.optimize(AA, PDI);
+        ChangedDuringIteration |= Forwarder.optimize(AA, PDI);
         Changed |= ChangedDuringIteration;
       }
     } while (ChangedDuringIteration);
