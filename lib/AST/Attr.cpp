@@ -68,13 +68,27 @@ bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
   }
 }
 
-const AvailabilityAttr *DeclAttributes::getUnavailable() const {
+const AvailabilityAttr *DeclAttributes::getUnavailable(
+                          const ASTContext &ctx) const {
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
-      // FIXME: Unify unavailabilty checking with that in MiscDiagnostics.cpp.
-      if (!AvAttr->hasPlatform())
-        if (AvAttr->IsUnvailable)
-          return AvAttr;
+      if (AvAttr->isInvalid())
+        continue;
+
+      // If this attribute doesn't apply to the active platform, we're done.
+      if (!AvAttr->isActivePlatform(ctx))
+        continue;
+
+      switch (AvAttr->getMinVersionAvailability(
+                ctx.LangOpts.MinPlatformVersion)) {
+      case MinVersionComparison::Available:
+      case MinVersionComparison::PotentiallyUnavailable:
+        break;
+
+      case MinVersionComparison::Obsoleted:
+      case MinVersionComparison::Unavailable:
+        return AvAttr;
+      }
     }
   return nullptr;
 }
@@ -380,7 +394,7 @@ AvailabilityAttr::platformFromString(StringRef Name) {
     .Default(Optional<AvailabilityAttr::PlatformKind>());
 }
 
-bool AvailabilityAttr::isActivePlatform(ASTContext &ctx) const {
+bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
   if (!hasPlatform())
     return true;
 
@@ -402,23 +416,29 @@ bool AvailabilityAttr::isActivePlatform(ASTContext &ctx) const {
   }
 }
 
+MinVersionComparison AvailabilityAttr::getMinVersionAvailability(
+                       clang::VersionTuple minVersion) const {
+  // Unconditionally unavailable.
+  if (IsUnvailable)
+    return MinVersionComparison::Unavailable;
+
+  // If this entity was obsoleted before or at the minimum platform version,
+  // consider it obsolete.
+  if (Obsoleted && *Obsoleted <= minVersion)
+    return MinVersionComparison::Obsoleted;
+
+  // If this entity was introduced after the minimum platform version, it's
+  // availability can only be determined dynamically.
+  if (Introduced && *Introduced > minVersion)
+    return MinVersionComparison::PotentiallyUnavailable;
+
+  // The entity is available.
+  return MinVersionComparison::Available;
+}
+
 const AvailabilityAttr *AvailabilityAttr::isUnavailable(const Decl *D) {
   ASTContext &ctx = D->getASTContext();
-  for (auto Attr : D->getAttrs()) {
-    if (Attr->isInvalid())
-      continue;
-    auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
-    if (!AvailAttr)
-      continue;
-    if (!AvailAttr->isActivePlatform(ctx))
-      continue;
-    if (AvailAttr->IsUnvailable)
-      return AvailAttr;
-    // FIXME: We should check the 'obsoleted' value here too, but the ASTContext
-    // doesn't give us a full deployment target.
-  }
-
-  return nullptr;
+  return D->getAttrs().getUnavailable(ctx);
 }
 
 

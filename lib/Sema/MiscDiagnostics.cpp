@@ -489,10 +489,27 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
         .highlight(SourceRange(Loc, Loc));
     }
 
-    auto DLoc = D->getLoc();
-    if (DLoc.isValid())
-      TC.diagnose(DLoc, diag::availability_marked_unavailable, Name)
-        .highlight(Attr->getRange());
+    switch (Attr->getMinVersionAvailability(
+              TC.Context.LangOpts.MinPlatformVersion)) {
+      case MinVersionComparison::Available:
+      case MinVersionComparison::PotentiallyUnavailable:
+        llvm_unreachable("These aren't considered unavailable");
+
+      case MinVersionComparison::Unavailable:
+        TC.diagnose(D, diag::availability_marked_unavailable, Name)
+          .highlight(Attr->getRange());
+        break;
+
+      case MinVersionComparison::Obsoleted: {
+        // FIXME: Use of the platformString here is non-awesome for application
+        // extensions.
+        TC.diagnose(D, diag::availability_obsoleted, Name,
+                    Attr->platformString(), *Attr->Obsoleted)
+          .highlight(Attr->getRange());
+        break;
+      }
+
+    }
   }
 }
 

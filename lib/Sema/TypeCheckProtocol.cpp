@@ -1385,7 +1385,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // Treat 'unavailable' implicitly as if it were 'optional'.
   // The compiler will reject actual uses.
   auto Attrs = requirement->getAttrs();
-  if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable()) {
+  if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable(TC.Context)) {
     return ResolveWitnessResult::Missing;
   }
 
@@ -1474,7 +1474,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
   // An optional requirement is trivially satisfied with an empty requirement.
   // An 'unavailable' requirement is treated like optional requirements.
   auto Attrs = requirement->getAttrs();
-  if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable()) {
+  if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable(TC.Context)) {
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
   }

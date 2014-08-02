@@ -554,6 +554,23 @@ public:
   }
 };
 
+/// Determine the result of comparing an availabilty attribute to a specific
+/// minimum platform version.
+enum class MinVersionComparison {
+  /// The entity is guaranteed to be available.
+  Available,
+
+  /// The entity is never available.
+  Unavailable,
+
+  /// The entity might be unavailable, because it was introduced after
+  /// the minimimum version.
+  PotentiallyUnavailable,
+
+  /// The entity has been obsoleted.
+  Obsoleted,
+};
+
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
@@ -630,7 +647,12 @@ public:
   }
 
   /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(ASTContext &ctx) const;
+  bool isActivePlatform(const ASTContext &ctx) const;
+
+  /// Compare this attribute's version information against the minimum platform
+  /// version (assuming the this attribute pertains to the active platform).
+  MinVersionComparison getMinVersionAvailability(
+                         clang::VersionTuple minVersion) const;
 
   /// Returns the PlatformKind for a given string.
   static Optional<PlatformKind> platformFromString(StringRef);
@@ -915,14 +937,13 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  // FIXME: eventually take a platform argument.
-  bool isUnavailable() const { return getUnavailable() != nullptr; }
+  bool isUnavailable(const ASTContext &ctx) const {
+    return getUnavailable(ctx) != nullptr;
+  }
 
   /// Returns the first @availability attribute that indicates
   /// a declaration is unavailable, or null otherwise.
-  //
-  // FIXME: eventually take a platform argument.
-  const AvailabilityAttr *getUnavailable() const;
+  const AvailabilityAttr *getUnavailable(const ASTContext &ctx) const;
 
   void dump() const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;

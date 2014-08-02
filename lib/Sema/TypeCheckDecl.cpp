@@ -4984,7 +4984,7 @@ public:
     }
 
     // FIXME: Possibly should extend to more availability checking.
-    if (base->getAttrs().isUnavailable()) {
+    if (base->getAttrs().isUnavailable(TC.Context)) {
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
 
@@ -6839,7 +6839,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   // Only protocols that are @objc can have "unavailable" methods.
-  if (auto AvAttr = Attrs.getUnavailable()) {
+  if (auto AvAttr = Attrs.getUnavailable(TC.Context)) {
     if (auto PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
       if (!PD->isObjC()) {
         TC.diagnose(AvAttr->getLocation(),

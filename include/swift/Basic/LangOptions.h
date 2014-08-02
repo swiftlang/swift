@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Basic/VersionTuple.h"
 #include <string>
 
 namespace swift {
@@ -81,7 +82,10 @@ namespace swift {
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
-    
+
+    /// The minimum platform version to which code will be deployed.
+    clang::VersionTuple MinPlatformVersion;
+
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)

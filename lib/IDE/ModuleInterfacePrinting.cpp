@@ -183,7 +183,7 @@ void swift::ide::printSubmoduleInterface(
   // buckets.
   for (Decl *D : Decls) {
     // If requested, skip unavailable declarations.
-    if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
+    if (Options.SkipUnavailable && D->getAttrs().isUnavailable(SwiftContext))
       continue;
 
     // Skip declarations that are not accessible.

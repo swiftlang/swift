@@ -25,6 +25,7 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -84,7 +85,8 @@ namespace swift {
     PatternKind,
     StaticSpellingKind,
     DescriptiveDeclKind,
-    DeclAttribute
+    DeclAttribute,
+    VersionTuple,
   };
 
   namespace diag {
@@ -109,6 +111,7 @@ namespace swift {
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
       const DeclAttribute *DeclAttributeVal;
+      clang::VersionTuple VersionVal;
     };
     
   public:
@@ -175,6 +178,10 @@ namespace swift {
     DiagnosticArgument(Accessibility kind)
       : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
 
+    DiagnosticArgument(clang::VersionTuple version)
+      : Kind(DiagnosticArgumentKind::VersionTuple),
+        VersionVal(version) { }
+
     DiagnosticArgumentKind getKind() const { return Kind; }
 
     StringRef getAsString() const {
@@ -230,6 +237,11 @@ namespace swift {
     const DeclAttribute *getAsDeclAttribute() const {
       assert(Kind == DiagnosticArgumentKind::DeclAttribute);
       return DeclAttributeVal;
+    }
+
+    clang::VersionTuple getAsVersionTuple() const {
+      assert(Kind == DiagnosticArgumentKind::VersionTuple);
+      return VersionVal;
     }
   };
   

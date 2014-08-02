@@ -87,6 +87,17 @@ static void updateTargetConfigurationOptions(LangOptions &LangOpts,
   default:
     llvm_unreachable("Unsupported target architecture");
   }
+
+  // Set the minimum platform version for deployment.
+  unsigned major, minor, revision;
+  if (triple.isMacOSX()) {
+    triple.getMacOSXVersion(major, minor, revision);
+  } else if (triple.isiOS()) {
+    triple.getiOSVersion(major, minor, revision);
+  } else {
+    llvm_unreachable("Unsupported target OS");
+  }
+  LangOpts.MinPlatformVersion = clang::VersionTuple(major, minor, revision);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {

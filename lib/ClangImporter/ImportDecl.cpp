@@ -2783,7 +2783,8 @@ namespace {
       // the same name.
       for (auto other : nominalOwner->lookupDirect(name)) {
         auto ctor = dyn_cast<ConstructorDecl>(other);
-        if (!ctor || ctor->isInvalid() || ctor->getAttrs().isUnavailable())
+        if (!ctor || ctor->isInvalid() ||
+            ctor->getAttrs().isUnavailable(Impl.SwiftContext))
           continue;
 
         // If the types don't match, this is a different constructor with

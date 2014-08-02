@@ -547,7 +547,8 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipImplicit && D->isImplicit())
     return false;
 
-  if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
+  if (Options.SkipUnavailable &&
+      D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
   // Skip declarations that are not accessible.

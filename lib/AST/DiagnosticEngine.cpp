@@ -275,6 +275,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
            "Improper modifier for DeclAttribute argument");
     Out << '\'' << Arg.getAsDeclAttribute()->getAttrName() << '\'';
     break;
+
+  case DiagnosticArgumentKind::VersionTuple:
+    assert(Modifier.empty() &&
+           "Improper modifier for VersionTuple argument");
+    Out << Arg.getAsVersionTuple().getAsString();
+    break;
   }
 }
 

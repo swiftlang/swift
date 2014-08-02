@@ -1602,6 +1602,10 @@ ERROR(availability_decl_unavailable_msg, sema_avail, none,
 NOTE(availability_marked_unavailable, sema_avail, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
 
+NOTE(availability_obsoleted, sema_avail, none,
+     "%0 was obsoleted in %1 version %2",
+    (DeclName, StringRef, clang::VersionTuple))
+
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -673,8 +673,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score2;
 
       // If one declaration is available and the other is not,
-      bool unavail1 = decl1->getAttrs().isUnavailable();
-      bool unavail2 = decl2->getAttrs().isUnavailable();
+      bool unavail1 = decl1->getAttrs().isUnavailable(cs.getASTContext());
+      bool unavail2 = decl2->getAttrs().isUnavailable(cs.getASTContext());
       if (unavail1 != unavail2) {
         if (unavail1)
           ++score2;

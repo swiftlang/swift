@@ -419,7 +419,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Always-unavailable imported constructors are factory methods
   // that have been imported as constructors and then hidden by an
   // imported init method.
-  if (decl->hasClangNode() && decl->getAttrs().isUnavailable())
+  if (decl->hasClangNode() &&
+      decl->getAttrs().isUnavailable(decl->getASTContext()))
     return;
 
   SILDeclRef constant(decl);

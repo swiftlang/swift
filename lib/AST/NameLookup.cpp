@@ -114,6 +114,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   // Determine the set of declarations that are shadowed by other declarations.
   llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
+  ASTContext &ctx = decls[0]->getASTContext();
   for (auto &collidingDecls : CollidingDeclGroups) {
     // If only one declaration has this signature, it isn't shadowed by
     // anything.
@@ -135,9 +136,9 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
          
         // If one declaration is available and the other is not, prefer the
         // available one.
-        if (firstDecl->getAttrs().isUnavailable() !=
-              secondDecl->getAttrs().isUnavailable()) {
-         if (firstDecl->getAttrs().isUnavailable()) {
+        if (firstDecl->getAttrs().isUnavailable(ctx) !=
+              secondDecl->getAttrs().isUnavailable(ctx)) {
+         if (firstDecl->getAttrs().isUnavailable(ctx)) {
            shadowed.insert(firstDecl);
            break;
          } else {
