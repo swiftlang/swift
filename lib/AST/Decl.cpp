@@ -370,6 +370,16 @@ bool Decl::isPrivateStdlibDecl() const {
   return false;
 }
 
+bool Decl::isWeakImported(Module *fromModule) const {
+  // For a Clang declaration, trust Clang.
+  if (auto clangDecl = getClangDecl()) {
+    return clangDecl->isWeakImported();
+  }
+
+  // FIXME: Implement using AvailabilityAttr::getMinVersionAvailability().
+  return false;
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericTypeParamDecl *> Params,
                                    SourceLoc WhereLoc,

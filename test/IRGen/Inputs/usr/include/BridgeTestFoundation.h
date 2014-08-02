@@ -42,3 +42,10 @@ typedef struct NSZone NSZone;
 @end
 
 typedef struct __CGImage *CGImageRef;
+
+__attribute__((availability(macosx,introduced=10.10)))
+@interface NSUserNotificationAction : NSObject
+@end
+
+extern int weak_variable __attribute__((weak_import));
+

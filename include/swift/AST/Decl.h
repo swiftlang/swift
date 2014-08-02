@@ -801,6 +801,9 @@ public:
 
   bool isPrivateStdlibDecl() const;
 
+  /// Whether this declaration is weak-imported.
+  bool isWeakImported(Module *fromModule) const;
+
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;

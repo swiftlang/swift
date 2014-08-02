@@ -185,7 +185,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return !isTypeKind(k) && !isProtocolConformanceKind(k);
+    return k <= Kind::Other;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ValueWitness;
@@ -415,6 +415,13 @@ public:
     return LINKENTITY_GET_FIELD(Data, IsIndirect);
   }
 
+  /// Determine whether this entity will be weak-imported.
+  bool isWeakImported(Module *module) const {
+    if (!isDeclKind(getKind()))
+      return false;
+
+    return getDecl()->isWeakImported(module);
+  }
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };

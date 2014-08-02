@@ -751,7 +751,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 static std::pair<llvm::GlobalValue::LinkageTypes,
                  llvm::GlobalValue::VisibilityTypes>
 getIRLinkage(IRGenModule &IGM,
-             SILLinkage linkage, ForDefinition_t isDefinition) {
+             SILLinkage linkage, ForDefinition_t isDefinition,
+             bool isWeakImported) {
   switch (linkage) {
 #define RESULT(LINKAGE, VISIBILITY)        \
     { llvm::GlobalValue::LINKAGE##Linkage, \
@@ -770,6 +771,9 @@ getIRLinkage(IRGenModule &IGM,
         return RESULT(LinkOnceODR, Default);
       return RESULT(AvailableExternally, Default);
     }
+
+    if (isWeakImported)
+      return RESULT(ExternalWeak, Default);
     return RESULT(External, Default);
   case SILLinkage::HiddenExternal:
     if (isDefinition) {
@@ -791,8 +795,10 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
                                        const LinkEntity &entity) {
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
-  auto linkage = getIRLinkage(IGM,
-                              entity.getLinkage(ForDefinition), ForDefinition);
+  auto linkage = getIRLinkage(
+                   IGM,
+                   entity.getLinkage(ForDefinition), ForDefinition,
+                   entity.isWeakImported(IGM.SILMod->getSwiftModule()));
   global->setLinkage(linkage.first);
   global->setVisibility(linkage.second);
 }
@@ -804,7 +810,8 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility) =
-    getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition);
+    getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition,
+                 entity.isWeakImported(IGM.SILMod->getSwiftModule()));
 
   return result;
 }
