@@ -417,6 +417,50 @@ bb3:
   return %5 : $FakeOptional
 }
 
+/// This version won't sink the ops because the enum_is_tag is in a different BB from
+/// the cond_br.
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_enum_is_tag_5 : $@thin (FakeOptional) -> () {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: enum_is_tag
+// CHECK: bb1:
+// CHECK-NEXT: function_ref blocker
+// CHECK-NEXT: function_ref @blocker
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: apply
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK-NEXT: retain_value
+// CHECK: bb3:
+// CHECK-NEXT: retain_value
+// CHECK: bb4:
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_enum_is_tag_5 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %100 = enum_is_tag $Builtin.Int1, %0 : $FakeOptional, #FakeOptional.Some!enumelt
+  br bb10
+
+bb10:
+  %1 = function_ref @blocker : $@thin () -> ()
+  retain_value %0 : $FakeOptional
+  apply %1() : $@thin () -> ()
+  %3 = alloc_stack $Builtin.Int32
+  retain_value %0 : $FakeOptional
+  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
+  cond_br %100, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = tuple()
+  return %4 : $()
+}
+
 // Sink the struct instruction
 // CHECK-LABEL: sil @sink_struct : $@thin (FakeOptional) -> Bool {
 // CHECK: bb0({{.*}}):

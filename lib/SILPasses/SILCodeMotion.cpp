@@ -448,6 +448,12 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   if (!EITI)
     return false;
 
+  // Its not clear whether its safe to do the
+  // valueHasARCDecrementsInInstructionRange analysis when the enum_is_tag is
+  // in another BB.  For now only do this when its the same BB as the cond_br.
+  if (EITI->getParent() != CondBr->getParent())
+    return false;
+
   // If the retain value's argument is not the switch's argument, we can't do
   // anything with our simplistic analysis... bail...
   if (Ptr != EITI->getOperand())
