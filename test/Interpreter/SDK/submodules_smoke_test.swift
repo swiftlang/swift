@@ -7,11 +7,7 @@ let _ = OpenAL.alGetError
 
 let _ = alcCreateContext // expected-error{{use of unresolved identifier 'alcCreateContext'}}
 
-#if os(iOS)
-import UIKit.UIGestureRecognizerSubclass
-let _: UIGestureRecognizer -> () -> Void = UIGestureRecognizer.reset
-
-#elseif os(OSX)
+#if os(OSX)
 import OpenGL.GL3
 let _ = glGetString
 let _ = OpenGL.glGetString
