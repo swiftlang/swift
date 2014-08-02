@@ -258,9 +258,6 @@ private:
   /// The active type checker, or null if there is no active type checker.
   LazyResolver *typeResolver = nullptr;
 
-  /// Translation API nullability from an API note into an optional kind.
-  static OptionalTypeKind translateNullability(api_notes::NullableKind kind);
-
 public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
@@ -280,6 +277,9 @@ public:
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
+  /// Translation API nullability from an API note into an optional kind.
+  static OptionalTypeKind translateNullability(api_notes::NullableKind kind);
+
   /// Retrieve the API notes readers that may contain information for the
   /// given Objective-C container.
   ///
@@ -292,10 +292,15 @@ public:
   std::tuple<StringRef, api_notes::APINotesReader*, api_notes::APINotesReader*>
   getAPINotesForContext(const clang::ObjCContainerDecl *container);
 
+  /// Retrieve the API notes reader that contains information for the
+  /// given declaration. Note, use getAPINotesForContext to get notes for ObjC
+  /// properties and methods.
+  api_notes::APINotesReader* getAPINotesForDecl(const clang::Decl *decl);
+
   /// Retrieve any information known a priori about the given Objective-C
   /// method, if we have it.
-  Optional<api_notes::ObjCMethodInfo> getKnownObjCMethod(
-                                        const clang::ObjCMethodDecl *method);
+  Optional<api_notes::ObjCMethodInfo>
+  getKnownObjCMethod(const clang::ObjCMethodDecl *method);
 
   /// For ObjC property accessor, if the property is known, lookup
   /// the property info and merge it in.
@@ -311,6 +316,14 @@ public:
   /// property.
   Optional<api_notes::ObjCPropertyInfo>
   getKnownObjCProperty(const clang::ObjCPropertyDecl *property);
+
+  /// Retrieve any information known a priori about the given global variable.
+  Optional<api_notes::GlobalVariableInfo>
+  getKnownGlobalVariable(const clang::VarDecl *global);
+
+  /// Retrieve any information known a priori about the given global function.
+  Optional<api_notes::GlobalFunctionInfo>
+  getKnownGlobalFunction(const clang::FunctionDecl *function);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 
@@ -827,7 +840,7 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importFunctionType(const clang::Decl *clangDecl,
+  Type importFunctionType(const clang::FunctionDecl *clangDecl,
                           clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,

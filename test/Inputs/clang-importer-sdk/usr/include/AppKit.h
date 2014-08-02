@@ -117,3 +117,6 @@
 @property (weak) id target;
 @property SEL action;
 @end
+
+extern NSString *NSViewFrameDidChangeNotification;
+extern NSString *NSViewFocusDidChangeNotification;

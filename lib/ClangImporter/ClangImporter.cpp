@@ -1350,17 +1350,20 @@ OptionalTypeKind ClangImporter::Implementation::translateNullability(
   }
 }
 
+api_notes::APINotesReader*
+ClangImporter::Implementation::getAPINotesForDecl(const clang::Decl *decl) {
+  if (auto module = getClangSubmoduleForDecl(decl))
+    if (*module)
+      return getAPINotesForModule((*module)->getTopLevelModule());
+  return nullptr;
+}
+
 std::tuple<StringRef, api_notes::APINotesReader *, api_notes::APINotesReader *>
 ClangImporter::Implementation::getAPINotesForContext(
     const clang::ObjCContainerDecl *container) {
   // Find the primary set of API notes, in the module where this container
   // was declared.
-  api_notes::APINotesReader *primary = nullptr;
-  if (auto primaryModule = getClangSubmoduleForDecl(container)) {
-    if (*primaryModule) {
-      primary = getAPINotesForModule((*primaryModule)->getTopLevelModule());
-    }
-  }
+  api_notes::APINotesReader *primary = getAPINotesForDecl(container);
 
   StringRef name;
 
@@ -1369,12 +1372,7 @@ ClangImporter::Implementation::getAPINotesForContext(
   api_notes::APINotesReader *secondary = nullptr;
   if (auto category = dyn_cast<clang::ObjCCategoryDecl>(container)) {
     auto *objcClass = category->getClassInterface();
-    if (auto secondaryModule = getClangSubmoduleForDecl(objcClass)) {
-      if (*secondaryModule) {
-        secondary = getAPINotesForModule(
-                                     (*secondaryModule)->getTopLevelModule());
-      }
-    }
+    secondary = getAPINotesForDecl(objcClass);
 
     // For categories, use the name of the class itself.
     name = objcClass->getName();
@@ -1591,6 +1589,24 @@ ClangImporter::Implementation::getKnownObjCProperty(
     }
   }
 
+  return Nothing;
+}
+
+Optional<api_notes::GlobalVariableInfo>
+ClangImporter::Implementation::getKnownGlobalVariable(
+    const clang::VarDecl *global) {
+  if (auto notesReader = getAPINotesForDecl(global))
+    return notesReader->lookupGlobalVariable(global->getName());
+  
+  return Nothing;
+}
+
+Optional<api_notes::GlobalFunctionInfo>
+ClangImporter::Implementation::getKnownGlobalFunction(
+    const clang::FunctionDecl *fn) {
+  if (auto notesReader = getAPINotesForDecl(fn))
+    return notesReader->lookupGlobalFunction(fn->getName());
+  
   return Nothing;
 }
 

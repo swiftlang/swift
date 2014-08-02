@@ -84,6 +84,9 @@
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
+// FOUNDATION: NSSetZoneName(zone: NSZone, name: String)
+// FOUNDATION: NSZoneName(zone: NSZone) -> String
+
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding {{{$}}
 // APPKIT-NEXT: init(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
@@ -104,6 +107,8 @@
 // APPKIT-NEXT: weak var target: @sil_weak AnyObject!
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
+// APPKIT: var NSViewFrameDidChangeNotification: NSString
+// APPKIT: var NSViewFocusDidChangeNotification: NSString
 
 // CTYPESBITS-NOT: FooStruct1
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}

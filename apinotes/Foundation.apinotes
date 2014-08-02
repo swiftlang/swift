@@ -238,3 +238,10 @@ Classes:
       - Selector:        'initWithData:'
         MethodKind:      Instance
         DesignatedInit:  true
+Functions:
+  - Name:        'NSZoneName'
+    Nullability: [ N ]
+    NullabilityOfRet: N
+  - Name:        'NSSetZoneName'
+    Nullability: [ N, N]
+

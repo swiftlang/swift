@@ -2117,6 +2117,13 @@ namespace {
       }
 
       if (!type) {
+        // Lookup nullability info.
+        OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
+        if (auto info = Impl.getKnownGlobalVariable(decl)) {
+          if (auto nullability = info->getNullability())
+            optionality = Impl.translateNullability(*nullability);
+        }
+
         // If the declaration is const, consider it audited.
         // We can assume that loading a const global variable doesn't
         // involve an ownership transfer.
@@ -2128,6 +2135,7 @@ namespace {
                                           : ImportTypeKind::Variable),
                                isInSystemModule(dc));
       }
+
       if (!type)
         return nullptr;
 

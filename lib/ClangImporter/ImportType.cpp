@@ -837,7 +837,7 @@ Type ClangImporter::Implementation::importPropertyType(
 }
 
 Type ClangImporter::Implementation::importFunctionType(
-       const clang::Decl *clangDecl,
+       const clang::FunctionDecl *clangDecl,
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
@@ -857,12 +857,23 @@ Type ClangImporter::Implementation::importFunctionType(
       clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
       clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
 
+  // Check if we know more about the type from our whitelists.
+  Optional<api_notes::GlobalFunctionInfo> knownFn;
+  if (auto knownFnTmp = getKnownGlobalFunction(clangDecl))
+    if (knownFnTmp->NullabilityAudited)
+      knownFn = knownFnTmp;
+
+  OptionalTypeKind OptionalityOfReturn
+    = knownFn ? translateNullability(knownFn->getReturnTypeInfo())
+              : OTK_ImplicitlyUnwrappedOptional;
+
   // Import the result type.
   auto swiftResultTy = importType(resultType,
                                   (isAuditedResult
                                     ? ImportTypeKind::AuditedResult
                                     : ImportTypeKind::Result),
-                                  isFromSystemModule);
+                                  isFromSystemModule,
+                                  OptionalityOfReturn);
   if (!swiftResultTy)
     return Type();
 
@@ -879,9 +890,14 @@ Type ClangImporter::Implementation::importFunctionType(
       continue;
     }
 
+    // Check nullability of the parameter.
+    OptionalTypeKind OptionalityOfParam
+      = knownFn ? translateNullability(knownFn->getParamTypeInfo(index))
+                : OTK_ImplicitlyUnwrappedOptional;
+
     // Import the parameter type into Swift.
     Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter,
-                                   isFromSystemModule);
+                                   isFromSystemModule, OptionalityOfParam);
     if (!swiftParamTy)
       return Type();
 
