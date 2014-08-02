@@ -573,6 +573,60 @@ Runtime.test("demangleName") {
       _stdlib_demangleName("_Tv1x1aGCS_3FooGS0_GS0_SiSi_GS0_SiSi__GS0_GS0_SiSi_GS0_SiSi___"))
 }
 
+Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
+  typealias IntPtr = UnsafeMutablePointer<Int>
+  var origP1 = IntPtr(0x10101010)
+  var origP2 = IntPtr(0x20202020)
+  var origP3 = IntPtr(0x30303030)
+
+  if true {
+    var object = origP1
+    var expected = origP1
+    let r = _stdlib_atomicCompareExchangeStrongPtr(
+      object: &object, expected: &expected, desired: origP2)
+    expectTrue(r)
+    expectEqual(origP2, object)
+    expectEqual(origP1, expected)
+  }
+  if true {
+    var object = origP1
+    var expected = origP2
+    let r = _stdlib_atomicCompareExchangeStrongPtr(
+      object: &object, expected: &expected, desired: origP3)
+    expectFalse(r)
+    expectEqual(origP1, object)
+    expectEqual(origP1, expected)
+  }
+
+  struct FooStruct {
+    var i: Int
+    var object: IntPtr
+    var expected: IntPtr
+
+    init(_ object: IntPtr, _ expected: IntPtr) {
+      self.i = 0
+      self.object = object
+      self.expected = expected
+    }
+  }
+  if true {
+    var foo = FooStruct(origP1, origP1)
+    let r = _stdlib_atomicCompareExchangeStrongPtr(
+      object: &foo.object, expected: &foo.expected, desired: origP2)
+    expectTrue(r)
+    expectEqual(origP2, foo.object)
+    expectEqual(origP1, foo.expected)
+  }
+  if true {
+    var foo = FooStruct(origP1, origP2)
+    let r = _stdlib_atomicCompareExchangeStrongPtr(
+      object: &foo.object, expected: &foo.expected, desired: origP3)
+    expectFalse(r)
+    expectEqual(origP1, foo.object)
+    expectEqual(origP1, foo.expected)
+  }
+}
+
 Runtime.run()
 // CHECK: {{^}}Runtime: All tests passed
 

@@ -17,6 +17,52 @@
 @asmname("putchar")
 func _putchar(value: Int32) -> Int32
 
+@asmname("swift_stdlib_atomicCompareExchangeStrongPtr")
+func _stdlib_atomicCompareExchangeStrongPtrImpl(
+  #object: UnsafeMutablePointer<COpaquePointer>,
+  #expected: UnsafeMutablePointer<COpaquePointer>,
+  #desired: COpaquePointer) -> Bool
+
+/// Atomic compare and exchange of `UnsafeMutablePointer<T>` with sequentially
+/// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
+///
+/// Warning: this operation is extremely tricky to use correctly because of
+/// writeback semantics.
+///
+/// It is best to use it directly on an
+/// `UnsafeMutablePointer<UnsafeMutablePointer<T>>` that is known to point
+/// directly to the memory where the value is stored.
+///
+/// In a call like this:
+///
+/// ::
+///
+///   _stdlib_atomicCompareExchangeStrongPtr(&foo.property1.property2, ...)
+///
+/// you need to manually make sure that:
+///
+/// - all properties in the chain are physical (to make sure that no writeback
+///   happens; the compare-and-exchange instruction should operate on on the
+///   shared memory); and
+///
+/// - the shared memory that you are accessing is located inside a heap
+///   allocation (a class instance property, a `HeapBuffer`, a pointer to
+///   an `Array` element etc.)
+///
+/// If the conditions above are not met, the code will still compile, but the
+/// compare-and-exchange instruction will operate on the writeback buffer, and
+/// you will get a *race* while doing writeback into shared memory.
+@transparent
+func _stdlib_atomicCompareExchangeStrongPtr<T>(
+  #object: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
+  #expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
+  #desired: UnsafeMutablePointer<T>) -> Bool {
+  return _stdlib_atomicCompareExchangeStrongPtrImpl(
+    object: UnsafeMutablePointer(object),
+    expected: UnsafeMutablePointer(expected),
+    desired: COpaquePointer(desired))
+}
+
 @transparent public func _countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }

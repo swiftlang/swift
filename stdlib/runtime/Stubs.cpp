@@ -175,3 +175,19 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 }
 
 #endif
+
+typedef enum {
+  memory_order_relaxed = 0,
+  memory_order_consume = 1,
+  memory_order_acquire = 2,
+  memory_order_release = 3,
+  memory_order_acq_rel = 4,
+  memory_order_seq_cst = 5
+} memory_order;
+
+extern "C" bool swift_stdlib_atomicCompareExchangeStrongPtr(
+    _Atomic(uintptr_t) * object, uintptr_t *expected, uintptr_t desired) {
+  return __c11_atomic_compare_exchange_strong(
+      object, expected, desired, memory_order_seq_cst, memory_order_seq_cst);
+}
+

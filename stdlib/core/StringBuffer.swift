@@ -28,7 +28,10 @@ struct _StringBufferIVars {
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
 
+  // This stored property should be stored at offset zero.  We perform atomic
+  // operations on it using HeapBuffer's pointer.
   var usedEnd: UnsafeMutablePointer<RawByte>
+
   var capacityAndElementShift: Int
   var byteCapacity: Int {
     return capacityAndElementShift & ~0x1
@@ -200,13 +203,23 @@ public struct _StringBuffer {
       return true
     }
 
-    // FIXME: this function is currently NOT THREADSAFE.  The test +
-    // assignment below should be replaced by a CAS
-    // <rdar://problem/17855614> _StringBuffer.grow() is racy
-    if usedEnd == subRange.endIndex {
-      usedEnd = newUsedEnd
+    // Optimization: even if the buffer is shared, but the substring we are
+    // trying to grow is located at the end of the buffer, it can be grown in
+    // place.  The operation should be implemented in a thread-safe way,
+    // though.
+    //
+    // if usedEnd == subRange.endIndex {
+    //  usedEnd = newUsedEnd
+    //  return true
+    // }
+    let usedEndPhysicalPtr =
+      UnsafeMutablePointer<UnsafeMutablePointer<RawByte>>(_storage._value)
+    var expected = UnsafeMutablePointer<RawByte>(subRange.endIndex)
+    if _stdlib_atomicCompareExchangeStrongPtr(
+      object: usedEndPhysicalPtr, expected: &expected, desired: newUsedEnd) {
       return true
     }
+
     return false
   }
 
