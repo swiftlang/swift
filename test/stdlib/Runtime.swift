@@ -63,18 +63,25 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return true
   }
 
-  static func _forceBridgeFromObjectiveC(x: ClassA) -> BridgedValueType {
+  static func _forceBridgeFromObjectiveC(
+    x: ClassA,
+    inout result: BridgedValueType?
+  ) {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
-    return BridgedValueType(value: x.value)
+    result = BridgedValueType(value: x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: ClassA
-  ) -> BridgedValueType? {
+    x: ClassA,
+    inout result: BridgedValueType?
+  ) -> Bool {
     if x.value % 2 == 0 {
-      return BridgedValueType(value: x.value)
+      result = BridgedValueType(value: x.value)
+      return true
     }
-    return .None
+
+    result = nil
+    return false
   }
 
   var value: Int
@@ -106,16 +113,25 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     return true
   }
 
-  static func _forceBridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType {
+  static func _forceBridgeFromObjectiveC(
+    x: ClassA,
+    inout result: BridgedLargeValueType?
+  ) {
     assert(x.value % 2 == 0, "not bridged to Objective-C")
-    return BridgedLargeValueType(value: x.value)
+    result = BridgedLargeValueType(value: x.value)
   }
 
-  static func _conditionallyBridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType? {
+  static func _conditionallyBridgeFromObjectiveC(
+    x: ClassA,
+    inout result: BridgedLargeValueType?
+  ) -> Bool {
     if x.value % 2 == 0 {
-      return BridgedLargeValueType(value: x.value)
+      result = BridgedLargeValueType(value: x.value)
+      return true
     }
-    return .None
+
+    result = nil
+    return false
   }
 
   var value: Int {
@@ -145,18 +161,24 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: ClassA
-  ) -> ConditionallyBridgedValueType {
+    x: ClassA,
+    inout result: ConditionallyBridgedValueType?
+  ) {
     assert(x.value % 2 == 0, "not bridged from Objective-C")
-    return ConditionallyBridgedValueType(value: x.value)
+    result = ConditionallyBridgedValueType(value: x.value)
   }
 
-  static func _conditionallyBridgeFromObjectiveC(x: ClassA)
-      -> ConditionallyBridgedValueType? {
+  static func _conditionallyBridgeFromObjectiveC(
+    x: ClassA,
+    inout result: ConditionallyBridgedValueType?
+  ) -> Bool {
     if x.value % 2 == 0 {
-      return ConditionallyBridgedValueType(value: x.value)
+      result = ConditionallyBridgedValueType(value: x.value)
+      return true
     }
-    return .None
+
+    result = nil
+    return false
   }
 
   static func _isBridgedToObjectiveC() -> Bool {

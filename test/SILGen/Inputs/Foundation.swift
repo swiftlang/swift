@@ -42,13 +42,16 @@ extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSString) -> String {
-    fatalError("implement")
+  public static func _forceBridgeFromObjectiveC(
+    x: NSString,
+    inout result: String?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString
-  ) -> String? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSString,
+    inout result: String?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -63,13 +66,16 @@ extension Int : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSNumber) -> Int {
-    fatal("implement")
+  public static func _forceBridgeFromObjectiveC(
+    x: NSNumber,
+    inout result: Int?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber
-  ) -> Int? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSNumber,
+    inout result: Int?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -80,10 +86,15 @@ extension Array : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSArray) -> Array {
-    fatal("implement")
+  public static func _forceBridgeFromObjectiveC(
+    x: NSArray,
+    inout result: Array?
+  ) {
   }
-  public static func _conditionallyBridgeFromObjectiveC(x: NSArray) -> Array? {
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSArray,
+    inout result: Array?
+  ) -> Bool {
     return nil
   }
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -98,11 +109,16 @@ extension Dictionary : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
-    fatal("implement")
+  public static func _forceBridgeFromObjectiveC(
+    x: NSDictionary,
+  inout result: Dictionary?
+  ) {
   }
-  public static func _conditionallyBridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
-    return nil
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSDictionary,
+    inout result: Dictionary?
+  ) -> Bool {
+    return true
   }
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(T.self)

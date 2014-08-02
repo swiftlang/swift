@@ -75,12 +75,19 @@ struct X : _ObjectiveCBridgeable {
     return Tracked(value)
   }
 
-  static func _forceBridgeFromObjectiveC(x: Tracked) -> X {
-    return X(x.value)
+  static func _forceBridgeFromObjectiveC(
+    x: Tracked,
+    inout result: X?
+  ) {
+    result = X(x.value)
   }
 
-  static func _conditionallyBridgeFromObjectiveC(x: Tracked) -> X? {
-    return X(x.value)
+  static func _conditionallyBridgeFromObjectiveC(
+    x: Tracked,
+    inout result: X?
+  ) -> Bool {
+    result = X(x.value)
+    return true
   }
 
   var value: Int

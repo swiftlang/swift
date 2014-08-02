@@ -56,13 +56,14 @@ extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSString) -> String {
-    _fatalError("implement")
+  public static func _forceBridgeFromObjectiveC(x: NSString,
+                                                inout result: String?) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString
-  ) -> String? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSString,
+    inout result: String?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -77,13 +78,16 @@ extension Int : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSNumber) -> Int {
-    _fatalError("implement")
+  public static func _forceBridgeFromObjectiveC(
+    x: NSNumber, 
+    inout result: Int?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber
-  ) -> Int? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSNumber,
+    inout result: Int?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -98,13 +102,16 @@ extension Array : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSArray) -> Array {
-    return []
+  public static func _forceBridgeFromObjectiveC(
+    x: NSArray,
+    inout result: Array?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSArray
-  ) -> Array? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSArray,
+    inout result: Array?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -119,13 +126,16 @@ extension Dictionary : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
-    return [:]
+  public static func _forceBridgeFromObjectiveC(
+    x: NSDictionary,
+    inout result: Dictionary?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSDictionary
-  ) -> Dictionary? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSDictionary,
+    inout result: Dictionary?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -140,12 +150,15 @@ extension CGFloat : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  public static func _forceBridgeFromObjectiveC(x: NSNumber) -> CGFloat {
-    return CGFloat()
+  public static func _forceBridgeFromObjectiveC(
+    x: NSNumber,
+    inout result: CGFloat?
+  ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber
-  ) -> CGFloat? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSNumber,
+    inout result: CGFloat?
+  ) -> Bool {
+    return true
   }
 }

@@ -1605,16 +1605,19 @@ struct _ObjectiveCBridgeableWitnessTable {
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
   HeapObject *(*bridgeToObjectiveC)(OpaqueValue *self, const Metadata *Self);
-  // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType) -> Self
-  OpaqueExistentialContainer (*forceBridgeFromObjectiveC)(HeapObject *sourceValue,
-                                                     const Metadata *self,
-                                                     const Metadata *selfType);
+  // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType,
+  //                                       inout result: Self?)
+  void (*forceBridgeFromObjectiveC)(HeapObject *sourceValue,
+                                    OpaqueValue *result,
+                                    const Metadata *self,
+                                    const Metadata *selfType);
 
-  // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType) -> Self?
-  OpaqueExistentialContainer (*conditionallyBridgeFromObjectiveC)(
-                               HeapObject *sourceValue,
-                               const Metadata *self,
-                               const Metadata *selfType);
+  // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType,
+  //                                              inout result: Self?) -> Bool
+  bool (*conditionallyBridgeFromObjectiveC)(HeapObject *sourceValue,
+                                            OpaqueValue *result,
+                                            const Metadata *self,
+                                            const Metadata *selfType);
 };
 // }
 
@@ -1720,10 +1723,11 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, nativeType: NativeType.Type
 // ) -> NativeType
-extern "C" OpaqueExistentialContainer
+extern "C" void
 swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
   const Metadata *nativeType,
+  OpaqueValue *destValue,
   const Metadata *nativeType_
 ) {
   // Check if the type conforms to _BridgedToObjectiveC.
@@ -1743,9 +1747,10 @@ swift_bridgeNonVerbatimFromObjectiveC(
       if (sourceValueAsObjectiveCType) {
         // The type matches.  _forceBridgeFromObjectiveC returns `Self`, so
         // we can just return it directly.
-        return bridgeWitness->forceBridgeFromObjectiveC(
+        bridgeWitness->forceBridgeFromObjectiveC(
           static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-            nativeType, nativeType);
+          destValue, nativeType, nativeType);
+        return;
       }
     }
   }
@@ -1758,22 +1763,23 @@ swift_bridgeNonVerbatimFromObjectiveC(
 // func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
 //     x: AnyObject, nativeType: NativeType.Type
 // ) -> NativeType?
-extern "C" OpaqueExistentialContainer
+extern "C" bool
 swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
   const Metadata *nativeType,
+  OpaqueValue *destValue,
   const Metadata *nativeType_
 ) {
-  // Local function that releases the source and produces a nil.
-  auto produceNil = [&] () -> OpaqueExistentialContainer {
+  // Local function that releases the source and returns false.
+  auto fail = [&] () -> bool {
     swift_unknownRelease(sourceValue);
-    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
+    return false;
   };
 
   // Check if the type conforms to _BridgedToObjectiveC.
   const auto *bridgeWitness = findBridgeWitness(nativeType);
   if (!bridgeWitness)
-    return produceNil();
+    return fail();
 
   // Dig out the Objective-C class type through which the native type
   // is bridged.
@@ -1786,13 +1792,13 @@ swift_bridgeNonVerbatimFromObjectiveCConditional(
     const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue, 
                                                     objectiveCType));
   if (!sourceValueAsObjectiveCType)
-    return produceNil();
+    return fail();
 
   // If the type also conforms to _ConditionallyBridgedToObjectiveC,
   // use conditional bridging.
   return bridgeWitness->conditionallyBridgeFromObjectiveC(
     static_cast<HeapObject*>(sourceValueAsObjectiveCType),
-      nativeType, nativeType);
+    destValue, nativeType, nativeType);
 }
 
 // func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool

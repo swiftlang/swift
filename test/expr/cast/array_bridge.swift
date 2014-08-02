@@ -15,11 +15,16 @@ struct B : _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> A {
     return A()
   }
-  static func _forceBridgeFromObjectiveC(x: A) -> B {
-    return B()
+  static func _forceBridgeFromObjectiveC(
+    x: A,
+    inout result: B?
+  ){
   }
-  static func _conditionallyBridgeFromObjectiveC(x: A) -> B? {
-    return B()
+  static func _conditionallyBridgeFromObjectiveC(
+    x: A,
+    inout result: B?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -54,11 +59,16 @@ struct F : _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> E {
     return E()
   }
-  static func _forceBridgeFromObjectiveC(x: E) -> F {
-    return F()
+  static func _forceBridgeFromObjectiveC(
+    x: E,
+    inout result: F?
+  ) {
   }
-  static func _conditionallyBridgeFromObjectiveC(x: E) -> F? {
-    return F()
+  static func _conditionallyBridgeFromObjectiveC(
+    x: E,
+    inout result: F?
+  ) -> Bool {
+    return true
   }
 }
 
@@ -79,11 +89,16 @@ struct H : _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> G {
     return G()
   }
-  static func _forceBridgeFromObjectiveC(x: G) -> H {
-    return H()
+  static func _forceBridgeFromObjectiveC(
+    x: G,
+    inout result: H?
+  ) {
   }
-  static func _conditionallyBridgeFromObjectiveC(x: G) -> H? {
-    _preconditionFailure("implement")
+  static func _conditionallyBridgeFromObjectiveC(
+    x: G,
+    inout result: H?
+  ) -> Bool {
+    return true
   }
   static func _isBridgedToObjectiveC() -> Bool {
     return false
@@ -107,11 +122,16 @@ struct I : _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
-  static func _forceBridgeFromObjectiveC(x: AnyObject) -> I {
-    return I()
+  static func _forceBridgeFromObjectiveC(
+    x: AnyObject,
+    inout result: I?
+  ) {
   }
-  static func _conditionallyBridgeFromObjectiveC(x: AnyObject) -> I? {
-    return I()
+  static func _conditionallyBridgeFromObjectiveC(
+    x: AnyObject,
+    inout result: I?
+  ) -> Bool {
+    return true
   }
 }
 

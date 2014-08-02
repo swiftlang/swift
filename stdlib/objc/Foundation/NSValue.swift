@@ -23,13 +23,18 @@ extension NSRange : _ObjectiveCBridgeable {
     return NSValue(range: self)
   }
 
-  public static func _forceBridgeFromObjectiveC(x: NSValue) -> NSRange {
-    return x.rangeValue
+  public static func _forceBridgeFromObjectiveC(
+    x: NSValue,
+    inout result: NSRange?
+  ) {
+    result = x.rangeValue
   }
   
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSValue
-  ) -> NSRange? {
-    return self._forceBridgeFromObjectiveC(x)
+    x: NSValue,
+    inout result: NSRange?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return true
   }
 }

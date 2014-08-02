@@ -22,13 +22,16 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
     return BridgedObjC()
   }
 
-  static func _forceBridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift {
-    return BridgedSwift()
+  static func _forceBridgeFromObjectiveC(
+    x: BridgedObjC,
+    inout result: BridgedSwift?
+  ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: BridgedObjC
-  ) -> BridgedSwift? {
-    return BridgedSwift()
+    x: BridgedObjC,
+    inout result: BridgedSwift?
+  ) -> Bool {
+    return true
   }
 }
 

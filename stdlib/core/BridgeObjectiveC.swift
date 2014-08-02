@@ -133,7 +133,11 @@ public protocol _ObjectiveCBridgeable {
   /// via as), and may defer complete checking until later. For
   /// example, when bridging from NSArray to Array<T>, we can defer
   /// the checking for the individual elements of the array.
-  class func _forceBridgeFromObjectiveC(source: _ObjectiveCType) -> Self
+  ///
+  /// :param: result The location where the result is written. The optional
+  /// will always contain a value.
+  class func _forceBridgeFromObjectiveC(source: _ObjectiveCType,
+                                        inout result: Self?)
 
   /// Try to bridge from an Objective-C object of the bridged class
   /// type to a value of the Self type.
@@ -143,11 +147,16 @@ public protocol _ObjectiveCBridgeable {
   /// complete conversion to the value type; it cannot defer checking
   /// to a later time.
   ///
-  /// Returns the bridged value if bridging succeeded, nil if bridging
-  /// did not succeed.
+  /// :param: result The location where the result is written.
+  ///
+  /// :returns: true if bridging succeeded, false otherwise. This redundant
+  /// information is provided for the convenience of the runtime's dynamic_cast
+  /// implementation, so that it need not look into the optional representation
+  /// to determine success.
   class func _conditionallyBridgeFromObjectiveC(
-    source: _ObjectiveCType
-  ) -> Self?
+    source: _ObjectiveCType,
+    inout result: Self?
+  ) -> Bool
 }
 
 //===--- Bridging facilities written in Objective-C -----------------------===//
@@ -199,7 +208,10 @@ public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as T
   }
-  return _bridgeNonVerbatimFromObjectiveC(x, T.self)
+
+  var result: T?
+  _bridgeNonVerbatimFromObjectiveC(x, T.self, &result)
+  return result!
 }
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
@@ -222,15 +234,27 @@ public func _conditionallyBridgeFromObjectiveC<T>(
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as? T
   }
-  return _bridgeNonVerbatimFromObjectiveCConditional(x, T.self)
+
+  var result: T?
+  _bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
+  return result
 }
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
-func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type) -> T
+func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type,
+                                         inout result: T?)
 
+/// Runtime optional to conditionall perform a bridge from an object to a value
+/// type.
+///
+/// :param: result Will be set to the resulting value if bridging succeeds, and
+/// unchanged otherwise.
+///
+/// :returns: true to indicate success, false to indicate failure
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject, 
-                                                    nativeType: T.Type) -> T?
+                                                    nativeType: T.Type,
+                                                    inout result: T?) -> Bool
 
 /// Determines if values of a given type can be converted to an Objective-C
 /// representation.

@@ -25,11 +25,16 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> ObjC {
     return ObjC()
   }
-  static func _forceBridgeFromObjectiveC(x: ObjC) -> BridgedToObjC {
-    return BridgedToObjC()
+  static func _forceBridgeFromObjectiveC(
+    x: ObjC,
+    inout result: BridgedToObjC?
+  ) {
   }
-  static func _conditionallyBridgeFromObjectiveC(x: ObjC) -> BridgedToObjC? {
-    return BridgedToObjC()
+  static func _conditionallyBridgeFromObjectiveC(
+    x: ObjC,
+    inout result: BridgedToObjC?
+  ) -> Bool {
+    return true
   }
 
   var hashValue: Int {

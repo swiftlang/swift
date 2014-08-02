@@ -155,14 +155,19 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
     return TestObjCKeyTy(value)
   }
 
-  static func _forceBridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
-    return TestBridgedKeyTy(x.value)
+  static func _forceBridgeFromObjectiveC(
+    x: TestObjCKeyTy,
+    inout result: TestBridgedKeyTy?
+  ) {
+    result = TestBridgedKeyTy(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCKeyTy
-  ) -> TestBridgedKeyTy? {
-    return TestBridgedKeyTy(x.value)
+    x: TestObjCKeyTy,
+    inout result: TestBridgedKeyTy?
+  ) -> Bool {
+    result = TestBridgedKeyTy(x.value)
+    return true
   }
 
   var value: Int
