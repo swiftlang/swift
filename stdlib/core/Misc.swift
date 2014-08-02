@@ -75,10 +75,14 @@ func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
 
 /// Returns the mangled type name for the given value.
 public func _stdlib_getTypeName<T>(value: T) -> String {
-  let (_, typeName) = _withUninitializedString {
-    _stdlib_getTypeNameImpl(value, $0)
-  }
-  return typeName
+  // FIXME: this code should be using _withUninitializedString, but it leaks
+  // when called from here.
+  // <rdar://problem/17892969> Closures in generic context leak their captures?
+  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  _stdlib_getTypeNameImpl(value, stringPtr)
+  let stringResult = stringPtr.move()
+  stringPtr.dealloc(1)
+  return stringResult
 }
 
 /// Returns the human-readable type name for the given value.
