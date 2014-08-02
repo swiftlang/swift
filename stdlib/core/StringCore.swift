@@ -582,6 +582,14 @@ extension _StringCore : RangeReplaceableCollectionType {
   >(
     subRange: Range<Int>, with newValues: C
   ) {
+    _precondition(
+      subRange.startIndex >= 0,
+      "replaceRange: subRange start precedes String start")
+    
+    _precondition(
+      subRange.endIndex <= count,
+      "replaceRange: subRange extends past String end")
+    
     let width = elementWidth == 2 || contains(newValues) { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(countElements(newValues)) as Int
     let replacedCount = countElements(subRange)
