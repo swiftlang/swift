@@ -571,10 +571,6 @@ func _arrayReplace<
     "${Self} replace: subRange start is negative")
   
   _precondition(
-    subRange.endIndex >= subRange.startIndex,
-    "${Self} replace: subRange is inside-out")
-  
-  _precondition(
     subRange.endIndex <= target.endIndex,
     "${Self} replace: subRange extends past the end")
   
