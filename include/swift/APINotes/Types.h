@@ -267,8 +267,13 @@ public:
     NullabilityAudited = true;
     if (NumAdjustedNullable < index + 1)
       NumAdjustedNullable = index + 1;
+
+    // Mask the bits.
+    NullabilityPayload &= ~(NullableKindMask << (index * NullableKindSize));
+
+    // Set the value.
     unsigned kindValue =
-    (static_cast<unsigned>(kind)) << (index * NullableKindSize);
+      (static_cast<unsigned>(kind)) << (index * NullableKindSize);
     NullabilityPayload |= kindValue;
   }
 
