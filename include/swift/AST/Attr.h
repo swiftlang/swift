@@ -577,7 +577,7 @@ public:
   /// Available platforms for the availability attribute.
   enum PlatformKind {
     none,
-#define AVAILABILITY_PLATFORM(X) X,
+#define AVAILABILITY_PLATFORM(X, PrettyName) X,
 #include "swift/AST/Attr.def"
   };
 
@@ -638,12 +638,20 @@ public:
     return Platform != PlatformKind::none;
   }
 
-  /// Returns the human-readable string for the specified platform.
+  /// Returns the string for the specified platform.
   static StringRef platformString(PlatformKind Platform);
 
-  /// Returns the human-readable string for the platform of the attribute.
+  /// Returns the string for the platform of the attribute.
   StringRef platformString() const {
     return platformString(Platform);
+  }
+
+  /// Returns the human-readable string for the specified platform.
+  static StringRef prettyPlatformString(PlatformKind Platform);
+
+  /// Returns the human-readable string for the platform of the attribute.
+  StringRef prettyPlatformString() const {
+    return prettyPlatformString(Platform);
   }
 
   /// Returns true if this attribute is active given the current platform.

@@ -378,7 +378,16 @@ StringRef
 AvailabilityAttr::platformString(AvailabilityAttr::PlatformKind platform) {
   switch (platform) {
     case none: return "*";
-#define AVAILABILITY_PLATFORM(X) case X: return #X;
+#define AVAILABILITY_PLATFORM(X, PrettyName) case X: return #X;
+#include "swift/AST/Attr.def"
+  }
+}
+
+StringRef AvailabilityAttr::prettyPlatformString(
+            AvailabilityAttr::PlatformKind platform) {
+  switch (platform) {
+    case none: return "*";
+#define AVAILABILITY_PLATFORM(X, PrettyName) case X: return PrettyName;
 #include "swift/AST/Attr.def"
   }
 }
@@ -389,7 +398,7 @@ AvailabilityAttr::platformFromString(StringRef Name) {
     return PlatformKind::none;
   return
     llvm::StringSwitch<Optional<AvailabilityAttr::PlatformKind>>(Name)
-#define AVAILABILITY_PLATFORM(X) .Case(#X, X)
+#define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, X)
 #include "swift/AST/Attr.def"
     .Default(Optional<AvailabilityAttr::PlatformKind>());
 }

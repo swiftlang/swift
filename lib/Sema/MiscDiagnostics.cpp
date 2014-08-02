@@ -504,7 +504,7 @@ static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
         // FIXME: Use of the platformString here is non-awesome for application
         // extensions.
         TC.diagnose(D, diag::availability_obsoleted, Name,
-                    Attr->platformString(), *Attr->Obsoleted)
+                    Attr->prettyPlatformString(), *Attr->Obsoleted)
           .highlight(Attr->getRange());
         break;
       }

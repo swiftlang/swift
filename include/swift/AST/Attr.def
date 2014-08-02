@@ -31,7 +31,7 @@
 #endif
 
 #ifndef AVAILABILITY_PLATFORM
-#define AVAILABILITY_PLATFORM(X)
+#define AVAILABILITY_PLATFORM(X, PrettyName)
 #endif
 
 // Type attributes
@@ -191,10 +191,10 @@ DECL_ATTR_ALIAS(unowned, Ownership)
 
 
 // Reordering these platforms will break serialization.
-AVAILABILITY_PLATFORM(iOS)
-AVAILABILITY_PLATFORM(OSX)
-AVAILABILITY_PLATFORM(iOSApplicationExtension)
-AVAILABILITY_PLATFORM(OSXApplicationExtension)
+AVAILABILITY_PLATFORM(iOS, "iOS")
+AVAILABILITY_PLATFORM(OSX, "OS X")
+AVAILABILITY_PLATFORM(iOSApplicationExtension, "iOS application extension")
+AVAILABILITY_PLATFORM(OSXApplicationExtension, "OS X application extension")
 
 #undef AVAILABILITY_PLATFORM
 #undef TYPE_ATTR
