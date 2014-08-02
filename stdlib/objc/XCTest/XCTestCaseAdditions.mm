@@ -41,6 +41,20 @@
 @end
 
 
+// Swift's memory management expectations are different than Objective-C; it
+// expects everything to be +1 rather than +0. So we need to bridge the
+// _XCTCurrentTestCase function to return a +1 object.
+
+XCT_EXPORT XCTestCase *_XCTCurrentTestCase(void);
+
+XCT_EXPORT NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void);
+
+NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void)
+{
+    return [_XCTCurrentTestCase() retain];
+}
+
+
 // Since Swift doesn't natively support exceptions, but Objective-C code can
 // still throw them, use a helper to evaluate a block that may result in an
 // exception being thrown that passes back the most important information about

@@ -15,14 +15,14 @@
 import CoreGraphics
 
 /// Returns the current test case, so we can use free functions instead of methods for the overlay.
-@asmname("_XCTCurrentTestCase") func _XCTCurrentTestCase() -> XCTestCase
+@asmname("_XCTCurrentTestCaseBridge") func _XCTCurrentTestCaseBridge() -> XCTestCase
 
 // --- Failure Formatting ---
 
 /// Register the failure, expected or unexpected, of the current test case.
 func _XCTRegisterFailure(expected: Bool, condition: String, message: String, file: String, line: UInt) -> Void {
   // Call the real _XCTFailureHandler.
-  let test = _XCTCurrentTestCase()
+  let test = _XCTCurrentTestCaseBridge()
   _XCTPreformattedFailureHandler(test, expected, file, line, condition, message)
 }
 
