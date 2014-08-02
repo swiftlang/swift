@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -parse -verify
 import Foundation
+import CoreGraphics
 
 var roomName : String? = nil
 
