@@ -275,6 +275,28 @@ StringTests.test("stringCoreReserve") {
   }
 }
 
+func makeStringCore(base: String) -> _StringCore {
+  var x = _StringCore()
+  // make sure some - but not all - replacements will have to grow the buffer
+  x.reserveCapacity(base._core.count * 3 / 2)
+  x.extend(base._core)
+  // In case the core was widened and lost its capacity
+  x.reserveCapacity(base._core.count * 3 / 2)
+  return x
+}
+
+StringTests.test("StringCoreReplace") {
+  let narrow = "01234567890"
+  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
+  for s1 in [narrow, wide] {
+    for s2 in [narrow, wide] {
+      checkRangeReplaceable(
+        { makeStringCore(s1) },
+        { makeStringCore(s2 + s2)[0..<$0] }
+      )
+    }
+  }
+}
 StringTests.run()
 // CHECK: {{^}}StringTests: All tests passed
 

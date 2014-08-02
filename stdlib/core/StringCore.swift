@@ -573,3 +573,88 @@ var _emptyStringBase: COpaquePointer {
     UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
 }
 
+extension _StringCore : RangeReplaceableCollectionType {
+  /// Replace the given `subRange` of elements with `newValues`.
+  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == UTF16.CodeUnit
+  >(
+    subRange: Range<Int>, with newValues: C
+  ) {
+    let width = elementWidth == 2 || contains(newValues) { $0 > 0x7f } ? 2 : 1
+    let replacementCount = numericCast(countElements(newValues)) as Int
+    let replacedCount = countElements(subRange)
+    let tailCount = count - subRange.endIndex
+    let growth = replacementCount - replacedCount
+    let newCount = count + growth
+    
+    let (_, existingStorage) = _claimCapacity(newCount, minElementWidth: width)
+
+    if _fastPath(existingStorage != nil) {
+      let rangeStart = UnsafeMutablePointer<UInt8>(
+        _pointerToNth(subRange.startIndex))
+      let tailStart = rangeStart + (replacedCount << elementShift)
+      
+      if growth > 0 {
+        (tailStart + (growth << elementShift)).assignBackwardFrom(
+          tailStart, count: tailCount << elementShift)
+      }
+      
+      if _fastPath(elementWidth == 1) {
+        var dst = rangeStart
+        for u in newValues {
+          dst++.memory = UInt8(u & 0xFF)
+        }
+      }
+      else {
+        var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
+        for u in newValues {
+          dst++.memory = u
+        }
+      }
+      
+      if growth < 0 {
+        (tailStart + (growth << elementShift)).assignFrom(
+          tailStart, count: tailCount << elementShift)
+      }
+    }
+    else {
+      var r = _StringCore(
+        _StringBuffer(
+          capacity: newCount,
+          initialSize: 0,
+          elementWidth:
+            width == 1 ? 1
+            : representableAsASCII() && !contains(newValues) { $0 > 0x7f } ? 1
+            : 2
+        ))
+      r.extend(self[0..<subRange.startIndex])
+      r.extend(newValues)
+      r.extend(self[subRange.endIndex..<count])
+      self = r
+    }
+  }
+
+  public mutating func insert(newElement: UTF16.CodeUnit, atIndex i: Int) {
+    Swift.insert(&self, newElement, atIndex: i)
+  }
+  
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == UTF16.CodeUnit
+  >(newValues: S, atIndex i: Int) {
+    Swift.splice(&self, newValues, atIndex: i)
+  }
+
+  public mutating func removeAtIndex(i: Int) -> UTF16.CodeUnit {
+    return Swift.removeAtIndex(&self, i)
+  }
+  
+  public mutating func removeRange(subRange: Range<Int>) {
+    Swift.removeRange(&self, subRange)
+  }
+
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    Swift.removeAll(&self, keepCapacity: keepCapacity)
+  }
+}
