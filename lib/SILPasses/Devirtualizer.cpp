@@ -1021,7 +1021,7 @@ namespace {
       }
     }
 
-    StringRef getName() override { return "Devirtualization"; }
+    StringRef getName() override { return "Inline Caches"; }
   };
 
 } // end anonymous namespace
