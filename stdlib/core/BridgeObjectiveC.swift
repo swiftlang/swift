@@ -136,8 +136,10 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// :param: result The location where the result is written. The optional
   /// will always contain a value.
-  class func _forceBridgeFromObjectiveC(source: _ObjectiveCType,
-                                        inout result: Self?)
+  class func _forceBridgeFromObjectiveC(
+    source: _ObjectiveCType,
+    inout result: Self?
+  )
 
   /// Try to bridge from an Objective-C object of the bridged class
   /// type to a value of the Self type.
@@ -229,7 +231,8 @@ public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
 public func _conditionallyBridgeFromObjectiveC<T>(
-  x: AnyObject, _: T.Type
+  x: AnyObject, 
+  _: T.Type
 ) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as? T
@@ -241,8 +244,11 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 }
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
-func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type,
-                                         inout result: T?)
+func _bridgeNonVerbatimFromObjectiveC<T>(
+  x: AnyObject, 
+  nativeType: T.Type,
+  inout result: T?
+)
 
 /// Runtime optional to conditionall perform a bridge from an object to a value
 /// type.
@@ -252,9 +258,11 @@ func _bridgeNonVerbatimFromObjectiveC<T>(x: AnyObject, nativeType: T.Type,
 ///
 /// :returns: true to indicate success, false to indicate failure
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
-func _bridgeNonVerbatimFromObjectiveCConditional<T>(x: AnyObject, 
-                                                    nativeType: T.Type,
-                                                    inout result: T?) -> Bool
+func _bridgeNonVerbatimFromObjectiveCConditional<T>(
+  x: AnyObject, 
+  nativeType: T.Type,
+  inout result: T?
+) -> Bool
 
 /// Determines if values of a given type can be converted to an Objective-C
 /// representation.

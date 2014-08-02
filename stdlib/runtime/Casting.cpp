@@ -1721,8 +1721,10 @@ extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
 
 // @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 // func _bridgeNonVerbatimFromObjectiveC<NativeType>(
-//     x: AnyObject, nativeType: NativeType.Type
-// ) -> NativeType
+//     x: AnyObject, 
+//     nativeType: NativeType.Type
+//     inout result: T?
+// )
 extern "C" void
 swift_bridgeNonVerbatimFromObjectiveC(
   HeapObject *sourceValue,
@@ -1761,8 +1763,10 @@ swift_bridgeNonVerbatimFromObjectiveC(
 
 // @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 // func _bridgeNonVerbatimFromObjectiveCConditional<NativeType>(
-//     x: AnyObject, nativeType: NativeType.Type
-// ) -> NativeType?
+//   x: AnyObject, 
+//   nativeType: T.Type,
+//   inout result: T?
+// ) -> Bool
 extern "C" bool
 swift_bridgeNonVerbatimFromObjectiveCConditional(
   HeapObject *sourceValue,
