@@ -1568,6 +1568,9 @@ ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
 
 ERROR(type_not_bridged,sema_objc,none,
       "%0 is not bridged to Objective-C", (Type))
+ERROR(missing_bridging_function,sema_objc,Fatal,
+      "missing '%select{_forceBridgeFromObjectiveC|"
+      "_conditionallyBridgeFromObjectiveC}0'", (bool))
 
 //------------------------------------------------------------------------------
 // dynamic

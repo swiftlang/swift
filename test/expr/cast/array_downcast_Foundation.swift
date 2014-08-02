@@ -31,11 +31,8 @@ func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
   // CHECK: (optional_evaluation_expr implicit type='[String]?'
   // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
   // CHECK-NEXT: (call_expr implicit type='[String]'
-  // CHECK-NEXT: (dot_syntax_call_expr implicit type='(NSArray) -> Array<String>'
-  // CHECK-NEXT: (declref_expr implicit type='(Array<String>.Type) -> (NSArray) -> Array<String>' decl=Foundation.(file).Array._forceBridgeFromObjectiveC
-  // CHECK-NEXT: (type_expr implicit type='[String].Type' typerepr='<null>'))
-  // CHECK-NEXT: (forced_checked_cast_expr type='NSArray'{{.*existential_to_concrete}}
-  // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
+  // CHECK: (forced_checked_cast_expr type='NSArray'{{.*existential_to_concrete}}
+  // CHECK: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (force_value_expr implicit type='AnyObject?'
   // CHECK-NEXT: (declref_expr type='AnyObject?!' 
   return obj as [String]?
@@ -50,10 +47,7 @@ func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
   // CHECK-NEXT: (bind_optional_expr implicit type='[String]'
   // CHECK-NEXT: (optional_evaluation_expr implicit type='[String]?'
   // CHECK-NEXT: (call_expr implicit type='[String]?
-  // CHECK-NEXT: (dot_syntax_call_expr implicit type='(NSArray) -> Array<String>?'
-  // CHECK-NEXT: (declref_expr implicit type='(Array<String>.Type) -> (NSArray) -> Array<String>?'
-  // CHECK-NEXT: (type_expr implicit type='[String].Type' typerepr='<null>'))
-  // CHECK-NEXT: (bind_optional_expr implicit type='NSArray'
+  // CHECK: (bind_optional_expr implicit type='NSArray'
   // CHECK-NEXT: (conditional_checked_cast_expr type='NSArray?' {{.*existential_to_concrete}} writtenType=[String]?
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
   // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject?'

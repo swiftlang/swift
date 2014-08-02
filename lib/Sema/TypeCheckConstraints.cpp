@@ -2214,18 +2214,12 @@ static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   if (!call || !call->isImplicit())
     return nullptr;
 
-  auto memberAccess = dyn_cast<DotSyntaxCallExpr>(call->getFn());
-  if (!memberAccess || !memberAccess->isImplicit())
-    return nullptr;
+  auto callee = call->getCalledValue();
+  if (callee == ctx.getForceBridgeFromObjectiveC(nullptr) ||
+      callee == ctx.getConditionallyBridgeFromObjectiveC(nullptr))
+    return cast<TupleExpr>(call->getArg())->getElements()[0];
 
-  auto callee = memberAccess->getCalledValue();
-  if (!callee || !callee->hasName() || 
-      (!callee->getFullName().matchesRef(ctx.Id_forceBridgeFromObjectiveC) &&
-       !callee->getFullName().matchesRef(
-          ctx.Id_conditionallyBridgeFromObjectiveC)))
-    return nullptr;
-
-  return call->getArg();
+  return nullptr;
 }
 
 /// If the expression has the effect of a forced downcast, find the

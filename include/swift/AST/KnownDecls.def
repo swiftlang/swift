@@ -42,4 +42,9 @@ FUNC_DECL(ConvertConstArrayToPointerArgument,
 FUNC_DECL(ConvertConstStringToUTF8PointerArgument,
           "_convertConstStringToUTF8PointerArgument")
 
+FUNC_DECL(ForceBridgeFromObjectiveC,
+          "_forceBridgeFromObjectiveC")
+FUNC_DECL(ConditionallyBridgeFromObjectiveC,
+          "_conditionallyBridgeFromObjectiveC")
+
 #undef FUNC_DECL
