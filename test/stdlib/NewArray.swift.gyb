@@ -491,9 +491,9 @@ class Rdar16914909 : NSObject {
 Rdar16914909().doColorStuff()
 // CHECK-NEXT: appended
 
-// FIXME: should be zero, if not for <rdar://problem/17892507>
+// FIXME: should be "leaks = 0", if not for <rdar://problem/17892507>
 println("leaks = \(xCount)")
-// CHECK-NEXT: leaks = 8800
+// CHECK-NEXT: leaks = 
 
 // CHECK-NEXT: all done.
 println("all done.")
