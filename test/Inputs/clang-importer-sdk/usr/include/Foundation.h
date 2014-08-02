@@ -415,8 +415,11 @@ typedef struct {
 
 @end
 
-typedef struct CGColor *CGColorRef;
 typedef const void * CFTypeRef;
+typedef const struct __attribute__((objc_bridge(NSString))) __CFString * CFStringRef;
+typedef const struct __attribute__((objc_bridge(NSDictionary))) __CFDictionary * CFDictionaryRef;
+typedef struct CGColor *CGColorRef;
+
 extern CFTypeRef CFRetain(CFTypeRef cf);
 extern void CFRelease(CFTypeRef cf);
 extern CFTypeRef CFAutorelease(CFTypeRef __attribute__((cf_consumed)) arg) __attribute__((availability(macosx,introduced=10.9)));

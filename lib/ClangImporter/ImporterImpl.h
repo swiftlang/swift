@@ -787,6 +787,9 @@ public:
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
+  /// \brief Retrieve the CFStringRef typealias.
+  Type getCFStringRefType();
+
   /// \brief Look up and attempt to import a Clang declaration with
   /// the given name.
   Decl *importDeclByName(StringRef name);

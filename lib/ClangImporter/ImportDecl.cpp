@@ -38,6 +38,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Path.h"
 
 #define DEBUG_TYPE "Clang module importer"
 
@@ -2097,21 +2098,36 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      // If the declaration is const, consider it audited.
-      // We can assume that loading a const global variable doesn't
-      // involve an ownership transfer.
-      bool isAudited = (decl->getType().isConstQualified() &&
-                        Impl.SwiftContext.LangOpts.ImportCFTypes);
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(),
-                                  (isAudited
-                                     ? ImportTypeKind::AuditedVariable
-                                     : ImportTypeKind::Variable),
-                                  isInSystemModule(dc));
+      Type type;
+
+      // HACK: Special-case badly-typed constants in <Security/SecItem.h>.
+      if (name.str().startswith("kSec") &&
+          dc->getParentModule()->Name.str().equals("Security")) {
+        auto typedefTy = decl->getType()->getAs<clang::TypedefType>();
+        if (typedefTy && typedefTy->getDecl()->getName() == "CFTypeRef") {
+          auto &clangSrcMgr = Impl.getClangASTContext().getSourceManager();
+          StringRef headerName = clangSrcMgr.getBufferName(decl->getLocation());
+          if (llvm::sys::path::filename(headerName) == "SecItem.h")
+            type = Impl.getCFStringRefType();
+        }
+      }
+
+      if (!type) {
+        // If the declaration is const, consider it audited.
+        // We can assume that loading a const global variable doesn't
+        // involve an ownership transfer.
+        bool isAudited = (decl->getType().isConstQualified() &&
+                          Impl.SwiftContext.LangOpts.ImportCFTypes);
+
+        type = Impl.importType(decl->getType(),
+                               (isAudited ? ImportTypeKind::AuditedVariable
+                                          : ImportTypeKind::Variable),
+                               isInSystemModule(dc));
+      }
       if (!type)
         return nullptr;
 

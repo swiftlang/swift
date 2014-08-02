@@ -49,3 +49,8 @@ module Properties {
   header "Properties.h"
   export *
 }
+
+module Security {
+  header "SecItem.h"
+  export *
+}
