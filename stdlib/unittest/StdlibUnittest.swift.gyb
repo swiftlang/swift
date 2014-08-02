@@ -537,6 +537,78 @@ func checkSliceableWithBidirectionalIndex<
   }
 }
 
+public func nthIndex<C: CollectionType>(x: C, n: Int) -> C.Index {
+  return advance(x.startIndex, numericCast(n))
+}
+
+public func nth<C: CollectionType>(x: C, n: Int) -> C.Generator.Element {
+  return x[nthIndex(x, n)]
+}
+
+public func checkRangeReplaceable<
+  C: RangeReplaceableCollectionType,
+  N: CollectionType
+where
+  C.Generator.Element: Equatable, C.Generator.Element == N.Generator.Element
+>(
+  makeCollection: ()->C,
+  makeNewValues: (Int)->N
+) {
+  typealias A = C
+
+  // First make an independent copy of the array that we can use for
+  // comparison later.
+  var source = ContiguousArray<A.Generator.Element>()
+  for x in makeCollection() {
+    source.append(x)
+  }
+  
+  for (ix, i) in enumerate(indices(source)) {
+    for (jx_, j) in enumerate(i..<source.endIndex) {
+      let jx = jx_ + ix
+      
+      let oldCount = jx - ix
+      for newCount in 0..<(2 * oldCount) {
+        let newValues = makeNewValues(newCount)
+
+        func reportFailure(inout a: A, message: String) {
+          println("\(message) when replacing indices \(ix)...\(jx)")
+          println("  in \(Array(source)) with \(Array(newValues))")
+          println("  yielding \(Array(a))")
+          println("====================================")
+          expectTrue(false)
+        }
+
+        var a = makeCollection()
+     
+        a.replaceRange(nthIndex(a, ix)..<nthIndex(a, jx), with: newValues)
+        let growth = newCount - oldCount
+        
+        let expectedCount = source.count + growth
+        let actualCount = numericCast(countElements(a)) as Int
+        if actualCount != expectedCount {
+          reportFailure(
+            &a, "\(actualCount) != expected count \(expectedCount)")
+        }
+        
+        for (kx, k) in enumerate(indices(a)) {
+          let expectedValue = kx < ix ? nth(source, kx)
+          : kx < jx + growth ? nth(newValues, kx - ix)
+          : nth(source, kx - growth)
+
+          if a[k] != expectedValue {
+            reportFailure(
+              &a,
+              // FIXME: why do we need to break this string into two parts?
+              "a[\(kx)] = "
+              + "\(a[k]) != expected value \(expectedValue)")
+          }
+        }
+      }
+    }
+  }
+}
+
 public func expectEqualSequence<
   Expected: SequenceType,
   Actual: SequenceType
