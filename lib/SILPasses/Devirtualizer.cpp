@@ -65,8 +65,9 @@ static bool isClassDeclOracle(ValueKind Kind) {
   }
 }
 
-/// \brief Recursively searches the ClassDecl for the type of \p S, or null.
-static ClassDecl *findClassDeclForOperand(SILValue S) {
+/// \brief Recursively searches the ClassDecl for a class_method operand.
+/// Return the ClassDecl from the point of construction of \p S or null.
+static ClassDecl *getClassFromConstructor(SILValue S) {
   // First strip off casts.
   S = S.stripCasts();
 
@@ -87,51 +88,24 @@ static ClassDecl *findClassDeclForOperand(SILValue S) {
   return instTy.getClassOrBoundGenericClass();
 }
 
-/// \brief Optimize a class_method and alloc_ref pair into a direct function
-/// reference:
-///
-/// \code
-/// %XX = alloc_ref $Foo
-/// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
-/// apply %YY(...)
-/// \endcode
-///
-///  or
-///
-/// %XX = metatype $...
-/// %YY = class_method %XX : ...
-/// apply %YY(...)
-///
-///  into
-///
-/// %YY = function_ref @...
-/// apply %YY(...)
+/// \brief Devirtualize an Apply instruction and a class member obtained
+/// using the class_method instruction into a direct call to a specific
+/// member of a specific class.
 ///
 /// \p AI is the apply to devirtualize.
 /// \p Member is the class member to devirtualize.
 /// \p ClassInstance is the operand for the ClassMethodInst or an alternative
 ///    reference (duch as downcasted class reference).
 /// \p KnownClass (can be null) is a specific class type to devirtualize to.
-static bool optimizeClassMethod(ApplyInst *AI, SILDeclRef Member,
-                                SILValue ClassInstance,
-                                ClassDecl *KnownClass) {
+static bool devirtMethod(ApplyInst *AI, SILDeclRef Member,
+                         SILValue ClassInstance, ClassDecl *Class) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin: " << ClassInstance);
 
-  // Then attempt to lookup the class for origin.
-  ClassDecl *Class = KnownClass ? KnownClass :
-                     findClassDeclForOperand(ClassInstance);
-
-  // If we are unable to lookup a class decl for origin there is nothing here
-  // that we can deserialize.
-  if (!Class) {
-    DEBUG(llvm::dbgs() << "        FAIL: Could not find class decl for "
-                          "SILValue.\n");
-    return false;
-  }
+  assert(Class && "Invalid class type");
 
   // Otherwise lookup from the module the least derived implementing method from
   // the module vtables.
@@ -177,9 +151,8 @@ static bool optimizeClassMethod(ApplyInst *AI, SILDeclRef Member,
 
   // Then compare the two types and if they are unequal...
   if (FuncSelfTy != OriginTy) {
-    assert(FuncSelfTy.isSuperclassOf(OriginTy) &&
-           "Can not call a class method on a non-subclass of the class_methods"
-           " class.");
+    assert(FuncSelfTy.isSuperclassOf(OriginTy) && "Can not call a class method"
+           " on a non-subclass of the class_methods class.");
 
     // Otherwise, upcast origin to the appropriate type.
     ClassInstance = B.createUpcast(AI->getLoc(), ClassInstance, FuncSelfTy);
@@ -222,6 +195,7 @@ static bool optimizeClassMethod(ApplyInst *AI, SILDeclRef Member,
       NewArgs.push_back(B.createUncheckedRefCast(AI->getLoc(), Op, FOpTy));
     }
   }
+
   // Add in self to the end.
   NewArgs.push_back(ClassInstance);
 
@@ -758,6 +732,11 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
+/// Return the final class decl using metadata.
+static ClassDecl *getClassFromClassMetadata(ClassMethodInst *CMI) {
+  return nullptr;
+}
+
 static bool optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
 
@@ -785,9 +764,16 @@ static bool optimizeApplyInst(ApplyInst *AI) {
   ///  into
   ///
   /// %YY = function_ref @...
-  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee()))
-    return optimizeClassMethod(AI, CMI->getMember(),
-                               CMI->getOperand().stripCasts(), nullptr);
+  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
+    // Check if the class member is known to be final.
+    if (ClassDecl *C = getClassFromClassMetadata(CMI))
+      return devirtMethod(AI, CMI->getMember(), CMI->getOperand(), C);
+
+    // Try to search for the point of construction.
+    if (ClassDecl *C = getClassFromConstructor(CMI->getOperand()))
+      return devirtMethod(AI, CMI->getMember(),
+                          CMI->getOperand().stripCasts(), C);
+  }
 
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
@@ -932,7 +918,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  optimizeClassMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
+  devirtMethod(IdenAI, CMI->getMember(), DownCastedClassInstance, CD);
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
