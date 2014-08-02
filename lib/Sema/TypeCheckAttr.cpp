@@ -910,10 +910,10 @@ bool AttributeChecker::visitAbstractAccessibilityAttr(
     if (attr->getAccess() > typeAccess) {
       auto diag = TC.diagnose(attr->getLocation(),
                               diag::access_control_member_more,
-                              typeAccess,
-                              ty->getAnyNominal()->getDescriptiveKind(),
                               attr->getAccess(),
-                              D->getDescriptiveKind());
+                              D->getDescriptiveKind(),
+                              typeAccess,
+                              ty->getAnyNominal()->getDescriptiveKind());
       swift::fixItAccessibility(diag, cast<ValueDecl>(D), typeAccess);
       return true;
     }
@@ -938,11 +938,10 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     auto extAttr = extension->getAttrs().getAttribute<AccessibilityAttr>();
     if (extAttr && attr->getAccess() > extAttr->getAccess()) {
       auto diag = TC.diagnose(attr->getLocation(),
-                              diag::access_control_member_more,
-                              extAttr->getAccess(),
-                              extension->getDescriptiveKind(),
+                              diag::access_control_ext_member_more,
                               attr->getAccess(),
-                              D->getDescriptiveKind());
+                              D->getDescriptiveKind(),
+                              extAttr->getAccess());
       return;
     }
   }
