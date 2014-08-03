@@ -2,6 +2,7 @@ add_swift_library(swiftDriver
   Action.cpp
   Compilation.cpp
   Driver.cpp
+  FrontendUtil.cpp
   Job.cpp
   OutputFileMap.cpp
   ParseableOutput.cpp
@@ -11,4 +12,4 @@ add_swift_library(swiftDriver
   ToolChains.cpp
   Types.cpp
   Util.cpp
-  DEPENDS swiftAST swiftBasic swiftOption)
+  DEPENDS swiftAST swiftBasic swiftFrontend swiftOption)
