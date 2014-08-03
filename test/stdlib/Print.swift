@@ -360,10 +360,11 @@ test_CTypesPrinting()
 
 func test_PointerPrinting() {
   let nullUP = UnsafeMutablePointer<Float>()
-  var fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234)
+  let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234)
 
 #if !(arch(i386) || arch(arm))
-  var eightByteUP = UnsafeMutablePointer<Float>(bitPattern: Int(bitPattern: 0xabcddcba12344321))
+  let eightByteAddr: UWord = 0xabcddcba12344321
+  let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)
 #endif
 
 #if arch(i386) || arch(arm)
