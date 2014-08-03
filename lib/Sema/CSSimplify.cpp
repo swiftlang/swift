@@ -2289,6 +2289,12 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
     return CheckedCastKind::DictionaryDowncast;
   }
 
+  // If we can bridge through an Objective-C class, do so.
+  auto &tc = cs->getTypeChecker();
+  if (tc.getDynamicBridgedThroughObjCClass(cs->DC, fromType, toType)) {
+    return CheckedCastKind::BridgeFromObjectiveC;
+  }
+
   // We can only downcast to an existential if the destination protocols are
   // objc and the source type is an objc class or an existential bounded by objc
   // protocols.
@@ -2442,8 +2448,19 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   case CheckedCastKind::Downcast:
   case CheckedCastKind::ExistentialToConcrete: {
-    // Peel off optionals metatypes from the types, because we might cast through
-    // them.
+    // Peel off optionals from the types, because we might cast
+    // through them.
+    auto toValueType = toType->lookThroughAllAnyOptionalTypes();
+    auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
+
+    addConstraint(ConstraintKind::Subtype, toValueType, fromValueType,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
+  }
+
+  case CheckedCastKind::BridgeFromObjectiveC: {
+    // Peel off optionals from the types, because we might cast
+    // through them.
     auto toValueType = toType->lookThroughAllAnyOptionalTypes();
     auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
 
@@ -2458,7 +2475,10 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       return SolutionKind::Solved;
     }
 
-    addConstraint(ConstraintKind::Subtype, toType, fromType,
+    Type objCClass = TC.getDynamicBridgedThroughObjCClass(DC, fromValueType, 
+                                                          toValueType);
+    assert(objCClass && "Type must be bridged");
+    addConstraint(ConstraintKind::Subtype, objCClass, fromValueType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
   }

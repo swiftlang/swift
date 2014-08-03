@@ -62,8 +62,7 @@ func test6<T>(x : T) {
 class B : A { }
 
 func test7(x : A) {
-  // This should get diagnosed with the "more optional type" error above.
-  let y = x as? B? // expected-error {{'B?' is not a subtype of 'A'}}
+  let y = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
 }
 
 func test8(x : AnyObject?) {

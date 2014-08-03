@@ -2447,6 +2447,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "dictionary_downcast";
   case CheckedCastKind::DictionaryDowncastBridged:
     return "dictionary_downcast_bridged";
+  case CheckedCastKind::BridgeFromObjectiveC:
+    return "bridge_from_objc";
   }
   llvm_unreachable("bad checked cast name");
 }

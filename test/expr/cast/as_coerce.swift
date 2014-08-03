@@ -64,4 +64,4 @@ class C4 : C3 {}
 
 var c: AnyObject = C3()
 
-if let castX = c as C4? {} // expected-error {{cannot convert the expression's type 'AnyObject' to type 'C4?'}}
+if let castX = c as C4? {} // expected-error {{cannot downcast from 'AnyObject' to a more optional type 'C4?'}}

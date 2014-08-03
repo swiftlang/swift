@@ -28,15 +28,3 @@ func matchesEither(#input: Hive, #a: Hive, #b: Hive) -> Bool {
     return false
   }
 }
-
-// CHECK-LABEL: sil @_TF11switch_objc9bridgedIs
-// CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-func bridgedIs(obj: AnyObject) {
-  // CHECK: function_ref @_TFSs34_conditionallyBridgeFromObjectiveCU__FTPSs9AnyObject_MQ__GSqQ__
-  // CHECK: checked_cast_br [[OBJ]] : $AnyObject to $NSString
-  obj as? String
-
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs34_conditionallyBridgeFromObjectiveCU__FTPSs9AnyObject_MQ__GSqQ__
-  // CHECK: apply [[BRIDGE_FN]]<[NSString]>
-  obj as? [NSString]
-}

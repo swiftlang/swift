@@ -2198,7 +2198,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // If we can bridge through an Objective-C class, do so.
   if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)){
     if (isSubtypeOf(objCClass, fromType, dc))
-      return CheckedCastKind::Downcast;
+      return CheckedCastKind::BridgeFromObjectiveC;
   }
 
   diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)

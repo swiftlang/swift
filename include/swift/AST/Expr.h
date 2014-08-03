@@ -94,8 +94,11 @@ enum class CheckedCastKind : unsigned {
   // A downcast from a dictionary type to another dictionary type that
   // requires bridging.
   DictionaryDowncastBridged,
-  
-  Last_CheckedCastKind = DictionaryDowncastBridged,
+  /// A downcast from an object of class or Objective-C existential
+  /// type to its bridged value type.
+  BridgeFromObjectiveC,
+
+  Last_CheckedCastKind = BridgeFromObjectiveC,
 };
   
 /// Expr - Base class for all expressions in swift.

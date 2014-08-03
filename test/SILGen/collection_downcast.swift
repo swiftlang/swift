@@ -48,17 +48,14 @@ func testArrayDowncast(array: [AnyObject]) -> [BridgedObjC] {
 // CHECK-LABEL: sil @_TF19collection_downcast27testArrayDowncastFromObject
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
 func testArrayDowncastFromObject(obj: AnyObject) -> [BridgedObjC] {
-// CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs26_forceBridgeFromObjectiveCU__FTPSs9AnyObject_MQ__Q_
-// CHECK:   [[NSARRAY_OBJ:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $NSArray
-// CHECK:   apply [[BRIDGE_FN]]<[BridgedObjC]>(
+  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
   return obj as [BridgedObjC]
 }
 
 // CHECK-LABEL: sil @_TF19collection_downcast28testArrayDowncastFromNSArray
 // CHECK: bb0([[NSARRAY_OBJ:%[0-9]+]] : $NSArray):
 func testArrayDowncastFromNSArray(obj: NSArray) -> [BridgedObjC] {
-// CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs26_forceBridgeFromObjectiveCU__FTPSs9AnyObject_MQ__Q_
-// CHECK:   apply [[BRIDGE_FN]]<[BridgedObjC]>
+  // CHECK: unconditional_checked_cast_addr take_always NSArray in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*NSArray to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
   return obj as [BridgedObjC]
 }
 
@@ -106,9 +103,7 @@ func testArrayIsaBridged(array: [AnyObject]) -> Bool {
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
 func testDictionaryDowncastFromObject(obj: AnyObject) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
-  // CHECK:   [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs26_forceBridgeFromObjectiveCU__FTPSs9AnyObject_MQ__Q_
-  // CHECK:   [[NSDICT_OBJ:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $NSDictionary
-  // CHECK:   apply [[BRIDGE_FN]]<Dictionary<BridgedObjC, BridgedObjC>>(
+  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Dictionary<BridgedObjC, BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Dictionary<BridgedObjC, BridgedObjC>
   return obj as Dictionary<BridgedObjC, BridgedObjC>
 }
 
