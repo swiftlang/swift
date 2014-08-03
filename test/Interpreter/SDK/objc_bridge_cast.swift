@@ -32,8 +32,19 @@ func testForcedValueToObjectBridging() {
   // CHECK-NEXT: )
   println(genericForcedCast(array) as NSObject)
 
-  // FIXME: Forced bridging (AnyObject)
-  // FIXME: Forced bridging (existential success)
+  // Forced bridging (AnyObject)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  println(genericForcedCast(array) as NSObject)
+
+  // Forced bridging (existential success)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  println(genericForcedCast(array) as NSCoding)
 
   println("Done")
 }
@@ -68,9 +79,34 @@ func testConditionalValueToObjectBridging() {
     println("Not an NSObject")
   }
 
-  // FIXME: Conditional bridging (AnyObject)
-  // FIXME: Conditional bridging (existential success)
-  // FIXME: Conditional bridging (existential failure)
+  // Conditional bridging (AnyObject)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  if let anyObject = (genericConditionalCast(array) as AnyObject?) {
+    println("\(anyObject)")
+  } else {
+    println("Not an AnyObject")
+  }
+
+  // Conditional bridging (existential success)
+  // CHECK-NEXT: (
+  // CHECK-NEXT:   Hello,
+  // CHECK-NEXT:   World
+  // CHECK-NEXT: )
+  if let coding = (genericConditionalCast(array) as NSCoding?) {
+    println("\(coding)")
+  } else {
+    println("Not an NSCoding")
+  }
+
+  // CHECK-NEXT: NSXMLParserDelegate
+  if let delegate = (genericConditionalCast(array) as NSXMLParserDelegate?) {
+    println("\(delegate)")
+  } else {
+    println("Not an NSXMLParserDelegate")
+  }
 
   // Conditional bridging (unrelated class)
   // CHECK-NEXT: Not an NSString

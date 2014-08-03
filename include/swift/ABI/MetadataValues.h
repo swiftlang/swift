@@ -114,6 +114,9 @@ inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
 inline DynamicCastFlags operator|(DynamicCastFlags a, DynamicCastFlags b) {
   return DynamicCastFlags(size_t(a) | size_t(b));
 }
+inline DynamicCastFlags operator-(DynamicCastFlags a, DynamicCastFlags b) {
+  return DynamicCastFlags(size_t(a) & ~size_t(b));
+}
 inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
   return a = (a | b);
 }

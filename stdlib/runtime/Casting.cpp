@@ -66,6 +66,30 @@ namespace {
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T);
 
+static bool _dynamicCastValueToClassViaObjCBridgeable(
+              OpaqueValue *dest,
+              OpaqueValue *src,
+              const Metadata *srcType,
+              const Metadata *targetType,
+              const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
+              DynamicCastFlags flags);
+
+static bool _dynamicCastValueToClassExistentialViaObjCBridgeable(
+              OpaqueValue *dest,
+              OpaqueValue *src,
+              const Metadata *srcType,
+              const ExistentialTypeMetadata *targetType,
+              const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
+              DynamicCastFlags flags);
+
+static bool _dynamicCastClassToValueViaObjCBridgeable(
+               OpaqueValue *dest,
+               OpaqueValue *src,
+               const Metadata *srcType,
+               const Metadata *targetType,
+               const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
+               DynamicCastFlags flags);
+
 /// A convenient method for failing out of a dynamic cast.
 static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
                   const Metadata *targetType, DynamicCastFlags flags) {
@@ -255,7 +279,7 @@ static const OpaqueValue *
 _dynamicCastToExistential(const OpaqueValue *value,
                           const Metadata *sourceType,
                           const ExistentialTypeMetadata *targetType) {
-   for (unsigned i = 0, n = targetType->Protocols.NumProtocols; i != n; ++i) {
+  for (unsigned i = 0, n = targetType->Protocols.NumProtocols; i != n; ++i) {
     auto *protocol = targetType->Protocols[i];
     if (!_conformsToProtocol(value, sourceType, protocol, nullptr))
       return nullptr;
@@ -407,11 +431,59 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     auto destExistential =
       reinterpret_cast<ClassExistentialContainer*>(dest);
 
+    // If the source type is a value type, it cannot possibly conform
+    // to a class-bounded protocol. 
+    switch (srcDynamicType->getKind()) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Metatype:
+      // Handle these cases below.
+      break;
+
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+      // If the source type is bridged to Objective-C, try to bridge.
+      if (auto srcBridgeWitness = findBridgeWitness(srcDynamicType)) {
+        DynamicCastFlags subFlags 
+          = flags - (DynamicCastFlags::TakeOnSuccess |
+                     DynamicCastFlags::DestroyOnFailure);
+        bool success = _dynamicCastValueToClassExistentialViaObjCBridgeable(
+                         dest,
+                         srcDynamicValue,
+                         srcDynamicType,
+                         targetType,
+                         srcBridgeWitness,
+                         subFlags);
+
+        if (src != srcDynamicValue && shouldDeallocateSource(success, flags)) {
+          deallocateDynamicValue(src, srcType);
+        }
+
+        return success;
+      }
+
+      break;
+
+    case MetadataKind::Function:
+    case MetadataKind::Block:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Tuple:
+      // Will never succeed.
+      return _fail(src, srcType, targetType, flags);
+    }
+
     // Check for protocol conformances and fill in the witness tables.
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
-                              destExistential->getWitnessTables()))
+                              destExistential->getWitnessTables())) {
       return _fail(src, srcType, targetType, flags);
+    }
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
@@ -1007,22 +1079,6 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   }
   _failCorruptType(srcType);
 }
-
-static bool _dynamicCastValueToClassViaObjCBridgeable(
-              OpaqueValue *dest,
-              OpaqueValue *src,
-              const Metadata *srcType,
-              const Metadata *targetType,
-              const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
-              DynamicCastFlags flags);
-
-static bool _dynamicCastClassToValueViaObjCBridgeable(
-               OpaqueValue *dest,
-               OpaqueValue *src,
-               const Metadata *srcType,
-               const Metadata *targetType,
-               const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
-               DynamicCastFlags flags);
 
 /// Perform a dynamic cast to an arbitrary type.
 bool swift::swift_dynamicCast(OpaqueValue *dest,
@@ -1665,7 +1721,7 @@ extern "C" const ProtocolDescriptor _TMpSs21_ObjectiveCBridgeable;
 
 /// Dynamic cast from a value type that conforms to the _ObjectiveCBridgeable
 /// protocol to a class type, first by bridging the value to its Objective-C
-/// object represntation and then by dynamic casting that object to the
+/// object representation and then by dynamic casting that object to the
 /// resulting target type.
 static bool _dynamicCastValueToClassViaObjCBridgeable(
                OpaqueValue *dest,
@@ -1682,16 +1738,57 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
   // Bridge the source value to an object.
   auto srcBridgedObject = srcBridgeWitness->bridgeToObjectiveC(src, srcType);
 
-  // Dynamic cast the object to the resulting class type. We pass on
-  // responsibility
+  // Dynamic cast the object to the resulting class type. The
+  // additional flags essneitally make this call act as taking the
+  // source object at +1.
   DynamicCastFlags classCastFlags = flags | DynamicCastFlags::TakeOnSuccess
                                   | DynamicCastFlags::DestroyOnFailure;
   bool success = _dynamicCastUnknownClass(dest, srcBridgedObject, targetType,
                                           classCastFlags);
 
   // Clean up the source if we're supposed to.
-  if ((success && (flags & DynamicCastFlags::TakeOnSuccess)) ||
-      (!success && (flags & DynamicCastFlags::DestroyOnFailure))) {
+  if (shouldDeallocateSource(success, flags)) {
+    srcType->vw_destroy(src);
+  }
+
+  // We're done.
+  return success;
+}
+
+/// Dynamic cast from a value type that conforms to the
+/// _ObjectiveCBridgeable protocol to a class-bounded existential,
+/// first by bridging the value to its Objective-C object
+/// representation and then by dynamic-casting that object to the
+/// resulting target type.
+static bool _dynamicCastValueToClassExistentialViaObjCBridgeable(
+              OpaqueValue *dest,
+              OpaqueValue *src,
+              const Metadata *srcType,
+              const ExistentialTypeMetadata *targetType,
+              const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
+              DynamicCastFlags flags) {
+  // Check whether the source is bridged to Objective-C.
+  if (!srcBridgeWitness->isBridgedToObjectiveC(srcType, srcType)) {
+    return _fail(src, srcType, targetType, flags);
+  }
+
+  // Bridge the source value to an object.
+  auto srcBridgedObject = srcBridgeWitness->bridgeToObjectiveC(src, srcType);
+
+  // Try to cast the object to the destination existential.
+  DynamicCastFlags subFlags = DynamicCastFlags::TakeOnSuccess
+                            | DynamicCastFlags::DestroyOnFailure;
+  if (flags & DynamicCastFlags::Unconditional)
+    subFlags |= DynamicCastFlags::Unconditional;
+  bool success = _dynamicCastToExistential(
+                   dest, 
+                   (OpaqueValue *)&srcBridgedObject,
+                   swift_getObjectType(srcBridgedObject),
+                   targetType,
+                   subFlags);
+
+  // Clean up the source if we're supposed to.
+  if (shouldDeallocateSource(success, flags)) {
     srcType->vw_destroy(src);
   }
 
