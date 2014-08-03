@@ -422,7 +422,8 @@ var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
 println(reflect(nilUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: UnsafeMutablePointer(0x123456)
-var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(0x123456)
+var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
+  bitPattern: 0x123456)
 println(reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
