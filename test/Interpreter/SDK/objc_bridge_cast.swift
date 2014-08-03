@@ -126,7 +126,6 @@ func testForcedObjectToValueBridging() {
   println("---Forced object to value bridging---")
 
   let nsArray: NSArray = ["Hello", "World"]
-  let nsObject: NSObject = nsArray
 
   // Forced bridging (exact)
   // CHECK: [Hello, World]
@@ -134,10 +133,17 @@ func testForcedObjectToValueBridging() {
 
   // Forced bridging (superclass)
   // CHECK: [Hello, World]
+  let nsObject: NSObject = nsArray
   println(genericForcedCast(nsObject) as [String])
 
-  // FIXME: Forced bridging (AnyObject)
-  // FIXME: Forced bridging (existential success)
+  // Forced bridging (AnyObject)
+  // CHECK: [Hello, World]
+  let anyObject: AnyObject = nsArray
+  println(genericForcedCast(anyObject) as [String])
+
+  // Forced bridging (existential success)
+  let nsCoding: NSCoding = nsArray
+  println(genericForcedCast(nsCoding) as [String])
 
   println("Done")
 }
@@ -150,6 +156,8 @@ func testConditionalObjectToValueBridging() {
 
   let nsArray: NSArray = ["Hello", "World"]
   let nsObject: NSObject = nsArray
+  let anyObject: AnyObject = nsArray
+  let nsCoding: NSCoding = nsArray
   let nsString: NSString = "Hello"
 
   // Conditional bridging (exact)
@@ -168,9 +176,29 @@ func testConditionalObjectToValueBridging() {
     println("Not a [String]")
   }
 
-  // FIXME: Conditional bridging (AnyObject)
-  // FIXME: Conditional bridging (existential success)
-  // FIXME: Conditional bridging (existential failure)
+  // Conditional bridging (AnyObject)
+  // CHECK: [Hello, World]
+  if let arr = (genericConditionalCast(anyObject) as [String]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
+
+  // Conditional bridging (existential success)
+  // CHECK: [Hello, World]
+  if let arr = (genericConditionalCast(nsCoding) as [String]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
+
+  // Conditional bridging (existential failure)
+  // Not a [Int]
+  if let arr = (genericConditionalCast(nsCoding) as [Int]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
 
   // Conditional bridging (unrelated class type)
   // CHECK: Not a [String]
