@@ -158,6 +158,9 @@ static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
   return object;
 }
 
+/// Atomically increments the reference count of an object, unless it has
+/// already been destroyed. Returns nil if the object is dead.
+extern "C" HeapObject *swift_tryRetain(HeapObject *object);
 
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:

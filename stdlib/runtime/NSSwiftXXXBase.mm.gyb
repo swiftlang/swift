@@ -73,6 +73,11 @@ using namespace swift;
   return _objc_rootAutorelease(self);
 }
 
+- (BOOL)_tryRetain {
+  auto SELF = reinterpret_cast<HeapObject *>(self);
+  return (bool)swift_tryRetain(SELF);
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {
