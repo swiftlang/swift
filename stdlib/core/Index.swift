@@ -79,6 +79,7 @@ public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 // isn't yet smart enough to handle.
 
 public protocol _Incrementable : Equatable {
+  /// Return the next consecutive value in a discrete sequence
   func successor() -> Self
 }
 
@@ -188,6 +189,7 @@ func _advanceForward<T: _ForwardIndexType>(
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndexType -------------------------------------------===//
 public protocol _BidirectionalIndexType : _ForwardIndexType {
+  /// Return the previous consecutive value in a discrete sequence
   func predecessor() -> Self
 }
 
