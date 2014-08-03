@@ -243,3 +243,29 @@ public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
   return UTF16.CodeUnit(us.value)
 }
 
+extension UnicodeScalar {
+  struct UTF16View {
+    var value: UnicodeScalar
+  }
+
+  var utf16: UTF16View {
+    return UTF16View(value: self)
+  }
+}
+
+extension UnicodeScalar.UTF16View : CollectionType {
+  var startIndex: Int {
+    return 0
+  }
+  var endIndex: Int {
+    return 0 + UTF16.width(value)
+  }
+  subscript(i: Int) -> UTF16.CodeUnit {
+    return i == 0 ? (
+      endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
+    ) : UTF16.trailSurrogate(value)
+  }
+  func generate() -> IndexingGenerator<UnicodeScalar.UTF16View> {
+    return IndexingGenerator(self)
+  }
+}

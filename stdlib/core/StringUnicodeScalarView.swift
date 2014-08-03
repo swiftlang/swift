@@ -227,6 +227,68 @@ extension String {
   }
 
   public var unicodeScalars : UnicodeScalarView {
-    return UnicodeScalarView(_core)
+    get {
+      return UnicodeScalarView(_core)
+    }
+    set {
+      _core = newValue._core
+    }
+  }
+}
+
+extension String.UnicodeScalarView : ExtensibleCollectionType {
+  public init() {
+    self = String.UnicodeScalarView(_StringCore())
+  }
+  public mutating func reserveCapacity(capacity: Int) {
+    _core.reserveCapacity(capacity)
+  }
+  public mutating func extend<
+    S : SequenceType where S.Generator.Element == UnicodeScalar
+  >(seq: S) {
+    _core.extend(
+      lazyConcatenate(lazy(seq).map { $0.utf16 })
+    )
+  }
+}
+
+extension String.UnicodeScalarView : RangeReplaceableCollectionType {
+
+  /// Replace the given `subRange` of elements with `newValues`.
+  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == UnicodeScalar
+  >(
+    subRange: Range<Index>, with newValues: C
+  ) {
+    _core.replaceRange(
+      subRange.startIndex._position
+      ..< subRange.endIndex._position,
+      with:
+        lazyConcatenate(lazy(newValues).map { $0.utf16 })
+    )
+  }
+
+  public mutating func insert(newElement: UnicodeScalar, atIndex i: Index) {
+    Swift.insert(&self, newElement, atIndex: i)
+  }
+  
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == UnicodeScalar
+  >(newValues: S, atIndex i: Index) {
+    Swift.splice(&self, newValues, atIndex: i)
+  }
+
+  public mutating func removeAtIndex(i: Index) -> UnicodeScalar {
+    return Swift.removeAtIndex(&self, i)
+  }
+  
+  public mutating func removeRange(subRange: Range<Index>) {
+    Swift.removeRange(&self, subRange)
+  }
+
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }
