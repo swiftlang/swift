@@ -363,7 +363,7 @@ func test_PointerPrinting() {
   var fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234)
 
 #if !(arch(i386) || arch(arm))
-  var eightByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcddcba12344321)
+  var eightByteUP = UnsafeMutablePointer<Float>(bitPattern: Int(bitPattern: 0xabcddcba12344321))
 #endif
 
 #if arch(i386) || arch(arm)
