@@ -110,6 +110,11 @@ public enum Character :
     // wasteful and inefficient.
     return String(self).hashValue
   }
+
+  typealias UTF16View = String.UTF16View
+  var utf16: UTF16View {
+    return String(self).utf16
+  }
 }
 
 extension String {

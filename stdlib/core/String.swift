@@ -549,3 +549,42 @@ extension String {
   }
 }
 
+extension String : RangeReplaceableCollectionType {
+  /// Replace the given `subRange` of elements with `newValues`.
+  /// Complexity: O(\ `countElements(subRange)`\ ) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newValues)`\ , O(N) otherwise.
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == Character
+  >(
+    subRange: Range<Index>, with newValues: C
+  ) {
+    _core.replaceRange(
+      subRange.startIndex._base._position
+      ..< subRange.endIndex._base._position,
+      with:
+        lazyConcatenate(lazy(newValues).map { $0.utf16 })
+    )
+  }
+
+  public mutating func insert(newElement: Character, atIndex i: Index) {
+    Swift.insert(&self, newElement, atIndex: i)
+  }
+  
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == Character
+  >(newValues: S, atIndex i: Index) {
+    Swift.splice(&self, newValues, atIndex: i)
+  }
+
+  public mutating func removeAtIndex(i: Index) -> Character {
+    return Swift.removeAtIndex(&self, i)
+  }
+  
+  public mutating func removeRange(subRange: Range<Index>) {
+    Swift.removeRange(&self, subRange)
+  }
+
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    Swift.removeAll(&self, keepCapacity: keepCapacity)
+  }
+}

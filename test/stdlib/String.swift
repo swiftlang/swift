@@ -294,9 +294,27 @@ StringTests.test("StringCoreReplace") {
         { makeStringCore(s1) },
         { makeStringCore(s2 + s2)[0..<$0] }
       )
+      checkRangeReplaceable(
+        { makeStringCore(s1) },
+        { Array(makeStringCore(s2 + s2)[0..<$0]) }
+      )
     }
   }
 }
+
+StringTests.test("StringReplace") {
+  let narrow = "01234567890"
+  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
+  for s1 in [narrow, wide] {
+    for s2 in [narrow, wide] {
+      checkRangeReplaceable(
+        { String(makeStringCore(s1)) },
+        { Array(String(makeStringCore(s2 + s2)[0..<$0])) }
+      )
+    }
+  }
+}
+
 StringTests.run()
 // CHECK: {{^}}StringTests: All tests passed
 
