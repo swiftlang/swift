@@ -98,6 +98,9 @@ extension String {
   var bufferID: UWord {
     return unsafeBitCast(_core._owner, UWord.self)
   }
+  var capacity: Int {
+    return _core.nativeBuffer?.capacity ?? 0
+  }
 }
 
 StringTests.test("appendToSubstring") {
@@ -253,7 +256,7 @@ StringTests.test("stringCoreReserve") {
 
     // Reserving up to the capacity in a unique native buffer is a no-op
     let nativeBuffer = base.bufferID
-    let currentCapacity = base._core.nativeBuffer!.capacity
+    let currentCapacity = base.capacity
     base._core.reserveCapacity(currentCapacity)
     expectEqual(nativeBuffer, base.bufferID)
 
@@ -334,6 +337,25 @@ StringTests.test("UnicodeScalarViewReplace") {
       )
     }
   }
+}
+
+StringTests.test("reserveCapacity") {
+  var s = ""
+  let id0 = s.bufferID
+  let oldCap = s.capacity
+  let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
+  s.splice(Repeat(count: s.capacity + 1, repeatedValue: x), atIndex: s.endIndex)
+  expectNotEqual(id0, s.bufferID)
+  s = ""
+  println("empty capacity \(s.capacity)")
+  s.reserveCapacity(oldCap + 2)
+  println("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  let id1 = s.bufferID
+  s.splice(Repeat(count: oldCap + 2, repeatedValue: x), atIndex: s.endIndex)
+  println("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  expectEqual(id1, s.bufferID)
+  s.splice(Repeat(count: s.capacity + 100, repeatedValue: x), atIndex: s.endIndex)
+  expectNotEqual(id1, s.bufferID)
 }
 
 StringTests.run()

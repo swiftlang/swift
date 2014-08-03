@@ -526,8 +526,7 @@ extension String : ExtensibleCollectionType {
   ///
   /// If current capacity is sufficient, has no effect.
   public mutating func reserveCapacity(n: Int) {
-    // FIXME: implement.
-    // <rdar://problem/16970908> Implement String.reserveCapacity
+    _core.reserveCapacity(n)
   }
 
   public mutating func extend<
