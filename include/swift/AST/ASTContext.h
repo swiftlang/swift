@@ -634,6 +634,9 @@ public:
 
   /// \brief Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
+  
+  /// \brief Returns memory used exclusively by constraint solver.
+  size_t getSolverMemory() const;
 
 private:
   friend class Decl;

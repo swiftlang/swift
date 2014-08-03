@@ -199,7 +199,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
-
+  inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
+  
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 

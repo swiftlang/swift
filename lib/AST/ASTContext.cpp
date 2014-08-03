@@ -1275,12 +1275,19 @@ size_t ASTContext::getTotalMemory() const {
     Impl.OpenedExistentialArchetypes.capacity() +
     Impl.Permanent.getTotalMemory();
 
-    if (Impl.CurrentConstraintSolverArena) {
-      Size +=
-        Impl.CurrentConstraintSolverArena->getTotalMemory();
-    }
+    Size += getSolverMemory();
 
     return Size;
+}
+
+size_t ASTContext::getSolverMemory() const {
+  size_t Size = 0;
+  
+  if (Impl.CurrentConstraintSolverArena) {
+    Size += Impl.CurrentConstraintSolverArena->getTotalMemory();
+  }
+  
+  return Size;
 }
 
 size_t ASTContext::Implementation::Arena::getTotalMemory() const {

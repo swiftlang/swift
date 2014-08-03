@@ -813,6 +813,15 @@ static bool tryTypeVariableBindings(
   SmallVector<PotentialBinding, 4> storedBindings;
   auto &tc = cs.getTypeChecker();
   ++cs.solverState->NumTypeVariablesBound;
+  
+  // If the solver has allocated an excessive amount of memory when solving for
+  // this expression, short-circuit the binding operation and mark the parent
+  // expression as "too complex".
+  if (cs.TC.Context.getSolverMemory() >
+        cs.TC.Context.LangOpts.SolverMemoryThreshold) {
+    cs.setExpressionTooComplex(true);
+    return true;
+  }
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
     // Try each of the bindings in turn.
@@ -1389,6 +1398,10 @@ bool ConstraintSystem::solveSimplified(
     // short-circuit the disjunction.
     if (firstSolvedConstraint &&
         shortCircuitDisjunctionAt(constraint, firstSolvedConstraint))
+      break;
+    
+    // If the expression was deemed "too complex", stop now and salvage.
+    if (getExpressionTooComplex())
       break;
 
     // Try to solve the system with this option in the disjunction.

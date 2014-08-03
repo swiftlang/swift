@@ -1109,6 +1109,10 @@ private:
 
   /// \brief Counter for type variables introduced.
   unsigned TypeCounter = 0;
+  
+  /// \brief The expression being solved has exceeded the solver's memory
+  /// threshold.
+  bool expressionExceededThreshold = false;
 
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
@@ -2164,6 +2168,18 @@ public:
   /// \param type The array type to inspect.
   /// \returns the base type of the array.
   Type getBaseTypeForArrayType(TypeBase *type);
+  
+  /// \brief Set whether or not the expression being solved is too complex and
+  /// has exceeded the solver's memory threshold.
+  void setExpressionTooComplex(bool tc) {
+    expressionExceededThreshold = tc;
+  }
+  
+  /// \brief Determine if the expression being solved has exceeded the solver's
+  /// memory threshold.
+  bool getExpressionTooComplex() {
+    return expressionExceededThreshold;
+  }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,

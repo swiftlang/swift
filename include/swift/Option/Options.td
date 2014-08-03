@@ -195,6 +195,10 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
+def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

@@ -624,6 +624,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugConstraintSolverAttempt = attempt;
   }
   
+  if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
+    unsigned threshold;
+    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    
+    Opts.SolverMemoryThreshold = threshold;
+  }
+  
   for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
                                  Args.filtered_end())) {
     Opts.addBuildConfigOption(A->getValue());

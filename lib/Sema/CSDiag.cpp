@@ -1334,6 +1334,7 @@ static bool shouldDiagnoseFromConstraints(Expr * expr, Failure &failure) {
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
                                Expr *expr,
                                bool onlyFailures) {
+  
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
     for (auto failure : unavoidableFailures) {
@@ -1428,6 +1429,11 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
   // If all else fails, attempt to diagnose the failure by looking through the
   // system's constraints.
   this->diagnoseFailureFromConstraints(expr);
+  
+  if (getExpressionTooComplex()) {
+    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
+    highlight(expr->getSourceRange());
+  }
   
   return true;
 }
