@@ -116,3 +116,62 @@ testNSMutableStringMatch("foobar")
 
 // CHECK: nomatch
 testNSMutableStringMatch("nope")
+
+func testAnyObjectDowncast(obj: AnyObject) {
+  switch obj {
+  case let str as String:
+    println("String: \(str)")
+
+  case let int as Int:
+    println("Int: \(int)")
+    
+  case let nsStrArr as [NSString]:
+    println("NSString array: \(nsStrArr)")
+
+  case let intArr as [Int]:
+    println("Int array: \(intArr)")
+
+  case let dict as Dictionary<String, Int>:
+    println("Dictionary<String, Int>: \(dict)")
+
+  default:
+    println("Did not match")
+  }
+}
+
+// CHECK: String: hello
+testAnyObjectDowncast("hello")
+
+// CHECK: Int: 5
+testAnyObjectDowncast(5)
+
+// CHECK: NSString array: [hello, swift, world]
+testAnyObjectDowncast(["hello", "swift", "world"] as NSArray)
+
+// CHECK: Int array: [1, 2, 3, 4, 5]
+testAnyObjectDowncast([1, 2, 3, 4, 5])
+
+// CHECK: Dictionary<String, Int>: [hello: 1, world: 2]
+testAnyObjectDowncast(["hello" : 1, "world" : 2])
+
+func testNSArrayDowncast(nsArr: NSArray) {
+  switch nsArr {
+  case let strArr as [String]:
+    println("[String]: \(strArr)")
+
+  case let intArr as [Int]:
+    println("[Int]: \(intArr)")
+
+  default:
+    println("Did not match");
+  }
+}
+
+// CHECK: [String]: [a, b, c]
+testNSArrayDowncast(["a", "b", "c"])
+
+// CHECK: [Int]: [1, 2, 3]
+testNSArrayDowncast([1, 2, 3])
+
+// CHECK: Did not match
+testNSArrayDowncast([[1, 2], [3, 4], [5, 6]])

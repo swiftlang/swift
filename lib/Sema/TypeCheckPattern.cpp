@@ -961,17 +961,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       IP->setCastKind(castKind);
       break;
     }
-    
-    // If this condition requires us to bridge, handle this via a
-    // conditional downcast.
-    auto srcValueType = type->lookThroughAllAnyOptionalTypes();
-    auto destValueType
-      = IP->getCastTypeLoc().getType()->lookThroughAllAnyOptionalTypes();
-    if (getDynamicBridgedThroughObjCClass(dc, srcValueType, destValueType))
-      return coercePatternViaConditionalDowncast(
-               *this, P, dc, type,
-               subOptions|TR_FromNonInferredPattern);
-
     IP->setType(type);
     
     // Coerce the subpattern to the destination type.
