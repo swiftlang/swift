@@ -73,7 +73,8 @@ public:
 
     std::pair<KeyTy, ValueTy> Pair;
     Pair.first = Key;
-    return std::lower_bound(Array.begin(), Array.end(), Pair, SortFun); 
+    iterator I = std::lower_bound(Array.begin(), Array.end(), Pair, SortFun);
+    return I->first == Key ? I : Array.end();
   }
 };
 
