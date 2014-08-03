@@ -25,7 +25,7 @@ public func <(
 }
 
 extension String {
-  public struct UnicodeScalarView : Sliceable, SequenceType {
+  public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable {
     init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -211,6 +211,10 @@ extension String {
         }
         return 0
       }
+    }
+
+    public func getMirror() -> MirrorType {
+      return _UnicodeScalarViewMirror(self)
     }
 
     var _core: _StringCore

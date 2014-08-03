@@ -15,7 +15,7 @@
 %TMirrorConformance = gyb.parseTemplate("../common/MirrorConformance.gyb")
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
-% for Self in ['UTF8View','UTF16View']:
+% for Self in ['UTF8View', 'UTF16View', 'UnicodeScalarView']:
 %   MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self)
 %   MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self)
 %   MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self)
@@ -28,6 +28,7 @@ extension String {
 
       subscript(i: Int) -> (String, MirrorType) {
         _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+        // FIXME(performance): optimize for sequential access.
         return ("[\(i)]", reflect(_value[advance(_value.startIndex, i)]))
       }
 

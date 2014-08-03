@@ -766,8 +766,14 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   var output = ""
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, &output)
 
-  // FIXME: the output is not pretty now.
-  //expectEqual(expected, output)
+  var expected = ""
+  expected += "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n"
+  expected += "  - [0]: \u{61}\n"
+  expected += "  - [1]: \u{304b}\n"
+  expected += "  - [2]: \u{3099}\n"
+  expected += "  - [3]: \u{1f425}\n"
+
+  expectEqual(expected, output)
 }
 
 Reflection.test("TupleMirror/NoLeak") {
