@@ -137,8 +137,8 @@ struct _UIViewMirror : MirrorType {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,MirrorType) { 
-    _sanityCheckFailure("MirrorType access out of bounds")
+  subscript(_: Int) -> (String, MirrorType) {
+    _preconditionFailure("MirrorType access out of bounds")
   }
   
   var summary: String { get { return ""} }

@@ -27,10 +27,8 @@ extension String {
       var count: Int { return distance(_value.startIndex,_value.endIndex) }
 
       subscript(i: Int) -> (String,MirrorType) {
-        if i >= count {
-          _sanityCheckFailure("MirrorType access out of bounds")
-        }
-        return ("[\(i)]",reflect(self[i]))
+        _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+        return ("[\(i)]", reflect(self[i]))
       }
 
       var summary: String { return String(_value._core) }

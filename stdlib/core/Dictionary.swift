@@ -2062,16 +2062,14 @@ class _DictionaryMirror<Key : Hashable,Value> : MirrorType {
     // this use of indexes is optimized for a world of contiguous accesses
     // i.e. we expect users to start asking for children in a range, then maybe
     // shift to a different range, .. and so on
-    if (i >= 0) && (i < count) {
-      while _pos < i {
-        _pos.successor()
-      }
-      while _pos > i {
-        _pos.prec()
-      }
-      return ("[\(_pos._intPos)]",reflect(_dict[_pos._dicPos]))
+    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+    while _pos < i {
+      _pos.successor()
     }
-    _sanityCheckFailure("MirrorType access out of bounds")
+    while _pos > i {
+      _pos.prec()
+    }
+    return ("[\(_pos._intPos)]", reflect(_dict[_pos._dicPos]))
   }
 
   var summary: String {

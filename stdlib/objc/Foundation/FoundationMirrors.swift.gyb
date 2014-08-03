@@ -37,8 +37,8 @@ ${getMirrorDecl("NSURL")} {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,MirrorType) {
-    _sanityCheckFailure("MirrorType access out of bounds")
+  subscript(_: Int) -> (String, MirrorType) {
+    _preconditionFailure("MirrorType access out of bounds")
   }
   
   var summary: String { get { return _value.absoluteString } }
@@ -51,11 +51,11 @@ ${getMirrorDecl("NSRange")} {
   
   var count: Int { get { return 2 } }
   
-  subscript(i: Int) -> (String,MirrorType) {
+  subscript(i: Int) -> (String, MirrorType) {
     switch i {
-      case 0: return ("location",reflect(_value.location))
-      case 1: return ("length",reflect(_value.length))
-      default: _sanityCheckFailure("MirrorType access out of bounds")
+    case 0: return ("location", reflect(_value.location))
+    case 1: return ("length", reflect(_value.length))
+    default: _preconditionFailure("MirrorType access out of bounds")
     }
   }
   
@@ -71,8 +71,8 @@ ${getMirrorDecl("NSDate")} {
   
   var count: Int { get { return 0 } }
   
-  subscript(i: Int) -> (String,MirrorType) {
-    _sanityCheckFailure("MirrorType access out of bounds")
+  subscript(i: Int) -> (String, MirrorType) {
+    _preconditionFailure("MirrorType access out of bounds")
   }
   
   var summary: String {
@@ -110,11 +110,9 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
     return 0
   }
   
-  subscript(i: Int) -> (String,MirrorType) {
-    if i >= 0 && i < count {
-      return ("[\(i)]",reflect(_a[i]))
-    }
-    _sanityCheckFailure("MirrorType access out of bounds")
+  subscript(i: Int) -> (String, MirrorType) {
+    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+    return ("[\(i)]", reflect(_a[i]))
   }
   
   var summary: String { return "\(count) elements" }

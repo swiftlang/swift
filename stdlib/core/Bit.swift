@@ -55,8 +55,8 @@ struct _BitMirror: MirrorType {
 
   var count: Int { return 0 }
 
-  subscript(i: Int) -> (String, MirrorType) { 
-    _sanityCheckFailure("MirrorType access out of bounds")
+  subscript(i: Int) -> (String, MirrorType) {
+    _preconditionFailure("MirrorType access out of bounds")
   }
 
   var summary: String { 

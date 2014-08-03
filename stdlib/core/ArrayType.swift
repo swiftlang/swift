@@ -112,10 +112,8 @@ internal struct _ArrayTypeMirror<T : ArrayType> : MirrorType {
   var count: Int { return _value.count }
 
   subscript(i: Int) -> (String, MirrorType) {
-    if (i >= 0) && (i < count) {
-      return ("[\(i)]",reflect(_value[i]))
-    }
-    _sanityCheckFailure("MirrorType access out of bounds")
+    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+    return ("[\(i)]", reflect(_value[i]))
   }
 
   var summary: String {

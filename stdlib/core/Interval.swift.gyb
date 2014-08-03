@@ -174,14 +174,14 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 
 struct _IntervalMirror<T: protocol<IntervalType,Printable>>: MirrorType {
   ${Boilerplate}
-  
+
   var count: Int { return 2 }
 
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
-      case 0: return ("start",reflect(_value.start))
-      case 1: return ("end",reflect(_value.end))
-      default: _sanityCheckFailure("MirrorType access out of bounds")
+    case 0: return ("start", reflect(_value.start))
+    case 1: return ("end", reflect(_value.end))
+    default: _preconditionFailure("MirrorType access out of bounds")
     }
   }
 
