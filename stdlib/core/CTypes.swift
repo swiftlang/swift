@@ -77,17 +77,47 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
-  var value : Builtin.RawPointer
-  
+  var value: Builtin.RawPointer
+
+  @transparent
   public init() {
-    var zero : Int = 0
-    value = Builtin.inttoptr_Word(zero.value)
+    value = Builtin.inttoptr_Word(0.value)
   }
 
+  @transparent
   init(_ v: Builtin.RawPointer) {
     value = v
   }
 
+  /// Construct a `COpaquePointer` from a given address in memory.
+  ///
+  /// This is a fundamentally unsafe conversion.
+  @transparent
+  public init(bitPattern: Word) {
+    value = Builtin.inttoptr_Word(bitPattern.value)
+  }
+
+  /// Construct a `COpaquePointer` from a given address in memory.
+  ///
+  /// This is a fundamentally unsafe conversion.
+  @transparent
+  public init(bitPattern: UWord) {
+    value = Builtin.inttoptr_Word(bitPattern.value)
+  }
+
+  /// Convert a typed `UnsafePointer` to an opaque C pointer.
+  @transparent
+  public init<T>(_ value: UnsafePointer<T>) {
+    self.value = value.value
+  }
+
+  /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
+  @transparent
+  public init<T>(_ value: UnsafeMutablePointer<T>) {
+    self.value = value.value
+  }
+
+  @transparent
   public static func null() -> COpaquePointer {
     return COpaquePointer()
   }
@@ -116,16 +146,6 @@ extension COpaquePointer : DebugPrintable {
 
 public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
-}
-
-extension COpaquePointer {
-  // FIXME: Make this an implicit conversion?
-  // FIXME: This shouldn't have to be in an extension.
-  //
-  /// Convert a typed UnsafeMutablePointer to an opaque C pointer.
-  public init<T>(_ from : UnsafeMutablePointer<T>) {
-    value = from.value;
-  }
 }
 
 public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {

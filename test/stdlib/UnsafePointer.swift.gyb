@@ -1,0 +1,89 @@
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/UnsafePointer.swift
+// RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/UnsafePointer.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/UnsafePointer.swift -- FileCheck %t/UnsafePointer.swift
+
+import StdlibUnittest
+
+var UnsafePointerTestCase = TestCase("UnsafePointer")
+var UnsafeMutablePointerTestCase = TestCase("UnsafeMutablePointer")
+var COpaquePointerTestCase = TestCase("COpaquePointer")
+
+% for (SelfName, SelfType) in [
+%     ( 'UnsafePointer', 'UnsafePointer<Float>' ),
+%     ( 'UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%     ( 'COpaquePointer', 'COpaquePointer' ) ]:
+
+${SelfName}TestCase.test("convertFromNil") {
+  let ptr: ${SelfType} = nil
+  expectEqual(0, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("null()") {
+  let ptr = ${SelfType}.null()
+  expectEqual(0, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("initNoArgs") {
+  let ptr = ${SelfType}()
+  expectEqual(0, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("initFromCOpaquePointer") {
+  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("initFromUnsafePointer") {
+  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("initFromUnsafeMutablePointer") {
+  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+}
+
+${SelfName}TestCase.test("initFromInteger") {
+  if true {
+    let word: Word = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEqual(word, unsafeBitCast(ptr, Word.self))
+  }
+  if true {
+    let uword: UWord = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEqual(uword, unsafeBitCast(ptr, UWord.self))
+  }
+}
+
+${SelfName}TestCase.test("Hashable") {
+  let ptrs = [
+    ${SelfType}(bitPattern: 0x0),
+    ${SelfType}(bitPattern: 0x12345678),
+    ${SelfType}(bitPattern: 0x87654321),
+  ]
+  for i in indices(ptrs) {
+    for j in indices(ptrs) {
+      var pi = ptrs[i]
+      var pj = ptrs[j]
+      checkHashable(i == j, pi, pj, SourceLocStack().withCurrentLoc()) {
+        "i=\(i), j=\(j)"
+      }
+    }
+  }
+}
+
+% end
+
+UnsafePointerTestCase.run()
+// CHECK: {{^}}UnsafePointer: All tests passed
+
+UnsafeMutablePointerTestCase.run()
+// CHECK: {{^}}UnsafeMutablePointer: All tests passed
+
+COpaquePointerTestCase.run()
+// CHECK: {{^}}COpaquePointer: All tests passed
+

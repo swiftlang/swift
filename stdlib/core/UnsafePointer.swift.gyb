@@ -17,7 +17,7 @@
 
 % for mutable in (True, False):
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
-%  a_Self = 'an UnsafeMutablePointer' if mutable else 'a UnsafePointer'
+%  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
 %  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
 %  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
@@ -65,8 +65,16 @@ public struct ${Self}<T>
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init(_ value : Int) {
-    self.value = Builtin.inttoptr_Word(value.value)
+  public init(bitPattern: Word) {
+    self.value = Builtin.inttoptr_Word(bitPattern.value)
+  }
+
+  /// Construct ${a_Self} from a given address in memory.
+  ///
+  /// This is a fundamentally unsafe conversion.
+  @transparent
+  public init(bitPattern: UWord) {
+    self.value = Builtin.inttoptr_Word(bitPattern.value)
   }
 
   /// Convert from an UnsafeMutablePointer of a different type.
