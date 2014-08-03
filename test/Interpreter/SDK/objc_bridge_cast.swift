@@ -84,3 +84,75 @@ func testConditionalValueToObjectBridging() {
 }
 // CHECK: Done
 testConditionalValueToObjectBridging()
+
+func testForcedObjectToValueBridging() {
+  // CHECK: ---Forced object to value bridging---
+  println("---Forced object to value bridging---")
+
+  let nsArray: NSArray = ["Hello", "World"]
+  let nsObject: NSObject = nsArray
+
+  // Forced bridging (exact)
+  // CHECK: [Hello, World]
+  println(genericForcedCast(nsArray) as [String])
+
+  // Forced bridging (superclass)
+  // CHECK: [Hello, World]
+  println(genericForcedCast(nsObject) as [String])
+
+  // FIXME: Forced bridging (AnyObject)
+  // FIXME: Forced bridging (existential success)
+
+  println("Done")
+}
+// CHECK: Done
+testForcedObjectToValueBridging()
+
+func testConditionalObjectToValueBridging() {
+  // CHECK: ---Conditional object to value bridging---
+  println("---Conditional object to value bridging---")
+
+  let nsArray: NSArray = ["Hello", "World"]
+  let nsObject: NSObject = nsArray
+  let nsString: NSString = "Hello"
+
+  // Conditional bridging (exact)
+  // CHECK: [Hello, World]
+  if let arr = (genericConditionalCast(nsArray) as [String]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
+
+  // Conditional bridging (superclass)
+  // CHECK: [Hello, World]
+  if let arr = (genericConditionalCast(nsObject) as [String]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
+
+  // FIXME: Conditional bridging (AnyObject)
+  // FIXME: Conditional bridging (existential success)
+  // FIXME: Conditional bridging (existential failure)
+
+  // Conditional bridging (unrelated class type)
+  // CHECK: Not a [String]
+  if let arr = (genericConditionalCast(nsString) as [String]?) {
+    println(arr)
+  } else {
+    println("Not a [String]")
+  }
+
+  // Conditional bridging (unrelated element type)
+  // CHECK: Not a [Int]
+  if let arr = (genericConditionalCast(nsArray) as [Int]?) {
+    println(arr)
+  } else {
+    println("Not a [Int]")
+  }
+
+  println("Done")
+}
+// CHECK: Done
+testConditionalObjectToValueBridging()

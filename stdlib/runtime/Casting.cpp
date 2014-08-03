@@ -1008,8 +1008,6 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   _failCorruptType(srcType);
 }
 
-/// Bridge a value type that conforms to the _ObjectiveCBridgeable protocol to
-/// a class type and dynamic cast the result to the given class type.
 static bool _dynamicCastValueToClassViaObjCBridgeable(
               OpaqueValue *dest,
               OpaqueValue *src,
@@ -1017,6 +1015,14 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
               const Metadata *targetType,
               const _ObjectiveCBridgeableWitnessTable *srcBridgeWitness,
               DynamicCastFlags flags);
+
+static bool _dynamicCastClassToValueViaObjCBridgeable(
+               OpaqueValue *dest,
+               OpaqueValue *src,
+               const Metadata *srcType,
+               const Metadata *targetType,
+               const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
+               DynamicCastFlags flags);
 
 /// Perform a dynamic cast to an arbitrary type.
 bool swift::swift_dynamicCast(OpaqueValue *dest,
@@ -1089,15 +1095,47 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                  cast<ExistentialMetatypeMetadata>(targetType),
                                              flags);
 
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+    switch (srcType->getKind()) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass: {
+      // If the target type is bridged to Objective-C, try to bridge.
+      if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
+        return _dynamicCastClassToValueViaObjCBridgeable(dest, src, srcType,
+                                                         targetType,
+                                                         targetBridgeWitness,
+                                                         flags);
+      }
+
+      break;
+    }
+
+    case MetadataKind::Enum:
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Function:
+    case MetadataKind::Block:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      break;
+    }
+
+    SWIFT_FALLTHROUGH;
+
   // The non-polymorphic types.
   case MetadataKind::Function:
   case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
-  case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
-  case MetadataKind::Struct:
   case MetadataKind::Tuple:
     // If there's an exact type match, we're done.
     if (srcType == targetType) {
@@ -1591,7 +1629,7 @@ extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
 
 namespace {
 
-// protocol _BridgedToObjectiveC {
+// protocol _ObjectiveCBridgeableWitnessTable {
 struct _ObjectiveCBridgeableWitnessTable {
   // typealias _ObjectiveCType: class
   const Metadata *ObjectiveCType;
@@ -1658,6 +1696,102 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
   }
 
   // We're done.
+  return success;
+}
+
+/// Dynamic cast from a class type to a value type that conforms to the
+/// _ObjectiveCBridgeable, first by dynamic casting the object to the
+/// Objective-C class to which the value type is bridged, and then bridging
+/// from that object to the value type via the witness table.
+static bool _dynamicCastClassToValueViaObjCBridgeable(
+               OpaqueValue *dest,
+               OpaqueValue *src,
+               const Metadata *srcType,
+               const Metadata *targetType,
+               const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
+               DynamicCastFlags flags) {
+  // Check whether the target is bridged to Objective-C.
+  if (!targetBridgeWitness->isBridgedToObjectiveC(targetType, targetType)) {
+    return _fail(src, srcType, targetType, flags);
+  }
+
+  // Determine the class type to which the target value type is bridged.
+  auto targetBridgedClass = targetBridgeWitness->getObjectiveCType(targetType,
+                                                                   targetType);
+
+  // Dynamic cast the source object to the class type to which the target value
+  // type is bridged. If we succeed, we
+  void *srcObject = *reinterpret_cast<void * const *>(src);
+  DynamicCastFlags classCastFlags = flags;
+  void *srcBridgedObject = nullptr;
+  if (!_dynamicCastUnknownClass(
+         reinterpret_cast<OpaqueValue *>(&srcBridgedObject), srcObject,
+         targetBridgedClass, classCastFlags)) {
+    return false;
+  }
+
+  // Unless we're always supposed to consume the input, retain the
+  // object because the witness takes it at +1.
+  bool alwaysConsumeSrc = (flags & (DynamicCastFlags::TakeOnSuccess | 
+                                    DynamicCastFlags::DestroyOnFailure));
+  if (!alwaysConsumeSrc) {
+    swift_unknownRetain(srcBridgedObject);
+  }
+
+  // Object that frees a buffer when it goes out of scope.
+  struct FreeBuffer {
+    void *Buffer = nullptr;
+    ~FreeBuffer() { free(Buffer); }
+  } freeBuffer;
+
+  // Allocate a buffer to store the T? returned by bridging.
+  // The extra byte is for the tag.
+  const std::size_t inlineValueSize = 3 * sizeof(void*);
+  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
+  void *optDestBuffer;
+  if (targetType->getValueWitnesses()->getStride() <= inlineValueSize) {
+    // Use the inline buffer.
+    optDestBuffer = inlineBuffer;
+  } else {
+    // Allocate a buffer.
+    optDestBuffer = malloc(targetType->getValueWitnesses()->size);
+    freeBuffer.Buffer = optDestBuffer;
+  }
+
+  // Initialize the buffer as an empty optional.
+  swift_storeEnumTagSinglePayload((OpaqueValue *)optDestBuffer, targetType, 
+                                  0, 1);
+
+  // Perform the bridging operation.
+  bool success;
+  if (flags & DynamicCastFlags::Unconditional) {
+    // For an unconditional dynamic cast, use forceBridgeFromObjectiveC.
+    targetBridgeWitness->forceBridgeFromObjectiveC(
+      (HeapObject *)srcBridgedObject, (OpaqueValue *)optDestBuffer, 
+      targetType, targetType);
+    success = true;
+  } else {
+    // For a conditional dynamic cast, use conditionallyBridgeFromObjectiveC.
+    success = targetBridgeWitness->conditionallyBridgeFromObjectiveC(
+                (HeapObject *)srcBridgedObject, (OpaqueValue *)optDestBuffer,
+                targetType, targetType);
+  }
+
+  // If we succeeded, take from the optional buffer into the
+  // destination buffer.
+  if (success) {
+    targetType->vw_initializeWithTake(dest, (OpaqueValue *)optDestBuffer);
+  }
+
+  // Unless we're always supposed to consume the input, release the
+  // input if we need to now.
+  if (!alwaysConsumeSrc) {
+    if ((success && (flags & DynamicCastFlags::TakeOnSuccess)) ||
+        (!success && (flags & DynamicCastFlags::DestroyOnFailure))) {
+      swift_unknownRelease(srcBridgedObject);
+    }
+  }
+
   return success;
 }
 
