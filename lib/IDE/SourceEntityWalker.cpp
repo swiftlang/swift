@@ -160,9 +160,10 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     if (auto *VD = PBD->getSingleVar()) {
       if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        auto *Get = VD->getGetter();
-        assert(Get && Get->isImplicit() && "lazy var not implicitly computed");
-        Get->getBody()->walk(*this);
+        if (auto *Get = VD->getGetter()) {
+          assert(Get->isImplicit() && "lazy var not implicitly computed");
+          Get->getBody()->walk(*this);
+        }
       }
     }
   }
