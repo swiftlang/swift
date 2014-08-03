@@ -1817,7 +1817,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                                                                    targetType);
 
   // Dynamic cast the source object to the class type to which the target value
-  // type is bridged. If we succeed, we
+  // type is bridged. If we succeed, we can bridge from there; if we fail,
+  // there's nothing more to do.
   void *srcObject = *reinterpret_cast<void * const *>(src);
   DynamicCastFlags classCastFlags = flags;
   void *srcBridgedObject = nullptr;
@@ -1829,8 +1830,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 
   // Unless we're always supposed to consume the input, retain the
   // object because the witness takes it at +1.
-  bool alwaysConsumeSrc = (flags & (DynamicCastFlags::TakeOnSuccess | 
-                                    DynamicCastFlags::DestroyOnFailure));
+  bool alwaysConsumeSrc = (flags & DynamicCastFlags::TakeOnSuccess) &&
+                          (flags & DynamicCastFlags::DestroyOnFailure);
   if (!alwaysConsumeSrc) {
     swift_unknownRetain(srcBridgedObject);
   }
@@ -1882,11 +1883,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 
   // Unless we're always supposed to consume the input, release the
   // input if we need to now.
-  if (!alwaysConsumeSrc) {
-    if ((success && (flags & DynamicCastFlags::TakeOnSuccess)) ||
-        (!success && (flags & DynamicCastFlags::DestroyOnFailure))) {
-      swift_unknownRelease(srcBridgedObject);
-    }
+  if (!alwaysConsumeSrc && shouldDeallocateSource(success, flags)) {
+    swift_unknownRelease(srcBridgedObject);
   }
 
   return success;
