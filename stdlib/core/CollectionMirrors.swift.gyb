@@ -44,7 +44,7 @@ ${MirrorDecl} {
     if i >= 0 && i < count {
       return ("${ElementName}",reflect(_value[advance(_value.startIndex,i)]))
     } else {
-      _fatalError("MirrorType access out of bounds")
+      _sanityCheckFailure("MirrorType access out of bounds")
     }
   }
 

@@ -88,7 +88,7 @@ public protocol _Incrementable : Equatable {
 // implementation of Range for details.
 public struct _DisabledRangeIndex_ {
   init() {
-    _fatalError("Nobody should ever create one.")
+    _sanityCheckFailure("Nobody should ever create one.")
   }
 }
 

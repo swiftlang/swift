@@ -169,7 +169,7 @@ public struct UTF8 : UnicodeCodecType {
       return true
 
     default:
-      _fatalError("one-byte sequences should be handled in the caller")
+      _sanityCheckFailure("one-byte sequences should be handled in the caller")
     }
   }
 
@@ -313,7 +313,7 @@ public struct UTF8 : UnicodeCodecType {
           // Set the EOF flag.
           switch _lookaheadFlags & 0b0000_1111 {
           case 0b1111:
-            _fatalError("should have not entered buffer refill loop")
+            _sanityCheckFailure("should have not entered buffer refill loop")
           case 0b0111:
             _lookaheadFlags |= 0b0100_0000
           case 0b0011:
@@ -324,7 +324,7 @@ public struct UTF8 : UnicodeCodecType {
             _lookaheadFlags |= 0b1000_0000
             return .EmptyInput
           default:
-            _fatalError("bad value in _lookaheadFlags")
+            _sanityCheckFailure("bad value in _lookaheadFlags")
           }
           break
         }
@@ -348,7 +348,7 @@ public struct UTF8 : UnicodeCodecType {
       case 0b0001_0000:
         _decodeLookahead <<= 3 * 8
       default:
-        _fatalError("bad value in _lookaheadFlags")
+        _sanityCheckFailure("bad value in _lookaheadFlags")
       }
       _lookaheadFlags = (_lookaheadFlags & 0b0000_1111) | 0b1000_0000
     }
@@ -626,7 +626,7 @@ public func transcode<
     case .Result(let us):
       OutputEncoding.encode(us, output: &output)
     case .EmptyInput:
-      _fatalError("should not enter the loop when input becomes empty")
+      _sanityCheckFailure("should not enter the loop when input becomes empty")
     case .Error:
       if stopOnError {
         return (hadError: true)

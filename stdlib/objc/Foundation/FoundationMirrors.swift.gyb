@@ -38,7 +38,7 @@ ${getMirrorDecl("NSURL")} {
   var count: Int { get { return 0 } }
   
   subscript(_: Int) -> (String,MirrorType) {
-    _fatalError("MirrorType access out of bounds")
+    _sanityCheckFailure("MirrorType access out of bounds")
   }
   
   var summary: String { get { return _value.absoluteString } }
@@ -55,7 +55,7 @@ ${getMirrorDecl("NSRange")} {
     switch i {
       case 0: return ("location",reflect(_value.location))
       case 1: return ("length",reflect(_value.length))
-      default: _fatalError("MirrorType access out of bounds")
+      default: _sanityCheckFailure("MirrorType access out of bounds")
     }
   }
   
@@ -72,7 +72,7 @@ ${getMirrorDecl("NSDate")} {
   var count: Int { get { return 0 } }
   
   subscript(i: Int) -> (String,MirrorType) {
-    _fatalError("MirrorType access out of bounds")
+    _sanityCheckFailure("MirrorType access out of bounds")
   }
   
   var summary: String {
@@ -114,7 +114,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
     if i >= 0 && i < count {
       return ("[\(i)]",reflect(_a[i]))
     }
-    _fatalError("MirrorType access out of bounds")
+    _sanityCheckFailure("MirrorType access out of bounds")
   }
   
   var summary: String { return "\(count) elements" }

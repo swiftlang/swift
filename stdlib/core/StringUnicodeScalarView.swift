@@ -98,7 +98,7 @@ extension String {
       case .Result(let us):
         return us
       case .EmptyInput:
-        _fatalError("can not subscript using an endIndex")
+        _sanityCheckFailure("can not subscript using an endIndex")
       case .Error:
         return UnicodeScalar(0xfffd)
       }

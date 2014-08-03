@@ -26,13 +26,13 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
   func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
-    _fatalError(
+    _sanityCheckFailure(
       "Concrete subclasses must implement canStoreElementsOfDynamicType")
   }
 
   /// A type that every element in the array is.
   var staticElementType: Any.Type {
-    _fatalError(
+    _sanityCheckFailure(
       "Concrete subclasses must implement staticElementType")
   }
 
@@ -112,7 +112,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
   /// Returns the object located at the specified `index` when the
   /// element type is not bridged verbatim.  
   func bridgingObjectAtIndex(index: Int, _: Void = ()) -> AnyObject {
-    _fatalError(
+    _sanityCheckFailure(
       "Concrete subclasses must implement bridgingObjectAtIndex")
   }
 
@@ -122,7 +122,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
     aBuffer: UnsafeMutablePointer<AnyObject>,
     range: _SwiftNSRange, _: Void = ()
   ) {
-    _fatalError(
+    _sanityCheckFailure(
       "Concrete subclasses must implement bridgingGetObjects")
   }
 
@@ -131,7 +131,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
     objects: UnsafeMutablePointer<AnyObject>,
     count bufferSize: Int, _: Void = ()
   ) -> Int {
-    _fatalError(
+    _sanityCheckFailure(
       "Concrete subclasses must implement bridgingCountByEnumeratingWithState")
   } 
 }

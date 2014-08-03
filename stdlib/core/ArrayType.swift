@@ -115,7 +115,7 @@ internal struct _ArrayTypeMirror<T : ArrayType> : MirrorType {
     if (i >= 0) && (i < count) {
       return ("[\(i)]",reflect(_value[i]))
     }
-    _fatalError("MirrorType access out of bounds")
+    _sanityCheckFailure("MirrorType access out of bounds")
   }
 
   var summary: String {

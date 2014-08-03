@@ -492,7 +492,7 @@ extension String : CollectionType {
     var count: Int { return 0 }
 
     subscript(i: Int) -> (String,MirrorType) {
-      _fatalError("MirrorType access out of bounds")
+      _sanityCheckFailure("MirrorType access out of bounds")
     }
 
     var summary: String { return "\(_value._utf16Index)" }

@@ -77,7 +77,7 @@ public struct Range<
   // goes for slicing.  The error message will be poor but at least it
   // is a compile-time error.
   public subscript(_: T._DisabledRangeIndex) -> T {
-    _fatalError("It shouldn't be possible to call this function'")
+    _sanityCheckFailure("It shouldn't be possible to call this function'")
   }
   
   //===--------------------------------------------------------------------===//

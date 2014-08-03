@@ -107,7 +107,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 4:
     _debugPreconditionFailure("can not happen")
   case 5:
-    _fatalError("can not happen")
+    _sanityCheckFailure("can not happen")
 
   default:
     return 0
@@ -317,7 +317,7 @@ if (Process.arguments[2] == "StdlibSanityCheckBooleanType") {
 
 func testStdlibSanityCheckFailure() {
   println("OK")
-  _fatalError("this should fail")
+  _sanityCheckFailure("this should fail")
 }
 if (Process.arguments[2] == "StdlibSanityCheckFailure") {
   testStdlibSanityCheckFailure()

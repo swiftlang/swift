@@ -72,7 +72,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return Array(_ArrayBuffer(buf))
     
   case (.Value, .Explicit):
-    _fatalError(
+    _sanityCheckFailure(
       "Force-casting between Arrays of value types not prevented at compile-time"
     )
   }
@@ -171,7 +171,7 @@ public func _arrayConditionalCast<SourceElement, TargetElement>(
 ) -> [TargetElement]? {
   switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
   case (.Value, _): 
-    _fatalError(
+    _sanityCheckFailure(
       "Conditional cast from array of value types not prevented at compile-time")
   case (.Reference, .Verbatim):
     return _arrayConditionalDownCastElements(source)

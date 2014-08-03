@@ -31,7 +31,7 @@ public var _cocoaStringToContiguous: (
 func _cocoaStringToContiguousNotInitialized(
   source: _CocoaStringType, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  _fatalError("_cocoaStringToContiguous not initialized")
+  _sanityCheckFailure("_cocoaStringToContiguous not initialized")
 }
 
 /// Reads the entire contents of a _CocoaStringType into contiguous
@@ -43,7 +43,7 @@ public var _cocoaStringReadAll: (
 func _cocoaStringReadAllNotInitialized(
   source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) -> Void {
-  _fatalError("_cocoaStringReadAll not initialized")
+  _sanityCheckFailure("_cocoaStringReadAll not initialized")
 }
 
 public var _cocoaStringLength: (
@@ -53,7 +53,7 @@ public var _cocoaStringLength: (
 func _cocoaStringLengthNotInitialized(
   source: _CocoaStringType
 ) -> Int {
-  _fatalError("_cocoaStringLength not initialized")
+  _sanityCheckFailure("_cocoaStringLength not initialized")
 }
 
 public var _cocoaStringSlice: (
@@ -63,7 +63,7 @@ public var _cocoaStringSlice: (
 func _cocoaStringSliceNotInitialized(
   target: _StringCore, subRange: Range<Int>
 ) -> _StringCore {
-  _fatalError("_cocoaStringSlice not initialized")
+  _sanityCheckFailure("_cocoaStringSlice not initialized")
 }
 
 public var _cocoaStringSubscript: (
@@ -73,7 +73,7 @@ public var _cocoaStringSubscript: (
 func _cocoaStringSubscriptNotInitialized(
   target: _StringCore, position: Int
 ) -> UTF16.CodeUnit {
-  _fatalError("_cocoaStringSubscript not initialized")
+  _sanityCheckFailure("_cocoaStringSubscript not initialized")
 }
 
 import SwiftShims
@@ -116,7 +116,7 @@ public final class _NSContiguousString : _NSSwiftString {
   }
 
   init(coder aDecoder: AnyObject) {
-    _fatalError("init(coder:) not implemented for _NSContiguousString")
+    _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
 
   func length() -> Int {

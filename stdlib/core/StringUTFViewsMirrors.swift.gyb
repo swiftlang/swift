@@ -28,7 +28,7 @@ extension String {
 
       subscript(i: Int) -> (String,MirrorType) {
         if i >= count {
-          _fatalError("MirrorType access out of bounds")
+          _sanityCheckFailure("MirrorType access out of bounds")
         }
         return ("[\(i)]",reflect(self[i]))
       }

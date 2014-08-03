@@ -261,7 +261,7 @@ public func _sanityCheck<T : BooleanType>(
 }
 
 @transparent @noreturn
-public func _fatalError(
+public func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {

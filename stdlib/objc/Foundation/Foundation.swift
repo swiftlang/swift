@@ -257,7 +257,7 @@ final class _NSOpaqueString : NSString {
   }
 
   required init(coder aDecoder: NSCoder) {
-    _fatalError("init(coder:) not implemented for _NSOpaqueString")
+    _sanityCheckFailure("init(coder:) not implemented for _NSOpaqueString")
   }
 
   //

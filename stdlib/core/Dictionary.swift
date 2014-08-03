@@ -482,19 +482,23 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   mutating func updateValue(value: Value, forKey: Key) -> Value? {
-    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+    _sanityCheckFailure(
+      "don't call mutating methods on _NativeDictionaryStorage")
   }
 
   mutating func removeAtIndex(index: Index) {
-    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+    _sanityCheckFailure(
+      "don't call mutating methods on _NativeDictionaryStorage")
   }
 
   mutating func removeValueForKey(key: Key) -> Value? {
-    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+    _sanityCheckFailure(
+      "don't call mutating methods on _NativeDictionaryStorage")
   }
 
   mutating func removeAll(#keepCapacity: Bool) {
-    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+    _sanityCheckFailure(
+      "don't call mutating methods on _NativeDictionaryStorage")
   }
 
   static func fromArray(
@@ -526,7 +530,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   init(dummy: (Int, ())) {}
 
   func bridgingNextObject(dummy: ()) -> AnyObject? {
-    _fatalError("'bridgingNextObject' should be overridden")
+    _sanityCheckFailure("'bridgingNextObject' should be overridden")
   }
 
   // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
@@ -545,7 +549,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
 
   @objc
   required override init() {
-    _fatalError("don't call this designated initializer")
+    _sanityCheckFailure("don't call this designated initializer")
   }
 
   @objc
@@ -562,7 +566,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
   typealias Index = _NativeDictionaryIndex<Key, Value>
 
   required init() {
-    _fatalError("don't call this designated initializer")
+    _sanityCheckFailure("don't call this designated initializer")
   }
 
   init(_ nativeStorage: NativeStorage) {
@@ -602,26 +606,26 @@ class _NativeDictionaryStorageOwnerBase
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   // subclass of an @objc class has no effect
   var bridgingCount: (Int, ()) {
-    _fatalError("'bridgingCount' should be overridden")
+    _sanityCheckFailure("'bridgingCount' should be overridden")
   }
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    _fatalError("'bridgingObjectForKey' should be overridden")
+    _sanityCheckFailure("'bridgingObjectForKey' should be overridden")
   }
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   func bridgingKeyEnumerator(dummy: ()) -> _SwiftNSEnumeratorType {
-    _fatalError("'bridgingKeyEnumerator' should be overridden")
+    _sanityCheckFailure("'bridgingKeyEnumerator' should be overridden")
   }
 
   func bridgingCountByEnumeratingWithState(
          state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
-    _fatalError("'countByEnumeratingWithState' should be overridden")
+    _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
   }
 
   //
@@ -637,7 +641,7 @@ class _NativeDictionaryStorageOwnerBase
     forKeys: UnsafePointer<Void>,
     count: Int
   ) {
-    _fatalError("don't call this designated initializer")
+    _sanityCheckFailure("don't call this designated initializer")
   }
 
   @objc
@@ -697,7 +701,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
     forKeys: UnsafePointer<Void>,
     count: Int
   ) {
-    _fatalError("don't call this designated initializer")
+    _sanityCheckFailure("don't call this designated initializer")
   }
 
   init(minimumCapacity: Int = 2) {
@@ -826,19 +830,19 @@ struct _CocoaDictionaryStorage : _DictionaryStorageType {
   }
 
   mutating func updateValue(value: AnyObject, forKey: AnyObject) -> AnyObject? {
-    _fatalError("can not mutate NSDictionary")
+    _sanityCheckFailure("can not mutate NSDictionary")
   }
 
   mutating func removeAtIndex(index: Index) {
-    _fatalError("can not mutate NSDictionary")
+    _sanityCheckFailure("can not mutate NSDictionary")
   }
 
   mutating func removeValueForKey(key: AnyObject) -> AnyObject? {
-    _fatalError("can not mutate NSDictionary")
+    _sanityCheckFailure("can not mutate NSDictionary")
   }
 
   mutating func removeAll(#keepCapacity: Bool) {
-    _fatalError("can not mutate NSDictionary")
+    _sanityCheckFailure("can not mutate NSDictionary")
   }
 
   var count: Int {
@@ -848,7 +852,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorageType {
   static func fromArray(
       elements: Array<(AnyObject, AnyObject)>
   ) -> _CocoaDictionaryStorage {
-    _fatalError("this function should never be called")
+    _sanityCheckFailure("this function should never be called")
   }
 }
 
@@ -889,14 +893,14 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
     case .Native(let owner):
       return owner.nativeStorage
     case .Cocoa:
-      _fatalError("internal error: not backed by native storage")
+      _sanityCheckFailure("internal error: not backed by native storage")
     }
   }
 
   var cocoa: CocoaStorage {
     switch self {
     case .Native:
-      _fatalError("internal error: not backed by NSDictionary")
+      _sanityCheckFailure("internal error: not backed by NSDictionary")
     case .Cocoa(let cocoaStorage):
       return cocoaStorage
     }
@@ -1289,7 +1293,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
   static func fromArray(
       elements: Array<(Key, Value)>
   ) -> _VariantDictionaryStorage<Key, Value> {
-    _fatalError("this function should never be called")
+    _sanityCheckFailure("this function should never be called")
   }
 }
 
@@ -1454,7 +1458,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
     case ._Native(let nativeIndex):
       return nativeIndex
     case ._Cocoa:
-      _fatalError("internal error: does not contain a native index")
+      _sanityCheckFailure("internal error: does not contain a native index")
     }
   }
 
@@ -1462,7 +1466,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
   var _cocoaIndex: _CocoaIndex {
     switch _value {
     case ._Native:
-      _fatalError("internal error: does not contain a Cocoa index")
+      _sanityCheckFailure("internal error: does not contain a Cocoa index")
     case ._Cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -1678,7 +1682,7 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
       _state = ._Native(start: startIndex.successor(), end: endIndex)
       return result
     case ._Cocoa:
-      _fatalError("internal error: not backed by NSDictionary")
+      _sanityCheckFailure("internal error: not backed by NSDictionary")
     }
   }
 
@@ -2067,7 +2071,7 @@ class _DictionaryMirror<Key : Hashable,Value> : MirrorType {
       }
       return ("[\(_pos._intPos)]",reflect(_dict[_pos._dicPos]))
     }
-    _fatalError("MirrorType access out of bounds")
+    _sanityCheckFailure("MirrorType access out of bounds")
   }
 
   var summary: String {
