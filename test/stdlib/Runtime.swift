@@ -719,6 +719,57 @@ Reflection.test("dumpToAStream") {
   expectEqual("▿ 2 elements\n  - [0]: 42\n  - [1]: 4242\n", output)
 }
 
+Reflection.test("String.UTF8View/Mirror") {
+  // U+0061 LATIN SMALL LETTER A
+  // U+304B HIRAGANA LETTER KA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  var output = ""
+  dump("\u{61}\u{304b}\u{3099}".utf8, &output)
+
+  var expected = ""
+  expected += "▿ \u{61}\u{304b}\u{3099}\n"
+  expected += "  - [0]: 97\n"
+  expected += "  - [1]: 227\n"
+  expected += "  - [2]: 129\n"
+  expected += "  - [3]: 139\n"
+  expected += "  - [4]: 227\n"
+  expected += "  - [5]: 130\n"
+  expected += "  - [6]: 153\n"
+
+  expectEqual(expected, output)
+}
+
+Reflection.test("String.UTF16View/Mirror") {
+  // U+0061 LATIN SMALL LETTER A
+  // U+304B HIRAGANA LETTER KA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  // U+1F425 FRONT-FACING BABY CHICK
+  var output = ""
+  dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, &output)
+
+  var expected = ""
+  expected += "▿ \u{61}\u{304b}\u{3099}\u{1f425}\n"
+  expected += "  - [0]: 97\n"
+  expected += "  - [1]: 12363\n"
+  expected += "  - [2]: 12441\n"
+  expected += "  - [3]: 55357\n"
+  expected += "  - [4]: 56357\n"
+
+  expectEqual(expected, output)
+}
+
+Reflection.test("String.UnicodeScalarView/Mirror") {
+  // U+0061 LATIN SMALL LETTER A
+  // U+304B HIRAGANA LETTER KA
+  // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+  // U+1F425 FRONT-FACING BABY CHICK
+  var output = ""
+  dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, &output)
+
+  // FIXME: the output is not pretty now.
+  //expectEqual(expected, output)
+}
+
 Reflection.test("TupleMirror/NoLeak") {
   if true {
     nsObjectCanaryCount = 0

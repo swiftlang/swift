@@ -26,9 +26,9 @@ extension String {
 
       var count: Int { return distance(_value.startIndex,_value.endIndex) }
 
-      subscript(i: Int) -> (String,MirrorType) {
+      subscript(i: Int) -> (String, MirrorType) {
         _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
-        return ("[\(i)]", reflect(self[i]))
+        return ("[\(i)]", reflect(_value[advance(_value.startIndex, i)]))
       }
 
       var summary: String { return String(_value._core) }
