@@ -23,6 +23,7 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -69,6 +70,7 @@ enum class ActionType {
   ParseReST,
   GenerateAPIAnnotation,
   CheckAPIAnnotation,
+  TestCreateCompilerInvocation,
 };
 
 namespace options {
@@ -112,6 +114,11 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::CheckAPIAnnotation,
                       "check-api-annotation", 
                       "Check an API annotation file"),
+           clEnumValN(ActionType::TestCreateCompilerInvocation,
+                      "test-createCompilerInvocation",
+                      "Test swift::driver::createCompilerInvocation using the "
+                      "arguments passed to swift-ide-test (must be specified "
+                      "before all other arguments)"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -1629,6 +1636,23 @@ static int doParseReST(StringRef SourceFilename) {
   return 0;
 }
 
+static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
+  PrintingDiagnosticConsumer PDC;
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  Diags.addConsumer(PDC);
+
+  std::unique_ptr<CompilerInvocation> CI =
+    driver::createCompilerInvocation(Args, Diags);
+
+  if (!CI) {
+    llvm::errs() << "error: unable to create a CompilerInvocation\n";
+    return 1;
+  }
+
+  return 0;
+}
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -1999,6 +2023,16 @@ int main(int argc, char *argv[]) {
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram X(argc, argv);
 
+  if (argc > 1) {
+    // Handle integrated test tools which do not use
+    // llvm::cl::ParseCommandLineOptions.
+    StringRef FirstArg(argv[1]);
+    if (FirstArg == "-test-createCompilerInvocation") {
+      ArrayRef<const char *> Args(argv + 2, argc - 2);
+      return doTestCreateCompilerInvocation(Args);
+    }
+  }
+
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift IDE Test\n");
 
   if (options::Action == ActionType::None) {
@@ -2043,6 +2077,12 @@ int main(int argc, char *argv[]) {
     }
 
     return 0;
+  }
+
+  if (options::Action == ActionType::TestCreateCompilerInvocation) {
+    llvm::errs() << "-test-createCompilerInvocation must be specified before "
+                    "all other arguments\n";
+    return 1;
   }
 
   if (options::SourceFilename.empty()) {
@@ -2101,6 +2141,7 @@ int main(int argc, char *argv[]) {
   case ActionType::None:
   case ActionType::GenerateAPIAnnotation:
   case ActionType::CheckAPIAnnotation:
+  case ActionType::TestCreateCompilerInvocation:
     llvm_unreachable("should be handled above");
 
   case ActionType::CodeCompletion:

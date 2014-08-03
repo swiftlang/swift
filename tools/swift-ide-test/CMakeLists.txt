@@ -1,7 +1,7 @@
 add_swift_executable(swift-ide-test
   swift-ide-test.cpp
   XMLValidator.cpp
-  DEPENDS swiftFrontend swiftIDE swiftAPINotes
+  DEPENDS swiftDriver swiftFrontend swiftIDE swiftAPINotes
   COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
 if(MODULES_SDK)
