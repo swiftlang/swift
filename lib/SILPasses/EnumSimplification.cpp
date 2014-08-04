@@ -409,8 +409,8 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
 bool BBEnumTagDataflowState::process() {
   bool Changed = false;
 
-  auto SI = getBB()->begin(), SE = getBB()->end();
-  while (SI != SE) {
+  auto SI = getBB()->begin();
+  while (SI != getBB()->end()) {
     SILInstruction *I = &*SI;
     ++SI;
     Changed |= visit(I);
