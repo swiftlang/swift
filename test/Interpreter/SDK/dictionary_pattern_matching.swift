@@ -25,10 +25,10 @@ func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
 
 func stateFromPlistCool(plist: Dictionary<String, AnyObject>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
-  case let (.Some(name as NSString), .Some(pop as NSNumber), .Some(abbr as NSString))
-  where abbr.length == 2:
+  case let (name as String, pop as Int, abbr as String)
+  where countElements(abbr) == 2:
     return State(name: name,
-                 population: pop.integerValue,
+                 population: pop,
                  abbrev: abbr)
   default:
     return nil
@@ -125,20 +125,14 @@ struct StatMirror: MirrorType {
 
 func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
   switch (plist["kind"], plist["name"], plist["population"], plist["abbrev"]) {
-  case let (.Some("state" as NSString),
-            .Some(name as NSString),
-            .Some(population as NSNumber),
-            .Some(abbrev as NSString))
-  where abbrev.length == 2:
+  case let ("state" as String, name as String, population as Int, abbrev as String)
+  where countElements(abbrev) == 2:
     return Statistic.ForState(State(name: name,
-                                    population: population.integerValue,
+                                    population: population,
                                     abbrev: abbrev))
-  case let (.Some("country" as NSString),
-            .Some(name as NSString),
-            .Some(population as NSNumber),
-            .None):
+  case let ("country" as String, name as String, population as Int, .None):
     return Statistic.ForCountry(Country(name: name,
-                                        population: population.integerValue))
+                                        population: population))
   default:
     return nil
   }
