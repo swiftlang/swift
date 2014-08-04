@@ -1295,7 +1295,7 @@ extension String {
   /// Returns a new string made from the `String` by replacing
   /// all percent encoded sequences with the matching UTF-8
   /// characters.
-  public var stringByRemovingPercentEncoding: String {
+  public var stringByRemovingPercentEncoding: String? {
     return _ns.stringByRemovingPercentEncoding
   }
 

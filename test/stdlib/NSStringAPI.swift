@@ -1144,15 +1144,49 @@ NSStringAPIs.test("stringByExpandingTildeInPath") {
 }
 
 NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
-  // FIXME
+  expectEqual("abcd", "abCD".stringByFoldingWithOptions(
+    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
+
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  // to lower case:
+  // U+0069 LATIN SMALL LETTER I
+  // U+0307 COMBINING DOT ABOVE
+  expectEqual("\u{0069}\u{0307}", "\u{0130}".stringByFoldingWithOptions(
+    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
+
+  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
+  // to lower case in Turkish locale:
+  // U+0069 LATIN SMALL LETTER I
+  expectEqual("\u{0069}", "\u{0130}".stringByFoldingWithOptions(
+    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "tr")))
+
+  expectEqual(
+    "example123",
+    "ｅｘａｍｐｌｅ１２３".stringByFoldingWithOptions(
+      .WidthInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
 }
 
 NSStringAPIs.test("stringByPaddingToLength(_:withString:startingAtIndex:)") {
-  // FIXME
+  expectEqual(
+    "abc абв \u{0001F60A}",
+    "abc абв \u{0001F60A}".stringByPaddingToLength(
+      10, withString: "XYZ", startingAtIndex: 0))
+  expectEqual(
+    "abc абв \u{0001F60A}XYZXY",
+    "abc абв \u{0001F60A}".stringByPaddingToLength(
+      15, withString: "XYZ", startingAtIndex: 0))
+  expectEqual(
+    "abc абв \u{0001F60A}YZXYZ",
+    "abc абв \u{0001F60A}".stringByPaddingToLength(
+      15, withString: "XYZ", startingAtIndex: 1))
 }
 
 NSStringAPIs.test("stringByRemovingPercentEncoding") {
-  // FIXME
+  expectOptionalEqual("", "".stringByRemovingPercentEncoding)
+  expectEmpty("%".stringByRemovingPercentEncoding)
+  expectOptionalEqual(
+    "abcd абвг",
+    "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".stringByRemovingPercentEncoding)
 }
 
 NSStringAPIs.test("stringByReplacingCharactersInRange(_:withString:)") {
@@ -1180,7 +1214,10 @@ NSStringAPIs.test("stringByTrimmingCharactersInSet(_:)") {
 }
 
 NSStringAPIs.test("stringsByAppendingPaths(_:)") {
-  // FIXME
+  expectEqual([], "".stringsByAppendingPaths([]))
+  expectEqual(
+    [ "/tmp/foo", "/tmp/bar" ],
+    "/tmp".stringsByAppendingPaths([ "foo", "bar" ]))
 }
 
 NSStringAPIs.test("substringFromIndex(_:)") {
