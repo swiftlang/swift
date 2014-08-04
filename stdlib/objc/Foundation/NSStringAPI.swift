@@ -35,21 +35,27 @@ func _toNSRange(r: Range<String.Index>) -> NSRange {
 }
 
 func _countFormatSpecifiers(a: String) -> Int {
-  var lastChar = _asUTF16CodeUnit(".") // anything other than % would work here
+  // The implementation takes advantage of the fact that internal
+  // representation of String is UTF-16.  Because we only care about the ASCII
+  // percent character, we don't need to decode UTF-16.
+
+  let percentUTF16  = UTF16.CodeUnit(("%" as UnicodeScalar).value)
+  let notPercentUTF16: UTF16.CodeUnit = 0
+  var lastChar = notPercentUTF16 // anything other than % would work here
   var count = 0
 
-  for c in a.unicodeScalars {
-    if lastChar == _asUTF16CodeUnit("%") {
-      if c == "%" {
+  for c in a.utf16 {
+    if lastChar == percentUTF16 {
+      if c == percentUTF16 {
         // a "%" following this one should not be taken as literal
-        lastChar = _asUTF16CodeUnit(".") 
+        lastChar = notPercentUTF16
       }
       else {
         ++count
-        lastChar = _asUTF16CodeUnit(c)
+        lastChar = c
       }
     } else {
-      lastChar = _asUTF16CodeUnit(c)
+      lastChar = c
     }
   }
   return count

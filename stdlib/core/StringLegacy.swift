@@ -159,7 +159,7 @@ extension String {
       }
       res = res * 10
 
-      var d = Int(c.value - _asUnicodeScalar("0").value)
+      var d = Int(c.value - UnicodeScalar("0").value)
       // Underflow occurs if res - d < Int.min.
       if res < Int.min + d {
         return .None

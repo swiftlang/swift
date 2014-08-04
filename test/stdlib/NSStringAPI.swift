@@ -717,12 +717,21 @@ NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
 }
 
 NSStringAPIs.test("init(format:_:...)") {
+  expectEqual("", String(format: ""))
+  expectEqual(
+    "abc абв \u{0001F60A}", String(format: "abc абв \u{0001F60A}"))
+
   let world: NSString = "world"
   expectEqual("Hello, world!%42",
       String(format: "Hello, %@!%%%ld", world, 42))
 }
 
 NSStringAPIs.test("init(format:arguments:)") {
+  expectEqual("", String(format: "", arguments: []))
+  expectEqual(
+    "abc абв \u{0001F60A}",
+    String(format: "abc абв \u{0001F60A}", arguments: []))
+
   let world: NSString = "world"
   let args: [CVarArgType] = [ world, 42 ]
   expectEqual("Hello, world!%42",
@@ -1079,6 +1088,17 @@ NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
 }
 
 NSStringAPIs.test("stringByAppendingFormat(_:_:...)") {
+  expectEqual("", "".stringByAppendingFormat(""))
+  expectEqual("a", "a".stringByAppendingFormat(""))
+  expectEqual(
+    "abc абв \u{0001F60A}",
+    "abc абв \u{0001F60A}".stringByAppendingFormat(""))
+
+  let formatArg: NSString = "привет мир \u{0001F60A}"
+  expectEqual(
+    "abc абв \u{0001F60A}def привет мир \u{0001F60A} 42",
+    "abc абв \u{0001F60A}"
+      .stringByAppendingFormat("def %@ %ld", formatArg, 42))
   // FIXME
 }
 
@@ -1091,7 +1111,10 @@ NSStringAPIs.test("stringByAppendingPathExtension(_:)") {
 }
 
 NSStringAPIs.test("stringByAppendingString(_:)") {
-  // FIXME
+  expectEqual("", "".stringByAppendingString(""))
+  expectEqual("a", "a".stringByAppendingString(""))
+  expectEqual("a", "".stringByAppendingString("a"))
+  expectEqual("さ\u{3099}", "さ".stringByAppendingString("\u{3099}"))
 }
 
 NSStringAPIs.test("stringByDeletingLastPathComponent") {

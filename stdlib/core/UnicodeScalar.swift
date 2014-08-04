@@ -233,16 +233,6 @@ public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
 }
 
-/// Helper to provide type context to guide type inference in code like::
-///
-///   var value = digit - _asUnicodeScalar("0")
-public func _asUnicodeScalar(us: UnicodeScalar) -> UnicodeScalar {
-  return us
-}
-public func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
-  return UTF16.CodeUnit(us.value)
-}
-
 extension UnicodeScalar {
   struct UTF16View {
     var value: UnicodeScalar

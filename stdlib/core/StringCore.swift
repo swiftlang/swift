@@ -257,9 +257,10 @@ public struct _StringCore {
   /// Get the Nth UTF-16 Code Unit stored
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p = UnsafeMutablePointer<UInt8>(_pointerToNth(position).value)
-      // Always dereference two bytes, but when elements are 8 bits we
-      // multiply the high byte by 0.
-      return UTF16.CodeUnit(p.memory)
+    // Always dereference two bytes, but when elements are 8 bits we
+    // multiply the high byte by 0.
+    // FIXME(performance): use masking instead of multiplication.
+    return UTF16.CodeUnit(p.memory)
       + UTF16.CodeUnit((p + 1).memory) * _highByteMultiplier
   }
 
