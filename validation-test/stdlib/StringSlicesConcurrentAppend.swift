@@ -41,8 +41,8 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
       // Get a fresh buffer.
       sharedString = ""
       sharedString.extend("abc")
-      expectLE(7, sharedString.capacityInBytes)
-      // FIXME: check capacity
+      sharedString.reserveCapacity(16)
+      expectLE(16, sharedString.capacityInBytes)
     }
 
     barrier()
