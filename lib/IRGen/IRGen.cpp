@@ -39,6 +39,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "IRGenModule.h"
@@ -119,7 +120,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     return nullptr;
   }
 
-  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
+  const llvm::DataLayout *DataLayout =
+    TargetMachine->getSubtargetImpl()->getDataLayout();
   assert(DataLayout && "target machine didn't set DataLayout?");
 
   // Create the IR emitter.
