@@ -74,7 +74,9 @@ public:
     std::pair<KeyTy, ValueTy> Pair;
     Pair.first = Key;
     iterator I = std::lower_bound(Array.begin(), Array.end(), Pair, SortFun);
-    return I->first == Key ? I : Array.end();
+    if (I != Array.end() && I->first != Key)
+      return Array.end();
+    return I;
   }
 };
 
