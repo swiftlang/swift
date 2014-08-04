@@ -242,6 +242,9 @@ enum class FixKind : uint8_t {
 
   /// Relabel a tuple due to a call
   RelabelCallTuple,
+  
+  /// Introduce a '!= nil' to convert an Optional to a Boolean expression.
+  OptionalToBoolean,
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.

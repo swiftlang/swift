@@ -99,5 +99,11 @@ class C {}
 var co: C? = nil
 var ciuo: C! = nil 
 
-if co {} // expected-error{{type 'C?' does not conform to protocol 'BooleanType.Protocol'}} expected-note{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
-if ciuo {} // expected-error{{type 'C!' does not conform to protocol 'BooleanType.Protocol'}} expected-note{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
+if co {} // expected-error{{optional type '@lvalue C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
+if ciuo {} // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}
+co ? true : false // expected-error{{optional type '@lvalue C?' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{3-3= != nil)}}
+!co ? false : true // expected-error{{optional type '@lvalue C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
+ciuo ? true : false // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
+!ciuo ? false : true // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
+!co // expected-error{{optional type '@lvalue C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
+!ciuo // expected-error{{optional type '@lvalue C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}

@@ -1417,21 +1417,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
                          cs.getConstraintLocator(expr));
         return false;
       }
-      
-      // If we're implicitly trying to treat an optional type as a boolean,
-      // let the user know that they should be testing for a value manually
-      // instead.
-      if (!rvalueType->getAnyOptionalObjectType().isNull()) {
-        auto pastEndLoc = Lexer::getLocForEndOfToken(cs.TC.Context.SourceMgr,
-                                                     expr->getEndLoc());
-        cs.TC.diagnose(expr->getStartLoc(),
-                       diag::optional_used_as_boolean, rvalueType)
-        .fixItInsert(expr->getStartLoc(), "(")
-        .fixItInsert(pastEndLoc, " != nil)");
-        
-        return false;
-      }
-      
 
       // Otherwise, the result must be a LogicValue.
       auto &tc = cs.getTypeChecker();

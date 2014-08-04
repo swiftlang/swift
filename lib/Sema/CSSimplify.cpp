@@ -2235,6 +2235,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
   }
   
+  if (!type->getAnyOptionalObjectType().isNull() &&
+      (protocol == TC.getProtocol(SourceLoc(),
+                                 KnownProtocolKind::BooleanType))) {
+    
+    Fixes.push_back({FixKind::OptionalToBoolean,
+      getConstraintLocator(locator)});
+    
+    return SolutionKind::Solved;
+  }
+  
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
                 Failure::DoesNotConformToProtocol, type,
@@ -3913,6 +3923,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   }
 
   case FixKind::RelabelCallTuple:
+  case FixKind::OptionalToBoolean:
     // The actual semantics are handled elsewhere.
     return SolutionKind::Solved;
   }

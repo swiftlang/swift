@@ -1105,7 +1105,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::ConformsTo, condExpr->getType(),
                        logicValue->getDeclaredType(),
-                       CS.getConstraintLocator(expr));
+                       CS.getConstraintLocator(condExpr));
 
       // The branches must be convertible to a common type.
       auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),

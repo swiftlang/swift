@@ -4822,7 +4822,34 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
           diagnosed = true;
         break;
       }
+          
+      case FixKind::OptionalToBoolean: {
+        // If we're implicitly trying to treat an optional type as a boolean,
+        // let the user know that they should be testing for a value manually
+        // instead.
+        
+        Expr *errorExpr = expr;
+        
+        // If we can, post the fix-it to the sub-expression if it's a better
+        // fit.
+        if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+          errorExpr = ifExpr->getCondExpr();
+        }
+        if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr)) {
+          errorExpr = prefixUnaryExpr->getArg();
+        }
+        
+        auto pastEndLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                     errorExpr->getEndLoc());
+        TC.diagnose(errorExpr->getLoc(),
+                       diag::optional_used_as_boolean, errorExpr->getType())
+        .fixItInsert(errorExpr->getStartLoc(), "(")
+        .fixItInsert(pastEndLoc, " != nil)");
+        
+        diagnosed = true;
+        break;
       }
+    }
 
       // FIXME: It would be really nice to emit a follow-up note showing where
       // we got the other type information from, e.g., the parameter we're
