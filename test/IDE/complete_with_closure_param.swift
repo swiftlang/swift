@@ -1,18 +1,27 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | FileCheck %s
 
-typealias TestAl = (Int, Int) -> Bool
+typealias FunctionTypealias = (Int, Int) -> Bool
+typealias OptionalFunctionTypealias = ((Int, Int) -> Bool)?
 
-class Bar {
-    func foo1(callback: (Int, Int) -> Void) {
-    }
-    func foo2(callback: TestAl) {
-    }
+struct FooStruct {
+  func instanceMethod1(callback: (Int, Int) -> Void) {}
+  func instanceMethod2(callback: ((Int, Int) -> Void)?) {}
+  func instanceMethod3(callback: ((Int, Int) -> Void)??) {}
+  func instanceMethod4(callback: ((Int, Int) -> Void)!) {}
+  func instanceMethod5(callback: FunctionTypealias) {}
+  func instanceMethod6(callback: FunctionTypealias?) {}
+  func instanceMethod7(callback: OptionalFunctionTypealias) {}
 }
 
-Bar().#^COMPLETE^#
+FooStruct().#^COMPLETE^#
 
-
-// CHECK: Begin completions, 2 items
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal:   foo1({#(callback): (Int, Int) -> Void##(Int, Int) -> Void#})[#Void#]
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal:   foo2({#(callback): TestAl##(Int, Int) -> Bool#})[#Void#]
+// CHECK: Begin completions, 7 items
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod1({#(callback): (Int, Int) -> Void##(Int, Int) -> Void#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod2({#(callback): ((Int, Int) -> Void)?##(Int, Int) -> Void#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod3({#(callback): ((Int, Int) -> Void)??##(Int, Int) -> Void#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod4({#(callback): ((Int, Int) -> Void)!##(Int, Int) -> Void#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod5({#(callback): FunctionTypealias##(Int, Int) -> Bool#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod6({#(callback): FunctionTypealias?##(Int, Int) -> Bool#})[#Void#]{{$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod7({#(callback): OptionalFunctionTypealias##(Int, Int) -> Bool#})[#Void#]{{$}}
 // CHECK: End completions
+
