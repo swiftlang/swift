@@ -732,7 +732,7 @@ namespace {
       
       for (unsigned i = 1; i != NumElements; ++i) {
         entry = IGF.Builder.CreateLShr(inValue, PointerBitwidth*i);
-        entry = IGF.Builder.CreateTruncOrBitCast(inValue, IGF.IGM.IntPtrTy);
+        entry = IGF.Builder.CreateTruncOrBitCast(entry, IGF.IGM.IntPtrTy);
         OutE.add(IGF.Builder.CreateIntToPtr(entry, IGF.IGM.WitnessTablePtrTy));
       }
     }
