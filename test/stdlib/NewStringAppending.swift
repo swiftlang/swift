@@ -65,6 +65,10 @@ println("--- Appending ---")
 
 var s = "⓪" // start non-empty
 
+// To make this test independent of the memory allocator implementation,
+// explicitly request initial capacity.
+s.reserveCapacity(8)
+
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
 s += "1"
 println("\(repr(s))")
