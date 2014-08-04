@@ -40,7 +40,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
       S : SequenceType
       where S.Generator.Element == Self.Generator.Element
   >(seq: S) /* {
-    reserveCapacity(underestimateCount(seq))
+    reserveCapacity(countElements(self) + underestimateCount(seq))
     for x in seq {
       seq.append(x)
     }
