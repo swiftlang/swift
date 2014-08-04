@@ -446,6 +446,13 @@ func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
 }
 % end # for mutable
 
+extension UnsafeMutablePointer : SinkType {
+  public mutating func put(x: T) {
+    self.memory = x
+    ++self
+  }
+}
+
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to UnsafeMutablePointer when
 /// you just want to do bytewise pointer arithmetic.

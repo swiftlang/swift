@@ -243,6 +243,9 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   public mutating func reserveCapacity(capacity: Int) {
     _core.reserveCapacity(capacity)
   }
+  public mutating func append(x: UnicodeScalar) {
+    _core.append(x)
+  }
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(seq: S) {

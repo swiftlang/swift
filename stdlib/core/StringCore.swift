@@ -422,8 +422,12 @@ public struct _StringCore {
       width == 2 ? UTF16.trailSurrogate(c) : nil
     )
   }
+
+  public mutating func append(u: UTF16.CodeUnit) {
+    append(u, nil)
+  }
   
-  mutating func append(u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit? = nil) {
+  mutating func append(u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit?) {
     _invariantCheck()
     let minBytesPerCodeUnit = u0 <= 0x7f ? 1 : 2
     let utf16Width = u1 == nil ? 1 : 2

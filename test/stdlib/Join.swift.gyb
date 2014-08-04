@@ -243,6 +243,10 @@ struct MockExtensibleCollection : ExtensibleCollectionType {
     _reservedCapacity = n
   }
 
+  mutating func append(x: Int) {
+    _storage.append(x)
+  }
+
   mutating func extend<
     S : SequenceType
     where S.Generator.Element == Int

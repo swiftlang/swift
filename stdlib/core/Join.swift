@@ -34,10 +34,18 @@ public protocol _ExtensibleCollectionType : CollectionType {
   >(inout _: Self, _: S)
   */
 
+  mutating func append(_: Self.Generator.Element)
+  
   mutating func extend<
       S : SequenceType
       where S.Generator.Element == Self.Generator.Element
-  >(_: S)
+  >(seq: S) /* {
+    reserveCapacity(underestimateCount(seq))
+    for x in seq {
+      seq.append(x)
+    }
+  }
+  */
 }
 
 public protocol ExtensibleCollectionType : _ExtensibleCollectionType {

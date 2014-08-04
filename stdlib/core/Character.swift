@@ -105,6 +105,40 @@ public enum Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
+  struct SmallUTF16 : CollectionType {
+    init(var _ u8: UInt64) {
+      let input = UnsafeBufferPointer(
+        start: UnsafePointer<UTF8.CodeUnit>(Builtin.addressof(&u8)), 
+        count: Character._smallSize(u8)
+      )
+      let count = UTF16.measure(
+          UTF8.self, input: input.generate(), repairIllFormedSequences: true)!.0
+      _sanityCheck(count <= 4, "Character with more than 4 UTF16 code units")
+      self.count = UInt16(count)
+      data = 0
+      let dest = UnsafeMutablePointer<UTF16.CodeUnit>(Builtin.addressof(&data))
+      transcode(
+        UTF8.self, UTF16.self, input.generate(), dest, stopOnError: false)
+      _fixLifetime(u8)
+    }
+    var startIndex : Int {
+      return 0
+    }
+    var endIndex : Int {
+      return Int(count)
+    }
+    subscript(i: Int) -> UTF16.CodeUnit {
+      var d = data
+      return UnsafePointer<UTF16.CodeUnit>(Builtin.addressof(&d))[i]
+    }
+    func generate() -> IndexingGenerator<SmallUTF16> {
+      return IndexingGenerator(self)
+    }
+    
+    var count: UInt16
+    var data: UInt64
+  }
+  
   public var hashValue: Int {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.

@@ -529,6 +529,16 @@ extension String : ExtensibleCollectionType {
     _core.reserveCapacity(n)
   }
 
+  public mutating func append(c: Character) {
+    switch c {
+    case .SmallRepresentation(var _63bits):
+      let bytes = Character._smallValue(_63bits)
+      _core.extend(Character.SmallUTF16(bytes))
+    case .LargeRepresentation(var str):
+      _core.extend(str._value._core)
+    }
+  }
+  
   public mutating func extend<
       S : SequenceType
       where S.Generator.Element == Character
