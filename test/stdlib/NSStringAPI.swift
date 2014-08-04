@@ -1099,15 +1099,21 @@ NSStringAPIs.test("stringByAppendingFormat(_:_:...)") {
     "abc абв \u{0001F60A}def привет мир \u{0001F60A} 42",
     "abc абв \u{0001F60A}"
       .stringByAppendingFormat("def %@ %ld", formatArg, 42))
-  // FIXME
 }
 
 NSStringAPIs.test("stringByAppendingPathComponent(_:)") {
-  // FIXME
+  expectEqual("", "".stringByAppendingPathComponent(""))
+  expectEqual("a.txt", "".stringByAppendingPathComponent("a.txt"))
+  expectEqual("/tmp/a.txt", "/tmp".stringByAppendingPathComponent("a.txt"))
 }
 
 NSStringAPIs.test("stringByAppendingPathExtension(_:)") {
-  // FIXME
+  expectEmpty("".stringByAppendingPathExtension(""))
+  expectOptionalEqual("a.txt.", "a.txt".stringByAppendingPathExtension(""))
+  expectEmpty("".stringByAppendingPathExtension("txt"))
+  expectOptionalEqual("a.txt", "a".stringByAppendingPathExtension("txt"))
+  expectOptionalEqual("a.txt.old", "a.txt".stringByAppendingPathExtension("old"))
+  expectOptionalEqual("/tmp/a.txt.old", "/tmp/a.txt".stringByAppendingPathExtension("old"))
 }
 
 NSStringAPIs.test("stringByAppendingString(_:)") {

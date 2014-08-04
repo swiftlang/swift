@@ -1221,7 +1221,13 @@ extension String {
 
   /// Returns a new string made by appending to the `String` an
   /// extension separator followed by a given extension.
-  public func stringByAppendingPathExtension(ext: String) -> String {
+  public func stringByAppendingPathExtension(ext: String) -> String? {
+    // FIXME: This method can return nil in practice, for example when self is
+    // an empty string.  OTOH, this is not documented, documentatios says that
+    // it always returns a string.
+    //
+    // <rdar://problem/17902469> -[NSString stringByAppendingPathExtension] can
+    // return nil
     return _ns.stringByAppendingPathExtension(ext)
   }
 
