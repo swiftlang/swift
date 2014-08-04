@@ -214,11 +214,11 @@ public func <(lhs: String, rhs: String) -> Bool {
 // Support for copy-on-write
 extension String {
 
-  mutating func extend(rhs: String) {
-    _core.append(rhs._core)
+  public mutating func extend(rhs: String) {
+    _core.extend(rhs._core)
   }
 
-  mutating func _append(x: UnicodeScalar) {
+  public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
 
