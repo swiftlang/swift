@@ -8,6 +8,7 @@ set(SWIFT_API_NOTES_OVERLAY_MODULES
 
 # List the modules that have API notes not asociated with SDK overlays.
 set(SWIFT_API_NOTES_NON_OVERLAY_MODULES
+  GameKit
   NotificationCenter
   )
 

@@ -1,0 +1,7 @@
+Name:            GameKit
+Classes:
+  - Name: GKLocalPlayer
+    Methods:
+      - Selector:        'localPlayer'
+        MethodKind:      Class
+        FactoryAsInit:   C
