@@ -734,6 +734,32 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
 
 /// Return the final class decl using metadata.
 static ClassDecl *getClassFromClassMetadata(ClassMethodInst *CMI) {
+  SILDeclRef Member = CMI->getMember();
+  FuncDecl *FD = Member.getFuncDecl();
+  SILType ClassType = CMI->getOperand().stripCasts().getType();
+  ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
+
+  // Only handle valid non-dynatmic non-overridden members.
+  if (!CD || !FD || FD->isInvalid() || FD->isDynamic() || FD->isOverridden())
+    return nullptr;
+
+  // Only consider 'private' members.
+  if (!FD->hasAccessibility() ||
+      FD->getAccessibility() != Accessibility::Private)
+    return nullptr;
+
+  // Search the class hierarchy for the class that has the member.
+  while (CD) {
+    for (Decl *M : CD->getMembers())
+      if (M == FD) {
+        DEBUG(llvm::dbgs() << "Devirtualizing member " << FD->getName() <<
+              "in class " << CD->getName() << "\n");
+        return CD;
+      }
+
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+  }
+
   return nullptr;
 }
 
