@@ -1124,11 +1124,18 @@ NSStringAPIs.test("stringByAppendingString(_:)") {
 }
 
 NSStringAPIs.test("stringByDeletingLastPathComponent") {
-  // FIXME
+  expectEqual("", "".stringByDeletingLastPathComponent)
+  expectEqual("/", "/".stringByDeletingLastPathComponent)
+  expectEqual("/", "/tmp".stringByDeletingLastPathComponent)
+  expectEqual("/tmp", "/tmp/a.txt".stringByDeletingLastPathComponent)
 }
 
 NSStringAPIs.test("stringByDeletingPathExtension") {
-  // FIXME
+  expectEqual("", "".stringByDeletingPathExtension)
+  expectEqual("/", "/".stringByDeletingPathExtension)
+  expectEqual("/tmp", "/tmp".stringByDeletingPathExtension)
+  expectEqual("/tmp/a", "/tmp/a.txt".stringByDeletingPathExtension)
+  expectEqual("/tmp/a.txt", "/tmp/a.txt.old".stringByDeletingPathExtension)
 }
 
 NSStringAPIs.test("stringByExpandingTildeInPath") {
