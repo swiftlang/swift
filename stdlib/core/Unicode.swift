@@ -611,7 +611,7 @@ public func transcode<
       OutputEncoding.CodeUnit == Output.Element>(
   inputEncoding: InputEncoding.Type, outputEncoding: OutputEncoding.Type,
   var input: Input, var output: Output, #stopOnError: Bool
-) -> (hadError: Bool) {
+) -> (Bool) {
 
   // NB.  It is not possible to optimize this routine to a memcpy if
   // InputEncoding == OutputEncoding.  The reason is that memcpy will not

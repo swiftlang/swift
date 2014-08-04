@@ -1405,6 +1405,10 @@ ERROR(class_super_access,sema_tcd,none,
       (bool, Accessibility, Accessibility))
 ERROR(dot_protocol_on_non_existential,sema_tct,none,
       "'Protocol' type only applies to existential types", ())
+ERROR(tuple_single_element,sema_tcd,none,
+      "cannot create a single-element tuple with an element label", ())
+ERROR(tuple_ellipsis,sema_tcd,none,
+      "cannot create a variadic tuple", ())
 
 // Ownership
 ERROR(invalid_ownership_type,attribute_parsing,none,

@@ -1,24 +1,7 @@
 // RUN: %swift %s -verify
 
-var t1a: (Int...) = ()
-var t1b: (Int, Int...) = () // expected-error {{tuple types '()' and '(Int, Int...)' have a different number of elements (0 vs. 2)}}
-
-var t2a: (Int...) = 1
-var t2b: (Int, Int ...) = 1
-var t2c: (Int, Int, Int...) = 1  // expected-error {{type '(Int, Int, Int...)' does not conform to protocol 'IntegerLiteralConvertible'}}
-var t2d: (Double = 0.0, Int...) = 1 // expected-error {{default argument not permitted in a tuple type}}
-
-var t3a: (Int...) = (1,2)
-var t3b: (Int, Int...) = (1,2)
-var t3c: (Int, Int, Int...) = (1,2)
-var t3d: (Int, Int, Int, Int...) = (1,2) // expected-error {{different number of elements}}
-
-var t4: (Int...) -> Int
-var t5: (a: Int...) -> Int = t4
-var t6: (a: [Int]) -> Int = t4 // expected-error {{cannot convert the expression's type '(Int...) -> Int' to type '(a: [Int]) -> Int'}}
-
-var t7: Int
-var t8: (Int, String...) = (t7)
+var t1a: (Int...) = (1) // expected-error{{cannot create a variadic tuple}}
+var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}}
 
 func f1(a: Int...) { for x in a {} }
 f1()

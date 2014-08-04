@@ -93,10 +93,6 @@ func tuples() {
   bar((4, 5).1)
 
   var T1 : (a: Int16, b: Int) = (b : 42, a : 777)
-
-  // varargs.
-  var va1 : (Int...) = ()
-  var va2 : (Int, Int...) = (1,2,3)
 }
 
 // CHECK-LABEL: sil  @_TF11expressions6tuplesFT_T_
@@ -148,13 +144,6 @@ func address_of_expr() {
 
 
 func identity<T>(x: T) -> T {}
-
-// CHECK-LABEL: sil  @_TF11expressions15scalar_to_tupleFT_T_
-func scalar_to_tuple() {
-  var a : (x: Int) = 42
-  var b : (Int...) = 42
-  var c : (Int, Int...) = 42
-}
 
 struct SomeStruct {
  mutating

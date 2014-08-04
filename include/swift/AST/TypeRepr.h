@@ -522,6 +522,8 @@ public:
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
   bool hasEllipsis() const { return Ellipsis.isValid(); }
 
+  void removeEllipsis() { Ellipsis = SourceLoc(); }
+
   bool isParenType() const {
     return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]);
   }

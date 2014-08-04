@@ -37,7 +37,7 @@ class D : B {
 }
 
 class B {
-  var foo : (bar:Int)
+  var foo : Int
   func bar() {}
 
   init() {

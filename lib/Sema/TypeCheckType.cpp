@@ -1610,12 +1610,34 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     }
   }
 
+  // Tuple representations are limited outside of function inputs.
+  if (!(options & TR_ImmediateFunctionInput)) {
+    bool complained = false;
+
+    // Variadic tuples are not permitted.
+    if (repr->hasEllipsis()) {
+      TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
+      repr->removeEllipsis();
+      complained = true;
+    } 
+
+    // Single-element labeled tuples are not permitted, either.
+    if (elements.size() == 1 && elements[0].hasName()) {
+      if (!complained) {
+        auto named = cast<NamedTypeRepr>(repr->getElements()[0]);
+        TC.diagnose(repr->getStartLoc(), diag::tuple_single_element)
+          .fixItRemoveChars(named->getStartLoc(),
+                            named->getTypeRepr()->getStartLoc());
+      }
+
+      elements[0] = TupleTypeElt(elements[0].getType());
+    }
+  }
+
   if (repr->hasEllipsis()) {
     Type baseTy = elements.back().getType();
     Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
     Identifier name = elements.back().getName();
-    // FIXME: Where are we rejecting default arguments for variadic
-    // parameters?
     elements.back() = TupleTypeElt(fullTy, name, DefaultArgumentKind::None,
                                    true);
   }

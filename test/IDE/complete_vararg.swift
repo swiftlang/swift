@@ -24,7 +24,7 @@ class C {
 }
 
 func genericFreeFunc1<T>(#t: T...) { }
-func interestingType1(#x: (Int, (Int, String...)...)...) { }
+func interestingType1(#x: (Int, (Int, String))...) { }
 
 func testTopLevel() {
   #^TOP_LEVEL_1^#
@@ -34,7 +34,7 @@ func testTopLevel() {
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc2({#x: Int#}, {#y: Int...#})[#Void#]{{$}}
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      freeFunc3({#w: Int...#})[#(x: Int...) -> Void#]{{$}}
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      genericFreeFunc1({#t: T...#})[#Void#]{{$}}
-// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      interestingType1({#x: (Int, (Int, String...)...)...#})[#Void#]{{$}}
+// TOP_LEVEL_1-DAG: Decl[FreeFunction]/CurrModule:      interestingType1({#x: (Int, (Int, String))...#})[#Void#]{{$}}
 // TOP_LEVEL_1: End completions
 
 var obj = C()
@@ -106,5 +106,5 @@ func testInterestingType() {
   interestingType1(#^INTERESTING_TYPE_1^#
 }
 // INTERESTING_TYPE_1: Begin completions, 1 items
-// INTERESTING_TYPE_1: Pattern/ExprSpecific:               ['(']{#x: (Int, (Int, String...)...)...#})[#Void#]{{$}}
+// INTERESTING_TYPE_1: Pattern/ExprSpecific:               ['(']{#x: (Int, (Int, String))...#})[#Void#]{{$}}
 // INTERESTING_TYPE_1: End completions

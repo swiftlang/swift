@@ -13,7 +13,7 @@ X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4
 
 // <rdar://problem/16801056>
 enum Policy {
-  case Head(count : Int)
+  case Head(Int)
 }
 
 func extra2(#x: Int, #y: Int) { }

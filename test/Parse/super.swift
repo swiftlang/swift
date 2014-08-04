@@ -1,7 +1,7 @@
 // RUN: %swift %s -parse -verify
 
 class B {
-  var foo: (bar: Int)
+  var foo: Int
   func bar() {}
 
   init() {}
@@ -24,7 +24,7 @@ class D : B {
 
   func super_calls() {
     super.foo        // expected-error {{expression resolves to an unused l-value}}
-    super.foo.bar    // expected-error {{expression resolves to an unused l-value}}
+    super.foo.bar    // expected-error {{'Int' does not have a member named 'bar'}}
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
     super.init // expected-error{{'super.init' cannot be called outside of an initializer}}

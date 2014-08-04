@@ -81,7 +81,7 @@ func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
 
 func open(name: String, oflag: Int) -> Int { }
 
-var foo:(bar:Int) = 0
+var foo: Int = 0
 
 var fd = posixCantFail(open)(args: ("foo", 0))
 

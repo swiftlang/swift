@@ -199,28 +199,15 @@ func testFor() {
 func testTuples() {
   var t = (2,3)
   var tt = (2, (4,5))
-  var c : (Int, Int...) = 42
   var d = "foo"
   // CHECK-LABEL: sil @_TF13sil_locations10testTuplesFT_T_
+
 
   // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-6]]:11
   // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:12
   // CHECK: integer_literal $Builtin.Int2048, 3                      {{.*}} line:[[@LINE-8]]:14
   // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-8]]:12
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:27
-  // CHECK: integer_literal $Builtin.Int2048, 42                     {{.*}} line:[[@LINE-10]]:27
-  // CHECK: integer_literal $Builtin.Word, 0                         {{.*}} line:[[@LINE-11]]:27
-  // CHECK: alloc_array                                              {{.*}} line:[[@LINE-12]]:27
-  // CHECK: address_to_pointer                                       {{.*}} line:[[@LINE-13]]:27
-  // CHECK: apply                                                    {{.*}} line:[[@LINE-14]]:27
-
-
-
-  // CHECK: apply                                                    {{.*}} line:[[@LINE-17]]:11
-  // CHECK: store                                                    {{.*}} line:[[@LINE-18]]:11
-  
-
+  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16  
 }
 
 // Test tuple emploding/exploding.

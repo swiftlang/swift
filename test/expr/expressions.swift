@@ -51,7 +51,7 @@ func basictest() {
   var tuple1 : ()
   var tuple2 : (Int)
   var tuple3 : (Int, Int, ())
-  var tuple2a : (a : Int)
+  var tuple2a : (a : Int) // expected-error{{cannot create a single-element tuple with an element label}}{{18-22=}}
   var tuple3a : (a : Int, b : Int, c : ())
 
   var tuple4 = (1, 2)        // Tuple literal.
@@ -143,7 +143,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int)(b: Int) -> (c: Int) {
+func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b

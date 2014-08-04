@@ -19,14 +19,14 @@ func test_conv() {
   var a5 : (Y, X) -> X = f0; // expected-error{{Y' is not a subtype of 'X'}}
   var a6 : (X) -> X = f1;
   var a7 : (X) -> (X) = f1;
-  var a8 : (x2 : X) -> (x : X) = f1;
-  var a9 : (x2 : X) -> ((x : X)) = f1;
+  var a8 : (x2 : X) -> (X) = f1;
+  var a9 : (x2 : X) -> ((X)) = f1;
   a7 = a8;
   a8 = a9;
   a9 = a7;
 
   var a10 : ((X)->X) -> ((Y) -> Y) = f2;
-  var a11 : ((x2 : X)-> (x3 : X)) -> (((y2 : Y) -> (y3 : Y))) = f2;
+  var a11 : ((x2 : X)-> (X)) -> (((y2 : Y) -> (Y))) = f2;
 
   typealias fp = ((X)->X) -> ((Y) -> Y)
   var a12 = f2
