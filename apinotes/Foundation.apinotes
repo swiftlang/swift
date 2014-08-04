@@ -193,6 +193,14 @@ Classes:
         MethodKind:      Instance
         DesignatedInit:  true
         Required:        true
+      - Selector:        'stringByAddingPercentEscapesUsingEncoding:'
+        MethodKind:      Instance
+        Nullability:     [ S ]
+        NullabilityOfRet: O
+      - Selector:        'stringByAddingPercentEncodingWithAllowedCharacters:'
+        MethodKind:      Instance
+        Nullability:     [ N ]
+        NullabilityOfRet: O
   - Name:            NSThread
     Methods:
       - Selector:        'init'

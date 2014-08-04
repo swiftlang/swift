@@ -1165,7 +1165,16 @@ extension String {
   /// characters.
   public func stringByAddingPercentEncodingWithAllowedCharacters(
     allowedCharacters: NSCharacterSet
-  ) -> String {
+  ) -> String? {
+    // FIXME: the documentation states that this method can return nil if the
+    // transformation is not possible, without going into futher details.  The
+    // implementation can only return nil if malloc() returns nil, so in
+    // practice this is not possible.  Still, to be consistent with
+    // documentation, we declare the method as returning an optional String.
+    //
+    // <rdar://problem/17901698> Docs for -[NSString
+    // stringByAddingPercentEncodingWithAllowedCharacters] don't precisely
+    // describe when return value is nil
     return _ns.stringByAddingPercentEncodingWithAllowedCharacters(
       allowedCharacters
     )
@@ -1179,7 +1188,7 @@ extension String {
   /// the `String` into a legal URL string.
   public func stringByAddingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
-  ) -> String {
+  ) -> String? {
     return _ns.stringByAddingPercentEscapesUsingEncoding(encoding)
   }
 

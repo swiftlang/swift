@@ -1064,13 +1064,18 @@ NSStringAPIs.test("stringByAbbreviatingWithTildeInPath") {
 }
 
 NSStringAPIs.test("stringByAddingPercentEncodingWithAllowedCharacters(_:)") {
-  expectEqual("ab%63d %D0%B0%D0%B1%D0%B2%D0%B3",
+  expectOptionalEqual("ab%63d %D0%B0%D0%B1%D0%B2%D0%B3",
     "abcd абвг".stringByAddingPercentEncodingWithAllowedCharacters(
       NSCharacterSet(charactersInString: "abd ")))
 }
 
 NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
-  // FIXME
+  expectEmpty(
+    "abcd абвг".stringByAddingPercentEscapesUsingEncoding(
+      NSASCIIStringEncoding))
+  expectOptionalEqual("abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
+    "abcd абвг".stringByAddingPercentEscapesUsingEncoding(
+      NSUTF8StringEncoding))
 }
 
 NSStringAPIs.test("stringByAppendingFormat(_:_:...)") {
