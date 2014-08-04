@@ -1166,7 +1166,17 @@ NSStringAPIs.test("substringToIndex(_:)") {
 }
 
 NSStringAPIs.test("substringWithRange(_:)") {
-  // FIXME
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+
+  expectEqual("", s.substringWithRange(s.startIndex..<s.startIndex))
+  expectEqual(
+    "",
+    s.substringWithRange(advance(s.startIndex, 1)..<advance(s.startIndex, 1)))
+  expectEqual("", s.substringWithRange(s.endIndex..<s.endIndex))
+  expectEqual(s, s.substringWithRange(s.startIndex..<s.endIndex))
+  expectEqual(
+    "さ\u{3099}し\u{3099}す\u{3099}",
+    s.substringWithRange(advance(s.startIndex, 5)..<advance(s.startIndex, 8)))
 }
 
 NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
