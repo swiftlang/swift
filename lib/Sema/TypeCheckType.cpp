@@ -1745,7 +1745,8 @@ Type TypeChecker::substType(Module *module, Type type,
 }
 
 Type TypeChecker::substMemberTypeWithBase(Module *module, Type T,
-                                          ValueDecl *Member, Type BaseTy) {
+                                          const ValueDecl *Member,
+                                          Type BaseTy){
   if (!BaseTy)
     return T;
 

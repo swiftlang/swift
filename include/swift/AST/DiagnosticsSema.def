@@ -804,6 +804,21 @@ ERROR(override_ownership_mismatch,sema_tcd,none,
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
 
+WARNING(override_unnecessary_IUO,sema_tcd,none,
+      "overriding %0 parameter of type %1 with implicitly unwrapped optional "
+      "type %2",
+      (DescriptiveDeclKind, Type, Type))
+WARNING(override_unnecessary_result_IUO,sema_tcd,none,
+      "overriding %0 optional result type %1 with implicitly unwrapped "
+      "optional type %2",
+      (DescriptiveDeclKind, Type, Type))
+NOTE(override_unnecessary_IUO_remove,sema_tcd,none,
+     "remove '!' to make the parameter required", ())
+NOTE(override_unnecessary_IUO_use_strict,sema_tcd,none,
+     "use '?' to make the result optional", ())
+NOTE(override_unnecessary_IUO_silence,sema_tcd,none,
+     "add parentheses to silence this warning", ())
+
 ERROR(override_mutable_covariant_property,sema_tcd,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
       (Identifier, Type, Type))

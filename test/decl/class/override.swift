@@ -138,3 +138,88 @@ class H : G {
 
   override func g1(Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}
 }
+
+@objc class IUOTestBaseClass {
+  func none() {}
+
+  func oneA(_: AnyObject) {}
+  func oneB(#x: AnyObject) {}
+  func oneC(var #x: AnyObject) {}
+  func oneD(x: AnyObject) {}
+
+  func manyA(_: AnyObject, _: AnyObject) {}
+  func manyB(a: AnyObject, b: AnyObject) {}
+  func manyC(var a: AnyObject, var b: AnyObject) {}
+
+  func result() -> AnyObject? { return nil }
+  func both(x: AnyObject) -> AnyObject? { return x }
+
+  init(_: AnyObject) {}
+  init(one: AnyObject) {}
+  init(a: AnyObject, b: AnyObject) {}
+}
+
+class IUOTestSubclass : IUOTestBaseClass {
+  override func oneA(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
+  override func oneB(#x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{35-36=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{26-26=(}} {{36-36=)}}
+  override func oneC(var #x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{39-40=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{30-30=(}} {{40-40=)}}
+  override func oneD(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
+
+  override func manyA(_: AnyObject!, _: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
+  // expected-note@-2 2 {{add parentheses to silence this warning}}
+  override func manyB(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
+  // expected-note@-2 2 {{add parentheses to silence this warning}}
+  override func manyC(var a: AnyObject!, var b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
+  // expected-note@-2 2 {{add parentheses to silence this warning}}
+
+  override func result() -> AnyObject! { return nil } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{use '?' to make the result optional}} {{38-39=?}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{29-29=(}} {{39-39=)}}
+  override func both(x: AnyObject!) -> AnyObject! { return x } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject!'}} expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{use '?' to make the result optional}} expected-note@-1 {{remove '!' to make the parameter required}}
+  // expected-note@-2 2 {{add parentheses to silence this warning}}
+
+  override init(_: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{29-30=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{20-20=(}} {{30-30=)}}
+  override init(one: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{31-32=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{22-22=(}} {{32-32=)}}
+  override init(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 2 {{remove '!' to make the parameter required}}
+  // expected-note@-2 2 {{add parentheses to silence this warning}}
+}
+
+class IUOTestSubclass2 : IUOTestBaseClass {
+  override func oneA(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
+  override func oneB(var #x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{39-40=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{30-30=(}} {{40-40=)}}
+  override func oneD(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
+
+  override func oneC(#x: ImplicitlyUnwrappedOptional<AnyObject>) {}  // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'ImplicitlyUnwrappedOptional<AnyObject>'}}
+  // expected-note@-1 {{add parentheses to silence this warning}} {{26-26=(}} {{64-64=)}}
+}
+
+class IUOTestSubclassOkay : IUOTestBaseClass {
+  override func oneA(_: AnyObject?) {}
+  override func oneB(#x: (AnyObject!)) {}
+  override func oneC(#x: AnyObject) {}
+
+  override func result() -> (AnyObject!) { return nil }
+}

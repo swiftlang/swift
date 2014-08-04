@@ -450,7 +450,7 @@ public:
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.
-  Type substMemberTypeWithBase(Module *module, Type T, ValueDecl *Member,
+  Type substMemberTypeWithBase(Module *module, Type T, const ValueDecl *Member,
                                Type BaseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if

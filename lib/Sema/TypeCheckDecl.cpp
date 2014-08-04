@@ -4409,7 +4409,7 @@ public:
 
   /// Adjust the type of the given declaration to appear as if it were
   /// in the given subclass of its actual declared class.
-  Type adjustSuperclassMemberDeclType(ValueDecl *decl, Type subclass) {
+  Type adjustSuperclassMemberDeclType(const ValueDecl *decl, Type subclass) {
     ClassDecl *superclassDecl =
       decl->getDeclContext()->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
@@ -4454,6 +4454,129 @@ public:
     }
 
     return true;
+  }
+
+  static const Pattern *getTupleElementPattern(const TuplePatternElt &elt) {
+    return elt.getPattern();
+  }
+
+  /// Diagnose overrides of '(T) -> T?' with '(T!) -> T!'.
+  void diagnoseUnnecessaryIUOs(const AbstractFunctionDecl *method,
+                               const AbstractFunctionDecl *parentMethod,
+                               Type owningTy) {
+    Type plainParentTy = adjustSuperclassMemberDeclType(parentMethod, owningTy);
+    const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
+    parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
+
+    // Check the parameter types.
+    auto checkParam = [&](const Pattern *paramPattern, Type parentParamTy) {
+      Type paramTy = paramPattern->getType();
+      if (!paramTy || !paramTy->getImplicitlyUnwrappedOptionalObjectType())
+        return;
+      if (!parentParamTy || parentParamTy->getAnyOptionalObjectType())
+        return;
+
+      if (auto parenPattern = dyn_cast<ParenPattern>(paramPattern))
+        paramPattern = parenPattern->getSubPattern();
+      if (auto varPattern = dyn_cast<VarPattern>(paramPattern))
+        paramPattern = varPattern->getSubPattern();
+      auto typedParamPattern = dyn_cast<TypedPattern>(paramPattern);
+      if (!typedParamPattern)
+        return;
+
+      TypeLoc TL = typedParamPattern->getTypeLoc();
+
+      // Allow silencing this warning using parens.
+      if (isa<ParenType>(TL.getType().getPointer()))
+        return;
+
+      TC.diagnose(paramPattern->getLoc(), diag::override_unnecessary_IUO,
+                  method->getDescriptiveKind(), parentParamTy, paramTy)
+        .highlight(TL.getSourceRange());
+
+      auto sugaredForm =
+        dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TL.getTypeRepr());
+      if (sugaredForm) {
+        TC.diagnose(sugaredForm->getExclamationLoc(),
+                    diag::override_unnecessary_IUO_remove)
+          .fixItRemove(sugaredForm->getExclamationLoc());
+      }
+
+      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                               TL.getSourceRange().End);
+      TC.diagnose(TL.getSourceRange().Start,
+                  diag::override_unnecessary_IUO_silence)
+        .fixItInsert(TL.getSourceRange().Start, "(")
+        .fixItInsert(endLoc, ")");
+    };
+
+    auto rawParamPatterns = method->getBodyParamPatterns()[1];
+    auto paramPatterns = dyn_cast<TuplePattern>(rawParamPatterns);
+
+    auto parentInput = parentTy->getInput();
+    auto parentTupleInput = parentInput->getAs<TupleType>();
+    if (parentTupleInput) {
+      if (paramPatterns) {
+        // FIXME: If we ever allow argument reordering, this is incorrect.
+        ArrayRef<TuplePatternElt> sharedParams = paramPatterns->getFields();
+        sharedParams = sharedParams.slice(0,
+                                          parentTupleInput->getNumElements());
+
+        using PatternView = ArrayRefView<TuplePatternElt, const Pattern *,
+                                         getTupleElementPattern>;
+        for_each(PatternView(sharedParams), parentTupleInput->getElementTypes(),
+                 checkParam);
+      } else if (parentTupleInput->getNumElements() > 0) {
+        checkParam(rawParamPatterns, parentTupleInput->getElementType(0));
+      }
+    } else {
+      // Otherwise, the parent has a single parameter with no label.
+      if (paramPatterns) {
+        checkParam(paramPatterns->getFields().front().getPattern(),
+                   parentInput);
+      } else {
+        checkParam(rawParamPatterns, parentInput);
+      }
+    }
+
+    auto methodAsFunc = dyn_cast<FuncDecl>(method);
+    if (!methodAsFunc)
+      return;
+
+    // FIXME: This is very nearly the same code as checkParam.
+    auto checkResult = [&](TypeLoc resultTL, Type parentResultTy) {
+      Type resultTy = resultTL.getType();
+      if (!resultTy || !resultTy->getImplicitlyUnwrappedOptionalObjectType())
+        return;
+      if (!parentResultTy || !parentResultTy->getOptionalObjectType())
+        return;
+
+      // Allow silencing this warning using parens.
+      if (isa<ParenType>(resultTy.getPointer()))
+        return;
+
+      TC.diagnose(resultTL.getSourceRange().Start,
+                  diag::override_unnecessary_result_IUO,
+                  method->getDescriptiveKind(), parentResultTy, resultTy)
+        .highlight(resultTL.getSourceRange());
+
+      auto sugaredForm =
+        dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(resultTL.getTypeRepr());
+      if (sugaredForm) {
+        TC.diagnose(sugaredForm->getExclamationLoc(),
+                    diag::override_unnecessary_IUO_use_strict)
+          .fixItReplace(sugaredForm->getExclamationLoc(), "?");
+      }
+
+      auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                               resultTL.getSourceRange().End);
+      TC.diagnose(resultTL.getSourceRange().Start,
+                  diag::override_unnecessary_IUO_silence)
+        .fixItInsert(resultTL.getSourceRange().Start, "(")
+        .fixItInsert(endLoc, ")");
+    };
+
+    checkResult(methodAsFunc->getBodyResultTypeLoc(), parentTy->getResult());
   }
 
   /// Determine which method or subscript this method or subscript overrides
@@ -4704,6 +4827,14 @@ public:
       if (declTy->isEqual(matchType)) {
         // Nothing to do.
         
+      } else if (method) {
+        // Private migration help for overrides of Objective-C methods.
+        if ((!isa<FuncDecl>(method) || !cast<FuncDecl>(method)->isAccessor()) &&
+            superclass->getClassOrBoundGenericClass()->isObjC()) {
+          diagnoseUnnecessaryIUOs(method, cast<AbstractFunctionDecl>(matchDecl),
+                                  owningTy);
+        }
+
       } else if (auto subscript =
                    dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
         // Otherwise, if this is a subscript, validate that covariance is ok.
