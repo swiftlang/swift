@@ -117,7 +117,7 @@ testNSMutableStringMatch("foobar")
 // CHECK: nomatch
 testNSMutableStringMatch("nope")
 
-func testAnyObjectDowncast(obj: AnyObject) {
+func testAnyObjectDowncast(obj: AnyObject!) {
   switch obj {
   case let str as String:
     println("String: \(str)")
@@ -157,7 +157,10 @@ testAnyObjectDowncast([1, 2, 3, 4, 5])
 // CHECK: ]
 testAnyObjectDowncast(["hello" : 1, "world" : 2])
 
-func testNSArrayDowncast(nsArr: NSArray) {
+// CHECK: Did not match
+testAnyObjectDowncast(nil)
+
+func testNSArrayDowncast(nsArr: NSArray?) {
   switch nsArr {
   case let strArr as [String]:
     println("[String]: \(strArr)")
@@ -178,3 +181,6 @@ testNSArrayDowncast([1, 2, 3])
 
 // CHECK: Did not match
 testNSArrayDowncast([[1, 2], [3, 4], [5, 6]])
+
+// CHECK: Did not match
+testNSArrayDowncast(nil)

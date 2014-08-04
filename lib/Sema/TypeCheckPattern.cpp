@@ -900,6 +900,31 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (validateType(IP->getCastTypeLoc(), dc))
       return nullptr;
 
+    auto castType = IP->getCastTypeLoc().getType();
+
+    // Determine whether we have an imbalance in the number of optionals.
+    SmallVector<Type, 2> inputTypeOptionals;
+    type->lookThroughAllAnyOptionalTypes(inputTypeOptionals);
+    SmallVector<Type, 2> castTypeOptionals;
+    castType->lookThroughAllAnyOptionalTypes(castTypeOptionals);
+
+    // If we have extra optionals on the input type. Create ".Some" patterns
+    // wrapping the isa pattern to balance out the optionals.
+    int numExtraOptionals = inputTypeOptionals.size()-castTypeOptionals.size();
+    if (numExtraOptionals > 0) {
+      Pattern *sub = IP;
+      for (int i = 0; i < numExtraOptionals; ++i) {
+        sub = new (Context) EnumElementPattern(TypeLoc(),
+                                               IP->getStartLoc(),
+                                               IP->getEndLoc(),
+                                               Context.Id_Some,
+                                               nullptr, sub,
+                                               /*Implicit=*/true);
+      }
+
+      P = sub;
+      return coercePatternToType(P, dc, type, options);
+    }
 
 
     CheckedCastKind castKind
