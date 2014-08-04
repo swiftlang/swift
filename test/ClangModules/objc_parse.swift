@@ -161,7 +161,10 @@ func keyedSubscripting(b: B, idx: A, a: A) {
 
   let dict = NSMutableDictionary()
   dict[NSString()] = a
-  let _ = dict[NSString()]
+  let value = dict[NSString()] // expected-warning {{constant 'value' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
+
+  dict[nil] = a // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
+  let _ = dict[nil]  // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
 }
 
 // Typed indexed subscripting

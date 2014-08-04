@@ -1019,29 +1019,26 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Import the parameter type into Swift.
+    OptionalTypeKind optionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
+    if (knownMethod)
+      optionalityOfParam =
+        translateNullability(knownMethod->getParamTypeInfo(index));
     Type swiftParamTy;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       swiftParamTy = getOptionalType(getNSCopyingType(),
-                                     ImportTypeKind::Parameter);
+                                     ImportTypeKind::Parameter,
+                                     optionalityOfParam);
     } else if (kind == SpecialMethodKind::PropertyAccessor) {
-      OptionalTypeKind OptionalityOfParam
-        = knownMethod
-            ? translateNullability(knownMethod->getParamTypeInfo(index))
-            : OTK_ImplicitlyUnwrappedOptional;
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::PropertyAccessor,
                                 isFromSystemModule,
-                                OptionalityOfParam);
+                                optionalityOfParam);
     } else {
-      OptionalTypeKind OptionalityOfParam
-        = knownMethod
-            ? translateNullability(knownMethod->getParamTypeInfo(index))
-            : OTK_ImplicitlyUnwrappedOptional;
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::Parameter,
                                 isFromSystemModule,
-                                OptionalityOfParam);
+                                optionalityOfParam);
     }
     if (!swiftParamTy)
       return Type();

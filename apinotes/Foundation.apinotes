@@ -31,12 +31,16 @@ Classes:
         DesignatedInit:  true
   - Name:            NSDictionary
     Methods:
-      - Selector:        'init'
-        MethodKind:      Instance
-        DesignatedInit:  true
-      - Selector:        'initWithObjects:forKeys:count:'
-        MethodKind:      Instance
-        DesignatedInit:  true
+      - Selector:         'init'
+        MethodKind:       Instance
+        DesignatedInit:   true
+      - Selector:         'initWithObjects:forKeys:count:'
+        MethodKind:       Instance
+        DesignatedInit:   true
+      - Selector:         'objectForKeyedSubscript:'
+        MethodKind:       Instance
+        Nullability:      [ N ]
+        NullabilityOfRet: O
   - Name:            NSDistributedNotificationCenter
     Methods:
       - Selector:        'notificationCenterForType:'
@@ -127,6 +131,9 @@ Classes:
       - Selector:        'initWithCapacity:'
         MethodKind:      Instance
         DesignatedInit:  true
+      - Selector:        'setObject:forKeyedSubscript:'
+        MethodKind:      Instance
+        Nullability:     [ O, N ]  # The object is optional to match the getter.
   - Name:            NSMutableOrderedSet
     Methods:
       - Selector:        'init'

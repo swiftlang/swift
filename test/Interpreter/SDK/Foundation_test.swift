@@ -108,12 +108,12 @@ nsArrayToAnyObjectArray(aoa)
 // Dictionaries
 //===----------------------------------------------------------------------===//
 var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
-assert((nsDict[1] as NSString).isEqual("Hello"))
-assert((nsDict[2] as NSString).isEqual("World"))
+assert((nsDict[1]! as NSString).isEqual("Hello"))
+assert((nsDict[2]! as NSString).isEqual("World"))
 
 let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
-assert(nsMutableDict["Hello"].isEqual(1))
-assert(nsMutableDict["World"].isEqual(2))
+assert(nsMutableDict["Hello"]!.isEqual(1))
+assert(nsMutableDict["World"]!.isEqual(2))
 
 //===----------------------------------------------------------------------===//
 // Ranges
@@ -171,7 +171,7 @@ class ClassWithDtor : NSObject {
 
 // <rdar://problem/17584531>
 var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
-var dict2 = dict["people"][0] as NSDictionary
+var dict2 = dict["people"]?[0] as NSDictionary
 println(dict2["id"])
 // CHECK: 255
 
