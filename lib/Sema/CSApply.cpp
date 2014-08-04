@@ -2318,15 +2318,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    /// A helper function to plumb a stack of optional types.
-    Type plumbOptionals(Type type, SmallVectorImpl<Type> &optionals) {
-      while (auto valueType = type->getAnyOptionalObjectType()) {
-        optionals.push_back(type);
-        type = valueType;
-      }
-      return type;
-    };
-
     Expr *visitIsaExpr(IsaExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -2385,9 +2376,9 @@ namespace {
 
       // Dig through the optionals in the from/to types.
       SmallVector<Type, 2> fromOptionals;
-      plumbOptionals(fromType, fromOptionals);
+      fromType->lookThroughAllAnyOptionalTypes(fromOptionals);
       SmallVector<Type, 2> toOptionals;
-      plumbOptionals(toType, toOptionals);
+      toType->lookThroughAllAnyOptionalTypes(toOptionals);
 
       // If we have an imbalance of optionals or a collection
       // downcast, handle this as a checked cast followed by a
@@ -2434,10 +2425,11 @@ namespace {
       Type srcType = subExpr->getType();
 
       SmallVector<Type, 4> srcOptionals;
-      srcType = plumbOptionals(srcType, srcOptionals);
+      srcType = srcType->lookThroughAllAnyOptionalTypes(srcOptionals);
 
       SmallVector<Type, 4> destOptionals;
-      auto destValueType = plumbOptionals(finalResultType, destOptionals);
+      auto destValueType
+        = finalResultType->lookThroughAllAnyOptionalTypes(destOptionals);
 
       // There's nothing special to do if the operand isn't optional
       // and we don't need any bridging.

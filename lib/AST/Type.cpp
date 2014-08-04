@@ -515,6 +515,16 @@ Type TypeBase::lookThroughAllAnyOptionalTypes() {
   return type;
 }
 
+Type TypeBase::lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals){
+  Type type(this);
+  while (auto objType = type->getAnyOptionalObjectType()) {
+    optionals.push_back(type);
+    type = objType;
+  }
+
+  return type;
+}
+
 ClassDecl *CanType::getClassBoundImpl(CanType type) {
   if (auto classTy = dyn_cast<ClassType>(type))
     return classTy->getDecl();

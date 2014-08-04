@@ -667,6 +667,10 @@ public:
   /// implicitly-unwrapped optional types.
   Type lookThroughAllAnyOptionalTypes();
 
+  /// Return the type T after looking through all of the optional or
+  /// implicitly-unwrapped optional types.
+  Type lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals);
+
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 
