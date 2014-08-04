@@ -31,16 +31,14 @@ let eager: Array = reverse(lazy(2..<8).map { $0 * 3 })
 println(equal(eager, r))
 
 let raboof = reduce(lazy("foobar").reverse(), "") {
-  // FIXME: "$0 + $1" should work just fine here
-  (s: String, c: Character) in s + c
+  (s: String, c: Character) in s + String(c)
 }
 // CHECK-NEXT: "raboof"
 debugPrintln(raboof)
 
 // Prove that the result is at least bidirectional, i.e. reversible
 let foobar = reduce(lazy("foobar").reverse().reverse(), "") {
-  // FIXME: "$0 + $1" should work just fine here
-  (s: String, c: Character) in s + c
+  (s: String, c: Character) in s + String(c)
 }
 // CHECK-NEXT: "foobar"
 debugPrintln(foobar)

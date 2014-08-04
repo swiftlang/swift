@@ -9,7 +9,7 @@ for letter in puzzleInput {
         case "a", "e", "i", "o", "u", " ":
             continue
         default:
-            puzzleOutput += letter
+            puzzleOutput.append(letter)
     }
 }
 println(puzzleOutput)

@@ -214,7 +214,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 // Support for copy-on-write
 extension String {
 
-  mutating func _append(rhs: String) {
+  mutating func extend(rhs: String) {
     _core.append(rhs._core)
   }
 
@@ -273,19 +273,10 @@ public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
   }
-  lhs._append(rhs)
+  lhs._core.extend(rhs._core)
   return lhs
 }
 
-public func +(var lhs: String, rhs: Character) -> String {
-  lhs._append(String(rhs))
-  return lhs
-}
-public func +(lhs: Character, rhs: String) -> String {
-  var result = String(lhs)
-  result._append(rhs)
-  return result
-}
 public func +(lhs: Character, rhs: Character) -> String {
   var result = String(lhs)
   result += String(rhs)
@@ -299,12 +290,8 @@ public func += (inout lhs: String, rhs: String) {
     lhs = rhs
   }
   else {
-    lhs._append(rhs)
+    lhs._core.extend(rhs._core)
   }
-}
-
-public func += (inout lhs: String, rhs: Character) {
-  lhs += String(rhs)
 }
 
 // Comparison operators
@@ -543,9 +530,18 @@ extension String : ExtensibleCollectionType {
       S : SequenceType
       where S.Generator.Element == Character
   >(seq: S) {
+    reserveCapacity(underestimateCount(seq))
     for c in seq {
-      self += c
+      self.append(c)
     }
+  }
+  
+  public init<
+      S : SequenceType
+      where S.Generator.Element == Character
+  >(seq: S) {
+    self = ""
+    self.extend(seq)
   }
 }
 
