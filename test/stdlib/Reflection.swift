@@ -411,6 +411,12 @@ println(reflect(emptyCollectionOfInt).summary)
 // CHECK-NEXT: .One
 println(reflect(Bit.One).summary)
 
+// CHECK-NEXT: from: 1.0
+// CHECK-NEXT: through: 12.15
+// CHECK-NEXT: by: 3.14
+
+dump(stride(from: 1.0, through: 12.15, by: 3.14))
+
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
 println("ObjC:")

@@ -74,6 +74,7 @@ set(SWIFTLIB_ESSENTIAL
   Shims.swift
   StaticString.swift
   Stride.swift
+  StrideMirrors.swift.gyb
   String.swift
   StringBridge.swift
   StringBuffer.swift
