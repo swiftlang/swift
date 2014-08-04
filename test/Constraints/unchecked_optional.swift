@@ -77,3 +77,12 @@ func test9() -> Test9a {
 
 func test10_helper(x : Int!) -> Int? { return x }
 func test10(x : Int?) -> Int! { return test10_helper(x) }
+
+// Fall back to object type behind an implicitly-unwrapped optional.
+protocol P11 { }
+extension Int : P11 { }
+func test11_helper<T : P11>(t: T) { }
+func test11(i: Int!, var j: Int!) {
+  test11_helper(i)
+  test11_helper(j)
+}

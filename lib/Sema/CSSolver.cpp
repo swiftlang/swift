@@ -275,6 +275,10 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   if (auto iot = type->getAs<InOutType>())
     result.push_back(iot->getObjectType());
 
+  // Try to unwrap implicitly unwrapped optional types.
+  if (auto objectType = type->getImplicitlyUnwrappedOptionalObjectType())
+    result.push_back(objectType);
+
   // FIXME: lots of other cases to consider!
   return result;
 }
