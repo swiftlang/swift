@@ -265,6 +265,8 @@ ERROR(func_decl_expected_arrow,decl_parsing,none,
 ERROR(func_static_not_allowed,decl_parsing,none,
       "static functions are not allowed in this context, "
       "use 'class' to declare a class method", ())
+ERROR(func_conversion,decl_parsing,none,
+      "'__conversion' functions are no longer allowed", ())
 
 // Enum
 ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,

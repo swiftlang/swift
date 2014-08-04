@@ -128,3 +128,8 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 
+
+// Ban __conversion
+struct Conversion {
+  func __conversion() -> Int { return 0 } // expected-error{{'__conversion' functions are no longer allowed}}
+}
