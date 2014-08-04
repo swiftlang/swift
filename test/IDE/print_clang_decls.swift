@@ -84,8 +84,10 @@
 // FOUNDATION-NEXT: {{^}}  static func convertFromNilLiteral() -> NSRuncingOptions{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// FOUNDATION: NSSetZoneName(zone: NSZone, name: String)
-// FOUNDATION: NSZoneName(zone: NSZone) -> String
+// FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
+// FOUNDATION-NEXT: @availability(*, unavailable)
+// FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, name: String)
+// FOUNDATION-NEXT: NSZoneName(zone: NSZone) -> String
 
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding {{{$}}
 // APPKIT-NEXT: init(coder aDecoder: NSCoder)

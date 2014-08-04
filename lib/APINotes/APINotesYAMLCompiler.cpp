@@ -48,7 +48,7 @@
  Availability: OSX        # Optional: Specifies which platform the API is
                           # available on. [OSX / iOS / none/ available]
 
- AvailabilityMessage: ""  # Optional: Custom availability message to display to
+ AvailabilityMsg: ""  # Optional: Custom availability message to display to
                           # the user, when API is not available.
 
  Classes:                 # List of classes
@@ -77,7 +77,7 @@
 
    Availability: OSX
 
-   AvailabilityMessage: ""
+   AvailabilityMsg: ""
 
    Methods:
      - Selector: "setSubviews:"       # Full name
@@ -91,7 +91,7 @@
 
        Availability: OSX
 
-       AvailabilityMessage: ""
+       AvailabilityMsg: ""
 
        FactoryAsInit: C               # Optional: Specifies if this method is a
                                       # factory initializer (false/true)
@@ -108,7 +108,7 @@
 
        Availability: OSX
 
-       AvailabilityMessage: ""
+       AvailabilityMsg: ""
 
  The protocol definition format is the same as the class definition.
 
@@ -123,7 +123,7 @@
 
    Availability: OSX
 
-   AvailabilityMessage: ""
+   AvailabilityMsg: ""
 
 Each global variable definition is of the following form:
 
@@ -133,7 +133,7 @@ Each global variable definition is of the following form:
 
    Availability: OSX
 
-   AvailabilityMessage: ""
+   AvailabilityMsg: ""
 
 */
 

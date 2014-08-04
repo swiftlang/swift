@@ -259,4 +259,6 @@ Functions:
     NullabilityOfRet: N
   - Name:        'NSSetZoneName'
     Nullability: [ N, N]
+    Availability: none
+    AvailabilityMsg: ""
 

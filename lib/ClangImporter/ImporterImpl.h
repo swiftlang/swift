@@ -727,6 +727,9 @@ public:
                             bool isStatic,
                             ClangNode ClangN);
 
+  /// \brief Add "Unavailable" annotation to the swift declaration.
+  void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
+
   /// \brief Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
   ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc,

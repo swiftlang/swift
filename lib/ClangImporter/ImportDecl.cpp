@@ -2010,6 +2010,8 @@ namespace {
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
+      result->setBodyResultType(resultTy);
+
       result->setAccessibility(Accessibility::Public);
 
       if (decl->isNoReturn())
@@ -2033,7 +2035,12 @@ namespace {
         Impl.registerExternalDecl(result);
       }
 
-      result->setBodyResultType(resultTy);
+      // Set availability.
+      auto knownFnInfo = Impl.getKnownGlobalFunction(decl);
+      if (knownFnInfo && knownFnInfo->Unavailable) {
+        Impl.markUnavailable(result, knownFnInfo->UnavailableMsg);
+      }
+
       return result;
     }
 
@@ -2116,11 +2123,13 @@ namespace {
         }
       }
 
+      auto knownVarInfo = Impl.getKnownGlobalVariable(decl);
+
       if (!type) {
         // Lookup nullability info.
         OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
-        if (auto info = Impl.getKnownGlobalVariable(decl)) {
-          if (auto nullability = info->getNullability())
+        if (knownVarInfo) {
+          if (auto nullability = knownVarInfo->getNullability())
             optionality = Impl.translateNullability(*nullability);
         }
 
@@ -2144,6 +2153,12 @@ namespace {
                        decl->getType().isConstQualified(),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
+
+      // Check availability.
+      if (knownVarInfo && knownVarInfo->Unavailable) {
+        Impl.markUnavailable(result, knownVarInfo->UnavailableMsg);
+      }
+
       return result;
     }
 
@@ -5238,6 +5253,17 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
 /// \brief Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
+void ClangImporter::Implementation::
+markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
+
+  unavailabilityMsgRef = SwiftContext.AllocateCopy(unavailabilityMsgRef);
+  auto ua = AvailabilityAttr::createUnavailableAttr(SwiftContext,
+                                                    unavailabilityMsgRef);
+  decl->getAttrs().add(ua);
+}
+
+/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// with the specified message.
 ValueDecl *ClangImporter::Implementation::
 createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                       StringRef UnavailableMessage, bool isStatic,
@@ -5247,11 +5273,8 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
   auto var = createDeclWithClangNode<VarDecl>(ClangN,
                                               isStatic, /*IsLet*/ false,
                                               SourceLoc(), name, type, dc);
+  markUnavailable(var, UnavailableMessage);
 
-  UnavailableMessage = SwiftContext.AllocateCopy(UnavailableMessage);
-  auto UA = AvailabilityAttr::createUnavailableAttr(SwiftContext,
-                                                    UnavailableMessage);
-  var->getAttrs().add(UA);
   return var;
 }
 
