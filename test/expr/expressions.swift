@@ -449,6 +449,10 @@ func stringliterals() {
   ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
 
+// <rdar://problem/17128913>
+var s = ""
+s.extend(["x"])
+
 //===----------------------------------------------------------------------===//
 // InOut arguments
 //===----------------------------------------------------------------------===//
@@ -645,6 +649,9 @@ func invalidDictionaryLiteral() {
   var f = [1: "one", 2 ???] // expected-error 3{{expected ',' separator}} expected-error 2{{expected key expression in dictionary literal}}  expected-error {{expected ':' in dictionary literal}}
   var g = [1: "one", 2: ???] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
 }
+
+[1].join([4]) // expected-error {{'Array<Int>' is not identical to 'Int'}}
+[1].join([[[4]]]) // expected-error {{'Int' is not identical to 'Array<Int>'}}
 
 //===----------------------------------------------------------------------===//
 // nil/.None comparisons

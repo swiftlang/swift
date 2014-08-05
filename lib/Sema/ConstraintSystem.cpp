@@ -451,7 +451,7 @@ namespace {
 
         // Bind the member's type variable as a type member of the base,
         // if needed.
-        if (archetype && shouldBindMember) {
+        if (shouldBindMember) {
           CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
                                               baseTypeVar, memberTypeVar, 
                                               member->getName(), locator));
