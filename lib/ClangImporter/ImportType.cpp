@@ -215,7 +215,7 @@ namespace {
       // without special hints.
       Type pointeeType;
       if (pointeeQualType->isVoidType())
-        pointeeType = Impl.SwiftContext.TheEmptyTupleType;
+        pointeeType = Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
       else
         pointeeType = Impl.importType(pointeeQualType,
                                       ImportTypeKind::Pointee,
