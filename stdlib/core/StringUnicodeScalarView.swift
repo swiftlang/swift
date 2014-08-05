@@ -250,7 +250,7 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(seq: S) {
     _core.extend(
-      lazyConcatenate(lazy(seq).map { $0.utf16 })
+      _lazyConcatenate(lazy(seq).map { $0.utf16 })
     )
   }
 }
@@ -269,7 +269,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
       subRange.startIndex._position
       ..< subRange.endIndex._position,
       with:
-        lazyConcatenate(lazy(newValues).map { $0.utf16 })
+        _lazyConcatenate(lazy(newValues).map { $0.utf16 })
     )
   }
 

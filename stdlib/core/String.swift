@@ -567,7 +567,7 @@ extension String : RangeReplaceableCollectionType {
       subRange.startIndex._base._position
       ..< subRange.endIndex._base._position,
       with:
-        lazyConcatenate(lazy(newValues).map { $0.utf16 })
+        _lazyConcatenate(lazy(newValues).map { $0.utf16 })
     )
   }
 

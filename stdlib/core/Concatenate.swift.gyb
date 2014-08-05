@@ -10,22 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `GeneratorType` used by `ConcatenateSequenceView`,
-/// `ForwardConcatenateView`, and `BidirectionalConcatenateView`.
+/// The `GeneratorType` used by `_ConcatenateSequenceView`,
+/// `_ForwardConcatenateView`, and `_BidirectionalConcatenateView`.
 /// Generates a sequence of the elements of the elements of its
 /// argument.
-public struct ConcatenateSequenceGenerator<
+struct _ConcatenateSequenceGenerator<
   Outer: GeneratorType where Outer.Element : SequenceType
 >: GeneratorType, SequenceType {
 
   /// Construct around a generator for the outer sequence
-  public init(_ outer: Outer) {
+  init(_ outer: Outer) {
     self._outer = outer
   }
 
   /// Return the next element in the sequence, or `nil`` if none exists,
   /// in either case advancing the generator.
-  public mutating func next() -> Outer.Element.Generator.Element? {
+  mutating func next() -> Outer.Element.Generator.Element? {
     do {
       if _fastPath(_inner != nil) {
         let ret = _inner!.next()
@@ -43,10 +43,10 @@ public struct ConcatenateSequenceGenerator<
   }
 
   /// Returns the generator itself
-  public func generate() -> ConcatenateSequenceGenerator {
+  func generate() -> _ConcatenateSequenceGenerator {
     return self
   }
-  
+
   var _outer: Outer
   var _inner: Outer.Element.Generator? = nil
 }
@@ -55,58 +55,58 @@ public struct ConcatenateSequenceGenerator<
 
 /// A `SequenceType` whose elements consist of those *contained in* in
 /// the elements of its `Base` sequence.
-public struct ConcatenateSequenceView<
+struct _ConcatenateSequenceView<
   Base: SequenceType where Base.Generator.Element: SequenceType
 > : SequenceType {
 
 
   /// Present the elmeents of the elements of `base`
-  public init(_ base: Base) {
+  init(_ base: Base) {
     self._base = base
   }
 
   /// Create a generator for this sequence
-  public func generate() -> ConcatenateSequenceGenerator<Base.Generator> {
-    return ConcatenateSequenceGenerator(_base.generate())
+  func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
+    return _ConcatenateSequenceGenerator(_base.generate())
   }
-  
+
   var _base: Base
 }
 
 /// Return a sequence that is a concatenation of the elements of
 /// `source`\ 's elements
-public func lazyConcatenate<
+func _lazyConcatenate<
   S:SequenceType
   where S.Generator.Element: SequenceType
->(source: S) -> LazySequence<ConcatenateSequenceView<S>> {
-  return LazySequence(ConcatenateSequenceView(source))
+>(source: S) -> LazySequence<_ConcatenateSequenceView<S>> {
+  return LazySequence(_ConcatenateSequenceView(source))
 }
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
-public func concatenate<
+func _concatenate<
   S:SequenceType
   where S.Generator.Element: SequenceType
 >(
   source: S
 ) -> [S.Generator.Element.Generator.Element] {
-  return lazyConcatenate(source).array
+  return _lazyConcatenate(source).array
 }
 
 //===--- Collections ------------------------------------------------------===//
 
 % for traversal in ('Forward', 'Bidirectional'):
-%   View = '%sConcatenateView' % traversal
-%   Self = 'Lazy%sCollection' % traversal
-%   Index = 'Concatenate%sIndex' % traversal
+%   View = '_%sConcatenateView' % traversal
+%   Self = '_Lazy%sCollection' % traversal
+%   Index = '_Concatenate%sIndex' % traversal
 %   IndexProtocol = '%sIndexType' % traversal
 
 /// A wrapper for a `${IndexProtocol}` for a collection of
 /// collections, that can be used to index the inner elements.
-public struct ${Index}<
-  C: CollectionType 
-    where C.Index : ${IndexProtocol}, 
-          C.Generator.Element: CollectionType, 
+struct ${Index}<
+  C: CollectionType
+    where C.Index : ${IndexProtocol},
+          C.Generator.Element: CollectionType,
           C.Generator.Element.Index : ${IndexProtocol}
 > : ${IndexProtocol} {
   typealias Outer = C.Index
@@ -120,7 +120,7 @@ public struct ${Index}<
     self._outer = outer
     self._inner = inner
   }
-  
+
   static func adjustForward(
     data: C, var _ outer: Outer, _ inner: Inner?
   ) -> ${Index} {
@@ -139,17 +139,17 @@ public struct ${Index}<
   }
 
   /// Return an index for the next position.
-  public func successor() -> ${Index} {
+  func successor() -> ${Index} {
     return ${Index}.adjustForward(_data, _outer, _inner!.successor())
   }
-  
+
   % if traversal == 'Bidirectional':
   /// Return an index for the previous position.
-  public func predecessor() -> ${Index} {
+  func predecessor() -> ${Index} {
 
     var outer = _outer
     var inner = _inner
-    
+
     while inner == nil || inner! == _data[outer].startIndex {
       inner = _data[--outer].endIndex
     }
@@ -158,49 +158,49 @@ public struct ${Index}<
 % end
 }
 
-public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
+func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
 /// The lazy `CollectionType` returned by `lazyConcatenate(c)` where `c` is a
 /// `CollectionType` having an `Index` conforming to `${IndexProtocol}`
-public struct ${View}<
+struct ${View}<
   C: CollectionType
     where C.Index: ${IndexProtocol},
-          C.Generator.Element: CollectionType, 
+          C.Generator.Element: CollectionType,
           C.Generator.Element.Index : ${IndexProtocol}
 > : CollectionType {
-  public typealias Index = ${Index}<C>
+  typealias Index = ${Index}<C>
 
   init(_ _base: C) {
-    self._base = _base 
+    self._base = _base
   }
 
-  public func generate() -> ConcatenateSequenceGenerator<C.Generator> {
-    return ConcatenateSequenceGenerator(_base.generate())
+  func generate() -> _ConcatenateSequenceGenerator<C.Generator> {
+    return _ConcatenateSequenceGenerator(_base.generate())
   }
-  
-  public var startIndex: Index {
+
+  var startIndex: Index {
     return ${Index}.adjustForward(_base, _base.startIndex, nil)
   }
-  
-  public var endIndex: Index {
+
+  var endIndex: Index {
     return ${Index}(_base, _base.endIndex, nil)
   }
 
-  public subscript(i: Index) -> C.Generator.Element.Generator.Element {
+  subscript(i: Index) -> C.Generator.Element.Generator.Element {
     return _base[i._outer][i._inner!]
   }
-  
+
   var _base: C
 }
 
 /// Return a collection that is a concatenation of the elements of
 /// `source`\ 's elements
-public func lazyConcatenate<
+func _lazyConcatenate<
   C: CollectionType
     where C.Index: ${IndexProtocol},
-          C.Generator.Element: CollectionType, 
+          C.Generator.Element: CollectionType,
           C.Generator.Element.Index : ${IndexProtocol}
 >(source: C) -> Lazy${traversal}Collection<${View}<C>> {
   return Lazy${traversal}Collection(${View}(source))
@@ -210,13 +210,13 @@ public func lazyConcatenate<
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
-public func concatenate<
+func _concatenate<
   C : CollectionType
   where C.Generator.Element : CollectionType
 >(
   source: C
 ) -> [C.Generator.Element.Generator.Element] {
-  return lazyConcatenate(source).array
+  return _lazyConcatenate(source).array
 }
 
 // ${'Local Variables'}:

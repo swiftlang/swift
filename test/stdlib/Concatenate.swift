@@ -9,7 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
+// RUN: %target-run %t.out | FileCheck %s
+
+import Swift
 import StdlibUnittest
 
 var ConcatenateTests = TestCase("ConcatenateTests")
@@ -33,19 +36,19 @@ for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
     checkCollection(
       Array(expected),
-      lazyConcatenate(source),
+      _lazyConcatenate(source),
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("reverse-\(source)") {
     checkCollection(
       lazy(expected).reverse().array,
-      lazyConcatenate(source).reverse(),
+      _lazyConcatenate(source).reverse(),
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("sequence-\(source)") {
     checkSequence(
       Array(expected),
-      lazyConcatenate(SequenceOf(source)),
+      _lazyConcatenate(SequenceOf(source)),
       SourceLocStack().withCurrentLoc())
   }
 }
