@@ -161,6 +161,8 @@ func operator_in_func_bad () {
                                                                     // expected-error {{braced block of statements is an unused closure}}
 }
 
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}}
+
 infix operator ??= {}
 
 func ??= <T>(inout result : T?, rhs : Int) {  // ok
