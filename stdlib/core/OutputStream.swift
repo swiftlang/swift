@@ -187,7 +187,7 @@ public func toString<T>(x: T) -> String {
 // building the standard library inlining makes us drop the special semantics.
 /// Returns the result of `print`\ 'ing `x` into a `String`
 @inline(never) @semantics("readonly")
-public func toStringReadOnly<T>(x: T) -> String {
+func toStringReadOnly<T>(x: T) -> String {
   var result = ""
   print(x, &result)
   return result
