@@ -115,8 +115,7 @@ llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   llvm::Value *objectMetadata =
     emitHeapMetadataRefForHeapObject(IGF, from, fromType);
 
-  objectMetadata = IGF.Builder.CreateBitCast(objectMetadata, IGF.IGM.Int8PtrTy);
-  targetMetadata = IGF.Builder.CreateBitCast(targetMetadata, IGF.IGM.Int8PtrTy);
+  objectMetadata = IGF.Builder.CreateBitCast(objectMetadata, targetMetadata->getType());
   llvm::Value *cond = IGF.Builder.CreateICmpEQ(objectMetadata, targetMetadata);
   llvm::Value *nil =
     llvm::ConstantPointerNull::get(cast<llvm::PointerType>(from->getType()));
