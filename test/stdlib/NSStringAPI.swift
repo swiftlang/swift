@@ -1181,9 +1181,13 @@ NSStringAPIs.test("stringByPaddingToLength(_:withString:startingAtIndex:)") {
       15, withString: "XYZ", startingAtIndex: 1))
 }
 
-NSStringAPIs.testXFail(
+NSStringAPIs.testXFailSkip(
   "stringByRemovingPercentEncoding/OSX 10.9",
-  xfail: [.OSXMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9")]
+  xfail: [
+    .OSXMinor(10, 9, reason: "looks like a bug in Foundation in OS X 10.9"),
+    .iOSMajor(7, reason: "same bug in Foundation in iOS 7.*")
+  ],
+  skip: [.iOSSimulatorAny("same bug in Foundation in iOS Simulator 7.*")]
 ) {
   expectOptionalEqual("", "".stringByRemovingPercentEncoding)
 }

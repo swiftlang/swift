@@ -275,3 +275,21 @@ XFailsIOS.run()
 // CHECK: XFailsIOS: Some tests failed, aborting
 // CHECK: abort()
 
+var XFailsIOSSimulator = TestCase("XFailsIOSSimulator")
+
+// CHECK: [   UXPASS ] XFailsIOSSimulator.xfail iOS Simulator passes{{$}}
+XFailsIOSSimulator.testXFail("xfail iOS Simulator passes", xfail: [.iOSSimulatorAny("")]) {
+  expectEqual(1, 1)
+}
+
+// CHECK: [    XFAIL ] XFailsIOSSimulator.xfail iOS Simulator fails{{$}}
+XFailsIOSSimulator.testXFail("xfail iOS Simulator fails", xfail: [.iOSSimulatorAny("")]) {
+  expectEqual(1, 2)
+}
+
+_setTestCaseFailedCallback() { println("abort()") }
+_setOverrideOSVersion(.iOSSimulator)
+XFailsIOSSimulator.run()
+// CHECK: XFailsIOSSimulator: Some tests failed, aborting
+// CHECK: abort()
+

@@ -409,6 +409,7 @@ func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
 public enum OSVersion : Printable {
   case OSX(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
+  case iOSSimulator
 
   public var description: String {
     switch self {
@@ -416,6 +417,8 @@ public enum OSVersion : Printable {
       return "OS X \(major).\(minor).\(bugFix)"
     case iOS(var major, var minor, var bugFix):
       return "iOS \(major).\(minor).\(bugFix)"
+    case iOSSimulator:
+      return "iOSSimulator"
     }
   }
 }
@@ -436,6 +439,13 @@ func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
 }
 
 func _getOSVersion() -> OSVersion {
+#if os(iOS) && (arch(i386) || arch(x86_64))
+  // On simulator, the plist file that we try to read turns out to be host's
+  // plist file, which indicates OS X.
+  //
+  // FIXME: how to get the simulator version *without* UIKit?
+  return .iOSSimulator
+#else
   let productName = _stdlib_getSystemVersionPlistProperty("ProductName")!
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -447,6 +457,7 @@ func _getOSVersion() -> OSVersion {
   default:
     fatalError("could not determine OS version")
   }
+#endif
 }
 
 var _runningOSVersion: OSVersion = _getOSVersion()
@@ -479,6 +490,8 @@ public enum TestRunPredicate : Printable {
   case iOSBugFix(Int, Int, Int, reason: String)
   case iOSBugFixRange(Int, Int, Range<Int>, reason: String)
 
+  case iOSSimulatorAny(/*reason:*/ String)
+
   public var description: String {
     switch self {
     case Custom(_, let reason):
@@ -508,6 +521,9 @@ public enum TestRunPredicate : Printable {
       return "iOS(\(major).\(minor).\(bugFix), reason: \(reason))"
     case iOSBugFixRange(let major, let minor, let bugFixRange, let reason):
       return "iOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+
+    case iOSSimulatorAny(let reason):
+      return "iOSSimulatorAny(*, reason: \(reason))"
     }
   }
 
@@ -608,6 +624,14 @@ public enum TestRunPredicate : Printable {
       switch _getRunningOSVersion() {
       case .iOS(major, minor, let runningBugFix):
         return contains(bugFixRange, runningBugFix)
+      default:
+        return false
+      }
+
+    case iOSSimulatorAny:
+      switch _getRunningOSVersion() {
+      case .iOSSimulator:
+        return true
       default:
         return false
       }
