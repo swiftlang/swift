@@ -353,8 +353,7 @@ StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
                                                SILBasicBlock *StartBB) {
   DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
   // Walk the Dom tree in search of a defining value:
-  DomTreeNode *Node = DT->getNode(StartBB);
-  while (true) {
+  for (DomTreeNode *Node = DT->getNode(StartBB); Node; Node = Node->getIDom()) {
     SILBasicBlock *BB = Node->getBlock();
 
     // If there is a store (that must comes after the Phi) use its value.
@@ -375,16 +374,10 @@ StackAllocationPromoter::getDefinitionForValue(BlockSet &PhiBlocks,
     }
 
     // Move to the next dominating block.
-    Node = Node->getIDom();
-    if (!Node) {
-      DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-      return SILValue();
-    }
-
     DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
-
-  llvm_unreachable("Could not find a definition");
+  DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
+  return SILValue();
 }
 
 void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
