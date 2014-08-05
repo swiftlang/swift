@@ -1,0 +1,34 @@
+//===--- StringInterpolation.swift.gyb - String Interpolation --*- swift -*-==//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% Types = []
+% for IntSize in [8,16,32,64]:
+%   Types.append('Int'+str(IntSize))
+% for UIntSize in [8,16,32,64]:
+%   Types.append('UInt'+str(UIntSize))
+% for FloatSize in [32,64]:
+%   Types.append('Float'+str(FloatSize))
+% Types.append('String')
+% Types.append('Bool')
+% Types.append('Int')
+% Types.append('UInt')
+% Types.append('Character')
+% Types.append('UnicodeScalar')
+
+% for Type in Types:
+extension String : StringInterpolationConvertible {
+  public static func convertFromStringInterpolationSegment(expr: ${Type}) -> String { return toStringReadOnly(expr) }
+}
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

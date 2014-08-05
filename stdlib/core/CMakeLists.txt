@@ -79,6 +79,7 @@ set(SWIFTLIB_ESSENTIAL
   StringBridge.swift
   StringBuffer.swift
   StringCore.swift
+  StringInterpolation.swift.gyb
   StringLegacy.swift
   StringUTF16.swift
   StringUTF8.swift
