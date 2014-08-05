@@ -33,6 +33,10 @@ class DerivesA : A {
   init(int i: Int) {
     super.init(int: i) // expected-error{{must call a designated initializer of the superclass 'A'}}
   }
+
+  convenience init(string: String) {
+    super.init(double: 3.14159) // expected-error{{convenience initializer for 'DerivesA' must delegate (with 'self.init') rather than chaining to a superclass initializer (with 'super.init')}}
+  }
 }
 
 struct S {

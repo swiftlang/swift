@@ -1072,6 +1072,10 @@ ERROR(init_delegates_and_chains,sema_tce,none,
       "superclass initializer ('super.init')", ())
 NOTE(init_delegation_or_chain,sema_tce,none,
       "previous %select{delegation|chaining}0 call is here", (bool))
+ERROR(delegating_convenience_super_init,sema_tce,none,
+      "convenience initializer for %0 must delegate (with 'self.init') rather "
+      "than chaining to a superclass initializer (with 'super.init')",
+      (Type))
 ERROR(delegating_designated_init,sema_tce,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",

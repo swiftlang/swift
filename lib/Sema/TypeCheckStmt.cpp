@@ -924,6 +924,13 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
     case ConstructorDecl::BodyInitKind::Chained:
       checkSuperInit(*this, ctor, initExpr, false);
+
+      /// A convenience initializer cannot chain to a superclass constructor.
+      if (ctor->isConvenienceInit()) {
+        diagnose(initExpr->getLoc(), diag::delegating_convenience_super_init,
+                 ctor->getDeclContext()->getDeclaredTypeOfContext());
+      }
+
       SWIFT_FALLTHROUGH;
 
     case ConstructorDecl::BodyInitKind::None:
