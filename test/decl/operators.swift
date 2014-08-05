@@ -160,3 +160,10 @@ func operator_in_func_bad () {
     prefix func + (input: String) -> String { return "+" + input } // expected-error {{operators are only allowed at global scope}} \
                                                                     // expected-error {{braced block of statements is an unused closure}}
 }
+
+infix operator ??= {}
+
+func ??= <T>(inout result : T?, rhs : Int) {  // ok
+}
+
+

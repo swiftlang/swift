@@ -712,6 +712,7 @@ static bool isBuiltinOperator(StringRef name, DeclAttribute *attr) {
   return ((isa<PrefixAttr>(attr)  && name == "&") ||   // lvalue to inout
           (isa<PostfixAttr>(attr) && name == "!") ||   // optional unwrapping
           (isa<PostfixAttr>(attr) && name == "?") ||   // optional chaining
+          (isa<InfixAttr>(attr) && name == "?") ||     // ternary operator
           (isa<PostfixAttr>(attr) && name == ">") ||   // generic argument list
           (isa<PrefixAttr>(attr)  && name == "<"));    // generic argument list
 }

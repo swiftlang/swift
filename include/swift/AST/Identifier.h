@@ -87,7 +87,7 @@ public:
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {
     // ASCII operator chars.
-    static const char OpChars[] = "/=-+*%<>!&|^~.";
+    static const char OpChars[] = "/=-+*%<>!&|^~.?";
     if (C < 0x80)
       return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
     

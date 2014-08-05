@@ -583,14 +583,8 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
-  // We only allow '?' or '??' as operators for now. '?' is the intrinsic
-  // ternary operator.
-  if (*TokStart == '?') {
-    if (*CurPtr == '?')
-      ++CurPtr;
-
   // We only allow '.' in a series.
-  } else if (*TokStart == '.') {
+  if (*TokStart == '.') {
     while (*CurPtr == '.')
       ++CurPtr;
     
@@ -605,8 +599,9 @@ void Lexer::lexOperatorIdentifier() {
     (void) didStart;
     
     do {
-      if (CurPtr != BufferEnd && InSILMode && *CurPtr == '!')
-        // In SIL mode, '!' is a special token and can't be in the middle of
+      if (CurPtr != BufferEnd && InSILMode &&
+          (*CurPtr == '!' || *CurPtr == '?'))
+        // In SIL mode, '!' and '?' are special token and can't be in the middle of
         // an operator.
         break;
     } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
