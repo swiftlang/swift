@@ -173,23 +173,21 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-// Mark popular toString of popular types as 'readonly' to allow the optimizer
-// to remove unused debug strings. Never inline these functions because when
-// building the standard library inlining makes us drop the special semantics.
-@inline(never) @semantics("readonly") public func toString(x: Int)    -> String { return toStringInternal(x) }
-@inline(never) @semantics("readonly") public func toString(x: String) -> String { return toStringInternal(x) }
-@inline(never) @semantics("readonly") public func toString(x: Float)  -> String { return toStringInternal(x) }
-@inline(never) @semantics("readonly") public func toString(x: Bool)   -> String { return toStringInternal(x) }
-@inline(never) @semantics("readonly") public func toString(x: UInt8)  -> String { return toStringInternal(x) }
-@inline(never) @semantics("readonly") public func toString(x: UInt32) -> String { return toStringInternal(x) }
 
 /// Returns the result of `print`\ 'ing `x` into a `String`
 public func toString<T>(x: T) -> String {
-  return toStringInternal(x)
+  var result = ""
+  print(x, &result)
+  return result
 }
 
+
+// Create a version of toString with 'readonly' annotation to allow the optimizer
+// to remove unused debug strings. Never inline this function because when
+// building the standard library inlining makes us drop the special semantics.
 /// Returns the result of `print`\ 'ing `x` into a `String`
-private func toStringInternal<T>(x: T) -> String {
+@inline(never) @semantics("readonly")
+public func toStringReadOnly<T>(x: T) -> String {
   var result = ""
   print(x, &result)
   return result

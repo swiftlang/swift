@@ -38,7 +38,6 @@ func array_of_strings_test() {
 //CHECK-NEXT: return
 func string_interpolation() {
   // Int
-  toString(2)
   let x : Int = 2
   "\(x)"
 
