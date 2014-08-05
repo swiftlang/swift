@@ -32,11 +32,11 @@ func array_of_strings_test() {
   let x = [""]
 }
 
-//CHECK-LABEL: string_escape
+//CHECK-LABEL: string_interpolation
 //CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
-func string_escape() {
+func string_interpolation() {
   // Int
   toString(2)
   let x : Int = 2
@@ -60,3 +60,10 @@ func string_escape() {
   "\(UInt32(4))"
 }
 
+//CHECK-LABEL: string_interpolation2
+//CHECK: bb0:
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+func string_interpolation2() {
+  "\(false) \(true)"
+}
