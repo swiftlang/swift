@@ -262,11 +262,13 @@ extension String : StringInterpolationConvertible {
     return result
   }
 
-  @semantics("readonly")
-  public
-  static func convertFromStringInterpolationSegment<T>(expr: T) -> String {
-    return toString(expr)
-  }
+  public static func convertFromStringInterpolationSegment<T>(expr: T)   -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: Int)    -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: String) -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: Float)  -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: Bool)   -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: UInt8)  -> String { return toString(expr) }
+  public static func convertFromStringInterpolationSegment(expr: UInt32) -> String { return toString(expr) }
 }
 
 public func +(var lhs: String, rhs: String) -> String {

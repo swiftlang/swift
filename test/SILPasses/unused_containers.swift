@@ -37,6 +37,26 @@ func array_of_strings_test() {
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 func string_escape() {
-  "\(2)"
+  // Int
+  toString(2)
+  let x : Int = 2
+  "\(x)"
+
+  // String
+  let y : String = "hi"
+  "\(y)"
+
+  // Float
+  let f : Float = 2.0
+  "\(f)"
+
+  // Bool
+  "\(true)"
+
+  //UInt8
+  "\(UInt8(2))"
+
+  //UInt32
+  "\(UInt32(4))"
 }
 

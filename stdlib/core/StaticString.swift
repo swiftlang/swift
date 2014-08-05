@@ -141,7 +141,6 @@ public struct AssertString : AssertStringType, StringInterpolationConvertible {
     return AssertString(value)
   }
 
-  @semantics("readonly")
   public static func convertFromStringInterpolation(
     strings: AssertString...
   ) -> AssertString {
@@ -152,7 +151,6 @@ public struct AssertString : AssertStringType, StringInterpolationConvertible {
     return AssertString(result)
   }
 
-  @semantics("readonly")
   @transparent
   public static func convertFromStringInterpolationSegment<T>(
     expr: T
