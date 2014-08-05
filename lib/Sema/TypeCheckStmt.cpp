@@ -935,13 +935,6 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       break;
     }
 
-    /// A convenience initializer must always be delegating.
-    if (ctor->isConvenienceInit() && !isDelegating) {
-      diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(),
-               diag::non_delegating_convenience_init,
-               ctor->getDeclContext()->getDeclaredTypeOfContext());
-    }
-
     // A class designated initializer must never be delegating.
     if (ctor->isDesignatedInit() && ClassD && isDelegating) {
       diagnose(ctor->getLoc(),

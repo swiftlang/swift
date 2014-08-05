@@ -8,7 +8,8 @@ class A {
     self.init(double: Double(i))
   }
 
-  convenience init(float f: Float) { // expected-error{{convenience initializer for 'A' must delegate (with 'self.init')}}
+  convenience init(float f: Float) {
+    self.init(double: Double(f))
   }
 
   init(double d: Double) { 
