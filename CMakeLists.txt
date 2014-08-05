@@ -327,10 +327,12 @@ endif()
 #     [IS_STDLIB_CORE]                  # This is the core standard library
 #     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [STATIC]                          # This is a static library
+#     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
+#                                       # into this directory.
 #     )
 function(compile_swift_files)
   parse_arguments(SWIFTFILE
-    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
+    "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
     "IS_MAIN;IS_STDLIB_CORE;STATIC"
     ${ARGN})
   
@@ -458,6 +460,8 @@ function(compile_swift_files)
     set(objsubdir)
     if (SWIFTFILE_SDK)
       set(objsubdir "/${SWIFTFILE_LIBRARY_SUBDIR}")
+    elseif(SWIFTFILE_MODULE_DIR)
+      set(objsubdir "/${SWIFTFILE_MODULE_DIR}")
     endif()
 
     set(objfile
@@ -474,9 +478,13 @@ function(compile_swift_files)
   else()
     get_filename_component(module_name ${objfile} NAME_WE)
 
-    set(module_dir "${SWIFTLIB_DIR}/${SWIFTFILE_LIBRARY_SUBDIR}")
-    if(SWIFTFILE_STATIC)
-      set(module_dir "${module_dir}/static")
+    if(NOT SWIFTFILE_MODULE_DIR)
+      set(module_dir "${SWIFTLIB_DIR}/${SWIFTFILE_LIBRARY_SUBDIR}")
+      if(SWIFTFILE_STATIC)
+        set(module_dir "${module_dir}/static")
+      endif()
+    else()
+      set(module_dir "${SWIFTFILE_MODULE_DIR}")
     endif()
 
     set(module_file ${module_dir}/${module_name}.swiftmodule)
