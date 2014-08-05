@@ -138,7 +138,7 @@ public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 
   // FIXME: Is there an similar term of art in Unicode?
-  func _isASCIIDigit() -> Bool {
+  public func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"
   }
 

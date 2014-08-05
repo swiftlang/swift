@@ -4,6 +4,7 @@ set(SWIFTUNITTEST_SOURCES
   # filename.
   StdlibUnittest.swift.gyb
 
+  GetOSVersion.mm
   InterceptTraps.cpp
   PthreadBarriers.swift
   PthreadWrappers.swift
