@@ -1,10 +1,11 @@
 // Make sure we don't crash while printing the standard library.
 //
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -accessibility-filter-public -skip-private-stdlib-decls -fully-qualified-types-if-ambiguous -synthesize-sugar-on-types > %t.txt
-// RUN: FileCheck -check-prefix=CHECK-ARGC -input-file %t.txt %s
-// RUN: FileCheck -input-file %t.txt %s
-// RUN: FileCheck -check-prefix=CHECK-SUGAR -input-file %t.txt %s
-// RUN: FileCheck -check-prefix=CHECK-MUTATING-ATTR -input-file %t.txt %s
+// RUN: FileCheck -check-prefix=CHECK-ARGC %s < %t.txt
+// RUN: FileCheck %s < %t.txt
+// RUN: FileCheck -check-prefix=CHECK-SUGAR %s < %t.txt
+// RUN: FileCheck -check-prefix=CHECK-MUTATING-ATTR %s < %t.txt
+// RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -accessibility-filter-public -skip-private-stdlib-decls -fully-qualified-types-if-ambiguous -synthesize-sugar-on-types -print-regular-comments | FileCheck -check-prefix=NO-FIXMES %s
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -module-print-submodules | FileCheck -check-prefix=CHECK-ARGC %s
 
 // CHECK-ARGC: var C_ARGC: CInt
@@ -26,3 +27,6 @@
 // CHECK-SUGAR: extension Optional :
 
 // CHECK-MUTATING-ATTR: mutating func
+
+// NO-FIXMES-NOT: FIXME
+

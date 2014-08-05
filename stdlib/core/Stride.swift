@@ -77,9 +77,10 @@ public struct StrideToGenerator<T: Strideable> : GeneratorType {
   }
 }
 
-/// A SequenceType of values formed by striding over a half-open interval
-/// FIXME: should really be a CollectionType, as it is multipass
+/// A `SequenceType` of values formed by striding over a half-open interval
 public struct StrideTo<T: Strideable> : SequenceType {
+  // FIXME: should really be a CollectionType, as it is multipass
+
   public func generate() -> StrideToGenerator<T> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -128,9 +129,10 @@ public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
   }
 }
 
-/// A SequenceType of values formed by striding over a closed interval
-/// FIXME: should really be a CollectionType, as it is multipass
+/// A `SequenceType` of values formed by striding over a closed interval
 public struct StrideThrough<T: Strideable> : SequenceType {
+  // FIXME: should really be a CollectionType, as it is multipass
+
   public func generate() -> StrideThroughGenerator<T> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)
