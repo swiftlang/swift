@@ -6686,18 +6686,38 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
   if (decl->addedImplicitInitializers())
     return;
 
+  // Local function that produces the canonical parameter type of the given
+  // initializer.
+  // FIXME: Doesn't work properly for generics.
+  auto getInitializerParamType = [](ConstructorDecl *ctor) -> CanType {
+    auto interfaceTy = ctor->getInterfaceType();
+
+    // Skip the 'self' parameter.
+    auto uncurriedInitTy = interfaceTy->castTo<AnyFunctionType>()->getResult();
+
+    // Grab the parameter type;
+    auto paramTy = uncurriedInitTy->castTo<AnyFunctionType>()->getInput();
+
+    return paramTy->getCanonicalType();
+  };
+
   // Check whether there is a user-declared constructor or an instance
   // variable.
   bool FoundInstanceVar = false;
   bool FoundUninitializedVars = false;
   bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
+  SmallPtrSet<CanType, 4> initializerParamTypes;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      validateDecl(ctor);
+
       if (ctor->isDesignatedInit()) {
         FoundDesignatedInit = true;
-        break;
       }
+
+      if (!ctor->isInvalid())
+        initializerParamTypes.insert(getInitializerParamType(ctor));
       continue;
     }
 
@@ -6759,6 +6779,12 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit()
           || superclassCtor->isInvalid())
+        continue;
+
+      // If we have already introduced an initializer with this parameter type,
+      // don't add one now.
+      if (!initializerParamTypes.insert(
+             getInitializerParamType(superclassCtor)))
         continue;
 
       // We have a designated initializer. Create an override of it.

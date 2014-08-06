@@ -141,3 +141,18 @@ extension Extensible {
     self.init()
   }
 }
+
+// <rdar://problem/17785840>
+protocol Protocol {
+    init(string: String)
+}
+
+class Parent: Protocol {
+    required init(string: String) {}
+}
+
+class Child: Parent {
+    convenience required init(string: String) {
+        self.init(string: "")
+    }
+}
