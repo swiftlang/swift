@@ -486,16 +486,16 @@ class MandatoryInlining : public SILModuleTransform {
 
       if (F.getRefCount() != 0) continue;
 
-      // We can always remove transparent functions.  We can also remove functions
-      // that came from closures.
+      // We can always remove transparent functions.  We can also
+      // remove functions that came from closures.
       if (!F.isTransparent() &&
           (!F.hasLocation() || !F.getLocation().isASTNode<Expr>() ||
            !F.getLocation().isASTNode<AbstractClosureExpr>()))
         continue;
 
-      // We discard functions that don't have external linkage, e.g. deserialized
-      // functions, internal functions, and thunks.  Being marked transparent
-      // controls this.
+      // We discard functions that don't have external linkage,
+      // e.g. deserialized functions, internal functions, and thunks.
+      // Being marked transparent controls this.
       if (isPossiblyUsedExternally(F.getLinkage())) continue;
 
       // Okay, just erase the function from the module.
