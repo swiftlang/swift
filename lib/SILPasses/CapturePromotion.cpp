@@ -323,8 +323,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   auto Fn = SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
                                 Orig->getContextGenericParams(),
                                 Orig->getLocation(), Orig->isBare(),
-                                IsNotTransparent, Orig->isNoinline(), Orig,
-                                Orig->getDebugScope());
+                                IsNotTransparent, Orig->isNoinline(),
+                                Orig->getEffectsInfo(),
+                                Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
   return Fn;
 }

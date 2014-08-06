@@ -70,6 +70,13 @@ enum class InlineKind : uint8_t {
   Never = 0
 };
 
+enum class EffectsKind : uint8_t {
+  Unspecified = 0,
+  ReadNone = 1,
+  ReadOnly = 2,
+  ReadWrite = 3
+};
+
 class InfixData {
   unsigned Precedence : 8;
 
@@ -874,6 +881,25 @@ public:
     return DA->getKind() == DAK_Inline;
   }
 };
+
+/// Represents the side effects attribute.
+class EffectsAttr : public DeclAttribute {
+  EffectsKind Kind;
+public:
+  EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
+  : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+  Kind(kind) {}
+
+  EffectsAttr(EffectsKind kind)
+  : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
+
+  EffectsKind getKind() const { return Kind; }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Effects;
+  }
+};
+
+
 
 /// Represents weak/unowned/unowned(unsafe) decl modifiers.
 class OwnershipAttr : public DeclAttribute {

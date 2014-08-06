@@ -1319,6 +1319,13 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isNoinline())
     OS << "[noinline] ";
 
+  if (getEffectsInfo() == EffectsKind::ReadOnly)
+    OS << "[readonly] ";
+  else if (getEffectsInfo() == EffectsKind::ReadNone)
+      OS << "[readnone] ";
+  if (getEffectsInfo() == EffectsKind::ReadWrite)
+    OS << "[readwrite] ";
+
   if (!getSemanticsAttr().empty())
     OS << "[semantics \"" << getSemanticsAttr() << "\"] ";
 

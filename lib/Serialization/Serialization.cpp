@@ -1341,6 +1341,14 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Effects: {
+    auto *theAttr = cast<EffectsAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
+    EffectsDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     (unsigned)theAttr->getKind());
+    return;
+  }
+
   case DAK_Availability: {
 #define LIST_VER_TUPLE_PIECES(X)\
   X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor

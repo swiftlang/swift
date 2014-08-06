@@ -979,6 +979,12 @@ ERROR(inline_attribute_expect_option,attribute_parsing,none,
 ERROR(inline_attribute_unknown_option,attribute_parsing,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
+// effects
+ERROR(effects_attribute_expect_option,attribute_parsing,none,
+      "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
+ERROR(effects_attribute_unknown_option,attribute_parsing,none,
+      "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
+
 // unowned
 ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,
       "expected 'safe' or 'unsafe'", ())

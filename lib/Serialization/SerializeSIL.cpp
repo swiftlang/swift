@@ -226,6 +226,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                 (unsigned)F.isTransparent(),
                                 (unsigned)F.isGlobalInit(),
                                 (unsigned)F.isNoinline(),
+                                (unsigned)F.getEffectsInfo(),
                                 FnID, SemanticsID);
 
   if (DeclOnly || F.isAvailableExternally() || F.isExternalDeclaration())

@@ -150,6 +150,7 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_Inline:
   case DAK_Accessibility:
   case DAK_Ownership:
+  case DAK_Effects:
     if (!DeclAttribute::isDeclModifier(getKind()))
       Printer << "@";
     Printer << getAttrName();
@@ -242,6 +243,17 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
+    }
+  case DAK_Effects:
+    switch (cast<EffectsAttr>(this)->getKind()) {
+      case EffectsKind::ReadNone:
+        return "Effects(readnone)";
+      case EffectsKind::ReadOnly:
+        return "Effects(readonly)";
+      case EffectsKind::ReadWrite:
+        return "Effects(readwrite)";
+      case EffectsKind::Unspecified:
+        return "Effects(Unspecified)";
     }
   case DAK_Accessibility:
   case DAK_SetterAccessibility:

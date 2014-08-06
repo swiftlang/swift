@@ -94,13 +94,16 @@ private:
   /// The function's semantics attribute.
   std::string SemanticsAttr;
 
+  /// The function's effects attribute.
+  EffectsKind EK;
+
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
               GenericParamList *contextGenericParams,
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
-              bool isNoinline,
+              bool isNoinline, EffectsKind E,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
               DeclContext *DC);
@@ -113,6 +116,7 @@ public:
                              IsBare_t isBareSILFunction = IsNotBare,
                              IsTransparent_t isTrans = IsNotTransparent,
                              bool isNoinline = false,
+                             EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
                              SILDebugScope *DebugScope = nullptr,
                              DeclContext *DC = nullptr);
@@ -228,6 +232,12 @@ public:
   /// Get this function's noinline attribute.
   bool isNoinline() const { return NoinlineFlag; }
   void setNoinline(bool isNI) { NoinlineFlag = isNI; }
+
+  /// \return the function side effects information.
+  EffectsKind getEffectsInfo() const { return EK; }
+
+  /// \brief Set the function side effect information.
+  void setEffectsInfo(EffectsKind E) { EK = E; }
 
   /// Get this function's global_init attribute.
   ///

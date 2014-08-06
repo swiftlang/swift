@@ -672,6 +672,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 
 static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
                                  bool &isNoinline, std::string &Semantics,
+                                 EffectsKind &MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (P.Tok.isNot(tok::identifier)) {
@@ -683,6 +684,12 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
       isGlobalInit = true;
     else if (P.Tok.getText() == "noinline")
       isNoinline = true;
+    else if (P.Tok.getText() == "readnone")
+      MRK = EffectsKind::ReadNone;
+    else if (P.Tok.getText() == "readonly")
+      MRK = EffectsKind::ReadOnly;
+    else if (P.Tok.getText() == "readwrite")
+      MRK = EffectsKind::ReadWrite;
     else if (P.Tok.getText() == "semantics") {
       P.consumeToken(tok::identifier);
       if (P.Tok.getKind() != tok::string_literal) {
@@ -2993,9 +3000,10 @@ bool Parser::parseDeclSIL() {
   bool isTransparent = false;
   bool isGlobalInit = false, isNoinline = false;
   std::string Semantics;
+  EffectsKind MRK;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, Semantics,
-                           *this) ||
+                           MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3019,6 +3027,7 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setNoinline(isNoinline);
+    FunctionState.F->setEffectsInfo(MRK);
     if (!Semantics.empty())
       FunctionState.F->setSemanticsAttr(Semantics);
 

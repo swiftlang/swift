@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 126;
+const uint16_t VERSION_MINOR = 128;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1036,6 +1036,11 @@ namespace decls_block {
   BCFixed<1>, // implicit flag
   BCBlob      // semantics value
   >;
+
+    using EffectsDeclAttrLayout = BCRecordLayout<
+    Inline_DECL_ATTR,
+    BCFixed<2>  // modref value
+    >;
 
   // Stub layouts, unused.
   using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;

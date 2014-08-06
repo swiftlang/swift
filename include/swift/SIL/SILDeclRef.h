@@ -228,6 +228,12 @@ struct SILDeclRef {
   /// \brief True if the function has noinline attribute.
   bool isNoinline() const;
 
+  /// \return True if the function has a effects attribute.
+  bool hasEffectsAttribute() const;
+
+  /// \return the effects kind of the function.
+  EffectsKind getEffectsAttribute() const;
+
   /// \brief Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 

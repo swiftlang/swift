@@ -1495,6 +1495,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
+      case decls_block::Effects_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
+                                                                      kind);
+        Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        break;
+      }
+
       case decls_block::Availability_DECL_ATTR: {
 #define LIST_VER_TUPLE_PIECES(X)\
   X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor

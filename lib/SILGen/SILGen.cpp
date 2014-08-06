@@ -264,11 +264,14 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
 
+  EffectsKind EK = constant.hasEffectsAttribute() ?
+  constant.getEffectsAttribute() : EffectsKind::Unspecified;
+
   SmallVector<char, 128> buffer;
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans,
-                                constant.isNoinline());
+                                constant.isNoinline(), EK);
 
   F->setGlobalInit(constant.isGlobal());
   if (constant.hasDecl())
