@@ -830,24 +830,19 @@ macro(add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_API_NOTES)
   if (SWIFTLIB_SINGLE_API_NOTES_NON_OVERLAY)
     # Adopt all of the non-overlay API notes.
-    list(APPEND SWIFTLIB_SINGLE_API_NOTES 
-      ${SWIFT_API_NOTES_NON_OVERLAY_MODULES})
+    foreach(next_notes_input ${SWIFT_API_NOTES_INPUTS})
+      if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/objc/${next_notes_input}")
+        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${next_notes_input}")
+      endif()
+    endforeach()
   endif()
 
   # Remove the "swift" prefix from the name to determine the module
   # name.
   string(REPLACE swift "" module_name ${name})
-  list(FIND SWIFT_API_NOTES_OVERLAY_MODULES ${module_name} overlay_index)
+  list(FIND SWIFT_API_NOTES_INPUTS ${module_name} overlay_index)
   if (${overlay_index} GREATER -1)
     set(SWIFTLIB_SINGLE_API_NOTES ${module_name})
-  endif()
-
-  # Make sure that this module name isn't listed in the "non-overlay"
-  # list. This is a sanity check.
-  list(FIND SWIFT_API_NOTES_NON_OVERLAY_MODULES ${module_name} 
-    non_overlay_index)
-  if (${non_overlay_index} GREATER -1)
-    message(SEND_ERROR "${module_name} module has an SDK overlay, so it should be listed in SWIFT_API_NOTES_OVERLAY_MODULES rather than SWIFT_API_NOTES_NON_OVERLAY_MODULES")
   endif()
 
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_DEPENDS,
@@ -1599,8 +1594,13 @@ include_directories(BEFORE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
+file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
+foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
+  get_filename_component(name "${file}" NAME_WE)
+  list(APPEND SWIFT_API_NOTES_INPUTS ${name})
+endforeach()
+
 # Add all of the subdirectories, where we actually do work.
-add_subdirectory(apinotes)
 if (SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)

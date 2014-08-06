@@ -63,23 +63,9 @@ API notes for a given module $MODULE and place them into their
   xcrun swift -apinotes -yaml-to-binary -target x64_64-apple-ios7.0 -o $SWIFT_EXEC/lib/swift/iphonesimulator/$MODULE.apinotesc $MODULE.apinotes
 
 To add API notes for a system module $MODULE that does not have them yet,
-create a new source file $MODULE.apinotes. Then, add this module name
-to the appropriate list in CMakeLists.txt:
- 
-  SWIFT_API_NOTES_OVERLAY_MODULES, when $MODULE already has a Swift
-  overlay. One can check whether a Swift overlay exists for a given
-  module by looking for libswift$MODULE.dylib within the appropriate
-  platform-specific directory:
-
-    OSX             $SWIFT_EXEC/lib/swift/macosx
-    iOS             $SWIFT_EXEC/lib/swift/iphoneos
-    iOS Simulator   $SWIFT_EXEC/lib/swift/iphonesimulator
-
-  SWIFT_API_NOTES_NON_OVERLAY_MODULES, when $MODULE does not have a
-  Swift overlay.
-
-Updated or newly-added API notes will be found by the compiler during
-the next compiler execution.
+create a new source file $MODULE.apinotes. Newly-added API notes will require
+re-running CMake. Updated API notes will be found by the build system during
+the next build.
 
 Note that Swift provides decompilation of binary API notes files via
 the "-apinotes -binary-to-yaml" option, which allows one to inspect
