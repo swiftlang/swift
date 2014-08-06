@@ -42,7 +42,7 @@ class C3 : C {
 class C4 : C3 {
   // implicitly required
   init(string s: String) { } 
-  // expected-error @-1{{override of required initializer missing 'required' modifier}}
+  // expected-error @-1{{'required' modifier must be present on all overrides of a required initializer}}
   // expected-note @-2{{'required' initializer is declared in superclass here}}
 }
 
