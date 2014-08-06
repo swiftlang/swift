@@ -3000,7 +3000,7 @@ bool Parser::parseDeclSIL() {
   bool isTransparent = false;
   bool isGlobalInit = false, isNoinline = false;
   std::string Semantics;
-  EffectsKind MRK;
+  EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(isTransparent, isGlobalInit, isNoinline, Semantics,
                            MRK, *this) ||
