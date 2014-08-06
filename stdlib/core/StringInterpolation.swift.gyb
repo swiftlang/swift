@@ -20,11 +20,11 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 StreamableTypes = [
     'String',
     'Character',
+    'UnicodeScalar',
   ]
 
 PrintableTypes = [
     'Bool',
-    'UnicodeScalar',
     'Float32',
     'Float64'
   ]
