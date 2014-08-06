@@ -131,9 +131,17 @@ public:
   /// than the SILModule).
   unsigned getRefCount() const { return RefCount; }
 
-  /// Increase the reference count.
-  void incrementRefCount() { RefCount++; }
-  void decrementRefCount() { RefCount--; }
+  /// Increment the reference count.
+  void incrementRefCount() {
+    RefCount++;
+    assert(RefCount != 0 && "Overflow of reference count!");
+  }
+
+  /// Decrement the reference count.
+  void decrementRefCount() {
+    assert(RefCount != 0 && "Expected non-zero reference count on decrement!");
+    RefCount--;
+  }
 
   /// Drops all uses belonging to instructions in this function. The only valid
   /// operation performable on this object after this is called is called the
