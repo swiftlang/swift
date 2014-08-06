@@ -19,10 +19,14 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/FastEntryPoints.h"
+#include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
   struct ProtocolDescriptor;
+
+  LLVM_LIBRARY_VISIBILITY
+  extern uintptr_t ISAMask;
 
   extern "C" LLVM_LIBRARY_VISIBILITY
   bool _swift_classConformsToObjCProtocol(const void *theClass,
@@ -43,6 +47,44 @@ namespace swift {
     // other than an arbitrarily long sequence of low bits.
     return (mask & (mask + 1)) == 0;
   }
+
+  /// Return the class of an object which is known to be an allocated
+  /// heap object.
+  static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
+    // Load the isa field.
+    uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
+    // Apply the mask.
+    bits &= ISAMask;
+    // The result is a class pointer.
+    return reinterpret_cast<const ClassMetadata *>(bits);
+  }
+
+#if SWIFT_OBJC_INTEROP
+  /// Is the given value an Objective-C tagged pointer?
+  static inline bool isObjCTaggedPointer(const void *object) {
+    return (((uintptr_t) object) & heap_object_abi::ObjCReservedBitsMask);
+  }
+
+  static inline bool isObjCTaggedPointerOrNull(const void *object) {
+    return object == nullptr || isObjCTaggedPointer(object);
+  }
+
+  LLVM_LIBRARY_VISIBILITY
+  const ClassMetadata *_swift_getClass(const void *object);
+#else
+  static inline const ClassMetadata *_swift_getClass(const void *object) {
+    return _swift_getClassOfAllocated(object);
+  }  
+#endif
+
+  static inline
+  const ClassMetadata *_swift_getSuperclass(const ClassMetadata *theClass) {
+    // This is kosher under the ABI.
+    return theClass->SuperClass;
+  }
+
+  LLVM_LIBRARY_VISIBILITY
+  bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
 } // end namespace swift
 

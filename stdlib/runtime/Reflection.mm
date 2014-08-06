@@ -17,6 +17,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Demangle.h"
 #include "Debug.h"
+#include "Private.h"
 #include <cassert>
 #include <cstring>
 #include <new>
@@ -32,8 +33,6 @@ using namespace swift;
 @interface DeclareSelectors
 
 - (id)debugQuickLookObject;
-- (bool) __usesNativeSwiftReferenceCounting;
-
 @end
 
 @class SwiftObject;
@@ -265,10 +264,10 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
                                     const Metadata *type) {
   Any result;
     
-  id object = *reinterpret_cast<const id *>(value);
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
+  void *object = *reinterpret_cast<void * const *>(value);
+  auto isa = _swift_getClass(object);
   result.Type = swift_getObjCClassMetadata(isa);
-  *reinterpret_cast<id *>(&result.Buffer) = [object retain];
+  *reinterpret_cast<void **>(&result.Buffer) = swift_unknownRetain(object);
   swift_release(owner);
   return result;
 }
@@ -328,8 +327,8 @@ extern "C"
 const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
                                                     const OpaqueValue *value,
                                                     const Metadata *type) {
-  id object = *reinterpret_cast<const id *>(value);
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
+  void *object = *reinterpret_cast<void * const *>(value);
+  auto isa = _swift_getClass(object);
   swift_release(owner);
   return swift_getObjCClassMetadata(isa);
 }
@@ -447,14 +446,6 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
   return count;
 }
   
-/// Decide dynamically whether the given object uses native Swift
-/// reference-counting.
-static bool usesNativeSwiftReferenceCounting(void *object) {
-  // This could be *much* faster if it were integrated into the ObjC runtime.
-  assert(object);
-  return [(id) object __usesNativeSwiftReferenceCounting];
-}
-
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 extern "C"
@@ -489,8 +480,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   // metadata, because we don't update the field offsets in the face of
   // resilient base classes.
   uintptr_t fieldOffset;
-  if (usesNativeSwiftReferenceCounting(*(void * const *)value)) {
-    
+  if (usesNativeSwiftReferenceCounting(Clas)) {
     fieldOffset = Clas->getFieldOffsets()[i];
   } else {
     Ivar *ivars = class_copyIvarList((Class)Clas, nullptr);
@@ -595,7 +585,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   }
   
   // The superobject counts as a child.
-  if (class_getSuperclass(isa))
+  if (_swift_getSuperclass((const ClassMetadata*) isa))
     count += 1;
   
   swift_release(owner);
@@ -623,7 +613,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   auto isa = (Class)type;
   
   // If there's a superclass, it becomes the first child.
-  if (auto sup = class_getSuperclass(isa)) {
+  if (auto sup = (Class) _swift_getSuperclass((const ClassMetadata*) isa)) {
     if (i == 0) {
       StringMirrorTuple result;
       const char *supName = class_getName(sup);
@@ -716,8 +706,7 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
   
   /// Store an ObjC reference into an Any.
   auto setAnyToObject = [](Any &any, id obj) {
-    any.Type = swift_getObjCClassMetadata(
-                  reinterpret_cast<const ClassMetadata*>(object_getClass(obj)));
+    any.Type = swift_getObjCClassMetadata(_swift_getClass((const void*) obj));
     *reinterpret_cast<id *>(&any.Buffer) = [obj retain];
   };
   
@@ -862,8 +851,8 @@ using MirrorTriple
 static MirrorTriple
 getImplementationForClass(const OpaqueValue *Value) {
   // Get the runtime type of the object.
-  id obj = *reinterpret_cast<const id *>(Value);
-  auto isa = reinterpret_cast<const ClassMetadata*>(object_getClass(obj));
+  const void *obj = *reinterpret_cast<const void * const *>(Value);
+  auto isa = _swift_getClass(obj);
   
   // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
   if (!isa->isTypeMetadata())

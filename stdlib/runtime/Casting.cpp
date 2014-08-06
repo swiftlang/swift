@@ -34,9 +34,7 @@ using namespace swift;
 using namespace metadataimpl;
 
 // Objective-C runtime entry points.
-extern "C" const ClassMetadata* object_getClass(const void *);
 extern "C" const char* class_getName(const ClassMetadata*);
-extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
 
 // Aliases for Swift runtime entry points for Objective-C types.
 extern "C" const void *swift_dynamicCastObjCProtocolConditional(
@@ -114,14 +112,6 @@ _setupClassMask() {
 size_t swift::swift_classMask = _setupClassMask();
 uint8_t swift::swift_classShift = 0;
 
-#if SWIFT_OBJC_INTEROP
-/// Does this object use a tagged-pointer representation?
-static bool isTaggedPointerOrNull(const void *object) {
-  return ((uintptr_t)object & heap_object_abi::ObjCReservedBitsMask) || 
-         object == nullptr;
-}
-#endif
-
 /// Dynamically cast a class object to a Swift class type.
 const void *
 swift::swift_dynamicCastClass(const void *object,
@@ -130,20 +120,18 @@ swift::swift_dynamicCastClass(const void *object,
   assert(!targetType->isPureObjC());
 
   // Swift native classes never have a tagged-pointer representation.
-  if (isTaggedPointerOrNull(object)) {
+  if (isObjCTaggedPointerOrNull(object)) {
     return NULL;
   }
-
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
-#else
-  auto isa = *reinterpret_cast<const ClassMetadata *const*>(object);
 #endif
+
+  auto isa = _swift_getClassOfAllocated(object);
 
   do {
     if (isa == targetType) {
       return object;
     }
-    isa = isa->SuperClass;
+    isa = _swift_getSuperclass(isa);
   } while (isa);
 
   return NULL;
@@ -1477,7 +1465,7 @@ recur:
   }
   case MetadataKind::ObjCClassWrapper: {
     auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
-    auto super = class_getSuperclass(wrapper->Class);
+    auto super = _swift_getSuperclass(wrapper->Class);
     if (!super)
       return cacheResult(nullptr);
     

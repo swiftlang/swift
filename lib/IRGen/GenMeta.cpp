@@ -2149,10 +2149,16 @@ namespace {
     }
 
     void addClassFlags() {
-      // Right now, we are not setting any flags.
-      // TODO: flag meaning "Swift 1.0"?
-      // TODO: flag saying "uses Swift refcounting"?
-      addConstantInt32(0);
+      // Always set a flag saying that this is a Swift 1.0 class.
+      ClassFlags flags = ClassFlags::IsSwift1;
+
+      // Set a flag if the class uses Swift 1.0 refcounting.
+      if (getReferenceCountingForClass(IGM, Target)
+            == ReferenceCounting::Native) {
+        flags |= ClassFlags::UsesSwift1Refcounting;
+      }
+
+      addConstantInt32((uint32_t) flags);
     }
 
     void addInstanceAddressPoint() {

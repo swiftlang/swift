@@ -125,6 +125,9 @@ inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
 enum class ClassFlags : uint32_t {
   /// Is this a Swift 1 class?
   IsSwift1 = 0x1,
+
+  /// Does this class use Swift 1.0 refcounting?
+  UsesSwift1Refcounting = 0x2,
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;

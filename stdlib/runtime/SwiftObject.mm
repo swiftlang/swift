@@ -48,6 +48,27 @@ extern "C" id objc_loadWeakRetained(id*);
 
 using namespace swift;
 
+extern "C" __attribute__((weak_import))
+const uintptr_t objc_debug_isa_class_mask;
+
+static uintptr_t computeISAMask() {
+  // The versions of the Objective-C runtime which use non-pointer
+  // ISAs also export this symbol.
+  if (auto runtimeSymbol = &objc_debug_isa_class_mask)
+    return *runtimeSymbol;
+  return ~uintptr_t(0);
+}
+
+uintptr_t swift::ISAMask = computeISAMask();
+
+#if SWIFT_OBJC_INTEROP
+const ClassMetadata *swift::_swift_getClass(const void *object) {
+  if (!isObjCTaggedPointer(object))
+    return _swift_getClassOfAllocated(object);
+  return reinterpret_cast<const ClassMetadata*>(object_getClass((id) object));
+}
+#endif
+
 struct SwiftObject_s {
   void *isa;
   long refCount;
@@ -129,8 +150,7 @@ static NSString *_getDescription(SwiftObject *obj) {
   
   String tmp;
   swift_retain((HeapObject*)obj);
-  swift_getSummary(&tmp, (OpaqueValue*)&obj,
-                   (const Metadata*)object_getClass(obj));
+  swift_getSummary(&tmp, (OpaqueValue*)&obj, _swift_getClassOfAllocated(obj));
   return [convertStringToNSString(tmp.x, tmp.y, tmp.z) autorelease];
 }
 
@@ -152,22 +172,22 @@ static NSString *_getDescription(SwiftObject *obj) {
 + (Class)class {
   return self;
 }
-- (id)class {
-  return object_getClass(self);
+- (Class)class {
+  return (Class) _swift_getClassOfAllocated(self);
 }
 + (Class)superclass {
-  return class_getSuperclass(self);
+  return (Class) _swift_getSuperclass((const ClassMetadata*) self);
 }
 - (Class)superclass {
-  return class_getSuperclass([self class]);
+  return (Class) _swift_getSuperclass(_swift_getClassOfAllocated(self));
 }
 
 + (BOOL)isMemberOfClass:(Class)cls {
-  return object_getClass((id)self) == cls;
+  return cls == (Class) _swift_getClassOfAllocated(self);
 }
 
 - (BOOL)isMemberOfClass:(Class)cls {
-  return [self class] == cls;
+  return cls == (Class) _swift_getClassOfAllocated(self);
 }
 
 - (instancetype)self {
@@ -182,7 +202,7 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
-  Class cls = object_getClass(self);
+  Class cls = (Class) _swift_getClassOfAllocated(self);
   fatalError("Unrecognized selector %c[%s %s]\n", 
              class_isMetaClass(cls) ? '+' : '-', 
              class_getName(cls), sel_getName(sel));
@@ -209,17 +229,18 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {
-  for (Class isa = object_getClass(self); isa != Nil;
-       isa = class_getSuperclass(isa))
-    if (isa == someClass)
+  for (auto isa = _swift_getClassOfAllocated(self); isa != nullptr;
+       isa = _swift_getSuperclass(isa))
+    if (isa == (const ClassMetadata*) someClass)
       return YES;
 
   return NO;
 }
 
 + (BOOL)isSubclassOfClass:(Class)someClass {
-  for (Class isa = self; isa != Nil; isa = class_getSuperclass(isa))
-    if (isa == someClass)
+  for (auto isa = (const ClassMetadata*) self; isa != nullptr;
+       isa = _swift_getSuperclass(isa))
+    if (isa == (const ClassMetadata*) someClass)
       return YES;
 
   return NO;
@@ -227,21 +248,17 @@ static NSString *_getDescription(SwiftObject *obj) {
 
 + (BOOL)respondsToSelector:(SEL)sel {
   if (!sel) return NO;
-  return class_respondsToSelector(object_getClass((id)self), sel);
+  return class_respondsToSelector((Class) _swift_getClassOfAllocated(self), sel);
 }
 
 - (BOOL)respondsToSelector:(SEL)sel {
   if (!sel) return NO;
-  return class_respondsToSelector([self class], sel);
+  return class_respondsToSelector((Class) _swift_getClassOfAllocated(self), sel);
 }
 
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
-  return class_conformsToProtocol([self class], proto);
-}
-
-- (bool) __usesNativeSwiftReferenceCounting {
-  return true;
+  return class_conformsToProtocol((Class) _swift_getClassOfAllocated(self), proto);
 }
 
 - (NSUInteger)hash {
@@ -273,15 +290,6 @@ static NSString *_getDescription(SwiftObject *obj) {
   return _getDescription(self);
 }
 @end
-
-// FIXME: there can be no exhaustive list of ObjC root classes; this
-// really needs to be done by the runtime.
-@implementation NSObject (__UsesNativeSwiftReferenceCounting)
-- (bool) __usesNativeSwiftReferenceCounting {
-  return false;
-}
-@end
-// FIXME: NSProxy?
 
 /*****************************************************************************/
 /****************************** WEAK REFERENCES ******************************/
@@ -346,42 +354,46 @@ static void objc_rootWeakRelease(id object) {
 
 /// Decide dynamically whether the given object uses native Swift
 /// reference-counting.
-static bool usesNativeSwiftReferenceCounting(void *object) {
-  // This could be *much* faster if it were integrated into the ObjC runtime.
-  assert(object);
-  return [(id) object __usesNativeSwiftReferenceCounting];
+bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
+  if (!theClass->isTypeMetadata()) return false;
+  return (theClass->getFlags() & ClassFlags::UsesSwift1Refcounting);
+}
+
+static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
+  assert(!isObjCTaggedPointerOrNull(object));
+  return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
 }
 
 void *swift::swift_unknownRetain(void *object) {
-  if (object == nullptr) return nullptr;
-  if (usesNativeSwiftReferenceCounting(object))
+  if (isObjCTaggedPointerOrNull(object)) return object;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_retain((HeapObject*) object);
   return objc_retain((id) object);
 }
 
 void swift::swift_unknownRelease(void *object) {
-  if (object == nullptr) return;
-  if (usesNativeSwiftReferenceCounting(object))
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_release((HeapObject*) object);
   return objc_release((id) object);
 }
 
 void swift::swift_unknownRetainUnowned(void *object) {
-  if (object == nullptr) return;
-  if (usesNativeSwiftReferenceCounting(object))
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_retainUnowned((HeapObject*) object);
   objc_rootRetainUnowned((id) object);
 }
 
 void swift::swift_unknownWeakRetain(void *object) {
-  if (object == nullptr) return;
-  if (usesNativeSwiftReferenceCounting(object))
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_weakRetain((HeapObject*) object);
   objc_rootWeakRetain((id) object);
 }
 void swift::swift_unknownWeakRelease(void *object) {
-  if (object == nullptr) return;
-  if (usesNativeSwiftReferenceCounting(object))
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_weakRelease((HeapObject*) object);
   objc_rootWeakRelease((id) object);
 }
@@ -408,30 +420,30 @@ static void doWeakDestroy(WeakReference *addr, bool valueIsNative) {
 }
 
 void swift::swift_unknownWeakInit(WeakReference *addr, void *value) {
-  if (value == nullptr) {
-    addr->Value = nullptr;
+  if (isObjCTaggedPointerOrNull(value)) {
+    addr->Value = (HeapObject*) value;
     return;
   }
-  doWeakInit(addr, value, usesNativeSwiftReferenceCounting(value));
+  doWeakInit(addr, value, usesNativeSwiftReferenceCounting_allocated(value));
 }
 
 void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
-  // If the incoming value is null, this is just a destroy and
-  // re-initialize.
-  if (newValue == nullptr) {
+  // If the incoming value is not allocated, this is just a destroy
+  // and re-initialize.
+  if (isObjCTaggedPointerOrNull(newValue)) {
     swift_unknownWeakDestroy(addr);
-    addr->Value = nullptr;
+    addr->Value = (HeapObject*) newValue;
     return;
   }
 
-  bool newIsNative = usesNativeSwiftReferenceCounting(newValue);
+  bool newIsNative = usesNativeSwiftReferenceCounting_allocated(newValue);
 
-  // If the existing value is null, this is just an initialize.
+  // If the existing value is not allocated, this is just an initialize.
   void *oldValue = addr->Value;
-  if (oldValue == nullptr)
+  if (isObjCTaggedPointerOrNull(oldValue))
     return doWeakInit(addr, newValue, newIsNative);
 
-  bool oldIsNative = usesNativeSwiftReferenceCounting(oldValue);
+  bool oldIsNative = usesNativeSwiftReferenceCounting_allocated(oldValue);
 
   // If they're both native, we can use the native function.
   if (oldIsNative && newIsNative)
@@ -449,9 +461,9 @@ void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
 
 void *swift::swift_unknownWeakLoadStrong(WeakReference *addr) {
   void *value = addr->Value;
-  if (value == nullptr) return nullptr;
+  if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting(value)) {
+  if (usesNativeSwiftReferenceCounting_allocated(value)) {
     return swift_weakLoadStrong(addr);
   } else {
     return (void*) objc_loadWeakRetained((id*) &addr->Value);
@@ -460,9 +472,9 @@ void *swift::swift_unknownWeakLoadStrong(WeakReference *addr) {
 
 void *swift::swift_unknownWeakTakeStrong(WeakReference *addr) {
   void *value = addr->Value;
-  if (value == nullptr) return nullptr;
+  if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting(value)) {
+  if (usesNativeSwiftReferenceCounting_allocated(value)) {
     return swift_weakTakeStrong(addr);
   } else {
     void *result = (void*) objc_loadWeakRetained((id*) &addr->Value);
@@ -473,26 +485,26 @@ void *swift::swift_unknownWeakTakeStrong(WeakReference *addr) {
 
 void swift::swift_unknownWeakDestroy(WeakReference *addr) {
   id object = (id) addr->Value;
-  if (object == nullptr) return;
-  doWeakDestroy(addr, usesNativeSwiftReferenceCounting(object));
+  if (isObjCTaggedPointerOrNull(object)) return;
+  doWeakDestroy(addr, usesNativeSwiftReferenceCounting_allocated(object));
 }
 void swift::swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src) {
   id object = (id) src->Value;
-  if (object == nullptr) {
-    dest->Value = nullptr;
+  if (isObjCTaggedPointerOrNull(object)) {
+    dest->Value = (HeapObject*) object;
     return;
   }
-  if (usesNativeSwiftReferenceCounting(object))
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_weakCopyInit(dest, src);
   objc_copyWeak((id*) &dest->Value, (id*) src);
 }
 void swift::swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src) {
   id object = (id) src->Value;
-  if (object == nullptr) {
-    dest->Value = nullptr;
+  if (isObjCTaggedPointerOrNull(object)) {
+    dest->Value = (HeapObject*) object;
     return;
   }
-  if (usesNativeSwiftReferenceCounting(object))
+  if (usesNativeSwiftReferenceCounting_allocated(object))
     return swift_weakTakeInit(dest, src);
   objc_moveWeak((id*) &dest->Value, (id*) &src->Value);
 }
@@ -547,8 +559,7 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
 ///
 /// The object pointer may be a tagged pointer, but cannot be null.
 const Metadata *swift::swift_getObjectType(HeapObject *object) {
-  auto theClass = object_getClass((id) object);
-  auto classAsMetadata = reinterpret_cast<ClassMetadata*>(theClass);
+  auto classAsMetadata = _swift_getClass(object);
   if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
   
   return swift_getObjCClassMetadata(classAsMetadata);

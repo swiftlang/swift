@@ -17,6 +17,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "MetadataImpl.h"
+#include "Private.h"
 #include <cstring>
 #include <climits>
 
@@ -120,7 +121,7 @@ int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
   
   // Return -1 for ObjC tagged pointers.
   // FIXME: This check is unnecessary for known-Swift types.
-  if (val & ObjCReservedBitsMask)
+  if (isObjCTaggedPointer((const void*) val))
     return -1;
   
   return (int)(val >> ObjCReservedLowBits);

@@ -22,9 +22,9 @@
 
 namespace swift {
 
-/// Flags which 
-enum class ClassFlags : uint32_t {
-  /// This class is a meta-class.
+/// Objetive-C class flags, stored in the ro-data.
+enum class ObjCClassFlags : uint32_t {
+  /// This class is a metaclass.
   Meta                 = 0x00001,
 
   /// This class is a root class.
@@ -51,11 +51,11 @@ enum class ClassFlags : uint32_t {
   /// when setting this flag, HasCXXStructors must be set as well.
   HasCXXDestructorOnly = 0x00100
 };
-inline ClassFlags &operator|=(ClassFlags &lhs, ClassFlags rhs) {
-  lhs = ClassFlags(uint32_t(lhs) | uint32_t(rhs));
+inline ObjCClassFlags &operator|=(ObjCClassFlags &lhs, ObjCClassFlags rhs) {
+  lhs = ObjCClassFlags(uint32_t(lhs) | uint32_t(rhs));
   return lhs;
 }
-inline ClassFlags operator|(ClassFlags lhs, ClassFlags rhs) {
+inline ObjCClassFlags operator|(ObjCClassFlags lhs, ObjCClassFlags rhs) {
   return (lhs |= rhs);
 }
 

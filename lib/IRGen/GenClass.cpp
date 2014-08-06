@@ -1159,21 +1159,21 @@ namespace {
 
   private:
     llvm::Constant *buildFlags(ForMetaClass_t forMeta) {
-      ClassFlags flags = ClassFlags::CompiledByARC;
+      ObjCClassFlags flags = ObjCClassFlags::CompiledByARC;
 
       // Mark metaclasses as appropriate.
       if (forMeta) {
-        flags |= ClassFlags::Meta;
+        flags |= ObjCClassFlags::Meta;
 
       // Non-metaclasses need us to record things whether primitive
       // construction/destructor is trivial.
       } else if (HasNonTrivialDestructor || HasNonTrivialConstructor) {
-        flags |= ClassFlags::HasCXXStructors;
+        flags |= ObjCClassFlags::HasCXXStructors;
         if (!HasNonTrivialConstructor)
-          flags |= ClassFlags::HasCXXDestructorOnly;
+          flags |= ObjCClassFlags::HasCXXDestructorOnly;
       }
 
-      // FIXME: set ClassFlags::Hidden when appropriate
+      // FIXME: set ObjCClassFlags::Hidden when appropriate
       return llvm::ConstantInt::get(IGM.Int32Ty, uint32_t(flags));
     }
 

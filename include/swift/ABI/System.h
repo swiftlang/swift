@@ -67,6 +67,7 @@
 #define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFFFF800000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.
+// Systems exist which use either bit.
 #define SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
 #define SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS 1
 
@@ -80,9 +81,9 @@
 // Heap objects are eight-byte aligned.
 #define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
-// Objective-C reserves the high and low bits for tagged pointers.
-#define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
-#define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 1
+// Objective-C reserves just the high bit for tagged pointers.
+#define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
+#define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 0
 
 
 #endif /* SWIFT_ABI_SYSTEM_H */

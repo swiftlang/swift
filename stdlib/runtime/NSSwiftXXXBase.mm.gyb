@@ -85,9 +85,6 @@ using namespace swift;
 }
 #pragma clang diagnostic pop
 
-- (bool) __usesNativeSwiftReferenceCounting {
-  return true;
-}
 @end
 % end
 
