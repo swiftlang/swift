@@ -325,7 +325,7 @@ static void objc_rootRetainUnowned(id object) {
 static void objc_rootWeakRetain(id object) {
   std::lock_guard<std::mutex> lock(UnownedRefsMutex);
   auto ins = UnownedRefs.insert({ (const void*) object, UnownedRefEntry() });
-  if (ins.second) {
+  if (!ins.second) {
     ins.first->second.Count++;
   } else {
     objc_initWeak(&ins.first->second.Value, object);
