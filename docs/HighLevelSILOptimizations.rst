@@ -257,3 +257,36 @@ readonly
   Readonly functions do not write through any pointer arguments and never change any state visible to callers.
 
 
+@effects attribute
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The @effects attribute describes how a function affects "the state of the world".
+More practically how the optimizer can modify the program based on information
+that is provided by the attribute.
+
+Usage:
+
+  @effects(readonly) func foo() { .. }
+
+
+The @effects attribute supports the following tags:
+
+readnone
+
+  function has no side effects and no dependencies on the state of
+  the program. It always returns an identical result given
+  identical inputs. Calls to readnone functions can be eliminated,
+  reordered, and folded arbitrarily.
+
+readonly
+
+  function has no side effects, but is dependent on the global 
+  state of the program. Calls to readonly functions can be
+  eliminated, but cannot be reordered or folded in a way that would
+  move calls to the readnone function across side effects.
+
+readwrite
+
+  function has side effects and the optimizer can't assume anything.
+
+
