@@ -34,7 +34,14 @@
 
 using namespace swift;
 
-static void registerAnalysisPasses(SILPassManager &PM, SILModule *Mod) {
+// Enumerates the optimization kinds that we do in SIL.
+enum OptimizationLevelKind {
+  LowLevel,
+  HighLevel,
+};
+
+static void registerAnalysisPasses(SILPassManager &PM) {
+  SILModule *Mod = PM.getModule();
   PM.registerAnalysis(createCallGraphAnalysis(Mod));
   PM.registerAnalysis(createAliasAnalysis(Mod));
   PM.registerAnalysis(createDominanceAnalysis(Mod));
@@ -54,7 +61,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   auto &Ctx = Module.getASTContext();
 
   SILPassManager PM(&Module, Options);
-  registerAnalysisPasses(PM, &Module);
+  registerAnalysisPasses(PM);
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
@@ -84,7 +91,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 }
 
 /// Perform semantic annotation/loop base optimizations.
-void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
+void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   // Perform classsic SSA optimizations for cleanup.
   PM.add(createLowerAggregate());
   PM.add(createSILCombine());
@@ -106,7 +113,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
   PM.add(createArrayOpts());
 }
 
-void AddLowLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
+void AddLowLevelLoopOptPasses(SILPassManager &PM) {
   PM.add(createLICMPass());
   PM.add(createDCE());
   PM.add(createCSE());
@@ -114,9 +121,7 @@ void AddLowLevelLoopOptPasses(SILPassManager &PM, SILModule &Mod) {
   PM.add(createSimplifyCFG());
 }
 
-void AddSSAPasses(SILPassManager &PM, SILModule &Module,
-                  bool useEarlyInliner) {
-
+void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createSimplifyCFG());
   PM.add(createAllocBoxToStack());
   PM.add(createLowerAggregate());
@@ -144,7 +149,8 @@ void AddSSAPasses(SILPassManager &PM, SILModule &Module,
 
   // Use either the early inliner that does not inline functions with defined
   // semantics or the late performance inliner that inlines everything.
-  PM.add(useEarlyInliner ? createEarlyInliner() : createPerfInliner());
+  PM.add(OpLevel == OptimizationLevelKind::HighLevel ? createEarlyInliner() :
+         createPerfInliner());
   PM.add(createSimplifyCFG());
   PM.add(createGlobalARCOpts());
 }
@@ -154,14 +160,14 @@ void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
   if (Options.DebugSerialization) {
     SILPassManager PM(&Module, Options);
-    registerAnalysisPasses(PM, &Module);
+    registerAnalysisPasses(PM);
     PM.add(createSILLinker());
     PM.run();
     return;
   }
 
   SILPassManager PM(&Module, Options);
-  registerAnalysisPasses(PM, &Module);
+  registerAnalysisPasses(PM);
 
   // Start by specializing generics and by cloning functions from stdlib.
   PM.add(createSILLinker());
@@ -170,18 +176,18 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.resetAndRemoveTransformations();
 
   // Run two iterations of the high-level SSA passes.
-  AddSSAPasses(PM, Module, true);
+  AddSSAPasses(PM, OptimizationLevelKind::HighLevel);
   PM.runOneIteration();
   PM.runOneIteration();
 
   // Run the high-level loop optimization passes.
   PM.resetAndRemoveTransformations();
-  AddHighLevelLoopOptPasses(PM, Module);
+  AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   // Run two iterations of the low-level SSA passes.
-  AddSSAPasses(PM, Module, false);
+  AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.runOneIteration();
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
@@ -201,11 +207,11 @@ void swift::runSILOptimizationPasses(SILModule &Module,
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches.
-  AddSSAPasses(PM, Module, false);
+  AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();
-  AddLowLevelLoopOptPasses(PM, Module);
+  AddLowLevelLoopOptPasses(PM);
   PM.runOneIteration();
 
   // Invalidate the SILLoader and allow it to drop references to SIL functions.

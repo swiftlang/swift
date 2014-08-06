@@ -70,6 +70,9 @@ namespace swift {
       llvm_unreachable("Unable to find analysis for requested type.");
     }
 
+    /// \returns the module that the pass manager owns.
+    SILModule *getModule() { return Mod; }
+
     /// \brief Add another transformation to the pipe. This transfers the
     /// ownership of the transformation to the pass manager that will delete it
     /// when done.
