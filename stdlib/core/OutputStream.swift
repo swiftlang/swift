@@ -188,8 +188,15 @@ public func toString<T>(x: T) -> String {
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inline(never) @semantics("readonly")
-func _toStringReadOnly<T>(x: T) -> String {
-  return toString(x)
+func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
+  var result = ""
+  x.writeTo(&result)
+  return result
+}
+
+@inline(never) @semantics("readonly")
+func _toStringReadOnlyPrintable<T : Printable>(x: T) -> String {
+  return x.description
 }
 
 /// Returns the result of `debugPrint`\ 'ing `x` into a `String`

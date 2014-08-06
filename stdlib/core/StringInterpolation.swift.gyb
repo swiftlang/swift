@@ -17,26 +17,37 @@ from SwiftIntTypes import *
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
-Types = [
+StreamableTypes = [
     'String',
-    'Bool',
     'Character',
+  ]
+
+PrintableTypes = [
+    'Bool',
     'UnicodeScalar',
     'Float32',
     'Float64'
   ]
 
 for (name, bits, signed) in all_integer_types(word_bits):
-    Types.append(int_name(name, signed))
+    PrintableTypes.append(int_name(name, signed))
 
 }%
 
 extension String : StringInterpolationConvertible {
-% for Type in Types:
+% for Type in StreamableTypes:
   public static func convertFromStringInterpolationSegment(
     expr: ${Type}
   ) -> String {
-    return _toStringReadOnly(expr)
+    return _toStringReadOnlyStreamable(expr)
+  }
+% end
+
+% for Type in PrintableTypes:
+  public static func convertFromStringInterpolationSegment(
+    expr: ${Type}
+  ) -> String {
+    return _toStringReadOnlyPrintable(expr)
   }
 % end
 }
