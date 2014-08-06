@@ -31,6 +31,13 @@ using namespace swift;
 STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 namespace {
+
+  // Controls the decision to inline functions with semantics attribute.
+  enum class InlineFuncSemanticsKind {
+    Inline,
+    DontInline
+  };
+
   class SILPerformanceInliner {
     /// The inline threashold.
     const unsigned InlineCostThreshold;
@@ -38,12 +45,12 @@ namespace {
     SILModule::LinkingMode LinkMode;
     /// If set to true then the inliner is allowed to inline function calls
     /// that are marked with the @semantics attribute.
-    bool InlineFunctionsWithSemantics;
+    InlineFuncSemanticsKind InlineFunctionsWithSemantics;
 
   public:
     SILPerformanceInliner(unsigned threshold,
                           SILModule::LinkingMode M,
-                          bool InlineFuncWithSemantics)
+                          InlineFuncSemanticsKind InlineFuncWithSemantics)
       : InlineCostThreshold(threshold), LinkMode(M),
     InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
 
@@ -63,7 +70,7 @@ namespace {
 /// that is legal to inline.
 static SILFunction *getInlinableFunction(ApplyInst *AI,
                                          SILModule::LinkingMode Mode,
-                                         bool InlineFunctionsWithSemantics) {
+                                         InlineFuncSemanticsKind InlineSem) {
   // Avoid substituion lists, we don't support them.
   if (AI->hasSubstitutions())
     return nullptr;
@@ -76,7 +83,8 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 
   // Don't inline functions that are marked with the @semantics attribute
   // if the inliner is asked not to inline them.
-  if (!InlineFunctionsWithSemantics && F->hasDefinedSemantics()) {
+  if (InlineSem == InlineFuncSemanticsKind::DontInline &&
+      F->hasDefinedSemantics()) {
     DEBUG(llvm::dbgs() << " Function " << F->getName()
           << " has special semantics: " << F->getSemanticsString() << "\n");
     return nullptr;
@@ -279,10 +287,10 @@ namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
   /// If InlineSem is true then the inliner is free to inline functions with
   /// defined semantics.
-  bool InlineSem;
+  InlineFuncSemanticsKind InlineSem;
 public:
-  SILPerformanceInlinerPass(bool InlineFuncWithSemantics):
-      InlineSem(InlineFuncWithSemantics) {}
+  SILPerformanceInlinerPass(InlineFuncSemanticsKind InlineFunSem):
+      InlineSem(InlineFunSem) {}
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -320,17 +328,16 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
 
-  StringRef getName() override { return "Performance Inlining"; }
+  StringRef getName() override { return "Performance Inliner"; }
 };
 } // end anonymous namespace
 
-
 SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(true /* Inline all functions. */);
+  return new SILPerformanceInlinerPass(InlineFuncSemanticsKind::Inline);
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
 /// the @semantics attribute.
 SILTransform *swift::createEarlyInliner() {
-  return new SILPerformanceInlinerPass(false);
+  return new SILPerformanceInlinerPass(InlineFuncSemanticsKind::DontInline);
 }
