@@ -66,3 +66,11 @@ func string_interpolation() {
 func string_interpolation2() {
   "\(false) \(true)"
 }
+
+//CHECK-LABEL: string_plus
+//CHECK: bb0:
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+func string_plus() {
+  "a" + "b"
+}

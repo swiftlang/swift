@@ -265,6 +265,7 @@ extension String : StringInterpolationConvertible {
   public static func convertFromStringInterpolationSegment<T>(expr: T)   -> String { return toString(expr) }
 }
 
+@semantics("readonly")
 public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
@@ -273,6 +274,7 @@ public func +(var lhs: String, rhs: String) -> String {
   return lhs
 }
 
+@semantics("readonly")
 public func +(lhs: Character, rhs: Character) -> String {
   var result = String(lhs)
   result += String(rhs)
