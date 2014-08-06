@@ -75,7 +75,7 @@ public:
     PendingNewlines++;
   }
 
-  void printIndent();
+  virtual void printIndent();
 
   /// Schedule a \c printDeclPre callback to be called as soon as a
   /// non-whitespace character is printed.

@@ -20,6 +20,7 @@
 #include "GenericTypeResolver.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
@@ -3688,6 +3689,109 @@ public:
     }
   }
 
+  /// AST stream printer that adds extra indentation to each line.
+  class ExtraIndentStreamPrinter : public StreamPrinter {
+    StringRef ExtraIndent;
+
+  public:
+    ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
+      : StreamPrinter(out), ExtraIndent(extraIndent) { }
+
+    virtual void printIndent() {
+      printText(ExtraIndent);
+      StreamPrinter::printIndent();
+    }
+  };
+
+  /// Diagnose a missing required initializer.
+  void diagnoseMissingRequiredInitializer(ClassDecl *classDecl,
+                                          ConstructorDecl *superInitializer) {
+    // Find the location at which we should insert the new initializer.
+    SourceLoc insertionLoc;
+    SourceLoc indentationLoc;
+    for (auto member : classDecl->getMembers()) {
+      // If we don't have an indentation location yet, grab one from this
+      // member.
+      if (indentationLoc.isInvalid()) {
+        indentationLoc = member->getLoc();
+      }
+
+      // We only want to look at explicit constructors.
+      auto ctor = dyn_cast<ConstructorDecl>(member);
+      if (!ctor)
+        continue;
+
+      if (ctor->isImplicit())
+        continue;
+
+      insertionLoc = ctor->getEndLoc();
+      indentationLoc = ctor->getLoc();
+    }
+
+    // If no initializers were listed, start at the opening '{' for the class.
+    if (insertionLoc.isInvalid()) {
+      insertionLoc = classDecl->getBraces().Start;
+    }
+    if (indentationLoc.isInvalid()) {
+      indentationLoc = classDecl->getBraces().End;
+    }
+
+    // Adjust the insertion location to point at the end of this line (i.e.,
+    // the start of the next line).
+    insertionLoc = Lexer::getLocForEndOfLine(TC.Context.SourceMgr,
+                                             insertionLoc);
+
+    // Find the indentation used on the indentation line.
+    StringRef indentation = Lexer::getIndentationForLine(TC.Context.SourceMgr,
+                                                         indentationLoc);
+
+    // Pretty-print the superclass initializer into a string.
+    // FIXME: Form a new initializer by performing the appropriate
+    // substitutions of subclass types into the superclass types, so that
+    // we get the right generic parameters.
+    std::string initializerText;
+    {
+      PrintOptions options;
+      options.PrintDefaultParameterPlaceholder = false;
+      options.PrintImplicitAttrs = false;
+
+      // Render the text.
+      llvm::raw_string_ostream out(initializerText);
+      {
+        ExtraIndentStreamPrinter printer(out, indentation);
+        printer.printNewline();
+
+        // If there is no explicit 'required', print one.
+        bool hasExplicitRequiredAttr = false;
+        if (auto requiredAttr
+              = superInitializer->getAttrs().getAttribute<RequiredAttr>())
+            hasExplicitRequiredAttr = !requiredAttr->isImplicit();
+
+        if (!hasExplicitRequiredAttr)
+          printer << "required ";
+
+        superInitializer->print(printer, options);
+      }
+
+      // FIXME: Infer body indentation from the source rather than hard-coding
+      // 4 spaces.
+
+      // Add a dummy body.
+      out << " {\n";
+      out << indentation << "    fatalError(\"";
+      superInitializer->getFullName().printPretty(out);
+      out << " has not been implemented\")\n";
+      out << indentation << "}\n";
+    }
+
+    // Complain.
+    TC.diagnose(insertionLoc, diag::required_initializer_missing,
+                superInitializer->getFullName(),
+                superInitializer->getDeclContext()->getDeclaredTypeOfContext())
+      .fixItInsert(insertionLoc, initializerText);
+    TC.diagnose(superInitializer, diag::required_initializer_here);
+  }
+
   void visitClassDecl(ClassDecl *CD) {
     // This class declaration is technically a parse error, so do not type
     // check.
@@ -3772,8 +3876,7 @@ public:
           if (auto overridden = ctor->getOverriddenDecl())
             overriddenCtors.insert(overridden);
         }
-        
-        bool diagnosed = false;
+
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
           // We only care about required or designated initializers.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
@@ -3799,16 +3902,7 @@ public:
 
           // Diagnose a missing override of a required initializer.
           if (superclassCtor->isRequired()) {
-            // Complain that we don't have an overriding constructor.
-            if (!diagnosed) {
-              TC.diagnose(CD, diag::required_incomplete_implementation,
-                          CD->getDeclaredInterfaceType());
-              diagnosed = true;
-            }
-
-            TC.diagnose(superclassCtor,
-                        diag::required_initializer_not_overridden,
-                        superclassCtor->getFullName());
+            diagnoseMissingRequiredInitializer(CD, superclassCtor);
             continue;
           }
 

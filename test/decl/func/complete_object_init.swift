@@ -109,7 +109,7 @@ class Ab2 : Ab1 {
 
   // Subclasses can use this to satisfy the required initializer
   // requirement.
-  required convenience init() { // expected-note{{'required' initializer 'init()' not overridden}}
+  required convenience init() { // expected-note{{'required' initializer is declared in superclass here}}
     self.init(string: "default")
   }
 
@@ -125,11 +125,12 @@ class Ab3 : Ab2 {
   }
 }
 
-class Ab4 : Ab3 { // expected-error{{class 'Ab4' does not implement its superclass's required members}}
-
+class Ab4 : Ab3 {
   init(int: Int) { 
     super.init(string:"four")
   }
+  // expected-error{{'required' initializer 'init()' must be provided by subclass of 'Ab2'}}
+  func blah() { }
 }
 
 // Only complete object initializers are allowed in extensions

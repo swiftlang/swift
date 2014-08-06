@@ -76,22 +76,22 @@ func testNoReturn(a : NSAwesomeDocument) -> Int {
 class MyViewController : NSViewController {
 }
 
-class MyView : NSView { // expected-error{{class 'MyView' does not implement its superclass's required members}}
+class MyView : NSView {
   override init() { super.init() }
-}
+} // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSView'}}
 
-class MyMenu : NSMenu { // expected-error{{class 'MyMenu' does not implement its superclass's required members}}
+class MyMenu : NSMenu {
   override init() { super.init() }
-}
+} // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSMenu'}}
 
 class MyTableViewController : NSTableViewController {
 }
 
-class MyOtherTableViewController : NSTableViewController { // expected-error{{class 'MyOtherTableViewController' does not implement its superclass's required members}}
+class MyOtherTableViewController : NSTableViewController {
   override init(int i: Int)  {
     super.init(int: i)
   }
-}
+} // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSTableViewController'}}
 
 class MyThirdTableViewController : NSTableViewController {
   override init(int i: Int)  {
@@ -126,6 +126,6 @@ class MyDictionary2 : NSDictionary {
   }
 }
 
-class MyString : NSString {  // expected-error{{class 'MyString' does not implement its superclass's required members}}
+class MyString : NSString {
   override init() { super.init() }
-}
+} // expected-error{{'required' initializer 'init(coder:)' must be provided by subclass of 'NSString'}}

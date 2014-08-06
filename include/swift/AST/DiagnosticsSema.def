@@ -1445,10 +1445,12 @@ ERROR(required_initializer_nonclass,attribute_parsing,none,
 ERROR(required_initializer_in_extension,attribute_parsing,none,
       "'required' initializer must be declared directly in class %0"
       " (not in an extension)", (Type))
-ERROR(required_incomplete_implementation,sema_tcd,none,
-      "class %0 does not implement its superclass's required members", (Type))
-NOTE(required_initializer_not_overridden,attribute_parsing,none,
-      "'required' initializer %0 not overridden", (DeclName))
+ERROR(required_initializer_missing,attribute_parsing,none,
+      "'required' initializer %0 must be provided by subclass of %1",
+      (DeclName, Type))
+NOTE(required_initializer_here,sema_tcd,none,
+      "'required' initializer is declared in superclass here", ())
+
 ERROR(required_initializer_not_accessible,sema_tcd,none,
       "'required' initializer must be as accessible as its enclosing type", ())
 ERROR(required_initializer_missing_keyword,sema_tcd,none,

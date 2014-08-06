@@ -266,6 +266,18 @@ public:
   static SourceLoc getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                          unsigned Offset);
 
+  /// Retrieve the start location of the line containing the given location.
+  /// the given location.
+  static SourceLoc getLocForStartOfLine(SourceManager &SM, SourceLoc Loc);
+
+  /// Retrieve the source location for the end of the line containing the
+  /// given token, which is the location of the start of the next line.
+  static SourceLoc getLocForEndOfLine(SourceManager &SM, SourceLoc Loc);
+
+  /// Retrieve the string used to indent the line that contains the given
+  /// source location.
+  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc);
+
   /// \brief Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);

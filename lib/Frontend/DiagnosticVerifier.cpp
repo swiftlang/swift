@@ -30,7 +30,7 @@ namespace {
   struct ExpectedFixIt {
     unsigned StartCol;
     unsigned EndCol;
-    StringRef Text;
+    std::string Text;
   };
 }
 
@@ -324,7 +324,18 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
                                           "verification"));
           continue;
         }
-        FixIt.Text = AfterEqual.slice(0, EndLoc);
+
+        // Translate literal "\\n" into '\n', inefficiently.
+        StringRef fixItText = AfterEqual.slice(0, EndLoc);
+        for (const char *current = fixItText.begin(), *end = fixItText.end();
+             current != end; /* in loop */) {
+          if (*current == '\\' && current + 1 < end && *(current + 1) == 'n') {
+            FixIt.Text += '\n';
+            current += 2;
+          } else {
+            FixIt.Text += *current++;
+          }
+        }
 
         // Finally, make sure the fix-it is present in the diagnostic.
         if (!checkForFixIt(FixIt, FoundDiagnostic, InputFile)) {

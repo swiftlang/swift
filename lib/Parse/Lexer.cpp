@@ -1615,6 +1615,20 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   return SM.getLocForOffset(BufferID, Offset);
 }
 
+// Find the start of the given line.
+static const char *findStartOfLine(const char *bufStart, const char *current) {
+  while (current != bufStart) {
+    if (current[0] == '\n' || current[0] == '\r') {
+      ++current;
+      break;
+    }
+
+    --current;
+  }
+
+  return current;
+}
+
 SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                        unsigned Offset) {
   CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
@@ -1632,18 +1646,81 @@ SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
 
   // Back up from the current location until we hit the beginning of a line
   // (or the buffer). We'll relex from that point.
-  const char *LexStart = StrData;
-  while (LexStart != BufStart) {
-    if (LexStart[0] == '\n' || LexStart[0] == '\r') {
-      ++LexStart;
-      break;
-    }
-
-    --LexStart;
-  }
+  const char *LexStart = findStartOfLine(BufStart, StrData);
 
   return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
                                     /*BufferStart=*/LexStart-BufStart,
                                     /*BufferEnd=*/Buffer.size(),
                                     /*InInterpolatedString=*/false);
 }
+
+SourceLoc Lexer::getLocForStartOfLine(SourceManager &SM, SourceLoc Loc) {
+  // Don't try to do anything with an invalid location.
+  if (Loc.isInvalid())
+    return Loc;
+
+  // Figure out which buffer contains this location.
+  int BufferID = SM.findBufferContainingLoc(Loc);
+  if (BufferID < 0)
+    return SourceLoc();
+
+  CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+  StringRef Buffer = SM.extractText(entireRange);
+
+  const char *BufStart = Buffer.data();
+  unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+
+  const char *StartOfLine = findStartOfLine(BufStart, BufStart + Offset);
+  return getSourceLoc(StartOfLine);
+}
+
+SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
+  // Don't try to do anything with an invalid location.
+  if (Loc.isInvalid())
+    return Loc;
+
+  // Figure out which buffer contains this location.
+  int BufferID = SM.findBufferContainingLoc(Loc);
+  if (BufferID < 0)
+    return SourceLoc();
+
+  // Use fake language options; language options only affect validity
+  // and the exact token produced.
+  LangOptions FakeLangOpts;
+
+  // Here we return comments as tokens because either the caller skipped
+  // comments and normally we won't be at the beginning of a comment token
+  // (making this option irrelevant), or the caller lexed comments and
+  // we need to lex just the comment token.
+  Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
+          CommentRetentionMode::ReturnAsTokens);
+  L.restoreState(State(Loc));
+  L.skipToEndOfLine();
+  return getSourceLoc(L.CurPtr);
+}
+
+StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
+  // Don't try to do anything with an invalid location.
+  if (Loc.isInvalid())
+    return "";
+
+  // Figure out which buffer contains this location.
+  int BufferID = SM.findBufferContainingLoc(Loc);
+  if (BufferID < 0)
+    return "";
+
+  CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+  StringRef Buffer = SM.extractText(entireRange);
+
+  const char *BufStart = Buffer.data();
+  unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+
+  const char *StartOfLine = findStartOfLine(BufStart, BufStart + Offset);
+  const char *EndOfIndentation = StartOfLine;
+  while (*EndOfIndentation && isHorizontalWhitespace(*EndOfIndentation))
+    ++EndOfIndentation;
+
+  return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
+}
+
+

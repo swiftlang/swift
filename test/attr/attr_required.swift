@@ -6,7 +6,7 @@
 required class AC { } // expected-error{{'required' may only be used on 'init' declarations}}
 
 class C {
-  required init(string s: String) { } // expected-note{{'required' initializer 'init(string:)' not overridden}}
+  required init(string s: String) { } // expected-note{{'required' initializer is declared in superclass here}}
 
   required var s: String // expected-error{{'required' may only be used on 'init' declarations}}
 
@@ -31,9 +31,9 @@ extension C {
 class C2 : C { // okay: implicitly defined
 }
 
-class C2b : C { // expected-error{{class 'C2b' does not implement its superclass's required members}}
+class C2b : C {
   init() {}
-}
+} // expected-error{{'required' initializer 'init(string:)' must be provided by subclass of 'C'}}{{1-1=\n  required init(string s: String) {\n      fatalError("init(string:) has not been implemented")\n  }\n}}
 
 class C3 : C {
   required init(string s: String) { } // expected-note{{overridden required initializer is here}}
@@ -41,15 +41,18 @@ class C3 : C {
 
 class C4 : C3 {
   // implicitly required
-  init(string s: String) { } // expected-error{{override of required initializer missing 'required' modifier}}{{3-3=required }}
-  // expected-note @-1{{'required' initializer 'init(string:)' not overridden}}
+  init(string s: String) { } 
+  // expected-error @-1{{override of required initializer missing 'required' modifier}}
+  // expected-note @-2{{'required' initializer is declared in superclass here}}
 }
 
 class C5 : C4 {
 }
 
-class C5b : C4 { // expected-error{{class 'C5b' does not implement its superclass's required members}}
+class C5b : C4 {
   init() {}
+  // expected-error{{'required' initializer 'init(string:)' must be provided by subclass of 'C4'}}
+  func wibble() { }
 }
 
 class Foo {
@@ -57,5 +60,4 @@ class Foo {
 }
 
 class Bar : Foo {
-  
 }
