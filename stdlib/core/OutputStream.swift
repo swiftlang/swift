@@ -181,16 +181,16 @@ public func toString<T>(x: T) -> String {
   return result
 }
 
-
-// Create a version of toString with 'readonly' annotation to allow the optimizer
-// to remove unused debug strings. Never inline this function because when
-// building the standard library inlining makes us drop the special semantics.
 /// Returns the result of `print`\ 'ing `x` into a `String`
+///
+/// Exactly the same as `toString`, but annotated 'readonly' to allow the optimizer
+/// to remove calls where results are unused.
+///
+/// This function is forbidden from being inlined because when building the
+/// standard library inlining makes us drop the special semantics.
 @inline(never) @semantics("readonly")
-func toStringReadOnly<T>(x: T) -> String {
-  var result = ""
-  print(x, &result)
-  return result
+func _toStringReadOnly<T>(x: T) -> String {
+  return toString(x)
 }
 
 /// Returns the result of `debugPrint`\ 'ing `x` into a `String`

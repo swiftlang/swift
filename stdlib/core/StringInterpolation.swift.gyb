@@ -24,9 +24,14 @@
 % Types.append('Character')
 % Types.append('UnicodeScalar')
 
-% for Type in Types:
 extension String : StringInterpolationConvertible {
-  public static func convertFromStringInterpolationSegment(expr: ${Type}) -> String { return toStringReadOnly(expr) }
+% for Type in Types:
+  public static func convertFromStringInterpolationSegment(
+    expr: ${Type}
+  ) -> String {
+    return _toStringReadOnly(expr)
+  }
+% end
 }
 
 // ${'Local Variables'}:
