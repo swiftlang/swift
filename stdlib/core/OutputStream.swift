@@ -173,7 +173,6 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-
 /// Returns the result of `print`\ 'ing `x` into a `String`
 public func toString<T>(x: T) -> String {
   var result = ""

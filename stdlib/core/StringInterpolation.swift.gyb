@@ -10,19 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-% Types = []
-% for IntSize in [8,16,32,64]:
-%   Types.append('Int'+str(IntSize))
-% for UIntSize in [8,16,32,64]:
-%   Types.append('UInt'+str(UIntSize))
-% for FloatSize in [32,64]:
-%   Types.append('Float'+str(FloatSize))
-% Types.append('String')
-% Types.append('Bool')
-% Types.append('Int')
-% Types.append('UInt')
-% Types.append('Character')
-% Types.append('UnicodeScalar')
+%{
+
+from SwiftIntTypes import *
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
+Types = [
+    'String',
+    'Bool',
+    'Character',
+    'UnicodeScalar',
+    'Float32',
+    'Float64'
+  ]
+
+for (name, bits, signed) in all_integer_types(word_bits):
+    Types.append(int_name(name, signed))
+
+}%
 
 extension String : StringInterpolationConvertible {
 % for Type in Types:
