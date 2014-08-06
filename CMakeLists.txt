@@ -1600,6 +1600,14 @@ foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
   list(APPEND SWIFT_API_NOTES_INPUTS ${name})
 endforeach()
 
+if(EXISTS "${SWIFT_API_NOTES_PATH}/.git/HEAD")
+  # Trigger updates if the apinotes repository version changes.
+  configure_file(
+    "${SWIFT_API_NOTES_PATH}/.git/HEAD"
+    "${CMAKE_BINARY_DIR}/apinotes-version.check_cache"
+    @ONLY)
+endif()
+
 # Add all of the subdirectories, where we actually do work.
 if (SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
