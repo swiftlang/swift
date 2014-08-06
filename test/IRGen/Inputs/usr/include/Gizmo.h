@@ -42,6 +42,10 @@ typedef long NSInteger;
 
 static inline int innerZero(void) { return 0; }
 static inline int zero(void) { return innerZero(); }
+static inline int wrappedZero(void) { return zero(); }
+
+extern int getInt(void);
+static inline int wrappedGetInt(void) { return getInt(); }
 
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;

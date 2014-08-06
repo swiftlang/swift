@@ -2021,17 +2021,7 @@ namespace {
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
       if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>())
-          && decl->getBody()) {
-        // FIXME: Total hack to force instantiation of inline
-        //        functions into the module rather than going through
-        //        Clang's CodeGenModule::Release(), which will emit
-        //        deferred decls that have been referenced, since
-        //        Release() does many things including emitting stuff
-        //        that along with what Swift emits results in broken
-        //        modules.
-        auto *attr = clang::UsedAttr::CreateImplicit(decl->getASTContext());
-        const_cast<clang::FunctionDecl *>(decl)->addAttr(attr);
-
+          && decl->hasBody()) {
         Impl.registerExternalDecl(result);
       }
 

@@ -22,6 +22,7 @@
 #include "swift/Basic/SuccessorMap.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -299,6 +300,7 @@ public:
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
+  llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<llvm::Constant*> GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;

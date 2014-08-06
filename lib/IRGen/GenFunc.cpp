@@ -3112,9 +3112,3 @@ void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
   if (dd->getBody())
     emitLocalDecls(dd->getBody());
 }
-
-// Emit IR for an imported inline Clang function body.
-void IRGenModule::emitLocalDecls(clang::Decl *decl) {
-  ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(decl));
-}
-

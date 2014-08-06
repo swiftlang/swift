@@ -214,7 +214,7 @@ ClangImporter::create(ASTContext &ctx,
   // target.
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
-    "-fsyntax-only", "-w",
+    "-fsyntax-only", "-w", "-femit-all-decls",
     "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
     "-target-abi", irGenOpts.TargetABI,
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
