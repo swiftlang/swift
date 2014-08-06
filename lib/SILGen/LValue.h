@@ -18,7 +18,6 @@
 #define SWIFT_LOWERING_LVALUE_H
 
 #include "SILGenFunction.h"
-#include "swift/Basic/DiverseList.h"
 
 namespace swift {
 namespace Lowering {
@@ -95,10 +94,9 @@ private:
 protected:
   PathComponent(LValueTypeData typeData, KindTy Kind)
     : TypeData(typeData), Kind(Kind) {}
-
+public:
   virtual ~PathComponent() {}
 
-public:
   /// Returns sizeof(the final type), plus any extra storage required.
   size_t allocated_size() const { return AllocatedSize; }
 
@@ -213,15 +211,11 @@ inline const LogicalPathComponent &PathComponent::asLogical() const {
 /// of a type, as opposed to an rvalue, which is an actual value
 /// of the type.
 class LValue {
-  DiverseList<PathComponent, 128> Path;
-
-  /// Iterating to the end of the l-value is expensive, so we cache it
-  /// here.
-  LValueTypeData TypeData;
+  std::vector<std::unique_ptr<PathComponent>> Path;
 
 public:
   LValue() = default;
-  LValue(const LValue &other) = default;
+  LValue(const LValue &other) = delete; // Would be nice someday.
   LValue(LValue &&other) = default;
 
   bool isValid() const { return !Path.empty(); }
@@ -230,7 +224,7 @@ public:
   bool isPhysical() const {
     assert(isValid());
     for (auto &component : Path)
-      if (!component.isPhysical())
+      if (!component->isPhysical())
         return false;
     return true;
   }
@@ -241,44 +235,35 @@ public:
     auto component = begin(), next = begin(), e = end();
     ++next;
     for (; next != e; component = next, ++next) { }
-    return component->isPhysical();
+    return (*component)->isPhysical();
   }
   
   /// Add a new component at the end of the access path of this lvalue.
-  template <class T, class... A> T &add(A &&...args) {
-    T &component = Path.add<T>(std::forward<A>(args)...);
-    component.AllocatedSize = sizeof(T);
-    assert(component.allocated_size() == sizeof(T));
-    TypeData = component.getTypeData();
-    return component;
+  void add(PathComponent *component) {
+    Path.push_back(std::unique_ptr<PathComponent>(component));
   }
 
-  template <class T, class... A> T &addWithExtra(A &&...args) {
-    size_t extraSize = T::extra_storage_size(std::forward<A>(args)...);
-    T &component = Path.addWithExtra<T>(extraSize, std::forward<A>(args)...);
-    component.AllocatedSize = sizeof(T) + extraSize;
-    assert(component.allocated_size() == sizeof(T) + extraSize);
-    TypeData = component.getTypeData();
-    return component;
-  }
-
-  typedef DiverseListImpl<PathComponent>::iterator iterator;
-  typedef DiverseListImpl<PathComponent>::const_iterator const_iterator;
+  typedef std::vector<std::unique_ptr<PathComponent>>::iterator iterator;
+  typedef std::vector<std::unique_ptr<PathComponent>>::const_iterator
+    const_iterator;
 
   iterator begin() { return Path.begin(); }
   iterator end() { return Path.end(); }
   const_iterator begin() const { return Path.begin(); }
   const_iterator end() const { return Path.end(); }
-  
+
+  const LValueTypeData &getTypeData() const {
+    return Path.back()->getTypeData();
+  }
+
   /// Returns the type-of-rvalue of the logical object referenced by
   /// this l-value.  Note that this may differ significantly from the
   /// type of l-value.
-  SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
-  CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
+  SILType getTypeOfRValue() const { return getTypeData().TypeOfRValue; }
+  CanType getSubstFormalType() const { return getTypeData().SubstFormalType; }
   AbstractionPattern getOrigFormalType() const {
-    return TypeData.OrigFormalType;
+    return getTypeData().OrigFormalType;
   }
-  const LValueTypeData &getTypeData() const { return TypeData; }
 };
   
 /// RAII object to enable writebacks for logical lvalues evaluated within the

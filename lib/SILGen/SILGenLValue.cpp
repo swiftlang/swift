@@ -855,8 +855,8 @@ LValue SILGenFunction::emitLValue(Expr *e) {
   if (r.isLastComponentPhysical()
       && getTypeLowering(r.getSubstFormalType()).getLoweredType()
             != r.getTypeOfRValue()) {
-    r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
-                                r.getSubstFormalType());
+    r.add(new OrigToSubstComponent(*this, r.getOrigFormalType(),
+                                   r.getSubstFormalType()));
   }
   return r;
 }
@@ -874,7 +874,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
     auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
-    lv.add<ValueComponent>(rv, typeData);
+    lv.add(new ValueComponent(rv, typeData));
     return lv;
   }
 
@@ -901,18 +901,18 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                                       var->getDeclContext()))
       substitutions = gen.buildForwardingSubstitutions(genericParams);
 
-    lv.add<GetterSetterComponent>(var, /*isSuper=*/false, substitutions,
-                                  typeData);
+    lv.add(new GetterSetterComponent(var, /*isSuper=*/false, substitutions,
+                                     typeData));
   } else {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
     auto address = gen.emitLValueForDecl(loc, var, isDirectPropertyAccess);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
-    lv.add<ValueComponent>(address, typeData);
+    lv.add(new ValueComponent(address, typeData));
 
     if (address.getType().is<ReferenceStorageType>())
-      lv.add<OwnershipComponent>(typeData);
+      lv.add(new OwnershipComponent(typeData));
   }
   return std::move(lv);
 }
@@ -924,7 +924,7 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e) {
 
   SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  lv.add(new ValueComponent(ManagedValue::forUnmanaged(address), typeData));
   return std::move(lv);
 }
 
@@ -956,7 +956,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
                              e->getBase(), cast<VarDecl>(baseDeclRef->getDecl()));
           auto typeData = getValueTypeData(self.getValue());
           LValue valueLV;
-          valueLV.add<ValueComponent>(self, typeData);
+          valueLV.add(new ValueComponent(self, typeData));
           return valueLV;
         }
       }
@@ -974,8 +974,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
   if (var->hasAccessorFunctions() && !e->isDirectPropertyAccess()) {
-    lv.add<GetterSetterComponent>(var, e->isSuper(),
-                                  e->getMember().getSubstitutions(), typeData);
+    lv.add(new GetterSetterComponent(var, e->isSuper(),
+                                     e->getMember().getSubstitutions(),
+                                     typeData));
     return std::move(lv);
   }
 
@@ -1007,14 +1008,14 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // was already emitted.  This member is accessed off of it.
   if (!e->getBase()->getType()->is<LValueType>()) {
     assert(e->getBase()->getType()->hasReferenceSemantics());
-    lv.add<RefElementComponent>(var, varStorageType, typeData);
+    lv.add(new RefElementComponent(var, varStorageType, typeData));
   } else {
-    lv.add<StructElementComponent>(var, varStorageType, typeData);
+    lv.add(new StructElementComponent(var, varStorageType, typeData));
   }
   
   // If the member has weak or unowned storage, convert it away.
   if (varStorageType.is<ReferenceStorageType>()) {
-    lv.add<OwnershipComponent>(typeData);
+    lv.add(new OwnershipComponent(typeData));
   }
   
   return lv;
@@ -1025,9 +1026,9 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(decl, e->isSuper(),
-                                e->getDecl().getSubstitutions(),
-                                typeData, e->getIndex());
+  lv.add(new GetterSetterComponent(decl, e->isSuper(),
+                                   e->getDecl().getSubstitutions(),
+                                   typeData, e->getIndex()));
   return lv;
 }
 
@@ -1042,7 +1043,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
     baseTypeData.TypeOfRValue.getTupleElementType(index)
   };
 
-  lv.add<TupleElementComponent>(index, typeData);
+  lv.add(new TupleElementComponent(index, typeData));
   return lv;
 }
 
@@ -1064,14 +1065,14 @@ getOptionalObjectTypeData(SILGenFunction &gen,
 LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e) {
   LValue lv = visitRec(e->getSubExpr());
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
-  lv.add<ForceOptionalObjectComponent>(typeData);
+  lv.add(new ForceOptionalObjectComponent(typeData));
   return lv;
 }
 
 LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e) {
   LValue lv = visitRec(e->getSubExpr());
   LValueTypeData typeData = getOptionalObjectTypeData(gen, lv.getTypeData());
-  lv.add<BindOptionalObjectComponent>(typeData, e->getDepth());
+  lv.add(new BindOptionalObjectComponent(typeData, e->getDepth()));
   return lv;
 }
 
@@ -1087,7 +1088,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
   auto baseType = base.getType().getSwiftRValueType();
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add<ValueComponent>(base, getUnsubstitutedTypeData(*this, baseType));
+  lv.add(new ValueComponent(base, getUnsubstitutedTypeData(*this, baseType)));
 
   auto origFormalType = getOrigFormalRValueType(ivar->getType());
   auto substFormalType = base.getType().getSwiftRValueType()
@@ -1102,16 +1103,16 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(substFormalType));
 
   if (baseType->hasReferenceSemantics())
-    lv.add<RefElementComponent>(ivar, varStorageType, typeData);
+    lv.add(new RefElementComponent(ivar, varStorageType, typeData));
   else
-    lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+    lv.add(new StructElementComponent(ivar, varStorageType, typeData));
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =
       ivar->getType()->getRValueType()->getReferenceStorageReferent();
     auto typeData =
       getUnsubstitutedTypeData(*this, formalRValueType->getCanonicalType());
-    lv.add<OwnershipComponent>(typeData);
+    lv.add(new OwnershipComponent(typeData));
   }
 
   return lv;
@@ -1514,10 +1515,10 @@ static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
   auto component = lv.begin(), next = lv.begin(), end = lv.end();
   ++next;
   for (; next != end; component = next, ++next) {
-    addr = drillIntoComponent(SGF, loc, *component, addr);
+    addr = drillIntoComponent(SGF, loc, **component, addr);
   }
 
-  return *component;
+  return **component;
 }
 
 ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,

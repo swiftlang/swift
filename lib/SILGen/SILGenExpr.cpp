@@ -5385,7 +5385,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
         CanUnmanagedStorageType::get(typeData.OrigFormalType.getAsType())),
       CanUnmanagedStorageType::get(typeData.SubstFormalType),
       SILType::getPrimitiveObjectType(typeData.TypeOfRValue.getSwiftRValueType()));
-    lv.add<AutoreleasingWritebackComponent>(unownedTypeData);
+    lv.add(new AutoreleasingWritebackComponent(unownedTypeData));
     break;
   }
   }
