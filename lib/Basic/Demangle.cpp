@@ -776,7 +776,8 @@ private:
     // Decode operator names.
     std::string opDecodeBuffer;
     if (isOperator) {
-      static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
+                                        // abcdefghijklmnopqrstuvwxyz
+      static const char op_char_table[] = "& @/= >    <*!|+?%-~   ^ .";
 
       opDecodeBuffer.reserve(identifier.size());
       for (signed char c : identifier) {

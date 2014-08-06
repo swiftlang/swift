@@ -137,3 +137,6 @@ protocol HasAssocType {
 func foo<T: HasAssocType>() {}
 // CHECK-LABEL: sil @_TF8mangling3fooUS_12HasAssocType_US_9AssocReqt__FT_T_ : $@thin <T where T : HasAssocType, T.Assoc : AssocReqt> () -> ()
 func foo<T: HasAssocType where T.Assoc: AssocReqt>() {}
+
+// CHECK-LABEL: sil @_TF8manglingoi2qqFTSiSi_T_
+func ??(x: Int, y: Int) {}

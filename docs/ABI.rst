@@ -977,6 +977,7 @@ Identifiers
   operator-char ::= 'n'                      // ! 'not'
   operator-char ::= 'o'                      // | 'or'
   operator-char ::= 'p'                      // + 'plus'
+  operator-char ::= 'q'                      // ? 'question'
   operator-char ::= 'r'                      // % 'remainder'
   operator-char ::= 's'                      // - 'subtract'
   operator-char ::= 't'                      // ~ 'tilde'

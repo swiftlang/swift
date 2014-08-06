@@ -49,6 +49,7 @@ static char mangleOperatorChar(char op) {
   case '!': return 'n'; // 'negate'
   case '|': return 'o'; // 'or'
   case '+': return 'p'; // 'plus'
+  case '?': return 'q'; // 'question'
   case '%': return 'r'; // 'remainder'
   case '-': return 's'; // 'subtract'
   case '~': return 't'; // 'tilde'
