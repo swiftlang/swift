@@ -1038,7 +1038,7 @@ namespace decls_block {
   >;
 
     using EffectsDeclAttrLayout = BCRecordLayout<
-    Inline_DECL_ATTR,
+    Effects_DECL_ATTR,
     BCFixed<2>  // modref value
     >;
 
