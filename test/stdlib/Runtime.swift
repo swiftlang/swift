@@ -4,6 +4,7 @@
 import Swift
 import StdlibUnittest
 import Foundation
+import CoreGraphics
 
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
