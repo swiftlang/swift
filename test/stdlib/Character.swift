@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 
@@ -194,6 +194,5 @@ CharacterTests.test("RoundTripping/Random") {
   }
 }
 
-CharacterTests.run()
-// CHECK: {{^}}Character: All tests passed
+runAllTests()
 

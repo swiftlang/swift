@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-build-swift -module-cache-path %t/clang-module-cache %s -o %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | FileCheck %s
+// RUN: %target-run %t/a.out
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -72,7 +72,8 @@ NSStringAPIs.test("pathWithComponents(_:)") {
       String.pathWithComponents(["flugelhorn", "baritone", "bass"]))
 }
 
-var existingPath = Process.arguments[1]
+// FIXME: creating a temporary file would be better.
+var existingPath = (String(__FILE__) + "/../Inputs/NSStringAPI_test.txt").stringByStandardizingPath
 var nonExistentPath = existingPath + "-NoNeXiStEnT"
 
 NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
@@ -1594,9 +1595,6 @@ NSStringAPIs.test("uppercaseString") {
   expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
 }
 
-NSStringAPIs.run()
-// CHECK: NSStringAPIs: All tests passed
-
 var CStringTests = TestCase("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {
@@ -1699,5 +1697,5 @@ CStringTests.test("String.fromCStringRepairingIllFormedUTF8") {
   }
 }
 
-CStringTests.run()
-// CHECK: {{^}}CStringTests: All tests passed
+runAllTests()
+

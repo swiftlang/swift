@@ -774,7 +774,7 @@ extension UTF16 {
     return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
   }
 
-  public static func copy<T: StringElementType, U: StringElementType>(
+  public static func copy<T : StringElementType, U : StringElementType>(
     source: UnsafeMutablePointer<T>,
     destination: UnsafeMutablePointer<U>, count: Int
   ) {

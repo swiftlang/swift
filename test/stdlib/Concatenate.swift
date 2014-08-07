@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run %t.out
 
 import Swift
 import StdlibUnittest
@@ -53,5 +53,5 @@ for (expected, source) in samples {
   }
 }
 
-ConcatenateTests.run()
-// CHECK: {{^}}ConcatenateTests: All tests passed
+runAllTests()
+

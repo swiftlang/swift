@@ -12,7 +12,7 @@
 
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/Join.swift
 // RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/Join.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/Join.swift -- FileCheck %t/Join.swift
+// RUN: %target-run %t/a.out
 
 import StdlibUnittest
 
@@ -445,6 +445,5 @@ JoinTestCase.test("OperatorPlus") {
   }
 }
 
-JoinTestCase.run()
-// CHECK: {{^}}Join: All tests passed
+runAllTests()
 

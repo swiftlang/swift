@@ -1,7 +1,19 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 import Foundation
+
+extension String {
+  var bufferID: UWord {
+    return unsafeBitCast(_core._owner, UWord.self)
+  }
+  var nativeCapacity: Int {
+    return _core.nativeBuffer!.capacity
+  }
+  var capacity: Int {
+    return _core.nativeBuffer?.capacity ?? 0
+  }
+}
 
 var StringTests = TestCase("StringTests")
 
@@ -91,16 +103,6 @@ StringTests.test("hasPrefix") {
   expectFalse("a\u{0301}bc".hasPrefix("a"))
   expectTrue("\u{00e1}bc".hasPrefix("a\u{0301}"))
   expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
-}
-
-
-extension String {
-  var bufferID: UWord {
-    return unsafeBitCast(_core._owner, UWord.self)
-  }
-  var capacity: Int {
-    return _core.nativeBuffer?.capacity ?? 0
-  }
 }
 
 StringTests.test("appendToSubstring") {
@@ -358,159 +360,83 @@ StringTests.test("reserveCapacity") {
   expectNotEqual(id1, s.bufferID)
 }
 
-StringTests.run()
-// CHECK: {{^}}StringTests: All tests passed
+StringTests.test("toInt") {
+  expectEmpty("".toInt())
+  expectEmpty("+".toInt())
+  expectEmpty("-".toInt())
+  expectOptionalEqual(20, "+20".toInt())
+  expectOptionalEqual(0, "0".toInt())
+  expectOptionalEqual(-20, "-20".toInt())
+  expectEmpty("-cc20".toInt())
+  expectEmpty("  -20".toInt())
+  expectEmpty("  \t 20ddd".toInt())
 
-func testStringToInt() {
-  println("test String to Int")
-  // CHECK: test String to Int
+  expectOptionalEqual(Int.min, "\(Int.min)".toInt())
+  expectOptionalEqual(Int.min + 1, "\(Int.min + 1)".toInt())
+  expectOptionalEqual(Int.max, "\(Int.max)".toInt())
+  expectOptionalEqual(Int.max - 1, "\(Int.max - 1)".toInt())
 
-  var s1 = "  \t 20ddd"
-  var i1 : Optional<Int> = s1.toInt()
-  if (i1 == nil) { println("none") } // CHECK-NEXT: none
+  expectEmpty("\(Int.min)0".toInt())
+  expectEmpty("\(Int.max)0".toInt())
 
-  if ("".toInt() == nil) { println("empty is none") }   // CHECK-NEXT: empty is none
-  if ("+".toInt() == nil) { println("+ is none") }      // CHECK-NEXT: + is none
-  if ("-".toInt() == nil) { println("- is none") }      // CHECK-NEXT: - is none
-  if ("+20".toInt()! == 20) { println("20") }     // CHECK-NEXT: 20
-  if ("0".toInt()! == 0) { println("0") }         // CHECK-NEXT: 0
-  if ("-20".toInt()! == -20) { println("-20") }   // CHECK-NEXT: -20
-  if ("-cc20".toInt() == nil) { println("none") }       // CHECK-NEXT: none
-  if ("  -20".toInt() == nil) { println("none") }       // CHECK-NEXT: none
-
-  if (String(Int.min).toInt()! == Int.min) {
-    println("round-trip Int.min")
-  }
-  // CHECK-NEXT: round-trip Int.min
-
-  if (String(Int.max).toInt()! == Int.max) {
-    println("round-trip Int.max")
-  }
-  // CHECK-NEXT: round-trip Int.max
-
-
-  // Make a String from an Int, mangle the String's characters, 
+  // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
-    initialValue: Int, 
-    modification: (inout chars: [UTF8.CodeUnit]) -> () ) 
+    initialValue: Int,
+    modification: (inout chars: [UTF8.CodeUnit]) -> () )
   {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
     var str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
-    var is_isnot = str.toInt() != nil ? "is" : "is not"
-    println("\(str) \(is_isnot) an Int")
+    expectEmpty(str.toInt())
   }
 
-  var minChars = String(Int.min).utf8
-
-  testConvertabilityOfStringWithModification(Int.min) { 
-    (inout chars: [UTF8.CodeUnit]) in ()
-  }
-  // CHECK-NEXT: {{-9223372036854775808|-2147483648}} is an Int
-
-  testConvertabilityOfStringWithModification(Int.min) { 
-    $0[$0.count-1]--; ()
-  }
-  // CHECK-NEXT: {{-9223372036854775807|-2147483647}} is an Int
-
-  testConvertabilityOfStringWithModification(Int.min) { 
-    $0[$0.count-1]++; ()  // underflow by one
-  }
-  // CHECK-NEXT: {{-9223372036854775809|-2147483649}} is not an Int
-
-  testConvertabilityOfStringWithModification(Int.min) { 
+  testConvertabilityOfStringWithModification(Int.min) {
     $0[2]++; ()  // underflow by lots
   }
-  // CHECK-NEXT: {{-9323372036854775808|-2247483648}} is not an Int
 
-  testConvertabilityOfStringWithModification(Int.min) { 
-    $0.append(Array("0".utf8)[0]); ()  // underflow by adding digits
-  }
-  // CHECK-NEXT: {{-92233720368547758080|-21474836480}} is not an Int
-
-
-  testConvertabilityOfStringWithModification(Int.max) { 
-    (inout chars: [UTF8.CodeUnit]) in ()
-  }
-  // CHECK-NEXT: {{9223372036854775807|2147483647}} is an Int
-
-  testConvertabilityOfStringWithModification(Int.max) { 
-    $0[$0.count-1]--; ()
-  }
-  // CHECK-NEXT: {{9223372036854775806|2147483646}} is an Int
-
-  testConvertabilityOfStringWithModification(Int.max) { 
-    $0[$0.count-1]++; ()  // overflow by one
-  }
-  // CHECK-NEXT: {{9223372036854775808|2147483648}} is not an Int
-
-  testConvertabilityOfStringWithModification(Int.max) { 
+  testConvertabilityOfStringWithModification(Int.max) {
     $0[1]++; ()  // overflow by lots
   }
-  // CHECK-NEXT: {{9323372036854775807|2247483647}} is not an Int
-
-  testConvertabilityOfStringWithModification(Int.max) { 
-    $0.append(Array("0".utf8)[0]); ()  // overflow by adding digits
-  }
-  // CHECK-NEXT: {{92233720368547758070|21474836470}} is not an Int
-
 
   // Test values lower than min.
-  var ui = UInt(Int.max) + 1
-  for index in 0..<20 {
-    ui = ui + UInt(index)
-    if ("-\(ui)".toInt()) != nil {
-      print(".")
-    } else {
-      print("*")
+  if true {
+    let base = UInt(Int.max)
+    expectOptionalEqual(Int.min + 1, "-\(base)".toInt())
+    expectOptionalEqual(Int.min, "-\(base + 1)".toInt())
+    for i in 2..<20 {
+      expectEmpty("-\(base + UInt(i))".toInt())
     }
   }
-  println("lower than min")
-  // CHECK-NEXT: .*******************lower than min
 
   // Test values greater than min.
-  ui = UInt(Int.max)
-  for index in 0..<20 {
-    ui = ui - UInt(index)
-    if ("-\(ui)".toInt()! == -Int(ui)) {
-      print(".")
-    } else {
-      print("*")
+  if true {
+    let base = UInt(Int.max)
+    for i in 0..<20 {
+      expectOptionalEqual(-Int(base - i) , "-\(base - i)".toInt())
     }
   }
-  println("greater than min")
-  // CHECK-NEXT: ....................greater than min
 
   // Test values greater than max.
-  ui = UInt(Int.max)
-  for index in 0..<20 {
-    ui = ui + UInt(index)
-    if (String(ui).toInt()) != nil {
-      print(".")
-    } else {
-      print("*")
+  if true {
+    let base = UInt(Int.max)
+    expectOptionalEqual(Int.max, "\(base)".toInt())
+    for i in 1..<20 {
+      expectEmpty("\(base + UInt(i))".toInt())
     }
   }
-  println("greater than max")
-  // CHECK-NEXT: .*******************greater than max
 
   // Test values lower than max.
-  ui = UInt(Int.max)
-  for index in 0..<20 {
-    ui = ui - UInt(index)
-    if (String(ui).toInt()! == Int(ui)) {
-      print(".")
-    } else {
-      print("*")
+  if true {
+    let base = UInt(Int.max)
+    for i in 0..<20 {
+      expectOptionalEqual(base - UInt(i), "\(base - UInt(i))".toInt())
     }
   }
-  println("lower than max")
-  // CHECK-NEXT: ....................lower than max
 }
 
 // Make sure strings don't grow unreasonably quickly when appended-to
-func testGrowth() {
+StringTests.test("growth") {
   var s = ""
   var s2 = s
 
@@ -518,69 +444,34 @@ func testGrowth() {
     s += "x"
     s2 = s
   }
-  // CHECK-NEXT: true
-  println(s._core.nativeBuffer!.capacity <= 34)
+  expectLE(s.nativeCapacity, 34)
 }
 
-testStringToInt()
-testGrowth()
+StringTests.test("UnicodeScalarView.compare") {
+  expectEqual(1, "hi".unicodeScalars.compare("bye".unicodeScalars))
+  expectEqual(-1, "bye".unicodeScalars.compare("hi".unicodeScalars))
+  expectEqual(0, "swift".unicodeScalars.compare("swift".unicodeScalars))
+  expectEqual(1, "a".unicodeScalars.compare("".unicodeScalars))
+  expectEqual(0, "a".unicodeScalars.compare("a".unicodeScalars))
+  expectEqual(-1, "a".unicodeScalars.compare("z".unicodeScalars))
+  expectEqual(1, "aa".unicodeScalars.compare("a".unicodeScalars))
+  expectEqual(-1, "a".unicodeScalars.compare("aa".unicodeScalars))
+  expectEqual(0, "".unicodeScalars.compare("".unicodeScalars))
+  expectEqual(-1, "a".unicodeScalars.compare("b".unicodeScalars))
+  expectEqual(1, "b".unicodeScalars.compare("a".unicodeScalars))
 
-func testCompare() {
-  // CHECK: testCompare
-  println("testCompare")
-  // CHECK: 1
-  println("hi".unicodeScalars.compare("bye".unicodeScalars))
-  // CHECK: -1
-  println("bye".unicodeScalars.compare("hi".unicodeScalars))
-  // CHECK: 0
-  println("swift".unicodeScalars.compare("swift".unicodeScalars))
-  // CHECK: 1
-  println("a".unicodeScalars.compare("".unicodeScalars))
-  // CHECK: 0
-  println("a".unicodeScalars.compare("a".unicodeScalars))
-  // CHECK: -1
-  println("a".unicodeScalars.compare("z".unicodeScalars))
-  // CHECK: 1
-  println("aa".unicodeScalars.compare("a".unicodeScalars))
-  // CHECK: -1
-  println("a".unicodeScalars.compare("aa".unicodeScalars))
-  // CHECK: 0
-  println("".unicodeScalars.compare("".unicodeScalars))
-  // CHECK: -1
-  println("a".unicodeScalars.compare("b".unicodeScalars))
-  // CHECK: 1
-  println("b".unicodeScalars.compare("a".unicodeScalars))
-  println("testCompare done")
-  // CHECK: testCompare done
+  expectEqual(1, "hi".unicodeScalars.compare("bye".unicodeScalars))
+  expectEqual(-1, "bye".unicodeScalars.compare("hi".unicodeScalars))
+  expectEqual(0, "ראשון".unicodeScalars.compare("ראשון".unicodeScalars))
+  expectEqual(1, "א".unicodeScalars.compare("".unicodeScalars))
+  expectEqual(0, "א".unicodeScalars.compare("א".unicodeScalars))
+  expectEqual(-1, "א".unicodeScalars.compare("ת".unicodeScalars))
+  expectEqual(1, "אא".unicodeScalars.compare("א".unicodeScalars))
+  expectEqual(-1, "א".unicodeScalars.compare("אא".unicodeScalars))
+  expectEqual(0, "".unicodeScalars.compare("".unicodeScalars))
+  expectEqual(-1, "א".unicodeScalars.compare("ב".unicodeScalars))
+  expectEqual(1, "ב".unicodeScalars.compare("א".unicodeScalars))
 }
-testCompare()
 
-func testCompareUnicode() {
-  // CHECK: testCompareUnicode
-  println("testCompareUnicode")
-  // CHECK: 1
-  println("hi".unicodeScalars.compare("bye".unicodeScalars))
-  // CHECK: -1
-  println("bye".unicodeScalars.compare("hi".unicodeScalars))
-  // CHECK: 0
-  println("ראשון".unicodeScalars.compare("ראשון".unicodeScalars))
-  // CHECK: 1
-  println("א".unicodeScalars.compare("".unicodeScalars))
-  // CHECK: 0
-  println("א".unicodeScalars.compare("א".unicodeScalars))
-  // CHECK: -1
-  println("א".unicodeScalars.compare("ת".unicodeScalars))
-  // CHECK: 1
-  println("אא".unicodeScalars.compare("א".unicodeScalars))
-  // CHECK: -1
-  println("א".unicodeScalars.compare("אא".unicodeScalars))
-  // CHECK: 0
-  println("".unicodeScalars.compare("".unicodeScalars))
-  // CHECK: -1
-  println("א".unicodeScalars.compare("ב".unicodeScalars))
-  // CHECK: 1
-  println("ב".unicodeScalars.compare("א".unicodeScalars))
-  println("testCompareUnicode done")
-  // CHECK: testCompareUnicode done
-}
-testCompareUnicode()
+runAllTests()
+

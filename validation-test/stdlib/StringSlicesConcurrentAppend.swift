@@ -1,5 +1,5 @@
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run %t.out
 
 import Swift
 import StdlibUnittest
@@ -109,6 +109,5 @@ StringTestCase.test("SliceConcurrentAppend") {
   barrierVar.dealloc(1)
 }
 
-StringTestCase.run()
-// CHECK: {{^}}String: All tests passed
+runAllTests()
 

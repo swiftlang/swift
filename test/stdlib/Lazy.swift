@@ -9,7 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
+
 import StdlibUnittest
 
 var LazyTestCase = TestCase("Lazy")
@@ -26,6 +27,5 @@ LazyTestCase.test("firstLast") {
   expectEmpty(lazy(7..<7).last)
 }
 
-LazyTestCase.run()
-// CHECK: {{^}}Lazy: All tests passed
+runAllTests()
 

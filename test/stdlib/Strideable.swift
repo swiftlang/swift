@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 
@@ -92,5 +92,5 @@ strideTestCase.test("Closed") {
   check(from: 1, through: -16, by: 3, sum: 0)
 }
 
-strideTestCase.run()
-// CHECK: {{^}}Strideable: All tests passed
+runAllTests()
+

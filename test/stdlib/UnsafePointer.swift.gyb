@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/UnsafePointer.swift
 // RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/UnsafePointer.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/UnsafePointer.swift -- FileCheck %t/UnsafePointer.swift
+// RUN: %target-run %t/a.out
 
 import StdlibUnittest
 
@@ -78,12 +78,5 @@ ${SelfName}TestCase.test("Hashable") {
 
 % end
 
-UnsafePointerTestCase.run()
-// CHECK: {{^}}UnsafePointer: All tests passed
-
-UnsafeMutablePointerTestCase.run()
-// CHECK: {{^}}UnsafeMutablePointer: All tests passed
-
-COpaquePointerTestCase.run()
-// CHECK: {{^}}COpaquePointer: All tests passed
+runAllTests()
 

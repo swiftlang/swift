@@ -9,8 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
-import Darwin
+// RUN: %target-run-simple-swift
+
 import StdlibUnittest
 
 var SliceableTests = TestCase("SliceableTests")
@@ -62,4 +62,5 @@ SliceableTests.test("prefixSuffix") {
   }
 }
 
-SliceableTests.run() // CHECK: {{^}}SliceableTests: All tests passed
+runAllTests()
+

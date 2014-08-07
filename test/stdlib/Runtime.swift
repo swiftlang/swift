@@ -1,5 +1,5 @@
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-run %t.out
 
 import Swift
 import StdlibUnittest
@@ -627,9 +627,6 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   }
 }
 
-Runtime.run()
-// CHECK: {{^}}Runtime: All tests passed
-
 var RuntimeFoundationWrappers = TestCase("RuntimeFoundationWrappers")
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
@@ -707,9 +704,6 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
   }
   expectEqual(0, nsStringCanaryCount)
 }
-
-RuntimeFoundationWrappers.run()
-// CHECK: {{^}}RuntimeFoundationWrappers: All tests passed
 
 var Reflection = TestCase("Reflection")
 
@@ -819,7 +813,5 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-Reflection.run()
-// CHECK: {{^}}Reflection: All tests passed
-
+runAllTests()
 

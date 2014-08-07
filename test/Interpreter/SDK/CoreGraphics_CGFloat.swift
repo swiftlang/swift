@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import CoreGraphics
 import Foundation
@@ -81,99 +81,69 @@ CGFloatTestCase.test("comparisons") {
   checkComparable(.EQ, x, y)
 }
 
-CGFloatTestCase.run()
-// CHECK: {{^}}CGFloat: All tests passed
 
-
-// CGFloat hashing
-func hashing() {
-  // CHECK-LABEL: hashing test
-  println("hashing test")
-
-  // CHECK-NEXT: hashValue = [[HASH_VALUE:[0-9]+]]
-  let flt = CGFloat(2.71828)
-  println("hashValue = \(flt.hashValue)")
-  
-}
-hashing()
-
-// Arithmetic
-func arithmetic() {
-  // CHECK-LABEL: arithmetic test
-  println("arithmetic test")
-
-  let x: CGFloat = 3.14
-  let y: CGFloat = 2.71
+CGFloatTestCase.test("arithmetic") {
+  let x: CGFloat = 0.25
+  let y: CGFloat = 4
   let z: CGFloat = 0.5
 
-  // CHECK-NEXT: 5.85
-  println(x + y)
+  expectEqual(4.25, x + y)
 
-  // CHECK-NEXT: 0.43
-  println(x - y)
+  expectEqual(-3.75, x - y)
 
-  // CHECK-NEXT: 8.5
-  println(x * y)
+  expectEqual(1.0, x * y)
 
-  // CHECK-NEXT: 1.15
-  println(x / y)
+  expectEqual(0.0625, x / y)
 
-  // CHECK-NEXT: 0.14
-  println(x % z)
+  expectEqual(0.25, x % z)
 }
-arithmetic()
 
-// Striding
-func striding() {
-  // CHECK-LABEL: striding test
-  println("striding test")
-
-  // CHECK-NEXT: 1.0
-  // CHECK-NEXT: 1.5
-  for f: CGFloat in stride(from: 1.0, to: 2.0, by: 0.5) {
-    println(f)
+CGFloatTestCase.test("striding") {
+  if true {
+    var result = [CGFloat]()
+    for f: CGFloat in stride(from: 1.0, to: 2.0, by: 0.5) {
+      result.append(f)
+    }
+    expectEqual([ 1.0, 1.5 ], result)
   }
 
-  // CHECK-NEXT: 1.0
-  // CHECK-NEXT: 1.5
-  // CHECK-NEXT: 2.0
-  for f: CGFloat in stride(from: 1.0, through: 2.0, by: 0.5) {
-    println(f)
+  if true {
+    var result = [CGFloat]()
+    for f: CGFloat in stride(from: 1.0, through: 2.0, by: 0.5) {
+      result.append(f)
+    }
+    expectEqual([ 1.0, 1.5, 2.0 ], result)
   }
 }
-striding()
 
-// Objective-C bridging to NSNumber.
-func bridging() {
-  // CHECK-LABEL: bridging test
-  println("bridging test")
+CGFloatTestCase.test("bridging") {
+  // Bridging to NSNumber.
+  if true {
+    let flt: CGFloat = 4.125
 
-  var flt: CGFloat = 3.14159
+    // CGFloat -> NSNumber conversion.
+    let nsnum: NSNumber = flt
+    expectEqual("4.125", "\(nsnum)")
 
-  // CGFloat -> NSNumber conversion.
-  // CHECK-NEXT: 3.14
-  var num: NSNumber = flt
-  println(num)
-
-  // NSNumber -> CGFloat
-  // CHECK-NEXT: 3.14
-  flt = num
-  println(flt)
+    // NSNumber -> CGFloat
+    let bridgedBack: CGFloat = nsnum
+    expectEqual(flt, bridgedBack)
+  }
 
   // Array bridging.
-  var arr: [CGFloat] = [3.14159, 2.71818]
-    
-  // Array -> NSArray
-  // CHECK-NEXT: (
-  // CHECK-NEXT:   "3.14
-  // CHECK-NEXT:   "2.71
-  // CHECK-NEXT: )
-  let nsarr: NSArray = arr
-  println(nsarr)
+  if true {
+    let originalArray: [CGFloat] = [ 4.125, 10.625 ]
 
-  // CHECK-NEXT: [3.14{{[0-9]*}}, 2.71{{[0-9]*}}]
-  arr = nsarr as [CGFloat]
-  println(arr)
+    // Array -> NSArray
+    let nsarr: NSArray = originalArray
+    expectEqual(2, nsarr.count)
+    expectEqual("4.125", "\(nsarr[0])")
+    expectEqual("10.625", "\(nsarr[1])")
+
+    // NSArray -> Array
+    expectEqualSequence(originalArray, nsarr as [CGFloat])
+  }
 }
-bridging()
+
+runAllTests()
 

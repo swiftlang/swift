@@ -4,10 +4,12 @@ set(SWIFTUNITTEST_SOURCES
   # filename.
   StdlibUnittest.swift.gyb
 
+  DarwinExtras.swift
   GetOSVersion.mm
   InterceptTraps.cpp
   PthreadBarriers.swift
   PthreadWrappers.swift
+  StdlibCoreExtras.swift
   SwiftBlockToCFunctionThunks.cpp
 )
 

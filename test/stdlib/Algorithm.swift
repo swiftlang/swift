@@ -1,55 +1,40 @@
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
-// RUN: %target-run %t.out | FileCheck %s
+// RUN: %target-build-swift -Xfrontend -disable-access-control %s -o %t.out
+// RUN: %target-run %t.out
 
 import StdlibUnittest
-import Swift
 
 var Algorithm = TestCase("Algorithm")
 
-typealias CodePoints = String.UnicodeScalarView
+extension String.UnicodeScalarView : Equatable {}
 
-extension CodePoints {
-  init(_ x: String) {
-    self = x.unicodeScalars
-  }
+public func == (
+  lhs: String.UnicodeScalarView, rhs: String.UnicodeScalarView) -> Bool {
+  return Array(lhs) == Array(rhs)
 }
 
-func print(x: CodePoints) { print(String(x._core)) }
-func println(x: CodePoints) { println(String(x._core)) }
+Algorithm.test("split") {
+  expectEqual(
+    [ "foo", "  bar baz " ].map { $0.unicodeScalars },
+    split("  foo   bar baz ".unicodeScalars, { $0._isSpace() }, maxSplit: 1))
 
-func println(x: [CodePoints]) {
-  print("[ ")
-  var prefix=""
-  for s in x {
-    print(prefix)
-    print("\"")
-    print(s)
-    print("\"")
-    prefix = ", "
-  }
-  println(" ]")
+  expectEqual(
+    [ "foo", "bar", "baz" ].map { $0.unicodeScalars },
+    split(
+      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
+      allowEmptySlices: false))
+
+  expectEqual(
+    [ "", "", "foo", "", "", "bar", "baz", "" ].map { $0.unicodeScalars },
+    split(
+      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
+      allowEmptySlices: true))
+
+  expectEqual(
+    [ "", "", "foo   bar baz " ].map { $0.unicodeScalars },
+    split(
+      "  foo   bar baz ".unicodeScalars, { $0._isSpace() },
+      allowEmptySlices: true, maxSplit: 2))
 }
-
-func testSplit() {
-  // CHECK: testing split
-  println("testing split")
-  
-  // CHECK-NEXT: [ "foo", "  bar baz " ]
-  println(split(CodePoints("  foo   bar baz "), { $0._isSpace() }, maxSplit:1))
-
-  // CHECK-NEXT: [ "foo", "bar", "baz" ]
-  println(split(CodePoints("  foo   bar baz "), { $0._isSpace() }, allowEmptySlices: false))
-
-  // CHECK-NEXT: [ "", "", "foo", "", "", "bar", "baz", "" ]
-  println(split(CodePoints("  foo   bar baz "), { $0._isSpace() }, allowEmptySlices: true))
-
-  // FIXME: Disabled pending <rdar://problem/15736729> and <rdar://problem/15733855>
-  // CHECK-NEXT-DISABLED: [ "", "", "foo   bar baz " ]
-  // println(split(CodePoints("  foo   bar baz "), { $0._isSpace() }, true, maxSplit:2))
-
-  println("done.")
-}
-testSplit()
 
 struct StartsWithTest {
   let expected: Bool
@@ -106,92 +91,54 @@ Algorithm.test("startsWith") {
   }
 }
 
-func testEnumerate() {
-  println("testing enumerate")
-  // CHECK: testing enumerate
+Algorithm.test("enumerate") {
+  var result = [String]()
   for (i, s) in enumerate( "You will never retrieve the necronomicon!"._split(" ") ) {
-      println("\(i): \(s)")
+    result.append("\(i) \(s)")
   }
-  // CHECK-NEXT: 0: You
-  // CHECK-NEXT: 1: will
-  // CHECK-NEXT: 2: never
-  // CHECK-NEXT: 3: retrieve
-  // CHECK-NEXT: 4: the
-  // CHECK-NEXT: 5: necronomicon!
-  println("done.")
+  expectEqual(
+    [ "0 You", "1 will", "2 never", "3 retrieve", "4 the", "5 necronomicon!" ],
+    result)
 }
-testEnumerate()
 
-func testEqual() {
-  // CHECK: testing equal
-  println("testing equal")
+Algorithm.test("equal") {
   var _0_4 = [0, 1, 2, 3]
-  // CHECK-NEXT: false
-  println(equal(_0_4, 0..<3))
-  // CHECK-NEXT: true
-  println(equal(_0_4, 0..<4))
-  // CHECK-NEXT: false
-  println(equal(_0_4, 0..<5))
-  // CHECK-NEXT: false
-  println(equal(_0_4, 1..<4))
-  println("done.")
+  expectFalse(equal(_0_4, 0..<3))
+  expectTrue(equal(_0_4, 0..<4))
+  expectFalse(equal(_0_4, 0..<5))
+  expectFalse(equal(_0_4, 1..<4))
 }
-testEqual()
 
-func testEqualPred() {
-  // CHECK: testing equal with predicate
-  println("testing equal with predicate")
+Algorithm.test("equal/predicate") {
   func compare(lhs: (Int, Int), rhs: (Int, Int)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
+
   var _0_4 = [(0, 10), (1, 11), (2, 12), (3, 13)]
-  // CHECK-NEXT: false
-  println(equal(_0_4, [(0, 10), (1, 11), (2, 12)], compare))
-  // CHECK-NEXT: true
-  println(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13)], compare))
-  // CHECK-NEXT: false
-  println(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13), (4, 14)], compare))
-  // CHECK-NEXT: false
-  println(equal(_0_4, [(1, 11), (2, 12), (3, 13)], compare))
-  println("done.")
+  expectFalse(equal(_0_4, [(0, 10), (1, 11), (2, 12)], compare))
+  expectTrue(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13)], compare))
+  expectFalse(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13), (4, 14)], compare))
+  expectFalse(equal(_0_4, [(1, 11), (2, 12), (3, 13)], compare))
 }
-testEqualPred()
 
-func testContains() {
-  // CHECK: testing contains
-  println("testing contains")
+Algorithm.test("contains") {
   let _0_4 = [0, 1, 2, 3]
-  // CHECK-NEXT: false
-  println(contains(_0_4, 7))
-  // CHECK-NEXT: true
-  println(contains(_0_4, 2))
-  // CHECK-NEXT: false
-  println(contains(_0_4, { $0 - 10 > 0  }))
-  // CHECK-NEXT: true
-  println(contains(_0_4, { $0 % 3 == 0 }))
-  println("done.")
-  
+  expectFalse(contains(_0_4, 7))
+  expectTrue(contains(_0_4, 2))
+  expectFalse(contains(_0_4, { $0 - 10 > 0  }))
+  expectTrue(contains(_0_4, { $0 % 3 == 0 }))
 }
-testContains()
 
-func testMinMax() {
-  // CHECK: testing min max
-  println("testing min max")
-  // CHECK-NEXT: 2
-  println(min(3, 2))
-  // CHECK-NEXT: 3
-  println(min(3, 7, 5))
-  // CHECK-NEXT: 3
-  println(max(3, 2))
-  // CHECK-NEXT: 7
-  println(max(3, 7, 5))
+Algorithm.test("min,max") {
+  expectEqual(2, min(3, 2))
+  expectEqual(3, min(3, 7, 5))
+  expectEqual(3, max(3, 2))
+  expectEqual(7, max(3, 7, 5))
 
   // FIXME: add tests that check that min/max return the
   // first element of the sequence (by reference equailty) that satisfy the
   // condition.
 }
-
-testMinMax()
 
 Algorithm.test("minElement,maxElement") {
   var arr = [Int](count: 10, repeatedValue: 0)
@@ -212,33 +159,28 @@ Algorithm.test("minElement,maxElement") {
   // condition.
 }
 
-func testFilter() {
+Algorithm.test("filter/eager") {
+  // Make sure filter is eager and only calls its predicate once per element.
   var count = 0
-  
-  // Make sure filter is eager and only calls its predicate once per
-  // element.
   let one = filter(0..<10) {
     (x: Int)->Bool in ++count; return x == 1
   }
-  // CHECK-NEXT: <10>
-  for x in one {
-    println("<\(count)>")
-  }
-  // CHECK-NEXT: <10>
-  for x in one {
-    println("<\(count)>")
-  }
+  for x in one {}
+  expectEqual(10, count)
+  for x in one {}
+  expectEqual(10, count)
 }
-testFilter()
 
 Algorithm.test("sorted") {
-  expectEqual([ "Banana", "apple", "cherry" ],
-      sorted([ "apple", "Banana", "cherry" ]))
+  expectEqual(
+    [ "Banana", "apple", "cherry" ],
+    sorted([ "apple", "Banana", "cherry" ]))
 
-  expectEqual([ "Banana", "cherry", "apple" ],
-      sorted(["apple", "Banana", "cherry"]) {
-        countElements($0) > countElements($1)
-      })
+  expectEqual(
+    [ "Banana", "cherry", "apple" ],
+    sorted(["apple", "Banana", "cherry"]) {
+      countElements($0) > countElements($1)
+    })
 }
 
 // A wrapper around Array<T> that disables any type-specific algorithm
@@ -336,9 +278,5 @@ Algorithm.test("invalidOrderings") {
   }
 }
 
-Algorithm.run()
-// CHECK: {{^}}Algorithm: All tests passed
-
-// CHECK-NEXT: all done.
-println("all done.")
+runAllTests()
 

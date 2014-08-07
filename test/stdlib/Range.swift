@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 
@@ -39,7 +39,7 @@ struct X<T: ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
   var debugDescription: String {
     return "X(\(toDebugString(a)))"
   }
-  
+
   var a: T
 }
 
@@ -50,43 +50,32 @@ func == <T: ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
 RangeTestCase.test("Printing") {
   expectEqual("0..<10", toString(X(0)..<X(10)))
   expectEqual("Range(X(0)..<X(10))", toDebugString(Range(X(0)..<X(10))))
-  
+
   // No separate representation for closed Ranges yet
-  expectEqual("10..<42", toString(X(10)...X(41))) 
+  expectEqual("10..<42", toString(X(10)...X(41)))
   expectEqual("Range(X(10)..<X(42))", toDebugString(Range(X(10)...X(41))))
 }
 
 RangeTestCase.test("Pattern matching") {
   let x = 0..<20
-  // FIXME: These don't work yet: <rdar://problem/17668465> 
+  // FIXME: These don't work yet: <rdar://problem/17668465>
   // expectTrue(x ~= 10)
   // expectFalse(x ~= 20)
   // expectFalse(x ~= -1)
 }
 
-RangeTestCase.run()
-// CHECK: {{^}}Range: All tests passed
-
-//===---
-// Misc tests.
-//===---
-
-// CHECK: testing...
-println("testing...")
-
-for i in stride(from: 1.4, through: 3.4, by: 1) { println(i) }
-// CHECK-NEXT: 1.4
-// CHECK-NEXT: 2.4
-// CHECK-NEXT: 3.4
-
-
-// <rdar://problem/17054014> map method should exist on ranges
-for i in ((1...3).map {$0*2}) {
-  println(i)
+RangeTestCase.test("stride") {
+  var result = [Double]()
+  for i in stride(from: 1.4, through: 3.4, by: 1) {
+    result.append(i)
+  }
+  expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
-// CHECK-NEXT: 2
-// CHECK-NEXT: 4
-// CHECK-NEXT: 6
 
-// CHECK-NEXT: done.
-println("done.")
+RangeTestCase.test("map") {
+  // <rdar://problem/17054014> map method should exist on ranges
+  expectEqual([ 2, 4, 6 ], Array((1...3).map {$0*2}))
+}
+
+runAllTests()
+

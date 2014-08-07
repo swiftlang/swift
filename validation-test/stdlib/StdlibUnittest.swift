@@ -1,21 +1,10 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
-import Darwin
 import StdlibUnittest
 
-//
-// Test OS version parsing
-//
-
-// CHECK: (10, 0, 0)
-println(_parseDottedVersionTriple("10"))
-
-// CHECK: (10, 9, 0)
-println(_parseDottedVersionTriple("10.9"))
-
-// CHECK: (10, 9, 3)
-println(_parseDottedVersionTriple("10.9.3"))
+_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
+_setTestCaseFailedCallback() { println("abort()") }
 
 //
 // Test that harness aborts when a test fails
@@ -25,8 +14,6 @@ var TestCasePasses = TestCase("TestCasePasses")
 TestCasePasses.test("passes") {
   expectEqual(1, 1)
 }
-_setTestCaseFailedCallback() { abort() }
-TestCasePasses.run()
 // CHECK: [       OK ] TestCasePasses.passes{{$}}
 // CHECK: TestCasePasses: All tests passed
 
@@ -34,9 +21,6 @@ var TestCaseUXPasses = TestCase("TestCaseUXPasses")
 TestCaseUXPasses.testXFail("uxpasses", xfail: [.OSXAny("")]) {
   expectEqual(1, 1)
 }
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-TestCaseUXPasses.run()
 // CHECK: [   UXPASS ] TestCaseUXPasses.uxpasses{{$}}
 // CHECK: TestCaseUXPasses: Some tests failed, aborting
 // CHECK: UXPASS: [uxpasses]
@@ -48,9 +32,6 @@ var TestCaseFails = TestCase("TestCaseFails")
 TestCaseFails.test("fails") {
   expectEqual(1, 2)
 }
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-TestCaseFails.run()
 // CHECK: [     FAIL ] TestCaseFails.fails{{$}}
 // CHECK: TestCaseFails: Some tests failed, aborting
 // CHECK: UXPASS: []
@@ -62,8 +43,6 @@ var TestCaseXFails = TestCase("TestCaseXFails")
 TestCaseXFails.testXFail("xfails", xfail: [.OSXAny("")]) {
   expectEqual(1, 2)
 }
-_setTestCaseFailedCallback() { abort() }
-TestCaseXFails.run()
 // CHECK: [    XFAIL ] TestCaseXFails.xfails{{$}}
 // CHECK: TestCaseXFails: All tests passed
 
@@ -109,9 +88,6 @@ XFailsAndSkips.testSkip("skip 10.9.3", skip: [.OSXBugFix(10, 9, 3, reason: "")])
   fatalError("should not be executed")
 }
 
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-XFailsAndSkips.run()
 // CHECK: XFailsAndSkips: Some tests failed, aborting
 // CHECK: abort()
 
@@ -131,8 +107,6 @@ XFailsCustomPredicates.testXFail("not matches", xfail: [.Custom({ false }, reaso
   expectEqual(1, 1)
 }
 
-_setTestCaseFailedCallback() { abort() }
-XFailsCustomPredicates.run()
 // CHECK: XFailsCustomPredicates: All tests passed
 
 //
@@ -201,95 +175,53 @@ XFailsOSX.testXFail("xfail 10.9.[3-4]", xfail: [.OSXBugFixRange(10, 9, 3...4, re
   expectEqual(1, 2)
 }
 
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-XFailsOSX.run()
 // CHECK: XFailsOSX: Some tests failed, aborting
 // CHECK: abort()
 
-var XFailsIOS = TestCase("XFailsIOS")
+//
+// Check that we pass through stdout and stderr
+//
 
-// CHECK: [   UXPASS ] XFailsIOS.xfail iOS passes{{$}}
-XFailsIOS.testXFail("xfail iOS passes", xfail: [.iOSAny("")]) {
-  expectEqual(1, 1)
+var PassThroughStdoutStderr = TestCase("PassThroughStdoutStderr")
+
+PassThroughStdoutStderr.test("hasNewline") {
+  println("stdout first")
+  println("stdout second")
+  println("stdout third")
+
+  var stderr = _Stderr()
+  println("stderr first", &stderr)
+  println("stderr second", &stderr)
+  println("stderr third", &stderr)
 }
+// CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
+// CHECK: out>>> stdout first
+// CHECK: out>>> stdout second
+// CHECK: out>>> stdout third
+// CHECK: err>>> stderr first
+// CHECK: err>>> stderr second
+// CHECK: err>>> stderr third
+// CHECK: [       OK ] PassThroughStdoutStderr.hasNewline
 
-// CHECK: [    XFAIL ] XFailsIOS.xfail iOS fails{{$}}
-XFailsIOS.testXFail("xfail iOS fails", xfail: [.iOSAny("")]) {
-  expectEqual(1, 2)
+PassThroughStdoutStderr.test("noNewline") {
+  println("stdout first")
+  println("stdout second")
+  print("stdout third")
+
+  var stderr = _Stderr()
+  println("stderr first", &stderr)
+  println("stderr second", &stderr)
+  print("stderr third", &stderr)
 }
+// CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
+// CHECK: out>>> stdout first
+// CHECK: out>>> stdout second
+// CHECK: out>>> stdout third
+// CHECK: err>>> stderr first
+// CHECK: err>>> stderr second
+// CHECK: err>>> stderr third
+// CHECK: [       OK ] PassThroughStdoutStderr.noNewline
+// CHECK: PassThroughStdoutStderr: All tests passed
 
-// CHECK: [       OK ] XFailsIOS.xfail 9.*{{$}}
-XFailsIOS.testXFail("xfail 9.*", xfail: [.iOSMajor(9, reason: "")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOS.xfail 10.*{{$}}
-XFailsIOS.testXFail("xfail 10.*", xfail: [.iOSMajor(10, reason: "")]) {
-  expectEqual(1, 2)
-}
-
-// CHECK: [       OK ] XFailsIOS.xfail 10.8{{$}}
-XFailsIOS.testXFail("xfail 10.8", xfail: [.iOSMinor(10, 8, reason: "")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOS.xfail 10.9{{$}}
-XFailsIOS.testXFail("xfail 10.9", xfail: [.iOSMinor(10, 9, reason: "")]) {
-  expectEqual(1, 2)
-}
-
-// CHECK: [       OK ] XFailsIOS.xfail 10.[7-8]{{$}}
-XFailsIOS.testXFail("xfail 10.[7-8]", xfail: [.iOSMinorRange(10, 7...8, reason: "")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOS.xfail 10.[9-10]{{$}}
-XFailsIOS.testXFail("xfail 10.[9-10]", xfail: [.iOSMinorRange(10, 9...10, reason: "")]) {
-  expectEqual(1, 2)
-}
-
-// CHECK: [       OK ] XFailsIOS.xfail 10.9.2{{$}}
-XFailsIOS.testXFail("xfail 10.9.2", xfail: [.iOSBugFix(10, 9, 2, reason: "")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOS.xfail 10.9.3{{$}}
-XFailsIOS.testXFail("xfail 10.9.3", xfail: [.iOSBugFix(10, 9, 3, reason: "")]) {
-  expectEqual(1, 2)
-}
-
-// CHECK: [       OK ] XFailsIOS.xfail 10.9.[1-2]{{$}}
-XFailsIOS.testXFail("xfail 10.9.[1-2]", xfail: [.iOSBugFixRange(10, 9, 1...2, reason: "")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOS.xfail 10.9.[3-4]{{$}}
-XFailsIOS.testXFail("xfail 10.9.[3-4]", xfail: [.iOSBugFixRange(10, 9, 3...4, reason: "")]) {
-  expectEqual(1, 2)
-}
-
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.iOS(major: 10, minor: 9, bugFix: 3))
-XFailsIOS.run()
-// CHECK: XFailsIOS: Some tests failed, aborting
-// CHECK: abort()
-
-var XFailsIOSSimulator = TestCase("XFailsIOSSimulator")
-
-// CHECK: [   UXPASS ] XFailsIOSSimulator.xfail iOS Simulator passes{{$}}
-XFailsIOSSimulator.testXFail("xfail iOS Simulator passes", xfail: [.iOSSimulatorAny("")]) {
-  expectEqual(1, 1)
-}
-
-// CHECK: [    XFAIL ] XFailsIOSSimulator.xfail iOS Simulator fails{{$}}
-XFailsIOSSimulator.testXFail("xfail iOS Simulator fails", xfail: [.iOSSimulatorAny("")]) {
-  expectEqual(1, 2)
-}
-
-_setTestCaseFailedCallback() { println("abort()") }
-_setOverrideOSVersion(.iOSSimulator)
-XFailsIOSSimulator.run()
-// CHECK: XFailsIOSSimulator: Some tests failed, aborting
-// CHECK: abort()
+runAllTests()
 

@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 import Foundation
@@ -23,6 +23,5 @@ nsValueBridging.test("NSRange") {
   expectEqual(19, swiftValue.length)
 }
 
-nsValueBridging.run()
+runAllTests()
 
-// CHECK: {{^}}NSValueBridging: All tests passed
