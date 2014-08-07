@@ -51,6 +51,7 @@ module Properties {
 }
 
 module Security {
+  header "Authorization.h"
   header "SecItem.h"
   export *
 }

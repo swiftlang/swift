@@ -917,6 +917,13 @@ namespace {
 /// Classify a potential CF typedef.
 CFPointeeInfo
 CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
+  bool isKnownNonCFType = llvm::StringSwitch<bool>(typedefDecl->getName())
+#define NON_CF(NAME) .Case(#NAME, true)
+#include "CFExclusions.def"
+    .Default(false);
+  if (isKnownNonCFType)
+    return forInvalid();
+
   clang::QualType type = typedefDecl->getUnderlyingType();
 
   if (auto subTypedef = type->getAs<clang::TypedefType>()) {
@@ -947,9 +954,11 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
 }
 
 static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
-  if (Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX))
-    if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
-      return pointee.isValid();
+  if (!Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX))
+    return false;
+
+  if (auto pointee = CFPointeeInfo::classifyTypedef(Decl))
+    return pointee.isValid();
   return false;
 }
 

@@ -18,3 +18,9 @@ func testIntegration() {
     println("Got: \(str)")
   }
 }
+
+func testAuthorizationIsNotCF() {
+  var auth = AuthorizationRef()
+  _ = AuthorizationCreate(&auth)
+  _ = AuthorizationFree(auth)
+}
