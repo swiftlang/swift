@@ -72,10 +72,10 @@ enum class InlineKind : uint8_t {
 
 /// This enum represents the possible values of the @effects attribute.
 enum class EffectsKind : uint8_t {
-  Unspecified = 0,
-  ReadNone = 1,
-  ReadOnly = 2,
-  ReadWrite = 3
+  ReadNone,
+  ReadOnly,
+  ReadWrite,
+  Unspecified
 };
 
 class InfixData {
