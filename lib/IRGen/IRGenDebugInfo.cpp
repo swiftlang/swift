@@ -774,7 +774,7 @@ void IRGenDebugInfo::eraseFunction(llvm::Function *Fn) {}
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   // Imports are visited after SILFunctions.
   llvm::DIScope Module = MainFile;
-  swift::Module *M = IGM.Context.getModule(D->getFullAccessPath());
+  swift::Module *M = IGM.Context.getModule(D->getModulePath());
   assert(M && "Could not find module for import decl.");
   if (!M)
     return;
