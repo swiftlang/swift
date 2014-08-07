@@ -39,19 +39,19 @@
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}
-  
+
   var count: Int { return 2 }
-  
+
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("${Children[0]}",reflect(_value.${Children[0]}))
-    case 0: return ("${Children[1]}",reflect(_value.${Children[1]}))
+    case 1: return ("${Children[1]}",reflect(_value.${Children[1]}))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
-  
+
   var summary: String { return "(${SummaryString})" }
-  
+
   var quickLookObject: QuickLookObject? { return .Some(.${QLTag}(${QLArgString})) }
 }
 

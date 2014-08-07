@@ -770,6 +770,50 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   expectEqual(expected, output)
 }
 
+Reflection.test("CGPoint") {
+  var output = ""
+  dump(CGPoint(x: 1.25, y: 2.75), &output)
+
+  var expected = ""
+  expected += "▿ (1.25,2.75)\n"
+  expected += "  - x: 1.25\n"
+  expected += "  - y: 2.75\n"
+
+  expectEqual(expected, output)
+}
+
+Reflection.test("CGSize") {
+  var output = ""
+  dump(CGSize(width: 1.25, height: 2.75), &output)
+
+  var expected = ""
+  expected += "▿ (1.25,2.75)\n"
+  expected += "  - width: 1.25\n"
+  expected += "  - height: 2.75\n"
+
+  expectEqual(expected, output)
+}
+
+Reflection.test("CGRect") {
+  var output = ""
+  dump(
+    CGRect(
+      origin: CGPoint(x: 1.25, y: 2.25),
+      size: CGSize(width: 10.25, height: 11.75)),
+    &output)
+
+  var expected = ""
+  expected += "▿ (1.25,2.25,10.25,11.75)\n"
+  expected += "  ▿ origin: (1.25,2.25)\n"
+  expected += "    - x: 1.25\n"
+  expected += "    - y: 2.25\n"
+  expected += "  ▿ size: (10.25,11.75)\n"
+  expected += "    - width: 10.25\n"
+  expected += "    - height: 11.75\n"
+
+  expectEqual(expected, output)
+}
+
 Reflection.test("TupleMirror/NoLeak") {
   if true {
     nsObjectCanaryCount = 0
