@@ -247,16 +247,6 @@ Dictionary
 ~~~~~~~~~~
 TBD.
 
-Other semantic attributes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-readonly
-
-  Marking a function with @semantics("readonly") indicates that the function computes its result strictly based on its arguments.
-  The function may dereference memory based on pointer arguments but it may not mutate any state.
-  Readonly functions do not write through any pointer arguments and never change any state visible to callers.
-
-
 @effects attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
