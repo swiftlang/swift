@@ -15,6 +15,7 @@
 #endif
 
 NON_CF(AuthorizationRef)
+NON_CF(CCCryptorRef)
 NON_CF(CFPlugInRef)
 NON_CF(ExtAudioFileRef)
 
