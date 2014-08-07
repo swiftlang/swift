@@ -279,10 +279,11 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Replace the switch with a branch to the TheSuccessorBlock.
       SILBuilder B(&BB);
       SILLocation Loc = TI->getLoc();
-      if (TheEnum->hasOperand())
+      if (!TheSuccessorBlock->bbarg_empty()) {
+        assert(TheEnum->hasOperand());
         B.createBranch(Loc, TheSuccessorBlock,
                        TheEnum->getOperand());
-      else
+      } else
         B.createBranch(Loc, TheSuccessorBlock);
 
       // Produce diagnostic info if we are not within an inlined function or
