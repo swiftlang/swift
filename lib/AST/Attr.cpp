@@ -239,11 +239,13 @@ StringRef DeclAttribute::getAttrName() const {
     return "availability";
   case DAK_ObjC:
     return "objc";
-  case DAK_Inline:
+  case DAK_Inline: {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
     }
+    llvm_unreachable("Invalid inline kind");
+  }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
