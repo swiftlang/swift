@@ -33,7 +33,8 @@ public protocol StaticStringType : AssertStringType {}
 public struct StaticString
   : StaticStringType,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinStringLiteralConvertible {
+    _BuiltinStringLiteralConvertible,
+    Printable {
   var _start: Builtin.RawPointer
   var _byteSize: Builtin.Word
   var _isASCII: Builtin.Int1
@@ -107,12 +108,16 @@ public struct StaticString
   ) -> StaticString {
     return value
   }
+
+  public var description: String {
+    return self.stringValue
+  }
 }
 
 /// A String-like type that can be constructed from string interpolation, and
 /// is considered less specific than `StaticString` in overload resolution.
-public struct AssertString : AssertStringType, StringInterpolationConvertible {
-
+public struct AssertString
+  : AssertStringType, StringInterpolationConvertible, Printable {
   public var stringValue: String
 
   @transparent
@@ -156,6 +161,10 @@ public struct AssertString : AssertStringType, StringInterpolationConvertible {
     expr: T
   ) -> AssertString {
     return AssertString(String.convertFromStringInterpolationSegment(expr))
+  }
+
+  public var description: String {
+    return self.stringValue
   }
 }
 
