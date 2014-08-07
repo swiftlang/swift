@@ -4373,6 +4373,32 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
 RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
                                                   SGFContext C) {
+  // This is an awful hack. Because we don't have failing initializers yet, we
+  // promote the following workaround for an ObjC initializer that might
+  // fail:
+  //
+  //   let x: NSFoo? = NSFoo(potentiallyFailingInit: x)
+  //
+  // However, our optimizer is smart enough now to recognize that an initializer
+  // can "never" produce nil, and will optimize away any attempts to check the
+  // resulting optional for nil. As a special case, when we're injecting the
+  // result of an ObjC constructor into an optional, do it using an unchecked
+  // bitcast, which is opaque to the optimizer.
+  if (auto apply = dyn_cast<ApplyExpr>(E->getSubExpr()))
+    if (auto constructorCall = dyn_cast<ConstructorRefCallExpr>(apply->getFn())) {
+      auto constructorRef = cast<DeclRefExpr>(constructorCall->getFn());
+      auto constructor = cast<ConstructorDecl>(constructorRef->getDecl());
+      if (constructor->isObjC()) {
+        auto result = SGF.emitRValue(E->getSubExpr())
+          .getAsSingleValue(SGF, E->getSubExpr());
+        auto optType = SGF.getLoweredLoadableType(E->getType());
+        SILValue bitcast = SGF.B.createUncheckedRefBitCast(E, result.getValue(),
+                                                           optType);
+        ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
+        return RValue(SGF, E, bitcastMV);
+      }
+    }
+  
   // Create a buffer for the result.  Abstraction difference will
   // force this to be returned indirectly from
   // _injectValueIntoOptional anyway, so there's not much point

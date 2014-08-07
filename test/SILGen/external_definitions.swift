@@ -15,11 +15,10 @@ hasNoPrototype()
 // CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___S_ : $@thin (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned Ansible
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectCfMS_FT_S_ : $@thin (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
-// CHECK:   store [[ANSIBLE]]
-// CHECK:   [[ANSIBLE:%.*]] = load {{.*}} : $*ImplicitlyUnwrappedOptional<Ansible>
-// CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
+// CHECK:   [[OANSIBLE:%.*]] = unchecked_ref_bit_cast [[ANSIBLE]]
+// CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[OANSIBLE]])
 // CHECK:   retain_autoreleased [[NSANSE_RESULT]]
-// CHECK:   release_value [[ANSIBLE]]
+// CHECK:   strong_release [[ANSIBLE]]
 // -- Referencing unapplied C function goes through a thunk
 // CHECK:   [[NSANSE:%.*]] = function_ref @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@thin (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 // -- Referencing unprototyped C function passes no parameters
