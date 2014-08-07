@@ -236,6 +236,11 @@ public:
   /// \return the function side effects information.
   EffectsKind getEffectsInfo() const { return EK; }
 
+  /// \return True if the function is annotated with the @effects attribute.
+  bool hasSpecifiedEffectsInfo() const {
+    return EK != EffectsKind::Unspecified;
+  }
+
   /// \brief Set the function side effect information.
   void setEffectsInfo(EffectsKind E) { EK = E; }
 

@@ -32,8 +32,9 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 namespace {
 
-  // Controls the decision to inline functions with semantics attribute.
-  enum class InlineFuncSemanticsKind {
+  // Controls the decision to inline functions with @semantics and @effect
+  // attributes.
+  enum class InlineFuncWithAttrKind {
     Inline,
     DontInline
   };
@@ -45,14 +46,13 @@ namespace {
     SILModule::LinkingMode LinkMode;
     /// If set to true then the inliner is allowed to inline function calls
     /// that are marked with the @semantics attribute.
-    InlineFuncSemanticsKind InlineFunctionsWithSemantics;
+    InlineFuncWithAttrKind InlineFuncWithAttr;
 
   public:
-    SILPerformanceInliner(unsigned threshold,
-                          SILModule::LinkingMode M,
-                          InlineFuncSemanticsKind InlineFuncWithSemantics)
+    SILPerformanceInliner(unsigned threshold, SILModule::LinkingMode M,
+                          InlineFuncWithAttrKind InlineAttr)
       : InlineCostThreshold(threshold), LinkMode(M),
-    InlineFunctionsWithSemantics(InlineFuncWithSemantics) {}
+    InlineFuncWithAttr(InlineAttr) {}
 
     bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA);
 
@@ -70,7 +70,7 @@ namespace {
 /// that is legal to inline.
 static SILFunction *getInlinableFunction(ApplyInst *AI,
                                          SILModule::LinkingMode Mode,
-                                         InlineFuncSemanticsKind InlineSem) {
+                                         InlineFuncWithAttrKind InlineAttr) {
   // Avoid substituion lists, we don't support them.
   if (AI->hasSubstitutions())
     return nullptr;
@@ -81,14 +81,14 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 
   SILFunction *F = FRI->getReferencedFunction();
 
-  // Don't inline functions that are marked with the @semantics attribute
-  // if the inliner is asked not to inline them.
-  if (InlineSem == InlineFuncSemanticsKind::DontInline &&
-      F->hasDefinedSemantics()) {
-    DEBUG(llvm::dbgs() << " Function " << F->getName()
-          << " has special semantics: " << F->getSemanticsString() << "\n");
-    return nullptr;
-  }
+  // Don't inline functions that are marked with the @semantics or @effects
+  // attribute if the inliner is asked not to inline them.
+  if (InlineAttr == InlineFuncWithAttrKind::DontInline &&
+      (F->hasDefinedSemantics() || F->hasSpecifiedEffectsInfo())) {
+      DEBUG(llvm::dbgs() << " Function " << F->getName()
+            << " has special semantics or effects attribute.\n");
+      return nullptr;
+    }
 
   // If F is an external declaration, we can't inline...
   if (F->empty() || F->isExternalDeclaration()) {
@@ -227,7 +227,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   for (auto AI : CallSites) {
     assert(AI && "Invalid AI");
     SILFunction *Callee = getInlinableFunction(AI, LinkMode,
-                                               InlineFunctionsWithSemantics);
+                                               InlineFuncWithAttr);
     if (Callee)
       CalleeCount[Callee]++;
   }
@@ -237,7 +237,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
     // Get the callee.
     SILFunction *Callee = getInlinableFunction(AI, LinkMode,
-                                               InlineFunctionsWithSemantics);
+                                               InlineFuncWithAttr);
     if (!Callee) {
       DEBUG(llvm::dbgs() << "        FAIL! Cannot find inlineable callee.\n");
       continue;
@@ -287,9 +287,9 @@ namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
   /// If InlineSem is true then the inliner is free to inline functions with
   /// defined semantics.
-  InlineFuncSemanticsKind InlineSem;
+  InlineFuncWithAttrKind InlineSem;
 public:
-  SILPerformanceInlinerPass(InlineFuncSemanticsKind InlineFunSem):
+  SILPerformanceInlinerPass(InlineFuncWithAttrKind InlineFunSem):
       InlineSem(InlineFunSem) {}
 
   void run() {
@@ -333,11 +333,11 @@ public:
 } // end anonymous namespace
 
 SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(InlineFuncSemanticsKind::Inline);
+  return new SILPerformanceInlinerPass(InlineFuncWithAttrKind::Inline);
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @semantics attribute.
+/// the @semantics or @effects attribute.
 SILTransform *swift::createEarlyInliner() {
-  return new SILPerformanceInlinerPass(InlineFuncSemanticsKind::DontInline);
+  return new SILPerformanceInlinerPass(InlineFuncWithAttrKind::DontInline);
 }
