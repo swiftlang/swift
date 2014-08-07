@@ -43,7 +43,7 @@ bb0(%0 : $@thick Foo.Type):
   return %3 : $Foo                                // id: %4
 }
 
-sil [semantics "readonly"] @_TF4main9readonly_funcFT_CS_3Foo : $@thin () -> @owned Foo {
+sil [readonly] @_TF4main9readonly_funcFT_CS_3Foo : $@thin () -> @owned Foo {
 bb0:
   // function_ref main.Foo.__allocating_init (main.Foo.Type)() -> main.Foo
   %0 = function_ref @_TFC4main3FooCfMS0_FT_S0_ : $@thin (@thick Foo.Type) -> @owned Foo // user: %2

@@ -1630,7 +1630,7 @@ bb0(%0 : $ZZZ):
   return %6 : $()                                 // id: %7
 }
 
-sil [semantics "readonly"] @_TF4main3barFCS_3ZZZT_ : $@thin (@owned ZZZ) -> ()
+sil [readonly] @_TF4main3barFCS_3ZZZT_ : $@thin (@owned ZZZ) -> ()
 
 sil_vtable ZZZ {
   #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ

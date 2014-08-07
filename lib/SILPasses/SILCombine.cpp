@@ -1122,7 +1122,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (FRI && FRI->getReferencedFunction()->hasSemanticsString("readonly")) {
+  if (FRI && FRI->getReferencedFunction()->getEffectsInfo() <
+      EffectsKind::ReadWrite){
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       // When deleting Apply instructions make sure to release any owned

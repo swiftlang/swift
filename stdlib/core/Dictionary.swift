@@ -1851,7 +1851,7 @@ public struct Dictionary<
   //
   // DictionaryLiteralConvertible conformance
   //
-  @semantics("readonly")
+  @effects(readonly)
   public static func convertFromDictionaryLiteral(elements: (Key, Value)...)
                 -> Dictionary<Key, Value> {
     return Dictionary<Key, Value>(

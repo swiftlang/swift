@@ -62,7 +62,7 @@ extension String {
 }
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
-  @semantics("readonly")
+  @effects(readonly)
   public
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
@@ -86,7 +86,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 }
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
-  @semantics("readonly")
+  @effects(readonly)
   public
   static func _convertFromBuiltinUTF16StringLiteral(
     start: Builtin.RawPointer, numberOfCodeUnits: Builtin.Word
@@ -252,7 +252,7 @@ extension String : Hashable {
 }
 
 extension String : StringInterpolationConvertible {
-  @semantics("readonly")
+  @effects(readonly)
   public
   static func convertFromStringInterpolation(strings: String...) -> String {
     var result = String()
@@ -265,7 +265,7 @@ extension String : StringInterpolationConvertible {
   public static func convertFromStringInterpolationSegment<T>(expr: T)   -> String { return toString(expr) }
 }
 
-@semantics("readonly")
+@effects(readonly)
 public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
@@ -274,7 +274,7 @@ public func +(var lhs: String, rhs: String) -> String {
   return lhs
 }
 
-@semantics("readonly")
+@effects(readonly)
 public func +(lhs: Character, rhs: Character) -> String {
   var result = String(lhs)
   result += String(rhs)

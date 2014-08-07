@@ -136,7 +136,7 @@ public struct ${Self}<T> : MutableCollectionType, Sliceable {
 }
 
 extension ${Self} : ArrayLiteralConvertible {
-  @semantics("readonly")
+  @effects(readonly)
   public static func convertFromArrayLiteral(elements: Element...) -> ${Self} {
     return ${Self}(_extractOrCopyToNativeArrayBuffer(elements._buffer))
   }
@@ -440,7 +440,7 @@ extension ${Self} {
 
 extension Array {
   /// This function "seeds" the ArrayLiteralConvertible protocol
-  @semantics("readonly")
+  @effects(readonly)
   public static func convertFromHeapArray(
     base: Builtin.RawPointer,
     owner: Builtin.NativeObject,
