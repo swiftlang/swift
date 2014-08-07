@@ -12,6 +12,7 @@
 // CHECK-DAG: ![[BASICFILE]] = {{.*}}basic.swift
 // CHECK-DAG: ![[BASICMODULE]] = {{.*}}[ DW_TAG_module ] [basic]
 import basic
+import typealias Swift.Optional
 
 println(basic.foo(1, 2))
 
@@ -20,6 +21,8 @@ println(basic.foo(1, 2))
 // DWARF-DAG: "Foo"
 // DWARF-DAG: "Swift"
 // DWARF-DAG: "basic"
+
+// DWARF-NOT: "Swift.Optional"
 
 // DWARF-DAG: file_names{{.*}} Imports.swift
 // DWARF-DAG: file_names{{.*}} Swift.swiftmodule
