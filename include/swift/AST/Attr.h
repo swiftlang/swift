@@ -70,6 +70,7 @@ enum class InlineKind : uint8_t {
   Never = 0
 };
 
+/// This enum represents the possible values of the @effects attribute.
 enum class EffectsKind : uint8_t {
   Unspecified = 0,
   ReadNone = 1,
