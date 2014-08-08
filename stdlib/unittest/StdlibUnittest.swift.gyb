@@ -636,29 +636,12 @@ public class TestCase {
     _testCaseNameToIndex[name] = _allTestCases.count - 1
   }
 
-  public func testXFailSkip(
-    name: String, xfail: [TestRunPredicate], skip: [TestRunPredicate],
-    _ testFunction: () -> ()
-  ) {
-    _tests.append(
-      _Test(name: name, xfail: xfail, skip: skip, code: testFunction))
-    _testNameToIndex[name] = _tests.count - 1
-  }
-
-  public func testXFail(
-    name: String, xfail: [TestRunPredicate], _ testFunction: () -> ()
-  ) {
-    testXFailSkip(name, xfail: xfail, skip: [], testFunction)
-  }
-
-  public func testSkip(
-    name: String, skip: [TestRunPredicate], _ testFunction: () -> ()
-  ) {
-    testXFailSkip(name, xfail: [], skip: skip, testFunction)
-  }
-
   public func test(name: String, _ testFunction: () -> ()) {
-    testXFailSkip(name, xfail: [], skip: [], testFunction)
+    _TestBuilder(testCase: self, name: name).code(testFunction)
+  }
+
+  public func test(name: String) -> _TestBuilder {
+    return _TestBuilder(testCase: self, name: name)
   }
 
   func _getTestByName(name: String) -> _Test {
@@ -677,6 +660,39 @@ public class TestCase {
 
     func getActiveSkipPredicates() -> [TestRunPredicate] {
       return skip.filter { $0.evaluate() }
+    }
+  }
+
+  public struct _TestBuilder {
+    let _testCase: TestCase
+    var _name: String
+    var _data: _Data = _Data()
+
+    class _Data {
+      var _xfail: [TestRunPredicate] = []
+      var _skip: [TestRunPredicate] = []
+    }
+
+    init(testCase: TestCase, name: String) {
+      _testCase = testCase
+      _name = name
+    }
+
+    public func xfail(predicates: TestRunPredicate) -> _TestBuilder {
+      _data._xfail.append(predicates)
+      return self
+    }
+
+    public func skip(predicates: TestRunPredicate) -> _TestBuilder {
+      _data._skip.append(predicates)
+      return self
+    }
+
+    public func code(testFunction: () -> ()) {
+      _testCase._tests.append(_Test(
+        name: _name, xfail: _data._xfail, skip: _data._skip,
+        code: testFunction))
+      _testCase._testNameToIndex[_name] = _testCase._tests.count - 1
     }
   }
 

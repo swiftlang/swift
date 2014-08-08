@@ -9,12 +9,14 @@ _setTestCaseFailedCallback() { println("abort()") }
 var XFailsIOSSimulator = TestCase("XFailsIOSSimulator")
 
 // CHECK: [   UXPASS ] XFailsIOSSimulator.xfail iOS Simulator passes{{$}}
-XFailsIOSSimulator.testXFail("xfail iOS Simulator passes", xfail: [.iOSSimulatorAny("")]) {
+XFailsIOSSimulator.test("xfail iOS Simulator passes")
+  .xfail(.iOSSimulatorAny("")).code {
   expectEqual(1, 1)
 }
 
 // CHECK: [    XFAIL ] XFailsIOSSimulator.xfail iOS Simulator fails{{$}}
-XFailsIOSSimulator.testXFail("xfail iOS Simulator fails", xfail: [.iOSSimulatorAny("")]) {
+XFailsIOSSimulator.test("xfail iOS Simulator fails")
+  .xfail(.iOSSimulatorAny("")).code {
   expectEqual(1, 2)
 }
 

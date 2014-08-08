@@ -85,7 +85,8 @@ TestCaseCrashes.test("fails3") {
 // CHECK: out>>> check failed
 // CHECK: [     FAIL ] TestCaseCrashes.fails3
 
-TestCaseCrashes.testXFail("crashesUnexpectedlyXfail", xfail: [.OSXBugFix(10, 9, 3, reason: "")]) {
+TestCaseCrashes.test("crashesUnexpectedlyXfail")
+  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
   println("crashesUnexpectedlyXfail")
   fatalError("this should crash")
 }
@@ -94,7 +95,8 @@ TestCaseCrashes.testXFail("crashesUnexpectedlyXfail", xfail: [.OSXBugFix(10, 9, 
 // CHECK: err>>> CRASHED: SIG
 // CHECK: [    XFAIL ] TestCaseCrashes.crashesUnexpectedlyXfail
 
-TestCaseCrashes.testXFail("crashesAsExpectedXfail", xfail: [.OSXBugFix(10, 9, 3, reason: "")]) {
+TestCaseCrashes.test("crashesAsExpectedXfail")
+  .xfail(.OSXBugFix(10, 9, 3, reason: "")).code {
   println("crashesAsExpectedXfail")
   expectCrashLater()
   fatalError("this should crash")
