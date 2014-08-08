@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-enum-simplification"
 #include "swift/SILPasses/Passes.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/PreallocatedMap.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
@@ -89,11 +88,12 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
 namespace {
 
+class BBToDataflowStateMap;
+
 /// Class that performs enum tag state dataflow on the given BB.
 class BBEnumTagDataflowState
     : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
   NullablePtr<SILBasicBlock> BB;
-  NullablePtr<AliasAnalysis> AA;
 
   using ValueToCaseSmallBlotMapVectorTy =
     BlotMapVector<SILValue, EnumElementDecl *,
@@ -107,19 +107,13 @@ class BBEnumTagDataflowState
   llvm::DenseMap<SILValue, EnumBBCaseList> EnumToEnumBBCaseListMap;
 
 public:
-  using PreallocatedMap = PreallocatedMap<SILBasicBlock *,
-                                          BBEnumTagDataflowState>;
-
   BBEnumTagDataflowState() = default;
   BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
   ~BBEnumTagDataflowState() = default;
 
-  bool init(SILBasicBlock *NewBB,
-            AliasAnalysis *NewAA) {
+  bool init(SILBasicBlock *NewBB) {
     assert(NewBB && "NewBB should not be null");
-    assert(NewAA && "NewAA should not be null");
     BB = NewBB;
-    AA = NewAA;
     return true;
   }
 
@@ -153,11 +147,42 @@ public:
   bool visitReleaseValueInst(ReleaseValueInst *RVI);
   bool process();
   void
-  mergePredecessorStates(PreallocatedMap &BBToStateMap);
-  bool
-  moveReleasesUpCFGIfCasesCovered();
+  mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
+  bool moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
   void handlePredCondEnumIsTag(CondBranchInst *CondBr);
+};
+
+/// Map all blocks to BBEnumTagDataflowState in RPO order.
+class BBToDataflowStateMap {
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToRPOMap;
+  std::vector<BBEnumTagDataflowState> BBToStateVec;
+public:
+  BBToDataflowStateMap(PostOrderAnalysis *POTA, SILFunction *F) {
+    auto ReversePostOrder = POTA->getReversePostOrder(F);
+    int PostOrderSize = std::distance(ReversePostOrder.begin(),
+                                      ReversePostOrder.end());
+    BBToStateVec.resize(PostOrderSize);
+    unsigned RPOIdx = 0;
+    for (SILBasicBlock *BB : ReversePostOrder) {
+      BBToStateVec[RPOIdx].init(BB);
+      BBToRPOMap[BB] = RPOIdx;
+      ++RPOIdx;
+    }
+  }
+  unsigned size() const {
+    return BBToStateVec.size();
+  }
+  BBEnumTagDataflowState &getRPOState(unsigned RPOIdx) {
+    return BBToStateVec[RPOIdx];
+  }
+  /// \return BBEnumTagDataflowState or NULL for unreachable blocks.
+  BBEnumTagDataflowState *getBBState(SILBasicBlock *BB) {
+    auto Iter = BBToRPOMap.find(BB);
+    if (Iter == BBToRPOMap.end())
+        return nullptr;
+    return &getRPOState(Iter->second);
+  }
 };
 
 } // end anonymous namespace
@@ -243,7 +268,7 @@ void BBEnumTagDataflowState::handlePredCondEnumIsTag(CondBranchInst *CondBr) {
 
 void
 BBEnumTagDataflowState::
-mergePredecessorStates(PreallocatedMap &BBToStateMap) {
+mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
 
   // If we have no precessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
@@ -259,14 +284,13 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
 
   // Initialize our state with our first predecessor...
   SILBasicBlock *OtherBB = *PI;
-  auto Iter = BBToStateMap.find(OtherBB);
-  if (Iter == BBToStateMap.end()) {
+  BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(OtherBB);
+  if (FirstPredState == nullptr) {
     DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
     return;
   }
-  BBEnumTagDataflowState &FirstPredState = Iter->second;
   ++PI;
-  ValueToCaseMap = FirstPredState.ValueToCaseMap;
+  ValueToCaseMap = FirstPredState->ValueToCaseMap;
 
   // If we are predecessors only successor, we can potentially hoist releases
   // into it.
@@ -304,13 +328,12 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
     // Grab the predecessors state...
     OtherBB = *PI;
 
-    auto OtherIter = BBToStateMap.find(OtherBB);
-    if (OtherIter == BBToStateMap.end()) {
+    BBEnumTagDataflowState *PredState = BBToStateMap.getBBState(OtherBB);
+    if (PredState == nullptr) {
       DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
       return;
     }
 
-    BBEnumTagDataflowState &PredState = OtherIter->second;
     ++PI;
 
     // Then for each (SILValue, Enum Tag) that we are tracking...
@@ -321,10 +344,10 @@ mergePredecessorStates(PreallocatedMap &BBToStateMap) {
 
       // Then attempt to look up the enum state for our SILValue in the other
       // predecessor.
-      auto OtherValue = PredState.ValueToCaseMap.find(P.first);
+      auto OtherValue = PredState->ValueToCaseMap.find(P.first);
 
       // If we find the state and it was not blotted...
-      if (OtherValue != PredState.ValueToCaseMap.end() && OtherValue->first) {
+      if (OtherValue != PredState->ValueToCaseMap.end() && OtherValue->first) {
 
         // Check if out predecessor has any other successors. If that is true we
         // clear all the state since we can not hoist safely.
@@ -417,7 +440,7 @@ bool BBEnumTagDataflowState::process() {
 }
 
 bool
-BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
+BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered(AliasAnalysis *AA) {
   bool Changed = false;
   unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
 
@@ -467,7 +490,7 @@ BBEnumTagDataflowState::moveReleasesUpCFGIfCasesCovered() {
     // if we are going to use it.
     if (arc::valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
                                                SILBasicBlock::iterator(RVI),
-                                               AA.get())) {
+                                               AA)) {
       DEBUG(llvm::dbgs() << "            Release value has use that stops "
             "hoisting! Bailing!\n");
       continue;
@@ -507,56 +530,21 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA,
 
   bool Changed = false;
 
-  auto ReversePostOrder = POTA->getReversePostOrder(&F);
-  int PostOrderSize = std::distance(ReversePostOrder.begin(),
-                                    ReversePostOrder.end());
+  BBToDataflowStateMap BBToStateMap(POTA, &F);
+  for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
+       ++RPOIdx) {
 
-  using PairTy = std::pair<SILBasicBlock *, BBEnumTagDataflowState>;
-  auto SortFn = [](const PairTy &P1,
-                   const PairTy &P2) { return P1.first < P2.first; };
+    DEBUG(llvm::dbgs() << "Visiting BB RPO#" << RPOIdx << "\n");
 
-  BBEnumTagDataflowState::PreallocatedMap BBToStateMap(PostOrderSize,
-                                                       SortFn);
+    BBEnumTagDataflowState &State = BBToStateMap.getRPOState(RPOIdx);
 
-#ifndef NDEBUG
-  llvm::DenseMap<SILBasicBlock *, unsigned> BBToRPOTNumMap;
-  unsigned RPOTId = 0;
-#endif
-
-  unsigned i = 0;
-  for (SILBasicBlock *BB : ReversePostOrder) {
-    BBToStateMap[i].first = BB;
-    BBToStateMap[i].second.init(BB, AA);
-#ifndef NDEBUG
-    BBToRPOTNumMap[BB] = RPOTId++;
-#endif
-    i++;
-  }
-  BBToStateMap.sort();
-
-  for (SILBasicBlock *BB : ReversePostOrder) {
-    DEBUG(llvm::dbgs() << "Visiting BB#" << BBToRPOTNumMap[BB] << "\n");
-
-    // We do this here to avoid issues with inserting, finding into BBToStateMap
-    // while using memory that it owns (State below).
     DEBUG(llvm::dbgs() << "    Predecessors (empty if no predecessors):\n");
-    DEBUG(for (SILBasicBlock *Pred : BB->getPreds()) {
-        llvm::dbgs() << "        BB#" << BBToRPOTNumMap[Pred]
-                     << "; Ptr: " << Pred << "\n";
+    DEBUG(for (SILBasicBlock *Pred : State.getBB()->getPreds()) {
+        llvm::dbgs() << "        BB#" << RPOIdx << "; Ptr: " << Pred << "\n";
     });
-
-    // Now that we have made sure that our predecessors all have initialized
-    // states, grab the state for this BB.
-    auto Iter = BBToStateMap.find(BB);
-    if (Iter == BBToStateMap.end()) {
-      assert(0 && "Found a BB in the post order without a state!\n");
-      return Changed;
-    }
-    BBEnumTagDataflowState &State = Iter->second;
-
     DEBUG(llvm::dbgs() << "    State Addr: " << &State << "\n");
 
-    // Then merge in our predecessor states. We relook up our the states for our
+    // Merge in our predecessor states. We relook up our the states for our
     // predecessors to avoid memory invalidation issues due to copying in the
     // dense map.
     DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
@@ -567,7 +555,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA,
     // them entirely.
     DEBUG(llvm::dbgs() << "    Attempting to move releases into "
           "predecessors!\n");
-    Changed |= State.moveReleasesUpCFGIfCasesCovered();
+    Changed |= State.moveReleasesUpCFGIfCasesCovered(AA);
 
     // Then perform the dataflow.
     DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
