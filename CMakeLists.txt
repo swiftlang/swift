@@ -910,15 +910,6 @@ macro(add_swift_library_single target name)
     install(TARGETS ${target}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SINGLE_SUBDIR})
-
-    # FIXME: Install .swift files so they can be parsed on import.
-    # Really we want to install a preparsed metadata file.
-    foreach(external_source ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES})
-      get_filename_component(extension ${external_source} EXT)
-      if(extension STREQUAL ".swift")
-        set(filename ${external_source})
-      endif()
-    endforeach(external_source)
   endif(SWIFTLIB_SINGLE_INSTALL)
 
   # Add variant-specific flags.

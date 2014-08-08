@@ -15,7 +15,7 @@ set(SWIFTUNITTEST_SOURCES
   SwiftBlockToCFunctionThunks.cpp
 )
 
-add_swift_library(swiftStdlibUnittest INSTALL
+add_swift_library(swiftStdlibUnittest INSTALL TARGET_LIBRARY
   ${SWIFTUNITTEST_SOURCES}
   FRAMEWORK_DEPENDS Foundation
   DEPENDS swiftCore swiftDarwin swiftFoundation)
