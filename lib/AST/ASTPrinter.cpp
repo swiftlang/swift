@@ -1376,8 +1376,9 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printAttributes(decl);
   printAccessibility(decl);
 
-  if (decl->getInitKind() == CtorInitializerKind::Convenience ||
-      decl->getInitKind() == CtorInitializerKind::ConvenienceFactory)
+  if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
+       decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
+      !decl->getAttrs().hasAttribute<ConvenienceAttr>())
     Printer << "convenience ";
   
   recordDeclLoc(decl,
