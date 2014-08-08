@@ -148,70 +148,119 @@ MergeTopDownLatticeStates(TopDownRefCountState::LatticeState L1,
 //                         ARCBBState Implementation
 //===----------------------------------------------------------------------===//
 
-/// Merge in the state of the successor basic block. This is currently a stub.
-void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBB) {
-  // For each entry in the other set, if our set has an entry with the same key,
-  // merge the entires. Otherwise, copy the entry and merge it with an empty
-  // entry.
-  for (auto MI : SuccBB.getBottomupStates()) {
-    auto Pair = PtrToBottomUpState.insert(MI);
-    // If we fail to merge, bail.
-    if (!Pair.first->second.merge(Pair.second ? BottomUpRefCountState()
-                                              : MI.second)) {
-      clear();
-      return;
-    }
-  }
+/// Merge in the state of the successor basic block. This is an intersection
+/// operation.
+void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
+  // For each [(SILValue, BottomUpState)] that we are tracking...
+  for (std::pair<SILValue, BottomUpRefCountState> &Pair : getBottomupStates()) {
+    SILValue RefCountedValue = Pair.first;
 
-  for (auto Pair : getBottomupStates()) {
-    if (SuccBB.PtrToBottomUpState.find(Pair.first) ==
-        SuccBB.PtrToBottomUpState.end())
-      // If we fail to merge, bail.
-      if (!Pair.second.merge(BottomUpRefCountState())) {
-        clear();
-        return;
-      }
+    // If our SILValue was blotted, skip it. This will be ignored in the rest of
+    // the optimizer.
+    if (!RefCountedValue)
+      continue;
+
+    // Then attempt to lookup the corresponding (SILValue, BottomUpState) from
+    // SuccBB. If we fail to do so, blot this SILValue and continue.
+    //
+    // Since we are already initialized by initSuccBottomUp(), this has the
+    // effect of an intersection.
+    auto Other = SuccBBState.PtrToBottomUpState.find(RefCountedValue);
+    if (Other == SuccBBState.PtrToBottomUpState.end()) {
+      PtrToBottomUpState.blot(RefCountedValue);
+      continue;
+    }
+
+    SILValue OtherRefCountedValue = Other->first;
+
+    // If the other ref count value was blotted, blot our value and continue.
+    // This has the effect of an intersection.
+    if (!OtherRefCountedValue) {
+      PtrToBottomUpState.blot(RefCountedValue);
+      continue;
+    }
+
+    // Ok, so now we know that the ref counted value we are tracking was not
+    // blotted on either side. Now we need to make sure that none of the ref
+    // count modifiers that we are tracking are reachable from any other to
+    // prevent our set from dynamically representing more than one reference
+    // count.
+    BottomUpRefCountState &RefCountState = Pair.second;
+    BottomUpRefCountState &OtherRefCountState = Other->second;
+
+    // Ok, now we know that the merged set can safely represent a set of
+    // of instructions which together semantically act as one ref count
+    // increment. Merge the two states together.
+    RefCountState.merge(OtherRefCountState);
   }
 }
 
 /// Initialize this BB with the state of the successor basic block. This is
 /// called on a basic block's state and then any other successors states are
 /// merged in. This is currently a stub.
-void ARCBBState::initSuccBottomUp(ARCBBState &SuccBB) {
-  PtrToBottomUpState = SuccBB.PtrToBottomUpState;
+void ARCBBState::initSuccBottomUp(ARCBBState &SuccBBState) {
+  PtrToBottomUpState = SuccBBState.PtrToBottomUpState;
 }
 
-/// Merge in the state of the predecessor basic block. This is currently a stub.
-void ARCBBState::mergePredTopDown(ARCBBState &PredBB) {
-  // For each entry in the other set, if our set has an entry with the same key,
-  // merge the entires. Otherwise, copy the entry and merge it with an empty
-  // entry.
-  for (auto MI : PredBB.getTopDownStates()) {
-    auto Pair = PtrToTopDownState.insert(MI);
-    // If we fail to merge, bail.
-    if (!Pair.first->second.merge(Pair.second ? TopDownRefCountState()
-                                              : MI.second)) {
-      clear();
-      return;
-    }
-  }
+/// Merge in the state of the predecessor basic block.
+void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
+  // For each [(SILValue, TopDownState)] that we are tracking...
+  for (std::pair<SILValue, TopDownRefCountState> &Pair : getTopDownStates()) {
+    SILValue RefCountedValue = Pair.first;
 
-  for (auto Pair : getTopDownStates()) {
-    if (PredBB.PtrToTopDownState.find(Pair.first) ==
-        PredBB.PtrToTopDownState.end())
-      // If we fail to merge, bail.
-      if (!Pair.second.merge(TopDownRefCountState())) {
-        clear();
-        return;
-      }
+    // If our SILValue was blotted, skip it. This will be ignored in the rest of
+    // the optimizer.
+    if (!RefCountedValue)
+      continue;
+
+    // Then attempt to lookup the corresponding (SILValue, TopDownState) from
+    // SuccBB. If we fail to do so, blot this SILValue and continue.
+    //
+    // Since we are already initialized by initSuccTopDown(), this has the
+    // effect of an intersection.
+    auto Other = PredBBState.PtrToTopDownState.find(RefCountedValue);
+    if (Other == PredBBState.PtrToTopDownState.end()) {
+      PtrToTopDownState.blot(RefCountedValue);
+      continue;
+    }
+
+    SILValue OtherRefCountedValue = Other->first;
+
+    // If the other ref count value was blotted, blot our value and continue.
+    // This has the effect of an intersection.
+    if (!OtherRefCountedValue) {
+      PtrToTopDownState.blot(RefCountedValue);
+      continue;
+    }
+
+    // Ok, so now we know that the ref counted value we are tracking was not
+    // blotted on either side. Now we need to make sure that none of the ref
+    // count modifiers that we are tracking are reachable from any other to
+    // prevent our set from dynamically representing more than one reference
+    // count.
+    TopDownRefCountState &RefCountState = Pair.second;
+    TopDownRefCountState &OtherRefCountState = Other->second;
+
+    if (RefCountState.Argument.isNull() != OtherRefCountState.Argument.isNull()) {
+      DEBUG(llvm::dbgs() << "Can not merge arg and non-arg path!\n");
+      PtrToTopDownState.blot(RefCountedValue);
+      continue;
+    }
+
+    // Ok, now we know that the merged set can safely represent a set of
+    // of instructions which together semantically act as one ref count
+    // increment. Merge the two states together.
+    RefCountState.merge(OtherRefCountState);
+    DEBUG(llvm::dbgs() << "                Partial: " << (RefCountState.isPartial()?"yes":"no")
+          << "\n");
   }
 }
 
 /// Initialize the state for this BB with the state of its predecessor
 /// BB. Used to create an initial state before we merge in other
 /// predecessors. This is currently a stub.
-void ARCBBState::initPredTopDown(ARCBBState &PredBB) {
-  PtrToTopDownState = PredBB.PtrToTopDownState;
+void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
+  PtrToTopDownState = PredBBState.PtrToTopDownState;
 }
 
 //===----------------------------------------------------------------------===//
@@ -300,6 +349,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
     return false;
   }
 
+  // Merge previously seen instructions.
   Decrements.insert(Other.Decrements.begin(), Other.Decrements.end());
 
   Partial |= Other.Partial;
@@ -416,11 +466,14 @@ static bool processBBTopDown(
       // tracking.
     }
 
-    // For all other (reference counted value, ref count state) we are
-    // tracking...
+    // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
       // If the state we are visiting is for the pointer we just visited, bail.
       if (Op && OtherState.first == Op)
+        continue;
+
+      // If the other state's value is blotted, skip it.
+      if (!OtherState.first)
         continue;
 
       // If the other state is not tracking anything, bail.
@@ -451,10 +504,11 @@ void
 swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
                                                             SILBasicBlock *BB) {
   bool HasAtLeastOnePred = false;
+  llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
 
   // For each successor of BB...
-  for (auto Pred : BB->getPreds()) {
-    auto *PredBB = Pred;
+  for (SILBasicBlock *PredBB : BB->getPreds()) {
+    DEBUG(llvm::dbgs() << "    Merging Pred: " << BBToBBID[PredBB] << "\n");
 
     // If the precessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
@@ -606,6 +660,10 @@ static bool processBBBottomUp(
       if (Op && OtherState.first == Op)
         continue;
 
+      // If the other state's value is blotted, skip it.
+      if (!OtherState.first)
+        continue;
+
       // If this state is not tracking anything, skip it.
       if (!OtherState.second.isTrackingRefCount())
         continue;
@@ -647,9 +705,14 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
     if (!SuccBB)
       continue;
 
-    // If the BB is the head of a backedge in our traversal, clear any state
-    // we are tracking now and clear the state of the basic block. There is
-    // some sort of control flow here that we do not understand.
+    // If the BB is the head of a backedge in our traversal, we have
+    // hit a loop boundary. In that case, add any instructions we are
+    // tracking or instructions that we have seen to the banned
+    // instruction list. Clear the instructions we are tracking
+    // currently, but leave that we saw a release on them. In a post
+    // order, we know that all of a BB's successors will always be
+    // visited before the BB, implying we will know if conservatively
+    // we saw a release on the pointer going down all paths.
     if (BackEdgeSet.count(SuccBB)) {
       BBState.clear();
       break;
@@ -679,7 +742,6 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
 
   // For each BB in our post order...
   for (auto *BB : POTA->getPostOrder(&F)) {
-
     DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.

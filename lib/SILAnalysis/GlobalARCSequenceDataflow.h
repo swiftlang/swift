@@ -111,8 +111,17 @@ public:
     return PtrToBottomUpState[Ptr];
   }
 
-  void clearTopDownState() { PtrToTopDownState.clear(); }
+  /// Blot \p Ptr.
+  void clearBottomUpRefCountState(SILValue Ptr) {
+    PtrToBottomUpState.blot(Ptr);
+  }
 
+  /// Blot \p Ptr.
+  void clearTopDownRefCountState(SILValue Ptr) {
+    PtrToTopDownState.blot(Ptr);
+  }
+
+  void clearTopDownState() { PtrToTopDownState.clear(); }
   void clearBottomUpState() { PtrToBottomUpState.clear(); }
 
   /// Clear both the bottom up *AND* top down state.

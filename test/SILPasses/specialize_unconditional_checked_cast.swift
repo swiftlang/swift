@@ -250,6 +250,7 @@ ConcreteToArchetypeConvertC(t: c, t2: d)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out E, @owned C, @in E) -> () {
 // CHECK: bb0
 // CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 ConcreteToArchetypeConvertC(t: c, t2: e)
 
