@@ -3125,25 +3125,33 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   } finder(diags);
   getBody()->walk(finder);
 
+  // get the kind out of the finder.
+  auto Kind = finder.Kind;
+
+
   // If we didn't find any delegating or chained initializers, check whether
-  // we have a class with a superclass: it gets an implicit chained initializer.
-  if (finder.Kind == BodyInitKind::None) {
+  // the initializer was explicitly marked 'convenience'.
+  if (Kind == BodyInitKind::None && getAttrs().hasAttribute<ConvenienceAttr>())
+    Kind = BodyInitKind::Delegating;
+
+  // If wes till don't know, check whether we have a class with a superclass: it
+  // gets an implicit chained initializer.
+  if (Kind == BodyInitKind::None) {
     if (auto classDecl = getDeclContext()->getDeclaredTypeInContext()
                            ->getClassOrBoundGenericClass()) {
       if (classDecl->getSuperclass())
-        finder.Kind = BodyInitKind::ImplicitChained;
+        Kind = BodyInitKind::ImplicitChained;
     }
   }
 
   // Cache the result if it is trustworthy.
   if (diags) {
-    ConstructorDeclBits.ComputedBodyInitKind
-      = static_cast<unsigned>(finder.Kind) + 1;
+    ConstructorDeclBits.ComputedBodyInitKind = static_cast<unsigned>(Kind) + 1;
     if (init)
       *init = finder.InitExpr;
   }
 
-  return finder.Kind;
+  return Kind;
 }
 
 ObjCSelector DestructorDecl::getObjCSelector() const {

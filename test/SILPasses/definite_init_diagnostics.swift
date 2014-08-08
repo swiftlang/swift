@@ -464,7 +464,7 @@ class DelegatingCtorClass {
   }
 
   convenience init(double: Double) {
-  } // expected-error{{property 'self.ivar' not initialized}}
+  } // expected-error{{self.init isn't called on all paths in delegating initializer}}
 }
 
 
