@@ -176,7 +176,7 @@ public:
 
   /// Construct the list of inputs and their types from the given arguments.
   ///
-  /// \param TC The default host tool chain.
+  /// \param TC The current tool chain.
   /// \param Args The input arguments.
   /// \param[out] Inputs The list in which to store the resulting compilation
   /// inputs.
@@ -185,11 +185,13 @@ public:
 
   /// Construct the OutputInfo for the driver from the given arguments.
   ///
+  /// \param TC The current tool chain.
   /// \param Args The input arguments.
   /// \param Inputs The inputs to the driver.
   /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
-  void buildOutputInfo(const llvm::opt::DerivedArgList &Args,
+  void buildOutputInfo(const ToolChain &TC,
+                       const llvm::opt::DerivedArgList &Args,
                        const InputList &Inputs, OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,

@@ -167,7 +167,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(*TranslatedArgList, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -501,7 +501,43 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
   }
 }
 
-void Driver::buildOutputInfo(const DerivedArgList &Args,
+/// Returns true if the given SDK path points to an SDK that is too old for
+/// the given target.
+static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
+  // FIXME: This is a hack.
+  // We should be looking at the SDKSettings.plist.
+  if (target.isMacOSX()) {
+    StringRef sdkDirName = llvm::sys::path::filename(sdkPath);
+
+    size_t versionStart = sdkDirName.find("OSX");
+    if (versionStart == StringRef::npos)
+      return false;
+    versionStart += strlen("OSX");
+
+    size_t versionEnd = sdkDirName.find(".Internal");
+    if (versionEnd == StringRef::npos)
+      versionEnd = sdkDirName.find(".sdk");
+    if (versionEnd == StringRef::npos)
+      return false;
+
+    clang::VersionTuple version;
+    if (version.tryParse(sdkDirName.slice(versionStart, versionEnd)))
+      return false;
+    return version < clang::VersionTuple(10, 10);
+
+  } else if (target.isiOS()) {
+    // iOS SDKs don't always have the version number in the name, but
+    // fortunately that started with the first version that supports Swift.
+    // Just check for one version before that, just in case.
+    return sdkPath.find("OS7") != StringRef::npos ||
+      sdkPath.find("Simulator7") != StringRef::npos;
+
+  } else {
+    return false;
+  }
+}
+
+void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                              const InputList &Inputs, OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropariately below if linking is required.
@@ -662,7 +698,7 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       OI.SDKPath = SDKROOT;
     } else if (OI.CompilerMode == OutputInfo::Mode::Immediate ||
                OI.CompilerMode == OutputInfo::Mode::REPL) {
-      if (llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+      if (TC.getTriple().isMacOSX()) {
         // In immediate modes, use the SDK provided by xcrun.
         // This will prefer the SDK alongside the Swift found by "xcrun swift".
         // We don't do this in compilation modes because defaulting to the
@@ -696,8 +732,17 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     }
 
     if (!OI.SDKPath.empty()) {
+      // Delete a trailing /.
+      if (OI.SDKPath.size() > 1 &&
+          llvm::sys::path::is_separator(OI.SDKPath.back())) {
+        OI.SDKPath.erase(OI.SDKPath.end()-1);
+      }
+
       if (!llvm::sys::fs::exists(OI.SDKPath)) {
         Diags.diagnose(SourceLoc(), diag::warning_no_such_sdk, OI.SDKPath);
+      } else if (isSDKTooOld(OI.SDKPath, TC.getTriple())) {
+        Diags.diagnose(SourceLoc(), diag::error_sdk_too_old,
+                       llvm::sys::path::filename(OI.SDKPath));
       }
     }
   }

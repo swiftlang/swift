@@ -35,10 +35,31 @@
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -deprecated-integrated-repl -### | FileCheck -check-prefix=XCRUN-SDK %s
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -### %s | FileCheck -check-prefix=XCRUN-SDK %s
 
-// XCRUN-SDK: -sdk /path/to/sdk/
+// XCRUN-SDK: -sdk /path/to/sdk
 
 // RUN: cp %S/Inputs/xcrun-empty.sh %t/usr/bin/xcrun
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -deprecated-integrated-repl -### | FileCheck -check-prefix=ROOT-SDK %s
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -### %s | FileCheck -check-prefix=ROOT-SDK %s
 
 // ROOT-SDK: -sdk /{{\s|$}}
+
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.8.sdk -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.9.sdk -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.9.sdk/ -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.9.Internal.sdk -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.9.Internal.sdk/ -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.10.sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.10.sdk/ -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.10.Internal.sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.10.Internal.sdk/ -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/MacOSX10.11.sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/OSX11.sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/iPhoneOS7.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/iPhoneOS7.0.Internal.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: not %swift_driver -sdk %S/Inputs/fake-sdks/iPhoneSimulator7.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/iPhoneOS8.0.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/iPhoneOS.sdk -target x86_64-apple-ios7 -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+// RUN: %swift_driver -sdk %S/Inputs/fake-sdks/custom-sdk -### 2>&1 | FileCheck -check-prefix=SDK-OKAY %s
+
+// SDK-TOO-OLD: error: the SDK '{{.+}}.sdk' does not support Swift
+// SDK-OKAY: -sdk {{.*}}/Inputs/fake-sdks/{{[^/ ]+}}
