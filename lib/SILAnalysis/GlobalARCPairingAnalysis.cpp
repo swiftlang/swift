@@ -300,7 +300,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       break;
   }
 
-  bool UnconditionallySafe = KnownSafeTD || KnownSafeBU;
+  bool UnconditionallySafe = KnownSafeTD && KnownSafeBU;
   if (UnconditionallySafe) {
     DEBUG(llvm::dbgs() << "UNCONDITIONALLY SAFE! DELETING INSTS.\n");
     MatchSet.IncrementInsertPts.clear();
