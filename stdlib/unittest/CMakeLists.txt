@@ -16,5 +16,5 @@ set(SWIFTUNITTEST_SOURCES
 add_swift_library(swiftStdlibUnittest INSTALL
   ${SWIFTUNITTEST_SOURCES}
   FRAMEWORK_DEPENDS Foundation
-  DEPENDS swiftCore swiftDarwin)
+  DEPENDS swiftCore swiftDarwin swiftFoundation)
 
