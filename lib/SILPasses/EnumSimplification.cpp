@@ -111,10 +111,7 @@ public:
                                           BBEnumTagDataflowState>;
 
   BBEnumTagDataflowState() = default;
-  BBEnumTagDataflowState(const BBEnumTagDataflowState &Other)
-      : BB(const_cast<SILBasicBlock *>(Other.BB.getPtrOrNull())),
-        AA(const_cast<AliasAnalysis *>(Other.AA.getPtrOrNull())),
-        ValueToCaseMap() {}
+  BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
   ~BBEnumTagDataflowState() = default;
 
   bool init(SILBasicBlock *NewBB,
