@@ -1,3 +1,0 @@
-module OpaqueIdentityFunctions {
-  header "OpaqueIdentityFunctions.h"
-}

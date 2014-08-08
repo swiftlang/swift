@@ -21,6 +21,11 @@ def all_integer_types(word_bits):
         for signed in False, True:
             yield str(name), int(word_bits if name=='Int' else name), signed
 
+def all_integer_type_names():
+    for name in _all_integer_type_bitwidths:
+        for signed in False, True:
+            yield int_name(str(name), signed)
+
 def _base_int_name(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)
 
@@ -32,4 +37,7 @@ def int_name(name, signed):
 
 def other_int_name(name, signed):
     return ('U' if signed else '') + _base_int_name(name)
+
+def is_signed_int(name):
+    return name[0] != 'U'
 

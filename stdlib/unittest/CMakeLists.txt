@@ -7,6 +7,8 @@ set(SWIFTUNITTEST_SOURCES
   DarwinExtras.swift
   GetOSVersion.mm
   InterceptTraps.cpp
+  OpaqueIdentityFunctions.cpp
+  OpaqueIdentityFunctions.swift
   PthreadBarriers.swift
   PthreadWrappers.swift
   StdlibCoreExtras.swift

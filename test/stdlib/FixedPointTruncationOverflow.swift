@@ -1,9 +1,8 @@
 // These tests should crash (until we change overflow trapping mechanizm in stdlib).
 // RUN: mkdir -p %t
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/OpaqueIdentityFunctions/OpaqueIdentityFunctions.m -c -o %t/OpaqueIdentityFunctions.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Debug
-// RUN: %target-build-swift %s -I %S/Inputs/OpaqueIdentityFunctions/ -Xlinker %t/CatchCrashes.o -Xlinker %t/OpaqueIdentityFunctions.o -o %t/a.out_Release -O
+// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Debug
+// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/a.out_Release -O
 //
 // RUN: %target-run %t/a.out_Debug 1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out_Debug 2 2>&1 | FileCheck %s -check-prefix=CHECK
@@ -27,7 +26,7 @@
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
 
 import Darwin
-import OpaqueIdentityFunctions
+import StdlibUnittest
 
 // Note: in this file, we need to go through opaque functions to load
 // constants.  This is to to check runtime behaviour and ensure the constant is

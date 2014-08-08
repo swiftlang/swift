@@ -1,0 +1,73 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/FloatingPointConversionTraps.swift
+// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -o %t/a.out_Debug
+// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -o %t/a.out_Release -O
+//
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
+
+import StdlibUnittest
+
+%{
+
+from SwiftIntTypes import *
+
+}%
+
+extension Float80 {
+  public static var infinity: Float80 {
+    return 1.0 / 0.0
+  }
+}
+
+var FloatingPointConversion = TestCase("FloatingPointConversion")
+
+% for FloatSelf in ['Float32', 'Float64', 'Float80']:
+%   for IntSelf in all_integer_type_names():
+
+%     if FloatSelf == 'Float80':
+#if arch(i386) || arch(x86_64)
+%     end
+
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf") {
+  var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(123.0)))
+  expectEqual(123, a)
+
+  expectCrashLater()
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(+${FloatSelf}.infinity)))
+}
+
+%     if is_signed_int(IntSelf):
+
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf") {
+  var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
+  expectEqual(-123, a)
+
+  expectCrashLater()
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
+}
+
+%     else:
+
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
+  expectCrashLater()
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
+}
+
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
+  expectCrashLater()
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
+}
+
+%     end
+
+%     if FloatSelf == 'Float80':
+#endif
+%     end
+
+%   end
+% end
+
+runAllTests()
+
