@@ -55,13 +55,13 @@ enum _XCTThrowableBlockResult {
 /// Asks some Objective-C code to evaluate a block which may throw an exception,
 /// and if it does consume the exception and return information about it.
 func _XCTRunThrowableBlock(block: () -> Void) -> _XCTThrowableBlockResult {
-  let d = _XCTRunThrowableBlockBridge(block) as [String:String]
+  let d = _XCTRunThrowableBlockBridge(block)
   
   if d.count > 0 {
-    let t = d["type"]!
+    let t: String = d["type"] as String
     
     if t == "objc" {
-      return .FailedWithException(className: d["className"]!, name: d["name"]!, reason: d["reason"]!)
+      return .FailedWithException(className: d["className"] as String, name: d["name"] as String, reason: d["reason"] as String)
     } else {
       return .FailedWithUnknownException
     }
@@ -175,10 +175,10 @@ public func XCTAssertTrue(expression: @autoclosure () -> BooleanType, _ message:
     expressionValueOptional = expression().boolValue
   }
   
-  let expressionValue = expressionValueOptional!
-  
   switch result {
   case .Success:
+    let expressionValue = expressionValueOptional!
+    
     if !expressionValue {
       // TODO: @auto_string expression
       
@@ -203,10 +203,10 @@ public func XCTAssertFalse(expression: @autoclosure () -> BooleanType, _ message
     expressionValueOptional = expression().boolValue
   }
   
-  let expressionValue = expressionValueOptional!
-  
   switch result {
   case .Success:
+    let expressionValue = expressionValueOptional!
+    
     if expressionValue {
       // TODO: @auto_string expression
       
@@ -233,11 +233,11 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> T, expr
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -274,11 +274,11 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Slice<T
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Slice<T> = expressionValue1Optional!
-  let expressionValue2: Slice<T> = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1: Slice<T> = expressionValue1Optional!
+    let expressionValue2: Slice<T> = expressionValue2Optional!
+    
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -309,11 +309,11 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Contigu
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: ContiguousArray<T> = expressionValue1Optional!
-  let expressionValue2: ContiguousArray<T> = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1: ContiguousArray<T> = expressionValue1Optional!
+    let expressionValue2: ContiguousArray<T> = expressionValue2Optional!
+    
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -344,11 +344,11 @@ public func XCTAssertEqual<T: Equatable>(expression1: @autoclosure () -> Array<T
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Array<T> = expressionValue1Optional!
-  let expressionValue2: Array<T> = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1: Array<T> = expressionValue1Optional!
+    let expressionValue2: Array<T> = expressionValue2Optional!
+    
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -379,11 +379,11 @@ public func XCTAssertEqual<T, U: Equatable>(expression1: @autoclosure () -> Dict
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Dictionary<T, U> = expressionValue1Optional!
-  let expressionValue2: Dictionary<T, U> = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1: Dictionary<T, U> = expressionValue1Optional!
+    let expressionValue2: Dictionary<T, U> = expressionValue2Optional!
+    
     if expressionValue1 != expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -414,11 +414,11 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> T, e
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -455,11 +455,11 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Cont
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: ContiguousArray<T> = expressionValue1Optional!
-  let expressionValue2: ContiguousArray<T> = expressionValue2Optional!
-
   switch result {
   case .Success:
+    let expressionValue1: ContiguousArray<T> = expressionValue1Optional!
+    let expressionValue2: ContiguousArray<T> = expressionValue2Optional!
+    
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -490,11 +490,11 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Slic
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Slice<T> = expressionValue1Optional!
-  let expressionValue2: Slice<T> = expressionValue2Optional!
-
   switch result {
   case .Success:
+    let expressionValue1: Slice<T> = expressionValue1Optional!
+    let expressionValue2: Slice<T> = expressionValue2Optional!
+    
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -525,11 +525,11 @@ public func XCTAssertNotEqual<T: Equatable>(expression1: @autoclosure () -> Arra
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Array<T> = expressionValue1Optional!
-  let expressionValue2: Array<T> = expressionValue2Optional!
-
   switch result {
   case .Success:
+    let expressionValue1: Array<T> = expressionValue1Optional!
+    let expressionValue2: Array<T> = expressionValue2Optional!
+    
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -560,11 +560,11 @@ public func XCTAssertNotEqual<T, U: Equatable>(expression1: @autoclosure () -> D
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1: Dictionary<T,U> = expressionValue1Optional!
-  let expressionValue2: Dictionary<T,U> = expressionValue2Optional!
-
   switch result {
   case .Success:
+    let expressionValue1: Dictionary<T,U> = expressionValue1Optional!
+    let expressionValue2: Dictionary<T,U> = expressionValue2Optional!
+    
     if expressionValue1 == expressionValue2 {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -610,11 +610,11 @@ public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(expression1: @autoc
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     var equalWithAccuracy: Bool = false
     
     switch (expressionValue1, expressionValue2, accuracy) {
@@ -678,11 +678,11 @@ public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(expression1: @au
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     var notEqualWithAccuracy: Bool = false
     
     switch (expressionValue1, expressionValue2, accuracy) {
@@ -731,11 +731,11 @@ public func XCTAssertGreaterThan<T: Comparable>(expression1: @autoclosure () -> 
     expressionValue2Optional = expression2()
   }
 
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if !(expressionValue1 > expressionValue2) {
     // TODO: @auto_string expression1
     // TODO: @auto_string expression2
@@ -767,11 +767,11 @@ public func XCTAssertGreaterThanOrEqual<T: Comparable>(expression1: @autoclosure
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if !(expressionValue1 >= expressionValue2) {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -802,11 +802,11 @@ public func XCTAssertLessThan<T: Comparable>(expression1: @autoclosure () -> T, 
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if !(expressionValue1 < expressionValue2) {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
@@ -838,11 +838,11 @@ public func XCTAssertLessThanOrEqual<T: Comparable>(expression1: @autoclosure ()
     expressionValue2Optional = expression2()
   }
   
-  let expressionValue1 = expressionValue1Optional!
-  let expressionValue2 = expressionValue2Optional!
-  
   switch result {
   case .Success:
+    let expressionValue1 = expressionValue1Optional!
+    let expressionValue2 = expressionValue2Optional!
+    
     if !(expressionValue1 <= expressionValue2) {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
