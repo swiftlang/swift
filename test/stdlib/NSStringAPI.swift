@@ -39,6 +39,19 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
+let temporaryFileContents =
+  "Lorem ipsum dolor sit amet, consectetur adipisicing elit,\n" +
+  "sed do eiusmod tempor incididunt ut labore et dolore magna\n" +
+  "aliqua.\n"
+
+func createNSStringTemporaryFile()
+  -> (existingPath: String, nonExistentPath: String) {
+  let existingPath =
+    createTemporaryFile("NSStringAPIs.", ".txt", temporaryFileContents)
+  let nonExistentPath = existingPath + "-NoNeXiStEnT"
+  return (existingPath, nonExistentPath)
+}
+
 var NSStringAPIs = TestCase("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
@@ -72,11 +85,8 @@ NSStringAPIs.test("pathWithComponents(_:)") {
       String.pathWithComponents(["flugelhorn", "baritone", "bass"]))
 }
 
-// FIXME: creating a temporary file would be better.
-var existingPath = (String(__FILE__) + "/../Inputs/NSStringAPI_test.txt").stringByStandardizingPath
-var nonExistentPath = existingPath + "-NoNeXiStEnT"
-
 NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
+  let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var err: NSError?
     var content = String.stringWithContentsOfFile(existingPath,
@@ -98,6 +108,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
 }
 
 NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
+  let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
@@ -121,10 +132,11 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
   }
 }
 
-var existingURL = NSURL.URLWithString("file://" + existingPath)
-var nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
 
 NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
+  let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
+  let existingURL = NSURL.URLWithString("file://" + existingPath)
+  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
   if true {
     var err: NSError?
     var content = String.stringWithContentsOfURL(existingURL,
@@ -146,6 +158,9 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
 }
 
 NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
+  let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
+  let existingURL = NSURL.URLWithString("file://" + existingPath)
+  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
@@ -265,6 +280,7 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
 }
 
 NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filterTypes)") {
+  let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var count = nonExistentPath.completePathIntoString(caseSensitive: false)
     expectEqual(0, count)

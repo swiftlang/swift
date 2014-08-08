@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Darwin
+import Foundation
+
 //
 // These APIs don't really belong in a unit testing library, but they are
 // useful in tests, and stdlib does not have such facilities yet.
@@ -85,5 +88,65 @@ func withArrayOfCStrings<R>(
     cStrings.append(nil)
     return body(cStrings)
   }
+}
+
+struct _Stderr : OutputStreamType {
+  mutating func write(string: String) {
+    for c in string.utf8 {
+      putc(Int32(c), stderr)
+    }
+  }
+}
+
+struct _FDOutputStream : OutputStreamType {
+  let fd: CInt
+
+  mutating func write(string: String) {
+    let utf8 = string.nulTerminatedUTF8
+    utf8.withUnsafeBufferPointer {
+      (utf8) -> () in
+      var writtenBytes: size_t = 0
+      let bufferSize = size_t(utf8.count - 1)
+      while writtenBytes != bufferSize {
+        let result = Darwin.write(
+          self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),
+          bufferSize - writtenBytes)
+        if result < 0 {
+          fatalError("write() returned an error")
+        }
+        writtenBytes += result
+      }
+    }
+  }
+}
+
+func _stdlib_mkstemps(inout template: String, suffixlen: CInt) -> CInt {
+  var utf8 = template.nulTerminatedUTF8
+  let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
+    (utf8) -> (CInt, String) in
+    let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress), suffixlen)
+    let fileName = String.fromCString(UnsafePointer(utf8.baseAddress))!
+    return (fd, fileName)
+  }
+  template = fileName
+  return fd
+}
+
+public func createTemporaryFile(
+  fileNamePrefix: String, fileNameSuffix: String, contents: String
+) -> String {
+  var fileName = NSTemporaryDirectory().stringByAppendingPathComponent(
+    fileNamePrefix + "XXXXXX" + fileNameSuffix)
+  let fd = _stdlib_mkstemps(
+    &fileName, CInt(countElements(fileNameSuffix.utf8)))
+  if fd < 0 {
+    fatalError("mkstemps() returned an error")
+  }
+  var stream = _FDOutputStream(fd: fd)
+  stream.write(contents)
+  if close(fd) != 0 {
+    fatalError("close() return an error")
+  }
+  return fileName
 }
 

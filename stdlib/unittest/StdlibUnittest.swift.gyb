@@ -328,26 +328,6 @@ func _stdlib_getline() -> String? {
   }
 }
 
-struct _Stderr : OutputStreamType {
-  mutating func write(string: String) {
-    for c in string.utf8 {
-      putc(Int32(c), stderr)
-    }
-  }
-}
-
-struct _FDOutputStream : OutputStreamType {
-  let fd: CInt
-
-  mutating func write(string: String) {
-    let utf8 = string.nulTerminatedUTF8
-    utf8.withUnsafeBufferPointer {
-      (utf8) in
-      Darwin.write(self.fd, UnsafePointer(utf8.baseAddress), size_t(utf8.count - 1))
-    }
-  }
-}
-
 struct _FDInputStream {
   let fd: CInt
   var isEOF: Bool = false
