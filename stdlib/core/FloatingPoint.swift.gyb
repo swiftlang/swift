@@ -493,6 +493,14 @@ extension ${Self} {
 %     end
 
   public init(_ v: ${That}) {
+%     if srcBits != 80:
+    // FIXME: Float80 does not have 'isFinite' property.
+    // <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
+    // <rdar://problem/17959546> Float80.isFinite is missing
+    _precondition(
+      v.isFinite,
+      "floating point value can not be converted to ${Self} because it is either infinite or NaN")
+%     end
     _precondition(v >= ${That}(${Self}.min),
         "floating point value can not be converted to ${Self} because it is greater than ${Self}.min")
     _precondition(v <= ${That}(${Self}.max),

@@ -19,6 +19,9 @@ extension Float80 {
   public static var infinity: Float80 {
     return 1.0 / 0.0
   }
+  public static var quietNaN: Float80 {
+    return 0.0 / 0.0
+  }
 }
 
 var FloatingPointConversion = TestCase("FloatingPointConversion")
@@ -31,8 +34,14 @@ var FloatingPointConversion = TestCase("FloatingPointConversion")
 %     end
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf") {
-  var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(123.0)))
-  expectEqual(123, a)
+  if true {
+    var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(0.0)))
+    expectEqual(0, a)
+  }
+  if true {
+    var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(123.0)))
+    expectEqual(123, a)
+  }
 
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(+${FloatSelf}.infinity)))
@@ -41,8 +50,14 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf") {
 %     if is_signed_int(IntSelf):
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf") {
-  var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
-  expectEqual(-123, a)
+  if true {
+    var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-0.0)))
+    expectEqual(0, a)
+  }
+  if true {
+    var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
+    expectEqual(-123, a)
+  }
 
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
@@ -61,6 +76,13 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
 }
 
 %     end
+
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/NaN")
+  .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
+  .code {
+  expectCrashLater()
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(${FloatSelf}.quietNaN)))
+}
 
 %     if FloatSelf == 'Float80':
 #endif
