@@ -154,19 +154,19 @@ bool constraints::matchCallArguments(
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
 
-  // Local function that claims the argument at \c nextArgIdx, returning the
+  // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
-  auto claim = [&](Identifier expectedName, bool ignoreNameClash = false)
-                  -> unsigned {
+  auto claim = [&](Identifier expectedName, unsigned argNumber,
+                   bool ignoreNameClash = false)  -> unsigned {
     // Make sure we can claim this argument.
-    assert(nextArgIdx != numArgs && "Must have a valid index to claim");
-    assert(!claimedArgs[nextArgIdx] && "Argument already claimed");
+    assert(argNumber != numArgs && "Must have a valid index to claim");
+    assert(!claimedArgs[argNumber] && "Argument already claimed");
 
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
-      actualArgNames[nextArgIdx] = expectedName;
-    } else if (argTuple[nextArgIdx].getName() != expectedName &&
+      actualArgNames[argNumber] = expectedName;
+    } else if (argTuple[argNumber].getName() != expectedName &&
                !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
@@ -183,12 +183,12 @@ bool constraints::matchCallArguments(
       }
 
       // Record this argument name.
-      actualArgNames[nextArgIdx] = expectedName;
+      actualArgNames[argNumber] = expectedName;
     }
 
-    claimedArgs[nextArgIdx] = true;
+    claimedArgs[argNumber] = true;
     ++numClaimedArgs;
-    return nextArgIdx++;
+    return argNumber;
   };
 
   // Local function that skips over any claimed arguments.
@@ -201,6 +201,9 @@ bool constraints::matchCallArguments(
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed
     = [&](Identifier name, bool ignoreNameMismatch) -> Optional<unsigned> {
+    // Skip over any claimed arguments.
+    skipClaimedArgs();
+
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
       return Nothing;
@@ -214,17 +217,14 @@ bool constraints::matchCallArguments(
           (argTuple[nextArgIdx].hasName() && !ignoreNameMismatch))
         return Nothing;
 
-      return claim(name);
+      return claim(name, nextArgIdx);
     }
-
-    // Skip over any claimed arguments.
-    skipClaimedArgs();
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
         (ignoreNameMismatch ||
          argTuple[nextArgIdx].getName() == name)) {
-      return claim(name);
+      return claim(name, nextArgIdx);
     }
 
     // The name didn't match. Go hunting for an unclaimed argument whose name
@@ -238,39 +238,18 @@ bool constraints::matchCallArguments(
       // Skip claimed arguments.
       if (claimedArgs[i]) {
         // Note that we have already claimed an argument with the same name.
-        if (!claimedWithSameName) {
+        if (!claimedWithSameName)
           claimedWithSameName = i;
-        }
         continue;
       }
 
-      // We found a match. Claim it.
-      nextArgIdx = i;
-      return claim(name);
-    }
+      // We found a match.  If the match wasn't the next one, we have
+      // potentially out of order arguments.
+      if (i != nextArgIdx)
+        potentiallyOutOfOrder = true;
 
-    // Look at previous arguments to determine whether any are unclaimed and
-    // have the same name.
-    for (unsigned i = 0; i != nextArgIdx; ++i) {
-      // Skip arguments where the name doesn't match.
-      if (argTuple[i].getName() != name)
-        continue;
-
-      // Skip claimed arguments.
-      if (claimedArgs[i]) {
-        // Note that we have already claimed an argument with the same name.
-        if (!claimedWithSameName) {
-          claimedWithSameName = i;
-        }
-
-        continue;
-      }
-
-      // We found a match. Claim it and note that the arguments are potentially
-      // out of order.
-      potentiallyOutOfOrder = true;
-      nextArgIdx = i;
-      return claim(name);
+      // Claim it.
+      return claim(name, i);
     }
 
     // If the current parameter appears to be a trailing closure, allow the
@@ -279,7 +258,7 @@ bool constraints::matchCallArguments(
     // or not.
     if (nextArgIdx != numArgs && paramIsTrailingClosure(paramTuple, paramIdx) &&
         argTuple[nextArgIdx].getName().empty()) {
-      return claim(Identifier(), /*ignoreNameClash=*/true);
+      return claim(Identifier(), nextArgIdx, /*ignoreNameClash=*/true);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
@@ -304,7 +283,7 @@ bool constraints::matchCallArguments(
     // Missing a keyword argument name.
     if (nextArgIdx != numArgs && !argTuple[nextArgIdx].hasName()) {
       // Claim the next argument.
-      return claim(name);
+      return claim(name, nextArgIdx);
     }
 
     // Typo correction is handled in a later pass.
