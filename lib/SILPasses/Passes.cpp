@@ -90,6 +90,15 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   return Ctx.hadError();
 }
 
+void AddSimplifyCFGSILCombine(SILPassManager &PM) {
+  PM.add(createSimplifyCFG());
+  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
+  // cond_br).
+  PM.add(createSILCombine());
+  // Which can expose opportunity for simplifcfg.
+  PM.add(createSimplifyCFG());
+}
+
 /// Perform semantic annotation/loop base optimizations.
 void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   // Perform classsic SSA optimizations for cleanup.
@@ -99,7 +108,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.add(createMem2Reg());
   PM.add(createDCE());
   PM.add(createSILCombine());
-  PM.add(createSimplifyCFG());
+  AddSimplifyCFGSILCombine(PM);
 
   // Run high-level loop opts.
   PM.add(createLoopRotatePass());
@@ -122,7 +131,7 @@ void AddLowLevelLoopOptPasses(SILPassManager &PM) {
 }
 
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
-  PM.add(createSimplifyCFG());
+  AddSimplifyCFGSILCombine(PM);
   PM.add(createAllocBoxToStack());
   PM.add(createLowerAggregate());
   PM.add(createSILCombine());
@@ -134,7 +143,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
-  PM.add(createSimplifyCFG());
+  AddSimplifyCFGSILCombine(PM);
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.add(createGlobalLoadStoreOpts());

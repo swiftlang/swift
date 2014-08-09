@@ -20,6 +20,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -95,7 +96,6 @@ namespace {
 
     bool simplifyBlocks();
     bool dominatorBasedSimplify(DominanceInfo *DT);
-    bool simplifyLoopStructure();
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
@@ -399,43 +399,6 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
   return false;
 }
 
-/// If V is only used in a single block (optionally ignoring uses in the
-/// given ignore block), then return that single other block.
-static SILBasicBlock *getBlockWithAllOtherUses(SILValue V,
-                                               SILBasicBlock *IgnoreBB) {
-  SILBasicBlock *BB = nullptr;
-  for (auto UI : V.getUses()) {
-    auto *UseBB = UI->getUser()->getParent();
-    if (UseBB == IgnoreBB)
-      continue;
-    if (!BB) {
-      BB = UseBB;
-      continue;
-    }
-    if (UI->getUser()->getParent() != BB)
-      return nullptr;
-  }
-  return BB;
-}
-
-/// Replaces all uses of a value with another, but only if that use is in the
-/// given BB.
-static void replaceAllUsesInBB(SILValue OrigV, SILValue NewV,
-                               SILBasicBlock *InBB) {
-  assert(OrigV != NewV && "Cannot RAUW a value with itself");
-  assert(OrigV->getNumTypes() == NewV->getNumTypes() &&
-         "An instruction and the value base that it is being replaced by "
-         "must have the same number of types");
-
-  for (auto UseIt = OrigV.use_begin(); UseIt != OrigV.use_end(); ) {
-    auto ThisUse = UseIt;
-    ++UseIt;
-    if (ThisUse->getUser()->getParent() != InBB)
-      continue;
-    ThisUse->set(NewV);
-  }
-}
-
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
@@ -465,14 +428,18 @@ namespace {
 
     SILBasicBlock *FromBB, *DestBB;
   public:
+    // A map of old to new available values.
+    SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
 
     ThreadingCloner(BranchInst *BI)
       : SILClonerWithScopes(*BI->getFunction()),
         FromBB(BI->getDestBB()), DestBB(BI->getParent()) {
       // Populate the value map so that uses of the BBArgs in the DestBB are
       // replaced with the branch's values.
-      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
+      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
         ValueMap[FromBB->getBBArg(i)] = BI->getArg(i);
+        AvailVals.push_back(std::make_pair(FromBB->getBBArg(i), BI->getArg(i)));
+      }
     }
 
     void process(SILInstruction *I) { visit(I); }
@@ -497,41 +464,109 @@ namespace {
     void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
       DestBB->getInstList().push_back(Cloned);
       SILClonerWithScopes<ThreadingCloner>::postProcess(Orig, Cloned);
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
     }
   };
 } // end anonymous namespace
+
+static bool containsAllocStack(SILBasicBlock *BB) {
+  for (auto &Inst : *BB)
+    if (isa<AllocStackInst>(&Inst) || isa<DeallocStackInst>(&Inst))
+      return true;
+  return false;
+}
+
+/// Check whether we can 'thread' through the switch_enum instruction by
+/// duplicating the switch_enum block into SrcBB.
+static bool isThreadableSwitchEnumInst(SwitchEnumInst *SEI,
+                                       SILBasicBlock *SrcBB, EnumInst *&E0,
+                                       EnumInst *&E1) {
+  auto SEIBB = SEI->getParent();
+  auto PIt = SEIBB->pred_begin();
+  auto PEnd = SEIBB->pred_end();
+
+  // Recognize a switch_enum preceeded by two direct branch blocks that carry
+  // the switch_enum operand's value as EnumInsts.
+  if(std::distance(PIt, PEnd) != 2)
+    return false;
+
+  auto Arg = dyn_cast<SILArgument>(SEI->getOperand());
+  if (!Arg)
+    return false;
+
+  if (Arg->getParent() != SEIBB)
+    return false;
+
+  // We must not duplicate alloc_stack, dealloc_stack.
+  if (containsAllocStack(SEIBB))
+      return false;
+
+  auto Idx = SEIBB->getBBArgIndex(Arg);
+  auto IncomingBr0 = dyn_cast<BranchInst>(((*PIt))->getTerminator());
+  ++PIt;
+  auto IncomingBr1 = dyn_cast<BranchInst>((*PIt)->getTerminator());
+
+  // Make sure that we don't have an incoming critical edge.
+  if (!IncomingBr0 || !IncomingBr1)
+    return false;
+
+  // We cannonicalize to IncomingBr0 to be from the basic block we clone
+  // into.
+  if (IncomingBr1->getParent() == SrcBB)
+    std::swap(IncomingBr0, IncomingBr1);
+
+  assert(IncomingBr0->getArgs().size() == SEIBB->getNumBBArg());
+  assert(IncomingBr1->getArgs().size() == SEIBB->getNumBBArg());
+
+  // Make sure that both predecessors arguments are an EnumInst so that we can
+  // forward the branch.
+  E0 = dyn_cast<EnumInst>(IncomingBr0->getArg(Idx));
+  E1 = dyn_cast<EnumInst>(IncomingBr1->getArg(Idx));
+  if (!E0 || !E1)
+    return false;
+
+  if (E0->getParent() != IncomingBr0->getParent() ||
+      E1->getParent() != IncomingBr1->getParent())
+    return false;
+
+  // We also need to check for the absence of payload uses. we are not handling
+  // them.
+  auto SwitchDestBB0 = SEI->getCaseDestination(E0->getElement());
+  auto SwitchDestBB1 = SEI->getCaseDestination(E1->getElement());
+  return SwitchDestBB0->getNumBBArg() == 0 && SwitchDestBB1->getNumBBArg() == 0;
+}
 
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
 bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   auto *DestBB = BI->getDestBB();
-
+  auto *SrcBB = BI->getParent();
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
   if (isa<ReturnInst>(DestBB->getTerminator()))
     return false;
 
-  // This code is intentionally simple.  It can thread arguments used outside
-  // of this block, only if they are used entirely in one of the blocks we
-  // are jumping to, and that block has no other predecessors.
-  typedef std::pair<SILArgument*, SILBasicBlock*> ArgUsePair;
-  SmallVector<ArgUsePair, 1> ArgsNeedingSSA;
-  for (auto Arg : DestBB->getBBArgs()) {
-    if (!isUsedOutsideOfBlock(Arg, DestBB))
-      // Used only in this block, so all is good.
-      continue;
-    SILBasicBlock *UseBB = getBlockWithAllOtherUses(Arg, DestBB);
-    if (!UseBB)
-      return false;
-    // All users (except those in DestBB) are in a single BB.  We need to make
-    // sure that the use BB is only entered directly from this BB.  Other cases
-    // require construcing SSA.
-    if (!isa<CondBranchInst>(DestBB->getTerminator()))
-      return false;
-    if (UseBB->getSinglePredecessor() != DestBB)
-      return false;
-    ArgsNeedingSSA.push_back(std::make_pair(Arg, UseBB));
-  }
+  bool isThreadableCondBr = isa<CondBranchInst>(DestBB->getTerminator()) &&
+                  !containsAllocStack(DestBB);
+
+  // We can jump thread switch enum instructions. But we need to 'thread' it by
+  // hand - i.e. we need to replace the switch enum by branches - if we don't do
+  // so the ssaupdater will fail because we can't form 'phi's with anything
+  // other than branches and conditional branches because only they support
+  // arguments :(.
+  EnumInst *EnumInst0 = nullptr;
+  EnumInst *EnumInst1 = nullptr;
+  SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(DestBB->getTerminator());
+  bool isThreadableEnumInst =
+      SEI && isThreadableSwitchEnumInst(SEI, SrcBB, EnumInst0, EnumInst1);
+
+  // This code is intentionally simple, and cannot thread if the BBArgs of the
+  // destination are used outside the DestBB.
+  bool HasDestBBDefsUsedOutsideBlock = false;
+  for (auto Arg : DestBB->getBBArgs())
+    if ((HasDestBBDefsUsedOutsideBlock |= isUsedOutsideOfBlock(Arg, DestBB)))
+      if (!isThreadableCondBr && !isThreadableEnumInst)
+        return false;
 
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
@@ -570,35 +605,12 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     // If there is an instruction in the block that has used outside the block,
     // duplicating it would require constructing SSA, which we're not prepared
     // to do.
-    if (isUsedOutsideOfBlock(&Inst, DestBB)) return false;
+    if ((HasDestBBDefsUsedOutsideBlock |=
+         isUsedOutsideOfBlock(&Inst, DestBB)))
+      if (!isThreadableCondBr && !isThreadableEnumInst)
+        return false;
   }
 
-  // If any of the arguments are live out of this BB, then we need to add them
-  // as arguments to the successor BB.  We do this before cloning as that
-  // way the clone will also have the argument.
-  if (ArgsNeedingSSA.size()) {
-    // Note that we must have cond_br as the terminator of this BB.  This was
-    // checked earlier when adding the live out BBs.
-    auto *CondBr = dyn_cast<CondBranchInst>(DestBB->getTerminator());
-    for (auto &ArgPair : ArgsNeedingSSA) {
-      // Find the successor of the branch which corresponds to the UseBB for
-      // this argument.
-      SILArgument *Arg = ArgPair.first;
-      SILBasicBlock *UseBB = ArgPair.second;
-      for (auto& Succ : CondBr->getSuccessors()) {
-        if (Succ != UseBB)
-          continue;
-        // Add an argument to the target BB.
-        auto *NewArg = UseBB->createArgument(Arg->getType());
-        replaceAllUsesInBB(Arg, NewArg, UseBB);
-
-        // Add the argument to the conditional instruction.
-        auto *NewTI = addArgumentToBranch(Arg, UseBB, CondBr);
-        CondBr->eraseFromParent();
-        CondBr = cast<CondBranchInst>(NewTI);
-      }
-    }
-  }
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
@@ -613,6 +625,76 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // simplified.
   addToWorklist(BI->getParent());
   BI->eraseFromParent();
+
+  // Thread the switch enum instruction.
+  if (isThreadableEnumInst && HasDestBBDefsUsedOutsideBlock) {
+    assert(EnumInst0 && EnumInst1 && "Need to have two enum instructions");
+    // We know that the switch enum is fed by enum instructions along all
+    // incoming edges.
+    auto SwitchDestBB0 = SEI->getCaseDestination(EnumInst0->getElement());
+    auto SwitchDestBB1 = SEI->getCaseDestination(EnumInst1->getElement());
+    assert(EnumInst0->getParent() == SrcBB);
+
+    auto ClonedSEI = SrcBB->getTerminator();
+    auto &InstList0 = EnumInst0->getParent()->getInstList();
+    InstList0.insert(InstList0.end(),
+                     BranchInst::create(SEI->getLoc(), SwitchDestBB0,
+                                        *SEI->getParent()->getParent()));
+
+    auto &InstList1 = SEI->getParent()->getInstList();
+    InstList1.insert(InstList1.end(),
+                     BranchInst::create(SEI->getLoc(), SwitchDestBB1,
+                                        *SEI->getParent()->getParent()));
+    ClonedSEI->eraseFromParent();
+    SEI->eraseFromParent();
+  }
+
+  if (HasDestBBDefsUsedOutsideBlock) {
+    SILSSAUpdater SSAUp;
+    for (auto AvailValPair : Cloner.AvailVals) {
+      ValueBase *Inst = AvailValPair.first;
+      if (Inst->use_empty())
+        continue;
+
+      for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
+        // Get the result index for the cloned instruction. This is going to be
+        // the result index stored in the available value for arguments (we look
+        // through the phi node) and the same index as the original value
+        // otherwise.
+        unsigned ResIdx = i;
+        if (isa<SILArgument>(Inst))
+          ResIdx = AvailValPair.second.getResultNumber();
+
+        SILValue Res(Inst, i);
+        SILValue NewRes(AvailValPair.second.getDef(), ResIdx);
+
+        SmallVector<UseWrapper, 16> UseList;
+        // Collect the uses of the value.
+        for (auto Use : Res.getUses())
+          UseList.push_back(UseWrapper(Use));
+
+        SSAUp.Initialize(Res.getType());
+        SSAUp.AddAvailableValue(DestBB, Res);
+        SSAUp.AddAvailableValue(SrcBB, NewRes);
+
+        if (UseList.empty())
+          continue;
+
+        // Update all the uses.
+        for (auto U : UseList) {
+          Operand *Use = U;
+          SILInstruction *User = Use->getUser();
+          assert(User && "Missing user");
+
+          // Ignore uses in the same basic block.
+          if (User->getParent() == DestBB)
+            continue;
+
+          SSAUp.RewriteUse(*Use);
+        }
+      }
+    }
+  }
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
@@ -881,234 +963,6 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   return true;
 }
 
-static SILBasicBlock *isEnumOnlyBlock(SILBasicBlock *BB, EnumInst *&Enum) {
-  SILBasicBlock::iterator BI = BB->begin();
-  assert(BI != BB->end() && "Malformed block?");
-  // Check for an enum instruction.
-  EnumInst *EI = dyn_cast<EnumInst>(&*BI);
-  if (!EI)
-    return nullptr;
-
-  // And only an enum instruction.
-  ++BI;
-  if (!isa<BranchInst>(&*BI))
-    return nullptr;
-
-  Enum = EI;
-  return BB;
-}
-
-static void removeBlock(SILBasicBlock *BB) {
-  SILBasicBlock::reverse_iterator RI;
-  while ((RI = BB->rbegin()) != BB->rend()) {
-    SILInstruction *CurI = &*RI;
-    CurI->dropAllReferences();
-    CurI->eraseFromParent();
-  }
-  BB->dropAllArgs();
-  BB->eraseFromParent();
-}
-
-/// Simplify a pattern that occurs in counting loops. What is normally the loop
-/// exiting header is expressed as a diamond with a switch on an optional. In
-/// many cases we can get rid of the switch_enum and replace the diamond by an
-/// conditional branch.
-static bool simplifySwitchEnumCondBrPattern(
-    SwitchEnumInst *SEI, DominanceInfo &DT,
-    SmallVectorImpl<SILBasicBlock *> &BlocksToRemove) {
-  // We are looking for the following diamond pattern.
-  //         CONDBR:
-  //           cond_br ..., OnlyEnumBB, OtherBB
-  //
-  //   OnlyEnumBB:          OtherBB:
-  //     Only:                i2 =
-  //     e = enum None()      e = enum Some(val)
-  //     br SWITCHBB (e,i)      br SWITCHBB (e,i2)
-  //
-  //   SWITCHBB: (e, i)
-  //     // (e, i) only used in OtherSucc
-  //     switch_enum e None: OnlyEnumSUCC, Some: OtherSUCC
-  //
-  // In such a case we can collapse the switch_enum into the following pattern.
-  //
-  //   CONDBR:
-  //     cond_br OnlyEnumSUCC, PRED2:
-  //
-  //   OtherBB:
-  //     i2 =
-  //     e = enum Some(val)
-  //     br OtherSUCC (i2)
-  //
-  //   OnlyEnumSUCC: ...
-  //   OtherSUCC(new_i): ...
-
-
-  if (SEI->getNumCases() != 2)
-    return false;
-
-  // The enum must be an argument to the switch block and the switch_enum must
-  // be the only instruction in the switch block.
-  SILBasicBlock *SwitchBB = SEI->getParent();
-  SILArgument *EnumMerge = dyn_cast<SILArgument>(SEI->getOperand());
-  if (&*SwitchBB->begin() != SEI || !EnumMerge ||
-      EnumMerge->getParent() != SwitchBB)
-    return false;
-
-  assert(!EnumMerge->use_empty() && "Empty use but switch enum user?!");
-
-  unsigned EnumMergeIdx = SwitchBB->getBBArgIndex(EnumMerge);
-
-  //  Check for two predecessors.
-  if (SwitchBB->pred_empty())
-    return false;
-
-  SILBasicBlock::pred_iterator Pred = SwitchBB->pred_begin();
-
-  SILBasicBlock *B1 = *Pred;
-  // Bail if there is only one predecessor.
-  if (++Pred == SwitchBB->pred_end())
-    return false;
-
-  SILBasicBlock *B2 = *Pred;
-  // Bail if there are more than two predecessors.
-  if (++Pred != SwitchBB->pred_end())
-    return false;
-
-  // Look for diamonds.
-  SILBasicBlock *CondBrBB = B1->getSinglePredecessor();
-  CondBranchInst *CondBr;
-  if (!CondBrBB || CondBrBB != B2->getSinglePredecessor())
-    return false;
-  if (!(CondBr = dyn_cast<CondBranchInst>(CondBrBB->getTerminator())))
-    return false;
-
-  if (B1->getSingleSuccessor() != SwitchBB ||
-      B2->getSingleSuccessor() != SwitchBB ||
-      !isa<BranchInst>(B1->getTerminator()) ||
-      !isa<BranchInst>(B2->getTerminator()))
-    return false;
-
-  // Look for a block with only an enum.
-  EnumInst *OnlyEnum = nullptr;
-  auto *OnlyEnumBB = isEnumOnlyBlock(B1, OnlyEnum) != nullptr
-                                 ? B1
-                                 : isEnumOnlyBlock(B2, OnlyEnum);
-  if (!OnlyEnumBB)
-    return false;
-
-  auto *OtherBlock = OnlyEnumBB == B1 ? B2 : B1;
-  BranchInst *OtherBlockBr = cast<BranchInst>(OtherBlock->getTerminator());
-  EnumInst *OtherBlockEnum =
-    dyn_cast<EnumInst>(OtherBlockBr->getArg(EnumMergeIdx));
-
-  // The two enum tags need to be different.
-  if (!OtherBlockEnum || OtherBlockEnum->getElement() == OnlyEnum->getElement())
-    return false;
-
-  // TODO: Implement the logic for handling this case.
-  if (SEI->hasDefault())
-    return false;
-
-  // Collect the switch's successor blocks.
-  auto *OnlyEnumBBSucc =
-      SEI->getCaseDestination(OnlyEnum->getElement());
-  auto *OtherBBSucc = SEI->getCaseDestination(OtherBlockEnum->getElement());
-
-  // Check that the blocks have only a single predecessor and no arguments.
-  if (!OnlyEnumBBSucc->getSinglePredecessor() ||
-      !OtherBBSucc->getSinglePredecessor() ||
-      !OnlyEnumBBSucc->getBBArgs().empty() ||
-      !OtherBBSucc->getBBArgs().empty())
-    return false;
-
-  // Make sure that all uses of the switch's arguments are dominated by the
-  // other bb's side. Except the enum instruction itself that will be used by
-  // the switch enum instructions.
-  for (auto *Arg : SwitchBB->getBBArgs()) {
-    for (auto Use : Arg->getUses())
-      if (Use->getUser() != SEI &&
-          !DT.dominates(OtherBBSucc, Use->getUser()->getParent()))
-        return false;
-  }
-
-  // Update the uses of the switch bb arguments. We made sure that they are
-  // dominated by the other block edge.
-  for (unsigned i = 0, e = SwitchBB->getNumBBArg(); i < e; ++i) {
-    auto *Arg = SwitchBB->getBBArg(i);
-    // We are also replacing the value use in the switch basic block. This is
-    // fine since we are going to delete it in the next steps.
-    Arg->replaceAllUsesWith(OtherBlockBr->getArg(i).getDef());
-  }
-
-  // The two enum tags need to be different.
-  bool ForwardEnumOnlyOnTrue = CondBr->getTrueBB() == OnlyEnumBB;
-
-  // Create a new conditional branch. We forward the path through the 'enum
-  // only' block and jump to the 'other bb' otherwise.
-  SILBuilder B(CondBr);
-  SILBasicBlock *TrueBB = ForwardEnumOnlyOnTrue ? OnlyEnumBBSucc : OtherBlock;
-  SILBasicBlock *FalseBB =
-      !ForwardEnumOnlyOnTrue ? OnlyEnumBBSucc : OtherBlock;
-  B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueBB, FalseBB);
-  CondBr->dropAllReferences();
-  CondBr->eraseFromParent();
-
-  // Directly jump to the 'other bb' edge successor.
-  B.setInsertionPoint(OtherBlockBr);
-  B.createBranch(OtherBlockBr->getLoc(), OtherBBSucc);
-  OtherBlockBr->dropAllReferences();
-  OtherBlockBr->eraseFromParent();
-
-  // Fix the dominator tree.
-  SmallVector<SILBasicBlock *, 4> BlocksToFix;
-  for (auto *Child: *DT.getNode(SwitchBB))
-     if (Child->getBlock() != OnlyEnumBBSucc &&
-         Child->getBlock() != OtherBBSucc)
-       BlocksToFix.push_back(Child->getBlock());
-
-  DT.changeImmediateDominator(DT.getNode(OnlyEnumBBSucc), DT.getNode(CondBrBB));
-  DT.changeImmediateDominator(DT.getNode(OtherBBSucc), DT.getNode(OtherBlock));
-  for (auto *B : BlocksToFix)
-    DT.changeImmediateDominator(DT.getNode(B), DT.getNode(CondBrBB));
-
-  DT.eraseNode(SwitchBB);
-  DT.eraseNode(OnlyEnumBB);
-
-  // Delete the switch block and the enum only block.
-  BlocksToRemove.push_back(SwitchBB);
-  BlocksToRemove.push_back(OnlyEnumBB);
-
-  return true;
-}
-
-bool SimplifyCFG::simplifyLoopStructure() {
-  bool Changed = false;
-  for (auto &BB: Fn)
-    if (isa<SwitchEnumInst>(BB.getTerminator()))
-      addToWorklist(&BB);
-
-  if (WorklistList.empty())
-   return false;
-
-  PM->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::CFG);
-  DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-  DominanceInfo *DT = DA->getDomInfo(&Fn);
-
-  while (SILBasicBlock *BB = popWorklist()) {
-    auto *SEI = cast<SwitchEnumInst>(BB->getTerminator());
-    SmallVector<SILBasicBlock *, 2> BlocksToRemove;
-    if (simplifySwitchEnumCondBrPattern(SEI, *DT, BlocksToRemove)) {
-      Changed = true;
-      for (auto *BB : BlocksToRemove) {
-        removeFromWorklist(BB);
-        removeBlock(BB);
-      }
-    }
-  }
-
-  return Changed;
-}
-
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction that gets its operand from a an enum
 /// instruction.
@@ -1303,9 +1157,6 @@ bool SimplifyCFG::run() {
   DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
   DominanceInfo *DT = DA->getDomInfo(&Fn);
   Changed |= dominatorBasedSimplify(DT);
-
-  // This function also uses the dominator tree.
-  Changed |= simplifyLoopStructure();
 
   // Now attempt to simplify the remaining blocks.
   if (simplifyBlocks()) {
