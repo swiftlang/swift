@@ -47,23 +47,11 @@ func scan<
   return result
 }
 
-func findSubstring<
-  C1 : Sliceable, C2 : Sliceable
-where
-  C1.Generator.Element == C1.SubSlice.Generator.Element,
-  C1.SubSlice : Sliceable,
-  C1.SubSlice == C1.SubSlice.SubSlice,
-  C1.Generator.Element == C2.Generator.Element,
-  C1.Generator.Element : Equatable
->(string: C1, substring: C2) -> C1.Index? {
-  var currentString = string[string.startIndex..<string.endIndex]
-  for i in string.startIndex..<string.endIndex {
-    if startsWith(currentString, substring) {
-      return i
-    }
-    currentString = dropFirst(currentString)
+func findSubstring(string: String, substring: String) -> String.Index? {
+  if substring.isEmpty {
+    return string.startIndex
   }
-  return nil
+  return string.rangeOfString(substring)?.startIndex
 }
 
 func withArrayOfCStrings<R>(
@@ -74,18 +62,18 @@ func withArrayOfCStrings<R>(
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
-  var argsBuffer = [UInt8]()
+  var argsBuffer = ContiguousArray<UInt8>()
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
-    argsBuffer += arg.utf8
-    argsBuffer += [ 0 ]
+    argsBuffer.extend(arg.utf8)
+    argsBuffer.append(0)
   }
 
   return argsBuffer.withUnsafeBufferPointer {
     (argsBuffer) in
     let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
     var cStrings = Array(map(argsOffsets) { ptr + $0 })
-    cStrings.append(nil)
+    cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
 }

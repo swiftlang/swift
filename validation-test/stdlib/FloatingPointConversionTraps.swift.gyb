@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/FloatingPointConversionTraps.swift
-// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -o %t/a.out_Debug
-// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -o %t/a.out_Release -O
+// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
+// RUN: %target-build-swift %t/FloatingPointConversionTraps.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O
 //
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
@@ -15,6 +15,7 @@ from SwiftIntTypes import *
 
 }%
 
+#if arch(i386) || arch(x86_64)
 extension Float80 {
   public static var infinity: Float80 {
     return 1.0 / 0.0
@@ -22,6 +23,32 @@ extension Float80 {
   public static var quietNaN: Float80 {
     return 0.0 / 0.0
   }
+}
+#endif
+
+func getInfiniteOrNaNMessage(floatType: String) -> String {
+  // FIXME: <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
+  if floatType == "Float80" {
+    return ""
+  }
+  if _isDebugAssertConfiguration() {
+    return "either infinite or NaN"
+  }
+  return ""
+}
+
+func getTooSmallMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "it is less than"
+  }
+  return ""
+}
+
+func getTooLargeMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "it is greater than"
+  }
+  return ""
 }
 
 var FloatingPointConversion = TestCase("FloatingPointConversion")
@@ -33,7 +60,8 @@ var FloatingPointConversion = TestCase("FloatingPointConversion")
 #if arch(i386) || arch(x86_64)
 %     end
 
-FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf") {
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   if true {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(0.0)))
     expectEqual(0, a)
@@ -49,7 +77,8 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf") {
 
 %     if is_signed_int(IntSelf):
 
-FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf") {
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   if true {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-0.0)))
     expectEqual(0, a)
@@ -65,12 +94,14 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf") {
 
 %     else:
 
-FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative")
+  .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
 }
 
-FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
+FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
 }
@@ -79,7 +110,7 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative") {
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/NaN")
   .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
-  .code {
+  .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(${FloatSelf}.quietNaN)))
 }

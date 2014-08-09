@@ -293,6 +293,10 @@ public func expectNotEmpty<T>(
 
 public func expectCrashLater() {
   println("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
+
+  var stderr = _Stderr()
+  println("\(_stdlibUnittestStreamPrefix);expectCrash", &stderr)
+
   _seenExpectCrash = true
 }
 
@@ -331,7 +335,7 @@ func _stdlib_getline() -> String? {
 struct _FDInputStream {
   let fd: CInt
   var isEOF: Bool = false
-  var _buffer = ContiguousArray<UInt8>()
+  var _buffer = ContiguousArray<UInt8>(count: 256, repeatedValue: 0)
   var _bufferUsed: Int = 0
 
   init(fd: CInt) {
@@ -358,11 +362,14 @@ struct _FDInputStream {
   }
 
   mutating func read() {
+    let minFree = 128
     var bufferFree = _buffer.count - _bufferUsed
-    // FIXME(performance): reserve capacity.
-    while bufferFree < 128 {
-      _buffer.append(0)
-      ++bufferFree
+    if bufferFree < minFree {
+      _buffer.reserveCapacity(minFree - bufferFree)
+      while bufferFree < minFree {
+        _buffer.append(0)
+        ++bufferFree
+      }
     }
     let readResult: ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
@@ -405,11 +412,10 @@ func _childProcess() {
     _anyExpectFailed = false
     test.code()
 
-    println(
-      "\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
+    println("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
     var stderr = _Stderr()
-    println(_stdlibUnittestStreamPrefix, &stderr)
+    println("\(_stdlibUnittestStreamPrefix);end", &stderr)
   }
 }
 
@@ -442,7 +448,8 @@ struct _ParentProcess {
   /// Returns the values of the corresponding variables in the child process.
   mutating func _runTestInChild(testCaseName: String, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
-        status: ProcessTerminationStatus?) {
+        status: ProcessTerminationStatus?,
+        crashStdout: [String], crashStderr: [String]) {
     if _pid <= 0 {
       _spawnChild()
     }
@@ -456,12 +463,13 @@ struct _ParentProcess {
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
     var errorfds = _stdlib_fd_set()
+    var stdoutSeenCrashDelimiter = false
+    var stderrSeenCrashDelimiter = false
     var stdoutEnd = false
     var stderrEnd = false
-    var capturedStdout = [String]()
-    var capturedStderr = [String]()
-    var anyExpectFailedInChild: Bool = false
-    var seenExpectCrashInChild: Bool = false
+    var capturedCrashStdout = [String]()
+    var capturedCrashStderr = [String]()
+    var anyExpectFailedInChild = false
     while !((childStdout.isEOF && childStderr.isEOF) ||
       (stdoutEnd && stderrEnd)) {
 
@@ -483,13 +491,13 @@ struct _ParentProcess {
         childStdout.read()
         while var line = childStdout.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            stdoutEnd = true
             let controlMessage = line[index..<line.endIndex]._split(";")
             switch controlMessage[1] {
             case "expectCrash":
-              seenExpectCrashInChild = true
+              stdoutSeenCrashDelimiter = true
               anyExpectFailedInChild = controlMessage[2] == "true"
             case "end":
+              stdoutEnd = true
               anyExpectFailedInChild = controlMessage[2] == "true"
             default:
               fatalError("unexpected message")
@@ -499,7 +507,9 @@ struct _ParentProcess {
               continue
             }
           }
-          capturedStdout.append(line)
+          if stdoutSeenCrashDelimiter {
+            capturedCrashStdout.append(line)
+          }
           println("out>>> \(line)")
         }
         continue
@@ -508,27 +518,43 @@ struct _ParentProcess {
         childStderr.read()
         while var line = childStderr.getline() {
           if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            stderrEnd = true
+            let controlMessage = line[index..<line.endIndex]._split(";")
+            switch controlMessage[1] {
+            case "expectCrash":
+              stderrSeenCrashDelimiter = true
+            case "end":
+              stderrEnd = true
+            default:
+              fatalError("unexpected message")
+            }
             line = line[line.startIndex..<index]
             if line.isEmpty {
               continue
             }
           }
-          capturedStderr.append(line)
+          if stderrSeenCrashDelimiter {
+            capturedCrashStderr.append(line)
+          }
           println("err>>> \(line)")
         }
         continue
       }
     }
     if stdoutEnd && stderrEnd {
-      return (anyExpectFailedInChild, seenExpectCrashInChild, nil)
+      return (
+        anyExpectFailedInChild,
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, nil,
+        capturedCrashStdout, capturedCrashStderr)
     }
 
     // We reached EOF on stdout and stderr, it looks like child crashed (of
     // course it could have closed the file descriptors, but we assume it did
     // not).
     let status = _waitForChild()
-    return (anyExpectFailedInChild, seenExpectCrashInChild, status)
+    return (
+      anyExpectFailedInChild,
+      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
+      capturedCrashStdout, capturedCrashStderr)
   }
 
   mutating func run() {
@@ -552,11 +578,14 @@ struct _ParentProcess {
 
         var expectCrash = false
         var childTerminationStatus: ProcessTerminationStatus? = nil
+        var crashStdout = [String]()
+        var crashStderr = [String]()
         if _runTestsInProcess {
           _anyExpectFailed = false
           t.code()
         } else {
-          (_anyExpectFailed, expectCrash, childTerminationStatus) =
+          (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
+           crashStderr) =
             _runTestInChild(testCase.name, t.name)
         }
 
@@ -580,6 +609,23 @@ struct _ParentProcess {
 
         default:
           preconditionFailure("unreachable")
+        }
+        if testPassed {
+          if let crashOutputMatches = t.crashOutputMatches {
+            // If we still think that the test passed, check if the crash
+            // output matches our expectations.
+            var found = false
+            for s in crashStdout + crashStderr {
+              if findSubstring(s, crashOutputMatches) != nil {
+                found = true
+                break
+              }
+            }
+            if !found {
+              println("did not find expected string \(crashOutputMatches.debugDescription)")
+            }
+            testPassed = found
+          }
         }
 
         // Apply XFAILs.
@@ -652,6 +698,7 @@ public class TestCase {
     let name: String
     let xfail: [TestRunPredicate]
     let skip: [TestRunPredicate]
+    let crashOutputMatches: String?
     let code: () -> ()
 
     func getActiveXFailPredicates() -> [TestRunPredicate] {
@@ -671,6 +718,7 @@ public class TestCase {
     class _Data {
       var _xfail: [TestRunPredicate] = []
       var _skip: [TestRunPredicate] = []
+      var _crashOutputMatches: String?
     }
 
     init(testCase: TestCase, name: String) {
@@ -688,10 +736,15 @@ public class TestCase {
       return self
     }
 
+    public func crashOutputMatches(string: String) -> _TestBuilder {
+      _data._crashOutputMatches = string
+      return self
+    }
+
     public func code(testFunction: () -> ()) {
       _testCase._tests.append(_Test(
         name: _name, xfail: _data._xfail, skip: _data._skip,
-        code: testFunction))
+        crashOutputMatches: _data._crashOutputMatches, code: testFunction))
       _testCase._testNameToIndex[_name] = _testCase._tests.count - 1
     }
   }

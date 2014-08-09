@@ -49,8 +49,13 @@ struct _stdlib_fd_set {
   }
 
   mutating func zero() {
-    for i in indices(_data) {
-      _data[i] = 0
+    let count = _data.count
+    return _data.withUnsafeMutableBufferPointer {
+      (_data) in
+      for i in 0..<count {
+        _data[i] = 0
+      }
+      return
     }
   }
 }

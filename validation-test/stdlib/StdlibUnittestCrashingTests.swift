@@ -106,6 +106,29 @@ TestCaseCrashes.test("crashesAsExpectedXfail")
 // CHECK: err>>> CRASHED: SIG
 // CHECK: [   UXPASS ] TestCaseCrashes.crashesAsExpectedXfail
 
+TestCaseCrashes.test("crashesWithMessagePasses")
+  .crashOutputMatches("this should crash").code {
+  println("abcd")
+  expectCrashLater()
+  fatalError("this should crash")
+}
+// CHECK: out>>> abcd
+// CHECK: err>>> fatal error: this should crash:
+// CHECK: err>>> CRASHED: SIGILL
+// CHECK: [       OK ] TestCaseCrashes.crashesWithMessagePasses
+
+TestCaseCrashes.test("crashesWithMessageFails")
+  .crashOutputMatches("this should crash").code {
+  println("this should crash")
+  expectCrashLater()
+  fatalError("unexpected message")
+}
+// CHECK: out>>> this should crash
+// CHECK: err>>> fatal error: unexpected message:
+// CHECK: err>>> CRASHED: SIGILL
+// CHECK: did not find expected string "this should crash"
+// CHECK: [     FAIL ] TestCaseCrashes.crashesWithMessageFails
+
 // CHECK: TestCaseCrashes: Some tests failed, aborting
 // CHECK: abort()
 

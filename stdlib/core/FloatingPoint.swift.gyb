@@ -502,9 +502,9 @@ extension ${Self} {
       "floating point value can not be converted to ${Self} because it is either infinite or NaN")
 %     end
     _precondition(v >= ${That}(${Self}.min),
-        "floating point value can not be converted to ${Self} because it is greater than ${Self}.min")
-    _precondition(v <= ${That}(${Self}.max),
         "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
+    _precondition(v <= ${That}(${Self}.max),
+        "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
     value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
   }
 
