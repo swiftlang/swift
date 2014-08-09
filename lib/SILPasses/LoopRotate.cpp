@@ -229,7 +229,8 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
   if (!ShouldRotate)
     return false;
 
-  bool DidRotate = rotateLoop(L, DT, LI, true, Latch, ShouldVerify);
+  bool DidRotate = rotateLoop(L, DT, LI, false /* RotateSingleBlockLoops */,
+                              Latch, ShouldVerify);
 
   // Keep rotating at most until we hit the original latch.
   if (DidRotate)
@@ -256,25 +257,12 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   assert(L != nullptr && DT != nullptr && LI != nullptr &&
          "Missing loop information");
 
-  SILBasicBlock *Header = L->getHeader();
-  if (!Header || (!RotateSingleBlockLoops && Header == UpTo))
+  auto *Header = L->getHeader();
+  if (!Header)
     return false;
 
-  assert(RotateSingleBlockLoops || L->getBlocks().size() != 1);
-
-  // Need a conditional branch that guards the entry into the loop.
-  auto *LoopEntryBranch = dyn_cast<CondBranchInst>(Header->getTerminator());
-  if (!LoopEntryBranch)
-    return false;
-
-  // The header needs to exit the loop.
-  if (!L->isLoopExiting(Header)) {
-    DEBUG(llvm::dbgs() << *L << " not a exiting header\n");
-    DEBUG(L->getHeader()->getParent()->dump());
-    return false;
-  }
-
-  // We need a preheader.
+  // We need a preheader - this is also a cannonicalization for follow-up
+  // passes.
   auto *Preheader = L->getLoopPreheader();
   bool ChangedCFG = false;
   if (!Preheader) {
@@ -291,6 +279,24 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
       DEBUG(L->getHeader()->getParent()->dump());
       return false;
     }
+  }
+
+
+  if (!RotateSingleBlockLoops && Header == UpTo)
+    return ChangedCFG;
+
+  assert(RotateSingleBlockLoops || L->getBlocks().size() != 1);
+
+  // Need a conditional branch that guards the entry into the loop.
+  auto *LoopEntryBranch = dyn_cast<CondBranchInst>(Header->getTerminator());
+  if (!LoopEntryBranch)
+    return ChangedCFG;
+
+  // The header needs to exit the loop.
+  if (!L->isLoopExiting(Header)) {
+    DEBUG(llvm::dbgs() << *L << " not a exiting header\n");
+    DEBUG(L->getHeader()->getParent()->dump());
+    return ChangedCFG;
   }
 
   // We need a single backedge and the latch must not exit the loop if it is
