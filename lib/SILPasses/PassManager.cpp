@@ -17,12 +17,17 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
 
 using namespace swift;
 
 STATISTIC(NumOptzIterations, "Number of optimization iterations");
+
+llvm::cl::opt<std::string>
+    SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
+                    llvm::cl::desc("Only print out the sil for this function"));
 
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
@@ -53,9 +58,11 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       // If this pass invalidated anything, print and verify.
       if (CompleteFuncs->hasChanged()) {
         if (Options.PrintAll) {
-          llvm::dbgs() << "*** SIL function after " << SFT->getName()
-                       << " (" << NumOptimizationIterations << ") ***\n";
-          F.dump();
+          if (SILPrintOnlyFun.empty() || F.getName().str() == SILPrintOnlyFun) {
+            llvm::dbgs() << "*** SIL function after " << SFT->getName() << " ("
+                         << NumOptimizationIterations << ") ***\n";
+            F.dump();
+          }
         }
         if (Options.VerifyAll) {
           F.verify();
@@ -111,9 +118,9 @@ void SILPassManager::runOneIteration() {
 
       // If this pass invalidated anything, print and verify.
       if (CompleteFuncs->hasChanged()) {
-        if (Options.PrintAll) {
-          llvm::dbgs() << "*** SIL module after " << SMT->getName()
-                       << " (" << NumOptimizationIterations << ") ***\n";
+        if (Options.PrintAll && SILPrintOnlyFun.empty()) {
+          llvm::dbgs() << "*** SIL module after " << SMT->getName() << " ("
+                       << NumOptimizationIterations << ") ***\n";
           Mod->dump();
         }
         if (Options.VerifyAll) {
@@ -138,7 +145,7 @@ void SILPassManager::runOneIteration() {
 }
 
 void SILPassManager::run() {
-  if (Options.PrintAll) {
+  if (Options.PrintAll && SILPrintOnlyFun.empty()) {
     llvm::dbgs() << "*** SIL module before transformation ("
                  << NumOptimizationIterations << ") ***\n";
     Mod->dump();
