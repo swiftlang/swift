@@ -95,7 +95,7 @@ func testConvertArrayOfImplicitUnwrappedArray() {
   // CHECK: )
   for (index, obj) in enumerate(nsarr) {
     if let innerNSArr = obj as? NSArray {
-      println("Element \(index) has value \(innerNSArr.description!)")
+      println("Element \(index) has value \(innerNSArr.description)")
     } else {
       println("Element \(index) is not an NSArray")
     }

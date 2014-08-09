@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 import Foundation
 
-func foo(f: String! -> String!) {
+func foo(f: String -> String) {
   println(f(", "))
   println(f(" • "))
 }
