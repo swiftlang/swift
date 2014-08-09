@@ -21,8 +21,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef NDEBUG
+#define DEBUG(...)
+#define DEBUG_DO(x)
+#else
 #define DEBUG(...) printf(__VA_ARGS__)
 #define DEBUG_DO(x) {x;}
+#endif
 
 #ifdef SMALL_PROBLEM_SIZE
 #define                Count           1000*1000
