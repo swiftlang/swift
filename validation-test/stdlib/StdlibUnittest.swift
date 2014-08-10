@@ -208,12 +208,12 @@ PassThroughStdoutStderr.test("hasNewline") {
   println("stderr third", &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
-// CHECK: out>>> stdout first
-// CHECK: out>>> stdout second
-// CHECK: out>>> stdout third
-// CHECK: err>>> stderr first
-// CHECK: err>>> stderr second
-// CHECK: err>>> stderr third
+// CHECK-DAG: out>>> stdout first
+// CHECK-DAG: out>>> stdout second
+// CHECK-DAG: out>>> stdout third
+// CHECK-DAG: err>>> stderr first
+// CHECK-DAG: err>>> stderr second
+// CHECK-DAG: err>>> stderr third
 // CHECK: [       OK ] PassThroughStdoutStderr.hasNewline
 
 PassThroughStdoutStderr.test("noNewline") {
@@ -227,12 +227,12 @@ PassThroughStdoutStderr.test("noNewline") {
   print("stderr third", &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
-// CHECK: out>>> stdout first
-// CHECK: out>>> stdout second
-// CHECK: out>>> stdout third
-// CHECK: err>>> stderr first
-// CHECK: err>>> stderr second
-// CHECK: err>>> stderr third
+// CHECK-DAG: out>>> stdout first
+// CHECK-DAG: out>>> stdout second
+// CHECK-DAG: out>>> stdout third
+// CHECK-DAG: err>>> stderr first
+// CHECK-DAG: err>>> stderr second
+// CHECK-DAG: err>>> stderr third
 // CHECK: [       OK ] PassThroughStdoutStderr.noNewline
 // CHECK: PassThroughStdoutStderr: All tests passed
 
