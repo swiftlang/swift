@@ -34,7 +34,8 @@ public struct StaticString
   : StaticStringType,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible,
-    Printable {
+    Printable,
+    DebugPrintable {
   var _start: Builtin.RawPointer
   var _byteSize: Builtin.Word
   var _isASCII: Builtin.Int1
@@ -112,12 +113,17 @@ public struct StaticString
   public var description: String {
     return self.stringValue
   }
+
+  public var debugDescription: String {
+    return self.stringValue.debugDescription
+  }
 }
 
 /// A String-like type that can be constructed from string interpolation, and
 /// is considered less specific than `StaticString` in overload resolution.
 public struct AssertString
-  : AssertStringType, StringInterpolationConvertible, Printable {
+  : AssertStringType, StringInterpolationConvertible, Printable,
+    DebugPrintable {
   public var stringValue: String
 
   @transparent
@@ -165,6 +171,10 @@ public struct AssertString
 
   public var description: String {
     return self.stringValue
+  }
+
+  public var debugDescription: String {
+    return self.stringValue.debugDescription
   }
 }
 
