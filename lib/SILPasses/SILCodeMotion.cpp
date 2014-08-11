@@ -442,19 +442,11 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   SILValue Ptr = I->getOperand(0);
 
   // Make sure the condition comes from an enum_is_tag
-
-
-  EnumIsTagInst *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
+  auto *EITI = dyn_cast<EnumIsTagInst>(CondBr->getCondition());
   if (!EITI)
     return false;
 
-  // Its not clear whether its safe to do the
-  // valueHasARCDecrementsInInstructionRange analysis when the enum_is_tag is
-  // in another BB.  For now only do this when its the same BB as the cond_br.
-  if (EITI->getParent() != CondBr->getParent())
-    return false;
-
-  // If the retain value's argument is not the switch's argument, we can't do
+  // If the retain value's argument is not the cond_br's argument, we can't do
   // anything with our simplistic analysis... bail...
   if (Ptr != EITI->getOperand())
     return false;
@@ -465,34 +457,34 @@ static bool tryToSinkRefCountAcrossEnumIsTag(CondBranchInst *CondBr,
   // not move it.
   SILBasicBlock::iterator II = I;
   if (valueHasARCDecrementsInInstructionRange(Ptr, std::next(II),
-                                              SILBasicBlock::iterator(EITI),
+                                              SILBasicBlock::iterator(CondBr),
                                               AA))
     return false;
 
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
-  EnumElementDecl *Elts[2] = { EITI->getElement(), nullptr };
-  const auto &Operand = EITI->getOperand();
-  if (EnumDecl *E = Operand.getType().getEnumOrBoundGenericEnum()) {
-    // Look for a single other element on this enum.
-    EnumElementDecl *OtherElt = nullptr;
-    for (EnumElementDecl *Elt : E->getAllElements()) {
-      // Skip the case where we find the enum_is_tag element
-      if (Elt == EITI->getElement())
-        continue;
-      // If we find another element, then we must have more than 2, so bail.
-      if (OtherElt)
-        return false;
-      OtherElt = Elt;
-    }
-    // Only a single enum element?  How would this even get here?  We should
-    // handle it in SILCombine.
-    if (!OtherElt)
-      return false;
-    Elts[1] = OtherElt;
-  } else
+  EnumElementDecl *Elts[2] = {EITI->getElement(), nullptr};
+  EnumDecl *E = EITI->getOperand().getType().getEnumOrBoundGenericEnum();
+  if (!E)
     return false;
+
+  // Look for a single other element on this enum.
+  EnumElementDecl *OtherElt = nullptr;
+  for (EnumElementDecl *Elt : E->getAllElements()) {
+    // Skip the case where we find the enum_is_tag element
+    if (Elt == EITI->getElement())
+      continue;
+    // If we find another element, then we must have more than 2, so bail.
+    if (OtherElt)
+      return false;
+    OtherElt = Elt;
+  }
+  // Only a single enum element?  How would this even get here?  We should
+  // handle it in SILCombine.
+  if (!OtherElt)
+    return false;
+  Elts[1] = OtherElt;
 
   SILBuilder Builder(EITI);
 
