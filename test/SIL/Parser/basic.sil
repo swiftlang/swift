@@ -184,6 +184,9 @@ bb0(%0 : $*P):
 
   // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
   %2 = protocol_method %0 : $*P, #P.doIt!1 : <Self : P> inout Self -> () -> () , $@cc(witness_method) (@inout @sil_self P) -> ()
+  // Make sure we have the correct scope for generic parameters.
+  // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
+  %7 = protocol_method %0 : $*P, #P.doIt!1 : <Self : P> inout Self -> () -> () , $@cc(witness_method) (@inout @sil_self P) -> ()
   // CHECK: apply
   %3 = apply %2(%1) : $@cc(witness_method) (@inout @sil_self P) -> ()
   %4 = tuple ()                       // CHECK: tuple ()

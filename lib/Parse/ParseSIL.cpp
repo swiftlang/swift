@@ -2270,7 +2270,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     // Parse the type for SILDeclRef.
+    Optional<Scope> GenericsScope;
+    GenericsScope.emplace(&P, ScopeKind::Generics);
     ParserResult<TypeRepr> TyR = P.parseType();
+    GenericsScope.reset();
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
