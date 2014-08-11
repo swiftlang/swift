@@ -307,8 +307,8 @@ bb3:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: retain_value
 // CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: retain_value
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -346,8 +346,8 @@ bb4:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: retain_value
 // CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: retain_value
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -424,10 +424,10 @@ bb3:
 // CHECK: bb1:
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
-// CHECK-NEXT: retain_value
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: enum_is_tag
+// CHECK-NEXT: retain_value
 // CHECK-NEXT: release_value
 // CHECK-NEXT: cond_br
 // CHECK: bb2:
@@ -563,4 +563,75 @@ bb2:
 bb3:
   %9999 = tuple()
   return %9999 : $() 
+}
+
+sil @arc_user : $@thin () -> ()
+sil @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+
+// The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
+// as possible down the current BB.  The first retain should be moved to above the release_value.
+// The second retain shouldn't move at all
+// The third retain should move below the sadd builtin_function_ref
+// The fourth retain should move below the arc_user builtin_function_ref, but above the apply
+// The fifth retain should move below the apply to _swift_isUniquelyReferenced
+// And the last retain should remain where it is at the end of the BB.
+//
+// CHECK-LABEL: sil @move_retain_down_bb : $@thin (FakeOptional, FakeOptional, FakeOptional, FakeOptional, FakeOptional) -> (Builtin.Int64, Builtin.Int1) {
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: retain_value %1
+// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: release_value %4
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: function_ref arc_user
+// CHECK-NEXT: function_ref @arc_user
+// CHECK-NEXT: retain_value %3
+// CHECK-NEXT: retain_value %2
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref _swift_isUniquelyReferenced
+// CHECK-NEXT: function_ref @_swift_isUniquelyReferenced
+// CHECK-NEXT: integer_literal $Builtin.Word, 1
+// CHECK-NEXT: struct $Int
+// CHECK-NEXT: apply
+// CHECK-NEXT: retain_value %3
+// CHECK-NEXT: retain_value %3
+// CHECK-NEXT: switch_enum
+
+// CHECK: return
+sil @move_retain_down_bb : $@thin (FakeOptional, FakeOptional, FakeOptional, FakeOptional, FakeOptional) -> (Builtin.Int64, Builtin.Int1) {
+bb0(%0 : $FakeOptional, %1 : $FakeOptional, %2 : $FakeOptional, %3 : $FakeOptional, %4 : $FakeOptional):
+  retain_value %0 : $FakeOptional
+  %13 = builtin_function_ref "ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  retain_value %1 : $FakeOptional
+  release_value %4 : $FakeOptional
+  retain_value %2 : $FakeOptional
+  %14 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  retain_value %3 : $FakeOptional
+  %1000 = function_ref @arc_user : $@thin () -> ()
+  apply %1000 () : $@thin () -> ()
+  retain_value %3 : $FakeOptional
+  // function_ref _swift_isUniquelyReferenced
+  %500 = function_ref @_swift_isUniquelyReferenced : $@thin (Int) -> Bool
+  %501 = integer_literal $Builtin.Word, 1
+  %502 = struct $Int (%501 : $Builtin.Word)
+  %503 = apply %500(%502) : $@thin (Int) -> Bool
+  retain_value %3 : $FakeOptional
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, default bb2
+
+bb1:
+  %100 = integer_literal $Builtin.Int64, 1
+  %101 = integer_literal $Builtin.Int64, 2
+  %102 = integer_literal $Builtin.Int1, 1
+  %10 = apply %13(%100, %101, %102) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  br bb3(%10 : $(Builtin.Int64, Builtin.Int1))
+
+bb2:
+  %200 = integer_literal $Builtin.Int64, 3
+  %201 = integer_literal $Builtin.Int64, 4
+  %202 = integer_literal $Builtin.Int1, 1
+  %11 = apply %14(%200, %201, %202) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  br bb3(%11 : $(Builtin.Int64, Builtin.Int1))
+
+bb3(%12 : $(Builtin.Int64, Builtin.Int1)):
+  return %12 : $(Builtin.Int64, Builtin.Int1)
 }

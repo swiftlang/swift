@@ -568,11 +568,18 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   // Promote switch_enum_addr to switch_enum. Detect the pattern:
   //store %X to %Y#1 : $*Optional<SomeClass>
   //switch_enum_addr %Y#1 : $*Optional<SomeClass>, case ...
-  if (SEAI == SEAI->getParent()->begin())
-    return nullptr;
 
   SILBasicBlock::iterator it = SEAI;
-  if (StoreInst *SI = dyn_cast<StoreInst>(--it)) {
+
+  // Retains are moved as far down the block as possible, so we should skip over
+  // them when we search backwards for a store.
+  do {
+    if (it == SEAI->getParent()->begin())
+      return nullptr;
+    --it;
+  } while (isa<RetainValueInst>(it));
+
+  if (StoreInst *SI = dyn_cast<StoreInst>(it)) {
     SILValue EnumVal = SI->getSrc();
 
     // Make sure that the store destination and the switch address is the same

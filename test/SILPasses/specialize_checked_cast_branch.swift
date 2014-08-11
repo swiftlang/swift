@@ -25,8 +25,8 @@ func ArchetypeToArchetypeCast<T1, T2>(#t1 : T1, #t2 : T2) -> T2 {
 // x -> x where x is a class.
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C_S0____TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@thin (@out C, @in C, @in C) -> () {
 // CHECK: [[T0:%.*]] = load %1 : $*C
-// CHECK: strong_retain [[T0]]
 // CHECK: enum $Optional<C>, #Optional.Some!enumelt.1, [[T0]] : $C
+// CHECK: strong_retain [[T0]]
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: c, t2: c)
 
@@ -61,9 +61,9 @@ ArchetypeToArchetypeCast(t1: c, t2: b)
 // CHECK:   [[V:%.*]] = load %1 : $*C
 // CHECK:   checked_cast_br [[V]] : $C to $D,
 // CHECK: bb1([[T0:%.*]] : $D):
-// CHECK:   strong_retain [[V]] : $C
 // CHECK:   [[T1:%.*]] = enum $Optional<D>, #Optional.Some!enumelt.1, [[T0]] : $D
 // CHECK:   store [[T1]] to [[TMP]]#1 : $*Optional<D>
+// CHECK:   strong_retain [[V]] : $C
 // CHECK:   br bb3
 // CHECK: bb2:
 // CHECK:   [[T0:%.*]] = enum $Optional<D>, #Optional.None
@@ -74,9 +74,9 @@ ArchetypeToArchetypeCast(t1: c, t2: d)
 // y -> x where x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D_CS_1C___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@thin (@out C, @in D, @in C) -> () {
 // CHECK: [[T0:%.*]] = load %1 : $*D
-// CHECK: strong_retain [[T0]] : $D
 // CHECK: [[T1:%.*]] = upcast [[T0]] : $D to $C
 // CHECK: enum $Optional<C>, #Optional.Some!enumelt.1, [[T1]] : $C
+// CHECK: strong_retain [[T0]] : $D
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: d, t2: c)
 

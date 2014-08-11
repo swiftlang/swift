@@ -15,6 +15,7 @@ func outer_function<T : P>(#In : T) { inner_function(In: In) }
 
 //CHECK: sil shared @_TTSC10spec_conf13FooS0_S_1P___TF10spec_conf114outer_functionUS_1P__FT2InQ__T_
 //CHECK: function_ref @_TTSC10spec_conf13FooS0_S_1P___TF10spec_conf114inner_functionUS_1P__FT2InQ__T_
+//CHECK-NEXT: retain
 //CHECK-NEXT: apply
 //CHECK: return
 

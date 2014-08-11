@@ -47,6 +47,7 @@ ArchetypeToArchetype(t: b, t2: c)
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 // CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
+// CHECK-NEXT: retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: b)
@@ -68,6 +69,7 @@ ArchetypeToArchetype(t: d, t2: c)
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 // CHECK: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
+// CHECK-NEXT: retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 // CHECK-NOT: unconditional_checked_cast archetype_to_archetype
 ArchetypeToArchetype(t: c, t2: e)
@@ -109,8 +111,8 @@ ArchetypeToConcreteConvertUInt8(t: b)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 ArchetypeToConcreteConvertUInt8(t: c)
 
@@ -147,8 +149,8 @@ ArchetypeToConcreteConvertC(t: d)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 ArchetypeToConcreteConvertC(t: e)
 
@@ -158,8 +160,8 @@ ArchetypeToConcreteConvertC(t: e)
 // CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: [[TRAP:%[0-9]+]] = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply [[TRAP]]() : $@thin @noreturn @callee_owned () -> ()
 ArchetypeToConcreteConvertE(t: c)
 
@@ -168,7 +170,6 @@ ArchetypeToConcreteConvertE(t: c)
 // CHECK: bb0
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: store
 // CHECK-NEXT: alloc_stack $D
 // CHECK-NEXT: unconditional_checked_cast_addr take_always
@@ -176,6 +177,7 @@ ArchetypeToConcreteConvertE(t: c)
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: load
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertD(t: c)

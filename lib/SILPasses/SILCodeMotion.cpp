@@ -542,38 +542,87 @@ static bool tryToSinkRefCountInst(SILInstruction *T, SILInstruction *I,
   return true;
 }
 
-/// Sink retains to successors if possible. We only do this if the successors
-/// have only one predecessor.
-static bool sinkRetainToSuccessors(SILBasicBlock *BB, AliasAnalysis *AA) {
-  SILInstruction *S = BB->getTerminator();
+/// \brief - Tries to move the given retain instruction down as far as possible
+/// in the current BB.  It will move it as far as 'Pos' if possible, or to the
+/// first release it sees.
+static bool tryToMoveRefCountInstDownInBB(SILBasicBlock::iterator Pos,
+                                          SILInstruction *I,
+                                          AliasAnalysis *AA) {
+  if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
+    return false;
 
-  // Make sure that each one of our successors only has one predecessor,
-  // us. If that condition is not true, bail...
-  for (auto &Succ : BB->getSuccs()) {
-    SILBasicBlock *SuccBB = Succ.getBB();
-    if (!SuccBB || !SuccBB->getSinglePredecessor())
-      return false;
+  SILValue Ptr = I->getOperand(0);
+  SILBasicBlock::iterator II = I;
+  ++II;
+  for (; II != Pos; ++II) {
+    // If we find a release, then this is the farthest down we can move the
+    // instruction.
+    if (canDecrementRefCount(&*II, Ptr, AA))
+      break;
   }
 
-  // Ok, we can perform this transformation... We bail immediately if we do not
-  // have
-  bool Changed = false;
-  SILBuilder Builder(BB);
+  // If we didn't find anywhere to move it then give up.
+  Pos = II;
+  --II;
+  if (I == II)
+    return false;
 
+  // Ok, we have a ref count instruction, move it further down the BB.
+  I->moveBefore(Pos);
+  NumSunk++;
+  return true;
+}
+
+/// Try sink a retain as far as possible.  This is either to sucessor BBs,
+/// or as far down the current BB as possible
+static bool sinkRetain(SILBasicBlock *BB, AliasAnalysis *AA) {
+
+  // Make sure that each one of our successors only has one predecessor,
+  // us.
+  // If that condition is not true, we can still sink to the end of this BB,
+  // but not to successors.
+  bool CanSinkToSuccessor = true;
+  for (auto &Succ : BB->getSuccs()) {
+    SILBasicBlock *SuccBB = Succ.getBB();
+    if (!SuccBB || !SuccBB->getSinglePredecessor()) {
+      CanSinkToSuccessor = false;
+      break;
+    }
+  }
+
+  SILInstruction *S = BB->getTerminator();
   SILBasicBlock::iterator SI = S, SE = BB->begin();
   if (SI == SE)
     return false;
 
-  SI = std::prev(SI);
+  bool Changed = false;
 
+  // Walk from the terminator up the BB.  Try move retains either to the next
+  // BB, or the end of this BB.  Note that ordering is maintained of retains
+  // within this BB.
+  SILBasicBlock::iterator InsertPos = SI;
+  SI = std::prev(SI);
   while (SI != SE) {
     SILInstruction *Inst = &*SI;
     SI = std::prev(SI);
-    if (tryToSinkRefCountInst(S, Inst, AA))
+    // Try sink to successor
+    if (CanSinkToSuccessor && tryToSinkRefCountInst(S, Inst, AA)) {
       Changed = true;
+      continue;
+    }
+    // Try move further down the current BB.
+    if (tryToMoveRefCountInstDownInBB(InsertPos, Inst, AA)) {
+      InsertPos = std::prev(InsertPos);
+      Changed = true;
+      continue;
+    }
   }
 
-  return Changed | tryToSinkRefCountInst(S, &*SI, AA);
+  if (CanSinkToSuccessor && tryToSinkRefCountInst(S, &*SI, AA))
+    return true;
+  if (tryToMoveRefCountInstDownInBB(InsertPos, &*SI, AA))
+    return true;
+  return Changed;
 }
 
 namespace {
@@ -592,7 +641,7 @@ class SILCodeMotion : public SILFunctionTransform {
     for (auto &BB : F) {
       Changed |= sinkCodeFromPredecessors(&BB);
       Changed |= sinkArgumentsFromPredecessors(&BB);
-      Changed |= sinkRetainToSuccessors(&BB, AA);
+      Changed |= sinkRetain(&BB, AA);
     }
 
     if (Changed)
