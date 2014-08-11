@@ -236,14 +236,14 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[C:%[0-9]+]] = apply [[FUNC]]([[I]], [[J]], [[META]])
   var c = SomeClass(x: i, y: j)
 
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> ()
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   c.method(i)
 
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass14curried_methodfS0_fBi64_FT1yBi64__T_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
@@ -255,14 +255,14 @@ func calls(var i:Int, var j:Int, var k:Int) {
   var cm1 = SomeClass.method(c)
   cm1(i)
 
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> ()
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[C]])
   SomeClass.method(c)(i)
 
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass14curried_methodfS0_fBi64_FT1yBi64__T_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
@@ -270,27 +270,25 @@ func calls(var i:Int, var j:Int, var k:Int) {
 
   // -- Curry 'self' onto unapplied methods, after applying side effects from a Type expression.
 
+  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[SIDEFUNC:%[0-9]+]] = function_ref @_TF9functions21SomeClassWithBenefitsFT_MCS_9SomeClass : $@thin () -> @thick SomeClass.Type
   // CHECK: apply [[SIDEFUNC]]()
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass14curried_methodfS0_fBi64_FT1yBi64__T_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
   SomeClassWithBenefits().curried_method(c)(i)(y: j)
 
   // -- Curry the Type onto static method argument lists.
-
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass13static_methodfMS0_FBi64_T_ : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
+  
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[META:%[0-9]+]] = value_metatype $@thick SomeClass.Type, %153 : $SomeClass
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
   c.dynamicType.static_method(i)
 
-  // CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFC9functions9SomeClass21static_curried_methodfMS0_fBi64_FT1yBi64__T_ : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[META:%[0-9]+]] = value_metatype $@thick SomeClass.Type, %160 : $SomeClass
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[META]])
@@ -312,20 +310,20 @@ func calls(var i:Int, var j:Int, var k:Int) {
 
   // -- FIXME: class_method-ify class getters.
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFC9functions9SomeClassg12somePropertyBi64_ : $@cc(method) @thin (@owned SomeClass) -> Builtin.Int64 // user: %170
+  // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: apply [[GETTER]]([[C]])
   i = c.someProperty
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TFC9functions9SomeClasss12somePropertyBi64_ : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> () // user: %176
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : SomeClass -> (Int) -> ()
   // CHECK: apply [[SETTER]]([[I]], [[C]])
   c.someProperty = i
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFC9functions9SomeClassg9subscriptFTBi64_Bi64__Bi64_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> Builtin.Int64 // user: %182
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : SomeClass -> (Int, Int) -> Int , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   i = c[j, k]
 
@@ -333,7 +331,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TFC9functions9SomeClasss9subscriptFTBi64_Bi64__Bi64_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Int, Int, Int) -> () , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned SomeClass) -> () 
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k
 
@@ -370,22 +368,22 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGeneric6methodU__fGS0_Q__FQ_Q_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned SomeGeneric<τ_0_0>) -> ()
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPI]]#1, [[G]])
   g.method(i)
 
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGeneric7genericU__fGS0_Q__U__FQ_Q_ : $@cc(method) @thin <τ_0_0, τ_1_0> (@out τ_1_0, @in τ_1_0, @owned SomeGeneric<τ_0_0>) -> ()
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPJ]]#1, [[G]])
   g.generic(j)
 
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = function_ref @_TFC9functions9SomeClass7genericfS0_U__FQ_Q_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @owned SomeClass) -> () // user: %245
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPK]]#1, [[C]])
@@ -452,7 +450,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
 
 // CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@thin (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : $SomeClass):
-// CHECK:   %1 = function_ref @_TFC9functions9SomeClass6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> ()
+// CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : SomeClass -> (Int) -> ()
 // CHECK:   %2 = partial_apply %1(%0)
 // CHECK:   return %2
 

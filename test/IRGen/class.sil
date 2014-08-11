@@ -106,8 +106,8 @@ entry(%c : $C):
 
 // Part of rdar://16079147
 // vtable tested above
-public class D {
-  public func multiply(#x : Builtin.Int8)(y : Builtin.Int16) -> Builtin.Int32
+class D {
+  func multiply(#x : Builtin.Int8)(y : Builtin.Int16) -> Builtin.Int32
 }
 
 sil @_TFC5class1DD : $@cc(method) @thin (@owned D) -> () {

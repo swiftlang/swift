@@ -27,7 +27,7 @@ class Foo {
   final var x : Int
 // CHECK: var x: Int
 
-  var y : Int {
+  final var y : Int {
     get {
       return 5
     }

@@ -11,8 +11,8 @@ protocol Fooable {
 // Witnesses Fooable.foo with the original ObjC-imported -foo method .
 extension Foo: Fooable {}
 
-public class Phoûx : NSObject, Fooable {
-  @objc public func foo() -> String! {
+class Phoûx : NSObject, Fooable {
+  @objc func foo() -> String! {
     return "phoûx!"
   }
 }

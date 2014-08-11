@@ -58,11 +58,9 @@ func test0(var #c: C) {
 // CHECK: weak.(testClosureOverWeak () -> ()).(closure #1)
 // CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout @sil_weak Optional<C>) -> Int {
 // CHECK-NEXT: bb0(%0 : $Builtin.NativeObject, %1 : $*@sil_weak Optional<C>):
-// CHECK-NEXT:  // function_ref weak.C.f (weak.C)() -> Swift.Int
-// CHECK-NEXT:   function_ref @_TFC4weak1C1ffS0_FT_Si : $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   load_weak %{{[0-9]+}} : $*@sil_weak Optional<C>
-// CHECK-NEXT:   alloc_stack $Optional<C>
-// CHECK-NEXT:   store %{{[0-9]+}} to %{{[0-9]+}}#1 : $*Optional<C>
+// CHECK-NEXT:  %2 = load_weak %1 : $*@sil_weak Optional<C>
+// CHECK-NEXT:  %3 = alloc_stack $Optional<C>
+// CHECK-NEXT:  store %2 to %3#1 : $*Optional<C>
 func testClosureOverWeak() {
   weak var bC = C()
   takeClosure { bC!.f() }

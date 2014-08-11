@@ -1,6 +1,6 @@
 // RUN: %swift -emit-ir -target x86_64-apple-macosx10.9 %s | FileCheck %s
 
-public protocol ClassBound : class {
+protocol ClassBound : class {
   func classBoundMethod()
 }
 protocol ClassBound2 : class {
@@ -42,10 +42,10 @@ class ClassGenericFieldClass<T:ClassBound> {
   }
 }
 
-public class ClassProtocolFieldClass {
-  public var x : Int = 0
-  public var y : ClassBound
-  public var z : Int = 0
+class ClassProtocolFieldClass {
+  var x : Int = 0
+  var y : ClassBound
+  var z : Int = 0
 
   init(classBound cb: ClassBound) {
     y = cb
@@ -250,8 +250,8 @@ func class_protocol_field_class_fields(x: ClassProtocolFieldClass)
   // CHECK:  = call i64 %{{[0-9]+}}
 }
 
-public class SomeSwiftClass {
-  public class func foo() {}
+class SomeSwiftClass {
+  class func foo() {}
 }
 
 // T must have a Swift loayout, so we can load this metatype with a direct access.

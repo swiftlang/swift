@@ -653,7 +653,8 @@ private:
 
   /// Add the final attribute to a decl
   void addFinal(ValueDecl *ValD) {
-    ValD->getAttrs().add(new (M->Ctx) FinalAttr(/*IsImplicit=*/true));
+    // Do not add the 'final' attribute - see rdar://17890078
+    // ValD->getAttrs().add(new (M->Ctx) FinalAttr(/*IsImplicit=*/true));
   }
 
   /// Whether we're a decl inside a class

@@ -15,8 +15,7 @@ class A {
 
   // Regular methods go through the @objc property accessors.
   // CHECK-LABEL: sil @_TFC15objc_properties1A6method
-  // CHECK: // function_ref objc_properties.A.method
-  // CHECK-NEXT: = function_ref @_TFC15objc_properties1A6methodfS0_FSiT_
+  // CHECK: class_method {{.*}} #A.prop
   func method(x: Int) {
     prop = x
     method(prop)
@@ -42,8 +41,8 @@ class A {
     // CHECK: assign %1 to [[SELF_A]]
     prop = x
 
-    // CHECK: class_method [volatile] %0 : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
-    // CHECK-NEXT: apply
+    // CHECK: class_method
+    // CHECK: apply
     other.prop = x
   }
 
@@ -58,15 +57,13 @@ class A {
 
 // CHECK-LABEL: sil @_TF15objc_properties11testPropGet
 func testPropGet(a: A) -> Int {
-  // CHECK:  class_method [volatile] %0 : $A, #A.prop!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
-  // CHECK-NEXT: apply %3(%0) : $@cc(objc_method) @thin (A) -> Int
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil @_TF15objc_properties11testPropSet
 func testPropSet(a: A, i: Int) {
-  // CHECK: class_method [volatile] %0 : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
-  // CHECK-NEXT: apply %5(%1, %0) : $@cc(objc_method) @thin (Int, A) -> ()
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
   a.prop = i
 }
 

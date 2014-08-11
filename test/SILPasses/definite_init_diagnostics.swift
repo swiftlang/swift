@@ -15,16 +15,16 @@ func test1() -> Int {
 func takes_inout(inout a: Int) {}
 func takes_closure(fn: () -> ()) {}
 
-public class SomeClass {
+class SomeClass { 
   var x : Int
-
+  
   var computedProperty : Int { return 42 }
 
   init() { x = 0 }
   init(b : Bool) {
     if (b) {}
   } // expected-error {{property 'self.x' not initialized}}
-
+  
   func baseMethod() {}
 }
 
@@ -374,7 +374,7 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Bool, b : Bool) {
     // x is a superclass member.  It cannot be used before we are initialized.
-    x = 17 // expected-error {{'self' used before super.init call}}
+    x = 17  // expected-error {{use of property 'x' in base object before super.init}}
     y = 42
     super.init()
   }
@@ -398,7 +398,7 @@ class SomeDerivedClass : SomeClass {
   init(a : Bool, b : Bool, c : Bool, d : Bool, e : Bool, f : Bool) {
     y = 11
     if a { super.init() }
-    x = 42        // expected-error {{'self' used before super.init call}}
+    x = 42        // expected-error {{use of property 'x' in base object before super.init}}
   }               // expected-error {{super.init isn't called before returning from initializer}}
   
   func someMethod() {}
@@ -410,18 +410,18 @@ class SomeDerivedClass : SomeClass {
 
   init(a : Int, b : Bool) {
     y = 42
-    someMethod() // expected-error {{'self' used before super.init call}}
+    someMethod() // expected-error 2 {{'self' used before super.init call}}
     super.init()
   }
 
   init(a : Int, b : Int) {
     y = 42
-    baseMethod()  // expected-error {{'self' used before super.init call}}
+    baseMethod()  // expected-error {{use of method 'baseMethod' in base object before super.init initializes it}}
     super.init()
   }
   
   init(a : Int, b : Int, c : Int) {
-    y = computedProperty  // expected-error {{'self' used before super.init call}}
+    y = computedProperty  // expected-error {{use of property 'computedProperty' in base object before super.init initializes it}}
     super.init()
   }
 
@@ -545,7 +545,7 @@ class RequiresInitsDerived : Gizmo {
   } // expected-error{{super.init isn't called before returning from initializer}}
 
   init(d: Double) {
-    f() // expected-error {{'self' used before super.init call}}
+    f() // expected-error 2{{'self' used before super.init call}}
     super.init()
   }
 

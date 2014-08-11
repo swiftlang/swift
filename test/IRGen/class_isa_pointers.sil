@@ -8,8 +8,8 @@ import gizmo
 // A pure Swift class. We can access its isa directly.
 //
 
-public class Purebred {
-  public func method() {}
+class Purebred {
+  func method() {}
 }
 
 // CHECK-LABEL: define void @purebred_method(%C18class_isa_pointers8Purebred*) {
@@ -28,8 +28,8 @@ entry(%0 : $Purebred):
 // A mixed Swift/ObjC class. We have to use object_getClass to access its isa.
 //
 
-public class Mongrel: Gizmo {
-  public func method() {}
+class Mongrel: Gizmo {
+  func method() {}
 }
 
 // CHECK-LABEL: define void @mongrel_method(%C18class_isa_pointers7Mongrel*) {

@@ -34,8 +34,8 @@ class GY<T> : GX<[T]> { }
 // CHECK-LABEL: sil @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@thin (@owned Y) -> ()
 func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
-// CHECK:   [[X_F:%[0-9]+]] = function_ref @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned X
 // CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : Self -> () -> Self , $@cc(method) @thin (@owned X) -> @owned X
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@cc(method) @thin (@owned X) -> @owned X
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   strong_release [[Y_RESULT]] : $Y
@@ -45,8 +45,8 @@ func testDynamicSelfDispatch(y: Y) {
 // CHECK-LABEL: sil @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@thin (@owned GY<Int>) -> ()
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
-  // CHECK:   [[GX_F:%[0-9]+]] = function_ref @_TFC12dynamic_self2GX1fU__fDGS0_Q__FT_DGS0_Q__ : $@cc(method) @thin <τ_0_0> (@owned GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> Self -> () -> Self , $@cc(method) @thin <τ_0_0> (@owned GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@cc(method) @thin <τ_0_0> (@owned GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   strong_release [[GY_RESULT]] : $GY<Int>
@@ -146,8 +146,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
 // CHECK-LABEL: sil @_TF12dynamic_self18testOptionalResult{{.*}} : $@thin (@owned OptionalResultInheritor) -> ()
-// CHECK:      [[T0:%.*]] = function_ref @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK:  [[V:%[0-9]+]] = upcast %0 : $OptionalResultInheritor to $OptionalResult
+// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: apply [[T0]]([[V]])
 // CHECK:      [[T0:%.*]] = function_ref @_TFSs22_doesOptionalHaveValueU__FRGSqQ__Bi1_
 // CHECK-NEXT: apply [transparent] [[T0]]<OptionalResult>

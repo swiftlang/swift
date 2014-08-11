@@ -69,20 +69,20 @@ struct BigStructWithNativeObjects {
   var h : Hoozit
 }
 
-@objc public class Foo {
+@objc class Foo {
   var x = 0
-  public class func create() -> Foo {
+  class func create() -> Foo {
     return Foo()
   }
 
-  public func drawInRect(#dirty: NSRect) {
+  func drawInRect(#dirty: NSRect) {
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call void @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
   // CHECK: }
 
-  public func bounds() -> NSRect {
+  func bounds() -> NSRect {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }

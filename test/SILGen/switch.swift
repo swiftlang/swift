@@ -1107,10 +1107,10 @@ class ClassPatternTest {
 // CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
 func test_class_pattern(#k: ClassPatternTest) {
   switch k {
-  // CHECK: [[XM:%.*]] = function_ref @_TFC6switch16ClassPatternTestg1xSi : $@cc(method) @thin (@owned ClassPatternTest) -> Int
-  // CHECK-NEXT: [[X:%.*]]= apply [transparent] [[XM:%.*]]([[C]])
-  // CHECK: [[YM:%.*]] = function_ref @_TFC6switch16ClassPatternTestg1ySS : $@cc(method) @thin (@owned ClassPatternTest) -> @owned String
-  // CHECK-NEXT: [[Y:%.*]]= apply [transparent] [[YM:%.*]]([[C]])
+  // CHECK: [[XM:%.*]] = class_method [[C]] : $ClassPatternTest, #ClassPatternTest.x!getter.1
+  // CHECK: [[X:%.*]]= apply [[XM:%.*]]([[C]])
+  // CHECK: [[YM:%.*]] = class_method [[C]] : $ClassPatternTest, #ClassPatternTest.y!getter.1
+  // CHECK: [[Y:%.*]]= apply [[YM:%.*]]([[C]])
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
 
   // CHECK: [[IS_CASE1]]:
@@ -1159,8 +1159,8 @@ class SubclassTestB : ClassPatternTest {}
 
 func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   switch k {
-  // CHECK: [[XM:%.*]] = function_ref  @_TFC6switch16ClassPatternTestg1xSi : $@cc(method) @thin (@owned ClassPatternTest) -> Int
-  // CHECK-NEXT: [[X:%.*]] = apply [transparent] [[XM:%.*]](%0)
+  // CHECK: [[XM:%.*]] = class_method %0 : $ClassPatternTest, #ClassPatternTest.x!getter.1
+  // CHECK: [[X:%.*]] = apply [[XM:%.*]](%0)
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
 
   // CHECK: [[IS_CASE1]]:
@@ -1186,8 +1186,8 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
 
 
   // CHECK: [[IS_NOT_A]]:
-  // CHECK:   [[YM:%.*]] = function_ref @_TFC6switch16ClassPatternTestg1ySS : $@cc(method) @thin (@owned ClassPatternTest) -> @owned String
-  // CHECK-NEXT:   [[Y:%.*]] = apply [transparent] [[YM:%.*]](%0)
+  // CHECK:   [[YM:%.*]] = class_method %0 : $ClassPatternTest, #ClassPatternTest.y!getter.1
+  // CHECK:   [[Y:%.*]] = apply [[YM:%.*]](%0)
   // CHECK:   cond_br {{%.*}}, [[IS_CASE3:bb[0-9]+]], [[IS_NOT_CASE3:bb[0-9]+]]
 
   // CHECK: [[IS_CASE3]]:

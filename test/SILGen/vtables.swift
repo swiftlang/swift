@@ -6,7 +6,7 @@ import gizmo
 // TODO: Generic base classes
 
 // Test for compilation order independence
-public class C : B {
+class C : B {
   // foo inherited from B
   override func bar() {}
   // bas inherited from A
@@ -15,10 +15,10 @@ public class C : B {
   // zim inherited from B
   override func zang() {}
 
-  public required init(int i: Int) { }
+  required init(int i: Int) { }
 
-  public func flopsy() {}
-  public func mopsy() {}
+  func flopsy() {}
+  func mopsy() {}
 }
 // CHECK: sil_vtable C {
 // CHECK:   #A.foo!1: _TFC7vtables1B3foofS0_FT_T_
@@ -33,10 +33,10 @@ public class C : B {
 // CHECK:   #C.mopsy!1: _TFC7vtables1C5mopsyfS0_FT_T_
 // CHECK: }
 
-public class A {
+class A {
   func foo() {}
   func bar() {}
-  public func bas() {}
+  func bas() {}
   func qux() {}
 }
 
@@ -48,15 +48,15 @@ public class A {
 // CHECK:   #A.init!initializer.1: _TFC7vtables1AcfMS0_FT_S0_
 // CHECK: }
 
-public class B : A {
-  public required init(int i: Int) { }
+class B : A {
+  required init(int i: Int) { }
 
   override func foo() {}
   // bar inherited from A
   // bas inherited from A
   override func qux() {}
 
-  public func zim() {}
+  func zim() {}
   func zang() {}
 }
 
@@ -73,13 +73,13 @@ public class B : A {
 
 // Test ObjC base class
 
-public class Hoozit : Gizmo {
+class Hoozit : Gizmo {
   // Overrides Gizmo.frob
-  override public func frob() {}
+  override func frob() {}
   // Overrides Gizmo.funge
-  override public func funge() {}
+  override func funge() {}
 
-  public func anse() {}
+  func anse() {}
   func incorrige() {}
 }
 
@@ -111,7 +111,7 @@ class Wotsit : Hoozit {
 // CHECK: sil_vtable Derived {
 // CHECK:   #Base.init!initializer.1: _TFC7vtables7DerivedcfMS0_FT_S0_
 // CHECK: }
-@objc public class Base {}
+@objc class Base {}
 
 extension Base {
   // note: does not have a vtable slot, because it is from an extension
@@ -120,8 +120,8 @@ extension Base {
   }
 }
 
-public class Derived : Base {
-  override public func identify() -> Int {
+class Derived : Base {
+  override func identify() -> Int {
     return 1
   }
 }

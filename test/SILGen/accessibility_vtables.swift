@@ -13,6 +13,7 @@ class Sub : Base {
 }
 
 // CHECK-LABEL: sil_vtable Sub {
+// CHECK-NEXT:  #Base.internalMethod!1: _TFC28accessibility_vtables_helper4Base14internalMethodfS0_FT_T_
 // CHECK-NEXT:  #Base.prop!getter.1: _TFC21accessibility_vtables3Subg4propSi  // accessibility_vtables.Sub.prop.getter : Swift.Int
 // CHECK-NEXT:  #Base.prop!setter.1: _TFC28accessibility_vtables_helper4Bases4propSi  // accessibility_vtables_helper.Base.prop.setter : Swift.Int
 // CHECK-NEXT:  #Base.init!initializer.1: _TFC28accessibility_vtables_helper4BasecfMS0_FT_S0_ // accessibility_vtables_helper.Base.init (accessibility_vtables_helper.Base.Type)() -> accessibility_vtables_helper.Base

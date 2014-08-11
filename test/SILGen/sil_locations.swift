@@ -107,8 +107,8 @@ func testMethodCall() {
   var l: LocationClass;
   l.mem();
   // CHECK-LABEL: sil  @_TF13sil_locations14testMethodCallFT_T_
-
-  // CHECK function_ref @_TFC13sil_locations13LocationClass3memfS0_FT_T_ : $@cc(method) @thin (@owned LocationClass) -> () // user: %5 line:[[@LINE-3]]:5
+  
+  // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem!1 {{.*}} line:[[@LINE-3]]:5
 }
 
 func multipleReturnsImplicitAndExplicit() {
