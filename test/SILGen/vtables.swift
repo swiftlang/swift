@@ -106,13 +106,15 @@ class Wotsit : Hoozit {
 
 // <rdar://problem/15282548>
 // CHECK: sil_vtable Base {
+// CHECK:   #Base.init!initializer.1: _TFC7vtables4BasecfMS0_FT_S0_
 // CHECK: }
 // CHECK: sil_vtable Derived {
-// CHECK:   #Derived.identify!1: _TFC7vtables7Derived8identifyfS0_FT_Si
+// CHECK:   #Base.init!initializer.1: _TFC7vtables7DerivedcfMS0_FT_S0_
 // CHECK: }
 @objc public class Base {}
 
 extension Base {
+  // note: does not have a vtable slot, because it is from an extension
   func identify() -> Int {
     return 0
   }

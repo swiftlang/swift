@@ -287,7 +287,7 @@ extension Hoozit {
     other()
   }
 
-  public func foof() {}
+  public func foof() {} // inferred dynamic
   // CHECK-LABEL: sil @_TToFC11objc_thunks6Hoozit4fooffS0_FT_T_ : $@cc(objc_method) @thin (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }
@@ -301,9 +301,9 @@ func useHoozit(h: Hoozit) {
   h.fork()
   // CHECK: class_method {{%.*}} : {{.*}}, #Hoozit.fork!1 :
 
-  // In an extension, gets statically dispatched
+  // In an extension, 'dynamic' was inferred.
   h.foof()
-  // CHECK: function_ref @_TFC11objc_thunks6Hoozit4fooffS0_FT_T_
+  // CHECK: class_method [volatile] {{%.*}} : $Hoozit, #Hoozit.foof!1.foreign
 }
 
 func useWotsit(w: Wotsit<String>) {

@@ -541,6 +541,34 @@ private:
   }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 
+  // Determine whether the 'dynamic' was inferred for this declaration and
+  // all of the declarations it overrides.
+  static bool isInferredDynamic(ValueDecl *ValD) {
+    if (!ValD)
+      return true;
+
+    // If we have an accessor function, check whether the abstract storage
+    // declaration itself has its dynamic inferred.
+    if (auto func = dyn_cast<FuncDecl>(ValD)) {
+      if (func->isAccessor()) {
+        if (!isInferredDynamic(func->getAccessorStorageDecl()))
+          return false;
+      }
+    }
+
+    // Check whether this declaration is dynamic.
+    if (auto dynamic = ValD->getAttrs().getAttribute<DynamicAttr>()) {
+      // If 'dynamic' was implicit, check whether the overridden declaration
+      // is also implicit.
+      if (dynamic->isImplicit())
+        return isInferredDynamic(ValD->getOverriddenDecl());
+
+      return false;
+    }
+
+    return true;
+  }
+
   bool walkToDeclPre(Decl *D) override {
     auto ValD = dyn_cast<ValueDecl>(D);
     if (!ValD)
@@ -554,9 +582,20 @@ private:
     if (ValD->isFinal() || ValD->isInvalid() || !ValD->hasAccessibility())
       return false;
 
-    // final cannot apply to dynamic functions
-    if (ValD->isDynamic())
-      return false;
+    // final cannot apply to dynamic functions, unless "dynamic" was
+    // inferred to work around our inability to override methods in extensions
+    // (see inferDynamic in TypeCheckDecl.cpp).
+    bool removeDynamic = false;
+    DynamicAttr *dynamicAttr = ValD->getAttrs().getAttribute<DynamicAttr>();
+    if (dynamicAttr) {
+      // If this 'dynamic' wasn't inferred, we cannot apply 'final'.
+      if (!isInferredDynamic(ValD))
+        return false;
+
+      // Allow us to add 'final' to a dynamic function. We'll remove the
+      // inferred 'dynamic' if we do add 'final'.
+      removeDynamic = true;
+    }
 
     // final can only be applied to private or internal. For internal, only if
     // we can see the entire module
@@ -570,6 +609,9 @@ private:
       // We can add final if we're overridden and we're in a class
       if (!ASD->isOverridden() && isInClass(ASD->getDeclContext())) {
         addFinal(ASD);
+
+        if (removeDynamic)
+          ValD->getAttrs().removeAttribute(dynamicAttr);
       }
       return true;
     }
@@ -590,6 +632,8 @@ private:
             return true;
 
         addFinal(AFD);
+        if (removeDynamic)
+          ValD->getAttrs().removeAttribute(dynamicAttr);
       }
       return true;
     }

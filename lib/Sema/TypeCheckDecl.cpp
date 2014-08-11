@@ -2849,8 +2849,36 @@ public:
   void markAsObjC(ValueDecl *D, bool isObjC) {
     D->setIsObjC(isObjC);
     
-    if (isObjC)
+    if (isObjC) {
       checkBridgedFunctions();
+    }
+  }
+
+  /// If we need to infer 'dynamic', do so now.
+  ///
+  /// FIXME: This is a workaround for the fact that we cannot dynamically
+  /// dispatch to methods introduced in extensions, because they aren't
+  /// available in the class vtable.
+  void inferDynamic(ValueDecl *D) {
+    // If we can't infer dynamic here, don't.
+    if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D))
+      return;
+
+    // Only 'objc' declarations use 'dynamic'.
+    if (!D->isObjC())
+      return;
+
+    // Only introduce 'dynamic' on declarations in extensions that don't
+    // override other declarations.
+    if (!isa<ExtensionDecl>(D->getDeclContext()) || D->getOverriddenDecl())
+      return;
+
+    // The presence of 'dynamic' or 'final' blocks the inference of 'final'.
+    if (D->isDynamic() || D->isFinal())
+      return;
+
+    // Add the 'dynamic' attribute.
+    D->getAttrs().add(new (TC.Context) DynamicAttr(/*isImplicit=*/true));
   }
 
   //===--------------------------------------------------------------------===//
@@ -2914,6 +2942,8 @@ public:
         }
       }
     }
+
+    inferDynamic(VD);
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
@@ -3225,6 +3255,8 @@ public:
         }
       }
     }
+
+    inferDynamic(SD);
 
     TC.checkDeclAttributes(SD);
   }
@@ -4497,7 +4529,9 @@ public:
         }
       }
     }
-    
+
+    inferDynamic(FD);
+
     TC.checkDeclAttributes(FD);
   }
 
@@ -5626,6 +5660,8 @@ public:
         }
       }
     }
+
+    inferDynamic(CD);
 
     TC.checkDeclAttributes(CD);
   }
