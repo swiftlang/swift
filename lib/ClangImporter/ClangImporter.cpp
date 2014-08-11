@@ -389,7 +389,9 @@ ClangImporter::create(ASTContext &ctx,
   clangPP.addPPCallbacks(new HeaderImportCallbacks(*importer, importer->Impl));
 
   instance.createModuleManager();
-  instance.getModuleManager()->addListener(new ASTReaderCallbacks(*importer));
+  instance.getModuleManager()->addListener(
+         std::unique_ptr<clang::ASTReaderListener>(
+                 new ASTReaderCallbacks(*importer)));
 
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
