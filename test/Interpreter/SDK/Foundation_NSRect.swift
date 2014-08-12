@@ -29,3 +29,8 @@ printRect(NSMakeRect(100,100,50,50))
 
 // CHECK: {0, 0}, {100, 50}
 println(NSStringFromRect(r))
+
+// CHECK: NSRect(1.5, 1.5, 1.5, 1.5)
+let d = 1.5
+var r2 = NSRect(x: d, y: d, width: d, height: d)
+printRect(r2)

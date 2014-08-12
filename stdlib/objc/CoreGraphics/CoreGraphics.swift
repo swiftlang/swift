@@ -27,6 +27,10 @@ public extension CGPoint {
   init(x: Int, y: Int) {
     self.init(x: CGFloat(x), y: CGFloat(y))
   }
+
+  init(x: Double, y: Double) {
+    self.init(x: CGFloat(x), y: CGFloat(y))
+  }
 }
 
 extension CGPoint : Equatable {}
@@ -45,6 +49,10 @@ public extension CGSize {
   init(width: Int, height: Int) {
     self.init(width: CGFloat(width), height: CGFloat(height))
   }
+
+  init(width: Double, height: Double) {
+    self.init(width: CGFloat(width), height: CGFloat(height))
+  }
 }
 
 extension CGSize : Equatable {}
@@ -56,8 +64,20 @@ public func == (lhs: CGSize, rhs: CGSize) -> Bool {
 public extension CGVector {
   static var zeroVector: CGVector { get { return CGVector(0, 0) } }
 
+  init(dx: Int, dy: Int) {
+    self.init(dx: CGFloat(dx), dy: CGFloat(dy))
+  }
+
+  init(dx: Double, dy: Double) {
+    self.init(dx: CGFloat(dx), dy: CGFloat(dy))
+  }
+
   init(_ dx: CGFloat, _ dy: CGFloat) {
     self.init(dx: dx, dy: dy)
+  }
+
+  init(_ dx: Double, _ dy: Double) {
+    self.init(CGFloat(dx), CGFloat(dy))
   }
 
   init(_ dx: Int, _ dy: Int) {
@@ -83,6 +103,11 @@ public extension CGRect {
   }
 
   init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
+    self.init(origin: CGPoint(x: x, y: y), 
+              size: CGSize(width: width, height: height))
+  }
+
+  init(x: Double, y: Double, width: Double, height: Double) {
     self.init(origin: CGPoint(x: x, y: y), 
               size: CGSize(width: width, height: height))
   }
