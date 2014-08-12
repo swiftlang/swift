@@ -877,30 +877,34 @@ BitTwiddlingTestCase.test("_countLeadingZeros") {
 }
 
 BitTwiddlingTestCase.test("_isPowerOf2/Int") {
-  expectFalse(_isPowerOf2(Int(-1025)))
-  expectFalse(_isPowerOf2(Int(-1024)))
-  expectFalse(_isPowerOf2(Int(-1023)))
-  expectFalse(_isPowerOf2(Int(-4)))
-  expectFalse(_isPowerOf2(Int(-3)))
-  expectFalse(_isPowerOf2(Int(-2)))
-  expectFalse(_isPowerOf2(Int(-1)))
-  expectFalse(_isPowerOf2(Int(0)))
-  expectTrue(_isPowerOf2(Int(1)))
-  expectTrue(_isPowerOf2(Int(2)))
-  expectFalse(_isPowerOf2(Int(3)))
-  expectTrue(_isPowerOf2(Int(1024)))
-  expectTrue(_isPowerOf2(Int(0x8000_0000)))
+  func asInt(a: Int) -> Int { return a }
+
+  expectFalse(_isPowerOf2(asInt(-1025)))
+  expectFalse(_isPowerOf2(asInt(-1024)))
+  expectFalse(_isPowerOf2(asInt(-1023)))
+  expectFalse(_isPowerOf2(asInt(-4)))
+  expectFalse(_isPowerOf2(asInt(-3)))
+  expectFalse(_isPowerOf2(asInt(-2)))
+  expectFalse(_isPowerOf2(asInt(-1)))
+  expectFalse(_isPowerOf2(asInt(0)))
+  expectTrue(_isPowerOf2(asInt(1)))
+  expectTrue(_isPowerOf2(asInt(2)))
+  expectFalse(_isPowerOf2(asInt(3)))
+  expectTrue(_isPowerOf2(asInt(1024)))
+  expectTrue(_isPowerOf2(asInt(0x8000_0000)))
   expectFalse(_isPowerOf2(Int.min))
   expectFalse(_isPowerOf2(Int.max))
 }
 
 BitTwiddlingTestCase.test("_isPowerOf2/UInt") {
-  expectFalse(_isPowerOf2(UInt(0)))
-  expectTrue(_isPowerOf2(UInt(1)))
-  expectTrue(_isPowerOf2(UInt(2)))
-  expectFalse(_isPowerOf2(UInt(3)))
-  expectTrue(_isPowerOf2(UInt(1024)))
-  expectTrue(_isPowerOf2(UInt(0x8000_0000)))
+  func asUInt(a: Int) -> Int { return a }
+
+  expectFalse(_isPowerOf2(asUInt(0)))
+  expectTrue(_isPowerOf2(asUInt(1)))
+  expectTrue(_isPowerOf2(asUInt(2)))
+  expectFalse(_isPowerOf2(asUInt(3)))
+  expectTrue(_isPowerOf2(asUInt(1024)))
+  expectTrue(_isPowerOf2(asUInt(0x8000_0000)))
   expectFalse(_isPowerOf2(UInt.max))
 }
 

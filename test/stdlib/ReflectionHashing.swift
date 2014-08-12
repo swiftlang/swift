@@ -27,6 +27,25 @@ Reflection.test("Dictionary") {
   var output = ""
   dump(dict, &output)
 
+#if arch(i386) || arch(arm)
+  var expected = ""
+  expected += "▿ 5 key/value pairs\n"
+  expected += "  ▿ [0]: (2 elements)\n"
+  expected += "    - .0: Four\n"
+  expected += "    - .1: 4\n"
+  expected += "  ▿ [1]: (2 elements)\n"
+  expected += "    - .0: One\n"
+  expected += "    - .1: 1\n"
+  expected += "  ▿ [2]: (2 elements)\n"
+  expected += "    - .0: Two\n"
+  expected += "    - .1: 2\n"
+  expected += "  ▿ [3]: (2 elements)\n"
+  expected += "    - .0: Five\n"
+  expected += "    - .1: 5\n"
+  expected += "  ▿ [4]: (2 elements)\n"
+  expected += "    - .0: Three\n"
+  expected += "    - .1: 3\n"
+#elseif arch(x86_64) || arch(arm64)
   var expected = ""
   expected += "▿ 5 key/value pairs\n"
   expected += "  ▿ [0]: (2 elements)\n"
@@ -44,6 +63,9 @@ Reflection.test("Dictionary") {
   expected += "  ▿ [4]: (2 elements)\n"
   expected += "    - .0: Four\n"
   expected += "    - .1: 4\n"
+#else
+  fatalError("unipmelemented")
+#endif
 
   expectEqual(expected, output)
 }
