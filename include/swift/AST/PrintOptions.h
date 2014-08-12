@@ -120,6 +120,9 @@ struct PrintOptions {
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
+  /// Whether we are printing part of SIL body.
+  bool PrintInSILBody = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     BothIfDifferent,
@@ -160,6 +163,7 @@ struct PrintOptions {
     result.PrintLongAttrsOnSeparateLines = true;
     result.PrintStorageRepresentationAttrs = true;
     result.PrintForSIL = true;
+    result.PrintInSILBody = true;
     return result;
   }
 

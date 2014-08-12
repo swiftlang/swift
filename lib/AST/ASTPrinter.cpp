@@ -2276,7 +2276,7 @@ public:
   }
 
   void visitArchetypeType(ArchetypeType *T) {
-    if (Options.PrintForSIL) {
+    if (Options.PrintInSILBody) {
       if (auto proto = T->getSelfProtocol()) {
         Printer << "@sil_self ";
         visit(proto->getDeclaredType());

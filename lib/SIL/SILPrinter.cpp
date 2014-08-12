@@ -1504,6 +1504,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.ExplodePatternBindingDecls = true;
     Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
+    Options.PrintInSILBody = false;
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
