@@ -815,21 +815,32 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
 
-std::unique_ptr<SILModule> SILModule::constructSIL(Module *mod,
-                                                   SourceFile *sf,
-                                                   unsigned startElem) {
-  std::unique_ptr<SILModule> m(new SILModule(mod));
+std::unique_ptr<SILModule>
+SILModule::constructSIL(Module *mod, SourceFile *sf,
+                        Optional<unsigned> startElem) {
+  const DeclContext *DC;
+  if (startElem) {
+    assert(sf && "cannot have a start element without a source file");
+    // Because more decls may be added to the SourceFile, we can't assume
+    // anything about the compilation context.
+    DC = nullptr;
+  } else if (sf) {
+    DC = sf;
+  } else {
+    DC = mod;
+  }
+
+  std::unique_ptr<SILModule> m(new SILModule(mod, DC));
   SILGenModule sgm(*m, mod);
 
   if (sf) {
-    sgm.emitSourceFile(sf, startElem);
+    sgm.emitSourceFile(sf, startElem.getValueOr(0));
   } else {
-    assert(startElem == 0 && "no explicit source file");
     for (auto file : mod->getFiles()) {
       auto nextSF = dyn_cast<SourceFile>(file);
       if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
-      sgm.emitSourceFile(nextSF, startElem);
+      sgm.emitSourceFile(nextSF, 0);
     }
   }
     
@@ -845,7 +856,7 @@ std::unique_ptr<SILModule> swift::performSILGeneration(Module *mod) {
   return SILModule::constructSIL(mod);
 }
 
-std::unique_ptr<SILModule> swift::performSILGeneration(SourceFile &sf,
-                                       unsigned startElem) {
+std::unique_ptr<SILModule>
+swift::performSILGeneration(SourceFile &sf, Optional<unsigned> startElem) {
   return SILModule::constructSIL(sf.getParentModule(), &sf, startElem);
 }

@@ -18,6 +18,7 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/LLVMContext.h"
@@ -154,8 +155,11 @@ namespace swift {
   std::unique_ptr<SILModule> performSILGeneration(Module *M);
 
   /// Turn a source file into SIL IR.
-  std::unique_ptr<SILModule> performSILGeneration(SourceFile &SF,
-                                                  unsigned StartElem = 0);
+  ///
+  /// If \p StartElem is provided, the module is assumed to be only part of the
+  /// SourceFile, and any optimizations should take that into account.
+  std::unique_ptr<SILModule>
+  performSILGeneration(SourceFile &SF, Optional<unsigned> StartElem = Nothing);
 
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 

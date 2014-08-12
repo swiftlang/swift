@@ -734,7 +734,43 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
 
 /// Return the final class decl using metadata.
 static ClassDecl *getClassFromClassMetadata(ClassMethodInst *CMI) {
-  return nullptr;
+  const DeclContext *associatedDC = CMI->getModule().getAssociatedContext();
+  if (!associatedDC) {
+    // Without an associated context, we can't perform any access-based
+    // optimizations.
+    return nullptr;
+  }
+
+  SILDeclRef Member = CMI->getMember();
+  FuncDecl *FD = Member.getFuncDecl();
+  SILType ClassType = CMI->getOperand().stripCasts().getType();
+  ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
+
+  // Only handle valid non-dynamic non-overridden members.
+  if (!CD || !FD || FD->isInvalid() || FD->isDynamic() || FD->isOverridden())
+    return nullptr;
+
+  // Only handle members defined within the SILModule's associated context.
+  if (!FD->isChildContextOf(associatedDC))
+    return nullptr;
+
+  if (!FD->hasAccessibility())
+    return nullptr;
+
+  // Only consider 'private' members, unless associatedDC is the entire module.
+  switch (FD->getAccessibility()) {
+  case Accessibility::Public:
+    return nullptr;
+  case Accessibility::Internal:
+    if (associatedDC != CMI->getModule().getSwiftModule())
+      return nullptr;
+    break;
+  case Accessibility::Private:
+    break;
+  }
+
+  Type selfTypeInMember = FD->getDeclContext()->getDeclaredTypeInContext();
+  return selfTypeInMember->getClassOrBoundGenericClass();
 }
 
 static bool optimizeApplyInst(ApplyInst *AI) {

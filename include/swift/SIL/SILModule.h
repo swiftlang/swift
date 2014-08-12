@@ -70,7 +70,7 @@ enum class SILStage {
 };
 
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
-/// when a Shily module is lowered to SIL.
+/// when a Swift compilation context is lowered to SIL.
 class SILModule {
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
@@ -97,6 +97,12 @@ private:
 
   /// The swift Module associated with this SILModule.
   Module *TheSwiftModule;
+
+  /// A specific context for AST-level declarations associated with this SIL
+  /// module.
+  ///
+  /// \sa getAssociatedContext
+  const DeclContext *AssociatedDeclContext;
 
   /// Lookup table for SIL functions. This needs to be declared before \p
   /// functions so that the destructor of \p functions is called first.
@@ -160,7 +166,7 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(Module *M);
+  SILModule(Module *M, const DeclContext *associatedDC);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -198,22 +204,34 @@ public:
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
-  static std::unique_ptr<SILModule> constructSIL(Module *M,
-                                                 SourceFile *sf = nullptr,
-                                                 unsigned startElem = 0);
+  static std::unique_ptr<SILModule>
+  constructSIL(Module *M, SourceFile *sf = nullptr,
+               Optional<unsigned> startElem = Nothing);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule> createEmptyModule(Module *M) {
-    return std::unique_ptr<SILModule>(new SILModule(M));
+    return std::unique_ptr<SILModule>(new SILModule(M, M));
   }
 
   /// Get the Swift module associated with this SIL module.
   Module *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
   ASTContext &getASTContext() const { return TheSwiftModule->Ctx; }
-
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
+
+  /// Get the Swift DeclContext associated with this SIL module.
+  ///
+  /// All AST declarations within this context are assumed to have been fully
+  /// processed as part of generating this module. This allows certain passes
+  /// to make additional assumptions about these declarations.
+  ///
+  /// If this is the same as TheSwiftModule, the entire module is being
+  /// compiled as a single unit. If this is null, no context-based assumptions
+  /// can be made.
+  const DeclContext *getAssociatedContext() const {
+    return AssociatedDeclContext;
+  }
 
   // FIXME: Remove these when SILGlobalVariable is ready to take over.
 
