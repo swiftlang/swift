@@ -391,8 +391,6 @@ void CompilerInstance::performSema() {
                           Invocation.getCodeCompletionFactory());
   }
 
-  performWholeModuleChecks(MainModule, PrimarySourceFile,
-                           PrimaryBufferID == NO_SUCH_BUFFER);
 }
 
 void CompilerInstance::performParseOnly() {
