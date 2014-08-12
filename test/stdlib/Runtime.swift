@@ -898,7 +898,6 @@ BitTwiddlingTestCase.test("_isPowerOf2/Int") {
 #else
   fatalError("implement")
 #endif
-  fatalError("implement")
   expectFalse(_isPowerOf2(Int.min))
   expectFalse(_isPowerOf2(Int.max))
 }
