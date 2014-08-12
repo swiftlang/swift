@@ -47,14 +47,14 @@ class Foo {
   // Call from Swift entrypoint with exploded Rect to @objc entrypoint
   // with unexploaded ABI-coerced type.
   // x86_64-macosx: define float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
-  // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*]], align 4
+  // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // x86_64-macosx: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 8
   // x86_64-macosx: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { <2 x float>, <2 x float> }*
   // x86_64-macosx: [[LOADED:%.*]] = load { <2 x float>, <2 x float> }* [[CAST]]
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, { <2 x float>, <2 x float> })*)(i8* [[SELFCAST]], i8* [[SEL]], { <2 x float>, <2 x float> } [[LOADED]])
   // armv7-ios: define float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
-  // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*]], align 4
+  // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { [4 x i32] }*
   // armv7-ios: [[LOADED:%.*]] = load { [4 x i32] }* [[CAST]]
@@ -79,7 +79,7 @@ class Foo {
   func getXFromRectIndirectSwift(r: MyRect) -> Float {
     let f : Float = 1.0;
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 4
-    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %7, i8* %6, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 4 [[TEMP]])
+    // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 4 [[TEMP]])
     // x86_64-macosx: ret float [[RESULT]]
     return getXFromRectIndirectByVal(f, second: f, third: f, fourth: f, fifth: f, sixth: f, seventh: f, withRect: r);
   }
@@ -94,7 +94,7 @@ class Foo {
   // x86_64-macosx:      ret float
   // armv7 returns an HA of four floats indirectly
   // armv7-ios: define float @_TFC8abitypes3Foo4barc{{.*}}(%CSo13StructReturns*, %C8abitypes3Foo*) {
-  // armv7-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*]], align 4
+  // armv7-ios: [[RESULT:%.*]] = alloca [[RECTTYPE:%.*MyRect.*]], align 4
   // armv7-ios: load i8** @"\01L_selector(newRect)", align 4
   // armv7-ios: call void bitcast (void ()* @objc_msgSend_stret to void ([[RECTTYPE]]*, [[RECEIVER:.*]]*, i8*)*)([[RECTTYPE]]* noalias sret %call.aggresult
   // armv7-ios: [[GEP1:%.*]] = getelementptr inbounds [[RECTTYPE]]* [[RESULT]], i32 0, i32 1
