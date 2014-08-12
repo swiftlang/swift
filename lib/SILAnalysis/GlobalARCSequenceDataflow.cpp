@@ -76,17 +76,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 }
 } // end namespace llvm
 
-/// Wrapper around SILValue::stripCasts to handle the UncheckedRefBitCastInst.
-static SILValue stripCasts(SILValue V) {
-  while (true) {
-    V = V.stripCasts();
-    auto *BCI = dyn_cast<UncheckedRefBitCastInst>(V);
-    if (!BCI)
-      return V;
-    V = BCI->getOperand();
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                           Lattice State Merging
 //===----------------------------------------------------------------------===//
@@ -420,7 +409,7 @@ static bool processBBTopDown(
     if (isRefCountIncrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      Op = stripCasts(I.getOperand(0));
+      Op = I.getOperand(0).stripCasts();
       TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
@@ -434,7 +423,7 @@ static bool processBBTopDown(
     // If we have a reference count decrement...
     if (isRefCountDecrement(I)) {
       // Look up the state associated with its operand...
-      Op = stripCasts(I.getOperand(0));
+      Op = I.getOperand(0).stripCasts();
       TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
@@ -605,7 +594,7 @@ static bool processBBBottomUp(
     if (isRefCountDecrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      Op = stripCasts(I.getOperand(0));
+      Op = I.getOperand(0).stripCasts();
       BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
@@ -619,7 +608,7 @@ static bool processBBBottomUp(
     // If we have a reference count decrement...
     if (isRefCountIncrement(I)) {
       // Look up the state associated with its operand...
-      Op = stripCasts(I.getOperand(0));
+      Op = I.getOperand(0).stripCasts();
       BottomUpRefCountState &RefCountState =
           BBState.getBottomUpRefCountState(Op);
 

@@ -35,6 +35,7 @@ SILValue SILValue::stripCasts() {
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
     case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::UncheckedRefBitCastInst:
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
     default:
