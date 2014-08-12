@@ -891,13 +891,20 @@ BitTwiddlingTestCase.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(2)))
   expectFalse(_isPowerOf2(asInt(3)))
   expectTrue(_isPowerOf2(asInt(1024)))
+#if arch(i386) || arch(arm)
+  // Not applicable to 32-bit architectures.
+#elseif arch(x86_64) || arch(arm64)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
+#else
+  fatalError("implement")
+#endif
+  fatalError("implement")
   expectFalse(_isPowerOf2(Int.min))
   expectFalse(_isPowerOf2(Int.max))
 }
 
 BitTwiddlingTestCase.test("_isPowerOf2/UInt") {
-  func asUInt(a: Int) -> Int { return a }
+  func asUInt(a: UInt) -> UInt { return a }
 
   expectFalse(_isPowerOf2(asUInt(0)))
   expectTrue(_isPowerOf2(asUInt(1)))
