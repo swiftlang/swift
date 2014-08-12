@@ -599,10 +599,10 @@ void Lexer::lexOperatorIdentifier() {
     (void) didStart;
     
     do {
-      if (CurPtr != BufferEnd && InSILMode &&
+      if (CurPtr != BufferEnd && InSILBody &&
           (*CurPtr == '!' || *CurPtr == '?'))
-        // In SIL mode, '!' and '?' are special token and can't be in the middle of
-        // an operator.
+        // When parsing SIL body, '!' and '?' are special token and can't be
+        // in the middle of an operator.
         break;
     } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
   }
@@ -647,6 +647,14 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
+    // FIXME: when parsing "<a, b<c>?>" as the generic arguments, lexer can't
+    // return ">?>" as one token. parseType uses consumingStartingGreater, which
+    // consumes ">", returns a token for "?" only, and silently drops the last
+    // '>'. For now, we stop the operator token right after '?'.
+    if (CurPtr-TokStart == 3 && TokStart[0] == '>' && TokStart[1] == '?' &&
+        TokStart[2] == '>')
+      CurPtr--;
+
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
