@@ -1307,7 +1307,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!Options.SkipIntroducerKeywords) {
       if (decl->isStatic() && !decl->isOperator())
         printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating())
+      if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>())
         Printer << "mutating ";
       Printer << "func ";
     }
