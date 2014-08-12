@@ -1508,7 +1508,8 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
-      if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
+      if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
+           isa<ExtensionDecl>(D)) &&
           !emittedFunctions.count(D) &&
           !D->isImplicit()) {
         D->print(OS, Options);

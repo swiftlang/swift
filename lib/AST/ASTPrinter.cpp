@@ -582,12 +582,16 @@ bool PrintAST::shouldPrint(const Decl *D) {
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // If we are printing StoredWithTrivialAccessors in sil, print get|set
-  // to differentiate from stored property.
+  // to differentiate from stored property. FIXME: Parser can't handle
+  // "let {get}", so do not print it.
   if (!ASD->hasAccessorFunctions() ||
-      (Options.PrintForSIL && !ASD->getSetter()) ||
+      (Options.PrintForSIL &&
+       ASD->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors
+       && isa<VarDecl>(ASD) && cast<VarDecl>(ASD)->isLet() &&
+       !ASD->getSetter()) ||
       (!Options.PrintForSIL &&
        ASD->getStorageKind()
-       == AbstractStorageDecl::StoredWithTrivialAccessors)){
+       == AbstractStorageDecl::StoredWithTrivialAccessors)) {
     // This is a 'let' vardecl.  We could print the initializer if we could
     // print expressions.
     return;
@@ -860,6 +864,19 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
       // We cannot extend sugared types.
       auto *nominal = decl->getExtendedType()->getAnyNominal();
       assert(nominal && "extension of non-nominal type");
+      
+      if (auto ct = decl->getExtendedType()->getAs<ClassType>()) {
+        if (auto ParentType = ct->getParent()) {
+          ParentType.print(Printer, Options);
+          Printer << ".";
+        }
+      }
+      if (auto st = decl->getExtendedType()->getAs<StructType>()) {
+        if (auto ParentType = st->getParent()) {
+          ParentType.print(Printer, Options);
+          Printer << ".";
+        }
+      }
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
