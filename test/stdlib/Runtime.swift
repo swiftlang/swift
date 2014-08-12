@@ -647,7 +647,7 @@ var nsStringCanaryCount = 0
     ++nsStringCanaryCount
     super.init()
   }
-  required init(coder: NSCoder!) {
+  required init(coder: NSCoder) {
     fatalError("don't call this initializer")
   }
   deinit {
