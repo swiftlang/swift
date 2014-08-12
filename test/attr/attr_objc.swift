@@ -1598,21 +1598,21 @@ class Class_ObjC3 {
 
 // @objc with selector names
 extension PlainClass {
-  // CHECK-LABEL: @objc(setFoo:) func
+  // CHECK-LABEL: @objc(setFoo:) dynamic func
   @objc(setFoo:)
   func foo(b: Bool) { }
 
-  // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) func set
+  // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) dynamic func set
   @objc(setWithRed:green:blue:alpha:)
   func set(Float, green: Float, blue: Float, alpha: Float)  { }
 
-  // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) class func createWith
+  // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
   class func createWithRed(Float, green: Float, blue: Float, alpha: Float) { }
   // expected-error@-2{{missing ':' after selector piece in '@objc' attribute}}{{28-28=:}}
   // expected-error@-3{{missing ':' after selector piece in '@objc' attribute}}{{39-39=:}}
 
-  // CHECK-LABEL: @objc(::) func badlyNamed
+  // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::)
   func badlyNamed(Int, y: Int) {}
 }

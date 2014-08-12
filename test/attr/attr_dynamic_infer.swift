@@ -29,20 +29,20 @@ extension Super {
 
 // CHECK: extension Sub
 extension Sub {
-  // CHECK: @objc override func foo
+  // CHECK: @objc override dynamic func foo
   override func foo() { }
 
-  // CHECK: @objc override var prop: Super
+  // CHECK: @objc override dynamic var prop: Super
   override var prop: Super {
-    // CHECK: @objc override get
+    // CHECK: @objc override dynamic get
     get { return Super() }
     // CHECK: @objc override dynamic set
     set { }
   }
 
-  // CHECK: @objc override subscript (sup: Super) -> Super
+  // CHECK: @objc override dynamic subscript (sup: Super) -> Super
   override subscript (sup: Super) -> Super {
-    // CHECK: @objc override get
+    // CHECK: @objc dynamic override get
     get { return sup }
     // CHECK: @objc dynamic override set
     set { }

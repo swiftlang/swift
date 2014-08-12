@@ -281,7 +281,7 @@ func dynamicMethodDispatch() {
 
 // CHECK-LABEL: sil @_TF7dynamic15managedDispatchFCS_3FooT_
 func managedDispatch(c: Foo) {
-  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign
+  // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!getter.1.foreign 
   let x = c.managedProp
   // CHECK: class_method [volatile] {{%.*}} : $Foo, #Foo.managedProp!setter.1.foreign
   c.managedProp = x
@@ -330,7 +330,7 @@ extension Gizmo {
 
 // CHECK-LABEL: sil @_TF7dynamic24foreignExtensionDispatchFCSo5GizmoT_
 func foreignExtensionDispatch(g: Gizmo) {
-  // CHECK: function_ref @_TFCSo5Gizmo20foreignObjCExtensionfS_FT_T_
+  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : Gizmo
   g.foreignObjCExtension()
   // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
   g.foreignDynamicExtension()

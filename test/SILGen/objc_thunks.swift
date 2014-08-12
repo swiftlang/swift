@@ -303,7 +303,7 @@ func useHoozit(h: Hoozit) {
 
   // In an extension, 'dynamic' was inferred.
   h.foof()
-  // CHECK: function_ref @_TFC11objc_thunks6Hoozit4fooffS0_FT_T_ 
+  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.foof!1.foreign
 }
 
 func useWotsit(w: Wotsit<String>) {
