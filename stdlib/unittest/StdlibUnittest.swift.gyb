@@ -235,6 +235,7 @@ public func assertionFailure() -> AssertionResult {
 public func expectTrue(
     actual: ${BoolType},
     stackTrace: SourceLocStack? = nil,
+    _ collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if !actual {
@@ -243,6 +244,7 @@ public func expectTrue(
     _printStackTrace(stackTrace)
     println("expected: true")
     println("actual: \(actual)")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -250,6 +252,7 @@ public func expectTrue(
 public func expectFalse(
     actual: ${BoolType},
     stackTrace: SourceLocStack? = nil,
+    _ collectMoreInfo: (()->String)? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if actual {
@@ -258,6 +261,7 @@ public func expectFalse(
     _printStackTrace(stackTrace)
     println("expected: false")
     println("actual: \(actual)")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }

@@ -46,6 +46,7 @@ set(SWIFTLIB_ESSENTIAL
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift.gyb
+  Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift

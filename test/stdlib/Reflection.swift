@@ -370,25 +370,6 @@ println("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
 println("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
-let dict = ["One":1,"Two":2,"Three":3,"Four":4,"Five":5]
-// CHECK-NEXT: ▿ 5 key/value pairs
-// CHECK-NEXT:   ▿ [0]: (2 elements)
-// CHECK-NEXT:     - .0: Four
-// CHECK-NEXT:     - .1: 4
-// CHECK-NEXT:   ▿ [1]: (2 elements)
-// CHECK-NEXT:     - .0: One
-// CHECK-NEXT:     - .1: 1
-// CHECK-NEXT:   ▿ [2]: (2 elements)
-// CHECK-NEXT:     - .0: Two
-// CHECK-NEXT:     - .1: 2
-// CHECK-NEXT:   ▿ [3]: (2 elements)
-// CHECK-NEXT:     - .0: Three
-// CHECK-NEXT:     - .1: 3
-// CHECK-NEXT:   ▿ [4]: (2 elements)
-// CHECK-NEXT:     - .0: Five
-// CHECK-NEXT:     - .1: 5
-dump(dict)
-
 enum JustSomeEnum {case A,B}
 // CHECK-NEXT: (Enum Value)
 println(reflect(JustSomeEnum.A).summary)

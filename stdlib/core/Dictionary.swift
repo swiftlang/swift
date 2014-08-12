@@ -380,7 +380,7 @@ struct _NativeDictionaryStorage<Key : Hashable, Value> :
   }
 
   func _bucket(k: Key) -> Int {
-    return k.hashValue & _bucketMask
+    return _squeezeHashValue(k.hashValue, 0..<capacity)
   }
 
   func _next(bucket: Int) -> Int {

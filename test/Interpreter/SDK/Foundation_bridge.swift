@@ -109,8 +109,8 @@ if let obj: AnyObject = _bridgeToObjectiveC(a3) {
 }
 
 // CHECK:      dictionary bridges to {
-// CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT:   2 = World;
+// CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT: }
 var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
 if let obj: AnyObject = _bridgeToObjectiveC(dict) {
@@ -120,8 +120,8 @@ if let obj: AnyObject = _bridgeToObjectiveC(dict) {
 }
 
 // CHECK:      dictionary bridges to {
-// CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT:   2 = World;
+// CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT: }
 var dict2 = [1: "Hello", 2: "World"]
 if let obj: AnyObject = _bridgeToObjectiveC(dict2) {

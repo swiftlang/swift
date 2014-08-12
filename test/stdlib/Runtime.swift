@@ -858,5 +858,51 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
+var BitTwiddlingTestCase = TestCase("BitTwiddling")
+
+func computeCountLeadingZeroes(var x: Int64) -> Int64 {
+  var r: Int64 = 64
+  while x != 0 {
+    x >>= 1
+    r--
+  }
+  return r
+}
+
+BitTwiddlingTestCase.test("_countLeadingZeros") {
+  for i in Int64(0)..<1000 {
+    expectEqual(computeCountLeadingZeroes(i), _countLeadingZeros(i))
+  }
+  expectEqual(0, _countLeadingZeros(Int64.min))
+}
+
+BitTwiddlingTestCase.test("_isPowerOf2/Int") {
+  expectFalse(_isPowerOf2(Int(-1025)))
+  expectFalse(_isPowerOf2(Int(-1024)))
+  expectFalse(_isPowerOf2(Int(-1023)))
+  expectFalse(_isPowerOf2(Int(-4)))
+  expectFalse(_isPowerOf2(Int(-3)))
+  expectFalse(_isPowerOf2(Int(-2)))
+  expectFalse(_isPowerOf2(Int(-1)))
+  expectFalse(_isPowerOf2(Int(0)))
+  expectTrue(_isPowerOf2(Int(1)))
+  expectTrue(_isPowerOf2(Int(2)))
+  expectFalse(_isPowerOf2(Int(3)))
+  expectTrue(_isPowerOf2(Int(1024)))
+  expectTrue(_isPowerOf2(Int(0x8000_0000)))
+  expectFalse(_isPowerOf2(Int.min))
+  expectFalse(_isPowerOf2(Int.max))
+}
+
+BitTwiddlingTestCase.test("_isPowerOf2/UInt") {
+  expectFalse(_isPowerOf2(UInt(0)))
+  expectTrue(_isPowerOf2(UInt(1)))
+  expectTrue(_isPowerOf2(UInt(2)))
+  expectFalse(_isPowerOf2(UInt(3)))
+  expectTrue(_isPowerOf2(UInt(1024)))
+  expectTrue(_isPowerOf2(UInt(0x8000_0000)))
+  expectFalse(_isPowerOf2(UInt.max))
+}
+
 runAllTests()
 

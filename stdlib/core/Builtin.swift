@@ -45,13 +45,6 @@ func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
-/// Returns if x is a power of 2, assuming that x is not 0
-@transparent
-func _isPowerOf2(v : Int) -> Bool {
-  _sanityCheck(v > 0)
-  return (v & (v - 1)) == 0
-}
-
 func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)

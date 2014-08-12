@@ -99,8 +99,8 @@ sub(x:f1, y:f2) // CHECK: Int = -1
 var array = [1, 2, 3, 4, 5]
 // CHECK: array : [Int] = [1, 2, 3, 4, 5]
 
-var dict = [ "Hello" : 1.5, "World" : 3.0 ]
-// CHECK: dict : [String : Double] = ["Hello": 1.5, "World": 3.0]
+var dict = [ "Hello" : 1.5 ]
+// CHECK: dict : [String : Double] = ["Hello": 1.5]
 
 0..<10
 // FIXME: Disabled CHECK for Range<Int> = 0...10 until we get general printing going

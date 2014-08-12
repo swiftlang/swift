@@ -67,6 +67,28 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
+/// Returns if `x` is a power of 2.
+@transparent
+public func _isPowerOf2(x: UInt) -> Bool {
+  if x == 0 {
+    return false
+  }
+  // Note: use unchecked subtraction because we have checked that `x` is not
+  // zero.
+  return x & (x &- 1) == 0
+}
+
+/// Returns if `x` is a power of 2.
+@transparent
+public func _isPowerOf2(x: Int) -> Bool {
+  if x <= 0 {
+    return false
+  }
+  // Note: use unchecked subtraction because we have checked that `x` is not
+  // `Int.min`.
+  return x & (x &- 1) == 0
+}
+
 @transparent public func _autorelease(x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
