@@ -15,9 +15,11 @@
 
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/CallGraph.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -37,8 +39,26 @@ namespace swift {
       return S->getKind() == AnalysisKind::CallGraph;
     }
 
-    /// \brief return a bottom-up function order.
-    const std::vector<SILFunction*> &bottomUpCallGraphOrder();
+    /// Return the bottom up call-graph order for module M. Notice that we don't
+    /// include functions that don't participate in any call (caller or callee).
+    const std::vector<SILFunction*> &bottomUpCallGraphOrder() {
+      if (!BottomUpFunctionOrder.empty())
+        return BottomUpFunctionOrder;
+
+      CallGraphSorter<SILFunction*> sorter;
+      for (auto &Caller : *M)
+        for (auto &BB : Caller)
+          for (auto &I : BB)
+            if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
+              SILFunction *Callee = FRI->getReferencedFunction();
+              sorter.addEdge(&Caller, Callee);
+            }
+
+      sorter.sort(BottomUpFunctionOrder);
+
+      return BottomUpFunctionOrder;
+    }
+
 
     virtual void invalidate(InvalidationKind K) {
       if (K >= InvalidationKind::CallGraph)

@@ -41,15 +41,6 @@ void CompleteFunctions::setComplete() {
   IsModulePending = false;
 }
 
-/// \brief return a bottom-up function order.
-const std::vector<SILFunction*> &CallGraphAnalysis::bottomUpCallGraphOrder() {
-  // If we haven't calculated the order before do it now.
-  if (!BottomUpFunctionOrder.size())
-    swift::bottomUpCallGraphOrder(M, BottomUpFunctionOrder);
-
-  return BottomUpFunctionOrder;
-}
-
 SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }
