@@ -249,13 +249,13 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
-        return "Effects(readnone)";
+        return "effects(readnone)";
       case EffectsKind::ReadOnly:
-        return "Effects(readonly)";
+        return "effects(readonly)";
       case EffectsKind::ReadWrite:
-        return "Effects(readwrite)";
+        return "effects(readwrite)";
       case EffectsKind::Unspecified:
-        return "Effects(Unspecified)";
+        return "effects(unspecified)";
     }
   case DAK_Accessibility:
   case DAK_SetterAccessibility:
