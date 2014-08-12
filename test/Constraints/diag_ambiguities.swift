@@ -12,8 +12,8 @@ f1(0) // expected-error{{ambiguous use of 'f1'}}
 
 infix operator +++ { } 
 
-func +++(i: Int, d: Double) {} // expected-note{{found this candidate}}
-func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}
+func +++(i: Int, d: Double) {}
+func +++(d: Double, i: Int) {}
 
-1 +++ 2 // expected-error{{ambiguous use of operator '+++'}}
+1 +++ 2 // expected-error{{cannot invoke '+++' with an argument list of type '(IntegerLiteralConvertible, IntegerLiteralConvertible)'}}
 

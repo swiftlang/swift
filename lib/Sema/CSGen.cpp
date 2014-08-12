@@ -852,6 +852,29 @@ namespace {
       return expr->getType();
     }
 
+    /// Determine whether the given parameter and argument type should be
+    /// "favored" because they match exactly.
+    bool isFavoredParamAndArg(Type paramTy, Type argTy) {
+      // Do the types match exactly?
+      if (paramTy->isEqual(argTy))
+        return true;
+
+      // If the argument is a type variable created for a literal that has a
+      // default type, this is a favored param/arg pair if the parameter is of
+      // that default type.
+      // Is the argument a type variable...
+      if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+        if (auto proto = argTypeVar->getImpl().literalConformanceProto) {
+          if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
+            if (paramTy->isEqual(defaultTy))
+              return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
     Type visitApplyExpr(ApplyExpr *expr) {
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
@@ -875,10 +898,7 @@ namespace {
       //     identical to the literal type, or whose return types are identical
       //     to any contextual type associated with the application expression.
       if (isBinaryExpr) {
-        
-        auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
-            
-        if (declRef) {
+        if (auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn())) {
         SmallVector<Constraint *, 4> constraints;
         
         auto fnType = expr->getFn()->getType().getPointer();
@@ -892,7 +912,6 @@ namespace {
           CG.gatherConstraints(tyvarType, constraints);
           
           if (constraints.size()) {
-            
             for (auto constraint : constraints) {
               if (constraint->getKind() == ConstraintKind::Disjunction) {
                 SmallVector<Constraint *, 4> newConstraints;
@@ -906,74 +925,41 @@ namespace {
                         ConstraintKind::BindOverload) {
                   continue;
                 }
-                
+
+                // Find the argument types.
                 auto argTy = expr->getArg()->getType();
-                TypeBase *firstArgTy = nullptr;
-                
-                if (auto argTupleTy = argTy->getAs<TupleType>()) {
-                  firstArgTy = argTupleTy->
-                               getFields()[1].
-                               getType().
-                               getPointer();
-                }
-                
+                auto argTupleTy = argTy->castTo<TupleType>();
+                Type firstArgTy = argTupleTy->getFields()[0].getType();
+                Type secondArgTy = argTupleTy->getFields()[1].getType();
+
                 // Copy over the existing bindings, dividing the constraints up
-                // into "favored" and non-favored lists, should one of the
-                // operands be a literal.
+                // into "favored" and non-favored lists, should all of the
+                // parameter/argument comparisons be favored.
                 for (auto oldConstraint : oldConstraints) {
                   auto overloadChoice = oldConstraint->getOverloadChoice();
-                  
-                  auto overloadTy = overloadChoice.getDecl()->getType();
+                  auto overloadDecl = overloadChoice.getDecl();
+                  auto overloadTy = overloadDecl->getType();
                   
                   if (auto fnTy = overloadTy->getAs<AnyFunctionType>()) {
-                    auto paramTy = fnTy->getInput();
+                    // Figure out the parameter type.
+                    if (overloadDecl->getDeclContext()->isTypeContext()) {
+                      fnTy = fnTy->castTo<AnyFunctionType>()->getResult()
+                               ->castTo<AnyFunctionType>();
+                    }
+
+                    Type paramTy = fnTy->getInput();
+                    auto paramTupleTy = paramTy->castTo<TupleType>();
+                    auto firstParamTy = paramTupleTy->getFields()[0].getType();
+                    auto secondParamTy = paramTupleTy->getFields()[1].getType();
+
                     auto resultTy = fnTy->getResult();
-                    
-                    if (auto tupleTy = paramTy->getAs<TupleType>()) {
-                      auto firstParamTy = tupleTy->
-                                            getFields()[0].
-                                            getType();
-                      auto secondParamTy = tupleTy->
-                                             getFields()[1].
-                                             getType();
-                      
-                      bool conformsToDefaultType = false;
-                      bool isExactParamTypeMatch =
-                              !firstParamTy.isNull() &&
-                              firstArgTy &&
-                              firstParamTy->isEqual(firstArgTy);
-                      
-                      if (auto tyvarArgTy =
-                              firstArgTy->getAs<TypeVariableType>()) {
-                        
-                        if (auto proto =
-                                  tyvarArgTy->
-                                  getImpl().literalConformanceProto) {
-                          
-                          auto defaultTy = CS.TC.getDefaultType(proto, CS.DC);
-                          
-                          conformsToDefaultType =
-                              resultTy &&
-                              !defaultTy.isNull() &&
-                              defaultTy->isEqual(resultTy);
-                        }
-                      }
- 
-                      auto contextualTy = CS.getContextualType(expr);
-                      
-                      if (secondParamTy->
-                              getNominalOrBoundGenericNominal() &&
-                          !resultTy->isVoid()) {
-                        if ((conformsToDefaultType ||
-                             isExactParamTypeMatch) &&
-                            secondParamTy->isEqual(resultTy) &&
-                            firstParamTy->isEqual(secondParamTy) &&
-                            (!contextualTy ||
-                                (*contextualTy)->isEqual(resultTy))) {
-                          oldConstraint->setFavored();
-                          favoredConstraints.push_back(oldConstraint);
-                        }
-                      }
+                    auto contextualTy = CS.getContextualType(expr);
+
+                    if ((isFavoredParamAndArg(firstParamTy, firstArgTy) ||
+                         isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+                        (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
+                      oldConstraint->setFavored();
+                      favoredConstraints.push_back(oldConstraint);
                     }
                   }
                   

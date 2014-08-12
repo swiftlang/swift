@@ -1229,7 +1229,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
-  if (successfulConstraint->isFavored()) {
+  if (successfulConstraint->isFavored() && !constraint->isFavored()) {
     return true;
   }
   

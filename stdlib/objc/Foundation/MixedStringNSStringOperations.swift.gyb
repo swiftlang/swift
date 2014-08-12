@@ -35,6 +35,13 @@ public func ${op} (lhs: NSString, rhs: String) -> Bool {
 // This overload is required to disambiguate homogeneous NSString/NSString
 // comparisons in non-generic code.
 @transparent
+public func == (lhs: NSString, rhs: NSString) -> Bool {
+  return lhs as NSObject == rhs as NSObject
+}
+
+// This overload is required to disambiguate homogeneous NSString/NSString
+// comparisons in non-generic code.
+@transparent
 public func != (lhs: NSString, rhs: NSString) -> Bool {
   return !(lhs == rhs)
 }

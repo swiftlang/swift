@@ -33,9 +33,8 @@ func test1a() -> unionSearchFlags {
 }
 
 func test1b(b : Bool) {
-  // FIXME: Ridiculously weird diagnostic.
   var x = 123
-  .description == 1 // expected-error{{'unionSearchFlags.Type' does not have a member named 'description'}}
+  .description == 1 // expected-error{{'Int.Type' does not have a member named 'description'}}
 }
 
 enum MaybeInt {

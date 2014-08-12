@@ -127,3 +127,8 @@ func notEquatableError(d: Dictionary<Int, NotEquatable>) -> Bool {
 // NSString -> String
 var nss1 = "Some great text" as NSString
 var nss2: NSString = nss1 + ", Some more text"
+
+// <rdar://problem/17943223>
+var inferDouble = 1.0/10
+let d: Double = 3.14159
+inferDouble = d
