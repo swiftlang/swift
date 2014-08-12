@@ -56,13 +56,13 @@ func stdlibTypesHaveDescription() {
 var failed = false
 
 func printedIs<T>(
-    object: T, expected: String,
+    object: T, expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = toString(object)
-  if expected != actual {
+  if expected1 != actual && (expected2 != nil && expected2! != actual) {
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
+    println("expected: \"\(expected1)\" or \"\(expected2)\"")
     println("actual: \"\(actual)\"")
     println()
     failed = true
@@ -70,14 +70,14 @@ func printedIs<T>(
 }
 
 func debugPrintedIs<T>(
-    object: T, expected: String,
+    object: T, expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = ""
   debugPrint(object, &actual)
-  if expected != actual {
+  if expected1 != actual && (expected2 != nil && expected2! != actual) {
     println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
+    println("expected: \"\(expected1)\" or \"\(expected2)\"")
     println("actual: \"\(actual)\"")
     println()
     failed = true
@@ -634,8 +634,8 @@ func test_DictionaryPrinting() {
   debugPrintedIs(dictSI, "[\"aaa\": 1]")
 
   dictSI = [ "aaa": 1, "bbb": 2 ]
-  printedIs(dictSI, "[bbb: 2, aaa: 1]")
-  debugPrintedIs(dictSI, "[\"bbb\": 2, \"aaa\": 1]")
+  printedIs(dictSI, "[aaa: 1, bbb: 2]", expected2: "[bbb: 2, aaa: 1]")
+  debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
 
   var dictSS = [ "aaa": "bbb" ]
   printedIs(dictSS, "[aaa: bbb]")
