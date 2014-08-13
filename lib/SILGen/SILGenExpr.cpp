@@ -4398,7 +4398,8 @@ static bool mayLieAboutNonOptionalReturn(ValueDecl *decl) {
   // Properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    return var->hasClangNode() && var->getType()->hasReferenceSemantics();
+    return var->hasClangNode() && 
+      var->getType()->getReferenceStorageReferent()->hasReferenceSemantics();
   }
 
   // Subscripts of non-optional reference type that were imported from

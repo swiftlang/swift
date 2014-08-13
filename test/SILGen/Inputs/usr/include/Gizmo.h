@@ -60,6 +60,7 @@ typedef long NSInteger;
 - (Gizmo*)nonNilGizmo;
 + (Gizmo*)nonNilGizmo;
 @property Gizmo* nonNilGizmoProperty;
+@property (unsafe_unretained) Gizmo* unownedNonNilGizmoProperty;
 @end
 
 @interface Guisemeau : Gizmo

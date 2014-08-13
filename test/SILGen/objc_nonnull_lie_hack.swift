@@ -68,3 +68,16 @@ func loadProperty(gizmo: Gizmo) -> Gizmo? {
   }
   return foo  
 }
+
+// OPT-LABEL: sil @_TF21objc_nonnull_lie_hack19loadUnownedPropertyFCSo5GizmoGSqS0__
+// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.unownedNonNilGizmoProperty!getter.1.foreign : Gizmo -> () -> Gizmo , $@cc(objc_method) @thin (Gizmo) -> @autoreleased Gizmo
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@cc(objc_method) @thin (Gizmo) -> @autoreleased Gizmo
+// OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_bit_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
+// OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>
+func loadUnownedProperty(gizmo: Gizmo) -> Gizmo? {
+  let foo: Gizmo? = gizmo.unownedNonNilGizmoProperty
+  if foo == nil {
+    println("nil")
+  }
+  return foo  
+}

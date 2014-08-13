@@ -12,3 +12,5 @@ Classes:
   Properties:
   - Name: nonNilGizmoProperty
     Nullability: N
+  - Name: unownedNonNilGizmoProperty
+    Nullability: N
