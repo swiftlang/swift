@@ -2350,7 +2350,8 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 
   for (auto &reqt : requirements) {
     ID.AddPointer(reqt.getFirstType().getPointer());
-    ID.AddPointer(reqt.getSecondType().getPointer());
+    if (reqt.getKind() != RequirementKind::WitnessMarker)
+      ID.AddPointer(reqt.getSecondType().getPointer());
     ID.AddInteger(unsigned(reqt.getKind()));
   }
 }
