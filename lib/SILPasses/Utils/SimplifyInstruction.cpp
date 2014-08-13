@@ -160,7 +160,24 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
   return SILValue();
 }
 
+// Simplify
+//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1 // user: %27
+//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C // user: %28
+// to %0 since we are building the same enum.
+static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
+  assert(EI->hasOperand() && "Expected an enum with an operand!");
+
+  auto *UEDI = dyn_cast<UncheckedEnumDataInst>(EI->getOperand());
+  if (!UEDI || UEDI->getElement() != EI->getElement())
+    return SILValue();
+
+  return UEDI->getOperand();
+}
+
 SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
+  if (EI->hasOperand())
+    return simplifyEnumFromUncheckedEnumData(EI);
+
   // Simplify enum insts to the value from a switch_enum when possible, e.g.
   // for
   //   switch_enum %0 : $Bool, case #Bool.true!enumelt: bb1
@@ -168,9 +185,6 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
   //   %1 = enum $Bool, #Bool.true!enumelt
   //
   // we'll return %0
-  if (EI->hasOperand())
-    return SILValue();
-
   auto *BB = EI->getParent();
   auto *Pred = BB->getSinglePredecessor();
   if (!Pred)
