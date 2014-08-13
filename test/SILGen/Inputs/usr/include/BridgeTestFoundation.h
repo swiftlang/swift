@@ -11,7 +11,6 @@
 
 - (instancetype)initWithObjects:(const id *)objects count:(int)count;
 - (instancetype)initWithArray:(NSArray*)array;
-
 @end
 
 @interface NSDictionary : NSObject

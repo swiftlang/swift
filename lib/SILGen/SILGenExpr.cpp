@@ -4371,11 +4371,101 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   return SGF.emitEmptyTupleRValue(E);
 }
 
+/// Determine whether the given declaration returns a non-optional object that
+/// might actually be nil.
+///
+/// This is an awful hack that makes it possible to work around several kinds
+/// of problems:
+///   - initializers currently cannot fail, so they always return non-optional.
+///   - an Objective-C method might have been annotated to state (incorrectly)
+///     that it returns a non-optional object
+///   - an Objective-C property might be annotated to state (incorrectly) that
+///     it is non-optional
+static bool mayLieAboutNonOptionalReturn(ValueDecl *decl) {
+  // Any Objective-C initializer, because failure propagates from any
+  // initializer written in Objective-C (and there's no way to tell).
+  if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
+    return constructor->isObjC();
+  }
+
+  // Functions that return non-optional reference type and were imported from
+  // Objective-C.
+  if (auto func = dyn_cast<FuncDecl>(decl)) {
+    return func->hasClangNode() &&
+           func->getResultType()->hasReferenceSemantics();
+  }
+
+  // Properties of non-optional reference type that were imported from
+  // Objective-C.
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    return var->hasClangNode() && var->getType()->hasReferenceSemantics();
+  }
+
+  // Subscripts of non-optional reference type that were imported from
+  // Objective-C.
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    return subscript->hasClangNode() &&
+           subscript->getElementType()->hasReferenceSemantics();
+  }
+  return false;
+}
+
+/// Determine whether the given expression returns a non-optional object that
+/// might actually be nil.
+///
+/// This is an awful hack that makes it possible to work around several kinds
+/// of problems:
+///   - initializers currently cannot fail, so they always return non-optional.
+///   - an Objective-C method might have been annotated to state (incorrectly)
+///     that it returns a non-optional object
+///   - an Objective-C property might be annotated to state (incorrectly) that
+///     it is non-optional
+static bool mayLieAboutNonOptionalReturn(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+
+  /// A reference to a declaration.
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(declRef->getDecl());
+  }
+
+  // An application, which we look through to get the function we're calling.
+  if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(apply->getFn());
+  }
+
+  // A load.
+  if (auto load = dyn_cast<LoadExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(load->getSubExpr());
+  }
+
+  // A reference to a member.
+  if (auto member = dyn_cast<MemberRefExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(member->getMember().getDecl());
+  }
+
+  // A reference to a subscript.
+  if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(subscript->getDecl().getDecl());
+  }
+
+  // A reference to a member found via dynamic lookup.
+  if (auto member = dyn_cast<DynamicMemberRefExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(member->getMember().getDecl());
+  }
+
+  // A reference to a subscript found via dynamic lookup.
+  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
+    return mayLieAboutNonOptionalReturn(subscript->getMember().getDecl());
+  }
+
+  return false;
+}
+
 RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
                                                   SGFContext C) {
-  // This is an awful hack. Because we don't have failing initializers yet, we
-  // promote the following workaround for an ObjC initializer that might
-  // fail:
+  // This is an awful hack. When the source expression might produce a
+  // non-optional reference that could legitimated be nil, such as with an
+  // initializer, allow this workaround to capture that nil:
   //
   //   let x: NSFoo? = NSFoo(potentiallyFailingInit: x)
   //
@@ -4384,21 +4474,16 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   // resulting optional for nil. As a special case, when we're injecting the
   // result of an ObjC constructor into an optional, do it using an unchecked
   // bitcast, which is opaque to the optimizer.
-  if (auto apply = dyn_cast<ApplyExpr>(E->getSubExpr()))
-    if (auto constructorCall = dyn_cast<ConstructorRefCallExpr>(apply->getFn())) {
-      auto constructorRef = cast<DeclRefExpr>(constructorCall->getFn());
-      auto constructor = cast<ConstructorDecl>(constructorRef->getDecl());
-      if (constructor->isObjC()) {
-        auto result = SGF.emitRValue(E->getSubExpr())
-          .getAsSingleValue(SGF, E->getSubExpr());
-        auto optType = SGF.getLoweredLoadableType(E->getType());
-        SILValue bitcast = SGF.B.createUncheckedRefBitCast(E, result.getValue(),
-                                                           optType);
-        ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
-        return RValue(SGF, E, bitcastMV);
-      }
-    }
-  
+  if (mayLieAboutNonOptionalReturn(E->getSubExpr())) {
+    auto result = SGF.emitRValue(E->getSubExpr())
+      .getAsSingleValue(SGF, E->getSubExpr());
+    auto optType = SGF.getLoweredLoadableType(E->getType());
+    SILValue bitcast = SGF.B.createUncheckedRefBitCast(E, result.getValue(),
+                                                       optType);
+    ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
+    return RValue(SGF, E, bitcastMV);
+  }
+
   // Create a buffer for the result.  Abstraction difference will
   // force this to be returned indirectly from
   // _injectValueIntoOptional anyway, so there's not much point

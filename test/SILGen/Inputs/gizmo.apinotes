@@ -1,0 +1,14 @@
+---
+Name: gizmo
+Classes:
+- Name: Gizmo
+  Methods:
+  - Selector: nonNilGizmo
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: nonNilGizmo
+    MethodKind: Class
+    NullabilityOfRet: N
+  Properties:
+  - Name: nonNilGizmoProperty
+    Nullability: N

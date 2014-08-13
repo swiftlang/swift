@@ -57,6 +57,9 @@ typedef long NSInteger;
 + (instancetype)gizmoWithStuff:(NSInteger)x;
 + (Gizmo*)gizmoWithExactlyStuff:(NSInteger)x;
 
+- (Gizmo*)nonNilGizmo;
++ (Gizmo*)nonNilGizmo;
+@property Gizmo* nonNilGizmoProperty;
 @end
 
 @interface Guisemeau : Gizmo
