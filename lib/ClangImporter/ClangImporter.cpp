@@ -570,6 +570,13 @@ Module *ClangImporter::loadModule(
                          clang::SourceLocation()} );
   }
 
+  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
+
+  // Look up the top-level module first, to see if it exists at all.
+  // FIXME: We should also check that the submodule we want actually exists.
+  if (!clangHeaderSearch.lookupModule(path.front().first.str()))
+    return nullptr;
+
   clang::ModuleLoadResult clangModule;
   {
     auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
@@ -589,7 +596,6 @@ Module *ClangImporter::loadModule(
                                             clangPath,
                                             clang::Module::AllVisible,
                                             /*IsInclusionDirective=*/false);
-
     if (!clangModule)
       return nullptr;
   }

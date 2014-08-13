@@ -1,5 +1,14 @@
-// RUN: rm -rf %t/clang-module-cache
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache -sdk %S/Inputs %s -emit-ir | FileCheck %s
+
+// RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule
+// RUN: %swift -target x86_64-apple-macosx10.9 -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/x86_64.swiftmodule %S/../Inputs/empty.swift -module-name Empty
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-cache-path %t/clang-module-cache2 -sdk %S/Inputs %s -F %t -DIMPORT_EMPTY -emit-ir | FileCheck %s
+
+#if IMPORT_EMPTY
+import Empty
+#endif
+
 import gizmo
 
 // CHECK: define i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_Si(%C12clang_inline16CallStaticInline*) {
