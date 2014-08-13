@@ -15,11 +15,13 @@
 
 namespace llvm {
   class FunctionPass;
+  class ImmutablePass;
 }
 
 namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCExpandPass();
+  llvm::ImmutablePass *createSwiftAliasAnalysisPass();
 } // end namespace swift
 
 #endif

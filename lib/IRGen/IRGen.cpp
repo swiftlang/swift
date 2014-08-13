@@ -286,6 +286,11 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     FunctionPasses.add(createVerifierPass());
   PMBuilder.populateFunctionPassManager(FunctionPasses);
 
+  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
+  // the swift AA pass after the other ones.
+  if (!Opts.DisableLLVMARCOpts)
+    FunctionPasses.add(createSwiftAliasAnalysisPass());
+
   // Run the function passes.
   FunctionPasses.doInitialization();
   for (auto I = Module->begin(), E = Module->end(); I != E; ++I)
@@ -298,6 +303,12 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   ModulePasses.add(new llvm::DataLayoutPass(*DataLayout));
   TargetMachine->addAnalysisPasses(ModulePasses);
   PMBuilder.populateModulePassManager(ModulePasses);
+
+  // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
+  // the swift AA pass after the other ones.
+  if (!Opts.DisableLLVMARCOpts)
+    ModulePasses.add(createSwiftAliasAnalysisPass());
+
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
 
