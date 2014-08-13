@@ -184,23 +184,22 @@ let d: Int? = 456
 let e: Int? = nil
 let f: Int? = nil
 
-debugPrintln(a ?? nextCounter()) // CHECK-NEXT: 123
-debugPrintln(b ?? nextCounter()) // CHECK-NEXT: 0
-debugPrintln(c ?? nextCounter()) // CHECK-NEXT: 1
-debugPrintln(d ?? nextCounter()) // CHECK-NEXT: 456
+debugPrintln(a ?? nextCounter())      // CHECK-NEXT: 123
+debugPrintln(b ?? nextCounter())      // CHECK-NEXT: 0
+debugPrintln(c ?? nextCounter())      // CHECK-NEXT: 1
+debugPrintln(d ?? nextCounter())      // CHECK-NEXT: 456
 debugPrintln(e ?? d ?? nextCounter()) // CHECK-NEXT: 456
-debugPrintln(f ?? nextCounter()) // CHECK-NEXT: 2
+debugPrintln(f ?? nextCounter())      // CHECK-NEXT: 2
 
 func nextCounter2() -> Int? {
   return nextCounter()
 }
 
-debugPrintln(c ?? d)             // CHECK-NEXT: Optional(456)
-debugPrintln(a ?? nextCounter2()) // CHECK-NEXT: Optional(123)
-debugPrintln(b ?? nextCounter2()) // CHECK-NEXT: Optional(3)
-debugPrintln(c ?? nextCounter2()) // CHECK-NEXT: Optional(4)
-debugPrintln(d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
+debugPrintln(c ?? d)                   // CHECK-NEXT: Optional(456)
+debugPrintln(c ?? e)                   // CHECK-NEXT: nil
+debugPrintln(a ?? nextCounter2())      // CHECK-NEXT: Optional(123)
+debugPrintln(b ?? nextCounter2())      // CHECK-NEXT: Optional(3)
+debugPrintln(c ?? nextCounter2())      // CHECK-NEXT: Optional(4)
+debugPrintln(d ?? nextCounter2())      // CHECK-NEXT: Optional(456)
 debugPrintln(e ?? d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
-debugPrintln(f ?? nextCounter2()) // CHECK-NEXT: Optional(5)
-
-
+debugPrintln(f ?? nextCounter2())      // CHECK-NEXT: Optional(5)
