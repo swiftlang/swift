@@ -16,8 +16,10 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
+  @transparent
   public init() { self = .None }
 
+  @transparent
   public init(_ some: T) { self = .Some(some) }
 
   @transparent
