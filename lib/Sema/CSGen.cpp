@@ -957,6 +957,7 @@ namespace {
 
                     if ((isFavoredParamAndArg(firstParamTy, firstArgTy) ||
                          isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
+                        firstParamTy->isEqual(secondParamTy) &&
                         (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
                       oldConstraint->setFavored();
                       favoredConstraints.push_back(oldConstraint);
