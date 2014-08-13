@@ -17,6 +17,10 @@ struct StringData {
   var size: Builtin.Word
 }
 
+struct PointerStorage {
+  var ptr: FakeOptional<Builtin.NativeObject>
+}
+
 class B { }
 class E : B { }
 
@@ -1688,3 +1692,15 @@ bb0(%18 : $*Builtin.NativeObject):
   %17 = tuple ()                                  // user: %18
   return %17 : $()                                // id: %18
 }
+
+// CHECK-LABEL: sil @merge_structextract_uncheckedenumdata_and_ref_bitcasts : $@thin (Builtin.NativeObject) -> Builtin.NativeObject {
+// CHECK: bb0({{%[0-9]+}} : $Builtin.NativeObject):
+// CHECK-NEXT: return
+sil @merge_structextract_uncheckedenumdata_and_ref_bitcasts : $@thin (Builtin.NativeObject) -> Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $PointerStorage
+  %2 = struct_extract %1 : $PointerStorage, #PointerStorage.ptr
+  %3 = unchecked_enum_data %2 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1
+  return %3 : $Builtin.NativeObject
+}
+
