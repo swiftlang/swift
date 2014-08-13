@@ -265,3 +265,13 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () -> T) -> T {
     return defaultValue()
   }
 }
+
+@transparent
+public func ?? <T> (optional: T?, defaultValue: @autoclosure () -> T?) -> T? {
+  switch optional {
+  case .Some(let value):
+    return value
+  case .None:
+    return defaultValue()
+  }
+}
