@@ -122,7 +122,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       NameLen = VD->getName().getLength();
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!ED->isInvalid()) {
+    if (!ED->isInvalid() && ED->getExtendedType()) {
       // FIXME: Handle all of the ref-components in extensions, as well as
       // the generic parameter lists.
       if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
