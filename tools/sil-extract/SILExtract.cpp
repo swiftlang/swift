@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
   Invocation.setImportSearchPaths(ImportPaths);
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
+  Invocation.getLangOptions().EnableAccessControl = false;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
