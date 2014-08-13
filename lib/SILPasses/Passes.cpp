@@ -112,13 +112,15 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
 
   // Run high-level loop opts.
   PM.add(createLoopRotatePass());
-  PM.add(createABCOpt());
 
   // Cleanup.
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
   PM.add(createSimplifyCFG());
+  PM.add(createABCOpt());
+  // Cleanup.
+  PM.add(createDCE());
   PM.add(createArrayOpts());
 }
 

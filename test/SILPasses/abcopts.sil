@@ -1,4 +1,5 @@
 // RUN: %sil-opt -loop-rotate -abcopts -enable-abcopts=1 %s | FileCheck %s
+// RUN: %sil-opt -loop-rotate -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | FileCheck %s --check-prefix=HOIST
 
 sil_stage canonical
 
@@ -316,6 +317,252 @@ bb3:
 }
 // CHECK: return
 
+// HOIST-LABEL: sil @hoist
+// HOIST: bb0
+// HOIST: [[END:%[0-9]+]] = struct_extract %0 : $Int, #Int.value
+// HOIST: [[ZERO:%[0-9]+]] = integer_literal $Builtin.Word, 0
+// HOIST: cond_br
+
+// HOIST: bb1
+// Check overflow.
+// HOIST:  [[SGE:%[0-9]+]] = builtin_function_ref "cmp_sge_Word"
+// HOIST:  [[SGE1:%[0-9]+]] = apply [[SGE]]([[ZERO]], [[END]])
+// HOIST:  cond_fail [[SGE1]]
+
+// Check start.
+// HOIST: [[S1:%[0-9]+]] = struct $Int ([[ZERO]] : $Builtin.Word)
+// HOIST: [[L1:%[0-9]+]] = load %1 : $*ArrayInt
+// HOIST: [[SE1:%[0-9]+]] = struct_extract [[L1]]
+// HOIST: [[SE2:%[0-9]+]] = struct_extract [[SE1]]
+// HOIST: retain_value [[SE2]]
+// HOIST: [[CB1:%[0-9]+]] = function_ref @checkbounds
+// HOIST: apply [[CB1]]([[S1]], [[L1]])
+
+// Check end.
+// HOIST: [[SUB:%[0-9]+]] = builtin_function_ref "ssub_with_overflow_Word"
+// HOIST: [[ONE:%[0-9]+]] = integer_literal $Builtin.Word, 1
+// HOIST: [[SUB1:%[0-9]+]] = apply [[SUB]]([[END]], [[ONE]]
+// HOIST: [[SUB2:%[0-9]+]] = tuple_extract [[SUB1]]
+// HOIST: [[SUB3:%[0-9]+]] = struct $Int ([[SUB2]]
+// HOIST: [[L2:%[0-9]+]] = load %1
+// HOIST: [[SEL2:%[0-9]+]] = struct_extract [[L2]]
+// HOIST: [[SEL21:%[0-9]+]] = struct_extract [[SEL2]]
+// HOIST: retain_value [[SEL21]]
+// HOIST: [[CB2:%[0-9]+]] = function_ref @checkbounds
+// HOIST: apply [[CB2]]([[SUB3]], [[L2]])
+// HOIST: br bb2
+
+// HOIST: bb2
+// HOIST-NOT: cond_fail
+// HOIST-NOT: load
+// HOIST-NOT: @checkbounds
+// HOIST: apply
+// HOIST: apply
+// HOIST-NOT: apply
+// HOIST: cond_br {{.*}}, {{.*}}, bb2
+// HOIST: return
+
+sil @hoist : $@thin (Int, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%4, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int(%4 : $Builtin.Word)
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+
+// HOIST-LABEL: sil @hoistinvariant
+
+// Preheader.
+// HOIST: bb1:
+// HOIST: [[SGE:%[0-9]+]] = builtin_function_ref "cmp_sge_Word"
+// HOIST: [[SGE1:%[0-9]+]] = apply [[SGE]]
+// HOIST: cond_fail [[SGE1]]
+// HOIST:  [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:  load %1 : $*ArrayInt                      // users: %13, %16
+// HOIST:  struct_extract
+// HOIST:  struct_extract
+// HOIST:  retain_value
+// HOIST:  apply [[CB]]
+// HOIST:  br bb2
+
+// Loop.
+// HOIST:  bb2{{.*}}:
+// HOIST-NOT: cond_fail
+// HOIST-NOT: load
+// HOIST-NOT: @checkbounds
+// HOIST: apply
+// HOIST: apply
+// HOIST-NOT: apply
+// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
+// HOIST: return
+
+sil @hoistinvariant : $@thin (Int, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  %37 = struct $Int(%2 : $Builtin.Word)
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%4, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+
+// HOIST-LABEL: sil @hoist_rangechecked
+// HOIST: bb0
+// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST: bb1:
+// HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:    apply [[CB]]
+// HOIST:   br bb2{{.*}}
+// HOIST: bb2{{.*}}:
+// HOIST-NOT: function_ref @checkbounds
+// HOIST-NOT:    apply [[CB]]
+// HOIST:   cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
+// HOIST: bb3{{.*}}:
+// HOIST:  return
+
+sil @hoist_rangechecked : $@thin (Int, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %60 = builtin_function_ref "cmp_sle_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %61 = apply %60(%2, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %62 = builtin_function_ref "xor_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %14 = apply %62(%61, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  cond_fail %14 : $Builtin.Int1
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%4, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int(%4 : $Builtin.Word)
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
+
+// HOIST-LABEL: hoist_inclusive_rangechecked
+// HOIST: bb0
+// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST: bb1:
+// HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:    apply [[CB]]
+// HOIST:   br bb2{{.*}}
+// HOIST: bb2{{.*}}:
+// HOIST-NOT: function_ref @checkbounds
+// HOIST-NOT:    apply [[CB]]
+// HOIST:   cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
+// HOIST: bb3{{.*}}:
+// HOIST: return
+sil @hoist_inclusive_rangechecked : $@thin (Int, @inout ArrayInt) -> Int {
+bb0(%0 : $Int, %24 : $*ArrayInt):
+  %1 = struct_extract %0 : $Int, #Int.value
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %60 = builtin_function_ref "cmp_sle_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %61 = apply %60(%2, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %62 = builtin_function_ref "xor_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %14 = apply %62(%61, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  cond_fail %14 : $Builtin.Int1
+  %63 = integer_literal $Builtin.Word, 1
+  %64 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %65 = integer_literal $Builtin.Int1, 0
+  %66 = apply %64(%1, %63, %65) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %67 = tuple_extract %66 : $(Builtin.Word, Builtin.Int1), 0
+  %68 = builtin_function_ref "cmp_sgt_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %69 = apply %68(%67, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %70 = apply %62(%69, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  cond_fail %70 : $Builtin.Int1
+  br bb1(%2 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %7 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %8 = apply %7(%4, %67) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int(%4 : $Builtin.Word)
+  %52 = function_ref @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %53) : $@cc(method) @thin (Int, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Word, 1
+  %18 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = apply %18(%4, %10, %19) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Word, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Word)
+
+bb3:
+  %23 = struct $Int (%4 : $Builtin.Word)
+  return %23 : $Int
+}
 
 sil public_external [semantics "array.check_subscript"] @checkbounds : $@cc(method) @thin (Int, @owned ArrayInt) -> () {
   bb0(%0: $Int, %1: $ArrayInt):
