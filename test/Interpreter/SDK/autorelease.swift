@@ -4,6 +4,9 @@
 // optimization on i386, even in the iOS simulator.
 // XFAIL: CPU=i386
 
+// FIXME: <rdar://17999904> Return-autorelease optimization broken on arm64
+// XFAIL: CPU=arm64
+
 import Foundation
 
 class PrintOnDeinit: NSObject {
