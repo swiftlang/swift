@@ -2460,7 +2460,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst: {
     ValueDecl *FieldV;
-    SourceLoc NameLoc;
+    SourceLoc NameLoc = P.Tok.getLoc();
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILDottedPath(FieldV))
@@ -3482,14 +3482,21 @@ bool Parser::parseSILWitnessTable() {
   NormalProtocolConformance *theConformance = conf ?
       dyn_cast<NormalProtocolConformance>(conf) : nullptr;
 
+  SILWitnessTable *wt = nullptr;
+  if (theConformance) {
+    wt = SIL->M->lookUpWitnessTable(theConformance, false).first;
+    assert((!wt || wt->isDeclaration()) &&
+           "Attempting to create duplicate witness table.");
+  }
+
   // If we don't have an lbrace, then this witness table is a declaration.
   if (Tok.getKind() != tok::l_brace) {
     // Default to public external linkage.
     if (!Linkage)
       Linkage = SILLinkage::PublicExternal;
     // We ignore empty witness table without normal protocol conformance.
-    if (theConformance)
-      SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+    if (!wt && theConformance)
+      wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
     BodyScope.reset();
     return false;
   }
@@ -3619,7 +3626,9 @@ bool Parser::parseSILWitnessTable() {
   if (!Linkage)
     Linkage = SILLinkage::Public;
 
-  SILWitnessTable::create(*SIL->M, *Linkage, theConformance, witnessEntries);
+  if (!wt)
+    wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+  wt->convertToDefinition(witnessEntries);
   BodyScope.reset();
   return false;
 }
