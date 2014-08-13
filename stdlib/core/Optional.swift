@@ -22,16 +22,6 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   @transparent
   public init(_ some: T) { self = .Some(some) }
 
-  @transparent
-  public var hasValue: Bool {
-    switch self {
-    case .Some:
-      return true
-    case .None:
-      return false
-    }
-  }
-
   /// Haskell's fmap, which was mis-named
   public func map<U>(f: (T)->U) -> U? {
     switch self {
@@ -87,6 +77,11 @@ public func map<T, U>(x: T?, f: (T)->U) -> U? {
 @transparent internal
 func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
   return (v != nil).value
+}
+
+@transparent internal
+func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
+  return v != nil
 }
 
 @transparent internal

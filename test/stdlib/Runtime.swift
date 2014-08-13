@@ -714,6 +714,257 @@ Reflection.test("dumpToAStream") {
   expectEqual("▿ 2 elements\n  - [0]: 42\n  - [1]: 4242\n", output)
 }
 
+// A struct type that gets destructured by the default mirror.
+struct Matte {
+  let s: String
+
+  init (_ s: String) {
+    self.s = s
+  }
+}
+
+Reflection.test("StructMirror") {
+  if true {
+    var output = ""
+    dump(Matte("123"), &output)
+    expectEqual("▿ a.Matte\n  - s: 123\n", output)
+  }
+
+  if true {
+    // Build a String around an interpolation as a way of smoke-testing that
+    // the internal MirrorType implementation gets memory management right.
+    var output = ""
+    dump(Matte("\(456)"), &output)
+    expectEqual("▿ a.Matte\n  - s: 456\n", output)
+  }
+
+  // Structs have no identity and thus no object identifier
+  expectEmpty(reflect(Matte("")).objectIdentifier)
+
+  // The default mirror provides no quick look object
+  expectEmpty(reflect(Matte("")).quickLookObject)
+
+  expectEqual(.Struct, reflect(Matte("")).disposition)
+}
+
+/// A type that provides its own mirror.
+struct BrilliantMirror : MirrorType {
+  let _value: Brilliant
+
+  init (_ _value: Brilliant) {
+    self._value = _value
+  }
+
+  var value: Any {
+    return _value
+  }
+
+  var valueType: Any.Type {
+    return value.dynamicType
+  }
+
+  var objectIdentifier: ObjectIdentifier? {
+    return ObjectIdentifier(_value)
+  }
+
+  var count: Int {
+    return 3
+  }
+
+  subscript(i: Int) -> (String, MirrorType) {
+    switch i {
+    case 0:
+      return ("first", reflect(_value.first))
+    case 1:
+      return ("second", reflect(_value.second))
+    case 2:
+      return ("self", self)
+    case _:
+      _preconditionFailure("child index out of bounds")
+    }
+  }
+
+  var summary: String {
+    return "Brilliant(\(_value.first), \(_value.second))"
+  }
+
+  var quickLookObject: QuickLookObject? {
+    return nil
+  }
+
+  var disposition: MirrorDisposition {
+    return .Container
+  }
+}
+
+class Brilliant : Reflectable {
+  let first: Int
+  let second: String
+
+  init(_ fst: Int, _ snd: String) {
+    self.first = fst
+    self.second = snd
+  }
+
+  func getMirror() -> MirrorType {
+    return BrilliantMirror(self)
+  }
+}
+
+/// Subclasses inherit their parents' custom mirrors.
+class Irradiant : Brilliant {
+  init() {
+    super.init(400, "")
+  }
+}
+
+Reflection.test("CustomMirror") {
+  if true {
+    var output = ""
+    dump(Brilliant(123, "four five six"), &output)
+
+    var expected = ""
+    expected += "▿ Brilliant(123, four five six) #0\n"
+    expected += "  - first: 123\n"
+    expected += "  - second: four five six\n"
+    expected += "  ▿ self: Brilliant(123, four five six) #0\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(Brilliant(123, "four five six"), &output, maxDepth: 0)
+    expectEqual("▹ Brilliant(123, four five six) #0\n", output)
+  }
+
+  if true {
+    var output = ""
+    dump(Brilliant(123, "four five six"), &output, maxItems: 3)
+
+    var expected = ""
+    expected += "▿ Brilliant(123, four five six) #0\n"
+    expected += "  - first: 123\n"
+    expected += "  - second: four five six\n"
+    expected += "    (1 more child)\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(Brilliant(123, "four five six"), &output, maxItems: 2)
+
+    var expected = ""
+    expected += "▿ Brilliant(123, four five six) #0\n"
+    expected += "  - first: 123\n"
+    expected += "    (2 more children)\n"
+
+    expectEqual(expected, output)
+  }
+
+  if true {
+    var output = ""
+    dump(Brilliant(123, "four five six"), &output, maxItems: 1)
+
+    var expected = ""
+    expected += "▿ Brilliant(123, four five six) #0\n"
+    expected += "    (3 children)\n"
+
+    expectEqual(expected, output)
+  }
+
+  expectEqual(.Container, reflect(Brilliant(123, "four five six")).disposition)
+
+  if true {
+    // Check that object identifiers are unique to class instances.
+    let a = Brilliant(1, "")
+    let b = Brilliant(2, "")
+
+    checkEquatable(true, ObjectIdentifier(a), ObjectIdentifier(a))
+    checkEquatable(false, ObjectIdentifier(a), ObjectIdentifier(b))
+  }
+}
+
+Reflection.test("CustomMirrorIsInherited") {
+  if true {
+    var output = ""
+    dump(Irradiant(), &output)
+
+    var expected = ""
+    expected += "▿ Brilliant(400, ) #0\n"
+    expected += "  - first: 400\n"
+    expected += "  - second: \n"
+    expected += "  ▿ self: Brilliant(400, ) #0\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+Reflection.test("TupleMirror") {
+  if true {
+    var output = ""
+    let tuple = (Brilliant(384, "seven six eight"), Matte("nine"))
+    dump(tuple, &output)
+
+    var expected = ""
+    expected += "▿ (2 elements)\n"
+    expected += "  ▿ .0: Brilliant(384, seven six eight) #0\n"
+    expected += "    - first: 384\n"
+    expected += "    - second: seven six eight\n"
+    expected += "    ▿ self: Brilliant(384, seven six eight) #0\n"
+    expected += "  ▿ .1: a.Matte\n"
+    expected += "    - s: nine\n"
+
+    expectEqual(expected, output)
+
+    expectEmpty(reflect(tuple).quickLookObject)
+    expectEqual(.Tuple, reflect(tuple).disposition)
+  }
+
+  if true {
+    // A tuple of stdlib types with mirrors.
+    var output = ""
+    let tuple = (1, 2.5, false, "three")
+    dump(tuple, &output)
+
+    var expected = ""
+    expected += "▿ (4 elements)\n"
+    expected += "  - .0: 1\n"
+    expected += "  - .1: 2.5\n"
+    expected += "  - .2: false\n"
+    expected += "  - .3: three\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+class DullClass {}
+Reflection.test("ObjectIdentity") {
+  // Check that the primitive MirrorType implementation produces appropriately
+  // unique identifiers for class instances.
+
+  let x = DullClass()
+  let y = DullClass()
+  let o = NSObject()
+  let p = NSObject()
+
+  checkEquatable(
+    true, reflect(x).objectIdentifier!, reflect(x).objectIdentifier!)
+  checkEquatable(
+    false, reflect(x).objectIdentifier!, reflect(y).objectIdentifier!)
+  checkEquatable(
+    true, reflect(o).objectIdentifier!, reflect(o).objectIdentifier!)
+  checkEquatable(
+    false, reflect(o).objectIdentifier!, reflect(p).objectIdentifier!)
+  checkEquatable(
+    false, reflect(o).objectIdentifier!, reflect(y).objectIdentifier!)
+
+  expectEmpty(reflect(x).quickLookObject)
+
+  expectEqual(.Class, reflect(x).disposition)
+}
+
 Reflection.test("String.UTF8View/Mirror") {
   // U+0061 LATIN SMALL LETTER A
   // U+304B HIRAGANA LETTER KA

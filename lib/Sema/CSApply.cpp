@@ -5207,37 +5207,39 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   return result;
 }
 
-Expr *
-Solution::convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const {
+Expr *Solution::convertOptionalToBool(Expr *expr,
+                                      ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this);
   auto &tc = cs.getTypeChecker();
+  tc.requireOptionalIntrinsics(expr->getLoc());
 
-  // Find the witness we need to use.
-  Type type = expr->getType();
-  auto hasValueMembers = tc.lookupMember(type, tc.Context.Id_HasValue, cs.DC);
-  
-  if (hasValueMembers.size() != 1) {
-    tc.diagnose(expr->getLoc(), diag::option_type_broken);
-    return nullptr;
-  }
-  
-  auto hasValueMember = dyn_cast<ValueDecl>(hasValueMembers[0]);
-  
-  if (!hasValueMember) {
-    tc.diagnose(expr->getLoc(), diag::option_type_broken);
-    return nullptr;
-    
-  }
-
-  // Form a reference to this member.
+  // Find the library intrinsic.
   auto &ctx = tc.Context;
-  Expr *memberRef = new (ctx) MemberRefExpr(expr, expr->getStartLoc(),
-                                            hasValueMember, expr->getEndLoc(),
-                                            /*Implicit=*/true);
-  tc.typeCheckExpressionShallow(memberRef, cs.DC);
+  auto *fn = ctx.getDoesOptionalHaveValueAsBoolDecl(&tc, OTK_Optional);
+  tc.validateDecl(fn);
 
-  return memberRef;
+  // Form a reference to the function. This library intrinsic is generic, so we
+  // need to form substitutions and compute the resulting type.
+  auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
+  Substitution sub(fn->getGenericParams()->getAllArchetypes()[0],
+                   unwrappedOptionalType, {});
+  ConcreteDeclRef fnSpecRef(ctx, fn, sub);
+  auto *fnRef =
+      new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);
+
+  TypeSubstitutionMap subMap;
+  auto genericParam = fn->getGenericSignatureOfContext()->getGenericParams()[0];
+  subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()] =
+      unwrappedOptionalType;
+  fnRef->setType(fn->getInterfaceType().subst(
+      constraintSystem->DC->getParentModule(), subMap, false, &tc));
+
+  Expr *call = new (ctx) CallExpr(fnRef, expr, /*Implicit=*/true);
+
+  bool failed = tc.typeCheckExpressionShallow(call, cs.DC);
+  assert(!failed && "Could not call library intrinsic?");
+  (void)failed;
+  return call;
 }
 
 Expr *

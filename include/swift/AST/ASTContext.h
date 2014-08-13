@@ -399,6 +399,10 @@ public:
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                          OptionalTypeKind kind) const;
 
+  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
+  FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
+                                               OptionalTypeKind kind) const;
+
   /// Retrieve the declaration of
   /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
   FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,

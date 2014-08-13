@@ -102,11 +102,14 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _preconditionOptionalHasValue<T>(v : [inout] Optional<T>) -> T
+  /// func _preconditionOptionalHasValue<T>(inout v: Optional<T>)
   FuncDecl *PreconditionOptionalHasValueDecls[NumOptionalTypeKinds] = {};
 
-  /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
+  /// func _doesOptionalHaveValue<T>(inout v: Optional<T>) -> Builtin.Int1
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
+
+  /// func _doesOptionalHaveValueAsBool<T>(v: Optional<T>) -> Bool
+  FuncDecl *DoesOptionalHaveValueAsBoolDecls[NumOptionalTypeKinds] = {};
 
   /// func _getOptionalValue<T>(v : Optional<T>) -> T
   FuncDecl *GetOptionalValueDecls[NumOptionalTypeKinds] = {};
@@ -785,6 +788,35 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver,
 
   // Output must be Builtin.Int1.
   if (!isBuiltinInt1Type(output))
+    return nullptr;
+
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getDoesOptionalHaveValueAsBoolDecl(
+    LazyResolver *resolver, OptionalTypeKind optionalKind) const {
+  auto &cache = Impl.DoesOptionalHaveValueAsBoolDecls[asIndex(optionalKind)];
+  if (cache)
+    return cache;
+
+  auto name =
+      getOptionalIntrinsicName("_does", optionalKind, "HaveValueAsBool");
+
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, name, resolver);
+  if (!decl || !isGenericIntrinsic(decl, input, output, param))
+    return nullptr;
+
+  // Input must be Optional<T>.
+  if (!isOptionalType(*this, optionalKind, input, param))
+    return nullptr;
+
+  // Output must be a global type named Bool.
+  auto nominalType = dyn_cast<NominalType>(output);
+  if (!nominalType || nominalType.getParent() ||
+      nominalType->getDecl()->getName().str() != "Bool")
     return nullptr;
 
   cache = decl;
