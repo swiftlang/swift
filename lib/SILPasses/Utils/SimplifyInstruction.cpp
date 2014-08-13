@@ -289,10 +289,6 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
 SILValue
 InstSimplifier::
 visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
-  // (unchecked_ref_bit_cast X->X x) -> x
-  if (URBCI->getOperand().getType() == URBCI->getType())
-    return URBCI->getOperand();
-
   // (unchecked_ref_bit_cast Y->X (unchecked_ref_bit_cast X->Y x)) -> x
   if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand()))
     if (Op->getOperand().getType() == URBCI->getType())
@@ -304,10 +300,6 @@ visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
 SILValue
 InstSimplifier::
 visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
-  // (unchecked_trivial_bit_cast X->X x) -> x
-  if (UTBCI->getOperand().getType() == UTBCI->getType())
-    return UTBCI->getOperand();
-
   // (unchecked_trivial_bit_cast Y->X (unchecked_trivial_bit_cast X->Y x)) -> x
   if (auto *Op = dyn_cast<UncheckedTrivialBitCastInst>(UTBCI->getOperand()))
     if (Op->getOperand().getType() == UTBCI->getType())
