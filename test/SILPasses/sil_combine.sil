@@ -1440,20 +1440,19 @@ enum TwoStateEnum {
 }
 
 // CHECK-LABEL: sil @reinterpretcast_simplification_unchecked_addr : $@thin (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum, @inout TwoStateEnum) -> (Builtin.NativeObject, Int, Builtin.NativeObject, Builtin.NativeObject, Int) {
-// CHECK: bb0([[INPTR_0:%[0-9]+]] : $*FakeOptional<rs_A>, [[INPTR_1:%[0-9]+]] : $*FakeOptional<rs_C>, [[INPTR_2:%[0-9]+]] : $*FakeOptional<rs_F>, [[INPTR_3:%[0-9]+]] : $*TwoStateEnum, [[INPTR_4:%[0-9]+]] : $*TwoStateEnum):
-// CHECK-NEXT: [[RS_A:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_0]] : $*FakeOptional<rs_A>, #FakeOptional.Some!enumelt.1
-// CHECK-NEXT: [[RS_B:%[0-9]+]] = struct_element_addr [[RS_A]] : $*rs_A, #rs_A.b
-// CHECK-NEXT: struct_element_addr [[RS_B]] : $*rs_B, #rs_B.ptr
-// CHECK-NEXT: [[RS_C:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_1]] : $*FakeOptional<rs_C>, #FakeOptional.Some!enumelt.1
-// CHECK-NEXT: [[RS_D:%[0-9]+]] = struct_element_addr [[RS_C]] : $*rs_C, #rs_C.d
-// CHECK-NEXT: struct_element_addr [[RS_D]] : $*rs_D, #rs_D.i
-// CHECK-NEXT: [[INVALUE_2:%[0-9]+]] = load [[INPTR_2]] : $*FakeOptional<rs_F>
-// CHECK-NEXT: unchecked_ref_bit_cast [[INVALUE_2]] : $FakeOptional<rs_F> to $Builtin.NativeObject
-// CHECK-NEXT: [[RS_A_2:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_3]] : $*TwoStateEnum, #TwoStateEnum.State1!enumelt.1
-// CHECK-NEXT: [[RS_B_2:%[0-9]+]] = struct_element_addr [[RS_A_2]] : $*rs_A, #rs_A.b
-// CHECK-NEXT: [[RS_PTR_2:%[0-9]+]] = struct_element_addr [[RS_B_2]] : $*rs_B, #rs_B.ptr
-// CHECK-NEXT: [[INVALUE_4:%[0-9]+]] = load [[INPTR_4]] : $*TwoStateEnum
-// CHECK-NEXT: unchecked_trivial_bit_cast [[INVALUE_4]] : $TwoStateEnum to $Int
+// CHECK: bb0(
+// CHECK-NEXT: load
+// CHECK-NEXT: unchecked_ref_bit_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: unchecked_trivial_bit_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: unchecked_ref_bit_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: unchecked_ref_bit_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: unchecked_trivial_bit_cast
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil @reinterpretcast_simplification_unchecked_addr
   : $@thin (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum,
             @inout TwoStateEnum)

@@ -1052,7 +1052,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
     } else {
       Args.push_back(Op);
     }
-  }  
+  }
 
   SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
@@ -1369,7 +1369,7 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
     UCI->setOperand(Op->getOperand());
     return Op->use_empty() ? eraseInstFromFunction(*Op) : nullptr;
   }
-  
+
   return nullptr;
 }
 
@@ -1433,80 +1433,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
-/// Prove that Ty1 is layout compatible with Ty2. This is separate from the
-/// implementation in SILType since we are only interested in rewritting
-/// unchecked_addr_cast from structs, enums into respectively fields, payloads.
-///
-/// TODO: Refactor this into SILType?
-static bool areLayoutCompatibleTypes(SILType Ty1, SILType Ty2, SILModule &Mod,
-                                     llvm::SmallVectorImpl<Projection> &Projs) {
-  // If Ty1 == Ty2, they must be layout compatible.
-  if (Ty1 == Ty2)
-    return true;
-
-  // We do not know the final types of generics implying we can not know if they
-  // are layout compatible.
-  if (Ty1.hasArchetype() || Ty2.hasArchetype())
-    return false;
-
-  SILType TyIter = Ty2;
-
-  while (true) {
-    // If this type is the type we are searching for (Ty1), we have succeeded,
-    // return.
-    if (TyIter == Ty1)
-      return true;
-
-    // Then if we have an enum...
-    if (EnumDecl *E = TyIter.getEnumOrBoundGenericEnum()) {
-      // Add the first payloaded field to the list. If we have no payloads,
-      // bail.
-      bool FoundResult = false;
-      for (EnumElementDecl *Elt : E->getAllElements()) {
-        if (Elt->hasArgumentType()) {
-          TyIter = TyIter.getEnumElementType(Elt, Mod);
-          Projs.push_back({TyIter, Elt});
-          FoundResult = true;
-          break;
-        }
-      }
-
-      if (FoundResult)
-        continue;
-      return false;
-    }
-
-    // Then if we have a struct address...
-    if (StructDecl *S = TyIter.getStructOrBoundGenericStruct()) {
-      // Look through its stored properties.
-      auto Range = S->getStoredProperties();
-
-      // If it has no stored properties, there is nothing we can do, bail.
-      if (Range.begin() == Range.end())
-        return false;
-
-      // Grab the first field.
-      auto Iter = Range.begin();
-      VarDecl *FirstVar = *Iter;
-      ++Iter;
-
-      // If we have more than one stored field, the struct is not able to have
-      // layout compatible relationships with any of its fields.
-      if (Iter != Range.end())
-        return false;
-
-      // Otherwise we can search into the structs fields.
-      TyIter = TyIter.getFieldType(FirstVar, Mod);
-      Projs.push_back({TyIter, FirstVar, Projection::NominalType::Struct});
-      continue;
-    }
-
-    // If we reached this point, then this type has no subrecords we are
-    // interested in. Thus we have failed. Return false.
-    return false;
-  }
-}
-
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   SILModule &Mod = UADCI->getModule();
@@ -1524,41 +1450,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     return new (Mod) UpcastInst(UADCI->getLoc(), UADCI->getOperand(),
                                 UADCI->getType());
 
-  // *NOTE* InstSimplify already handles the identity case so we don't need to
-  // worry about that problem here and can assume that the cast types are
-  // different.
-  llvm::SmallVector<Projection, 4> Projs;
-
-  // Given (unchecked_addr_cast x X->Y), we prove that Y is layout compatible
-  // with X as an aggregate. If we can do that, then we can rewrite the cast as
-  // a typed GEP.
-  if (areLayoutCompatibleTypes(UADCI->getType(),
-                               UADCI->getOperand().getType(),
-                               Mod,
-                               Projs)) {
-    SILBuilder Builder(UADCI);
-    SILValue V = UADCI->getOperand();
-
-    for (auto &P : Projs) {
-      if (P.getNominalType() == Projection::NominalType::Struct) {
-        V = Builder.createStructElementAddr(UADCI->getLoc(),
-                                            V, cast<VarDecl>(P.getDecl()),
-                                            P.getType());
-      } else {
-        assert(P.getNominalType() == Projection::NominalType::Enum &&
-               "We only support rewriting of reinterpretCasts into enums and "
-               "structs");
-        V = Builder.createUncheckedTakeEnumDataAddr(
-            UADCI->getLoc(), V, cast<EnumElementDecl>(P.getDecl()),
-            P.getType());
-      }
-    }
-
-    return replaceInstUsesWith(*UADCI, V.getDef(), 0);
-  }
-
-  // Ok, we can't rewrite this one. See if we have all loads from this
-  // instruction. If we do, load the original type and create a bitcast.
+  // See if we have all loads from this unchecked_addr_cast. If we do, load the
+  // original type and create the appropriate bitcast.
 
   // First if our UADCI has not users, bail. This will be eliminated by DCE.
   if (UADCI->use_empty())
