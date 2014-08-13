@@ -3401,6 +3401,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   //   T $< U ===> T $< U?
   case ConversionRestrictionKind::ValueToOptional: {
     addContextualScore();
+    increaseScore(SK_ValueToOptional);
     assert(matchKind >= TypeMatchKind::Subtype);
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());

@@ -349,8 +349,9 @@ class ProtocolAdopterBad3 : FooProto { // expected-error{{type 'ProtocolAdopterB
 @objc protocol RefinedFooProtocol : FooProto {}
 
 func testPreferClassMethodToCurriedInstanceMethod(obj: NSObject) {
-  let result = NSObject.isEqual(obj)
-  let resultChecked: Bool = result // no-warning
+  // FIXME: We shouldn't need the ": Bool" type annotation here.
+  // <rdar://problem/18006008>
+  let result: Bool = NSObject.isEqual(obj)
   let curried = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
 }
 

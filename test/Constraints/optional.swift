@@ -68,3 +68,30 @@ func test7(x : A) {
 func test8(x : AnyObject?) {
   let y : A = x as A
 }
+
+
+// Partial ordering with optionals
+func test9_helper<T>(x: T) -> Int { }
+func test9_helper<T>(x: T?) -> Double { }
+
+func test9(i: Int, io: Int?) {
+  var result = test9_helper(i)
+  var i2: Int = result
+  var result2 = test9_helper(io)
+  let d: Double = result2
+}
+
+protocol P { }
+
+func test10_helper<T : P>(x: T) -> Int { }
+func test10_helper<T : P>(x: T?) -> Double { }
+
+extension Int : P { }
+
+func test10(i: Int, io: Int?) {
+  let result = test10_helper(i)
+  var i2: Int = result
+
+  let result2 = test10_helper(io)
+  var d: Double = result2
+}

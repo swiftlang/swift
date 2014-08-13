@@ -707,6 +707,8 @@ enum ScoreKind {
   SK_CollectionBridgedConversion,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
+  /// A value-to-optional conversion.
+  SK_ValueToOptional,
   /// A conversion from an inout to a pointer of matching element type.
   SK_ScalarPointerConversion,
   /// A conversion from an array to a pointer of matching element type.

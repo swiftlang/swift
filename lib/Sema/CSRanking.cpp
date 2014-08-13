@@ -64,6 +64,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
       log << "collection bridged conversion";
       break;
         
+    case SK_ValueToOptional:
+      log << "value to optional";
+      break;
+
     case SK_ArrayPointerConversion:
       log << "array-to-pointer conversion";
       break;
@@ -555,7 +559,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
   // Solve the system.
   SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
+  if (cs.solve(solutions, FreeTypeVariableBinding::Allow))
+    return false;
+
+  // Ban value-to-optional conversions.
+  return solutions[0].getFixedScore().Data[SK_ValueToOptional] == 0;
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
