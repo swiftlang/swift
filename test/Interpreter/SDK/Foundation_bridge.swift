@@ -140,7 +140,7 @@ if let obj: AnyObject = _bridgeToObjectiveC(dict3) {
 
 // Check dictionary bridging.
 var propListStr: NSString = "\"Hello\" = 1;\n\n\"World\" = 2;"
-var dict4 = propListStr.propertyListFromStringsFileFormat()
+var dict4 = propListStr.propertyListFromStringsFileFormat()!
 var hello = "Hello"
 var world = "World"
 

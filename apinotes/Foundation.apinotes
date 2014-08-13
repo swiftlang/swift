@@ -23,11 +23,63 @@ Classes:
     NullabilityOfRet: S
 - Name: NSAppleEventDescriptor
   Methods:
+  - Selector: 'appleEventWithEventClass:eventID:targetDescriptor:returnID:transactionID:'
+    MethodKind: Class
+    Nullability:
+    - S
+    - S
+    - O
+    - S
+    - S
+    NullabilityOfRet: O
+  - Selector: 'attributeDescriptorForKeyword:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'coerceToDescriptorType:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'descriptorAtIndex:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'descriptorForKeyword:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'descriptorWithBoolean:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'descriptorWithEnumCode:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'descriptorWithInt32:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: O
   - Selector: 'descriptorWithString:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'descriptorWithTypeCode:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: initListDescriptor
+    MethodKind: Instance
+    NullabilityOfRet: O
   - Selector: initRecordDescriptor
     MethodKind: Instance
     NullabilityOfRet: N
@@ -36,12 +88,28 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: N
+  - Selector: 'initWithDescriptorType:bytes:length:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: O
   - Selector: 'initWithDescriptorType:data:'
     MethodKind: Instance
     Nullability:
     - S
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'initWithEventClass:eventID:targetDescriptor:returnID:transactionID:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - O
+    - S
+    - S
+    NullabilityOfRet: O
   - Selector: 'insertDescriptor:atIndex:'
     MethodKind: Instance
     Nullability:
@@ -54,6 +122,11 @@ Classes:
   - Selector: nullDescriptor
     MethodKind: Class
     NullabilityOfRet: N
+  - Selector: 'paramDescriptorForKeyword:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
   - Selector: recordDescriptor
     MethodKind: Class
     NullabilityOfRet: N
@@ -78,6 +151,8 @@ Classes:
   Properties:
   - Name: data
     Nullability: N
+  - Name: stringValue
+    Nullability: O
 - Name: NSAppleEventManager
   Methods:
   - Selector: 'replyAppleEventForSuspensionID:'
@@ -98,23 +173,28 @@ Classes:
     NullabilityOfRet: N
 - Name: NSAppleScript
   Methods:
+  - Selector: 'executeAndReturnError:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
   - Selector: 'executeAppleEvent:error:'
     MethodKind: Instance
     Nullability:
     - N
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithContentsOfURL:error:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    NullabilityOfRet: U
+    - O
+    NullabilityOfRet: O
   - Selector: 'initWithSource:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
 - Name: NSArchiver
   Methods:
   - Selector: 'archivedDataWithRootObject:'
@@ -125,7 +205,7 @@ Classes:
   - Selector: 'archiveRootObject:toFile:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     - N
     NullabilityOfRet: S
   - Selector: 'classNameEncodedForTrueClassName:'
@@ -137,6 +217,11 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'encodeRootObject:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: S
   - Selector: 'initForWritingWithMutableData:'
@@ -192,15 +277,20 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: N
+  - Selector: 'containsObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'descriptionWithLocale:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'descriptionWithLocale:indent:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - S
     NullabilityOfRet: N
   - Selector: 'enumerateObjectsAtIndexes:options:usingBlock:'
@@ -230,7 +320,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'indexesOfObjectsAtIndexes:options:passingTest:'
     MethodKind: Instance
     Nullability:
@@ -249,10 +339,21 @@ Classes:
     - S
     - N
     NullabilityOfRet: N
+  - Selector: 'indexOfObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indexOfObject:inRange:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
   - Selector: 'indexOfObject:inSortedRange:options:usingComparator:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - S
     - S
     - N
@@ -263,6 +364,17 @@ Classes:
     - N
     - S
     - N
+    NullabilityOfRet: S
+  - Selector: 'indexOfObjectIdenticalTo:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indexOfObjectIdenticalTo:inRange:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
     NullabilityOfRet: S
   - Selector: 'indexOfObjectPassingTest:'
     MethodKind: Instance
@@ -299,7 +411,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithContentsOfURL:'
     MethodKind: Instance
     Nullability:
@@ -318,6 +430,12 @@ Classes:
   - Selector: 'isEqualToArray:'
     MethodKind: Instance
     Nullability:
+    - U
+    NullabilityOfRet: S
+  - Selector: 'makeObjectsPerformSelector:withObject:'
+    MethodKind: Instance
+    Nullability:
+    - S
     - O
     NullabilityOfRet: S
   - Selector: 'objectAtIndex:'
@@ -377,7 +495,7 @@ Classes:
   - Selector: 'setValue:forKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'sortedArrayUsingComparator:'
@@ -423,7 +541,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'writeToFile:atomically:'
     MethodKind: Instance
     Nullability:
@@ -439,6 +557,10 @@ Classes:
   Properties:
   - Name: description
     Nullability: N
+  - Name: firstObject
+    Nullability: O
+  - Name: lastObject
+    Nullability: O
   - Name: sortedArrayHint
     Nullability: N
 - Name: NSAssertionHandler
@@ -454,7 +576,7 @@ Classes:
     - N
     - S
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'attribute:atIndex:longestEffectiveRange:inRange:'
     MethodKind: Instance
     Nullability:
@@ -462,7 +584,7 @@ Classes:
     - S
     - S
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'attributedSubstringFromRange:'
     MethodKind: Instance
     Nullability:
@@ -515,7 +637,7 @@ Classes:
   - Selector: 'isEqualToAttributedString:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   Properties:
   - Name: string
@@ -567,22 +689,22 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'classNamed:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithPath:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithURL:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'loadAndReturnError:'
     MethodKind: Instance
     Nullability:
@@ -591,9 +713,9 @@ Classes:
   - Selector: 'localizedStringForKey:value:table:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
-    - U
+    - N
+    - N
+    - O
     NullabilityOfRet: N
   - Selector: mainBundle
     MethodKind: Class
@@ -602,80 +724,174 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'pathForAuxiliaryExecutable:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'pathForResource:ofType:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    NullabilityOfRet: O
   - Selector: 'pathForResource:ofType:inDirectory:'
     MethodKind: Class
     Nullability:
-    - U
-    - U
+    - O
+    - O
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'pathForResource:ofType:inDirectory:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
+    NullabilityOfRet: O
+  - Selector: 'pathForResource:ofType:inDirectory:forLocalization:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
+    - O
+    NullabilityOfRet: O
   - Selector: 'pathsForResourcesOfType:inDirectory:'
     MethodKind: Class
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: N
   - Selector: 'pathsForResourcesOfType:inDirectory:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: 'pathsForResourcesOfType:inDirectory:forLocalization:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
-    - U
+    - O
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: 'preferredLocalizationsFromArray:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'preferredLocalizationsFromArray:forPreferences:'
     MethodKind: Class
     Nullability:
-    - U
-    - U
+    - N
+    - O
     NullabilityOfRet: N
   - Selector: 'preflightAndReturnError:'
     MethodKind: Instance
     Nullability:
     - O
     NullabilityOfRet: S
+  - Selector: 'URLForAuxiliaryExecutable:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'URLForResource:withExtension:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: O
+  - Selector: 'URLForResource:withExtension:subdirectory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - O
+    NullabilityOfRet: O
   - Selector: 'URLForResource:withExtension:subdirectory:inBundleWithURL:'
     MethodKind: Class
     Nullability:
-    - U
-    - U
-    - U
     - N
-    NullabilityOfRet: U
+    - O
+    - O
+    - N
+    NullabilityOfRet: O
+  - Selector: 'URLForResource:withExtension:subdirectory:localization:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - O
+    - O
+    NullabilityOfRet: O
+  - Selector: 'URLsForResourcesWithExtension:subdirectory:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    NullabilityOfRet: O
   - Selector: 'URLsForResourcesWithExtension:subdirectory:inBundleWithURL:'
     MethodKind: Class
     Nullability:
-    - U
-    - U
+    - O
+    - O
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'URLsForResourcesWithExtension:subdirectory:localization:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
+    NullabilityOfRet: O
   Properties:
+  - Name: builtInPlugInsPath
+    Nullability: O
+  - Name: builtInPlugInsURL
+    Nullability: O
+  - Name: bundleIdentifier
+    Nullability: O
   - Name: bundlePath
     Nullability: N
   - Name: bundleURL
     Nullability: N
+  - Name: developmentLocalization
+    Nullability: O
+  - Name: executableArchitectures
+    Nullability: O
+  - Name: executablePath
+    Nullability: O
+  - Name: executableURL
+    Nullability: O
   - Name: infoDictionary
     Nullability: N
   - Name: localizations
     Nullability: N
+  - Name: localizedInfoDictionary
+    Nullability: N
   - Name: preferredLocalizations
     Nullability: N
+  - Name: principalClass
+    Nullability: O
+  - Name: privateFrameworksPath
+    Nullability: O
+  - Name: privateFrameworksURL
+    Nullability: O
+  - Name: resourcePath
+    Nullability: O
+  - Name: resourceURL
+    Nullability: O
+  - Name: sharedFrameworksPath
+    Nullability: O
+  - Name: sharedFrameworksURL
+    Nullability: O
+  - Name: sharedSupportPath
+    Nullability: O
+  - Name: sharedSupportURL
+    Nullability: O
 - Name: NSByteCountFormatter
   Methods:
   - Selector: 'stringFromByteCount:'
@@ -691,6 +907,16 @@ Classes:
     NullabilityOfRet: N
 - Name: NSCache
   Methods:
+  - Selector: 'objectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'removeObjectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'setObject:forKey:'
     MethodKind: Instance
     Nullability:
@@ -722,7 +948,7 @@ Classes:
     Nullability:
     - N
     - N
-    - U
+    - O
     - S
     NullabilityOfRet: N
   Properties:
@@ -730,6 +956,8 @@ Classes:
     Nullability: N
   - Name: response
     Nullability: N
+  - Name: userInfo
+    Nullability: O
 - Name: NSCalendar
   Methods:
   - Selector: autoupdatingCurrentCalendar
@@ -826,7 +1054,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'enumerateDatesStartingAfterDate:matchingComponents:options:usingBlock:'
     MethodKind: Instance
     Nullability:
@@ -866,7 +1094,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'isDate:equalToDate:toUnitGranularity:'
     MethodKind: Instance
     Nullability:
@@ -1136,7 +1364,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'characterSetWithRange:'
     MethodKind: Class
     Nullability:
@@ -1216,11 +1444,16 @@ Classes:
     Nullability: N
 - Name: NSClassDescription
   Methods:
+  - Selector: 'classDescriptionForClass:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: O
   - Selector: 'inverseForRelationshipKey:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'registerClassDescription:forClass:'
     MethodKind: Class
     Nullability:
@@ -1245,6 +1478,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
+    NullabilityOfRet: S
+  - Selector: 'decodeBytesForKey:returnedLength:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
     NullabilityOfRet: S
   - Selector: 'decodeDoubleForKey:'
     MethodKind: Instance
@@ -1280,29 +1519,32 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'decodeObjectOfClass:forKey:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'decodeObjectOfClasses:forKey:'
     MethodKind: Instance
     Nullability:
     - U
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'decodePointForKey:'
     MethodKind: Instance
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: decodePropertyList
+    MethodKind: Instance
+    NullabilityOfRet: O
   - Selector: 'decodePropertyListForKey:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'decodeRectForKey:'
     MethodKind: Instance
     Nullability:
@@ -1326,10 +1568,20 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  - Selector: 'encodeConditionalObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'encodeConditionalObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'encodeDataObject:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: S
   - Selector: 'encodeDouble:forKey:'
@@ -1368,10 +1620,15 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  - Selector: 'encodeObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'encodeObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - N
     NullabilityOfRet: S
   - Selector: 'encodePoint:forKey:'
@@ -1380,10 +1637,20 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  - Selector: 'encodePropertyList:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'encodeRect:forKey:'
     MethodKind: Instance
     Nullability:
     - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'encodeRootObject:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: S
   - Selector: 'encodeSize:forKey:'
@@ -1392,6 +1659,40 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  Properties:
+  - Name: allowedClasses
+    Nullability: O
+- Name: NSCondition
+  Methods:
+  - Selector: 'waitUntilDate:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  Properties:
+  - Name: name
+    Nullability: O
+- Name: NSConditionLock
+  Methods:
+  - Selector: 'initWithCondition:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: 'lockBeforeDate:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'lockWhenCondition:beforeDate:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  Properties:
+  - Name: name
+    Nullability: O
 - Name: NSConnection
   Methods:
   - Selector: 'addRequestMode:'
@@ -1411,8 +1712,8 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    - U
-    NullabilityOfRet: U
+    - O
+    NullabilityOfRet: O
   - Selector: 'connectionWithRegisteredName:host:usingNameServer:'
     MethodKind: Class
     Nullability:
@@ -1420,15 +1721,15 @@ Classes:
     - U
     - U
     NullabilityOfRet: U
-  - Selector: defaultConnection
+  - Selector: currentConversation
     MethodKind: Class
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithReceivePort:sendPort:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
-    NullabilityOfRet: N
+    - O
+    - O
+    NullabilityOfRet: O
   - Selector: 'removeRequestMode:'
     MethodKind: Instance
     Nullability:
@@ -1444,27 +1745,27 @@ Classes:
     Nullability:
     - N
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'rootProxyForConnectionWithRegisteredName:host:usingNameServer:'
     MethodKind: Class
     Nullability:
     - N
     - U
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'serviceConnectionWithName:rootObject:'
     MethodKind: Class
     Nullability:
     - N
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'serviceConnectionWithName:rootObject:usingNameServer:'
     MethodKind: Class
     Nullability:
     - N
     - U
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
   - Name: delegate
     Nullability: O
@@ -1484,9 +1785,37 @@ Classes:
     Nullability: N
 - Name: NSCountedSet
   Methods:
+  - Selector: 'addObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'countForObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'initWithArray:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: 'initWithCapacity:'
     MethodKind: Instance
     DesignatedInit: true
+  - Selector: 'initWithSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: U
+  - Selector: objectEnumerator
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'removeObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
 - Name: NSData
   Methods:
   - Selector: 'base64EncodedDataWithOptions:'
@@ -1510,7 +1839,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'dataWithContentsOfURL:options:error:'
     MethodKind: Class
     Nullability:
@@ -1557,7 +1886,7 @@ Classes:
     Nullability:
     - S
     - S
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithBytesNoCopy:length:freeWhenDone:'
     MethodKind: Instance
@@ -1570,7 +1899,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithContentsOfFile:options:error:'
     MethodKind: Instance
     Nullability:
@@ -1582,7 +1911,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'initWithContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithContentsOfURL:options:error:'
     MethodKind: Instance
     Nullability:
@@ -1598,7 +1932,7 @@ Classes:
   - Selector: 'isEqualToData:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'rangeOfData:options:range:'
     MethodKind: Instance
@@ -1662,9 +1996,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  - Selector: date
-    MethodKind: Class
-    NullabilityOfRet: N
   - Selector: 'dateByAddingTimeInterval:'
     MethodKind: Instance
     Nullability:
@@ -1673,41 +2004,36 @@ Classes:
   - Selector: 'dateWithCalendarFormat:timeZone:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: 'dateWithNaturalLanguageString:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'dateWithNaturalLanguageString:locale:'
     MethodKind: Class
     Nullability:
     - N
-    - U
-    NullabilityOfRet: U
+    - O
+    NullabilityOfRet: O
   - Selector: 'dateWithString:'
     MethodKind: Class
     Nullability:
     - N
     NullabilityOfRet: N
-  - Selector: 'dateWithTimeIntervalSinceReferenceDate:'
-    MethodKind: Class
-    Nullability:
-    - S
-    NullabilityOfRet: N
   - Selector: 'descriptionWithCalendarFormat:timeZone:locale:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
-    - U
+    - O
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: 'descriptionWithLocale:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: distantFuture
     MethodKind: Class
@@ -1759,7 +2085,7 @@ Classes:
   - Selector: 'isEqualToDate:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'laterDate:'
     MethodKind: Instance
@@ -1781,14 +2107,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-- Name: NSDateComponentsFormatter
-  Methods:
-  - Selector: 'stringFromDate:toDate:'
-    MethodKind: Instance
-    Nullability:
-    - U
-    - U
-    NullabilityOfRet: N
 - Name: NSDateFormatter
   Methods:
   - Selector: 'dateFormatFromTemplate:options:locale:'
@@ -1798,51 +2116,28 @@ Classes:
     - S
     - O
     NullabilityOfRet: U
-  Properties:
-  - Name: dateFormat
-    Nullability: N
-  - Name: locale
-    Nullability: O
-  - Name: monthSymbols
-    Nullability: N
-  - Name: quarterSymbols
-    Nullability: N
-  - Name: shortMonthSymbols
-    Nullability: N
-  - Name: shortQuarterSymbols
-    Nullability: N
-  - Name: shortStandaloneMonthSymbols
-    Nullability: N
-  - Name: shortStandaloneQuarterSymbols
-    Nullability: N
-  - Name: shortStandaloneWeekdaySymbols
-    Nullability: N
-  - Name: shortWeekdaySymbols
-    Nullability: N
-  - Name: standaloneMonthSymbols
-    Nullability: N
-  - Name: standaloneQuarterSymbols
-    Nullability: N
-  - Name: standaloneWeekdaySymbols
-    Nullability: N
-  - Name: veryShortMonthSymbols
-    Nullability: N
-  - Name: veryShortStandaloneMonthSymbols
-    Nullability: N
-  - Name: veryShortStandaloneWeekdaySymbols
-    Nullability: N
-  - Name: veryShortWeekdaySymbols
-    Nullability: N
-  - Name: weekdaySymbols
-    Nullability: N
-- Name: NSDateIntervalFormatter
-  Methods:
-  - Selector: 'stringFromDate:toDate:'
+  - Selector: 'dateFromString:'
     MethodKind: Instance
     Nullability:
     - U
-    - U
+    NullabilityOfRet: O
+  - Selector: 'getObjectValue:forString:range:error:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'stringFromDate:'
+    MethodKind: Instance
+    Nullability:
+    - N
     NullabilityOfRet: N
+  Properties:
+  - Name: locale
+    Nullability: O
+- Name: NSDateIntervalFormatter
   Properties:
   - Name: locale
     Nullability: O
@@ -1862,7 +2157,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberByDividingBy:'
     MethodKind: Instance
@@ -1873,7 +2168,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberByMultiplyingBy:'
     MethodKind: Instance
@@ -1884,7 +2179,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberByMultiplyingByPowerOf10:'
     MethodKind: Instance
@@ -1895,7 +2190,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberByRaisingToPower:'
     MethodKind: Instance
@@ -1906,12 +2201,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberByRoundingAccordingToBehavior:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberBySubtracting:'
     MethodKind: Instance
@@ -1922,7 +2217,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberWithMantissa:exponent:isNegative:'
     MethodKind: Class
@@ -1934,13 +2229,13 @@ Classes:
   - Selector: 'decimalNumberWithString:'
     MethodKind: Class
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'decimalNumberWithString:locale:'
     MethodKind: Class
     Nullability:
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: defaultBehavior
     MethodKind: Class
@@ -1948,7 +2243,7 @@ Classes:
   - Selector: 'descriptionWithLocale:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithDecimal:'
     MethodKind: Instance
@@ -1963,13 +2258,13 @@ Classes:
   - Selector: 'initWithString:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithString:locale:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: N
   - Selector: maximumDecimalNumber
     MethodKind: Class
@@ -2016,22 +2311,29 @@ Classes:
     - S
     - S
     NullabilityOfRet: N
+- Name: NSDeleteCommand
+  Methods:
+  - Selector: 'setReceiversSpecifier:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
 - Name: NSDictionary
   Methods:
   - Selector: 'allKeysForObject:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'descriptionWithLocale:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'descriptionWithLocale:indent:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - S
     NullabilityOfRet: N
   - Selector: 'dictionaryWithObject:forKey:'
@@ -2051,6 +2353,27 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+  - Selector: fileCreationDate
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileGroupOwnerAccountID
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileGroupOwnerAccountName
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileModificationDate
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileOwnerAccountID
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileOwnerAccountName
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: fileType
+    MethodKind: Instance
+    NullabilityOfRet: O
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
@@ -2064,36 +2387,41 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithContentsOfURL:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initWithDictionary:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'initWithDictionary:copyItems:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - S
     NullabilityOfRet: N
   - Selector: 'initWithObjects:forKeys:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - N
+    - N
     NullabilityOfRet: N
   - Selector: 'initWithObjects:forKeys:count:'
     MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'isEqualToDictionary:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: keyEnumerator
     MethodKind: Instance
@@ -2128,6 +2456,11 @@ Classes:
   - Selector: objectEnumerator
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'objectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'objectForKeyedSubscript:'
     MethodKind: Instance
     Nullability:
@@ -2148,7 +2481,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'writeToFile:atomically:'
     MethodKind: Instance
     Nullability:
@@ -2170,6 +2503,10 @@ Classes:
     Nullability: N
   - Name: descriptionInStringsFileFormat
     Nullability: N
+- Name: NSDirectoryEnumerator
+  Properties:
+  - Name: fileAttributes
+    Nullability: O
 - Name: NSDistantObject
   Methods:
   - Selector: 'initWithCoder:'
@@ -2206,7 +2543,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
   - Name: lockDate
     Nullability: N
@@ -2217,16 +2554,16 @@ Classes:
     Nullability:
     - N
     - S
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: S
   - Selector: 'addObserver:selector:name:object:suspensionBehavior:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    - U
-    - U
+    - O
+    - O
     - S
     NullabilityOfRet: S
   - Selector: defaultCenter
@@ -2242,39 +2579,46 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: S
   - Selector: 'postNotificationName:object:userInfo:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: S
   - Selector: 'postNotificationName:object:userInfo:deliverImmediately:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    - U
+    - O
+    - O
     - S
     NullabilityOfRet: S
   - Selector: 'postNotificationName:object:userInfo:options:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    - U
+    - O
+    - O
     - S
+    NullabilityOfRet: S
+  - Selector: 'removeObserver:name:object:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
     NullabilityOfRet: S
 - Name: NSEnergyFormatter
   Methods:
   - Selector: 'getObjectValue:forString:errorDescription:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
-    - U
+    - O
     NullabilityOfRet: S
   - Selector: 'stringFromJoules:'
     MethodKind: Instance
@@ -2303,6 +2647,10 @@ Classes:
   - Name: numberFormatter
     Nullability: N
 - Name: NSEnumerator
+  Methods:
+  - Selector: nextObject
+    MethodKind: Instance
+    NullabilityOfRet: O
   Properties:
   - Name: allObjects
     Nullability: N
@@ -2313,53 +2661,206 @@ Classes:
     Nullability:
     - N
     - S
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithDomain:code:userInfo:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    - U
+    - O
     NullabilityOfRet: N
     DesignatedInit: true
   Properties:
   - Name: domain
     Nullability: N
+  - Name: helpAnchor
+    Nullability: O
   - Name: localizedDescription
     Nullability: N
+  - Name: localizedFailureReason
+    Nullability: O
+  - Name: localizedRecoveryOptions
+    Nullability: O
+  - Name: localizedRecoverySuggestion
+    Nullability: O
+  - Name: recoveryAttempter
+    Nullability: O
+  - Name: userInfo
+    Nullability: O
 - Name: NSException
   Methods:
   - Selector: 'initWithName:reason:userInfo:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
-    - U
+    - N
+    - O
+    - O
     NullabilityOfRet: N
     DesignatedInit: true
+  - Selector: 'raise:format:arguments:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - O
+    - S
+    NullabilityOfRet: S
   Properties:
   - Name: callStackReturnAddresses
     Nullability: N
   - Name: callStackSymbols
     Nullability: N
+  - Name: name
+    Nullability: N
+  - Name: reason
+    Nullability: O
+  - Name: userInfo
+    Nullability: O
 - Name: NSExpression
   Methods:
+  - Selector: 'expressionForAggregate:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: expressionForAnyKey
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'expressionForBlock:arguments:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForConstantValue:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: expressionForEvaluatedObject
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'expressionForFunction:arguments:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForFunction:selectorName:arguments:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForIntersectSet:with:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForKeyPath:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForMinusSet:with:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForSubquery:usingIteratorVariable:predicate:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForUnionSet:with:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionForVariable:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionValueWithObject:context:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: N
+  - Selector: 'expressionWithFormat:argumentArray:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'expressionWithFormat:arguments:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
   - Selector: 'initWithExpressionType:'
     MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
     DesignatedInit: true
+  Properties:
+  - Name: arguments
+    Nullability: N
+  - Name: collection
+    Nullability: N
+  - Name: constantValue
+    Nullability: N
+  - Name: expressionBlock
+    Nullability: N
+  - Name: function
+    Nullability: N
+  - Name: keyPath
+    Nullability: N
+  - Name: leftExpression
+    Nullability: N
+  - Name: operand
+    Nullability: N
+  - Name: predicate
+    Nullability: N
+  - Name: rightExpression
+    Nullability: N
+  - Name: variable
+    Nullability: N
 - Name: NSExtensionContext
   Methods:
+  - Selector: 'cancelRequestWithError:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'completeRequestReturningItems:completionHandler:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'openURL:completion:'
     MethodKind: Instance
     Availability: none
     AvailabilityMsg: 'call openURL:completionHandler:'
+  - Selector: 'openURL:completionHandler:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
+  Properties:
+  - Name: inputItems
+    Nullability: N
 - Name: NSExtensionItem
   Properties:
   - Name: attachments
@@ -2370,6 +2871,23 @@ Classes:
     Nullability: O
   - Name: userInfo
     Nullability: O
+- Name: NSFileAccessIntent
+  Methods:
+  - Selector: 'readingIntentWithURL:options:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
+  - Selector: 'writingIntentWithURL:options:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
+  Properties:
+  - Name: URL
+    Nullability: N
 - Name: NSFileCoordinator
   Methods:
   - Selector: 'addFilePresenter:'
@@ -2460,41 +2978,119 @@ Classes:
     Nullability: N
 - Name: NSFileHandle
   Methods:
+  - Selector: 'acceptConnectionInBackgroundAndNotifyForModes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'fileHandleForReadingAtPath:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'fileHandleForReadingFromURL:error:'
     MethodKind: Class
     Nullability:
+    - U
     - O
-    - O
+    NullabilityOfRet: O
+  - Selector: 'fileHandleForUpdatingAtPath:'
+    MethodKind: Class
+    Nullability:
+    - N
     NullabilityOfRet: O
   - Selector: 'fileHandleForUpdatingURL:error:'
     MethodKind: Class
     Nullability:
+    - U
     - O
-    - O
+    NullabilityOfRet: O
+  - Selector: 'fileHandleForWritingAtPath:'
+    MethodKind: Class
+    Nullability:
+    - N
     NullabilityOfRet: O
   - Selector: 'fileHandleForWritingToURL:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
+  - Selector: fileHandleWithNullDevice
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: fileHandleWithStandardError
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: fileHandleWithStandardInput
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: fileHandleWithStandardOutput
+    MethodKind: Class
+    NullabilityOfRet: N
   - Selector: 'initWithCoder:'
     MethodKind: Instance
     Nullability:
     - N
+    NullabilityOfRet: O
+  - Selector: 'initWithFileDescriptor:'
+    MethodKind: Instance
+    Nullability:
+    - S
     NullabilityOfRet: N
+  - Selector: 'initWithFileDescriptor:closeOnDealloc:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'readDataOfLength:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: readDataToEndOfFile
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'readInBackgroundAndNotifyForModes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'readToEndOfFileInBackgroundAndNotifyForModes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'waitForDataInBackgroundAndNotifyForModes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'writeData:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  Properties:
+  - Name: availableData
+    Nullability: N
+  - Name: readabilityHandler
+    Nullability: O
+  - Name: writeabilityHandler
+    Nullability: O
 - Name: NSFileManager
   Methods:
   - Selector: 'attributesOfFileSystemForPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'attributesOfItemAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'changeCurrentDirectoryPath:'
@@ -2506,17 +3102,17 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'containerURLForSecurityApplicationGroupIdentifier:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'contentsAtPath:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'contentsEqualAtPath:andPath:'
     MethodKind: Instance
     Nullability:
@@ -2526,66 +3122,66 @@ Classes:
   - Selector: 'contentsOfDirectoryAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'contentsOfDirectoryAtURL:includingPropertiesForKeys:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'copyItemAtPath:toPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'copyItemAtURL:toURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'createDirectoryAtPath:withIntermediateDirectories:attributes:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - N
     - S
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'createDirectoryAtURL:withIntermediateDirectories:attributes:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - N
     - S
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'createFileAtPath:contents:attributes:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: S
   - Selector: 'createSymbolicLinkAtPath:withDestinationPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'createSymbolicLinkAtURL:withDestinationURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: defaultManager
@@ -2594,7 +3190,7 @@ Classes:
   - Selector: 'destinationOfSymbolicLinkAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'displayNameAtPath:'
@@ -2611,14 +3207,14 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     - S
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'evictUbiquitousItemAtURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'fileExistsAtPath:'
@@ -2643,15 +3239,15 @@ Classes:
     - S
     - S
     - S
-    - O
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'getRelationship:ofDirectoryAtURL:toItemAtURL:error:'
     MethodKind: Instance
     Nullability:
     - S
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'isDeletableFileAtPath:'
@@ -2682,90 +3278,102 @@ Classes:
   - Selector: 'linkItemAtPath:toPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'linkItemAtURL:toURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
-  - Selector: 'moveItemAtPath:toPath:error:'
+  - Selector: 'mountedVolumeURLsIncludingResourceValuesForKeys:options:'
     MethodKind: Instance
     Nullability:
     - O
-    - O
+    - S
+    NullabilityOfRet: O
+  - Selector: 'moveItemAtPath:toPath:error:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'moveItemAtURL:toURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - N
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'removeItemAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'removeItemAtURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'replaceItemAtURL:withItemAtURL:backupItemName:options:resultingItemURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     - S
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'setAttributes:ofItemAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'setUbiquitous:itemAtURL:destinationURL:error:'
     MethodKind: Instance
     Nullability:
     - S
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'startDownloadingUbiquitousItemAtURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: S
+  - Selector: 'stringWithFileSystemRepresentation:length:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
   - Selector: 'subpathsAtPath:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'subpathsOfDirectoryAtPath:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'trashItemAtURL:resultingItemURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'URLForDirectory:inDomain:appropriateForURL:create:error:'
@@ -2773,15 +3381,20 @@ Classes:
     Nullability:
     - S
     - S
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'URLForPublishingUbiquitousItemAtURL:expirationDate:error:'
     MethodKind: Instance
     Nullability:
+    - U
+    - U
     - O
-    - O
+    NullabilityOfRet: O
+  - Selector: 'URLForUbiquityContainerIdentifier:'
+    MethodKind: Instance
+    Nullability:
     - O
     NullabilityOfRet: O
   - Selector: 'URLsForDirectory:inDomains:'
@@ -2795,13 +3408,15 @@ Classes:
     Nullability: N
   - Name: delegate
     Nullability: O
+  - Name: ubiquityIdentityToken
+    Nullability: O
 - Name: NSFileSecurity
   Methods:
   - Selector: 'initWithCoder:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSFileVersion
   Methods:
   - Selector: 'addVersionOfItemAtURL:withContentsOfURL:options:error:'
@@ -2816,7 +3431,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'getNonlocalVersionsOfItemAtURL:completionHandler:'
     MethodKind: Class
     Nullability:
@@ -2827,7 +3442,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'removeAndReturnError:'
     MethodKind: Instance
     Nullability:
@@ -2855,83 +3470,370 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'versionOfItemAtURL:forPersistentIdentifier:'
     MethodKind: Class
     Nullability:
     - N
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
+  - Name: localizedName
+    Nullability: O
+  - Name: localizedNameOfSavingComputer
+    Nullability: O
+  - Name: modificationDate
+    Nullability: O
   - Name: persistentIdentifier
     Nullability: N
   - Name: URL
     Nullability: N
 - Name: NSFileWrapper
   Methods:
+  - Selector: 'addFileWithPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'addFileWrapper:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'addRegularFileWithContents:preferredFilename:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'addSymbolicLinkWithDestination:preferredFilename:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
   - Selector: 'initDirectoryWithFileWrappers:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'initRegularFileWithContents:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
     DesignatedInit: true
+  - Selector: 'initSymbolicLinkWithDestination:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: 'initSymbolicLinkWithDestinationURL:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'initWithCoder:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
+  - Selector: 'initWithPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithSerializedRepresentation:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
     DesignatedInit: true
   - Selector: 'initWithURL:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
     DesignatedInit: true
+  - Selector: 'keyForFileWrapper:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'matchesContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'needsToBeUpdatedFromPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'readFromURL:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
+    NullabilityOfRet: S
+  - Selector: 'removeFileWrapper:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: symbolicLinkDestination
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'updateFromPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'writeToFile:atomically:updateFilenames:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - S
     NullabilityOfRet: S
   - Selector: 'writeToURL:options:originalContentsURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
-    - O
+    - U
     - O
     NullabilityOfRet: S
-- Name: NSHashTable
+  Properties:
+  - Name: fileAttributes
+    Nullability: N
+  - Name: filename
+    Nullability: O
+  - Name: fileWrappers
+    Nullability: N
+  - Name: regularFileContents
+    Nullability: O
+  - Name: serializedRepresentation
+    Nullability: N
+  - Name: symbolicLinkDestinationURL
+    Nullability: N
+- Name: NSFormatter
   Methods:
-  - Selector: 'isEqualToHashTable:'
+  - Selector: 'attributedStringForObjectValue:withDefaultAttributes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: O
+  - Selector: 'editingStringForObjectValue:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'getObjectValue:forString:errorDescription:'
     MethodKind: Instance
     Nullability:
     - O
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'isPartialStringValid:newEditingString:errorDescription:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'isPartialStringValid:proposedSelectedRange:originalString:originalSelectedRange:errorDescription:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    - N
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'stringForObjectValue:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+- Name: NSHashTable
+  Methods:
+  - Selector: 'addObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'containsObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'hashTableWithOptions:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithOptions:capacity:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithPointerFunctions:capacity:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
+  - Selector: 'intersectHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'intersectsHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isEqualToHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: S
+  - Selector: 'isSubsetOfHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - N
     NullabilityOfRet: S
   - Selector: 'member:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: O
+  - Selector: 'minusHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: objectEnumerator
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'removeObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'unionHashTable:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: weakObjectsHashTable
+    MethodKind: Class
+    NullabilityOfRet: N
+  Properties:
+  - Name: allObjects
+    Nullability: N
+  - Name: anyObject
+    Nullability: O
+  - Name: setRepresentation
+    Nullability: N
 - Name: NSHost
   Methods:
+  - Selector: currentHost
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'hostWithAddress:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'hostWithName:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: N
   - Selector: 'isEqualToHost:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
+  Properties:
+  - Name: address
+    Nullability: O
+  - Name: addresses
+    Nullability: N
+  - Name: name
+    Nullability: O
+  - Name: names
+    Nullability: N
+- Name: NSHTTPCookie
+  Methods:
+  - Selector: 'cookiesWithResponseHeaderFields:forURL:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: U
+  - Selector: 'cookieWithProperties:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'initWithProperties:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'requestHeaderFieldsWithCookies:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  Properties:
+  - Name: comment
+    Nullability: O
+  - Name: commentURL
+    Nullability: O
 - Name: NSHTTPCookieStorage
   Methods:
+  - Selector: 'getCookiesForTask:completionHandler:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: S
+  - Selector: 'setCookies:forURL:mainDocumentURL:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    - O
+    NullabilityOfRet: S
   - Selector: sharedHTTPCookieStorage
     MethodKind: Class
+    NullabilityOfRet: N
+- Name: NSHTTPURLResponse
+  Methods:
+  - Selector: 'initWithURL:statusCode:HTTPVersion:headerFields:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'localizedStringForStatusCode:'
+    MethodKind: Class
+    Nullability:
+    - S
     NullabilityOfRet: N
 - Name: NSIndexPath
   Methods:
@@ -2940,41 +3842,200 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'indexPathByAddingIndex:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: indexPathByRemovingLastIndex
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'initWithIndex:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
   - Selector: 'initWithIndexes:length:'
     MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
     DesignatedInit: true
 - Name: NSIndexSet
   Methods:
+  - Selector: 'containsIndexes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'enumerateIndexesInRange:options:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - O
+    NullabilityOfRet: S
+  - Selector: 'enumerateIndexesUsingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'enumerateIndexesWithOptions:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'enumerateRangesInRange:options:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'enumerateRangesUsingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'enumerateRangesWithOptions:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indexesInRange:options:passingTest:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - N
+    NullabilityOfRet: N
+  - Selector: 'indexesPassingTest:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'indexesWithOptions:passingTest:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: N
+  - Selector: 'indexInRange:options:passingTest:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indexPassingTest:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'indexWithOptions:passingTest:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'initWithIndex:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
   - Selector: 'initWithIndexesInRange:'
     MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'initWithIndexSet:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'isEqualToIndexSet:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
 - Name: NSInputStream
   Methods:
+  - Selector: 'initWithData:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: 'initWithFileAtPath:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+  - Selector: 'initWithURL:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'inputStreamWithFileAtPath:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
 - Name: NSInvocation
   Availability: none
 - Name: NSInvocationOperation
   Methods:
   - Selector: 'initWithInvocation:'
     MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
     DesignatedInit: true
+  - Selector: 'initWithTarget:selector:object:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - O
+    NullabilityOfRet: O
+  Properties:
+  - Name: invocation
+    Nullability: N
+  - Name: result
+    Nullability: O
+- Name: NSItemProvider
+  Methods:
+  - Selector: 'hasItemConformingToTypeIdentifier:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'initWithContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
+  - Selector: 'initWithItem:typeIdentifier:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: N
+  - Selector: 'registerItemForTypeIdentifier:loadHandler:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  Properties:
+  - Name: previewImageHandler
+    Nullability: O
+  - Name: registeredTypeIdentifiers
+    Nullability: N
 - Name: NSJSONSerialization
   Methods:
   - Selector: 'dataWithJSONObject:options:error:'
@@ -3016,24 +4077,24 @@ Classes:
   - Selector: 'archivedDataWithRootObject:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: 'archiveRootObject:toFile:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     - N
     NullabilityOfRet: S
   - Selector: 'classNameForClass:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'classNameForClass:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'encodeBool:forKey:'
     MethodKind: Instance
     Nullability:
@@ -3050,7 +4111,7 @@ Classes:
   - Selector: 'encodeConditionalObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - N
     NullabilityOfRet: S
   - Selector: 'encodeDouble:forKey:'
@@ -3086,7 +4147,7 @@ Classes:
   - Selector: 'encodeObject:forKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'initForWritingWithMutableData:'
@@ -3097,13 +4158,13 @@ Classes:
   - Selector: 'setClassName:forClass:'
     MethodKind: Class
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   - Selector: 'setClassName:forClass:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     - N
     NullabilityOfRet: S
   Properties:
@@ -3115,12 +4176,12 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'classForClassName:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'containsValueForKey:'
     MethodKind: Instance
     Nullability:
@@ -3166,7 +4227,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'initForReadingWithData:'
     MethodKind: Instance
     Nullability:
@@ -3193,7 +4254,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
   - Name: delegate
     Nullability: O
@@ -3235,8 +4296,14 @@ Classes:
     - S
     - N
     - S
-    - U
+    - N
     NullabilityOfRet: S
+  - Selector: 'initWithTagSchemes:options:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
   - Selector: 'tagAtIndex:scheme:tokenRange:sentenceRange:'
     MethodKind: Instance
     Nullability:
@@ -3244,14 +4311,14 @@ Classes:
     - N
     - S
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'tagsInRange:scheme:options:tokenRanges:'
     MethodKind: Instance
     Nullability:
     - S
     - N
     - S
-    - U
+    - O
     NullabilityOfRet: N
   Properties:
   - Name: tagSchemes
@@ -3268,7 +4335,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'characterDirectionForLanguage:'
     MethodKind: Class
     Nullability:
@@ -3289,12 +4356,12 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithLocaleIdentifier:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: ISOCountryCodes
     MethodKind: Class
     NullabilityOfRet: N
@@ -3312,7 +4379,7 @@ Classes:
   - Selector: 'localeIdentifierFromComponents:'
     MethodKind: Class
     Nullability:
-    - U
+    - N
     NullabilityOfRet: N
   - Selector: systemLocale
     MethodKind: Class
@@ -3327,8 +4394,50 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  Properties:
+  - Name: name
+    Nullability: O
+- Name: NSLogicalTest
+  Methods:
+  - Selector: 'initAndTestWithTests:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'initNotTestWithTest:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'initOrTestWithTests:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
 - Name: NSMachBootstrapServer
   Methods:
+  - Selector: 'portForName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'portForName:host:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: O
+  - Selector: 'registerPort:name:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'servicePortWithName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: sharedInstance
     MethodKind: Class
     NullabilityOfRet: N
@@ -3371,14 +4480,104 @@ Classes:
     NullabilityOfRet: S
 - Name: NSMapTable
   Methods:
+  - Selector: dictionaryRepresentation
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'initWithKeyOptions:valueOptions:capacity:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithKeyPointerFunctions:valuePointerFunctions:capacity:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - S
+    NullabilityOfRet: N
+  - Selector: keyEnumerator
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'mapTableWithKeyOptions:valueOptions:'
+    MethodKind: Class
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: objectEnumerator
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'objectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'removeObjectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'setObject:forKey:'
     MethodKind: Instance
     Nullability:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: strongToStrongObjectsMapTable
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: strongToWeakObjectsMapTable
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: weakToStrongObjectsMapTable
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: weakToWeakObjectsMapTable
+    MethodKind: Class
+    NullabilityOfRet: N
+  Properties:
+  - Name: keyPointerFunctions
+    Nullability: N
+- Name: NSMassFormatter
+  Methods:
+  - Selector: 'stringFromKilograms:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: 'stringFromValue:unit:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'unitStringFromKilograms:usedUnit:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'unitStringFromValue:unit:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
 - Name: NSMessagePortNameServer
   Methods:
+  - Selector: 'portForName:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
+  - Selector: 'portForName:host:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
   - Selector: sharedInstance
     MethodKind: Class
     NullabilityOfRet: N
@@ -3498,8 +4697,108 @@ Classes:
     - S
     - N
     NullabilityOfRet: S
+- Name: NSMutableAttributedString
+  Methods:
+  - Selector: 'addAttribute:value:range:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'addAttributes:range:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'appendAttributedString:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'insertAttributedString:atIndex:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'removeAttribute:range:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
+  Properties:
+  - Name: mutableString
+    Nullability: N
+- Name: NSMutableCharacterSet
+  Methods:
+  - Selector: 'addCharactersInString:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: alphanumericCharacterSet
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: capitalizedLetterCharacterSet
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'characterSetWithBitmapRepresentation:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: U
+  - Selector: 'characterSetWithCharactersInString:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'characterSetWithContentsOfFile:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'formIntersectionWithCharacterSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'formUnionWithCharacterSet:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeCharactersInString:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+- Name: NSMutableData
+  Methods:
+  - Selector: 'appendData:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setData:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
 - Name: NSMutableDictionary
   Methods:
+  - Selector: 'addEntriesFromDictionary:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'dictionaryWithSharedKeySet:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
@@ -3511,11 +4810,60 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
+  - Selector: 'initWithContentsOfFile:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'initWithContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'removeObjectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeObjectsForKeys:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setDictionary:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setObject:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
   - Selector: 'setObject:forKeyedSubscript:'
     MethodKind: Instance
     Nullability:
     - O
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setValue:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - N
+    NullabilityOfRet: S
+- Name: NSMutableIndexSet
+  Methods:
+  - Selector: 'addIndexes:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeIndexes:'
+    MethodKind: Instance
+    Nullability:
     - N
     NullabilityOfRet: S
 - Name: NSMutableOrderedSet
@@ -3549,7 +4897,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'insertObject:atIndex:'
     MethodKind: Instance
     Nullability:
@@ -3686,7 +5034,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'intersectSet:'
     MethodKind: Instance
     Nullability:
@@ -3760,7 +5108,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSNetService
   Methods:
   - Selector: 'initWithDomain:type:name:port:'
@@ -3786,7 +5134,25 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
+    NullabilityOfRet: O
+  - Selector: 'initWithName:object:userInfo:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    - O
     NullabilityOfRet: N
+  - Selector: 'notificationWithName:object:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: N
+  Properties:
+  - Name: name
+    Nullability: N
+  - Name: userInfo
+    Nullability: O
 - Name: NSNotificationCenter
   Methods:
   - Selector: 'addObserver:selector:name:object:'
@@ -3794,9 +5160,17 @@ Classes:
     Nullability:
     - N
     - S
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: S
+  - Selector: 'addObserverForName:object:queue:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - O
+    - O
+    - U
+    NullabilityOfRet: U
   - Selector: defaultCenter
     MethodKind: Class
     NullabilityOfRet: N
@@ -3809,14 +5183,14 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'postNotificationName:object:userInfo:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    - U
+    - O
+    - O
     NullabilityOfRet: S
   - Selector: 'removeObserver:'
     MethodKind: Instance
@@ -3827,14 +5201,22 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    - U
+    - O
+    - O
     NullabilityOfRet: S
 - Name: NSNotificationQueue
   Methods:
   - Selector: defaultQueue
     MethodKind: Class
     NullabilityOfRet: N
+  - Selector: 'enqueueNotification:postingStyle:coalesceMask:forModes:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    - S
+    - O
+    NullabilityOfRet: S
   - Selector: 'initWithNotificationCenter:'
     MethodKind: Instance
     DesignatedInit: true
@@ -3848,7 +5230,7 @@ Classes:
   - Selector: 'descriptionWithLocale:'
     MethodKind: Instance
     Nullability:
-    - U
+    - O
     NullabilityOfRet: N
   - Selector: 'initWithBool:'
     MethodKind: Instance
@@ -3864,7 +5246,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithDouble:'
     MethodKind: Instance
     Nullability:
@@ -3933,7 +5315,7 @@ Classes:
   - Selector: 'isEqualToNumber:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'numberWithBool:'
     MethodKind: Class
@@ -4015,59 +5397,14 @@ Classes:
     Nullability: N
 - Name: NSNumberFormatter
   Methods:
-  - Selector: 'localizedStringFromNumber:numberStyle:'
-    MethodKind: Class
+  - Selector: 'numberFromString:'
+    MethodKind: Instance
     Nullability:
-    - N
-    - S
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   Properties:
-  - Name: currencyCode
-    Nullability: N
-  - Name: exponentSymbol
-    Nullability: N
   - Name: locale
     Nullability: O
-  - Name: minusSign
-    Nullability: N
-  - Name: multiplier
-    Nullability: N
-  - Name: negativeFormat
-    Nullability: N
-  - Name: negativeInfinitySymbol
-    Nullability: N
-  - Name: negativePrefix
-    Nullability: N
-  - Name: negativeSuffix
-    Nullability: N
-  - Name: nilSymbol
-    Nullability: N
-  - Name: notANumberSymbol
-    Nullability: N
-  - Name: percentSymbol
-    Nullability: N
-  - Name: perMillSymbol
-    Nullability: N
-  - Name: plusSign
-    Nullability: N
-  - Name: positiveInfinitySymbol
-    Nullability: N
-  - Name: positivePrefix
-    Nullability: N
-  - Name: positiveSuffix
-    Nullability: N
-- Name: NSObject
-  Methods:
-  - Selector: 'awakeAfterUsingCoder:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: U
-  - Selector: 'isEqualTo:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
 - Name: NSOperation
   Methods:
   - Selector: 'addDependency:'
@@ -4076,8 +5413,15 @@ Classes:
     - N
     NullabilityOfRet: S
   Properties:
+  - Name: completionBlock
+    Nullability: O
   - Name: dependencies
     Nullability: N
+- Name: NSOperationQueue
+  Methods:
+  - Selector: currentQueue
+    MethodKind: Class
+    NullabilityOfRet: O
 - Name: NSOrderedSet
   Methods:
   - Selector: 'addObserver:forKeyPath:options:context:'
@@ -4192,7 +5536,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithObject:'
     MethodKind: Instance
     Nullability:
@@ -4247,7 +5591,7 @@ Classes:
   - Selector: 'isEqualToOrderedSet:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'isSubsetOfOrderedSet:'
     MethodKind: Instance
@@ -4335,7 +5679,11 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
+- Name: NSPointerArray
+  Properties:
+  - Name: allObjects
+    Nullability: N
 - Name: NSPortMessage
   Methods:
   - Selector: 'initWithSendPort:receivePort:components:'
@@ -4422,10 +5770,16 @@ Classes:
     - N
     NullabilityOfRet: S
   Properties:
+  - Name: cancellationHandler
+    Nullability: O
   - Name: localizedAdditionalDescription
     Nullability: N
   - Name: localizedDescription
     Nullability: N
+  - Name: pausingHandler
+    Nullability: O
+  - Name: userInfo
+    Nullability: O
 - Name: NSPropertyListSerialization
   Methods:
   - Selector: 'dataFromPropertyList:format:errorDescription:'
@@ -4456,7 +5810,7 @@ Classes:
     - S
     - S
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'propertyListWithData:options:format:error:'
     MethodKind: Class
     Nullability:
@@ -4464,7 +5818,7 @@ Classes:
     - S
     - S
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'propertyListWithStream:options:format:error:'
     MethodKind: Class
     Nullability:
@@ -4472,7 +5826,7 @@ Classes:
     - S
     - S
     - U
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'writePropertyList:toStream:format:options:error:'
     MethodKind: Class
     Nullability:
@@ -4524,7 +5878,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSRegularExpression
   Methods:
   - Selector: 'enumerateMatchesInString:options:range:usingBlock:'
@@ -4620,7 +5974,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSRunLoop
   Methods:
   - Selector: 'acceptInputForMode:beforeDate:'
@@ -4663,7 +6017,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: mainRunLoop
     MethodKind: Class
     NullabilityOfRet: N
@@ -4690,7 +6044,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithCommandDescription:'
     MethodKind: Instance
     Nullability:
@@ -4707,7 +6061,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithSuiteName:commandName:dictionary:'
     MethodKind: Instance
     Nullability:
@@ -4720,6 +6074,11 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'typeForArgumentWithName:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
   Properties:
   - Name: argumentNames
     Nullability: N
@@ -4736,7 +6095,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithContainerClassDescription:containerSpecifier:key:'
     MethodKind: Instance
     DesignatedInit: true
@@ -4754,7 +6113,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSSet
   Methods:
   - Selector: 'addObserver:forKeyPath:options:context:'
@@ -4802,7 +6161,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
   - Selector: 'initWithObjects:count:'
     MethodKind: Instance
     Nullability:
@@ -4829,7 +6188,7 @@ Classes:
   - Selector: 'isEqualToSet:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'isSubsetOfSet:'
     MethodKind: Instance
@@ -4840,7 +6199,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: objectEnumerator
     MethodKind: Instance
     NullabilityOfRet: N
@@ -4927,13 +6286,38 @@ Classes:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: 'initWithKey:ascending:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithKey:ascending:comparator:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - N
+    NullabilityOfRet: N
+  - Selector: 'initWithKey:ascending:selector:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - S
+    NullabilityOfRet: N
+  Properties:
+  - Name: comparator
+    Nullability: O
+  - Name: reversedSortDescriptor
+    Nullability: O
 - Name: NSSpecifierTest
   Methods:
   - Selector: 'initWithCoder:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSSpellServer
   Properties:
   - Name: delegate
@@ -4984,15 +6368,15 @@ Classes:
     - N
     - S
     - S
-    - U
+    - O
     NullabilityOfRet: S
   - Selector: 'completePathIntoString:caseSensitive:matchesIntoArray:filterTypes:'
     MethodKind: Instance
     Nullability:
-    - N
+    - U
     - S
     - U
-    - U
+    - O
     NullabilityOfRet: S
   - Selector: 'componentsSeparatedByCharactersInSet:'
     MethodKind: Instance
@@ -5004,14 +6388,42 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: N
+  - Selector: 'containsString:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'dataUsingEncoding:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: 'dataUsingEncoding:allowLossyConversion:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: O
+  - Selector: 'enumerateLinesUsingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:'
     MethodKind: Instance
     Nullability:
     - S
     - N
     - S
-    - U
-    - U
+    - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'enumerateSubstringsInRange:options:usingBlock:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - N
     NullabilityOfRet: S
   - Selector: 'hasPrefix:'
     MethodKind: Instance
@@ -5027,6 +6439,26 @@ Classes:
     MethodKind: Instance
     NullabilityOfRet: N
     DesignatedInit: true
+  - Selector: 'initWithBytes:length:encoding:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: O
+  - Selector: 'initWithCharacters:length:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithCharactersNoCopy:length:freeWhenDone:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - S
+    NullabilityOfRet: N
   - Selector: 'initWithCoder:'
     MethodKind: Instance
     Nullability:
@@ -5051,39 +6483,56 @@ Classes:
   - Selector: 'initWithContentsOfURL:encoding:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'initWithContentsOfURL:usedEncoding:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
+    NullabilityOfRet: O
+  - Selector: 'initWithCString:encoding:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithData:encoding:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
     NullabilityOfRet: O
   - Selector: 'initWithFormat:arguments:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'initWithFormat:locale:arguments:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'initWithString:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
+  - Selector: 'initWithUTF8String:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: N
   - Selector: 'isEqualToString:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'linguisticTagsInRange:scheme:options:orthography:tokenRanges:'
     MethodKind: Instance
@@ -5091,7 +6540,7 @@ Classes:
     - S
     - N
     - S
-    - U
+    - O
     - U
     NullabilityOfRet: N
   - Selector: 'localizedCaseInsensitiveCompare:'
@@ -5124,9 +6573,17 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: N
-  - Selector: propertyListFromStringsFileFormat
+  - Selector: 'pathWithComponents:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: propertyList
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: propertyListFromStringsFileFormat
+    MethodKind: Instance
+    NullabilityOfRet: O
   - Selector: 'rangeOfCharacterFromSet:'
     MethodKind: Instance
     Nullability:
@@ -5229,6 +6686,11 @@ Classes:
     - S
     - S
     NullabilityOfRet: N
+  - Selector: 'stringByReplacingPercentEscapesUsingEncoding:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
   - Selector: 'stringByTrimmingCharactersInSet:'
     MethodKind: Instance
     Nullability:
@@ -5237,7 +6699,13 @@ Classes:
   - Selector: 'stringsByAppendingPaths:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
+    NullabilityOfRet: N
+  - Selector: 'stringWithCharacters:length:'
+    MethodKind: Class
+    Nullability:
+    - S
+    - S
     NullabilityOfRet: N
   - Selector: 'stringWithContentsOfFile:encoding:error:'
     MethodKind: Class
@@ -5256,22 +6724,33 @@ Classes:
   - Selector: 'stringWithContentsOfURL:encoding:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - N
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'stringWithContentsOfURL:usedEncoding:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - N
     - S
     - O
     NullabilityOfRet: O
+  - Selector: 'stringWithCString:encoding:'
+    MethodKind: Class
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: N
   - Selector: 'stringWithString:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
+  - Selector: 'stringWithUTF8String:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: N
   - Selector: 'substringFromIndex:'
     MethodKind: Instance
     Nullability:
@@ -5303,7 +6782,7 @@ Classes:
   - Selector: 'writeToURL:atomically:encoding:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - N
     - S
     - S
     - O
@@ -5365,6 +6844,8 @@ Classes:
     Nullability: N
   - Name: standardOutput
     Nullability: N
+  - Name: terminationHandler
+    Nullability: O
 - Name: NSThread
   Methods:
   - Selector: init
@@ -5380,7 +6861,7 @@ Classes:
     - S
     - U
     - S
-    - U
+    - O
     - S
     NullabilityOfRet: N
   - Selector: 'scheduledTimerWithTimeInterval:invocation:repeats:'
@@ -5396,7 +6877,7 @@ Classes:
     - S
     - N
     - S
-    - U
+    - O
     - S
     NullabilityOfRet: N
   - Selector: 'timerWithTimeInterval:invocation:repeats:'
@@ -5412,12 +6893,14 @@ Classes:
     - S
     - N
     - S
-    - U
+    - O
     - S
     NullabilityOfRet: N
   Properties:
   - Name: fireDate
     Nullability: N
+  - Name: userInfo
+    Nullability: O
 - Name: NSTimeZone
   Methods:
   - Selector: defaultTimeZone
@@ -5426,7 +6909,7 @@ Classes:
   - Selector: 'isEqualToTimeZone:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'localizedName:locale:'
     MethodKind: Instance
@@ -5434,6 +6917,11 @@ Classes:
     - S
     - O
     NullabilityOfRet: U
+  - Selector: 'timeZoneWithAbbreviation:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: O
   Properties:
   - Name: description
     Nullability: N
@@ -5443,7 +6931,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'boolForKey:'
     MethodKind: Instance
     Nullability:
@@ -5453,7 +6941,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: defaultStore
     MethodKind: Class
     NullabilityOfRet: N
@@ -5461,7 +6949,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'doubleForKey:'
     MethodKind: Instance
     Nullability:
@@ -5476,7 +6964,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'removeObjectForKey:'
     MethodKind: Instance
     Nullability:
@@ -5534,7 +7022,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   Properties:
   - Name: dictionaryRepresentation
     Nullability: N
@@ -5556,7 +7044,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'replaceObject:withObject:'
     MethodKind: Instance
     Nullability:
@@ -5567,12 +7055,12 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'unarchiveObjectWithFile:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
 - Name: NSUndoManager
   Methods:
   - Selector: 'prepareWithInvocationTarget:'
@@ -5630,15 +7118,15 @@ Classes:
   - Selector: 'bookmarkDataWithContentsOfURL:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:'
     MethodKind: Instance
     Nullability:
     - S
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'checkPromisedItemIsReachableAndReturnError:'
@@ -5651,90 +7139,215 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
+  - Selector: fileReferenceURL
+    MethodKind: Instance
+    NullabilityOfRet: O
+  - Selector: 'fileURLWithFileSystemRepresentation:isDirectory:relativeToURL:'
+    MethodKind: Class
+    Nullability:
+    - S
+    - S
+    - U
+    NullabilityOfRet: O
+  - Selector: 'fileURLWithPath:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'fileURLWithPath:isDirectory:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: O
+  - Selector: 'fileURLWithPathComponents:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: 'getPromisedItemResourceValue:forKey:error:'
     MethodKind: Instance
     Nullability:
+    - U
+    - U
     - O
-    - O
+    NullabilityOfRet: S
+  - Selector: 'getResourceValue:forKey:error:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'initByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
+  - Selector: 'initFileURLWithFileSystemRepresentation:isDirectory:relativeToURL:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    - U
+    NullabilityOfRet: O
+  - Selector: 'initFileURLWithPath:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'initFileURLWithPath:isDirectory:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: N
+  - Selector: 'initWithScheme:host:path:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    - N
+    NullabilityOfRet: O
+  - Selector: 'initWithString:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'initWithString:relativeToURL:'
     MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: O
     DesignatedInit: true
   - Selector: 'promisedItemResourceValuesForKeys:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'resourceValuesForKeys:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'setResourceValue:forKey:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'setResourceValues:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: S
   - Selector: 'URLByAppendingPathComponent:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'URLByAppendingPathComponent:isDirectory:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'URLByAppendingPathExtension:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'URLByResolvingAliasFileAtURL:options:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:'
     MethodKind: Class
     Nullability:
-    - O
+    - U
+    - S
+    - U
     - S
     - O
-    - S
-    - O
+    NullabilityOfRet: O
+  - Selector: 'URLWithString:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'URLWithString:relativeToURL:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - U
     NullabilityOfRet: O
   - Selector: 'writeBookmarkData:toURL:options:error:'
     MethodKind: Class
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - S
     - O
     NullabilityOfRet: S
+  Properties:
+  - Name: absoluteString
+    Nullability: O
+  - Name: absoluteURL
+    Nullability: O
+  - Name: baseURL
+    Nullability: O
+  - Name: filePathURL
+    Nullability: O
+  - Name: fragment
+    Nullability: O
+  - Name: host
+    Nullability: O
+  - Name: parameterString
+    Nullability: O
+  - Name: password
+    Nullability: O
+  - Name: path
+    Nullability: O
+  - Name: port
+    Nullability: O
+  - Name: query
+    Nullability: O
+  - Name: relativePath
+    Nullability: O
+  - Name: relativeString
+    Nullability: O
+  - Name: standardizedURL
+    Nullability: O
+  - Name: URLByDeletingLastPathComponent
+    Nullability: O
+  - Name: URLByDeletingPathExtension
+    Nullability: O
+  - Name: URLByResolvingSymlinksInPath
+    Nullability: O
+  - Name: URLByStandardizingPath
+    Nullability: O
+  - Name: user
+    Nullability: O
+- Name: NSURLAuthenticationChallenge
+  Properties:
+  - Name: error
+    Nullability: O
+  - Name: failureResponse
+    Nullability: O
+  - Name: proposedCredential
+    Nullability: O
 - Name: NSURLCache
   Methods:
   - Selector: sharedURLCache
@@ -5742,17 +7355,111 @@ Classes:
     NullabilityOfRet: N
 - Name: NSURLComponents
   Methods:
+  - Selector: 'componentsWithString:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: O
+  - Selector: 'componentsWithURL:resolvingAgainstBaseURL:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: O
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'initWithString:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
+  - Selector: 'initWithURL:resolvingAgainstBaseURL:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    NullabilityOfRet: O
+  Properties:
+  - Name: fragment
+    Nullability: O
+  - Name: host
+    Nullability: O
+  - Name: password
+    Nullability: O
+  - Name: path
+    Nullability: O
+  - Name: percentEncodedFragment
+    Nullability: O
+  - Name: percentEncodedHost
+    Nullability: O
+  - Name: percentEncodedPassword
+    Nullability: O
+  - Name: percentEncodedPath
+    Nullability: O
+  - Name: percentEncodedQuery
+    Nullability: O
+  - Name: percentEncodedUser
+    Nullability: O
+  - Name: port
+    Nullability: O
+  - Name: query
+    Nullability: O
+  - Name: scheme
+    Nullability: O
+  - Name: user
+    Nullability: O
 - Name: NSURLConnection
   Methods:
+  - Selector: 'canHandleRequest:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'connectionWithRequest:delegate:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'initWithRequest:delegate:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'initWithRequest:delegate:startImmediately:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    - S
+    NullabilityOfRet: O
+  - Selector: 'sendAsynchronousRequest:queue:completionHandler:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - O
+    - O
+    NullabilityOfRet: S
   - Selector: 'sendSynchronousRequest:returningResponse:error:'
     MethodKind: Class
     Nullability:
+    - U
+    - U
     - O
+    NullabilityOfRet: O
+  - Selector: 'setDelegateQueue:'
+    MethodKind: Instance
+    Nullability:
     - O
-    - O
+    NullabilityOfRet: S
+- Name: NSURLCredentialStorage
+  Methods:
+  - Selector: 'defaultCredentialForProtectionSpace:'
+    MethodKind: Instance
+    Nullability:
+    - U
     NullabilityOfRet: O
 - Name: NSURLProtocol
   Methods:
@@ -5770,9 +7477,23 @@ Classes:
     MethodKind: Instance
     DesignatedInit: true
 - Name: NSURLSession
+  Methods:
+  - Selector: 'dataTaskWithRequest:completionHandler:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - O
+    NullabilityOfRet: U
   Properties:
   - Name: delegate
     Nullability: O
+- Name: NSURLSessionConfiguration
+  Methods:
+  - Selector: 'backgroundSessionConfigurationWithIdentifier:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: U
 - Name: NSUserActivity
   Methods:
   - Selector: 'addUserInfoEntriesFromDictionary:'
@@ -5800,29 +7521,183 @@ Classes:
     Nullability: O
 - Name: NSUserDefaults
   Methods:
+  - Selector: 'addSuiteNamed:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'arrayForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'boolForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'dataForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'dictionaryForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: dictionaryRepresentation
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'doubleForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'floatForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'initWithSuiteName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'integerForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
   - Selector: 'objectForKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: O
+  - Selector: 'objectIsForcedForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'persistentDomainForName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'registerDefaults:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeObjectForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removePersistentDomainForName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeSuiteNamed:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'removeVolatileDomainForName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setBool:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setDouble:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setFloat:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setInteger:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setObject:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setPersistentDomain:forName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setURL:forKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setVolatileDomain:forName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: standardUserDefaults
+    MethodKind: Class
+    NullabilityOfRet: N
   - Selector: 'stringArrayForKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: O
   - Selector: 'stringForKey:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     NullabilityOfRet: O
+  - Selector: 'URLForKey:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'volatileDomainForName:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  Properties:
+  - Name: volatileDomainNames
+    Nullability: N
 - Name: NSUserNotification
   Methods:
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
+  Properties:
+  - Name: actionButtonTitle
+    Nullability: O
+  - Name: responsePlaceholder
+    Nullability: O
+  - Name: userInfo
+    Nullability: O
 - Name: NSUserNotificationCenter
   Methods:
   - Selector: defaultUserNotificationCenter
@@ -5836,7 +7711,7 @@ Classes:
   - Selector: 'initWithURL:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: O
 - Name: NSUUID
@@ -5853,7 +7728,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: UUID
     MethodKind: Class
     NullabilityOfRet: N
@@ -5873,7 +7748,7 @@ Classes:
   - Selector: 'isEqualToValue:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'valueWithNonretainedObject:'
     MethodKind: Class
@@ -5917,7 +7792,7 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: valueTransformerNames
     MethodKind: Class
     NullabilityOfRet: N
@@ -5927,7 +7802,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: O
 - Name: NSXMLDocument
   Methods:
   - Selector: init
@@ -5936,7 +7811,7 @@ Classes:
   - Selector: 'initWithContentsOfURL:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
@@ -5958,22 +7833,22 @@ Classes:
   - Selector: 'objectByApplyingXSLT:arguments:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'objectByApplyingXSLTAtURL:arguments:error:'
     MethodKind: Instance
     Nullability:
-    - O
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'objectByApplyingXSLTString:arguments:error:'
     MethodKind: Instance
     Nullability:
-    - N
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'validateAndReturnError:'
@@ -5981,6 +7856,9 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
+  Properties:
+  - Name: DTD
+    Nullability: O
 - Name: NSXMLDTD
   Methods:
   - Selector: 'addChild:'
@@ -5988,30 +7866,36 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'attributeDeclarationForName:elementName:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
   - Selector: 'elementDeclarationForName:'
     MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'entityDeclarationForName:'
     MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
   - Selector: 'initWithContentsOfURL:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
   - Selector: 'initWithData:options:error:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - S
     - O
     NullabilityOfRet: O
@@ -6019,13 +7903,13 @@ Classes:
   - Selector: 'notationDeclarationForName:'
     MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'predefinedEntityDeclarationForName:'
     MethodKind: Class
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
 - Name: NSXMLDTDNode
   Methods:
   - Selector: init
@@ -6034,11 +7918,16 @@ Classes:
   - Selector: 'initWithXMLString:'
     MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
 - Name: NSXMLElement
   Methods:
   - Selector: 'addAttribute:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'addChild:'
     MethodKind: Instance
     Nullability:
     - N
@@ -6052,18 +7941,18 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'attributeForName:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'elementsForLocalName:URI:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     NullabilityOfRet: N
   - Selector: 'elementsForName:'
     MethodKind: Instance
@@ -6073,20 +7962,20 @@ Classes:
   - Selector: 'initWithName:'
     MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'initWithName:stringValue:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'initWithName:URI:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'initWithXMLString:error:'
     MethodKind: Instance
     Nullability:
@@ -6097,7 +7986,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'removeAttributeForName:'
     MethodKind: Instance
     Nullability:
@@ -6112,114 +8001,175 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'resolvePrefixForNamespaceURI:'
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
-  Properties:
-  - Name: attributes
-    Nullability: N
-  - Name: namespaces
-    Nullability: N
+    NullabilityOfRet: O
+  - Selector: 'setAttributesAsDictionary:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'setAttributesWithDictionary:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
 - Name: NSXMLNode
   Methods:
   - Selector: 'attributeWithName:stringValue:'
     MethodKind: Class
     Nullability:
-    - N
-    - N
-    NullabilityOfRet: U
-  - Selector: 'canonicalXMLStringPreservingComments:'
-    MethodKind: Instance
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'attributeWithName:URI:stringValue:'
+    MethodKind: Class
     Nullability:
-    - S
-    NullabilityOfRet: N
+    - U
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'commentWithStringValue:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: O
+  - Selector: document
+    MethodKind: Class
+    NullabilityOfRet: O
+  - Selector: 'documentWithRootElement:'
+    MethodKind: Class
+    Nullability:
+    - U
+    NullabilityOfRet: O
   - Selector: 'DTDNodeWithXMLString:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'elementWithName:'
     MethodKind: Class
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'elementWithName:children:attributes:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'elementWithName:stringValue:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'elementWithName:URI:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - U
+    NullabilityOfRet: O
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
-  - Selector: 'localNameForName:'
-    MethodKind: Class
+  - Selector: 'initWithKind:'
+    MethodKind: Instance
     Nullability:
-    - N
-    NullabilityOfRet: N
+    - S
+    NullabilityOfRet: O
+  - Selector: 'initWithKind:options:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    - S
+    NullabilityOfRet: O
   - Selector: 'namespaceWithName:stringValue:'
     MethodKind: Class
     Nullability:
-    - N
-    - N
-    NullabilityOfRet: U
+    - U
+    - U
+    NullabilityOfRet: O
   - Selector: 'nodesForXPath:error:'
     MethodKind: Instance
     Nullability:
-    - N
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'objectsForXQuery:constants:error:'
     MethodKind: Instance
     Nullability:
-    - N
-    - O
+    - U
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'objectsForXQuery:error:'
     MethodKind: Instance
     Nullability:
-    - N
+    - U
     - O
     NullabilityOfRet: O
   - Selector: 'predefinedNamespaceForPrefix:'
     MethodKind: Class
     Nullability:
-    - N
-    NullabilityOfRet: U
+    - U
+    NullabilityOfRet: O
   - Selector: 'prefixForName:'
     MethodKind: Class
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'processingInstructionWithName:stringValue:'
     MethodKind: Class
     Nullability:
-    - N
-    - N
-    NullabilityOfRet: U
-  - Selector: 'setStringValue:resolvingEntities:'
-    MethodKind: Instance
+    - U
+    - U
+    NullabilityOfRet: O
+  - Selector: 'textWithStringValue:'
+    MethodKind: Class
     Nullability:
-    - N
-    - S
-    NullabilityOfRet: S
+    - U
+    NullabilityOfRet: O
   - Selector: 'XMLStringWithOptions:'
     MethodKind: Instance
     Nullability:
     - S
     NullabilityOfRet: N
   Properties:
-  - Name: children
-    Nullability: N
   - Name: description
     Nullability: N
+  - Name: URI
+    Nullability: O
   - Name: XMLString
     Nullability: N
 - Name: NSXMLParser
   Methods:
+  - Selector: 'initWithContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
   - Selector: 'initWithData:'
     MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
     DesignatedInit: true
+  - Selector: 'initWithStream:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    NullabilityOfRet: O
   Properties:
   - Name: delegate
+    Nullability: O
+  - Name: publicID
+    Nullability: O
+  - Name: systemID
     Nullability: O
 - Name: NSXPCConnection
   Methods:
@@ -6245,6 +8195,12 @@ Classes:
     - N
     NullabilityOfRet: N
   Properties:
+  - Name: endpoint
+    Nullability: N
+  - Name: interruptionHandler
+    Nullability: O
+  - Name: invalidationHandler
+    Nullability: O
   - Name: remoteObjectProxy
     Nullability: N
 - Name: NSXPCInterface
@@ -6364,7 +8320,14 @@ Protocols:
     - S
     - N
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
+- Name: NSExtensionRequestHandling
+  Methods:
+  - Selector: 'beginRequestWithExtensionContext:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
 - Name: NSFileManagerDelegate
   Methods:
   - Selector: 'fileManager:shouldCopyItemAtPath:toPath:'
@@ -6568,20 +8531,24 @@ Protocols:
   Properties:
   - Name: presentedItemOperationQueue
     Nullability: N
+  - Name: presentedItemURL
+    Nullability: O
+  - Name: primaryPresentedItemURL
+    Nullability: O
 - Name: NSKeyedArchiverDelegate
   Methods:
   - Selector: 'archiver:didEncodeObject:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - O
     NullabilityOfRet: S
   - Selector: 'archiver:willEncodeObject:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'archiver:willReplaceObject:withObject:'
     MethodKind: Instance
     Nullability:
@@ -6612,8 +8579,8 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    NullabilityOfRet: U
+    - O
+    NullabilityOfRet: O
   - Selector: 'unarchiver:willReplaceObject:withObject:'
     MethodKind: Instance
     Nullability:
@@ -7014,23 +8981,23 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    - N
-    - N
+    - U
+    - U
+    - U
     NullabilityOfRet: S
   - Selector: 'parser:didEndMappingPrefix:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'parser:didStartElement:namespaceURI:qualifiedName:attributes:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    - N
-    - N
+    - U
+    - U
+    - U
     - U
     NullabilityOfRet: S
   - Selector: 'parser:didStartMappingPrefix:toURI:'
@@ -7044,10 +9011,10 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
-    - N
-    - N
-    - N
+    - U
+    - U
+    - U
+    - U
     NullabilityOfRet: S
   - Selector: 'parser:foundCDATA:'
     MethodKind: Instance
@@ -7059,13 +9026,13 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'parser:foundComment:'
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     NullabilityOfRet: S
   - Selector: 'parser:foundElementDeclarationWithName:model:'
     MethodKind: Instance

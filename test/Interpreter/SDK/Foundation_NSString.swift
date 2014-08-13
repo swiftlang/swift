@@ -18,7 +18,7 @@ println(upperHello)
 
 // Note: easy way to create an NSDictionary
 var strings : NSString = "\"A\" = \"Foo\";\n\"B\" = \"Bar\";\n"
-var dict  = strings.propertyListFromStringsFileFormat()
+var dict  = strings.propertyListFromStringsFileFormat()!
 
 // Subscripting an NSDictionary. FIXME: The inner NSString casts are annoying.
 // CHECK: A -> Foo

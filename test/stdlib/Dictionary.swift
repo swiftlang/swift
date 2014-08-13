@@ -1519,7 +1519,7 @@ func slurpFastEnumeration(
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
-      let value: AnyObject = d.objectForKey(key)
+      let value: AnyObject = d.objectForKey(key)!
       let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
       pairs += [kv]
     }
@@ -2842,8 +2842,6 @@ DictionaryTestCase.test("BridgedToObjC_Count") {
 DictionaryTestCase.test("BridgedToObjC.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  assert(d.objectForKey(nil) == nil)
-
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
   assert((v as TestObjCValueTy).value == 1010)
 
@@ -2862,7 +2860,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.NextObject") {
 
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)
+    let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2950,7 +2948,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)
+    let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2978,7 +2976,7 @@ DictionaryTestCase.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)
+    let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -3006,7 +3004,7 @@ DictionaryTestCase.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)
+    let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -3047,7 +3045,7 @@ DictionaryTestCase.test("BridgingRoundtrip") {
 
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
-    let value: AnyObject = d.objectForKey(key)
+    let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     pairs.append(kv)
   }

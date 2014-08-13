@@ -1349,7 +1349,7 @@ extension String {
   /// by a given encoding.
   public func stringByReplacingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
-  ) -> String {
+  ) -> String? {
     return _ns.stringByReplacingPercentEscapesUsingEncoding(encoding)
   }
 
