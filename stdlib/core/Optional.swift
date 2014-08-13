@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-public enum Optional<T>: Reflectable, NilLiteralConvertible {
+public enum Optional<T> : Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
@@ -29,7 +29,7 @@ public enum Optional<T>: Reflectable, NilLiteralConvertible {
       return false
     }
   }
-  
+
   /// Haskell's fmap, which was mis-named
   public func map<U>(f: (T)->U) -> U? {
     switch self {
@@ -43,9 +43,9 @@ public enum Optional<T>: Reflectable, NilLiteralConvertible {
   public func getMirror() -> MirrorType {
     return _OptionalMirror(self)
   }
-  
-  @transparent public
-  static func convertFromNilLiteral() -> Optional<T> {
+
+  @transparent
+  public static func convertFromNilLiteral() -> Optional<T> {
     return .None
   }
 }
@@ -141,9 +141,9 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
 @transparent public
 func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_) :
+  case .Some(_):
     return false
-  case .None :
+  case .None:
     return true
   }
 }
@@ -152,36 +152,36 @@ func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 // element type isn't equatable
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_) : 
+  case .Some(_):
     return false
-  case .None :
+  case .None:
     return true
   }
 }
 
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
-  case .Some(_) :
+  case .Some(_):
     return true
-  case .None :
+  case .None:
     return false
   }
 }
 
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_) :
+  case .Some(_):
     return false
-  case .None :
+  case .None:
     return true
   }
 }
 
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
-  case .Some(_) :
+  case .Some(_):
     return true
-  case .None :
+  case .None:
     return false
   }
 }
@@ -201,14 +201,14 @@ internal struct _OptionalMirror<T> : MirrorType {
 
   var count: Int { return (_value != nil) ? 1 : 0 }
 
-  subscript(i: Int) -> (String, MirrorType) { 
+  subscript(i: Int) -> (String, MirrorType) {
     switch (_value,i) {
     case (.Some(let contents),0) : return ("Some",reflect(contents))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
 
-  var summary: String { 
+  var summary: String {
     switch _value {
       case .Some(let contents): return reflect(contents).summary
       default: return "nil"
