@@ -361,3 +361,31 @@ bb4(%20 : $Builtin.Int1):                         // Preds: bb1 bb2 bb3
   %11 = struct $Bool (%20 : $Builtin.Int1)
   return %11 : $Bool
 }
+
+enum E {
+  case Nope, Yup(Builtin.Int1)
+}
+
+// CHECK-LABEL: sil @simplify_switch_enum_pred_no_arg
+sil @simplify_switch_enum_pred_no_arg : $@thin (E) -> Builtin.Int1 {
+bb0(%0 : $E):
+// CHECK-LABEL: bb0
+// CHECK: switch_enum %0 : $E, case #E.Nope!enumelt: bb1, case #E.Yup!enumelt.1: bb2
+  switch_enum %0 : $E, case #E.Nope!enumelt: bb1, case #E.Yup!enumelt.1: bb2
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  br bb4(%1 : $Builtin.Int1)
+
+bb2:
+// CHECK: unchecked_enum_data %0 : $E, #E.Yup!enumelt.1
+// CHECK-NOT: switch_enum
+  switch_enum %0 : $E, case #E.Yup!enumelt.1: bb4, case #E.Nope!enumelt: bb3
+
+bb3:
+  %2 = integer_literal $Builtin.Int1, 0
+  br bb4(%2 : $Builtin.Int1)
+
+bb4(%3 : $Builtin.Int1):
+  return %3 : $Builtin.Int1
+}

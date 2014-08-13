@@ -168,13 +168,28 @@ static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
                                    SILBasicBlock *BB) {
   auto *Dest = SEI->getCaseDestination(Element);
 
-  if (BB->bbarg_empty() || Dest->bbarg_empty()) {
+  if (Dest->bbarg_empty()) {
     SILBuilder(SEI).createBranch(SEI->getLoc(), Dest);
-  } else {
-    assert(BB->bbarg_size() == 1 && "Expected only one argument!");
-    ArrayRef<SILValue> Args = { BB->getBBArg(0) };
-    SILBuilder(SEI).createBranch(SEI->getLoc(), Dest, Args);
+    SEI->eraseFromParent();
+    return;
   }
+
+  SILValue Arg;
+
+  if (BB->bbarg_empty()) {
+    auto &Mod = SEI->getModule();
+    auto OpndTy = SEI->getOperand()->getType(0);
+    auto Ty = OpndTy.getEnumElementType(Element, Mod);
+    auto *UED = SILBuilder(SEI).createUncheckedEnumData(SEI->getLoc(),
+                                                        SEI->getOperand(),
+                                                        Element, Ty);
+    Arg = SILValue(UED);
+  } else {
+    Arg = BB->getBBArg(0);
+  }
+
+  ArrayRef<SILValue> Args = { Arg };
+  SILBuilder(SEI).createBranch(SEI->getLoc(), Dest, Args);
   SEI->eraseFromParent();
 }
 
