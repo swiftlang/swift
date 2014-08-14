@@ -223,7 +223,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // arbitrary keys to put in the 
   Module->addModuleFlag(llvm::Module::Override,
                         "Objective-C Garbage Collection",
-                        (uint32_t) (objcVersion << 8));
+                        (uint32_t) (swiftVersion << 8));
 
   // Mark iOS simulator images.
   if (tripleIsiOSSimulator(llvm::Triple(Opts.Triple)))

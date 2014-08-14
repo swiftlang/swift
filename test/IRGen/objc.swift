@@ -113,5 +113,5 @@ class WeakObjC {
 // CHECK: metadata !{i32 1, metadata !"Swift Version", i32 1}
 // CHECK: metadata !{i32 1, metadata !"Objective-C Image Info Version", i32 0}
 // CHECK: metadata !{i32 1, metadata !"Objective-C Image Info Section", metadata !"__DATA, __objc_imageinfo, regular, no_dead_strip"}
-//   512 == (1 << 8).  1 is the Swift ABI version.
-// CHECK: metadata !{i32 4, metadata !"Objective-C Garbage Collection", i32 512}
+//   256 == (1 << 8).  1 is the Swift ABI version.
+// CHECK: metadata !{i32 4, metadata !"Objective-C Garbage Collection", i32 256}
