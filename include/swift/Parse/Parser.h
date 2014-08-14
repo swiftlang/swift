@@ -796,7 +796,7 @@ public:
 
   bool isImplicitlyUnwrappedOptionalToken() const {
     return Tok.is(tok::exclaim_postfix) ||
-           (isInSILMode() && Tok.is(tok::sil_exclamation));
+           Tok.is(tok::sil_exclamation);
   }
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
