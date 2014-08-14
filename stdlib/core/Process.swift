@@ -27,4 +27,4 @@ public struct _Process {
   }
 }
 
-public var Process = _Process()
+public let Process = _Process()

@@ -308,7 +308,6 @@ public func += (inout lhs: String, rhs: String) {
 }
 
 // Comparison operators
-// FIXME: Compare Characters, not code units
 extension String : Comparable {
 }
 
@@ -531,10 +530,10 @@ extension String : ExtensibleCollectionType {
 
   public mutating func append(c: Character) {
     switch c {
-    case .SmallRepresentation(var _63bits):
+    case .SmallRepresentation(let _63bits):
       let bytes = Character._smallValue(_63bits)
       _core.extend(Character.SmallUTF16(bytes))
-    case .LargeRepresentation(var str):
+    case .LargeRepresentation(let str):
       _core.extend(str._value._core)
     }
   }
