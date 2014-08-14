@@ -276,6 +276,7 @@ private:
   Type FloatLiteralType;
   Type BooleanLiteralType;
   Type CharacterLiteralType;
+  Type UnicodeScalarType;
   Type ExtendedGraphemeClusterType;
   Type StringLiteralType;
   Type ArrayLiteralType;

@@ -86,6 +86,12 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
+  public static func convertFromUnicodeScalarLiteral(
+    value: String
+  ) -> Selector {
+    return convertFromStringLiteral(value)
+  }
+
   /// Construct a selector from a string literal.
   public static func convertFromExtendedGraphemeClusterLiteral(
     value: String) -> Selector {

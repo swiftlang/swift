@@ -538,7 +538,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{type '(target: String, dependencies: String)' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
+ruleVar = Rule("a") // expected-error {{type '(target: String, dependencies: String)' does not conform to protocol 'UnicodeScalarLiteralConvertible'}}
 
 
 class C {

@@ -40,6 +40,13 @@ public struct ObjCBool : BooleanType {
 public struct Selector : StringLiteralConvertible {
   private var ptr : COpaquePointer
 
+  public static func convertFromUnicodeScalarLiteral(
+    value: String
+  ) -> Selector {
+
+    return convertFromStringLiteral(value)
+  }
+
   public static func convertFromExtendedGraphemeClusterLiteral(
     value: String) -> Selector {
 

@@ -75,6 +75,10 @@ isExtendedGraphemeClusterBoundary(GraphemeClusterBreakProperty GCB1,
   return !(RuleRow & (1 << static_cast<unsigned>(GCB2)));
 }
 
+bool isSingleUnicodeScalar(StringRef S);
+
+unsigned extractFirstUnicodeScalar(StringRef S);
+
 } // namespace unicode
 } // namespace swift
 

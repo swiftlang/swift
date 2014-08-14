@@ -1196,6 +1196,7 @@ namespace index_block {
     StringInterpolationConvertible,
     StringLiteralConvertible,
     NilLiteralConvertible,
+    UnicodeScalarLiteralConvertible,
 
     _BuiltinBooleanLiteralConvertible,
     _BuiltinCharacterLiteralConvertible,
@@ -1204,6 +1205,7 @@ namespace index_block {
     _BuiltinIntegerLiteralConvertible,
     _BuiltinStringLiteralConvertible,
     _BuiltinUTF16StringLiteralConvertible,
+    _BuiltinUnicodeScalarLiteralConvertible,
 
     AnyObject,
     RawRepresentable,

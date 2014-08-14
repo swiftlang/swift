@@ -48,8 +48,9 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // In debug mode keep verbose fatal errors.
 // DEBUG-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
 // DEBUG: "Human nature ..."
-// DEBUG: "fatal error"
-// DEBUG: int_trap
+// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: unreachable
 
 // In release mode keep succinct fatal errors (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
@@ -69,11 +70,11 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose library precondition checks.
 // DEBUG-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// DEBUG:  "fatal error"
-// DEBUG:  function_ref @swift_reportFatalError
-// DEBUG:  builtin_function_ref "int_trap"
-// DEBUG:  unreachable
-// DEBUG:  return
+// DEBUG: "fatal error"
+// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: unreachable
+// DEBUG: return
 
 // In release mode keep succinct library precondition checks (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
@@ -94,10 +95,10 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose partial safety checks.
 // DEBUG-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// DEBUG:  "fatal error"
-// DEBUG:  function_ref @swift_reportFatalError
-// DEBUG:  builtin_function_ref "int_trap"
-// DEBUG:  unreachable
+// DEBUG: "fatal error"
+// DEBUG: %[[FATAL_ERROR:.+]] = function_ref @_TFSs18_fatalErrorMessageFTVSs12StaticStringS_S_Su_T_
+// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: unreachable
 
 // In release mode remove partial safety checks.
 // RELEASE-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si

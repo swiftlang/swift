@@ -95,19 +95,32 @@ internal func _convertNSStringToString(nsstring: NSString) -> String {
 }
 
 extension NSString : StringLiteralConvertible {
+  public class func convertFromUnicodeScalarLiteral(
+    value: StaticString
+  ) -> Self {
+    return convertFromStringLiteral(value)
+  }
+
   public class func convertFromExtendedGraphemeClusterLiteral(
     value: StaticString) -> Self {
     return convertFromStringLiteral(value)
   }
 
   public class func convertFromStringLiteral(value: StaticString) -> Self {
-    
-    let immutableResult = NSString(
-      bytesNoCopy: UnsafeMutablePointer<Void>(value.start),
-      length: Int(value.byteSize),
-      encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
-      freeWhenDone: false)
-    
+    var immutableResult: NSString
+    if value.hasPointerRepresentation {
+      immutableResult = NSString(
+        bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
+        length: Int(value.byteSize),
+        encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
+        freeWhenDone: false)
+    } else {
+      var uintValue = value.unicodeScalar
+      immutableResult = NSString(
+        bytes: &uintValue,
+        length: 4,
+        encoding: NSUTF32StringEncoding)
+    }
     return self(string: immutableResult)
   }
 }

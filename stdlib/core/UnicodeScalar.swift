@@ -12,7 +12,9 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
+public struct UnicodeScalar :
+  _BuiltinUnicodeScalarLiteralConvertible,
+  UnicodeScalarLiteralConvertible {
 
   var _value: Builtin.Int32
 
@@ -22,11 +24,18 @@ public struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     }
   }
 
-  @effects(readonly)
-  public static func convertFromExtendedGraphemeClusterLiteral(
-      value: String) -> UnicodeScalar {
-    let unicodeScalars = value.unicodeScalars
-    return unicodeScalars[unicodeScalars.startIndex]
+  @transparent
+  public static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32
+  ) -> UnicodeScalar {
+    return UnicodeScalar(value)
+  }
+
+  @transparent
+  public static func convertFromUnicodeScalarLiteral(
+    value: UnicodeScalar
+  ) -> UnicodeScalar {
+    return value
   }
 
   public init() {

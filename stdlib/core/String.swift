@@ -61,6 +61,21 @@ extension String {
   }
 }
 
+extension String : _BuiltinUnicodeScalarLiteralConvertible {
+  @effects(readonly)
+  public static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32) -> String {
+    return String._fromWellFormedCodeUnitSequence(
+      UTF32.self, input: CollectionOfOne(UInt32(value)))
+  }
+}
+
+extension String : UnicodeScalarLiteralConvertible {
+  public static func convertFromUnicodeScalarLiteral(value: String) -> String {
+    return value
+  }
+}
+
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @effects(readonly)
   public

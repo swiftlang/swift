@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{cannot invoke '+' with an argument list of type '(@lvalue Int, ExtendedGraphemeClusterLiteralConvertible)'}}
+  return a + "a" // expected-error{{cannot invoke '+' with an argument list of type '(@lvalue Int, UnicodeScalarLiteralConvertible)'}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{cannot invoke '+' with an argument list of type '(Int, ExtendedGraphemeClusterLiteralConvertible)'}}
+  return a() + "a" // expected-error{{cannot invoke '+' with an argument list of type '(Int, UnicodeScalarLiteralConvertible)'}}
 }
 
 

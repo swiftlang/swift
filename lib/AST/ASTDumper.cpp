@@ -1154,6 +1154,7 @@ public:
     switch (encoding) {
     case StringLiteralExpr::UTF8: OS << "utf8"; break;
     case StringLiteralExpr::UTF16: OS << "utf16"; break;
+    case StringLiteralExpr::OneUnicodeScalar: OS << "unicodeScalar"; break;
     }
   }
 

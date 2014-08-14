@@ -70,32 +70,54 @@ func _reportUnimplementedInitializer(
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
-@noreturn
+///
+/// This function should not be inlined because it is cold and it inlining just
+/// bloats code.
+@noreturn @inline(never)
 func _assertionFailed(
   prefix: StaticString, message: StaticString,
   file: StaticString, line: UWord
 ) {
-  _reportFatalErrorInFile(
-    prefix.start, prefix.byteSize, message.start, message.byteSize,
-    file.start, file.byteSize, line)
-
+  prefix.withUTF8Buffer {
+    (prefix) -> () in
+    message.withUTF8Buffer {
+      (message) -> () in
+      file.withUTF8Buffer {
+        (file) -> () in
+        _reportFatalErrorInFile(
+          prefix.baseAddress, UWord(prefix.count),
+          message.baseAddress, UWord(message.count),
+          file.baseAddress, UWord(file.count), line)
+        Builtin.int_trap()
+      }
+    }
+  }
   Builtin.int_trap()
 }
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
-@noreturn
+///
+/// This function should not be inlined because it is cold and it inlining just
+/// bloats code.
+@noreturn @inline(never)
 func _assertionFailed(
   prefix: StaticString, message: String,
   file: StaticString, line: UWord
 ) {
-  let messageUTF8 = message.nulTerminatedUTF8
-  messageUTF8.withUnsafeBufferPointer {
-    (messageUTF8) in
-    _reportFatalErrorInFile(
-      prefix.start, prefix.byteSize,
-      messageUTF8.baseAddress, UWord(messageUTF8.count),
-      file.start, file.byteSize, line)
+  prefix.withUTF8Buffer {
+    (prefix) -> () in
+    let messageUTF8 = message.nulTerminatedUTF8
+    messageUTF8.withUnsafeBufferPointer {
+      (messageUTF8) -> () in
+      file.withUTF8Buffer {
+        (file) -> () in
+        _reportFatalErrorInFile(
+          prefix.baseAddress, UWord(prefix.count),
+          messageUTF8.baseAddress, UWord(messageUTF8.count),
+          file.baseAddress, UWord(file.count), line)
+      }
+    }
   }
 
   Builtin.int_trap()
@@ -103,16 +125,36 @@ func _assertionFailed(
 
 /// This function should be used only in the implementation of stdlib
 /// assertions.
-@transparent @noreturn internal
+///
+/// This function should not be inlined because it is cold and it inlining just
+/// bloats code.
+@noreturn @inline(never)
 func _fatalErrorMessage(prefix: StaticString, message: StaticString,
                         file: StaticString, line: UWord) {
 #if INTERNAL_CHECKS_ENABLED
-  _reportFatalErrorInFile(
-      prefix.start, prefix.byteSize, message.start, message.byteSize,
-      file.start, file.byteSize, line)
+  prefix.withUTF8Buffer {
+    (prefix) in
+    message.withUTF8Buffer {
+      (message) in
+      file.withUTF8Buffer {
+        (file) in
+        _reportFatalErrorInFile(
+          prefix.baseAddress, UWord(prefix.count),
+          message.baseAddress, UWord(message.count),
+          file.baseAddress, UWord(file.count), line)
+      }
+    }
+  }
 #else
-  _reportFatalError(prefix.start, prefix.byteSize,
-                    message.start, message.byteSize)
+  prefix.withUTF8Buffer {
+    (prefix) in
+    message.withUTF8Buffer {
+      (message) in
+      _reportFatalError(
+        prefix.baseAddress, prefix.count,
+        message.baseAddress, message.count)
+    }
+  }
 #endif
 
   Builtin.int_trap()
@@ -120,7 +162,7 @@ func _fatalErrorMessage(prefix: StaticString, message: StaticString,
 
 /// Prints a fatal error message when a unimplemented initializer gets
 /// called by the Objective-C runtime.
-@transparent @noreturn internal
+@transparent @noreturn
 func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,
@@ -132,14 +174,29 @@ func _unimplemented_initializer(className: StaticString,
   // information about the user's source.
 
   if _isDebugAssertConfiguration() {
-    _reportUnimplementedInitializerInFile(
-        className.start, className.byteSize,
-        initName.start, initName.byteSize,
-        file.start, file.byteSize, line, column)
+    className.withUTF8Buffer {
+      (className) in
+      initName.withUTF8Buffer {
+        (initName) in
+        file.withUTF8Buffer {
+          (file) in
+          _reportUnimplementedInitializerInFile(
+            className.baseAddress, UWord(className.count),
+            initName.baseAddress, UWord(initName.count),
+            file.baseAddress, UWord(file.count), line, column)
+        }
+      }
+    }
   } else {
-    _reportUnimplementedInitializer(
-        className.start, className.byteSize,
-        initName.start, initName.byteSize)
+    className.withUTF8Buffer {
+      (className) in
+      initName.withUTF8Buffer {
+        (initName) in
+        _reportUnimplementedInitializer(
+          className.baseAddress, UWord(className.count),
+          initName.baseAddress, UWord(initName.count))
+      }
+    }
   }
 
   Builtin.int_trap()

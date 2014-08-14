@@ -45,6 +45,19 @@ public enum Character :
   }
 
   @effects(readonly)
+  public static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32) -> Character {
+    return Character(
+      String._fromWellFormedCodeUnitSequence(
+        UTF32.self, input: CollectionOfOne(UInt32(value))))
+  }
+
+  public static func convertFromUnicodeScalarLiteral(
+    value: Character) -> Character {
+    return value
+  }
+
+  @effects(readonly)
   public static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
       start: Builtin.RawPointer,
       byteSize: Builtin.Word,

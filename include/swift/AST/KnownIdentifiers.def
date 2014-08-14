@@ -83,11 +83,19 @@ IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,
                      "convertFromCharacterLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinCharacterLiteral,
                      "_convertFromBuiltinCharacterLiteral")
+
+IDENTIFIER(ExtendedGraphemeClusterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinExtendedGraphemeClusterLiteral,
                      "_convertFromBuiltinExtendedGraphemeClusterLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromExtendedGraphemeClusterLiteral,
                      "convertFromExtendedGraphemeClusterLiteral")
-IDENTIFIER(ExtendedGraphemeClusterLiteralType)
+
+IDENTIFIER(UnicodeScalarLiteralType)
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinUnicodeScalarLiteral,
+                     "_convertFromBuiltinUnicodeScalarLiteral")
+IDENTIFIER_WITH_NAME(ConvertFromUnicodeScalarLiteral,
+                     "convertFromUnicodeScalarLiteral")
+
 IDENTIFIER_WITH_NAME(ConvertFromStringLiteral, "convertFromStringLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinUTF16StringLiteral,
                      "_convertFromBuiltinUTF16StringLiteral")

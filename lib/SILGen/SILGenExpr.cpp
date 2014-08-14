@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -822,6 +823,13 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
     // The length of the transcoded string in UTF-16 code points.
     Length = toPtr - &buffer[0];
     break;
+  }
+  case StringLiteralExpr::OneUnicodeScalar: {
+    SILType Ty = SGF.getLoweredLoadableType(E->getType());
+    SILValue UnicodeScalarValue =
+        SGF.B.createIntegerLiteral(E, Ty,
+                                   unicode::extractFirstUnicodeScalar(Str));
+    return RValue(SGF, E, ManagedValue::forUnmanaged(UnicodeScalarValue));
   }
   }
 

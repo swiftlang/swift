@@ -115,13 +115,18 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
                        KnownProtocolKind::CharacterLiteralConvertible);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
+    if (SLE->isSingleUnicodeScalar())
+      return getProtocol(
+          expr->getLoc(),
+          KnownProtocolKind::UnicodeScalarLiteralConvertible);
+
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
           expr->getLoc(),
           KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
-    else
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringLiteralConvertible);
+
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::StringLiteralConvertible);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))

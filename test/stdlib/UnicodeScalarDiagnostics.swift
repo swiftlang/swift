@@ -5,9 +5,9 @@ func isString(inout s: String) {}
 func test_UnicodeScalarDoesNotImplementArithmetic(us: UnicodeScalar, i: Int) {
   var a1 = "a" + "b" // OK
   isString(&a1)
-  let a2 = "a" - "b" // expected-error {{type 'UInt8' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
-  let a3 = "a" * "b" // expected-error {{type 'UInt8' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
-  let a4 = "a" / "b" // expected-error {{type 'UInt8' does not conform to protocol 'ExtendedGraphemeClusterLiteralConvertible'}}
+  let a2 = "a" - "b" // expected-error {{type 'UInt8' does not conform to protocol 'UnicodeScalarLiteralConvertible'}}
+  let a3 = "a" * "b" // expected-error {{type 'UInt8' does not conform to protocol 'UnicodeScalarLiteralConvertible'}}
+  let a4 = "a" / "b" // expected-error {{type 'UInt8' does not conform to protocol 'UnicodeScalarLiteralConvertible'}}
 
   let b1 = us + us // expected-error {{cannot invoke '+' with an argument list of type '(UnicodeScalar, UnicodeScalar)'}}
   let b2 = us - us // expected-error {{cannot invoke '-' with an argument list of type '(UnicodeScalar, UnicodeScalar)'}}

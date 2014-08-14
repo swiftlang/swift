@@ -3444,6 +3444,7 @@ public:
         bool literalConvertible = false;
         for (auto literalProtoKind : {
                  KnownProtocolKind::CharacterLiteralConvertible,
+                 KnownProtocolKind::UnicodeScalarLiteralConvertible,
                  KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
                  KnownProtocolKind::FloatLiteralConvertible,
                  KnownProtocolKind::IntegerLiteralConvertible,
@@ -6593,6 +6594,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
     CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[]")
+    CHECK_LITERAL_PROTOCOL(UnicodeScalarLiteralConvertible, "\"\"")
     CHECK_LITERAL_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, "\"\"")
     CHECK_LITERAL_PROTOCOL(FloatLiteralConvertible, "0.0")
     CHECK_LITERAL_PROTOCOL(IntegerLiteralConvertible, "0")

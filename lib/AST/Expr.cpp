@@ -220,6 +220,8 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range)
     : LiteralExpr(ExprKind::StringLiteral, /*Implicit=*/false), Val(Val),
       Range(Range) {
   StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
+  StringLiteralExprBits.IsSingleUnicodeScalar =
+      unicode::isSingleUnicodeScalar(Val);
   StringLiteralExprBits.IsSingleExtendedGraphemeCluster =
       unicode::isSingleExtendedGraphemeCluster(Val);
 }

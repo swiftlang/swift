@@ -12,10 +12,10 @@ class DesignatedStubs : Gizmo {
 }
 // CHECK-DEBUG: sil @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_S0_
 // CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift"
-// CHECK-DEBUG: function_ref @swift_reportUnimplementedInitializerInFile
+// CHECK-DEBUG: function_ref @_TFVSs12StaticString14withUTF8BufferfS_U__FFGVSs19UnsafeBufferPointerVSs5UInt8_Q_Q_
 
 // CHECK-RELEASE: sil @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_S0_
-// CHECK-RELEASE-NOT: unimplemented_initializer.swift
-// CHECK-RELEASE: function_ref @swift_reportUnimplementedInitializer
-// CHECK-RELEASE-NOT: unimplemented_initializer.swift
+// CHECK-RELEASE-NOT: unimplemented_initializer.swift"
+// CHECK-RELEASE: function_ref @_TFVSs12StaticString14withUTF8BufferfS_U__FFGVSs19UnsafeBufferPointerVSs5UInt8_Q_Q_
+// CHECK-RELEASE-NOT: unimplemented_initializer.swift"
 

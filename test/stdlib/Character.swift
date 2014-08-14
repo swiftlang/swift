@@ -106,6 +106,33 @@ func randomGraphemeCluster(minSize: Int, maxSize: Int) -> String {
 
 var CharacterTests = TestCase("Character")
 
+CharacterTests.test("literal") {
+  if true {
+    // U+0041 LATIN CAPITAL LETTER A
+    let ch: Character = "A"
+    expectEqual("\u{0041}", String(ch))
+  }
+
+  if true {
+    // U+3042 HIRAGANA LETTER A
+    let ch: Character = "あ"
+    expectEqual("\u{3042}", String(ch))
+  }
+
+  if true {
+    // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+    let ch: Character = "例"
+    expectEqual("\u{4F8B}", String(ch))
+  }
+
+  if true {
+    // U+304B HIRAGANA LETTER KA
+    // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
+    let ch: Character = "\u{304b}\u{3099}"
+    expectEqual("\u{304b}\u{3099}", String(ch))
+  }
+}
+
 CharacterTests.test("sizeof") {
   // FIXME: should be 8.
   // <rdar://problem/16754935> sizeof(Character.self) is 9, should be 8

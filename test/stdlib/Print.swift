@@ -716,6 +716,12 @@ struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
 
   var value: String
 
+  static func convertFromUnicodeScalarLiteral(
+    value: String
+  ) -> MyString {
+    return MyString(str: value)
+  }
+
   static func convertFromExtendedGraphemeClusterLiteral(
       value: String) -> MyString {
     return MyString(str: value)

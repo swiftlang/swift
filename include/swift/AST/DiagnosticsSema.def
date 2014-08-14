@@ -1198,6 +1198,11 @@ ERROR(builtin_character_literal_broken_proto,sema_tce,none,
 ERROR(character_literal_broken_proto,sema_tce,none,
       "protocol 'CharacterLiteralConvertible' is broken", ())
 
+ERROR(builtin_unicode_scalar_literal_broken_proto,sema_tce,none,
+      "protocol '_BuiltinUnicodeScalarLiteralConvertible' is broken", ())
+ERROR(unicode_scalar_literal_broken_proto,sema_tce,none,
+      "protocol 'UnicodeScalarLiteralConvertible' is broken", ())
+
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
       "protocol '_BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,sema_tce,none,

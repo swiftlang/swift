@@ -18,6 +18,14 @@ struct SillyCharacter :
 }
 
 struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {
+  static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32
+  ) -> SillyString { }
+
+  static func convertFromUnicodeScalarLiteral(
+    value: SillyString
+  ) -> SillyString { }
+
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -33,6 +41,14 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
 }
 
 struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralConvertible {
+  static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32
+  ) -> SillyUTF16String { }
+
+  static func convertFromUnicodeScalarLiteral(
+    value: SillyString
+  ) -> SillyUTF16String { }
+
   static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
     start: Builtin.RawPointer,
     byteSize: Builtin.Word,

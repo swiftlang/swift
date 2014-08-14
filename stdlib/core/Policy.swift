@@ -33,6 +33,7 @@ public typealias IntegerLiteralType = Int
 public typealias FloatLiteralType = Double
 public typealias BooleanLiteralType = Bool
 // typealias CharacterLiteralType = ?
+public typealias UnicodeScalarType = String
 public typealias ExtendedGraphemeClusterType = String
 public typealias StringLiteralType = String
 

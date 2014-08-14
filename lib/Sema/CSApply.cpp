@@ -1457,6 +1457,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       bool isStringLiteral = true;
+      bool isGraphemeClusterLiteral = false;
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
 
@@ -1467,6 +1468,15 @@ namespace {
             expr->getLoc(),
             KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
         isStringLiteral = false;
+        isGraphemeClusterLiteral = true;
+      }
+      if (!tc.conformsToProtocol(type, protocol, cs.DC)) {
+        // ... or it should be UnicodeScalarLiteralConvertible.
+        protocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::UnicodeScalarLiteralConvertible);
+        isStringLiteral = false;
+        isGraphemeClusterLiteral = false;
       }
 
       assert(tc.conformsToProtocol(type, protocol, cs.DC));
@@ -1478,14 +1488,7 @@ namespace {
           type = defaultType;
       }
 
-      // Add the first element (
       SmallVector<TupleTypeElt, 3> elements;
-      elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
-
-/*
-        TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context)),
-        TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
-*/
 
       ProtocolDecl *builtinProtocol;
       Identifier literalType;
@@ -1505,6 +1508,7 @@ namespace {
         if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
+          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("numberOfCodeUnits")));
@@ -1519,6 +1523,7 @@ namespace {
               KnownProtocolKind::_BuiltinStringLiteralConvertible);
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinStringLiteral;
+          elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("byteSize")));
@@ -1532,7 +1537,7 @@ namespace {
         }
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
-      } else {
+      } else if (isGraphemeClusterLiteral) {
         literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName =
             tc.Context.Id_ConvertFromExtendedGraphemeClusterLiteral;
@@ -1541,6 +1546,7 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
+        elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                        tc.Context.getIdentifier("byteSize")));
@@ -1551,6 +1557,27 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
+      } else {
+        // Otherwise, we should have just one Unicode scalar.
+        literalType = tc.Context.Id_UnicodeScalarLiteralType;
+        literalFuncName = tc.Context.Id_ConvertFromUnicodeScalarLiteral;
+        builtinProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
+        builtinLiteralFuncName =
+            tc.Context.Id_ConvertFromBuiltinUnicodeScalarLiteral;
+        builtinProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
+
+        elements.push_back(
+            TupleTypeElt(BuiltinIntegerType::get(32, tc.Context)));
+
+        brokenProtocolDiag = diag::unicode_scalar_literal_broken_proto;
+        brokenBuiltinProtocolDiag =
+            diag::builtin_unicode_scalar_literal_broken_proto;
+
+        stringLiteral->setEncoding(StringLiteralExpr::OneUnicodeScalar);
       }
 
       return convertLiteral(expr,

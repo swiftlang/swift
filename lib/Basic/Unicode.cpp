@@ -60,3 +60,37 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
   }
 }
 
+static bool extractFirstUnicodeScalarImpl(StringRef S, unsigned &Scalar) {
+  if (S.empty())
+    return false;
+
+  const UTF8 *SourceStart = reinterpret_cast<const UTF8 *>(S.data());
+
+  const UTF8 *SourceNext = SourceStart;
+  UTF32 C;
+  UTF32 *TargetStart = &C;
+
+  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, TargetStart + 1,
+                     lenientConversion);
+  if (TargetStart == &C) {
+    // The source string contains an ill-formed subsequence at the end.
+    return false;
+  }
+
+  Scalar = C;
+  return size_t(SourceNext - SourceStart) == S.size();
+}
+
+bool swift::unicode::isSingleUnicodeScalar(StringRef S) {
+  unsigned Scalar;
+  return extractFirstUnicodeScalarImpl(S, Scalar);
+}
+
+unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
+  unsigned Scalar;
+  bool Result = extractFirstUnicodeScalarImpl(S, Scalar);
+  assert(Result && "string does not consist of one Unicode scalar");
+  (void)Result;
+  return Scalar;
+}
+

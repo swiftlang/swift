@@ -705,8 +705,29 @@ let UTF16Tests = [
   ],
 ]
 
-var UnicodeScalars = TestCase("UnicodeScalars")
-UnicodeScalars.test("Construction") {
+var UnicodeScalarTests = TestCase("UnicodeScalarTests")
+
+UnicodeScalarTests.test("literal") {
+  if true {
+    // U+0041 LATIN CAPITAL LETTER A
+    let us: UnicodeScalar = "A"
+    expectEqual(0x0041, us.value)
+  }
+
+  if true {
+    // U+3042 HIRAGANA LETTER A
+    let us: UnicodeScalar = "あ"
+    expectEqual(0x3042, us.value)
+  }
+
+  if true {
+    // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+    let us: UnicodeScalar = "例"
+    expectEqual(0x4F8B, us.value)
+  }
+}
+
+UnicodeScalarTests.test("init") {
   expectEqual("f", UnicodeScalar(102))
   expectEqual("g", UnicodeScalar(UInt32(103)))
   expectEqual("h", UnicodeScalar(UInt16(104)))

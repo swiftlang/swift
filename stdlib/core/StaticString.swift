@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 public protocol AssertStringType
-  : ExtendedGraphemeClusterLiteralConvertible,
+  : UnicodeScalarLiteralConvertible,
+    ExtendedGraphemeClusterLiteralConvertible,
     StringLiteralConvertible {
   var stringValue: String { get }
 }
@@ -32,33 +33,84 @@ public protocol StaticStringType : AssertStringType {}
 /// "statically knowable".
 public struct StaticString
   : StaticStringType,
+    _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     _BuiltinStringLiteralConvertible,
     Printable,
     DebugPrintable {
-  var _start: Builtin.RawPointer
+
+  /// Either a pointer to the start of UTF-8 data, or an integer representation
+  /// of a single Unicode scalar.
+  var _startPtrOrData: Builtin.RawPointer
+
+  /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
+  /// in bytes.
   var _byteSize: Builtin.Word
-  var _isASCII: Builtin.Int1
+
+  /// Extra flags:
+  ///
+  /// - bit 0: set to 0 if `_startPtrOrData` is a pointer, or to 1 if it is a
+  ///   Unicode scalar.
+  ///
+  /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
+  ///   ASCII.
+  var _flags: Builtin.Word
 
   @transparent
-  public var start: UnsafePointer<UInt8> {
-    return UnsafePointer(_start)
+  public var utf8Start: UnsafePointer<UInt8> {
+    _precondition(
+      hasPointerRepresentation,
+      "StaticString should have pointer representation")
+    return UnsafePointer(_startPtrOrData)
   }
 
   @transparent
-  public var byteSize: UWord {
-    return UWord(_byteSize)
+  public var unicodeScalar: UnicodeScalar {
+    _precondition(
+      !hasPointerRepresentation,
+      "StaticString should have Unicode scalar representation")
+    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UWord.self)))
+  }
+
+  @transparent
+  public var byteSize: Word {
+    return Word(_byteSize)
+  }
+
+  @transparent
+  public var hasPointerRepresentation: Bool {
+    return (UWord(_flags) & 0x1) == 0
   }
 
   @transparent
   public var isASCII: Bool {
-    return Bool(_isASCII)
+    return (UWord(_flags) & 0x2) == 1
+  }
+
+  public func withUTF8Buffer<R>(body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    if hasPointerRepresentation {
+      return body(UnsafeBufferPointer(start: utf8Start, count: Int(byteSize)))
+    } else {
+      var buffer: UInt64 = 0
+      var i = 0
+      var sink = SinkOf<UInt8> {
+        (byte) in
+        buffer = buffer | (UInt64(byte) << (UInt64(i) * 8))
+        ++i
+      }
+      UTF8.encode(unicodeScalar, output: &sink)
+      return body(UnsafeBufferPointer(
+        start: UnsafePointer(Builtin.addressof(&buffer)),
+        count: i))
+    }
   }
 
   @transparent
   public var stringValue: String {
-    return String._convertFromBuiltinStringLiteral(
-      start.value, byteSize: byteSize.value, isASCII: isASCII.value)
+    return withUTF8Buffer {
+      (buffer) in
+      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: buffer)
+    }
   }
 
   @transparent
@@ -70,9 +122,35 @@ public struct StaticString
   init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
-    self._start = start
+    self._startPtrOrData = start
     self._byteSize = byteSize
-    self._isASCII = isASCII
+    self._flags = Bool(isASCII) ? 0x2.value : 0.value
+  }
+
+  @transparent
+  init(
+    unicodeScalar: Builtin.Int32
+  ) {
+    self._startPtrOrData =
+      unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self).value
+    self._byteSize = 0.value
+    self._flags = 0.value
+  }
+
+  @effects(readonly)
+  @transparent
+  public static func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32
+  ) -> StaticString {
+    return StaticString(unicodeScalar: value)
+  }
+
+  @effects(readonly)
+  @transparent
+  public static func convertFromUnicodeScalarLiteral(
+    value: StaticString
+  ) -> StaticString {
+    return value
   }
 
   @effects(readonly)
@@ -134,6 +212,14 @@ public struct AssertString
   @transparent
   public init(_ value: String) {
     self.stringValue = value
+  }
+
+  @effects(readonly)
+  @transparent
+  public static func convertFromUnicodeScalarLiteral(
+    value: String
+  ) -> AssertString {
+    return AssertString(value)
   }
 
   @effects(readonly)

@@ -541,6 +541,14 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &CharacterLiteralType;
     name = "CharacterLiteralType";
   }
+  // UnicodeScalarLiteralConvertible -> UnicodeScalarType
+  else if (protocol ==
+           getProtocol(
+               SourceLoc(),
+               KnownProtocolKind::UnicodeScalarLiteralConvertible)) {
+    type = &UnicodeScalarType;
+    name = "UnicodeScalarType";
+  }
   // ExtendedGraphemeClusterLiteralConvertible -> ExtendedGraphemeClusterType
   else if (protocol ==
            getProtocol(

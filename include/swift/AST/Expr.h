@@ -137,7 +137,8 @@ class alignas(8) Expr {
     friend class StringLiteralExpr;
     unsigned : NumLiteralExprBits;
 
-    unsigned Encoding : 1;
+    unsigned Encoding : 2;
+    unsigned IsSingleUnicodeScalar : 1;
     unsigned IsSingleExtendedGraphemeCluster : 1;
   };
   enum { NumStringLiteralExprBits = NumLiteralExprBits + 2 };
@@ -551,8 +552,14 @@ class StringLiteralExpr : public LiteralExpr {
 public:
   /// The encoding that should be used for the string literal.
   enum Encoding : unsigned {
+    /// A UTF-8 string.
     UTF8,
-    UTF16
+
+    /// A UTF-16 string.
+    UTF16,
+
+    /// A single UnicodeScalar, passed as an integer.
+    OneUnicodeScalar
   };
 
   StringLiteralExpr(StringRef Val, SourceRange Range);
@@ -568,6 +575,10 @@ public:
   /// Set the encoding that should be used for this string literal.
   void setEncoding(Encoding encoding) {
     StringLiteralExprBits.Encoding = static_cast<unsigned>(encoding);
+  }
+
+  bool isSingleUnicodeScalar() const {
+    return StringLiteralExprBits.IsSingleUnicodeScalar;
   }
 
   bool isSingleExtendedGraphemeCluster() const {

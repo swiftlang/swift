@@ -247,14 +247,29 @@ public protocol CharacterLiteralConvertible {
   class func convertFromCharacterLiteral(value: CharacterLiteralType) -> Self
 }
 
-public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible {
+public protocol _BuiltinUnicodeScalarLiteralConvertible {
+  class func _convertFromBuiltinUnicodeScalarLiteral(
+    value: Builtin.Int32) -> Self
+}
+
+public protocol UnicodeScalarLiteralConvertible {
+  typealias UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
+  class func convertFromUnicodeScalarLiteral(
+    value: UnicodeScalarLiteralType) -> Self
+}
+
+public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
+  : _BuiltinUnicodeScalarLiteralConvertible {
+
   class func _convertFromBuiltinExtendedGraphemeClusterLiteral(
       start: Builtin.RawPointer,
       byteSize: Builtin.Word,
       isASCII: Builtin.Int1) -> Self
 }
 
-public protocol ExtendedGraphemeClusterLiteralConvertible {
+public protocol ExtendedGraphemeClusterLiteralConvertible
+  : UnicodeScalarLiteralConvertible {
+
   typealias ExtendedGraphemeClusterLiteralType : _BuiltinExtendedGraphemeClusterLiteralConvertible
   class func convertFromExtendedGraphemeClusterLiteral(
       value: ExtendedGraphemeClusterLiteralType) -> Self
