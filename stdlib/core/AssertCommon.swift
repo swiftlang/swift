@@ -151,8 +151,8 @@ func _fatalErrorMessage(prefix: StaticString, message: StaticString,
     message.withUTF8Buffer {
       (message) in
       _reportFatalError(
-        prefix.baseAddress, prefix.count,
-        message.baseAddress, message.count)
+        prefix.baseAddress, UWord(prefix.count),
+        message.baseAddress, UWord(message.count))
     }
   }
 #endif
