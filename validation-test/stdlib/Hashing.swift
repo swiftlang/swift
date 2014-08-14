@@ -119,5 +119,11 @@ HashingTestCase.test("_squeezeHashValue/UInt") {
   checkRange((UInt.max-10)..<(UInt.max-1))
 }
 
+HashingTestCase.test("overridePerExecutionHashSeed/overflow") {
+  // Test that we don't use checked arithmetic on the seed.
+  _HashingDetail.fixedSeedOverride = UInt64.max
+  expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))
+}
+
 runAllTests()
 
