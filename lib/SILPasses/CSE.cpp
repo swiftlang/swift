@@ -77,7 +77,9 @@ struct SimpleValue {
     case ValueKind::MetatypeInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::IndexRawPointerInst:
+    case ValueKind::IndexAddrInst:
     case ValueKind::PointerToAddressInst:
+    case ValueKind::AddressToPointerInst:
     case ValueKind::CondFailInst:
     case ValueKind::EnumInst:
     case ValueKind::UncheckedEnumDataInst:
@@ -205,9 +207,15 @@ public:
     return llvm::hash_combine(X->getKind(), X->getType(), X->getBase(),
                               X->getIndex());
   }
+
   hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
+
+  hash_code visitAddressToPointerInst(AddressToPointerInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
   hash_code visitApplyInst(ApplyInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(X->getKind(), X->getCallee(),
@@ -215,6 +223,7 @@ public:
                                                        Operands.end()),
                               X->hasSubstitutions(), X->isTransparent());
   }
+
   hash_code visitEnumInst(EnumInst *X) {
     // We hash the enum by hashing its kind, element, and operand if it has one.
     if (!X->hasOperand())
@@ -226,6 +235,12 @@ public:
     // We hash the enum by hashing its kind, element, and operand.
     return llvm::hash_combine(X->getKind(), X->getElement(), X->getOperand());
   }
+
+  hash_code visitIndexAddrInst(IndexAddrInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getBase(),
+                              X->getIndex());
+  }
+
 };
 } // end anonymous namespace
 

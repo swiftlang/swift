@@ -671,3 +671,19 @@ bb0(%0 : $D):
   %6 = tuple()
   return %6 : $()
 }
+
+// CHECK-LABEL: sil @cse_index_addr_inst : $@thin (@in D, Builtin.Word) -> (Builtin.RawPointer, Builtin.RawPointer) {
+// CHECK: bb0(
+// CHECK-NEXT: index_addr
+// CHECK-NEXT: address_to_pointer
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @cse_index_addr_inst : $@thin (@in D, Builtin.Word) -> (Builtin.RawPointer, Builtin.RawPointer) {
+bb0(%0 : $*D, %1 : $Builtin.Word):
+  %2 = index_addr %0 : $*D, %1 : $Builtin.Word
+  %3 = index_addr %0 : $*D, %1 : $Builtin.Word
+  %4 = address_to_pointer %2 : $*D to $Builtin.RawPointer
+  %5 = address_to_pointer %3 : $*D to $Builtin.RawPointer
+  %6 = tuple(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer)
+  return %6 : $(Builtin.RawPointer, Builtin.RawPointer)
+}
