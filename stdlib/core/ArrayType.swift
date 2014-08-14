@@ -86,6 +86,10 @@ internal protocol ArrayType
 
   func reduce<U>(initial: U, combine: (U, Self.Generator.Element) -> U) -> U
 
+  /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
+  /// `isOrderedBefore` induces a `strict weak ordering
+  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// over the elements.
   mutating func sort(
     isOrderedBefore: (
       Self.Generator.Element, Self.Generator.Element

@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Returns the minimum element in `elements`.  Requires:
+/// `elements` is non-empty. O(countElements(elements))
 public func minElement<
      R : SequenceType
-       where R.Generator.Element : Comparable>(range: R)
+       where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  var g = range.generate()
+  var g = elements.generate()
   var result = g.next()!  
   for e in GeneratorSequence(g) {
     if e < result { result = e }
@@ -22,11 +24,13 @@ public func minElement<
   return result
 }
 
+/// Returns the maximum element in `elements`.  Requires:
+/// `elements` is non-empty. O(countElements(elements))
 public func maxElement<
      R : SequenceType
-       where R.Generator.Element : Comparable>(range: R)
+       where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  var g = range.generate()
+  var g = elements.generate()
   var result = g.next()!
   for e in GeneratorSequence(g) {
     if e > result { result = e }
@@ -34,8 +38,8 @@ public func maxElement<
   return result
 }
 
-// Returns the first index where value appears in domain or nil if
-// domain doesn't contain the value. O(countElements(domain))
+// Returns the first index where `value` appears in `domain` or `nil` if
+// `domain` doesn't contain `value`. O(countElements(domain))
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, value: C.Generator.Element) -> C.Index? {
@@ -91,9 +95,14 @@ func _insertionSort<
   }
 }
 
-/// Partition a range into two partially sorted regions and return
-/// the index of the pivot:
-/// [start..idx), pivot ,[idx..end)
+/// Re-order the given `range` of `elements` and return a pivot index
+/// *p*.  Postcondition: for all *i* in `range.startIndex..<`\ *p*,
+/// and *j* in *p*\ `..<range.endIndex`, `less(elements[`\ *i*\ `],
+/// elements[`\ *j*\ `]) && !less(elements[`\ *j*\ `], elements[`\
+/// *p*\ `])`.  Only returns `range.endIndex` when `elements` is
+/// empty.  Requires: `less` is a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over `elements`.
 public func partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
@@ -188,17 +197,17 @@ struct Less<T: Comparable> {
   }
 }
 
-/// Sort `collection` in-place according to `predicate`.  Requires:
-/// `predicate` induces a `strict weak ordering
+/// Sort `collection` in-place according to `isOrderedBefore`.  Requires:
+/// `isOrderedBefore` induces a `strict weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
 public func sort<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   inout collection: C,
-  predicate: (C.Generator.Element, C.Generator.Element) -> Bool
+  isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool
 ) {
-  _quickSort(&collection, indices(collection), predicate)
+  _quickSort(&collection, indices(collection), isOrderedBefore)
 }
 
 /// Sort `collection` in-place.  Requires:
@@ -214,13 +223,13 @@ public func sort<
   _quickSort(&collection, indices(collection))
 }
 
-/// Sort `array` in-place according to `predicate`.  Requires:
-/// `predicate` induces a `strict weak ordering
+/// Sort `array` in-place according to `isOrderedBefore`.  Requires:
+/// `isOrderedBefore` induces a `strict weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
-public func sort<T>(inout array: [T], predicate: (T, T) -> Bool) {
+public func sort<T>(inout array: [T], isOrderedBefore: (T, T) -> Bool) {
   return array.withUnsafeMutableBufferPointer {
-    a in sort(&a, predicate)
+    a in sort(&a, isOrderedBefore)
     return
   }
 }
@@ -241,7 +250,7 @@ public func sort<T : Comparable>(inout array: [T]) {
 }
 
 /// Return an `Array` containing the elements of `source` sorted
-/// according to `predicate`.  Requires: `predicate` induces a `strict
+/// according to `isOrderedBefore`.  Requires: `isOrderedBefore` induces a `strict
 /// weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
@@ -249,10 +258,10 @@ public func sorted<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
 >(
   source: C,
-  predicate: (C.Generator.Element, C.Generator.Element) -> Bool
+  isOrderedBefore: (C.Generator.Element, C.Generator.Element) -> Bool
 ) -> C {
   var result = source
-  sort(&result, predicate)
+  sort(&result, isOrderedBefore)
   return result
 }
 
@@ -270,7 +279,7 @@ public func sorted<
 }
 
 /// Return an `Array` containing the elements of `source` sorted
-/// according to `predicate`.  Requires: `predicate` induces a `strict
+/// according to `isOrderedBefore`.  Requires: `isOrderedBefore` induces a `strict
 /// weak ordering
 /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
 /// over the elements.
@@ -278,10 +287,10 @@ public func sorted<
   S: SequenceType
 >(
   source: S,
-  predicate: (S.Generator.Element, S.Generator.Element) -> Bool
+  isOrderedBefore: (S.Generator.Element, S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
   var result = Array(source)
-  sort(&result, predicate)
+  sort(&result, isOrderedBefore)
   return result
 }
 
@@ -343,9 +352,11 @@ func _insertionSort<
   }
 }
 
-/// Partition a range into two partially sorted regions and return
-/// the index of the pivot:
-/// [start..idx), pivot ,[idx..end)
+/// Re-order the given `range` of `elements` and return a pivot index
+/// *p*.  Postcondition: for all *i* in `range.startIndex..<`\ *p*,
+/// and *j* in *p*\ `..<range.endIndex`, `elements[`\ *i*\ `] <
+/// elements[`\ *j*\ `] && elements[`\ *p*\ `] <= elements[`\ *j*\
+/// `]`.  Only returns `range.endIndex` when `elements` is empty.  .
 public func partition<
   C: MutableCollectionType where C.Generator.Element: Comparable
 , C.Index: RandomAccessIndexType
@@ -434,7 +445,7 @@ public func swap<T>(inout a : T, inout b : T) {
   Builtin.initialize(tmp, p2)
 }
 
-
+/// Return the lesser of `x` and `y`
 public func min<T : Comparable>(x: T, y: T) -> T {
   var r = x
   if y < x {
@@ -443,6 +454,7 @@ public func min<T : Comparable>(x: T, y: T) -> T {
   return r
 }
 
+/// Return the least argument passed
 public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   var r = x
   if y < x {
@@ -459,6 +471,7 @@ public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   return r
 }
 
+/// Return the greater of `x` and `y`
 public func max<T : Comparable>(x: T, y: T) -> T {
   var r = y
   if y < x {
@@ -467,6 +480,7 @@ public func max<T : Comparable>(x: T, y: T) -> T {
   return r
 }
 
+/// Return the greatest argument passed
 public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   var r = y
   if y < x {
@@ -483,26 +497,35 @@ public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
   return r
 }
 
-public func split<Seq: Sliceable, R:BooleanType>(
-  seq: Seq, 
-  isSeparator: (Seq.Generator.Element)->R, 
+/// Return the result of slicing `elements` into sub-sequences that
+/// don't contain elements satisfying the predicate `isSeparator`.
+///
+/// :param: maxSplit the maximum number of slices to return, minus 1.
+/// If `maxSplit + 1` slices would otherwise be returned, the
+/// algorithm stops splitting and returns a suffix of `elements`
+///
+/// :param: allowEmptySlices if true, an empty slice is produced in
+/// the result for each pair of consecutive 
+public func split<S: Sliceable, R:BooleanType>(
+  elements: S, 
+  isSeparator: (S.Generator.Element)->R, 
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false
-  ) -> [Seq.SubSlice] {
+  ) -> [S.SubSlice] {
 
-  var result = Array<Seq.SubSlice>()
+  var result = Array<S.SubSlice>()
 
   // FIXME: could be simplified pending <rdar://problem/15032945>
   // (ternary operator not resolving some/none)
-  var startIndex: Optional<Seq.Index>
-     = allowEmptySlices ? .Some(seq.startIndex) : .None
+  var startIndex: Optional<S.Index>
+     = allowEmptySlices ? .Some(elements.startIndex) : .None
   var splits = 0
 
-  for j in indices(seq) {
-    if isSeparator(seq[j]) {
+  for j in indices(elements) {
+    if isSeparator(elements[j]) {
       if startIndex != nil {
         var i = startIndex!
-        result.append(seq[i..<j])
+        result.append(elements[i..<j])
         startIndex = .Some(j.successor())
         if ++splits >= maxSplit {
           break
@@ -521,7 +544,7 @@ public func split<Seq: Sliceable, R:BooleanType>(
 
   switch startIndex {
   case .Some(var i):
-    result.append(seq[i..<seq.endIndex])
+    result.append(elements[i..<elements.endIndex])
   default:
     ()
   }
@@ -548,21 +571,23 @@ public func startsWith<
   return prefixGenerator.next() != nil ? false : true
 }
 
-/// Return true iff the the initial elements of `s` are equal to `prefix`,
-/// using `pred` as equality `==` comparison.
+/// Return true iff `s` begins with elements equivalent to those of
+/// `prefix`, using `isEquivalent` as the equivalence test.  Requires:
+/// `isEquivalent` is an `equivalence relation
+/// <http://en.wikipedia.org/wiki/Equivalence_relation>`__
 public func startsWith<
   S0: SequenceType, S1: SequenceType
   where
     S0.Generator.Element == S1.Generator.Element
 >(s: S0, prefix: S1,
-  predicate: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
+  isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
 {
   var prefixGenerator = prefix.generate()
 
   for e0 in s {
     var e1 = prefixGenerator.next()
     if e1 == nil { return true }
-    if !predicate(e0, e1!) {
+    if !isEquivalent(e0, e1!) {
       return false
     }
   }
@@ -625,14 +650,16 @@ public func equal<
   }
 }
 
-/// Return true iff `a1` and `a2` contain the same elements, using
-/// `pred` as equality `==` comparison.
+/// Return true iff `a1` and `a2` contain equivalent elements, using
+/// `isEquivalent` as the equivalence test.  Requires: `isEquivalent`
+/// is an `equivalence relation
+/// <http://en.wikipedia.org/wiki/Equivalence_relation>`__
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
     S1.Generator.Element == S2.Generator.Element
 >(a1: S1, a2: S2,
-  predicate: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
+  isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool) -> Bool
 {
   var g1 = a1.generate()
   var g2 = a2.generate()
@@ -640,7 +667,7 @@ public func equal<
     var e1 = g1.next()
     var e2 = g2.next()
     if (e1 != nil) && (e2 != nil) {
-      if !predicate(e1!, e2!) {
+      if !isEquivalent(e1!, e2!) {
         return false
       }
     }
