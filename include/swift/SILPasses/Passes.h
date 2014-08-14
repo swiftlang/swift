@@ -72,6 +72,7 @@ namespace swift {
   SILTransform *createPerfInliner();
   SILTransform *createEarlyInliner();
   SILTransform *createGenericSpecializer();
+  SILTransform *createClosureSpecializer();
   SILTransform *createARCOpts();
   SILTransform *createSimplifyCFG();
   SILTransform *createDevirtualization();

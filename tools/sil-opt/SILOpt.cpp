@@ -80,6 +80,7 @@ enum class PassKind {
   GlobalLoadStoreOpts,
   ArrayOpts,
   ABCOpts,
+  ClosureSpecialization
 };
 
 enum class OptGroup {
@@ -264,6 +265,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::ABCOpts,
                                    "abcopts",
                                    "Array bounds check opts."),
+                        clEnumValN(PassKind::ClosureSpecialization,
+                                   "closure-specialize",
+                                   "Closure specialization."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -463,6 +467,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::ABCOpts:
       PM.add(createABCOpt());
+      break;
+    case PassKind::ClosureSpecialization:
+      PM.add(createClosureSpecializer());
       break;
     }
   }

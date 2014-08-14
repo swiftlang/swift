@@ -43,4 +43,5 @@ add_swift_library(swiftSILPasses
   IVInfoPrinter.cpp
   ArrayOpt.cpp
   ArrayBoundsCheckOpts.cpp
+  ClosureSpecializer.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
