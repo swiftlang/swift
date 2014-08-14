@@ -375,8 +375,6 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 };
 
-#include "llvm/Support/raw_ostream.h"
-
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
