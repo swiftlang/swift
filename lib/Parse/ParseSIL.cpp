@@ -885,16 +885,21 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
     assert(FullName.size() > 1 &&
            "A single module is not a full path to SILDeclRef");
     auto Mod = Res.get<Module*>();
+    values.clear();
     VD = lookupMember(P, ModuleType::get(Mod), FullName[1], Locs[1], values,
                       FullName.size() == 2/*ExpectMultipleResults*/);
-    for (unsigned I = 2, E = FullName.size(); I < E; I++)
+    for (unsigned I = 2, E = FullName.size(); I < E; I++) {
+      values.clear();
       VD = lookupMember(P, VD->getType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
+    }
   } else {
     VD = Res.get<ValueDecl*>();
-    for (unsigned I = 1, E = FullName.size(); I < E; I++)
+    for (unsigned I = 1, E = FullName.size(); I < E; I++) {
+      values.clear();
       VD = lookupMember(P, VD->getType(), FullName[I], Locs[I], values,
                         I == FullName.size() - 1/*ExpectMultipleResults*/);
+    }
   }
   Decl = VD;
   return false;
@@ -1014,16 +1019,6 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       break;
 
   } while (P.consumeIf(tok::period));
-
-  if (Kind == SILDeclRef::Kind::EnumElement) {
-    // Sometimes lookupMember on Enum will return the Enum itself. We pick the
-    // correct one out of the look up results.
-    for (unsigned I = 0, E = values.size(); I < E; I++)
-      if (isa<EnumElementDecl>(values[I])) {
-        VD = values[I];
-        break;
-      }
-  }
 
   // Construct SILDeclRef.
   Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
