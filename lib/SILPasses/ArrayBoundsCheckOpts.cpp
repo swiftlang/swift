@@ -32,6 +32,7 @@
 #include "swift/SIL/SILInstruction.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -56,7 +57,10 @@ static llvm::cl::opt<bool> EnableABCHoisting("enable-abc-hoisting",
 
 
 using ArraySet = llvm::SmallPtrSet<SILValue, 16>;
-using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ValueBase *>>;
+// A pair of the array pointer and the array check kind (kCheckIndex or
+// kCheckSubscript).
+using ArrayAccessDesc = llvm::PointerIntPair<ValueBase *, 1, bool>;
+using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ArrayAccessDesc>>;
 using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 16>;
 using ValueBaseList = llvm::SmallVector<ValueBase *, 4>;
 
@@ -399,18 +403,15 @@ eraseArrayBoundsCheckAndMatchingRetain(SILInstruction *BoundsCheck) {
 
 // Get the pair of array and index. Because we want to disambiguate between the
 // two types of check bounds checks merge in the type into the lower bit of one
-// of the addresses.
-static std::pair<ValueBase *, ValueBase *>
+// of the addresse index.
+static std::pair<ValueBase *, ArrayAccessDesc>
 getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
   assert((K == ArrayCallKind::kCheckIndex ||
           K == ArrayCallKind::kCheckSubscript) &&
          "Must be a bounds check call");
-  assert(((uintptr_t)Array.getDef() & 0x1) != 1 &&
-         "Pointers need to be aligned for this to work");
   return std::make_pair(
-      reinterpret_cast<ValueBase *>(((uintptr_t)Array.getDef()) |
-                                    (K == ArrayCallKind::kCheckIndex)),
-      ArrayIndex.getDef());
+      Array.getDef(),
+      ArrayAccessDesc(ArrayIndex.getDef(), K == ArrayCallKind::kCheckIndex));
 }
 
 /// Remove redundant checks in a basic block. This pass will reset the state
@@ -490,7 +491,7 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
 
   // When we come back from the dominator tree recursion we need to remove
   // checks that we have seen for the first time.
-  SmallVector<std::pair<ValueBase *, ValueBase *>, 8> SafeChecksToPop;
+  SmallVector<std::pair<ValueBase *, ArrayAccessDesc>, 8> SafeChecksToPop;
 
   // Process all instructions in the current block.
   for (auto Iter = BB->begin(); Iter != BB->end();) {
@@ -543,7 +544,7 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
-                [&](std::pair<ValueBase *, ValueBase *> &V) {
+                [&](std::pair<ValueBase *, ArrayAccessDesc> &V) {
     DominatingSafeChecks.erase(V);
   });
 
