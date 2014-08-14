@@ -1263,3 +1263,38 @@ bb3:
   %2 = tuple()
   return %2 : $()
 }
+
+
+/// Make sure we strip off casts when inserting new retains, releases. Otherwise
+/// we run into dominance problems if the bitcast is in a branch.
+// CHECK-LABEL: sil @switch_merge_with_bit_cast_in_branches : $@thin (@owned S) -> () {
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK: bb3:
+// CHECK: retain_value
+// CHECK: release_value
+sil @switch_merge_with_bit_cast_in_branches : $@thin (@owned S) -> () {
+bb0(%0 : $S):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  %2 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
+  strong_retain %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %3 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
+  %4 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %4(%3) : $@thin (Builtin.NativeObject) -> ()
+  apply %4(%3) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %3 : $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
