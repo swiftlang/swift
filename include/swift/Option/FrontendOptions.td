@@ -182,6 +182,9 @@ def sil_opt_pass_count : Separate<["-"], "sil-opt-pass-count">,
   
 def sil_print_all : Flag<["-"], "sil-print-all">,
   HelpText<"Print SIL after each transform">;
+
+def sil_print_pass_name : Flag<["-"], "sil-print-pass-name">,
+  HelpText<"Print SIL pass name before each transform">;
   
 def sil_time_transforms : Flag<["-"], "sil-time-transforms">,
   HelpText<"Time each SIL transform invocation">;

@@ -57,6 +57,9 @@ public:
   /// Dump SIL after each transform.
   bool PrintAll = false;
   
+  /// Dump pass number and name before each transform.
+  bool PrintPassName = false;
+
   /// Time each transform invocation in the pass manager.
   bool TimeTransforms = false;
   

@@ -40,6 +40,11 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       CompleteFuncs->resetChanged();
       SFT->injectPassManager(this);
       SFT->injectFunction(&F);
+
+      if (Options.PrintPassName)
+        llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SFT->getName()
+                     << ", Function: " << F.getName() << "\n";
+
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
 
@@ -100,6 +105,10 @@ void SILPassManager::runOneIteration() {
       CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
+
+      if (Options.PrintPassName)
+        llvm::dbgs() << "#" << NumPassesRun << " Pass: " << SMT->getName()
+                     << " (module pass)\n";
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();

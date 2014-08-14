@@ -825,6 +825,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll |= Args.hasArg(OPT_sil_print_all);
+  Opts.PrintPassName |= Args.hasArg(OPT_sil_print_pass_name);
   Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
