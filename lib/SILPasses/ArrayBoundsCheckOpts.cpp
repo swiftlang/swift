@@ -800,6 +800,14 @@ struct InductionInfo {
 class InductionAnalysis {
   using InductionInfoMap = llvm::DenseMap<SILArgument *, InductionInfo *>;
 
+  DominanceInfo *DT;
+  SILBasicBlock *Preheader;
+  SILBasicBlock *Header;
+  SILBasicBlock *ExitingBlk;
+  IVInfo &IVs;
+  InductionInfoMap Map;
+  llvm::SpecificBumpPtrAllocator<InductionInfo> Allocator;
+
 public:
   InductionAnalysis(DominanceInfo *D, IVInfo &IVs, SILBasicBlock *Preheader,
                     SILBasicBlock *Header, SILBasicBlock *ExitingBlk)
@@ -922,14 +930,6 @@ private:
     return new (Allocator.Allocate()) InductionInfo(
         Arg, FoundInc, Start, End, BuiltinValueKind::ICMP_EQ, IsRangeChecked);
   }
-
-  DominanceInfo *DT;
-  SILBasicBlock *Preheader;
-  SILBasicBlock *Header;
-  SILBasicBlock *ExitingBlk;
-  IVInfo &IVs;
-  InductionInfoMap Map;
-  llvm::SpecificBumpPtrAllocator<InductionInfo> Allocator;
 };
 
 /// Hoist the bounds check \p CheckToHoist to the preheader updating the index
