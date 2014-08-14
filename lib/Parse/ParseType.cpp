@@ -739,7 +739,7 @@ ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
 /// are looking at the exclamation mark.
 ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
-  assert(Tok.is(tok::exclaim_postfix));
+  assert(Tok.is(tok::exclaim_postfix) || Tok.is(tok::sil_exclamation));
   SourceLoc exclamationLoc = consumeToken();
   return makeParserResult(
            new (Context) ImplicitlyUnwrappedOptionalTypeRepr(

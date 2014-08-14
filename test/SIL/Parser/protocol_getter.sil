@@ -5,6 +5,7 @@ import Swift
 
 protocol TestP : class {
   var count: Int {get}
+  func test() -> String!
 }
 
 // CHECK-LABEL: sil @test
@@ -15,4 +16,17 @@ bb0(%0 : $TestP):
 
   %3 = tuple ()
   return %3 : $()
+}
+
+// Make sure we can parse "!" as ImplicitlyUnwrappedOptional.
+// CHECK-LABEL: sil @top
+sil @top : $@thin (@owned TestP) -> @owned ImplicitlyUnwrappedOptional<String> {
+bb0(%0 : $TestP):
+  strong_retain %0 : $TestP
+  %3 = project_existential_ref %0 : $TestP to $@sil_self TestP
+  // CHECK: protocol_method %{{[0-9]+}} : $TestP, #TestP.test!1 : <`Self` : TestP> Self -> () -> String!,
+  %4 = protocol_method %0 : $TestP, #TestP.test!1 : <`Self` : TestP> Self -> () -> String!, $@cc(witness_method) @callee_owned (@owned @sil_self TestP) -> @owned ImplicitlyUnwrappedOptional<String>
+  %5 = apply %4(%3) : $@cc(witness_method) @callee_owned (@owned @sil_self TestP) -> @owned ImplicitlyUnwrappedOptional<String>
+  strong_release %0 : $TestP
+  return %5 : $ImplicitlyUnwrappedOptional<String>
 }
