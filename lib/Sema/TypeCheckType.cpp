@@ -1272,7 +1272,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (attrs.hasOwnership()) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
-        if ((attrs.has(TAK_sil_weak) && ty->getAnyOptionalObjectType()) ||
+        if (((attrs.has(TAK_sil_weak) || attrs.has(TAK_sil_unmanaged)) &&
+             ty->getAnyOptionalObjectType()) ||
             (!attrs.has(TAK_sil_weak) && ty->hasReferenceSemantics())) {
           ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
           attrs.clearOwnership();
