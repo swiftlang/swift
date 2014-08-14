@@ -760,6 +760,9 @@ public func contains<
   return contains(seq, { $0 == x })
 }
 
+/// Return the result of repeatedly calling `combine` with an
+/// accumulated value initialized to `initial` and each element of
+/// `sequence`, in turn.
 public func reduce<S: SequenceType, U>(
   sequence: S, initial: U, combine: (U, S.Generator.Element)->U
 ) -> U {
