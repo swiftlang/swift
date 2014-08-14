@@ -452,7 +452,7 @@ extension String : CollectionType {
 
   @availability(*, unavailable, message="cannot subscript String with an Int")
   public subscript(i: Int) -> Character {
-    return " "
+    fatalError("String.subscript(_:) can not be called")
   }
 
   public func generate() -> IndexingGenerator<String> {
