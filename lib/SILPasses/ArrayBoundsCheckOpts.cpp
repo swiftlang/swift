@@ -822,13 +822,14 @@ public:
     bool FoundIndVar = false;
     for (auto *Arg : Header->getBBArgs()) {
       // Look for induction variables.
-      if (!IVs.isInductionVariable(Arg)) {
+      IVInfo::IVDesc IV;
+      if (!(IV = IVs.getInductionDesc(Arg))) {
         DEBUG(llvm::dbgs() << " not a induction variable: " << *Arg);
         continue;
       }
 
       InductionInfo *Info;
-      if (!(Info = analyseIndVar(Arg))) {
+      if (!(Info = analyseIndVar(Arg, IV.Inc, IV.IncVal))) {
         DEBUG(llvm::dbgs() << " could not analyse the induction on: " << *Arg);
         continue;
       }
@@ -850,42 +851,16 @@ public:
 private:
 
   /// Analyse one potential induction variable starting at Arg.
-  InductionInfo *analyseIndVar(SILArgument *Arg) {
+  InductionInfo *analyseIndVar(SILArgument *HeaderVal, ApplyInst *Inc,
+                               IntegerLiteralInst *IncVal) {
+    if (IncVal->getValue() != 1)
+      return nullptr;
+
     // Find the start value.
     auto *PreheaderTerm = dyn_cast<BranchInst>(Preheader->getTerminator());
     if (!PreheaderTerm)
       return nullptr;
-    auto Start = PreheaderTerm->getArg(Header->getBBArgIndex(Arg));
-
-    // Find the increment.
-    ApplyInst *FoundInc = nullptr;
-    for (auto *Op : Arg->getUses()) {
-      auto *AI = dyn_cast<ApplyInst>(Op->getUser());
-      if (!AI)
-        continue;
-
-      SILValue L, R;
-      // Find an overflow checked +1 increment.
-      if (match(AI, m_ApplyInst(BuiltinValueKind::SAddOver, m_SILValue(L),
-                                m_SILValue(R))) &&
-          IVs.isInductionVariable(AI)) {
-        assert(!FoundInc && "Already found induction increment");
-        // Get the integer constant.
-        auto IncValue = L.getDef() == Arg
-                            ? cast<IntegerLiteralInst>(R.getDef())
-                            : cast<IntegerLiteralInst>(L.getDef());
-        if (IncValue->getValue() != 1)
-          continue;
-        DEBUG(llvm::dbgs() << " found increment " << *AI);
-        FoundInc = AI;
-        break;
-      }
-    }
-
-    if (!FoundInc) {
-      DEBUG(llvm::dbgs() << " increment not found\n");
-      return nullptr;
-    }
+    auto Start = PreheaderTerm->getArg(Header->getBBArgIndex(HeaderVal));
 
     // Find the exit condition.
     auto CondBr = dyn_cast<CondBranchInst>(ExitingBlk->getTerminator());
@@ -902,11 +877,11 @@ private:
     // Look for a compare of induction variable + 1.
     // TODO: obviously we need to handle many more patterns.
     if (!match(Cond, m_ApplyInst(BuiltinValueKind::ICMP_EQ,
-                                 m_TupleExtractInst(m_Specific(FoundInc), 0),
+                                 m_TupleExtractInst(m_Specific(Inc), 0),
                                  m_SILValue(End))) &&
         !match(Cond,
                m_ApplyInst(BuiltinValueKind::ICMP_EQ, m_SILValue(End),
-                           m_TupleExtractInst(m_Specific(FoundInc), 0)))) {
+                           m_TupleExtractInst(m_Specific(Inc), 0)))) {
       DEBUG(llvm::dbgs() << " found no exit condition\n");
       return nullptr;
     }
@@ -915,13 +890,13 @@ private:
     if (!dominates(DT, End, Header))
       return nullptr;
 
-    DEBUG(llvm::dbgs() << " found an induction variable (ICMP_EQ): " << *Arg
-                       << "  start: " << *Start.getDef()
+    DEBUG(llvm::dbgs() << " found an induction variable (ICMP_EQ): "
+                       << *HeaderVal << "  start: " << *Start.getDef()
                        << "  end: " << *End.getDef());
 
     // Check whether the addition is overflow checked by a cond_fail or whether
     // code in the preheader's predecessor ensures that we won't overflow.
-    bool CondFailOnOverflow = isOverflowChecked(FoundInc);
+    bool CondFailOnOverflow = isOverflowChecked(Inc);
     bool IsRangeChecked =
         CondFailOnOverflow ? false : isRangeChecked(Start, End, Preheader, DT);
 
@@ -929,7 +904,7 @@ private:
       return nullptr;
 
     return new (Allocator.Allocate()) InductionInfo(
-        Arg, FoundInc, Start, End, BuiltinValueKind::ICMP_EQ, IsRangeChecked);
+        HeaderVal, Inc, Start, End, BuiltinValueKind::ICMP_EQ, IsRangeChecked);
   }
 };
 

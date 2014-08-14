@@ -29,6 +29,21 @@ public:
   friend class SCCVisitor;
 
 public:
+
+  /// A descriptor for an induction variable comprised of an header argument
+  /// (phi node) and an increment by an integer literal.
+  class IVDesc {
+  public:
+    ApplyInst *Inc;
+    IntegerLiteralInst *IncVal;
+
+    IVDesc() : Inc(nullptr), IncVal(nullptr) {}
+    IVDesc(ApplyInst *AI, IntegerLiteralInst *I) : Inc(AI), IncVal(I) {}
+
+    operator bool() { return Inc != nullptr && IncVal != nullptr; }
+    static IVDesc invalidIV() { return IVDesc(); }
+  };
+
   IVInfo(SILFunction &F) : SCCVisitor(F) {
     run();
   }
@@ -45,11 +60,22 @@ public:
     return InductionVariableMap.find(IV)->second;
   }
 
+  IVDesc getInductionDesc(SILArgument *Arg) {
+    llvm::DenseMap<const ValueBase *, IVDesc>::iterator CI =
+        InductionInfoMap.find(Arg);
+    if (CI == InductionInfoMap.end())
+      return IVDesc::invalidIV();
+    return CI->second;
+  }
+
 private:
   // Map from an element of an induction sequence to the header.
   llvm::DenseMap<const ValueBase *, SILArgument *> InductionVariableMap;
 
-  bool isInductionSequence(SCCType &SCC, unsigned &ArgIndex);
+  // Map from an induction variable header to the induction descriptor.
+  llvm::DenseMap<const ValueBase *, IVDesc> InductionInfoMap;
+
+  SILArgument *isInductionSequence(SCCType &SCC);
   void visit(SCCType &SCC);
 };
 
