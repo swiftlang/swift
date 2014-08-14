@@ -1181,7 +1181,7 @@ bool SimplifyCFG::run() {
     RU.run();
 
     // Force dominator recomputation below.
-    PM->invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+    PM->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::CFG);
     Changed = true;
   }
 
