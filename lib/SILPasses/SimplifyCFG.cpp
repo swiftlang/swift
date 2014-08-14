@@ -251,13 +251,30 @@ static bool trySimplifySwitchEnumWithKnownElement(TermInst *Term,
   // Now we need to work out which switch case would be taken, based on whether
   // the enum is of the given tag or not.
   bool BranchTaken = getBranchTaken(PredCondBr, DomBB);
-  // TODO: Handle the case where we jump to the switch if we don't match the
-  // tag.  This may not always be possible to completely eliminate the switch.
-  if (!BranchTaken)
-    return false;
-
-  simplifySwitchEnumInst(SEI, EITI->getElement(), DomBB);
-  return true;
+  if (BranchTaken) {
+    // The switch is taken when the cond_br is true, ie, we know we matched
+    // a tag.
+    simplifySwitchEnumInst(SEI, EITI->getElement(), DomBB);
+    return true;
+  }
+  // We jump to the switch when we don't pass enum_is_tag.  It may be possible
+  // to work out which specific case this means for the switch.
+  if (SEI->getNumCases() == 2 && !SEI->hasDefault()) {
+    // For now, just handle the case where the enum has only 2 tags.  That way
+    // as we didn't match one of them, we must have matched the other one.
+    const auto &Case0 = SEI->getCase(0);
+    const auto &Case1 = SEI->getCase(1);
+    auto *OtherElt = Case0.first == EITI->getElement() ? Case1.first :
+                                                         Case0.first;
+    // This code assumes that the switch covers all cases.  If that was ever to
+    // change, then this assert will fire.
+    assert((OtherElt == Case0.first || OtherElt == Case1.first) &&
+           "Switches aren't covered");
+    simplifySwitchEnumInst(SEI, OtherElt, DomBB);
+    return true;
+  }
+  // TODO: Other cases.
+  return false;
 }
 
 bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
