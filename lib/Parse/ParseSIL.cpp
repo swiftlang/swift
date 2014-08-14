@@ -2520,22 +2520,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::GlobalAddrInst: {
     Identifier GlobalName;
+    SourceLoc GLoc;
     SILType Ty;
     if (P.parseToken(tok::pound, diag::expected_sil_constant) ||
-        parseSILIdentifier(GlobalName, diag::expected_sil_constant) ||
+        parseSILIdentifier(GlobalName, GLoc, diag::expected_sil_constant) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
       return true;
     // Find VarDecl for GlobalName.
-    ValueDecl *VD;
-    SmallVector<ValueDecl*, 4> CurModuleResults;
-    // Perform a module level lookup on the first component of the
-    // fully-qualified name.
-    P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), GlobalName,
-                                        NLKind::UnqualifiedLookup,
-                                        CurModuleResults);
-    assert(CurModuleResults.size() == 1);
-    VD = CurModuleResults[0];
+    llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, GlobalName);
+    assert(Res.is<ValueDecl*>() && "Global look-up should return a Decl");
+    ValueDecl *VD = Res.get<ValueDecl*>();
+
+    if (!isa<VarDecl>(VD))
+      P.diagnose(GLoc, diag::sil_global_variable_not_found, GlobalName);
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
     break;
   }
