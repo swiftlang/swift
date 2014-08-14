@@ -315,6 +315,18 @@ public struct ${Self}<T>
 %  end
   }
 
+  @transparent
+  public func uncheckedSubscriptGet (i : Int) -> T {
+      return (self &+ i).memory
+    }
+%  if mutable:
+  @transparent
+  public func uncheckedSubscriptSet (i : Int, newValue: T) {
+    (self &+ i).memory = newValue
+  }
+%  end
+
+
 % if mutable:
   /// If self was converted from nil, writes the result of invoking body into 
   /// the pointee
@@ -414,6 +426,12 @@ func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return ${Self}(
     Builtin.gep_Word(lhs.value, (rhs * strideof(T.self)).value))
+}
+
+@transparent public
+func &+ <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+  return ${Self}(
+    Builtin.gep_Word(lhs.value, (rhs &* strideof(T.self)).value))
 }
 
 @transparent public
