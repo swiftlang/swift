@@ -26,7 +26,7 @@ func testInternalInternal() {
   obj.bar()
 }
 
-//PRIMARY-FILE-LABEL: sil @
+//PRIMARY-FILE-LABEL: sil @_TF13devirt_access19testInternalPrivateFT_T_
 //PRIMARY-FILE: function_ref @_TF13devirt_access16getInternalClassFT_CS_13InternalClass 
 //PRIMARY-FILE: function_ref @_TF13devirt_access9invokeFooFCS_13InternalClassT_ 
 //PRIMARY-FILE: return
