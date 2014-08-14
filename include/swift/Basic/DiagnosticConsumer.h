@@ -28,7 +28,8 @@
 
 namespace swift {
   class SourceManager;
-  
+  enum class DiagID : uint32_t;
+
 /// \brief Describes the kind of diagnostic.
 ///
 enum class DiagnosticKind {
@@ -40,6 +41,8 @@ enum class DiagnosticKind {
 /// \brief Extra information carried along with a diagnostic, which may or
 /// may not be of interest to a given diagnostic consumer.
 struct DiagnosticInfo {
+  DiagID ID = DiagID(0);
+
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
     CharSourceRange Range;

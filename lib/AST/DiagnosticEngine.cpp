@@ -512,6 +512,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
 
   // Pass the diagnostic off to the consumer.
   DiagnosticInfo Info;
+  Info.ID = ActiveDiagnostic->getID();
   Info.Ranges = ActiveDiagnostic->getRanges();
   Info.FixIts = ActiveDiagnostic->getFixIts();
   for (auto &Consumer : Consumers)
