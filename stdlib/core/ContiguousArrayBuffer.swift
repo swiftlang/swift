@@ -227,26 +227,20 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public subscript(i: Int) -> T {
     get {
       _sanityCheck(_isValidSubscript(i), "Array index out of range")
-      // If the index is in bounds, we can assume we have storage. We can also
-      // assume that if the index is within bounds that the size in bytes has
-      // been overflow checked during allocation - therefore, we can use
-      // unchecked subscripting (subscripting normally would involve an overflow
-      // check when we multiply by the size of the type)
-      return _unsafeElementStorage.uncheckedSubscriptGet(i)
+      // If the index is in bounds, we can assume we have storage.
+      return _unsafeElementStorage[i]
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
-      // If the index is in bounds, we can assume we have storage. We can also
-      // assume that if the index is within bounds that the size in bytes has
-      // been overflow checked during allocation.
+      // If the index is in bounds, we can assume we have storage.
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
       // <rdar://problem/16831852> check retain/release order
       // _unsafeElementStorage[i] = newValue
       var nv = newValue
       let tmp = nv
-      nv = _unsafeElementStorage.uncheckedSubscriptGet(i)
-      _unsafeElementStorage.uncheckedSubscriptSet(i, newValue: tmp)
+      nv = _unsafeElementStorage[i]
+      _unsafeElementStorage[i] = tmp
     }
   }
 
