@@ -150,11 +150,11 @@ public func |= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
 }
 
 public func &= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
-  lhs = lhs | rhs
+  lhs = lhs & rhs
 }
 
 public func ^= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
-  lhs = lhs | rhs
+  lhs = lhs ^ rhs
 }
 
 public protocol Hashable : Equatable {
