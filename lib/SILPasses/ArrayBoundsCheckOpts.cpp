@@ -965,6 +965,9 @@ public:
 
   static AccessFunction getLinearFunction(SILValue Idx,
                                           InductionAnalysis &IndVars) {
+    // Match the actual induction variable burried in the integer struct.
+    // %2 = struct $Int(%1 : $Builtin.Word)
+    //    = apply %check_bounds(%array, %2) : $@thin (Int, ArrayInt) -> ()
     auto ArrayIndexStruct = dyn_cast<StructInst>(Idx);
     if (!ArrayIndexStruct)
       return nullptr;
