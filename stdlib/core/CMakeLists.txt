@@ -60,7 +60,6 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   NSSwiftArray.swift
-  Nil.swift
   Optional.swift
   OutputStream.swift
   Pointer.swift
