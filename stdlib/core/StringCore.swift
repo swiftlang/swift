@@ -238,9 +238,13 @@ public struct _StringCore {
   
   /// Return the given sub-_StringCore
   public subscript(subRange: Range<Int>) -> _StringCore {
-    
-    _sanityCheck(subRange.startIndex >= 0)
-    _sanityCheck(subRange.endIndex <= count)
+    _precondition(
+      subRange.startIndex >= 0,
+      "subscript: subRange start precedes String start")
+
+    _precondition(
+      subRange.endIndex <= count,
+      "subscript: subRange extends past String end")
 
     let newCount = subRange.endIndex - subRange.startIndex
     _sanityCheck(UWord(newCount) & _flagMask == 0)
@@ -266,8 +270,13 @@ public struct _StringCore {
 
   /// Get the Nth UTF-16 Code Unit stored
   public subscript(position: Int) -> UTF16.CodeUnit {
-    _sanityCheck(position >= 0)
-    _sanityCheck(position <= count)
+    _precondition(
+      position >= 0,
+      "subscript: index precedes String start")
+
+    _precondition(
+      position <= count,
+      "subscript: index points past String end")
 
     if _fastPath(_baseAddress != .null()) {
       return _nthContiguous(position)

@@ -86,7 +86,7 @@ StringTests.test("indexComparability") {
   expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
 }
 
-StringTests.test("IndexPortability/Valid") {
+StringTests.test("ForeignIndexes/Valid") {
   if true {
     let donor = "abcdef"
     let acceptor = "uvwxyz"
@@ -106,7 +106,7 @@ StringTests.test("IndexPortability/Valid") {
   }
 }
 
-StringTests.test("IndexPortability/UnexpectedCrash")
+StringTests.test("ForeignIndexes/UnexpectedCrash")
   .xfail(
     .Custom({ true },
     reason: "<rdar://problem/18029290> String.Index caches the grapheme " +
@@ -119,7 +119,7 @@ StringTests.test("IndexPortability/UnexpectedCrash")
   expectEqual("a", acceptor[donor.startIndex])
 }
 
-StringTests.test("IndexPortability/OutOfBoundsTrap") {
+StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
   let donor = "abcdef"
   let acceptor = "uvw"
 
@@ -129,6 +129,96 @@ StringTests.test("IndexPortability/OutOfBoundsTrap") {
 
   expectCrashLater()
   acceptor[advance(donor.startIndex, 3)]
+}
+
+StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex..<advance(donor.startIndex, 3)])
+
+  expectCrashLater()
+  acceptor[donor.startIndex..<advance(donor.startIndex, 4)]
+}
+
+StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex..<advance(donor.startIndex, 3)])
+
+  expectCrashLater()
+  acceptor[advance(donor.startIndex, 4)..<advance(donor.startIndex, 5)]
+}
+
+StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/1") {
+  let donor = "abcdef"
+  var acceptor = "uvw"
+
+  acceptor.replaceRange(
+    donor.startIndex..<donor.startIndex.successor(), with: "u")
+  expectEqual("uvw", acceptor)
+
+  expectCrashLater()
+  acceptor.replaceRange(
+    donor.startIndex..<advance(donor.startIndex, 4), with: "")
+}
+
+StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/2") {
+  let donor = "abcdef"
+  var acceptor = "uvw"
+
+  acceptor.replaceRange(
+    donor.startIndex..<donor.startIndex.successor(), with: "u")
+  expectEqual("uvw", acceptor)
+
+  expectCrashLater()
+  acceptor.replaceRange(
+    advance(donor.startIndex, 4)..<advance(donor.startIndex, 5), with: "")
+}
+
+StringTests.test("ForeignIndexes/removeAtIndex/OutOfBoundsTrap") {
+  if true {
+    let donor = "abcdef"
+    var acceptor = "uvw"
+
+    let removed = acceptor.removeAtIndex(donor.startIndex)
+    expectEqual("u", removed)
+    expectEqual("vw", acceptor)
+  }
+
+  let donor = "abcdef"
+  var acceptor = "uvw"
+
+  expectCrashLater()
+  acceptor.removeAtIndex(advance(donor.startIndex, 4))
+}
+
+StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/1") {
+  if true {
+    let donor = "abcdef"
+    var acceptor = "uvw"
+
+    acceptor.removeRange(
+      donor.startIndex..<donor.startIndex.successor())
+    expectEqual("vw", acceptor)
+  }
+
+  let donor = "abcdef"
+  var acceptor = "uvw"
+
+  expectCrashLater()
+  acceptor.removeRange(
+    donor.startIndex..<advance(donor.startIndex, 4))
+}
+
+StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/2") {
+  let donor = "abcdef"
+  var acceptor = "uvw"
+
+  expectCrashLater()
+  acceptor.removeRange(
+    advance(donor.startIndex, 4)..<advance(donor.startIndex, 5))
 }
 
 StringTests.test("_splitFirst") {
