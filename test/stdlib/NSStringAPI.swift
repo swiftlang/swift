@@ -89,7 +89,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   if true {
     var err: NSError?
-    var content = String.stringWithContentsOfFile(existingPath,
+    let content = String.stringWithContentsOfFile(existingPath,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectEmpty(err)
@@ -99,7 +99,7 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
   }
   if true {
     var err: NSError?
-    var content = String.stringWithContentsOfFile(nonExistentPath,
+    let content = String.stringWithContentsOfFile(nonExistentPath,
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectNotEmpty(err)
@@ -1521,11 +1521,38 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
 }
 
 NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
-  // FIXME
+  let (_, nonExistentPath) = createNSStringTemporaryFile()
+  if true {
+    let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit"
+    var err: NSError?
+    let result = s.writeToFile(
+      nonExistentPath, atomically: false, encoding: NSASCIIStringEncoding,
+      error: &err)
+    expectEmpty(err)
+    expectTrue(result)
+
+    expectOptionalEqual(
+      s, String.stringWithContentsOfFile(
+        nonExistentPath, encoding: NSASCIIStringEncoding))
+  }
 }
 
 NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
-  // FIXME
+  let (_, nonExistentPath) = createNSStringTemporaryFile()
+  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
+  if true {
+    let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit"
+    var err: NSError?
+    let result = s.writeToURL(
+      nonExistentURL, atomically: false, encoding: NSASCIIStringEncoding,
+      error: &err)
+    expectEmpty(err)
+    expectTrue(result)
+
+    expectOptionalEqual(
+      s, String.stringWithContentsOfFile(
+        nonExistentPath, encoding: NSASCIIStringEncoding))
+  }
 }
 
 struct ComparisonTest {
