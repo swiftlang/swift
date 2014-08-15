@@ -1214,15 +1214,164 @@ NSStringAPIs.test("stringByRemovingPercentEncoding") {
 }
 
 NSStringAPIs.test("stringByReplacingCharactersInRange(_:withString:)") {
-  // FIXME
+  if true {
+    let empty = ""
+    expectEqual("", empty.stringByReplacingCharactersInRange(
+      empty.startIndex..<empty.startIndex, withString: ""))
+  }
+
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+
+  expectEqual(s, s.stringByReplacingCharactersInRange(
+    s.startIndex..<s.startIndex, withString: ""))
+  expectEqual(s, s.stringByReplacingCharactersInRange(
+    s.endIndex..<s.endIndex, withString: ""))
+  expectEqual("zzz" + s, s.stringByReplacingCharactersInRange(
+    s.startIndex..<s.startIndex, withString: "zzz"))
+  expectEqual(s + "zzz", s.stringByReplacingCharactersInRange(
+    s.endIndex..<s.endIndex, withString: "zzz"))
+
+  expectEqual(
+    "す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      s.startIndex..<advance(s.startIndex, 7), withString: ""))
+  expectEqual(
+    "zzzす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      s.startIndex..<advance(s.startIndex, 7), withString: "zzz"))
+  expectEqual(
+    "\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      s.startIndex..<advance(s.startIndex, 7), withString: "\u{1F602}"))
+
+  expectEqual("\u{1F601}", s.stringByReplacingCharactersInRange(
+    s.startIndex.successor()..<s.endIndex, withString: ""))
+  expectEqual("\u{1F601}zzz", s.stringByReplacingCharactersInRange(
+    s.startIndex.successor()..<s.endIndex, withString: "zzz"))
+  expectEqual("\u{1F601}\u{1F602}", s.stringByReplacingCharactersInRange(
+    s.startIndex.successor()..<s.endIndex, withString: "\u{1F602}"))
+
+  expectEqual(
+    "\u{1F601}aす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      advance(s.startIndex, 2)..<advance(s.startIndex, 7), withString: ""))
+  expectEqual(
+    "\u{1F601}azzzす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      advance(s.startIndex, 2)..<advance(s.startIndex, 7), withString: "zzz"))
+  expectEqual(
+    "\u{1F601}a\u{1F602}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingCharactersInRange(
+      advance(s.startIndex, 2)..<advance(s.startIndex, 7),
+      withString: "\u{1F602}"))
 }
 
 NSStringAPIs.test("stringByReplacingOccurrencesOfString(_:withString:options:range:)") {
-  // FIXME
+  if true {
+    let empty = ""
+    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+      "", withString: ""))
+    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+      "", withString: "xyz"))
+    expectEqual("", empty.stringByReplacingOccurrencesOfString(
+      "abc", withString: "xyz"))
+  }
+
+  let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
+
+  expectEqual(s, s.stringByReplacingOccurrencesOfString("", withString: "xyz"))
+  expectEqual(s, s.stringByReplacingOccurrencesOfString("xyz", withString: ""))
+
+  expectEqual("", s.stringByReplacingOccurrencesOfString(s, withString: ""))
+
+  expectEqual(
+    "\u{1F601}xyzbc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString("a", withString: "xyz"))
+
+  expectEqual(
+    "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "\u{1F601}", withString: "\u{1F602}\u{1F603}"))
+
+  expectEqual(
+    "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "し\u{3099}", withString: "xyz"))
+
+  expectEqual(
+    "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "し\u{3099}", withString: "xyz"))
+
+  expectEqual(
+    "\u{1F601}abc さ\u{3099}xyzす\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "\u{3058}", withString: "xyz"))
+
+  //
+  // Use non-default 'options:'
+  //
+
+  expectEqual(
+    "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "\u{1F601}", withString: "\u{1F602}\u{1F603}",
+      options: NSStringCompareOptions.LiteralSearch))
+
+  expectEqual(s, s.stringByReplacingOccurrencesOfString(
+    "\u{3058}", withString: "xyz",
+    options: NSStringCompareOptions.LiteralSearch))
+
+  //
+  // Use non-default 'range:'
+  //
+
+  expectEqual(
+    "\u{1F602}\u{1F603}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}",
+    s.stringByReplacingOccurrencesOfString(
+      "\u{1F601}", withString: "\u{1F602}\u{1F603}",
+      options: NSStringCompareOptions.LiteralSearch,
+      range: s.startIndex..<advance(s.startIndex, 1)))
+
+  expectEqual(s, s.stringByReplacingOccurrencesOfString(
+      "\u{1F601}", withString: "\u{1F602}\u{1F603}",
+      options: NSStringCompareOptions.LiteralSearch,
+      range: advance(s.startIndex, 1)..<advance(s.startIndex, 3)))
 }
 
 NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)") {
-  // FIXME
+  expectOptionalEqual(
+    "abcd абвг",
+    "abcd абвг".stringByReplacingPercentEscapesUsingEncoding(
+      NSASCIIStringEncoding))
+
+  expectOptionalEqual(
+    "abcd абвг\u{0000}\u{0001}",
+    "abcd абвг%00%01".stringByReplacingPercentEscapesUsingEncoding(
+      NSASCIIStringEncoding))
+
+  expectOptionalEqual(
+    "abcd абвг",
+    "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3"
+      .stringByReplacingPercentEscapesUsingEncoding(NSUTF8StringEncoding))
+
+  expectEmpty("%ED%B0".stringByReplacingPercentEscapesUsingEncoding(
+    NSUTF8StringEncoding))
+
+  expectEmpty("%zz".stringByReplacingPercentEscapesUsingEncoding(
+    NSUTF8StringEncoding))
+}
+
+NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)/rdar18029471")
+  .xfail(
+    .Custom({ true },
+    reason: "<rdar://problem/18029471> NSString " +
+      "stringByReplacingPercentEscapesUsingEncoding: does not return nil " +
+      "when a byte sequence is not legal in ASCII"))
+  .code {
+  expectEmpty(
+    "abcd%FF".stringByReplacingPercentEscapesUsingEncoding(
+      NSASCIIStringEncoding))
 }
 
 NSStringAPIs.test("stringByResolvingSymlinksInPath") {
@@ -1550,6 +1699,19 @@ NSStringAPIs.test("hasPrefix,hasSuffix") {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
     checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
   }
+}
+
+NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
+  .xfail(
+    .Custom({ true },
+    reason: "<rdar://problem/18029104> Strings referring to underlying " +
+      "storage with unpaired surrogates compare unequal"))
+  .code {
+  let donor = "abcdef"
+  let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
+
+  expectEqual("\u{fffd}\u{1f602}\u{fffd}",
+    acceptor[advance(donor.startIndex, 1)..<advance(donor.startIndex, 5)])
 }
 
 // FIXME: these properties should be implemented in the core library.
