@@ -342,14 +342,38 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
 }
 
 NSStringAPIs.test("componentsSeparatedByCharactersInSet(_:)") {
-  expectEqual([ "абв", "", "あいう", "abc" ],
-      "абв12あいう3abc".componentsSeparatedByCharactersInSet(
-          NSCharacterSet.decimalDigitCharacterSet()))
+  expectEqual([ "" ], "".componentsSeparatedByCharactersInSet(
+    NSCharacterSet.decimalDigitCharacterSet()))
+
+  expectEqual(
+    [ "абв", "", "あいう", "abc" ],
+    "абв12あいう3abc".componentsSeparatedByCharactersInSet(
+        NSCharacterSet.decimalDigitCharacterSet()))
+
+  expectEqual(
+    [ "абв", "", "あいう", "abc" ],
+    "абв\u{1F601}\u{1F602}あいう\u{1F603}abc"
+      .componentsSeparatedByCharactersInSet(
+        NSCharacterSet(charactersInString: "\u{1F601}\u{1F602}\u{1F603}")))
+
+  // Performs Unicode scalar comparison.
+  expectEqual(
+    [ "abcし\u{3099}def" ],
+    "abcし\u{3099}def".componentsSeparatedByCharactersInSet(
+      NSCharacterSet(charactersInString: "\u{3058}")))
 }
 
 NSStringAPIs.test("componentsSeparatedByString(_:)") {
-  expectEqual([ "абв", "あいう", "abc" ],
-      "абв//あいう//abc".componentsSeparatedByString("//"))
+  expectEqual([ "" ], "".componentsSeparatedByString("//"))
+
+  expectEqual(
+    [ "абв", "あいう", "abc" ],
+    "абв//あいう//abc".componentsSeparatedByString("//"))
+
+  // Performs normalization.
+  expectEqual(
+    [ "abc", "def" ],
+    "abcし\u{3099}def".componentsSeparatedByString("\u{3058}"))
 }
 
 NSStringAPIs.test("cStringUsingEncoding(_:)") {
@@ -1375,15 +1399,39 @@ NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)/rdar18029471
 }
 
 NSStringAPIs.test("stringByResolvingSymlinksInPath") {
-  // FIXME
+  // <rdar://problem/18030188> Difference between
+  // stringByResolvingSymlinksInPath and stringByStandardizingPath is unclear
+  expectEqual("", "".stringByResolvingSymlinksInPath)
+  expectEqual(
+    "/var", "/private/var/tmp////..//".stringByResolvingSymlinksInPath)
 }
 
 NSStringAPIs.test("stringByStandardizingPath") {
-  // FIXME
+  // <rdar://problem/18030188> Difference between
+  // stringByResolvingSymlinksInPath and stringByStandardizingPath is unclear
+  expectEqual("", "".stringByStandardizingPath)
+  expectEqual(
+    "/var", "/private/var/tmp////..//".stringByStandardizingPath)
 }
 
 NSStringAPIs.test("stringByTrimmingCharactersInSet(_:)") {
-  // FIXME
+  expectEqual("", "".stringByTrimmingCharactersInSet(
+    NSCharacterSet.decimalDigitCharacterSet()))
+
+  expectEqual("abc", "abc".stringByTrimmingCharactersInSet(
+    NSCharacterSet.decimalDigitCharacterSet()))
+
+  expectEqual("", "123".stringByTrimmingCharactersInSet(
+    NSCharacterSet.decimalDigitCharacterSet()))
+
+  expectEqual("abc", "123abc789".stringByTrimmingCharactersInSet(
+    NSCharacterSet.decimalDigitCharacterSet()))
+
+  // Performs Unicode scalar comparison.
+  expectEqual(
+    "し\u{3099}abc",
+    "し\u{3099}abc".stringByTrimmingCharactersInSet(
+      NSCharacterSet(charactersInString: "\u{3058}")))
 }
 
 NSStringAPIs.test("stringsByAppendingPaths(_:)") {
