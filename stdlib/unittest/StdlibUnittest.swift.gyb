@@ -733,13 +733,13 @@ public class TestSuite {
       _name = name
     }
 
-    public func xfail(predicates: TestRunPredicate) -> _TestBuilder {
-      _data._xfail.append(predicates)
+    public func xfail(predicate: TestRunPredicate) -> _TestBuilder {
+      _data._xfail.append(predicate)
       return self
     }
 
-    public func skip(predicates: TestRunPredicate) -> _TestBuilder {
-      _data._skip.append(predicates)
+    public func skip(predicate: TestRunPredicate) -> _TestBuilder {
+      _data._skip.append(predicate)
       return self
     }
 
@@ -1323,6 +1323,25 @@ public func expectEqualSequence<
     if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
+}
+
+public func expectEqualUnicodeScalars(
+  expected: [UInt32], actual: String,
+  stackTrace: SourceLocStack? = nil,
+  collectMoreInfo: (()->String)? = nil,
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  let actualUnicodeScalars = Array(lazy(actual.unicodeScalars).map { $0.value })
+  if !equal(expected, actualUnicodeScalars) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
+    println("expected elements: \"\(asHex(expected))\"")
+    println("actual: \"\(asHex(actualUnicodeScalars))\"")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
+    println()
+  }
+
 }
 
 // ${'Local Variables'}:
