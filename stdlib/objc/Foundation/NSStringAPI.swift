@@ -1331,8 +1331,7 @@ extension String {
     options: NSStringCompareOptions = nil,
     range searchRange: Range<Index>? = nil
   ) -> String {
-    // FIXME: " != nil" needed pending <rdar://problem/16997968> 
-    return (searchRange !=  nil) || (options != nil)
+    return (searchRange != nil) || (options != nil)
     ? _ns.stringByReplacingOccurrencesOfString(
       target,
       withString: replacement, options: options,
