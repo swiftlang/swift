@@ -369,6 +369,8 @@ public:
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
   SILInstruction *visitEnumIsTagInst(EnumIsTagInst *EIT);
+  SILInstruction *visitStructExtractInst(StructExtractInst *SEI);
+  SILInstruction *visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
@@ -563,6 +565,77 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 //                                  Visitors
 //===----------------------------------------------------------------------===//
+
+SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
+  // If our operand has archetypes or our field is not trivial, do not do
+  // anything.
+  SILValue Op = SEI->getOperand();
+  SILType OpType = Op.getType();
+  if (OpType.hasArchetype() || OpType.isTrivial(SEI->getModule()))
+    return nullptr;
+
+  // (struct_extract (unchecked_ref_bit_cast X->Y x) #z)
+  //    ->
+  // (unchecked_ref_bit_cast X->Z x)
+  //
+  // Where #z is a Z typed field of single field struct Y.
+  auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op);
+  if (!URBCI)
+    return nullptr;
+
+  // If we only have one stored property, then we are layout compatible with
+  // that property and can perform the operation.
+  StructDecl *S = SEI->getStructDecl();
+  auto R = S->getStoredProperties();
+  auto B = R.begin();
+  if (B == R.end())
+    return nullptr;
+  ++B;
+  if (B != R.end())
+    return nullptr;
+
+  return new (SEI->getModule()) UncheckedRefBitCastInst(SEI->getLoc(),
+                                                        URBCI->getOperand(),
+                                                        SEI->getType());
+}
+
+static bool isFirstPayloadedCase(EnumDecl *E, EnumElementDecl *Elt) {
+  for (EnumElementDecl *Iter : E->getAllElements())
+    if (Iter->hasArgumentType())
+      return Iter == Elt;
+  return false;
+}
+
+SILInstruction *
+SILCombiner::
+visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
+  // First to be safe, do not perform this optimization on unchecked_enum_data
+  // on bounded generic nominal types.
+  SILValue Op = UEDI->getOperand();
+  SILType OpType = Op.getType();
+  if (OpType.hasArchetype() || OpType.isTrivial(UEDI->getModule()))
+    return nullptr;
+
+  // (unchecked_enum_data (unchecked_ref_bit_cast X->Y x) #z)
+  //    ->
+  // (unchecked_ref_bit_cast X->Z x)
+  //
+  // Where #z is the payload of type Z of the first payloaded case of the enum
+  // Y.
+  auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op);
+  if (!URBCI)
+    return nullptr;
+
+  // A UEDI performs a layout compatible operation if it is extracting the first
+  // argument case of the enum.
+  EnumDecl *E = OpType.getEnumOrBoundGenericEnum();
+  if (!isFirstPayloadedCase(E, UEDI->getElement()))
+    return nullptr;
+
+  return new (UEDI->getModule()) UncheckedRefBitCastInst(UEDI->getLoc(),
+                                                         URBCI->getOperand(),
+                                                         UEDI->getType());
+}
 
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   // Promote switch_enum_addr to switch_enum. Detect the pattern:
