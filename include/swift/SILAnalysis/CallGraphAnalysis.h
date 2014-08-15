@@ -47,12 +47,7 @@ namespace swift {
 
       CallGraphSorter<SILFunction*> sorter;
       for (auto &Caller : *M)
-        for (auto &BB : Caller)
-          for (auto &I : BB)
-            if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
-              SILFunction *Callee = FRI->getReferencedFunction();
-              sorter.addEdge(&Caller, Callee);
-            }
+        addEdgesForFunction(sorter, &Caller);
 
       sorter.sort(BottomUpFunctionOrder);
 
@@ -66,6 +61,16 @@ namespace swift {
     }
 
     virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
+
+  private:
+    void addEdgesForFunction(CallGraphSorter<SILFunction *> &sorter,
+                             SILFunction *Caller) {
+      for (auto &BB : *Caller)
+        for (auto &I : BB)
+          if (auto *AI = dyn_cast<ApplyInst>(&I))
+            if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+              sorter.addEdge(Caller, FRI->getReferencedFunction());
+    }
   };
 
 } // end namespace swift
