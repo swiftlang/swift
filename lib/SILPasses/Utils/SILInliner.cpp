@@ -39,7 +39,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
          "Inliner called on apply instruction in wrong function?");
   assert(((CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
            CalleeFunction->getAbstractCC() != AbstractCC::C) ||
-          IKind == InlineKind::PerformanceInline) &&    
+          IKind == InlineKind::PerformanceInline) &&
          "Cannot inline Objective-C methods or C functions in mandatory "
          "inlining");
 
@@ -168,7 +168,7 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // The mandatory inliner drops debug_value_addr instructions when inlining, as
   // if it were a "nodebug" function in C.
   if (IKind == InlineKind::MandatoryInline) return;
-  
+
   return SILCloner<SILInliner>::visitDebugValueAddrInst(Inst);
 }
 
@@ -303,12 +303,12 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     // Protocol descriptor references are free.
     case ValueKind::ObjCProtocolInst:
       return InlineCost::Free;
-      
+
     // Metatype-to-object conversions are free.
     case ValueKind::ObjCExistentialMetatypeToObjectInst:
     case ValueKind::ObjCMetatypeToObjectInst:
       return InlineCost::Free;
-      
+
     // Return and unreachable are free.
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:
@@ -321,7 +321,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
       auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
       if (FRI && FRI->getReferencedFunction() == AI->getFunction())
         return InlineCost::CannotBeInlined;
- 
+
       return InlineCost::Expensive;
     }
 
