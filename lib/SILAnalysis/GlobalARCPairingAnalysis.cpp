@@ -61,7 +61,7 @@ public:
 
   void init(SILInstruction *Inst) {
     clear();
-    MatchSet.Ptr = Inst->getOperand(0).stripCasts();
+    MatchSet.Ptr = Inst->getOperand(0).stripRCIdentityPreservingOps();
     NewIncrements.push_back(Inst);
   }
 

@@ -28,6 +28,11 @@ class RetainUser { }
 
 sil @rawpointer_use: $@thin (Builtin.RawPointer) -> Bool
 
+enum FakeOptional<T> {
+  case None
+  case Some(T)
+}
+
 /////////////////
 // Basic Tests //
 /////////////////
@@ -1295,6 +1300,25 @@ bb3:
   apply %4(%3) : $@thin (Builtin.NativeObject) -> ()
   apply %4(%3) : $@thin (Builtin.NativeObject) -> ()
   strong_release %3 : $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
+
+
+// CHECK-LABEL: sil @strip_off_layout_compatible_typed_geps : $@thin (S, FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @strip_off_layout_compatible_typed_geps : $@thin (S, FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
+  %2 = struct_extract %0 : $S, #S.x
+  strong_retain %2 : $Builtin.NativeObject
+  release_value %0 : $S
+
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1
+  strong_retain %3 : $Builtin.NativeObject
+  release_value %1 : $FakeOptional<Builtin.NativeObject>
   %5 = tuple()
   return %5 : $()
 }

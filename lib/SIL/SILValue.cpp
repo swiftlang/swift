@@ -22,25 +22,35 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
+static bool isRCIdentityPreservingCast(ValueKind Kind) {
+  switch (Kind) {
+  case ValueKind::UpcastInst:
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedRefBitCastInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 SILValue SILValue::stripCasts() {
   SILValue V = *this;
 
   while (true) {
-    switch (V->getKind()) {
-    case ValueKind::UpcastInst:
-    case ValueKind::AddressToPointerInst:
-    case ValueKind::PointerToAddressInst:
-    case ValueKind::UncheckedRefCastInst:
-    case ValueKind::UncheckedAddrCastInst:
-    case ValueKind::RefToRawPointerInst:
-    case ValueKind::RawPointerToRefInst:
-    case ValueKind::UnconditionalCheckedCastInst:
-    case ValueKind::UncheckedRefBitCastInst:
+    auto K = V->getKind();
+    if (isRCIdentityPreservingCast(K) ||
+        K == ValueKind::UncheckedTrivialBitCastInst) {
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
-    default:
-      return V;
     }
+
+    return V;
   }
 }
 
@@ -81,5 +91,58 @@ SILValue SILValue::stripIndexingInsts() {
     if (!isa<IndexingInst>(V.getDef()))
       return V;
     V = cast<IndexingInst>(V)->getBase();
+  }
+}
+
+/// Returns true if S is a decl of a struct with only one stored field.
+static bool isSingleFieldStruct(StructDecl *S) {
+  auto R = S->getStoredProperties();
+  auto B = R.begin();
+  if (B == R.end())
+    return false;
+  ++B;
+  if (B != R.end())
+    return false;
+  return true;
+}
+
+/// Returns true if \p Elt is the EnumElementDecl of the first payloaded case of
+/// \p E.
+static bool isFirstPayloadedCaseOfEnum(EnumDecl *E, EnumElementDecl *Elt) {
+  for (EnumElementDecl *Iter : E->getAllElements())
+    if (Iter->hasArgumentType())
+      return Iter == Elt;
+  return false;
+}
+
+SILValue SILValue::stripRCIdentityPreservingOps() {
+  SILValue V = *this;
+  while (true) {
+    // Strip off RC identity preserving casts.
+    if (isRCIdentityPreservingCast(V->getKind())) {
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    }
+
+    // Then if we have a struct_extract from a struct with one member is is ref
+    // count equivalent with the member. Strip off extract.
+    if (auto *SEI = dyn_cast<StructExtractInst>(V)) {
+      if (isSingleFieldStruct(SEI->getStructDecl())) {
+        V = SEI->getOperand();
+        continue;
+      }
+    }
+
+    // If we have an unchecked_enum_data from the first payloaded argument of an
+    // enum, strip off the unchecked_enum_data.
+    if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(V)) {
+      EnumDecl *E = UEDI->getOperand().getType().getEnumOrBoundGenericEnum();
+      if (isFirstPayloadedCaseOfEnum(E, UEDI->getElement())) {
+        V = UEDI->getOperand();
+        continue;
+      }
+    }
+
+    return V;
   }
 }
