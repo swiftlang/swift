@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-var Algorithm = TestCase("Algorithm")
+var Algorithm = TestSuite("Algorithm")
 
 extension String.UnicodeScalarView : Equatable {}
 

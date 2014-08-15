@@ -211,7 +211,7 @@ func withSwiftObjectCanary<T>(
   expectEqual(0, swiftObjectCanaryCount, stackTrace: stackTrace)
 }
 
-var Runtime = TestCase("Runtime")
+var Runtime = TestSuite("Runtime")
 
 Runtime.test("bridgeToObjectiveC") {
   expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
@@ -628,7 +628,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   }
 }
 
-var RuntimeFoundationWrappers = TestCase("RuntimeFoundationWrappers")
+var RuntimeFoundationWrappers = TestSuite("RuntimeFoundationWrappers")
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
   nsObjectCanaryCount = 0
@@ -706,7 +706,7 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
-var Reflection = TestCase("Reflection")
+var Reflection = TestSuite("Reflection")
 
 Reflection.test("dumpToAStream") {
   var output = ""
@@ -1109,7 +1109,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-var BitTwiddlingTestCase = TestCase("BitTwiddling")
+var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(var x: Int64) -> Int64 {
   var r: Int64 = 64
@@ -1120,14 +1120,14 @@ func computeCountLeadingZeroes(var x: Int64) -> Int64 {
   return r
 }
 
-BitTwiddlingTestCase.test("_countLeadingZeros") {
+BitTwiddlingTestSuite.test("_countLeadingZeros") {
   for i in Int64(0)..<1000 {
     expectEqual(computeCountLeadingZeroes(i), _countLeadingZeros(i))
   }
   expectEqual(0, _countLeadingZeros(Int64.min))
 }
 
-BitTwiddlingTestCase.test("_isPowerOf2/Int") {
+BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   func asInt(a: Int) -> Int { return a }
 
   expectFalse(_isPowerOf2(asInt(-1025)))
@@ -1153,7 +1153,7 @@ BitTwiddlingTestCase.test("_isPowerOf2/Int") {
   expectFalse(_isPowerOf2(Int.max))
 }
 
-BitTwiddlingTestCase.test("_isPowerOf2/UInt") {
+BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
   func asUInt(a: UInt) -> UInt { return a }
 
   expectFalse(_isPowerOf2(asUInt(0)))

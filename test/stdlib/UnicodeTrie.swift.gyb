@@ -36,7 +36,7 @@ var graphemeBreakPropertyTable = [
 % end
 ]
 
-var UnicodeTrie = TestCase("UnicodeTrie")
+var UnicodeTrie = TestSuite("UnicodeTrie")
 
 UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
   // Verify that the trie reports correct values of the property for every code

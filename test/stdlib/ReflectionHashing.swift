@@ -8,7 +8,7 @@
 
 import StdlibUnittest
 
-var Reflection = TestCase("Reflection")
+var Reflection = TestSuite("Reflection")
 
 Reflection.test("Dictionary/Empty") {
   let dict = [Int : Int]()

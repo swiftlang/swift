@@ -3,7 +3,7 @@
 import Foundation
 import StdlibUnittest
 
-var FoundationTestCase = TestCase("Foundation")
+var FoundationTestSuite = TestSuite("Foundation")
 
 func asNSString(s: String) -> NSString { return s }
 func asString(ns: NSString) -> String { return ns }
@@ -12,7 +12,7 @@ func asString(ns: NSString) -> String { return ns }
 // Strings
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSString") {
+FoundationTestSuite.test("NSString") {
   var str = "Hello"
   var nsStr : NSString = str
   assert(nsStr.compare(str).toRaw() == NSComparisonResult.OrderedSame.toRaw())
@@ -27,7 +27,7 @@ FoundationTestCase.test("NSString") {
 // Numbers
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSNumber") {
+FoundationTestSuite.test("NSNumber") {
   var i = 17
   var d = 3.14159
   var b = true
@@ -57,7 +57,7 @@ FoundationTestCase.test("NSNumber") {
 // Arrays
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSArray") {
+FoundationTestSuite.test("NSArray") {
   // Literals
   var nsArr: NSArray = [ 1, 2.5, "Hello" ]
   assert(nsArr.count == 3)
@@ -75,7 +75,7 @@ FoundationTestCase.test("NSArray") {
   expectEqualSequence([ "1", "2.5", "Hello" ], result)
 }
 
-FoundationTestCase.test("NSMutableArray") {
+FoundationTestSuite.test("NSMutableArray") {
   let nsMutableArr: NSMutableArray = ["Constant", "Moon"]
   nsMutableArr[0] = "Inconstant"
 
@@ -84,12 +84,12 @@ FoundationTestCase.test("NSMutableArray") {
   expectEqual("Moon", nsMutableArr[1] as NSString)
 }
 
-FoundationTestCase.test("NSArrayVariadicInit") {
+FoundationTestSuite.test("NSArrayVariadicInit") {
   let variadicArray = NSArray(objects: "A", "B", "C")
   expectEqual(3, variadicArray.count)
 }
 
-FoundationTestCase.test("arrayConversions") {
+FoundationTestSuite.test("arrayConversions") {
   var nsa = NSArray()
   var aoa: Array<AnyObject> = []
 
@@ -111,7 +111,7 @@ FoundationTestCase.test("arrayConversions") {
 // Dictionaries
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSDictionary") {
+FoundationTestSuite.test("NSDictionary") {
   var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
   assert((nsDict[1]! as NSString).isEqual("Hello"))
   assert((nsDict[2]! as NSString).isEqual("World"))
@@ -125,7 +125,7 @@ FoundationTestCase.test("NSDictionary") {
 // Ranges
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSRange") {
+FoundationTestSuite.test("NSRange") {
   let nsRange = NSRange(1..<5)
   expectEqual("{1, 4}", toString(NSStringFromRange(nsRange)))
 }
@@ -134,7 +134,7 @@ FoundationTestCase.test("NSRange") {
 // URLs
 //===----------------------------------------------------------------------===//
 
-FoundationTestCase.test("NSURL") {
+FoundationTestSuite.test("NSURL") {
   let nsURL = NSURL(string: "http://llvm.org")
   expectEqual("http://llvm.org", nsURL.description)
 }
@@ -152,7 +152,7 @@ func matchesEither(input: NSNumber, a: NSNumber, b: NSNumber) -> Bool {
   }
 }
 
-FoundationTestCase.test("patternMatching") {
+FoundationTestSuite.test("patternMatching") {
   var one, two, three, oneAgain : NSNumber
   one = NSNumber(int: 1)
   two = NSNumber(int: 2)
@@ -176,7 +176,7 @@ class ClassWithDtor : NSObject {
   }
 }
 
-FoundationTestCase.test("rdar://17584531") {
+FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
   var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
@@ -187,7 +187,7 @@ FoundationTestCase.test("rdar://17584531") {
 func staticAssertType<T>(_: T.Type, inout value: T) {}
 
 #if os(OSX)
-FoundationTestCase.test("NSRectEdge/constants") {
+FoundationTestSuite.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.
   //
   // It is valid to hardcode the value in the test.  The way they are currently

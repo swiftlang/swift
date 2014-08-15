@@ -13,7 +13,7 @@
 
 import StdlibUnittest
 
-var strideTestCase = TestCase("Strideable")
+var strideTestSuite = TestSuite("Strideable")
 
 struct R : RandomAccessIndexType {
   var x: Int
@@ -36,12 +36,12 @@ struct R : RandomAccessIndexType {
   }
 }
 
-strideTestCase.test("Double") {
+strideTestSuite.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
   // to RandomAccessIndexType
 }
 
-strideTestCase.test("HalfOpen") {
+strideTestSuite.test("HalfOpen") {
   func check(from start: Int, to end: Int, by stepSize: Int, #sum: Int) {
     // Work on Ints
     expectEqual(
@@ -66,7 +66,7 @@ strideTestCase.test("HalfOpen") {
   check(from: 1, to: -16, by: 3, sum: 0)
 }
 
-strideTestCase.test("Closed") {
+strideTestSuite.test("Closed") {
   func check(from start: Int, through end: Int, by stepSize: Int, #sum: Int) {
     // Work on Ints
     expectEqual(

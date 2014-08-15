@@ -12,7 +12,7 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
-var DictionaryTestCase = TestCase("Dictionary")
+var DictionaryTestSuite = TestSuite("Dictionary")
 
 //===---
 // Utilities.
@@ -148,7 +148,7 @@ func equalsUnordered(lhs: Array<Int>, rhs: Array<Int>) -> Bool {
 // Tests.
 //===---
 
-DictionaryTestCase.test("sizeof") {
+DictionaryTestSuite.test("sizeof") {
   var dict = [ 1: "meow", 2: "meow" ]
 #if arch(i386) || arch(arm)
   expectEqual(4, sizeofValue(dict))
@@ -157,7 +157,7 @@ DictionaryTestCase.test("sizeof") {
 #endif
 }
 
-DictionaryTestCase.test("valueDestruction") {
+DictionaryTestSuite.test("valueDestruction") {
   var d1 = Dictionary<Int, TestValueTy>()
   for i in 100...110 {
     d1[i] = TestValueTy(i)
@@ -169,7 +169,7 @@ DictionaryTestCase.test("valueDestruction") {
   }
 }
 
-DictionaryTestCase.test("COW.Smoke") {
+DictionaryTestSuite.test("COW.Smoke") {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
   var identity1 = unsafeBitCast(d1, Word.self)
 
@@ -218,7 +218,7 @@ func getCOWSlowEquatableDictionary()
 }
 
 
-DictionaryTestCase.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
+DictionaryTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -240,7 +240,7 @@ DictionaryTestCase.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   withExtendedLifetime(endIndex) { () }
 }
 
-DictionaryTestCase.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
+DictionaryTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -262,7 +262,7 @@ DictionaryTestCase.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -278,7 +278,7 @@ DictionaryTestCase.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -295,7 +295,7 @@ DictionaryTestCase.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -337,7 +337,7 @@ DictionaryTestCase.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   assert(d[40]! == 2040)
 }
 
-DictionaryTestCase.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -380,7 +380,7 @@ DictionaryTestCase.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   if true {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Word.self)
@@ -455,7 +455,7 @@ DictionaryTestCase.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestCase.test("COW.Slow.AddDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   if true {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Word.self)
@@ -533,7 +533,7 @@ DictionaryTestCase.test("COW.Slow.AddDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.IndexForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -558,7 +558,7 @@ DictionaryTestCase.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestCase.test("COW.Slow.IndexForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -584,7 +584,7 @@ DictionaryTestCase.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
   if true {
     var d = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d, Word.self)
@@ -621,7 +621,7 @@ DictionaryTestCase.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
   }
 }
 
-DictionaryTestCase.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
   if true {
     var d = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d, Word.self)
@@ -657,7 +657,7 @@ DictionaryTestCase.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
   if true {
     var d1 = getCOWFastDictionary()
     var identity1 = unsafeBitCast(d1, Word.self)
@@ -695,7 +695,7 @@ DictionaryTestCase.test("COW.Fast.RemoveValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestCase.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
   if true {
     var d1 = getCOWSlowDictionary()
     var identity1 = unsafeBitCast(d1, Word.self)
@@ -734,7 +734,7 @@ DictionaryTestCase.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.RemoveAllDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   if true {
     var d = getCOWFastDictionary()
     let originalCapacity = d._variantStorage.native.capacity
@@ -820,7 +820,7 @@ DictionaryTestCase.test("COW.Fast.RemoveAllDoesNotReallocate") {
   }
 }
 
-DictionaryTestCase.test("COW.Slow.RemoveAllDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   if true {
     var d = getCOWSlowDictionary()
     let originalCapacity = d._variantStorage.native.capacity
@@ -907,7 +907,7 @@ DictionaryTestCase.test("COW.Slow.RemoveAllDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.CountDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.CountDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -915,7 +915,7 @@ DictionaryTestCase.test("COW.Fast.CountDoesNotReallocate") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("COW.Slow.CountDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.CountDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -924,7 +924,7 @@ DictionaryTestCase.test("COW.Slow.CountDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.GenerateDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -937,7 +937,7 @@ DictionaryTestCase.test("COW.Fast.GenerateDoesNotReallocate") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("COW.Slow.GenerateDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
 
@@ -962,7 +962,7 @@ DictionaryTestCase.test("COW.Slow.GenerateDoesNotReallocate") {
 }
 
 
-DictionaryTestCase.test("COW.Fast.EqualityTestDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
   var d1 = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d1, Word.self)
 
@@ -979,7 +979,7 @@ DictionaryTestCase.test("COW.Fast.EqualityTestDoesNotReallocate") {
   assert(identity2 == unsafeBitCast(d2, Word.self))
 }
 
-DictionaryTestCase.test("COW.Slow.EqualityTestDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
   var d1 = getCOWSlowEquatableDictionary()
   var identity1 = unsafeBitCast(d1, Word.self)
 
@@ -1023,7 +1023,7 @@ func helperDeleteThree(k1: TestKeyTy, k2: TestKeyTy, k3: TestKeyTy) {
   assert(d1.count == 0)
 }
 
-DictionaryTestCase.test("deleteChainCollision") {
+DictionaryTestSuite.test("deleteChainCollision") {
   var k1 = TestKeyTy(value: 10, hashValue: 0)
   var k2 = TestKeyTy(value: 20, hashValue: 0)
   var k3 = TestKeyTy(value: 30, hashValue: 0)
@@ -1031,7 +1031,7 @@ DictionaryTestCase.test("deleteChainCollision") {
   helperDeleteThree(k1, k2, k3)
 }
 
-DictionaryTestCase.test("deleteChainNoCollision") {
+DictionaryTestSuite.test("deleteChainNoCollision") {
   var k1 = TestKeyTy(value: 10, hashValue: 0)
   var k2 = TestKeyTy(value: 20, hashValue: 1)
   var k3 = TestKeyTy(value: 30, hashValue: 2)
@@ -1039,7 +1039,7 @@ DictionaryTestCase.test("deleteChainNoCollision") {
   helperDeleteThree(k1, k2, k3)
 }
 
-DictionaryTestCase.test("deleteChainCollision2") {
+DictionaryTestSuite.test("deleteChainCollision2") {
   var k1_0 = TestKeyTy(value: 10, hashValue: 0)
   var k2_0 = TestKeyTy(value: 20, hashValue: 0)
   var k3_2 = TestKeyTy(value: 30, hashValue: 2)
@@ -1075,7 +1075,7 @@ func pickRandom<T>(a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
-DictionaryTestCase.test("deleteChainCollisionRandomized") {
+DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   let timeNow = CUnsignedInt(time(nil))
   println("time is \(timeNow)")
   srandom(timeNow)
@@ -1127,7 +1127,7 @@ DictionaryTestCase.test("deleteChainCollisionRandomized") {
   }
 }
 
-DictionaryTestCase.test("convertFromDictionaryLiteral") {
+DictionaryTestSuite.test("convertFromDictionaryLiteral") {
   if true {
     var empty = Dictionary<Int, Int>.convertFromDictionaryLiteral()
     assert(empty.count == 0)
@@ -1709,7 +1709,7 @@ func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKey
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -1734,7 +1734,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -1760,7 +1760,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.IndexForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -1785,7 +1785,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.IndexForKey") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -1810,7 +1810,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -1838,7 +1838,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   withExtendedLifetime(endIndex) { () }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -1866,7 +1866,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   withExtendedLifetime(endIndex) { () }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   var d = getBridgedVerbatimDictionary([:])
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -1885,7 +1885,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   withExtendedLifetime(endIndex) { () }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -1904,7 +1904,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") 
   withExtendedLifetime(endIndex) { () }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -1959,7 +1959,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   assert(v.value == 2040)
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2015,7 +2015,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   if true {
     var d = getBridgedVerbatimDictionary()
@@ -2057,7 +2057,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   if true {
     var d = getBridgedNonverbatimDictionary()
@@ -2100,7 +2100,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -2117,7 +2117,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   assert(d.indexForKey(TestObjCKeyTy(10)) == nil)
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2135,7 +2135,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   if true {
     var d = getBridgedVerbatimDictionary()
     var identity1 = unsafeBitCast(d, Word.self)
@@ -2194,7 +2194,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = unsafeBitCast(d, Word.self)
@@ -2254,7 +2254,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveAll") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   if true {
     var d = getBridgedVerbatimDictionary([:])
     var identity1 = unsafeBitCast(d, Word.self)
@@ -2337,7 +2337,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.RemoveAll") {
   }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   if true {
     var d = getBridgedNonverbatimDictionary([:])
     var identity1 = unsafeBitCast(d, Word.self)
@@ -2421,7 +2421,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.Count") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -2430,7 +2430,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.Count") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Count") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2440,7 +2440,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Count") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -2460,7 +2460,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2480,7 +2480,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var d = getBridgedVerbatimDictionary([:])
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -2498,7 +2498,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2517,7 +2517,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate_Huge") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var d = getHugeBridgedVerbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isCocoaDictionary(d))
@@ -2541,7 +2541,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   assert(identity1 == unsafeBitCast(d, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var d = getHugeBridgedNonverbatimDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
   assert(isNativeDictionary(d))
@@ -2566,7 +2566,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.Generate_ParallelArray") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_ParallelArray") {
 autoreleasepool {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
@@ -2592,7 +2592,7 @@ autoreleasepool {
 }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
 autoreleasepool {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
@@ -2619,7 +2619,7 @@ autoreleasepool {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var d1 = getBridgedVerbatimEquatableDictionary([:])
   var identity1 = unsafeBitCast(d1, Word.self)
   assert(isCocoaDictionary(d1))
@@ -2643,7 +2643,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   assert(identity2 == unsafeBitCast(d2, Word.self))
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var d1 = getBridgedNonverbatimEquatableDictionary([:])
   var identity1 = unsafeBitCast(d1, Word.self)
   assert(isNativeDictionary(d1))
@@ -2667,7 +2667,7 @@ DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(nd1: Dictionary<Int, Int>, nd2: Dictionary<Int, Int>, expectedEq: Bool) {
     var d1 = getBridgedVerbatimEquatableDictionary(nd1)
     var identity1 = unsafeBitCast(d1, Word.self)
@@ -2756,7 +2756,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 }
 
 
-DictionaryTestCase.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.addObject(
@@ -2777,7 +2777,7 @@ DictionaryTestCase.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   }
 }
 
-DictionaryTestCase.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.addObject(
@@ -2833,13 +2833,13 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
 }
 
 
-DictionaryTestCase.test("BridgedToObjC_Count") {
+DictionaryTestSuite.test("BridgedToObjC_Count") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   assert(d.count == 3)
 }
 
-DictionaryTestCase.test("BridgedToObjC.ObjectForKey") {
+DictionaryTestSuite.test("BridgedToObjC.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
@@ -2854,7 +2854,7 @@ DictionaryTestCase.test("BridgedToObjC.ObjectForKey") {
   assert(d.objectForKey(TestObjCKeyTy(40)) == nil)
 }
 
-DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.NextObject") {
+DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.NextObject") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
   let enumerator = d.keyEnumerator()
 
@@ -2871,7 +2871,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.NextObject") {
   assert(enumerator.nextObject() == nil)
 }
 
-DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.NextObject_Empty") {
+DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.NextObject_Empty") {
   let d = getBridgedEmptyNSDictionary()
   let enumerator = d.keyEnumerator()
 
@@ -2880,7 +2880,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.NextObject_Empty") {
   assert(enumerator.nextObject() == nil)
 }
 
-DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.FastEnumeration") {
+DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.FastEnumeration") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   var pairs = slurpFastEnumeration(d, d.keyEnumerator())
@@ -2890,7 +2890,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.FastEnumeration") {
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
-DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.FastEnumeration_Empty") {
+DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.FastEnumeration_Empty") {
   let d = getBridgedEmptyNSDictionary()
 
   var pairs = slurpFastEnumeration(d, d.keyEnumerator())
@@ -2900,7 +2900,7 @@ DictionaryTestCase.test("BridgedToObjC.KeyEnumerator.FastEnumeration_Empty") {
   assert(equalsUnordered(pairs, []))
 }
 
-DictionaryTestCase.test("BridgedToObjC.FastEnumeration") {
+DictionaryTestSuite.test("BridgedToObjC.FastEnumeration") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   var pairs = slurpFastEnumeration(d, d)
@@ -2910,7 +2910,7 @@ DictionaryTestCase.test("BridgedToObjC.FastEnumeration") {
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
-DictionaryTestCase.test("BridgedToObjC.FastEnumeration_Empty") {
+DictionaryTestSuite.test("BridgedToObjC.FastEnumeration_Empty") {
   let d = getBridgedEmptyNSDictionary()
 
   var pairs = slurpFastEnumeration(d, d)
@@ -2942,7 +2942,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary 
   return bridged
 }
 
-DictionaryTestCase.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
+DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
   let enumerator = d.keyEnumerator()
 
@@ -2970,7 +2970,7 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   return bridged
 }
 
-DictionaryTestCase.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
+DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   let d = getBridgedNSDictionaryOfKey_ValueTypeCustomBridged()
   let enumerator = d.keyEnumerator()
 
@@ -2998,7 +2998,7 @@ func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
   return bridged
 }
 
-DictionaryTestCase.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
+DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   let d = getBridgedNSDictionaryOfValue_ValueTypeCustomBridged()
   let enumerator = d.keyEnumerator()
 
@@ -3039,7 +3039,7 @@ func getRoundtripBridgedNSDictionary() -> NSDictionary {
   return bridgedBack
 }
 
-DictionaryTestCase.test("BridgingRoundtrip") {
+DictionaryTestSuite.test("BridgingRoundtrip") {
   let d = getRoundtripBridgedNSDictionary()
   let enumerator = d.keyEnumerator()
 
@@ -3056,7 +3056,7 @@ DictionaryTestCase.test("BridgingRoundtrip") {
 // NSDictionary -> Dictionary implicit conversion.
 //===---
 
-DictionaryTestCase.test("NSDictionaryToDictionaryCoversion") {
+DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
   let keys = NSMutableArray()
   keys.addObject(TestObjCKeyTy(10))
   keys.addObject(TestObjCKeyTy(20))
@@ -3079,7 +3079,7 @@ DictionaryTestCase.test("NSDictionaryToDictionaryCoversion") {
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
-DictionaryTestCase.test("DictionaryToNSDictionaryCoversion") {
+DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3094,7 +3094,7 @@ DictionaryTestCase.test("DictionaryToNSDictionaryCoversion") {
 // Dictionary upcasts
 //===---
 
-DictionaryTestCase.test("DictionaryUpcastEntryPoint") {
+DictionaryTestSuite.test("DictionaryUpcastEntryPoint") {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3113,7 +3113,7 @@ DictionaryTestCase.test("DictionaryUpcastEntryPoint") {
   assert((v! as TestObjCValueTy).value == 1030)
 }
 
-DictionaryTestCase.test("DictionaryUpcast") {
+DictionaryTestSuite.test("DictionaryUpcast") {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3132,7 +3132,7 @@ DictionaryTestCase.test("DictionaryUpcast") {
   assert((v! as TestObjCValueTy).value == 1030)
 }
 
-DictionaryTestCase.test("DictionaryUpcastBridgedEntryPoint") {
+DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>(minimumCapacity: 32)
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
@@ -3183,7 +3183,7 @@ DictionaryTestCase.test("DictionaryUpcastBridgedEntryPoint") {
   }
 }
 
-DictionaryTestCase.test("DictionaryUpcastBridged") {
+DictionaryTestSuite.test("DictionaryUpcastBridged") {
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>(minimumCapacity: 32)
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
@@ -3236,7 +3236,7 @@ DictionaryTestCase.test("DictionaryUpcastBridged") {
 // Dictionary downcasts
 //===---
 
-DictionaryTestCase.test("DictionaryDowncastEntryPoint") {
+DictionaryTestSuite.test("DictionaryDowncastEntryPoint") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3255,7 +3255,7 @@ DictionaryTestCase.test("DictionaryDowncastEntryPoint") {
   assert(v!.value == 1030)
 }
 
-DictionaryTestCase.test("DictionaryDowncast") {
+DictionaryTestSuite.test("DictionaryDowncast") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3274,7 +3274,7 @@ DictionaryTestCase.test("DictionaryDowncast") {
   assert(v!.value == 1030)
 }
 
-DictionaryTestCase.test("DictionaryDowncastConditionalEntryPoint") {
+DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3304,7 +3304,7 @@ DictionaryTestCase.test("DictionaryDowncastConditionalEntryPoint") {
   }
 }
 
-DictionaryTestCase.test("DictionaryDowncastConditional") {
+DictionaryTestSuite.test("DictionaryDowncastConditional") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3332,7 +3332,7 @@ DictionaryTestCase.test("DictionaryDowncastConditional") {
   }
 }
 
-DictionaryTestCase.test("DictionaryBridgeFromObjectiveCEntryPoint") {
+DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3384,7 +3384,7 @@ DictionaryTestCase.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   }
 }
 
-DictionaryTestCase.test("DictionaryBridgeFromObjectiveC") {
+DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3433,7 +3433,7 @@ DictionaryTestCase.test("DictionaryBridgeFromObjectiveC") {
   }
 }
 
-DictionaryTestCase.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") {
+DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3503,7 +3503,7 @@ DictionaryTestCase.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") {
   }
 }
 
-DictionaryTestCase.test("DictionaryBridgeFromObjectiveCConditional") {
+DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3580,7 +3580,7 @@ func getDerivedAPIsDictionary() -> Dictionary<Int, Int> {
   return d
 }
 
-var DictionaryDerivedAPIs = TestCase("DictionaryDerivedAPIs")
+var DictionaryDerivedAPIs = TestSuite("DictionaryDerivedAPIs")
 
 DictionaryDerivedAPIs.test("isEmpty") {
   if true {
@@ -3624,7 +3624,7 @@ DictionaryDerivedAPIs.test("values") {
   }
 }
 
-var ObjCThunks = TestCase("ObjCThunks")
+var ObjCThunks = TestSuite("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
   dynamic func acceptArrayBridgedVerbatim(array: [TestObjCValueTy]) {
@@ -3772,7 +3772,7 @@ ObjCThunks.test("Dictionary/Return") {
 // Misc tests.
 //===---
 
-DictionaryTestCase.test("misc") {
+DictionaryTestSuite.test("misc") {
   if true {
     // Dictionary literal
     var dict = [ "Hello": 1, "World": 2 ]
@@ -3836,7 +3836,7 @@ DictionaryTestCase.test("misc") {
   }
 }
 
-DictionaryTestCase.test("noLeaks") {
+DictionaryTestSuite.test("noLeaks") {
   expectEqual(0, keyCount) { "key leak" }
   expectEqual(0, valueCount) { "value leak" }
 

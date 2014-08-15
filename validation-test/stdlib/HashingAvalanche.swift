@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-var HashingTestCase = TestCase("Hashing")
+var HashingTestSuite = TestSuite("Hashing")
 
 func avalancheTest(bits: Int, hashUnderTest: (UInt64) -> UInt64, pValue: Double) {
   let testsInBatch = 100000
@@ -41,11 +41,11 @@ func avalancheTest(bits: Int, hashUnderTest: (UInt64) -> UInt64, pValue: Double)
 
 // White-box testing: assume that the other N-bit to N-bit mixing functions
 // just dispatch to these.  (Avalanche test is relatively expensive.)
-HashingTestCase.test("_mixUInt64/avalanche") {
+HashingTestSuite.test("_mixUInt64/avalanche") {
   avalancheTest(64, _mixUInt64, 0.02)
 }
 
-HashingTestCase.test("_mixUInt32/avalanche") {
+HashingTestSuite.test("_mixUInt32/avalanche") {
   avalancheTest(32, { UInt64(_mixUInt32(UInt32($0 & 0xffff_ffff))) }, 0.02)
 }
 

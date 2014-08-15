@@ -52,7 +52,7 @@ func createNSStringTemporaryFile()
   return (existingPath, nonExistentPath)
 }
 
-var NSStringAPIs = TestCase("NSStringAPIs")
+var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
   let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
@@ -1608,7 +1608,7 @@ NSStringAPIs.test("uppercaseString") {
   expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseString)
 }
 
-var CStringTests = TestCase("CStringTests")
+var CStringTests = TestSuite("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {
   return .null()

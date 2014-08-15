@@ -3,9 +3,9 @@
 
 import StdlibUnittest
 
-var HashingTestCase = TestCase("Hashing")
+var HashingTestSuite = TestSuite("Hashing")
 
-HashingTestCase.test("_mixUInt32/GoldenValues") {
+HashingTestSuite.test("_mixUInt32/GoldenValues") {
   expectEqual(0x11b882c9, _mixUInt32(0x0))
   expectEqual(0x60d0aafb, _mixUInt32(0x1))
   expectEqual(0x636847b5, _mixUInt32(0xffff))
@@ -21,11 +21,11 @@ HashingTestCase.test("_mixUInt32/GoldenValues") {
   expectEqual(0xfe265934, _mixUInt32(0xfd2268c9))
 }
 
-HashingTestCase.test("_mixInt32/GoldenValues") {
+HashingTestSuite.test("_mixInt32/GoldenValues") {
   expectEqual(Int32(bitPattern: 0x11b882c9), _mixInt32(0x0))
 }
 
-HashingTestCase.test("_mixUInt64/GoldenValues") {
+HashingTestSuite.test("_mixUInt64/GoldenValues") {
   expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt64(0x0))
   expectEqual(0x792e_33eb_0685_57de, _mixUInt64(0x1))
   expectEqual(0x9ec4_3423_1b42_3dab, _mixUInt64(0xffff))
@@ -43,11 +43,11 @@ HashingTestCase.test("_mixUInt64/GoldenValues") {
   expectEqual(0x98ceedc363c4e56a, _mixUInt64(0xe5fb9b5f6c426a84))
 }
 
-HashingTestCase.test("_mixUInt64/GoldenValues") {
+HashingTestSuite.test("_mixUInt64/GoldenValues") {
   expectEqual(Int64(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt64(0x0))
 }
 
-HashingTestCase.test("_mixUInt/GoldenValues") {
+HashingTestSuite.test("_mixUInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(0x11b8_82c9, _mixUInt(0x0))
 #elseif arch(x86_64) || arch(arm64)
@@ -57,7 +57,7 @@ HashingTestCase.test("_mixUInt/GoldenValues") {
 #endif
 }
 
-HashingTestCase.test("_mixInt/GoldenValues") {
+HashingTestSuite.test("_mixInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(Int(bitPattern: 0x11b8_82c9), _mixInt(0x0))
 #elseif arch(x86_64) || arch(arm64)
@@ -67,7 +67,7 @@ HashingTestCase.test("_mixInt/GoldenValues") {
 #endif
 }
 
-HashingTestCase.test("_squeezeHashValue/Int") {
+HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<Int>) {
     var results = [Int : Void]()
@@ -98,7 +98,7 @@ HashingTestCase.test("_squeezeHashValue/Int") {
 #endif
 }
 
-HashingTestCase.test("_squeezeHashValue/UInt") {
+HashingTestSuite.test("_squeezeHashValue/UInt") {
   // Check that the function can return values that cover the whole range.
   func checkRange(r: Range<UInt>) {
     var results = [UInt : Void]()
@@ -119,7 +119,7 @@ HashingTestCase.test("_squeezeHashValue/UInt") {
   checkRange((UInt.max-10)..<(UInt.max-1))
 }
 
-HashingTestCase.test("overridePerExecutionHashSeed/overflow") {
+HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   // Test that we don't use checked arithmetic on the seed.
   _HashingDetail.fixedSeedOverride = UInt64.max
   expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))

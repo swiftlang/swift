@@ -13,12 +13,12 @@
 
 import StdlibUnittest
 
-var IntervalTestCase = TestCase("Interval")
+var IntervalTestSuite = TestSuite("Interval")
 
 func expectType<T>(T.Type, x: T) {
 }
 
-IntervalTestCase.test("Ambiguity") {
+IntervalTestSuite.test("Ambiguity") {
   // Ensure type deduction still works as expected; these will fail to
   // compile if it's broken
   let pieToPie = -3.1415927..<3.1415927
@@ -36,7 +36,7 @@ IntervalTestCase.test("Ambiguity") {
   expectType(Range<Int>.self, zeroThruOne)
 }
 
-IntervalTestCase.test("PatternMatching") {
+IntervalTestSuite.test("PatternMatching") {
 
   let pie = 3.1415927
 
@@ -70,7 +70,7 @@ IntervalTestCase.test("PatternMatching") {
   }
 }
 
-IntervalTestCase.test("Overlaps") {
+IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
     I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
@@ -110,14 +110,14 @@ IntervalTestCase.test("Overlaps") {
   expectOverlaps(true, 0...20, 5...10)
 }
 
-IntervalTestCase.test("Emptiness") {
+IntervalTestSuite.test("Emptiness") {
   expectTrue((0.0..<0.0).isEmpty)
   expectFalse((0.0...0.0).isEmpty)
   expectFalse((0.0..<0.1).isEmpty)
   expectFalse((0.0..<0.1).isEmpty)
 }
 
-IntervalTestCase.test("start/end") {
+IntervalTestSuite.test("start/end") {
   expectEqual(0.0, (0.0..<0.1).start)
   expectEqual(0.0, (0.0...0.1).start)
   expectEqual(0.1, (0.0..<0.1).end)
@@ -149,7 +149,7 @@ func == <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-IntervalTestCase.test("Printable/DebugPrintable") {
+IntervalTestSuite.test("Printable/DebugPrintable") {
   expectEqual("0.0..<0.1", toString(X(0.0)..<X(0.1)))
   expectEqual("0.0...0.1", toString(X(0.0)...X(0.1)))
   
@@ -161,7 +161,7 @@ IntervalTestCase.test("Printable/DebugPrintable") {
     toDebugString(ClosedInterval(X(0.0)...X(0.1))))
 }
 
-IntervalTestCase.test("rdar12016900") {
+IntervalTestSuite.test("rdar12016900") {
   if true {
     let wc = 0
     expectFalse((0x00D800 ..< 0x00E000).contains(wc))
@@ -172,7 +172,7 @@ IntervalTestCase.test("rdar12016900") {
   }
 }
 
-IntervalTestCase.test("clamp") {
+IntervalTestSuite.test("clamp") {
   expectEqual(
     (5..<10).clamp(0..<3), 5..<5)
   expectEqual(

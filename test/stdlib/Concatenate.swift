@@ -15,7 +15,7 @@
 import Swift
 import StdlibUnittest
 
-var ConcatenateTests = TestCase("ConcatenateTests")
+var ConcatenateTests = TestSuite("ConcatenateTests")
 
 // Help the type checker (<rdar://problem/17897413> Slow type deduction)
 typealias X = (Range<Int>, [Range<Int>])

@@ -51,7 +51,7 @@ func getTooLargeMessage() -> String {
   return ""
 }
 
-var FloatingPointConversion = TestCase("FloatingPointConversion")
+var FloatingPointConversion = TestSuite("FloatingPointConversion")
 
 % for FloatSelf in ['Float32', 'Float64', 'Float80']:
 %   for IntSelf in all_integer_type_names():

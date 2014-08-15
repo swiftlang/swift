@@ -13,7 +13,7 @@
 
 import StdlibUnittest
 
-var SliceableTests = TestCase("SliceableTests")
+var SliceableTests = TestSuite("SliceableTests")
 
 SliceableTests.test("dropFirstLast") {
   if true {

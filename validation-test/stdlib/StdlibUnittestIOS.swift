@@ -4,9 +4,9 @@
 import StdlibUnittest
 
 _setOverrideOSVersion(.iOS(major: 10, minor: 9, bugFix: 3))
-_setTestCaseFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { println("abort()") }
 
-var XFailsIOS = TestCase("XFailsIOS")
+var XFailsIOS = TestSuite("XFailsIOS")
 
 // CHECK: [   UXPASS ] XFailsIOS.xfail iOS passes{{$}}
 XFailsIOS.test("xfail iOS passes").xfail(.iOSAny("")).code {

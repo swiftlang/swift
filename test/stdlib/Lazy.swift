@@ -13,14 +13,14 @@
 
 import StdlibUnittest
 
-var LazyTestCase = TestCase("Lazy")
+var LazyTestSuite = TestSuite("Lazy")
 
-LazyTestCase.test("isEmpty") {
+LazyTestSuite.test("isEmpty") {
   expectTrue(lazy(0..<0).isEmpty)
   expectFalse(lazy(0...0).isEmpty)
 }
 
-LazyTestCase.test("firstLast") {
+LazyTestSuite.test("firstLast") {
   expectOptionalEqual(7, lazy(7..<42).first)
   expectOptionalEqual(41, lazy(7..<42).last)
   expectEmpty(lazy(7..<7).first)

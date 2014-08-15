@@ -304,14 +304,14 @@ public func expectCrashLater() {
   _seenExpectCrash = true
 }
 
-func _defaultTestCaseFailedCallback() {
+func _defaultTestSuiteFailedCallback() {
   abort()
 }
 
-var _testCaseFailedCallback: () -> () = _defaultTestCaseFailedCallback
+var _testSuiteFailedCallback: () -> () = _defaultTestSuiteFailedCallback
 
-public func _setTestCaseFailedCallback(callback: () -> ()) {
-  _testCaseFailedCallback = callback
+public func _setTestSuiteFailedCallback(callback: () -> ()) {
+  _testSuiteFailedCallback = callback
 }
 
 var _runTestsInProcess: Bool {
@@ -396,8 +396,8 @@ func _printDebuggingAdvice() {
   println("$ \(Process.arguments[0]) --stdlib-unittest-in-process")
 }
 
-var _allTestCases: [TestCase] = []
-var _testCaseNameToIndex: [String : Int] = [:]
+var _allTestSuites: [TestSuite] = []
+var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
 
@@ -408,11 +408,11 @@ func _childProcess() {
   _stdlib_installTrapInterceptor()
   while let line = _stdlib_getline() {
     let parts = line._split(";")
-    let testCaseName = parts[0]
+    let testSuiteName = parts[0]
     let testName = parts[1]
 
-    let testCase = _allTestCases[_testCaseNameToIndex[testCaseName]!]
-    let test = testCase._getTestByName(testName)
+    let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
+    let test = testSuite._getTestByName(testName)
     _anyExpectFailed = false
     test.code()
 
@@ -450,7 +450,7 @@ struct _ParentProcess {
   }
 
   /// Returns the values of the corresponding variables in the child process.
-  mutating func _runTestInChild(testCaseName: String, _ testName: String)
+  mutating func _runTestInChild(testSuiteName: String, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: [String], crashStderr: [String]) {
@@ -462,7 +462,7 @@ struct _ParentProcess {
     var childStdout = _FDInputStream(fd: _childStdoutFD)
     var childStderr = _FDInputStream(fd: _childStderrFD)
 
-    println("\(testCaseName);\(testName)", &childStdin)
+    println("\(testSuiteName);\(testName)", &childStdin)
 
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
@@ -562,12 +562,12 @@ struct _ParentProcess {
   }
 
   mutating func run() {
-    for testCase in _allTestCases {
+    for testSuite in _allTestSuites {
       var uxpassedTests = [String]()
       var failedTests = [String]()
       var skippedTests = [String]()
-      for t in testCase._tests {
-        let fullTestName = "\(testCase.name).\(t.name)"
+      for t in testSuite._tests {
+        let fullTestName = "\(testSuite.name).\(t.name)"
         let activeSkips = t.getActiveSkipPredicates()
         if !activeSkips.isEmpty {
           skippedTests += [ t.name ]
@@ -590,7 +590,7 @@ struct _ParentProcess {
         } else {
           (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
            crashStderr) =
-            _runTestInChild(testCase.name, t.name)
+            _runTestInChild(testSuite.name, t.name)
         }
 
         // Determine if the test passed, not taking XFAILs into account.
@@ -654,14 +654,14 @@ struct _ParentProcess {
       }
 
       if !uxpassedTests.isEmpty || !failedTests.isEmpty {
-        println("\(testCase.name): Some tests failed, aborting")
+        println("\(testSuite.name): Some tests failed, aborting")
         println("UXPASS: \(uxpassedTests)")
         println("FAIL: \(failedTests)")
         println("SKIP: \(skippedTests)")
         _printDebuggingAdvice()
-        _testCaseFailedCallback()
+        _testSuiteFailedCallback()
       } else {
-        println("\(testCase.name): All tests passed")
+        println("\(testSuite.name): All tests passed")
       }
     }
   }
@@ -676,22 +676,22 @@ public func runAllTests() {
   }
 }
 
-public class TestCase {
+public class TestSuite {
   public init(_ name: String) {
     self.name = name
     _precondition(
       _testNameToIndex[name] == nil,
-      "test case with the same name already exists")
-    _allTestCases.append(self)
-    _testCaseNameToIndex[name] = _allTestCases.count - 1
+      "test suite with the same name already exists")
+    _allTestSuites.append(self)
+    _testSuiteNameToIndex[name] = _allTestSuites.count - 1
   }
 
   public func test(name: String, _ testFunction: () -> ()) {
-    _TestBuilder(testCase: self, name: name).code(testFunction)
+    _TestBuilder(testSuite: self, name: name).code(testFunction)
   }
 
   public func test(name: String) -> _TestBuilder {
-    return _TestBuilder(testCase: self, name: name)
+    return _TestBuilder(testSuite: self, name: name)
   }
 
   func _getTestByName(name: String) -> _Test {
@@ -715,7 +715,7 @@ public class TestCase {
   }
 
   public struct _TestBuilder {
-    let _testCase: TestCase
+    let _testSuite: TestSuite
     var _name: String
     var _data: _Data = _Data()
 
@@ -725,8 +725,8 @@ public class TestCase {
       var _crashOutputMatches: String?
     }
 
-    init(testCase: TestCase, name: String) {
-      _testCase = testCase
+    init(testSuite: TestSuite, name: String) {
+      _testSuite = testSuite
       _name = name
     }
 
@@ -746,10 +746,10 @@ public class TestCase {
     }
 
     public func code(testFunction: () -> ()) {
-      _testCase._tests.append(_Test(
+      _testSuite._tests.append(_Test(
         name: _name, xfail: _data._xfail, skip: _data._skip,
         crashOutputMatches: _data._crashOutputMatches, code: testFunction))
-      _testCase._testNameToIndex[_name] = _testCase._tests.count - 1
+      _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
   }
 

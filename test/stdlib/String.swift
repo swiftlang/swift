@@ -15,7 +15,7 @@ extension String {
   }
 }
 
-var StringTests = TestCase("StringTests")
+var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
   expectEqual(3 * sizeof(Int.self), sizeof(String.self))

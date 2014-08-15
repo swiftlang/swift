@@ -8,9 +8,9 @@
 
 import StdlibUnittest
 
-var TestCaseFails = TestCase("TestCaseFails")
+var TestSuiteFails = TestSuite("TestSuiteFails")
 
-TestCaseFails.test("fails") {
+TestSuiteFails.test("fails") {
   expectEqual(1, 2)
 }
 

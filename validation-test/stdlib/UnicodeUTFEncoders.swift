@@ -152,7 +152,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
   }
 }
 
-var UTFEncoders = TestCase("UTFEncoders")
+var UTFEncoders = TestSuite("UTFEncoders")
 
 UTFEncoders.test("encodeRandomBlock") {
   srandomdev()

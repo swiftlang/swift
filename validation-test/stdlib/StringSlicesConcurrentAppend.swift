@@ -5,7 +5,7 @@ import Swift
 import StdlibUnittest
 import Dispatch
 
-var StringTestCase = TestCase("String")
+var StringTestSuite = TestSuite("String")
 
 extension String {
   var bufferID: UWord {
@@ -82,7 +82,7 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
   }
 }
 
-StringTestCase.test("SliceConcurrentAppend") {
+StringTestSuite.test("SliceConcurrentAppend") {
   barrierVar = UnsafeMutablePointer.alloc(1)
   barrierVar.initialize(_stdlib_pthread_barrier_t())
   var ret = _stdlib_pthread_barrier_init(barrierVar, nil, 2)

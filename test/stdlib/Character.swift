@@ -104,7 +104,7 @@ func randomGraphemeCluster(minSize: Int, maxSize: Int) -> String {
 // Tests.
 //===---
 
-var CharacterTests = TestCase("Character")
+var CharacterTests = TestSuite("Character")
 
 CharacterTests.test("literal") {
   if true {

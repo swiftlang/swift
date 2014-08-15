@@ -4,9 +4,9 @@ import CoreGraphics
 import Foundation
 import StdlibUnittest
 
-var CGFloatTestCase = TestCase("CGFloat")
+var CGFloatTestSuite = TestSuite("CGFloat")
 
-CGFloatTestCase.test("literals") {
+CGFloatTestSuite.test("literals") {
   var flt: CGFloat = 4.125
   expectEqual(4.125, flt)
 
@@ -14,7 +14,7 @@ CGFloatTestCase.test("literals") {
   expectEqual(42, flt)
 }
 
-CGFloatTestCase.test("init") {
+CGFloatTestSuite.test("init") {
   expectEqual(0.0, CGFloat())
   expectEqual(4.125, CGFloat(Float(4.125)))
   expectEqual(4.125, CGFloat(Double(4.125)))
@@ -31,7 +31,7 @@ CGFloatTestCase.test("init") {
   expectEqual(42, CGFloat(UInt64(42)))
 }
 
-CGFloatTestCase.test("initOtherTypesFromCGFloat") {
+CGFloatTestSuite.test("initOtherTypesFromCGFloat") {
   let flt: CGFloat = 4.125
 
   expectEqual(4.125, Float(flt))
@@ -49,7 +49,7 @@ CGFloatTestCase.test("initOtherTypesFromCGFloat") {
   expectEqual(4, UInt64(flt))
 }
 
-CGFloatTestCase.test("comparisons") {
+CGFloatTestSuite.test("comparisons") {
   let x = 3.14
   let y = 3.14
   let z = 2.71
@@ -82,7 +82,7 @@ CGFloatTestCase.test("comparisons") {
 }
 
 
-CGFloatTestCase.test("arithmetic") {
+CGFloatTestSuite.test("arithmetic") {
   let x: CGFloat = 0.25
   let y: CGFloat = 4
   let z: CGFloat = 0.5
@@ -98,7 +98,7 @@ CGFloatTestCase.test("arithmetic") {
   expectEqual(0.25, x % z)
 }
 
-CGFloatTestCase.test("striding") {
+CGFloatTestSuite.test("striding") {
   if true {
     var result = [CGFloat]()
     for f: CGFloat in stride(from: 1.0, to: 2.0, by: 0.5) {
@@ -116,7 +116,7 @@ CGFloatTestCase.test("striding") {
   }
 }
 
-CGFloatTestCase.test("bridging") {
+CGFloatTestSuite.test("bridging") {
   // Bridging to NSNumber.
   if true {
     let flt: CGFloat = 4.125

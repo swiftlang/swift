@@ -14,7 +14,7 @@
 import StdlibUnittest
 import Foundation
 
-var nsValueBridging = TestCase("NSValueBridging")
+var nsValueBridging = TestSuite("NSValueBridging")
 
 nsValueBridging.test("NSRange") {
   let nsValue = _bridgeToObjectiveC(NSRange(location: 17, length: 19)) as NSValue

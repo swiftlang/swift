@@ -2,9 +2,9 @@
 
 import StdlibUnittest
 
-var RangeTestCase = TestCase("Range")
+var RangeTestSuite = TestSuite("Range")
 
-RangeTestCase.test("ReverseRange") {
+RangeTestSuite.test("ReverseRange") {
   // We no longer have a ReverseRange, but we can still make sure that
   // lazy reversal works correctly.
   expectTrue(equal(lazy(0..<10).reverse(), [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]))
@@ -12,7 +12,7 @@ RangeTestCase.test("ReverseRange") {
 
 func isEquatable<E : Equatable>(e: E) {}
 
-RangeTestCase.test("Range/Equatable") {
+RangeTestSuite.test("Range/Equatable") {
   let r1 = Range(start: 0, end: 0)
   let r2 = Range(start: 0, end: 1)
   isEquatable(r1)
@@ -47,7 +47,7 @@ func == <T: ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-RangeTestCase.test("Printing") {
+RangeTestSuite.test("Printing") {
   expectEqual("0..<10", toString(X(0)..<X(10)))
   expectEqual("Range(X(0)..<X(10))", toDebugString(Range(X(0)..<X(10))))
 
@@ -56,7 +56,7 @@ RangeTestCase.test("Printing") {
   expectEqual("Range(X(10)..<X(42))", toDebugString(Range(X(10)...X(41))))
 }
 
-RangeTestCase.test("Pattern matching") {
+RangeTestSuite.test("Pattern matching") {
   let x = 0..<20
   // FIXME: These don't work yet: <rdar://problem/17668465>
   // expectTrue(x ~= 10)
@@ -64,7 +64,7 @@ RangeTestCase.test("Pattern matching") {
   // expectFalse(x ~= -1)
 }
 
-RangeTestCase.test("stride") {
+RangeTestSuite.test("stride") {
   var result = [Double]()
   for i in stride(from: 1.4, through: 3.4, by: 1) {
     result.append(i)
@@ -72,7 +72,7 @@ RangeTestCase.test("stride") {
   expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
 
-RangeTestCase.test("map") {
+RangeTestSuite.test("map") {
   // <rdar://problem/17054014> map method should exist on ranges
   expectEqual([ 2, 4, 6 ], Array((1...3).map {$0*2}))
 }

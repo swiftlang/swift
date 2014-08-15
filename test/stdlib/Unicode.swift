@@ -6,7 +6,7 @@ import Swift
 import StdlibUnittest
 import Foundation
 
-var UTF16APIs = TestCase("UTF16APIs")
+var UTF16APIs = TestSuite("UTF16APIs")
 
 UTF16APIs.test("width") {
   expectEqual(1, UTF16.width("x"))
@@ -705,7 +705,7 @@ let UTF16Tests = [
   ],
 ]
 
-var UnicodeScalarTests = TestCase("UnicodeScalarTests")
+var UnicodeScalarTests = TestSuite("UnicodeScalarTests")
 
 UnicodeScalarTests.test("literal") {
   if true {
@@ -734,7 +734,7 @@ UnicodeScalarTests.test("init") {
   expectEqual("i", UnicodeScalar(UInt8(105)))
 }
 
-var UTF8Decoder = TestCase("UTF8Decoder")
+var UTF8Decoder = TestSuite("UTF8Decoder")
 
 UTF8Decoder.test("Internal/_numTrailingBytes") {
   for i in UInt8(0x00)...UInt8(0x7f) {
@@ -1851,7 +1851,7 @@ UTF8Decoder.test("Noncharacters") {
   expectTrue(checkDecodeUTF8([ 0xfdff ], [], [ 0xef, 0xb7, 0xbf ]))
 }
 
-var UTF16Decoder = TestCase("UTF16Decoder")
+var UTF16Decoder = TestSuite("UTF16Decoder")
 
 UTF16Decoder.test("measure") {
   if true {
@@ -1890,7 +1890,7 @@ UTF16Decoder.test("Decoding") {
   }
 }
 
-var UTF32Decoder = TestCase("UTF32Decoder")
+var UTF32Decoder = TestSuite("UTF32Decoder")
 
 UTF32Decoder.test("Empty") {
   expectTrue(checkDecodeUTF32([], [], []))
@@ -2029,7 +2029,7 @@ UTF32Decoder.test("IllFormed") {
   expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0xffff_ffff ]))
 }
 
-var UTF8Encoder = TestCase("UTF8Encoder")
+var UTF8Encoder = TestSuite("UTF8Encoder")
 
 UTF8Encoder.test("SmokeTest") {
   for test in UTF8TestsSmokeTest {
@@ -2113,7 +2113,7 @@ func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
   }
 }
 
-var StringCookedViews = TestCase("StringCookedViews")
+var StringCookedViews = TestSuite("StringCookedViews")
 
 StringCookedViews.test("UTF8ForContiguousUTF16") {
   for test in UTF8TestsSmokeTest {
@@ -2312,7 +2312,7 @@ StringCookedViews.test("UnicodeScalars") {
   }
 }
 
-var StringTests = TestCase("StringTests")
+var StringTests = TestSuite("StringTests")
 
 StringTests.test("StreamableConformance") {
   forStringsWithUnpairedSurrogates {

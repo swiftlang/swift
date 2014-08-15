@@ -4,53 +4,53 @@
 import StdlibUnittest
 
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-_setTestCaseFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { println("abort()") }
 
 //
 // Test that harness aborts when a test fails
 //
 
-var TestCasePasses = TestCase("TestCasePasses")
-TestCasePasses.test("passes") {
+var TestSuitePasses = TestSuite("TestSuitePasses")
+TestSuitePasses.test("passes") {
   expectEqual(1, 1)
 }
-// CHECK: [       OK ] TestCasePasses.passes{{$}}
-// CHECK: TestCasePasses: All tests passed
+// CHECK: [       OK ] TestSuitePasses.passes{{$}}
+// CHECK: TestSuitePasses: All tests passed
 
-var TestCaseUXPasses = TestCase("TestCaseUXPasses")
-TestCaseUXPasses.test("uxpasses").xfail(.OSXAny("")).code {
+var TestSuiteUXPasses = TestSuite("TestSuiteUXPasses")
+TestSuiteUXPasses.test("uxpasses").xfail(.OSXAny("")).code {
   expectEqual(1, 1)
 }
-// CHECK: [   UXPASS ] TestCaseUXPasses.uxpasses{{$}}
-// CHECK: TestCaseUXPasses: Some tests failed, aborting
+// CHECK: [   UXPASS ] TestSuiteUXPasses.uxpasses{{$}}
+// CHECK: TestSuiteUXPasses: Some tests failed, aborting
 // CHECK: UXPASS: [uxpasses]
 // CHECK: FAIL: []
 // CHECK: SKIP: []
 // CHECK: abort()
 
-var TestCaseFails = TestCase("TestCaseFails")
-TestCaseFails.test("fails") {
+var TestSuiteFails = TestSuite("TestSuiteFails")
+TestSuiteFails.test("fails") {
   expectEqual(1, 2)
 }
-// CHECK: [     FAIL ] TestCaseFails.fails{{$}}
-// CHECK: TestCaseFails: Some tests failed, aborting
+// CHECK: [     FAIL ] TestSuiteFails.fails{{$}}
+// CHECK: TestSuiteFails: Some tests failed, aborting
 // CHECK: UXPASS: []
 // CHECK: FAIL: [fails]
 // CHECK: SKIP: []
 // CHECK: abort()
 
-var TestCaseXFails = TestCase("TestCaseXFails")
-TestCaseXFails.test("xfails").xfail(.OSXAny("")).code {
+var TestSuiteXFails = TestSuite("TestSuiteXFails")
+TestSuiteXFails.test("xfails").xfail(.OSXAny("")).code {
   expectEqual(1, 2)
 }
-// CHECK: [    XFAIL ] TestCaseXFails.xfails{{$}}
-// CHECK: TestCaseXFails: All tests passed
+// CHECK: [    XFAIL ] TestSuiteXFails.xfails{{$}}
+// CHECK: TestSuiteXFails: All tests passed
 
 //
 // Test 'xfail:' and 'skip:' annotations
 //
 
-var XFailsAndSkips = TestCase("XFailsAndSkips")
+var XFailsAndSkips = TestSuite("XFailsAndSkips")
 
 // CHECK: [       OK ] XFailsAndSkips.passes{{$}}
 XFailsAndSkips.test("passes") {
@@ -100,7 +100,7 @@ XFailsAndSkips.test("skip 10.9.3")
 // Test custom XFAIL predicates
 //
 
-var XFailsCustomPredicates = TestCase("XFailsCustomPredicates")
+var XFailsCustomPredicates = TestSuite("XFailsCustomPredicates")
 
 // CHECK: [    XFAIL ] XFailsCustomPredicates.matches{{$}}
 XFailsCustomPredicates.test("matches")
@@ -120,7 +120,7 @@ XFailsCustomPredicates.test("not matches")
 // Test version comparison rules
 //
 
-var XFailsOSX = TestCase("XFailsOSX")
+var XFailsOSX = TestSuite("XFailsOSX")
 
 // CHECK: [   UXPASS ] XFailsOSX.xfail OSX passes{{$}}
 XFailsOSX.test("xfail OSX passes").xfail(.OSXAny("")).code {
@@ -195,7 +195,7 @@ XFailsOSX.test("xfail 10.9.[3-4]")
 // Check that we pass through stdout and stderr
 //
 
-var PassThroughStdoutStderr = TestCase("PassThroughStdoutStderr")
+var PassThroughStdoutStderr = TestSuite("PassThroughStdoutStderr")
 
 PassThroughStdoutStderr.test("hasNewline") {
   println("stdout first")

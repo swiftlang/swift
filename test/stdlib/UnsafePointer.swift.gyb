@@ -4,49 +4,49 @@
 
 import StdlibUnittest
 
-var UnsafePointerTestCase = TestCase("UnsafePointer")
-var UnsafeMutablePointerTestCase = TestCase("UnsafeMutablePointer")
-var COpaquePointerTestCase = TestCase("COpaquePointer")
+var UnsafePointerTestSuite = TestSuite("UnsafePointer")
+var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
+var COpaquePointerTestSuite = TestSuite("COpaquePointer")
 
 % for (SelfName, SelfType) in [
 %     ( 'UnsafePointer', 'UnsafePointer<Float>' ),
 %     ( 'UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
 %     ( 'COpaquePointer', 'COpaquePointer' ) ]:
 
-${SelfName}TestCase.test("convertFromNil") {
+${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType} = nil
   expectEqual(0, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("null()") {
+${SelfName}TestSuite.test("null()") {
   let ptr = ${SelfType}.null()
   expectEqual(0, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("initNoArgs") {
+${SelfName}TestSuite.test("initNoArgs") {
   let ptr = ${SelfType}()
   expectEqual(0, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("initFromCOpaquePointer") {
+${SelfName}TestSuite.test("initFromCOpaquePointer") {
   let other = UnsafePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("initFromUnsafePointer") {
+${SelfName}TestSuite.test("initFromUnsafePointer") {
   let other = UnsafePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("initFromUnsafeMutablePointer") {
+${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
   let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 
-${SelfName}TestCase.test("initFromInteger") {
+${SelfName}TestSuite.test("initFromInteger") {
   if true {
     let word: Word = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
@@ -59,7 +59,7 @@ ${SelfName}TestCase.test("initFromInteger") {
   }
 }
 
-${SelfName}TestCase.test("Hashable") {
+${SelfName}TestSuite.test("Hashable") {
   let ptrs = [
     ${SelfType}(bitPattern: 0x0),
     ${SelfType}(bitPattern: 0x12345678),

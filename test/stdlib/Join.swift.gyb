@@ -16,11 +16,11 @@
 
 import StdlibUnittest
 
-var JoinTestCase = TestCase("Join")
+var JoinTestSuite = TestSuite("Join")
 
 %for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
 
-JoinTestCase.test("${ArrayType}") {
+JoinTestSuite.test("${ArrayType}") {
   typealias ArrayType = ${ArrayType}<Int>
 
   //
@@ -175,7 +175,7 @@ JoinTestCase.test("${ArrayType}") {
 
 %end
 
-JoinTestCase.test("String") {
+JoinTestSuite.test("String") {
   //
   // Test the free function.
   //
@@ -260,7 +260,7 @@ struct MockExtensibleCollection : ExtensibleCollectionType {
 }
 
 
-JoinTestCase.test("ReservesCapacity") {
+JoinTestSuite.test("ReservesCapacity") {
   if true {
     let r = join(MockExtensibleCollection([]), [])
     expectEqual(0, r._reservedCapacity!)
@@ -313,7 +313,7 @@ struct MinimalCollection : CollectionType {
   var _storage: Array<Int> = []
 }
 
-JoinTestCase.test("OperatorPlus") {
+JoinTestSuite.test("OperatorPlus") {
   // ExtensibleCollectionType + SequenceType
   if true {
     var ec: [Int] = []
