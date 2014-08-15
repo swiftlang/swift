@@ -4685,6 +4685,10 @@ void ClangImporter::Implementation::importAttributes(
 {
   ASTContext &C = SwiftContext;
 
+  if (auto maybeDefinition = getDefinitionForClangTypeDecl(ClangDecl))
+    if (maybeDefinition.getValue())
+      ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
+
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
   bool IsUnavailable = false;

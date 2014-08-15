@@ -1,8 +1,9 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-macosx10.9 %s
+// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-macosx10.9 %s
 
 import Foundation
 import stdio
+import AvailabilityExtras
 
 // Test if an instance method marked __attribute__((unavailable)) on
 // the *class* NSObject can be used.
@@ -52,4 +53,25 @@ func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColorRef ) {
   CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
   CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}}
   CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}}
+}
+
+func testRedeclarations() {
+  unavail1() // expected-error {{is unavailable: first}}
+  unavail2() // expected-error {{is unavailable: middle}}
+  unavail3() // expected-error {{is unavailable: last}}
+
+  UnavailClass1.self // expected-error {{is unavailable: first}}
+  UnavailClass2.self // expected-error {{is unavailable: middle}}
+  UnavailClass3.self // expected-error {{is unavailable: last}}
+
+  let _: UnavailStruct1 // expected-error {{is unavailable: first}}
+  let _: UnavailStruct2 // expected-error {{is unavailable: first}}
+  let _: UnavailStruct3 // expected-error {{is unavailable: first}}
+  let _: UnavailStruct4 // expected-error {{is unavailable: middle}}
+  let _: UnavailStruct5 // expected-error {{is unavailable: middle}}
+  let _: UnavailStruct6 // expected-error {{is unavailable: last}}
+
+  let _: UnavailProto1 // expected-error {{is unavailable: first}}
+  let _: UnavailProto2 // expected-error {{is unavailable: middle}}
+  let _: UnavailProto3 // expected-error {{is unavailable: last}}
 }

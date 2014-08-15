@@ -791,24 +791,31 @@ ClangImporter::Implementation::getAPINotesForModule(
            .first->second.get();
 }
 
+Optional<const clang::Decl *>
+ClangImporter::Implementation::getDefinitionForClangTypeDecl(
+    const clang::Decl *D) {
+  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
+    return OID->getDefinition();
+
+  if (auto TD = dyn_cast<clang::TagDecl>(D))
+    return TD->getDefinition();
+
+  if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
+    return OPD->getDefinition();
+
+  return Nothing;
+}
+
 Optional<clang::Module *>
 ClangImporter::Implementation::getClangSubmoduleForDecl(
     const clang::Decl *D,
     bool allowForwardDeclaration) {
   const clang::Decl *actual = nullptr;
-  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
-    // Put the Objective-C class into the module that contains the @interface
-    // definition, not just some @class forward declaration.
-    actual = OID->getDefinition();
-    if (!actual && !allowForwardDeclaration)
-      return Nothing;
 
-  } else if (auto TD = dyn_cast<clang::TagDecl>(D)) {
-    actual = TD->getDefinition();
-    if (!actual && !allowForwardDeclaration)
-      return Nothing;
-  } else if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D)) {
-    actual = OPD->getDefinition();
+  // Put an Objective-C class into the module that contains the @interface
+  // definition, not just some @class forward declaration.
+  if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
+    actual = maybeDefinition.getValue();
     if (!actual && !allowForwardDeclaration)
       return Nothing;
   }
