@@ -30,7 +30,12 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
+llvm::cl::opt<bool>
+    SILViewCFG("sil-view-cfg", llvm::cl::init(false),
+               llvm::cl::desc("Only print out the sil for this function"));
 
 using namespace swift;
 
@@ -234,6 +239,13 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     SILPassManager PrinterPM(&Module, Options);
     PrinterPM.add(createSILInstCount());
     PrinterPM.runOneIteration();
+  }
+
+  // Call the CFG viewer.
+  if (SILViewCFG) {
+    PM.resetAndRemoveTransformations();
+    PM.add(createSILCFGPrinter());
+    PM.runOneIteration();
   }
 
   DEBUG(Module.verify());
