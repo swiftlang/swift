@@ -86,6 +86,38 @@ StringTests.test("indexComparability") {
   expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
 }
 
+StringTests.test("IndexPortability/Valid") {
+  if true {
+    let donor = "abcdef"
+    let acceptor = "uvwxyz"
+    expectEqual("u", acceptor[donor.startIndex])
+    expectEqual("wxy",
+      acceptor[advance(donor.startIndex, 2)..<advance(donor.startIndex, 5)])
+  }
+  if true {
+    let donor = "abcdef"
+    let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
+    expectEqual("\u{fffd}", acceptor[donor.startIndex])
+    expectEqual("\u{fffd}", acceptor[donor.startIndex.successor()])
+    expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
+      acceptor[advance(donor.startIndex, 1)..<advance(donor.startIndex, 5)])
+    expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
+      acceptor[advance(donor.startIndex, 2)..<advance(donor.startIndex, 5)])
+  }
+}
+
+StringTests.test("IndexPortability/OutOfBoundsTrap") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("u", acceptor[advance(donor.startIndex, 0)])
+  expectEqual("v", acceptor[advance(donor.startIndex, 1)])
+  expectEqual("w", acceptor[advance(donor.startIndex, 2)])
+
+  expectCrashLater()
+  acceptor[advance(donor.startIndex, 3)]
+}
+
 StringTests.test("_splitFirst") {
   var (before, after, found) = "foo.bar"._splitFirst(".")
   expectTrue(found)
