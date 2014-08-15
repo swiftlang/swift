@@ -542,7 +542,7 @@ extension String : ExtensibleCollectionType {
       S : SequenceType
       where S.Generator.Element == Character
   >(seq: S) {
-    reserveCapacity(underestimateCount(seq))
+    reserveCapacity(_core.count + underestimateCount(seq))
     for c in seq {
       self.append(c)
     }
