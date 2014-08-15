@@ -106,6 +106,19 @@ StringTests.test("IndexPortability/Valid") {
   }
 }
 
+StringTests.test("IndexPortability/UnexpectedCrash")
+  .xfail(
+    .Custom({ true },
+    reason: "<rdar://problem/18029290> String.Index caches the grapheme " +
+      "cluster size, but it is not always correct to use"))
+  .code {
+
+  let donor = "\u{1f601}\u{1f602}\u{1f603}"
+  let acceptor = "abcdef"
+  // FIXME: this traps right now when trying to construct Character("ab").
+  expectEqual("a", acceptor[donor.startIndex])
+}
+
 StringTests.test("IndexPortability/OutOfBoundsTrap") {
   let donor = "abcdef"
   let acceptor = "uvw"
