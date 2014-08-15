@@ -60,7 +60,11 @@ func printedIs<T>(
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = toString(object)
-  if expected1 != actual && (expected2 != nil && expected2! != actual) {
+  var match = expected1 == actual
+  if !match && expected2 != nil {
+    match = expected2! == actual
+  }
+  if !match {
     println("check failed at \(file), line \(line)")
     println("expected: \"\(expected1)\" or \"\(expected2)\"")
     println("actual: \"\(actual)\"")
@@ -660,7 +664,10 @@ func test_TuplePrinting() {
   printedIs(tuple4, "(42, <10 20 30 40>)")
 
   var tuple5 = (42, ClassPrintable(3))
-  printedIs(tuple3, "(42, ►3◀︎)")
+  printedIs(tuple5, "(42, ►3◀︎)")
+
+  var tuple6 = ([123: 123], (1, 2, "3"))
+  printedIs(tuple6, "([123: 123], (1, 2, 3))")
 
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
