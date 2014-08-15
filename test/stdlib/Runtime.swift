@@ -937,6 +937,22 @@ Reflection.test("TupleMirror") {
 
     expectEqual(expected, output)
   }
+
+  if true {
+    // A nested tuple.
+    var output = ""
+    let tuple = (1, ("Hello", "World"))
+    dump(tuple, &output)
+
+    var expected = ""
+    expected += "▿ (2 elements)\n"
+    expected += "  - .0: 1\n"
+    expected += "  ▿ .1: (2 elements)\n"
+    expected += "    - .0: Hello\n"
+    expected += "    - .1: World\n"
+
+    expectEqual(expected, output)
+  }
 }
 
 class DullClass {}
