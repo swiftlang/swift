@@ -35,7 +35,7 @@
 
 llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
-               llvm::cl::desc("Only print out the sil for this function"));
+               llvm::cl::desc("Enable the sil cfg viewer pass"));
 
 using namespace swift;
 
