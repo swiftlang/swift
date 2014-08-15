@@ -15,6 +15,8 @@ extension String {
   }
 }
 
+func expectType<T>(_: T.Type, inout x: T) {}
+
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
@@ -103,6 +105,65 @@ StringTests.test("hasPrefix") {
   expectFalse("a\u{0301}bc".hasPrefix("a"))
   expectTrue("\u{00e1}bc".hasPrefix("a\u{0301}"))
   expectTrue("a\u{0301}bc".hasPrefix("\u{00e1}"))
+}
+
+StringTests.test("literalConcatenation") {
+  if true {
+    // UnicodeScalarLiteral + UnicodeScalarLiteral
+    var s = "1" + "2"
+    expectType(String.self, &s)
+    expectEqual("12", s)
+  }
+  if true {
+    // UnicodeScalarLiteral + ExtendedGraphemeClusterLiteral
+    var s = "1" + "a\u{0301}"
+    expectType(String.self, &s)
+    expectEqual("1a\u{0301}", s)
+  }
+  if true {
+    // UnicodeScalarLiteral + StringLiteral
+    var s = "1" + "xyz"
+    expectType(String.self, &s)
+    expectEqual("1xyz", s)
+  }
+
+  if true {
+    // ExtendedGraphemeClusterLiteral + UnicodeScalar
+    var s = "a\u{0301}" + "z"
+    expectType(String.self, &s)
+    expectEqual("a\u{0301}z", s)
+  }
+  if true {
+    // ExtendedGraphemeClusterLiteral + ExtendedGraphemeClusterLiteral
+    var s = "a\u{0301}" + "e\u{0302}"
+    expectType(String.self, &s)
+    expectEqual("a\u{0301}e\u{0302}", s)
+  }
+  if true {
+    // ExtendedGraphemeClusterLiteral + StringLiteral
+    var s = "a\u{0301}" + "xyz"
+    expectType(String.self, &s)
+    expectEqual("a\u{0301}xyz", s)
+  }
+
+  if true {
+    // StringLiteral + UnicodeScalar
+    var s = "xyz" + "1"
+    expectType(String.self, &s)
+    expectEqual("xyz1", s)
+  }
+  if true {
+    // StringLiteral + ExtendedGraphemeClusterLiteral
+    var s = "xyz" + "a\u{0301}"
+    expectType(String.self, &s)
+    expectEqual("xyza\u{0301}", s)
+  }
+  if true {
+    // StringLiteral + StringLiteral
+    var s = "xyz" + "abc"
+    expectType(String.self, &s)
+    expectEqual("xyzabc", s)
+  }
 }
 
 StringTests.test("appendToSubstring") {
