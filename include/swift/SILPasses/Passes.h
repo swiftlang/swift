@@ -88,6 +88,7 @@ namespace swift {
   SILTransform *createLICMPass();
   SILTransform *createArrayOpts();
   SILTransform *createABCOpt();
+  SILTransform *createCapturePropagation();
 
   // Utilities
   SILTransform *createStripDebug();

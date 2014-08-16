@@ -2,6 +2,7 @@ add_subdirectory(Utils)
 add_swift_library(swiftSILPasses
   AllocBoxToStack.cpp
   CapturePromotion.cpp
+  CapturePropagation.cpp
   ConstantPropagation.cpp
   CSE.cpp
   SILCodeMotion.cpp

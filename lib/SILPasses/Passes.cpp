@@ -215,6 +215,14 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // Hoist globals out of loops.
   PM.add(createGlobalOpt());
 
+  // Propagate constants into closures and convert to static dispatch.  This
+  // should run after specialization and inlining because we don't want to
+  // specialize a call that can be inlined. It should run before
+  // ClosureSpecialization, because constant propagation is more effective.  At
+  // least one round of SSA optimization and inlining should run after this to
+  // take advantage of static dispatch.
+  PM.add(createCapturePropagation());
+
   // Insert inline caches for virtual calls.
   PM.add(createDevirtualization());
   PM.add(createInlineCaches());
@@ -222,7 +230,8 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   PM.resetAndRemoveTransformations();
 
   // Run another iteration of the SSA optimizations to optimize the
-  // devirtualized inline caches.
+  // devirtualized inline caches and constants propagated into closures
+  // (CapturePropagation).
   AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
   PM.runOneIteration();
 
