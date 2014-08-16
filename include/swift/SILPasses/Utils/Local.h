@@ -92,6 +92,11 @@ namespace swift {
   /// instruction.
   TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                 TermInst *Branch);
+
+  /// \brief Get the linkage to be used for specializations of a function with
+  /// the given linkage.
+  SILLinkage getSpecializedLinkage(SILLinkage L);
+
 } // end namespace swift
 
 #endif

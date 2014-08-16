@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-function-signature-opts"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/NullablePtr.h"
@@ -205,30 +206,12 @@ private:
 
 } // end anonymous namespace
 
-static SILLinkage getOptimizedLinkage(SILLinkage L) {
-  switch (L) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-    // Specializations of public or hidden symbols can be shared by all TUs
-    // that specialize the definition.
-    return SILLinkage::Shared;
-
-  case SILLinkage::Private:
-    // Specializations of private symbols should remain so.
-    return SILLinkage::Private;
-  }
-}
-
 SILFunction *FunctionSignatureOptCloner::initCloned(
     SILFunction &Orig, ArrayRef<ArgumentDescriptor> Args, StringRef NewName) {
   SILModule &M = Orig.getModule();
 
   // TODO: Change this to always be shared perhaps.
-  SILLinkage OptimizedLinkage = getOptimizedLinkage(Orig.getLinkage());
+  SILLinkage OptimizedLinkage = getSpecializedLinkage(Orig.getLinkage());
 
   // Create the new optimized function type.
   CanSILFunctionType OldFTy = Orig.getLoweredFunctionType();

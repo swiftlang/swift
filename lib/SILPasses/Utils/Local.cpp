@@ -293,3 +293,21 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
 
   llvm_unreachable("unsupported terminator");
 }
+
+SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
+  switch (L) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+    // Specializations of public or hidden symbols can be shared by all TUs
+    // that specialize the definition.
+    return SILLinkage::Shared;
+
+  case SILLinkage::Private:
+    // Specializations of private symbols should remain so.
+    return SILLinkage::Private;
+  }
+}
