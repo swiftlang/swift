@@ -21,6 +21,7 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -1219,7 +1220,8 @@ removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest, int idx) {
 
     if (Dest == CBI->getTrueBB())
       TrueArgs.erase(TrueArgs.begin() + idx);
-    else
+
+    if (Dest == CBI->getFalseBB())
       FalseArgs.erase(FalseArgs.begin() + idx);
 
     Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
@@ -1437,7 +1439,14 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     Changed = true;
     BB->eraseArgument(i);
 
+    // Determine the set of predecessors in case any predecessor has
+    // two edges to this block (e.g. a conditional branch where both
+    // sides reach this block).
+    llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
     for (auto *Pred : BB->getPreds())
+      PredBBs.insert(Pred);
+
+    for (auto *Pred : PredBBs)
       removeArgumentFromTerminator(Pred, BB, i);
   }
 

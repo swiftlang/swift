@@ -389,3 +389,12 @@ bb3:
 bb4(%3 : $Builtin.Int1):
   return %3 : $Builtin.Int1
 }
+
+sil @same_destination_unused_arg : $@thin (Optional<Int>) -> Optional<Int> {
+bb0(%0 : $Optional<Int>):
+  %1 = enum_is_tag $Builtin.Int1, %0 : $Optional<Int>, #Optional.Some!enumelt.1
+  cond_br %1, bb1(%0 : $Optional<Int>), bb1(%0 : $Optional<Int>)
+
+bb1(%2 : $Optional<Int>):
+  return %0 : $Optional<Int>
+}
