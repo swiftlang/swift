@@ -109,7 +109,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
-    // If the instruction is not dead or force is false, there is nothing to do.
+    // If the instruction is not dead and force is false, do nothing.
     if (Force || isInstructionTriviallyDead(I))
       DeadInsts.insert(I);
   }
