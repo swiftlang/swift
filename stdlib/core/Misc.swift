@@ -178,9 +178,10 @@ public func _stdlib_demangleName(mangledName: String) -> String {
   }
 }
 
-/// Returns floor(log(x)) for x. This equals to the position of the most
+/// Returns `floor(log(x))`.  This equals to the position of the most
 /// significant non-zero bit, or 63 - number-of-zeros before it.
-/// The function should be used only for positive values.
+///
+/// The function is only defined for positive values of `x`.
 ///
 /// Examples::
 ///
@@ -191,7 +192,9 @@ public func _stdlib_demangleName(mangledName: String) -> String {
 /// TODO: Implement version working on Int instead of Int64.
 @transparent
 func _floorLog2(x: Int64) -> Int {
-  _sanityCheck(x > 0)
-  return 63 - Int(_countLeadingZeros(x))
+  _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
+  // Note: use unchecked subtraction because we this expression can not
+  // overflow.
+  return 63 &- Int(_countLeadingZeros(x))
 }
 
