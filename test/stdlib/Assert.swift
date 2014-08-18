@@ -9,13 +9,16 @@
 // RUN: %target-run %t/Assert_Debug Debug AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug AssertionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug Debug AssertionFailureInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 //
 // RUN: %target-run %t/Assert_Debug Debug Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug PreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug PreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug Debug PreconditionFailureInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 //
 // RUN: %target-run %t/Assert_Debug Debug FatalError 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug Debug FatalErrorInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 //
 // RUN: %target-run %t/Assert_Debug Debug StdlibPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
 // RUN: %target-run %t/Assert_Debug Debug StdlibPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
@@ -178,6 +181,15 @@ if (Process.arguments[2] == "AssertionFailure") {
   testAssertionFailure()
 }
 
+func testAssertionFailureInterpolation() {
+  var should = "should"
+  println("OK")
+  assertionFailure("this \(should) fail")
+}
+if (Process.arguments[2] == "AssertionFailureInterpolation") {
+  testAssertionFailureInterpolation()
+}
+
 func testPrecondition() {
   var x = 2
   precondition(x * 21 == 42, "should not fail")
@@ -226,12 +238,30 @@ if (Process.arguments[2] == "PreconditionFailure") {
   testPreconditionFailure()
 }
 
+func testPreconditionFailureInterpolation() {
+  var should = "should"
+  println("OK")
+  preconditionFailure("this \(should) fail")
+}
+if (Process.arguments[2] == "PreconditionFailureInterpolation") {
+  testPreconditionFailureInterpolation()
+}
+
 func testFatalError() {
   println("OK")
   fatalError("this should fail")
 }
 if (Process.arguments[2] == "FatalError") {
   testFatalError()
+}
+
+func testFatalErrorInterpolation() {
+  var should = "should"
+  println("OK")
+  fatalError("this \(should) fail")
+}
+if (Process.arguments[2] == "FatalErrorInterpolation") {
+  testFatalErrorInterpolation()
 }
 
 func testStdlibPrecondition() {

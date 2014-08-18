@@ -80,15 +80,23 @@ public func precondition${generic_params}(
 
 % end
 
+% for (generic_params, message_param, message_eval) in [
+%     ( '',
+%       'message: StaticString',
+%       'message' ),
+%     ( '<Str : AssertStringType>',
+%       'message: Str',
+%       'message.stringValue' ),
+%   ]:
+
 /// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
 @transparent @noreturn
-public func assertionFailure(
-  message: StaticString,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+public func assertionFailure${generic_params}(
+  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message, file, line)
+    _assertionFailed("fatal error", ${message_eval}, file, line)
   }
   _conditionallyUnreachable()
 }
@@ -97,13 +105,12 @@ public func assertionFailure(
 /// in optimized mode.  In unchecked builds this is a noop, but the
 /// optimizer can still assume that the call is unreachable.
 @transparent @noreturn
-public func preconditionFailure(
-  message: StaticString,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+public func preconditionFailure${generic_params}(
+  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailed("fatal error", message, file, line)
+    _assertionFailed("fatal error", ${message_eval}, file, line)
   } else if _isReleaseAssertConfiguration() {
     Builtin.int_trap()
   }
@@ -113,12 +120,13 @@ public func preconditionFailure(
 /// A fatal error occurred and program execution should stop in debug,
 /// optimized and unchecked modes.
 @transparent @noreturn
-public func fatalError(
-  message: StaticString,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+public func fatalError${generic_params}(
+  ${message_param}, file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  _assertionFailed("fatal error", message, file, line)
+  _assertionFailed("fatal error", ${message_eval}, file, line)
 }
+
+% end
 
 /// Library precondition checks
 ///
