@@ -7,6 +7,8 @@ Latest
   are equivalent to force-casts from [NSArray], this makes certain
   Array round-trips through Objective-C code O(1) instead of O(N).
 
+* Characters can no longer be concatenated using "+".  Use String(c1) +
+  String(c2) instead.
 
 2014-08-04
 ----------
