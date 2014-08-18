@@ -184,22 +184,10 @@ bool SILGlobalOpt::run() {
   return HasChanged;
 }
 
-#ifndef NDEBUG
-// Temporary flag for easy performance testing since this is a new feature.
-llvm::cl::opt<bool>
-EnableGlobalOpt("enable-global-opt", llvm::cl::init(true));
-#else
-static bool EnableGlobalOpt = true;
-#endif
-
 namespace {
 class SILGlobalOptPass : public SILModuleTransform
 {
   void run() override {
-    if (!EnableGlobalOpt) {
-        DEBUG(llvm::dbgs() << "GlobalOpt pass is disabled!\n");
-        return;
-    }
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     if (SILGlobalOpt(getModule(), DA).run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
