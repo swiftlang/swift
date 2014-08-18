@@ -278,12 +278,12 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
       } else if (ColNum == MaxColumns) { // Handle long lines.
 
         if (LLBehavior == LongLineBehavior::Wrap) {
-          if (LastSpace) {
-            OutStr.insert(LastSpace, "\\l...");
-            ColNum = i - LastSpace;
-            LastSpace = 0;
-            i += 3; // The loop will advance 'i' again.
-          }
+          if (!LastSpace)
+            LastSpace = i;
+          OutStr.insert(LastSpace, "\\l...");
+          ColNum = i - LastSpace;
+          LastSpace = 0;
+          i += 3; // The loop will advance 'i' again.
         } else if (LLBehavior == LongLineBehavior::Truncate) {
           unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
           OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
