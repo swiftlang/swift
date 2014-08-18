@@ -78,7 +78,7 @@ enum class PassKind {
   LICM,
   IVInfoPrinter,
   GlobalLoadStoreOpts,
-  ArrayOpts,
+  COWArrayOpts,
   ABCOpts,
   ClosureSpecialization,
   CapturePropagation,
@@ -260,9 +260,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::GlobalLoadStoreOpts,
                                    "global-load-store-opts",
                                    "Multiple basic block load store opts."),
-                        clEnumValN(PassKind::ArrayOpts,
-                                   "array-opt",
-                                   "Array optimizations"),
+                        clEnumValN(PassKind::COWArrayOpts,
+                                   "cowarray-opt",
+                                   "COW Array optimizations"),
                         clEnumValN(PassKind::ABCOpts,
                                    "abcopts",
                                    "Array bounds check opts."),
@@ -466,8 +466,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
     case PassKind::GlobalLoadStoreOpts:
       PM.add(createGlobalLoadStoreOpts());
       break;
-    case PassKind::ArrayOpts:
-      PM.add(createArrayOpts());
+    case PassKind::COWArrayOpts:
+      PM.add(createCOWArrayOpts());
       break;
     case PassKind::ABCOpts:
       PM.add(createABCOpt());

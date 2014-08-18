@@ -42,7 +42,7 @@ add_swift_library(swiftSILPasses
   LoopRotate.cpp
   LICM.cpp
   IVInfoPrinter.cpp
-  ArrayOpt.cpp
+  COWArrayOpt.cpp
   ArrayBoundsCheckOpts.cpp
   ClosureSpecializer.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)

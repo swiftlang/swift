@@ -126,7 +126,7 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.add(createABCOpt());
   // Cleanup.
   PM.add(createDCE());
-  PM.add(createArrayOpts());
+  PM.add(createCOWArrayOpts());
 }
 
 void AddLowLevelLoopOptPasses(SILPassManager &PM) {

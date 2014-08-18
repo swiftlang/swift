@@ -1,4 +1,4 @@
-//===------------- ArrayOpt.cpp - Optimize Swift Array Checks -------------===//
+//===------- COWArrayOpt.cpp - Optimize Copy-On-Write Array Checks --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "array-opts"
+#define DEBUG_TYPE "cowarray-opts"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -220,7 +220,7 @@ static bool isRelease(SILInstruction *Inst, SILValue Value) {
 }
 
 namespace {
-/// Optimize Array checks based on high-level semantics.
+/// Optimize Copy-On-Write array checks based on high-level semantics.
 ///
 /// Performs an analysis on all Array users to ensure they do not interfere
 /// with make_mutable hoisting. Ultimately, the only thing that can interefere
@@ -245,7 +245,7 @@ namespace {
 ///
 /// TODO: Completely eliminate make_mutable calls if all operations that the
 /// guard are already guarded by either "init" or "mutate_unknown".
-class SILArrayOpt {
+class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
   typedef StructUseCollector::UserMap UserMap;
 
@@ -275,7 +275,7 @@ class SILArrayOpt {
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
 public:
-  SILArrayOpt(SILLoop *L, DominanceAnalysis *DA)
+  COWArrayOpt(SILLoop *L, DominanceAnalysis *DA)
     : Function(L->getHeader()->getParent()), Loop(L),
       Preheader(L->getLoopPreheader()), DomTree(DA->getDomInfo(Function)),
       ColdBlocks(DA)
@@ -305,7 +305,7 @@ protected:
 /// need to check how it is initialized here, because that will show up as a
 /// store to the local's address. checkSafeArrayAddressUses will check that the
 /// store is a simple initialization outside the loop.
-bool SILArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
+bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
   if (SILArgument *Arg = dyn_cast<SILArgument>(ArrayContainer)) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
@@ -332,7 +332,7 @@ bool SILArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
 }
 
 /// Lazilly compute blocks that may reach the loop.
-SmallPtrSetImpl<SILBasicBlock*> &SILArrayOpt::getReachingBlocks() {
+SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
   if (ReachingBlocks.empty()) {
     SmallVector<SILBasicBlock*, 8> Worklist;
     ReachingBlocks.insert(Preheader);
@@ -360,7 +360,7 @@ SmallPtrSetImpl<SILBasicBlock*> &SILArrayOpt::getReachingBlocks() {
 /// This does not apply to addresses of elements within the array. e.g. it is
 /// not safe to store to an element in the array because we may be storing an
 /// alias to the array storage.
-bool SILArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
+bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
     if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
@@ -413,7 +413,7 @@ bool SILArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 ///
 /// Since this does not recurse through multi-operand instructions, no visited
 /// set is necessary.
-bool SILArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
+bool COWArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
                                             StructExtractInst *SEI) {
   for (auto UI : SEI->getUses()) {
     SILInstruction *UseInst = UI->getUser();
@@ -463,7 +463,7 @@ bool SILArrayOpt::checkSafeArrayElementUses(SILValue ArrayVal,
 /// an array, or the value of an element within the array, is safe w.r.t
 /// make_mutable hoisting. Retains are safe as long as they are not inside the
 /// Loop.
-bool SILArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
+bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
   for (auto *UseInst : ArrayValueUsers) {
     if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (isArraySemanticCall(AI))
@@ -491,7 +491,7 @@ bool SILArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
 }
 
 /// Check that the use of an Array element is safe w.r.t. make_mutable hoisting.
-bool SILArrayOpt::checkSafeElementValueUses(UserMap &ElementValueUsers) {
+bool COWArrayOpt::checkSafeElementValueUses(UserMap &ElementValueUsers) {
   for (auto &Pair : ElementValueUsers) {
     SILInstruction *UseInst = Pair.first;
     Operand *ArrayValOper = Pair.second;
@@ -525,7 +525,7 @@ static SILBasicBlock *getValBB(SILValue Val) {
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
-bool SILArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
+bool COWArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
   DEBUG(llvm::dbgs() << "    Checking mutable array: " << Array);
 
   SILBasicBlock *ArrayBB = getValBB(Array);
@@ -559,7 +559,7 @@ bool SILArrayOpt::hoistMakeMutable(ApplyInst *MakeMutable, SILValue Array) {
   return true;
 }
 
-bool SILArrayOpt::run() {
+bool COWArrayOpt::run() {
   DEBUG(llvm::dbgs() << "  Array Opts in Loop " << *Loop);
 
   Preheader = Loop->getLoopPreheader();
@@ -599,20 +599,11 @@ bool SILArrayOpt::run() {
   return HasChanged;
 }
 
-// Temporary flag for easy performance testing since this is a new feature.
-llvm::cl::opt<bool>
-EnableArrayOpt("sil-array-opts", llvm::cl::init(true));
-
 namespace {
-class SILArrayOptPass : public SILFunctionTransform
+class COWArrayOptPass : public SILFunctionTransform
 {
   void run() override {
-    if (!EnableArrayOpt) {
-      DEBUG(llvm::dbgs() << "Array Opts Pass is Disabled!\n");
-      DEBUG(getFunction()->dump());
-      return;
-    }
-    DEBUG(llvm::dbgs() << "Array Opts in Func " << getFunction()->getName()
+    DEBUG(llvm::dbgs() << "COW Array Opts in Func " << getFunction()->getName()
           << "\n");
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
@@ -633,7 +624,7 @@ class SILArrayOptPass : public SILFunctionTransform
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= SILArrayOpt(L, DA).run();
+      HasChanged |= COWArrayOpt(L, DA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
@@ -643,6 +634,6 @@ class SILArrayOptPass : public SILFunctionTransform
 };
 } // anonymous
 
-SILTransform *swift::createArrayOpts() {
-  return new SILArrayOptPass();
+SILTransform *swift::createCOWArrayOpts() {
+  return new COWArrayOptPass();
 }
