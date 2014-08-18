@@ -1,7 +1,5 @@
 // RUN: %target-run-stdlib-swift
 
-// REQUIRES: long_tests
-
 import Swift
 import StdlibUnittest
 import Foundation

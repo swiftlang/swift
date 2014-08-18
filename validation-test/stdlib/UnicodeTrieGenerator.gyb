@@ -1,8 +1,6 @@
 %{
 
 # RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s | FileCheck %s
-#
-# REQUIRES: long_tests
 
 from GYBUnicodeDataUtils import *
 
