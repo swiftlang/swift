@@ -63,13 +63,14 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
     desired: COpaquePointer(desired))
 }
 
-@transparent public func _countLeadingZeros(value: Int64) -> Int64 {
+@transparent
+func _countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
 /// Returns if `x` is a power of 2.
 @transparent
-public func _isPowerOf2(x: UInt) -> Bool {
+func _isPowerOf2(x: UInt) -> Bool {
   if x == 0 {
     return false
   }
@@ -80,7 +81,7 @@ public func _isPowerOf2(x: UInt) -> Bool {
 
 /// Returns if `x` is a power of 2.
 @transparent
-public func _isPowerOf2(x: Int) -> Bool {
+func _isPowerOf2(x: Int) -> Bool {
   if x <= 0 {
     return false
   }
@@ -189,7 +190,7 @@ public func _stdlib_demangleName(mangledName: String) -> String {
 ///
 /// TODO: Implement version working on Int instead of Int64.
 @transparent
-public func _floorLog2(x: Int64) -> Int {
+func _floorLog2(x: Int64) -> Int {
   _sanityCheck(x > 0)
   return 63 - Int(_countLeadingZeros(x))
 }
