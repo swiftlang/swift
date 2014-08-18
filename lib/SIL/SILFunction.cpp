@@ -204,7 +204,7 @@ enum class LongLineBehavior { None, Truncate, Wrap };
 } // end anonymous namespace
 llvm::cl::opt<LongLineBehavior>
 LLBehavior("view-cfg-long-line-behavior",
-           llvm::cl::init(LongLineBehavior::Wrap),
+           llvm::cl::init(LongLineBehavior::Truncate),
            llvm::cl::desc("Behavior when line width is greater than the "
                           "value provided my -view-cfg-max-columns "
                           "option"),
