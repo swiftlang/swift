@@ -44,6 +44,15 @@ func _isFastAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 2
 }
 
+@transparent
+func _isStdlibInternalChecksEnabled() -> Bool {
+#if INTERNAL_CHECKS_ENABLED
+  return true
+#else
+  return false
+#endif
+}
+
 @asmname("swift_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
   prefix: UnsafePointer<UInt8>, prefixLength: UWord,

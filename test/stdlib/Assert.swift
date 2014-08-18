@@ -1,80 +1,14 @@
-// These tests should crash.
+// RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Debug
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Release -O
-// RUN: %target-build-swift %s -Xlinker %t/CatchCrashes.o -o %t/Assert_Unchecked -Ounchecked
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
 //
-// RUN: %target-run %t/Assert_Debug Debug Assert 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug AssertionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug AssertionFailureInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Debug Debug Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug PreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug PreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug PreconditionFailureInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Debug Debug FatalError 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug FatalErrorInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Debug Debug StdlibPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Debug Debug StdlibDebugPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibDebugPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibDebugPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Debug Debug StdlibSanityCheck 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibSanityCheckBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Debug Debug StdlibSanityCheckFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-//
-// RUN: %target-run %t/Assert_Release Release Assert 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// RUN: %target-run %t/Assert_Release Release AssertInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// RUN: %target-run %t/Assert_Release Release AssertBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// Skip because the optimizer assumes that the code path is unreachable.
-// SKIP:            %t/Assert_Release Release AssertionFailure
-//
-// RUN: %target-run %t/Assert_Release Release Precondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-// RUN: %target-run %t/Assert_Release Release PreconditionInterpolation 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-// RUN: %target-run %t/Assert_Release Release PreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-// RUN: %target-run %t/Assert_Release Release PreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-//
-// RUN: %target-run %t/Assert_Release Release FatalError 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-// RUN: %target-run %t/Assert_Release Release StdlibPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-// RUN: %target-run %t/Assert_Release Release StdlibPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-// RUN: %target-run %t/Assert_Release Release StdlibPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-//
-// RUN: %target-run %t/Assert_Release Release StdlibDebugPrecondition 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// RUN: %target-run %t/Assert_Release Release StdlibDebugPreconditionBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_NO_TRAP
-// Skip because the optimizer assumes that the code path is unreachable.
-// SKIP:            %t/Assert_Release Release StdlibDebugPreconditionFailure 2>&1 | FileCheck %s -check-prefix=CHECK_NO_MESSAGE
-//
-// RUN: %target-run %t/Assert_Release Release StdlibSanityCheck 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Release Release StdlibSanityCheckBooleanType 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-// RUN: %target-run %t/Assert_Release Release StdlibSanityCheckFailure 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
-//
-//
-// RUN: %target-run %t/Assert_Unchecked Unchecked FatalError 2>&1 | FileCheck %s -check-prefix=CHECK_MESSAGE
+// RUN: %target-run %t/Assert_Debug
+// RUN: %target-run %t/Assert_Release
+// RUN: %target-run %t/Assert_Unchecked
 
-// REQUIRES: swift_stdlib_asserts
-
-// CHECK_MESSAGE: OK
-// CHECK_MESSAGE: this should fail
-// CHECK_MESSAGE: CRASHED: SIG{{ILL|TRAP|ABRT}}
-
-// CHECK_NO_MESSAGE: OK
-// CHECK_NO_MESSAGE-NOT: this should fail
-// CHECK_NO_MESSAGE: CRASHED: SIG{{ILL|TRAP|ABRT}}
-
-// CHECK_NO_TRAP: did not trap
-
-import Darwin
+import StdlibUnittest
 
 //===---
 // Utilities.
@@ -89,8 +23,8 @@ struct Truthiness : BooleanType {
 var falsie = Truthiness(false)
 var truthie = Truthiness(true)
 
-func isDebugAssertConfiguration() -> Bool {
-  return Process.arguments[1] == "Debug"
+func isDebugOrRelease() -> Bool {
+  return !_isFastAssertConfiguration()
 }
 
 //===---
@@ -117,242 +51,263 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   }
 }
 
-func testAssert() {
+var Assert = TestSuite("Assert")
+
+Assert.test("assert")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches("this should fail")
+  .code {
   var x = 2
   assert(x * 21 == 42, "should not fail")
-  println("OK")
+
+  expectCrashLater()
   assert(x == 42, "this should fail")
 }
-if (Process.arguments[2] == "Assert") {
-  testAssert()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testAssertInterpolation() {
+Assert.test("assert/StringInterpolation")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches("this should fail")
+  .code {
   var should = "should"
   var x = 2
   assert(x * 21 == 42, "\(should) not fail")
-  println("OK")
+
+  expectCrashLater()
   assert(x == 42, "this \(should) fail")
 }
-if (Process.arguments[2] == "AssertInterpolation") {
-  testAssertInterpolation()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testAssertBooleanType() {
+Assert.test("assert/BooleanType")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches("this should fail")
+  .code {
   assert(truthie, "should not fail")
-  println("OK")
+
+  expectCrashLater()
   assert(falsie, "this should fail")
 }
-if (Process.arguments[2] == "AssertBooleanType") {
-  testAssertBooleanType()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testAssertBooleanTypeInterpolation() {
+Assert.test("assert/BooleanType/StringInterpolation")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "assertions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches("this should fail")
+  .code {
   var should = "should"
   assert(truthie, "\(should) not fail")
-  println("OK")
+
+  expectCrashLater()
   assert(falsie, "this \(should) fail")
 }
-if (Process.arguments[2] == "AssertBooleanTypeInterpolation") {
-  testAssertBooleanTypeInterpolation()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testAssertionFailure() {
-  println("OK")
+Assert.test("assertionFailure")
+  .skip(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches("this should fail")
+  .code {
+  expectCrashLater()
   assertionFailure("this should fail")
 }
-if (Process.arguments[2] == "AssertionFailure") {
-  testAssertionFailure()
-}
 
-func testAssertionFailureInterpolation() {
+Assert.test("assertionFailure/StringInterpolation")
+  .skip(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches("this should fail")
+  .code {
   var should = "should"
-  println("OK")
+  expectCrashLater()
   assertionFailure("this \(should) fail")
 }
-if (Process.arguments[2] == "AssertionFailureInterpolation") {
-  testAssertionFailureInterpolation()
-}
 
-func testPrecondition() {
+Assert.test("precondition")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var x = 2
   precondition(x * 21 == 42, "should not fail")
-  println("OK")
+  expectCrashLater()
   precondition(x == 42, "this should fail")
 }
-if (Process.arguments[2] == "Precondition") {
-  testPrecondition()
-}
 
-func testPreconditionInterpolation() {
+Assert.test("precondition/StringInterpolation")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var should = "should"
   var x = 2
   precondition(x * 21 == 42, "\(should) not fail")
-  println("OK")
+  expectCrashLater()
   precondition(x == 42, "this \(should) fail")
 }
-if (Process.arguments[2] == "PreconditionInterpolation") {
-  testPreconditionInterpolation()
-}
 
-func testPreconditionBooleanType() {
+Assert.test("precondition/BooleanType")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   precondition(truthie, "should not fail")
-  println("OK")
+  expectCrashLater()
   precondition(falsie, "this should fail")
 }
-if (Process.arguments[2] == "PreconditionBooleanType") {
-  testPreconditionBooleanType()
-}
 
-func testPreconditionBooleanTypeInterpolation() {
+Assert.test("precondition/BooleanType/StringInterpolation")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var should = "should"
   precondition(truthie, "\(should) not fail")
-  println("OK")
+  expectCrashLater()
   precondition(falsie, "this \(should) fail")
 }
-if (Process.arguments[2] == "PreconditionBooleanTypeInterpolation") {
-  testPreconditionBooleanTypeInterpolation()
-}
 
-func testPreconditionFailure() {
-  println("OK")
+Assert.test("preconditionFailure")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
+  expectCrashLater()
   preconditionFailure("this should fail")
 }
-if (Process.arguments[2] == "PreconditionFailure") {
-  testPreconditionFailure()
-}
 
-func testPreconditionFailureInterpolation() {
+Assert.test("preconditionFailure/StringInterpolation")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var should = "should"
-  println("OK")
+  expectCrashLater()
   preconditionFailure("this \(should) fail")
 }
-if (Process.arguments[2] == "PreconditionFailureInterpolation") {
-  testPreconditionFailureInterpolation()
-}
 
-func testFatalError() {
-  println("OK")
+Assert.test("fatalError")
+  .crashOutputMatches("this should fail")
+  .code {
+  expectCrashLater()
   fatalError("this should fail")
 }
-if (Process.arguments[2] == "FatalError") {
-  testFatalError()
-}
 
-func testFatalErrorInterpolation() {
+Assert.test("fatalError/StringInterpolation")
+  .crashOutputMatches("this should fail")
+  .code {
   var should = "should"
-  println("OK")
+  expectCrashLater()
   fatalError("this \(should) fail")
 }
-if (Process.arguments[2] == "FatalErrorInterpolation") {
-  testFatalErrorInterpolation()
-}
 
-func testStdlibPrecondition() {
+Assert.test("_precondition")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var x = 2
   _precondition(x * 21 == 42, "should not fail")
-  println("OK")
+  expectCrashLater()
   _precondition(x == 42, "this should fail")
 }
-if (Process.arguments[2] == "StdlibPrecondition") {
-  testStdlibPrecondition()
-}
 
-func testStdlibPreconditionBooleanType() {
+Assert.test("_precondition/BooleanType")
+  .xfail(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "preconditions are disabled in Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   _precondition(truthie, "should not fail")
-  println("OK")
+  expectCrashLater()
   _precondition(falsie, "this should fail")
 }
-if (Process.arguments[2] == "StdlibPreconditionBooleanType") {
-  testStdlibPreconditionBooleanType()
-}
 
-func testStdlibPreconditionFailure() {
-  println("OK")
+Assert.test("_preconditionFailure")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
+  expectCrashLater()
   _preconditionFailure("this should fail")
 }
-if (Process.arguments[2] == "StdlibPreconditionFailure") {
-  testStdlibPreconditionFailure()
-}
 
-func testStdlibDebugPrecondition() {
+Assert.test("_debugPrecondition")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "debug preconditions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   var x = 2
   _debugPrecondition(x * 21 == 42, "should not fail")
-  println("OK")
+  expectCrashLater()
   _debugPrecondition(x == 42, "this should fail")
 }
-if (Process.arguments[2] == "StdlibDebugPrecondition") {
-  testStdlibDebugPrecondition()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testStdlibDebugPreconditionBooleanType() {
+Assert.test("_debugPrecondition/BooleanType")
+  .xfail(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "debug preconditions are disabled in Release and Unchecked mode"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
+  .code {
   _debugPrecondition(truthie, "should not fail")
-  println("OK")
+  expectCrashLater()
   _debugPrecondition(falsie, "this should fail")
 }
-if (Process.arguments[2] == "StdlibDebugPreconditionBooleanType") {
-  testStdlibDebugPreconditionBooleanType()
-  println("did not trap")
-  if !isDebugAssertConfiguration() {
-    exit(0)
-  }
-}
 
-func testStdlibDebugPreconditionFailure() {
-  println("OK")
+Assert.test("_debugPreconditionFailure")
+  .skip(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches("this should fail")
+  .code {
+  expectCrashLater()
   _debugPreconditionFailure("this should fail")
 }
-if (Process.arguments[2] == "StdlibDebugPreconditionFailure") {
-  testStdlibDebugPreconditionFailure()
-}
 
-func testStdlibSanityCheck() {
+Assert.test("_sanityCheck")
+  .xfail(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .crashOutputMatches("this should fail")
+  .code {
   var x = 2
   _sanityCheck(x * 21 == 42, "should not fail")
-  println("OK")
+  expectCrashLater()
   _sanityCheck(x == 42, "this should fail")
 }
-if (Process.arguments[2] == "StdlibSanityCheck") {
-  testStdlibSanityCheck()
-}
 
-func testStdlibSanityCheckBooleanType() {
+Assert.test("_sanityCheck/BooleanType")
+  .xfail(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .crashOutputMatches("this should fail")
+  .code {
   _sanityCheck(truthie, "should not fail")
-  println("OK")
+  expectCrashLater()
   _sanityCheck(falsie, "this should fail")
 }
-if (Process.arguments[2] == "StdlibSanityCheckBooleanType") {
-  testStdlibSanityCheckBooleanType()
-}
 
-func testStdlibSanityCheckFailure() {
-  println("OK")
+Assert.test("_sanityCheckFailure")
+  .skip(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "optimizer assumes that the code path is unreachable"))
+  .crashOutputMatches("this should fail")
+  .code {
+  expectCrashLater()
   _sanityCheckFailure("this should fail")
 }
-if (Process.arguments[2] == "StdlibSanityCheckFailure") {
-  testStdlibSanityCheckFailure()
-}
 
-println("BUSTED: should have crashed already")
-exit(1)
+runAllTests()
 
