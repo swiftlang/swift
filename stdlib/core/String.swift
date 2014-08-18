@@ -289,14 +289,6 @@ public func +(var lhs: String, rhs: String) -> String {
   return lhs
 }
 
-@effects(readonly)
-public func +(lhs: Character, rhs: Character) -> String {
-  var result = String(lhs)
-  result += String(rhs)
-  return result
-}
-
-
 // String append
 public func += (inout lhs: String, rhs: String) {
   if (lhs.isEmpty) {

@@ -62,3 +62,7 @@ func testOverloads() {
   overloaded(Character("a"))
 }
 
+func testAddCharacters(a: Character) {
+  a + a // expected-error {{cannot invoke '+' with an argument list of type '(Character, Character)'}}
+}
+
