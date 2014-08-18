@@ -1,250 +1,39 @@
-// These tests should crash.
-// REQUIRES: long_tests
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/FixedPointArithmeticTraps.swift
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out_Debug -Xfrontend -disable-access-control
-// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -Xlinker %t/CatchCrashes.o -o %t/a.out_Release -O -Xfrontend -disable-access-control
+// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug
+// RUN: %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
 //
-// RUN: %target-run %t/a.out_Debug 1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 4 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 5 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 6 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 7 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 8 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 9 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 10 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 11 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 12 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 13 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 14 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 15 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 16 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 17 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 18 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 19 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 20 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 21 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 22 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 23 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 24 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 25 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 26 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 27 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 28 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 29 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 30 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 31 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 32 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 33 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 34 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 35 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 36 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 37 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 38 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 39 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 40 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 41 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 42 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 43 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 44 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 45 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 46 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 47 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 48 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 49 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 50 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 51 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 52 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 53 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 54 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 55 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 56 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 57 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 58 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 59 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 60 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 61 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 62 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 63 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 64 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 65 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 66 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 67 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 68 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 69 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 70 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 71 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 72 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 73 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 74 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 75 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 76 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 77 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 78 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 79 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 80 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 81 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 82 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 83 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 84 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 85 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 86 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 87 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 88 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 89 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 90 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 90 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 91 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 92 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 93 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 94 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 95 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 96 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 97 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 98 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 99 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Debug 100 2>&1 | FileCheck %s -check-prefix=CHECK
-//
-// RUN: %target-run %t/a.out_Release 1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 2 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 3 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 4 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 5 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 6 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 7 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 8 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 9 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 10 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 11 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 12 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 13 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 14 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 15 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 16 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 17 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 18 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 19 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 20 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 21 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 22 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 23 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 24 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 25 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 26 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 27 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 28 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 29 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 30 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 31 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 32 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 33 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 34 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 35 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 36 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 37 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 38 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 39 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 40 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 41 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 42 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 43 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 44 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 45 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 46 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 47 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 48 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 49 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 50 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 51 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 52 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 53 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 54 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 55 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 56 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 57 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 58 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 59 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 60 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 61 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 62 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 63 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 64 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 65 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 66 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 67 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 68 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 69 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 70 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 71 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 72 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 73 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 74 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 75 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 76 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 77 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 78 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 79 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 80 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 81 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 82 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 83 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 84 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 85 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 86 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 87 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 88 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 89 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 90 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 90 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 91 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 92 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 93 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 94 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 95 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 96 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 97 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 98 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 99 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/a.out_Release 100 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out_Debug
+// RUN: %target-run %t/a.out_Release
 
-// CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
-
-import Darwin
 import StdlibUnittest
 
 // Note: in this file, we need to go through opaque functions to load
 // constants.  This is to to check runtime behaviour and ensure the constant is
 // not folded.
 
-func getInt(x: Int) -> Int {
-  return Int(getInt64(x.toIntMax()))
-}
-
-func getUInt(x: UInt) -> UInt {
-  return UInt(getUInt64(x.toUIntMax()))
-}
-
-func expectOverflow<T>(res: (T, overflow: Bool), line: Int = __LINE__) {
-  if !res.overflow {
-    println("expected overflow at line \(line)")
-    exit(1)
+func expectOverflow<T>(
+  res: (T, overflow: Bool),
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  expectTrue(
+    res.overflow,
+    stackTrace: SourceLoc(file, line).withCurrentLoc()) {
+    "expected overflow"
   }
 }
 
-func expectNoOverflow<T>(res: (T, overflow: Bool), line: Int = __LINE__) {
-  if res.overflow {
-    println("expected no overflow at line \(line)")
-    exit(1)
+func expectNoOverflow<T>(
+  res: (T, overflow: Bool),
+  file: String = __FILE__, line: UWord = __LINE__
+) {
+  expectFalse(
+    res.overflow,
+    stackTrace: SourceLoc(file, line).withCurrentLoc()) {
+    "expected no overflow"
   }
 }
-
-// Interpret the command line arguments.
-var arg = Process.arguments[1]
 
 %{
 
@@ -263,61 +52,59 @@ allIntTypes = [
 
 }%
 
-% testNum = 1
+var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
+
 % for (signedness, IntTy) in allIntTypes:
 
 //
 // Test pre- and post-increment/decrement for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
   ++x
 
   x = get${IntTy}(${IntTy}.min)
-  println("OK")
+  expectCrashLater()
   // --IntTy.min
   --x
 }
-%   testNum += 1
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
   --x
 
   x = get${IntTy}(${IntTy}.max)
-  println("OK")
+  expectCrashLater()
   // ++IntTy.max
   ++x
 }
-%   testNum += 1
-if arg == "${testNum}" {
+
+FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
   x++
 
   x = get${IntTy}(${IntTy}.min)
-  println("OK")
+  expectCrashLater()
   // IntTy.min--
   x--
 }
-%   testNum += 1
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
   x--
 
   x = get${IntTy}(${IntTy}.max)
-  println("OK")
+  expectCrashLater()
   // IntTy.max++
   x++
 }
-%   testNum += 1
 
 //
 // Test addition for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Addition/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   expectNoOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
@@ -328,16 +115,15 @@ if arg == "${testNum}" {
 
   // Overflow in addition.
   expectOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
-  println("OK")
+  expectCrashLater()
   a = a + get${IntTy}(${IntTy}.max / 3)
 }
-%   testNum += 1
 
 //
 // Test subtraction for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
   var a = get${IntTy}(${IntTy}.min + get${IntTy}(${IntTy}.max / 3))
 
   expectNoOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
@@ -345,16 +131,15 @@ if arg == "${testNum}" {
 
   // Overflow in subtraction.
   expectOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
-  println("OK")
+  expectCrashLater()
   a = a - get${IntTy}(${IntTy}.max / 3)
 }
-%   testNum += 1
 
 //
 // Test multiplication for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Multplication/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
@@ -362,16 +147,15 @@ if arg == "${testNum}" {
 
   // Overflow in multiplication.
   expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
-  println("OK")
+  expectCrashLater()
   a = a * get${IntTy}(2)
 }
-%   testNum += 1
 
 //
 // Test division for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Division/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x / 3
@@ -380,14 +164,13 @@ if arg == "${testNum}" {
 
   // x / 0
   expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(0)))
-  println("OK")
+  expectCrashLater()
   a = a / get${IntTy}(0)
 }
-%   testNum += 1
 
 %   if signedness == 'signed':
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
   expectNoOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(3)))
@@ -395,11 +178,10 @@ if arg == "${testNum}" {
 
   a = get${IntTy}(${IntTy}.min)
   expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(-1)))
-  println("OK")
+  expectCrashLater()
   a = a / get${IntTy}(-1)
   // IntTy.min / -1
 }
-%     testNum += 1
 
 %   end
 
@@ -407,7 +189,7 @@ if arg == "${testNum}" {
 // Test remainder computation for ${IntTy}
 //
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x % 3
@@ -416,14 +198,13 @@ if arg == "${testNum}" {
 
   // x % 0
   expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(0)))
-  println("OK")
+  expectCrashLater()
   a = a % get${IntTy}(0)
 }
-%   testNum += 1
 
 %   if signedness == 'signed':
 
-if arg == "${testNum}" {
+FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
   // Int.min % 3
@@ -433,10 +214,9 @@ if arg == "${testNum}" {
   // Int.min % -1
   a = get${IntTy}(${IntTy}.min)
   expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(-1)))
-  println("OK")
+  expectCrashLater()
   a = a % get${IntTy}(-1)
 }
-%     testNum += 1
 
 %   end
 
@@ -445,6 +225,5 @@ if arg == "${testNum}" {
 
 % end
 
-println("BUSTED: should have crashed already")
-exit(1)
+runAllTests()
 
