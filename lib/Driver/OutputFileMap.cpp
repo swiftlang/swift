@@ -91,7 +91,7 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
 
 bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   llvm::SourceMgr SM;
-  llvm::yaml::Stream YAMLStream(Buffer.release(), SM);
+  llvm::yaml::Stream YAMLStream(std::move(Buffer), SM);
   auto I = YAMLStream.begin();
   if (I == YAMLStream.end())
     return true;
