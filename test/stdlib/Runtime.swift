@@ -1181,5 +1181,12 @@ BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
   expectFalse(_isPowerOf2(UInt.max))
 }
 
+BitTwiddlingTestSuite.test("_floorLog2") {
+  expectEqual(_floorLog2(1), 0)
+  expectEqual(_floorLog2(8), 3)
+  expectEqual(_floorLog2(15), 3)
+  expectEqual(_floorLog2(Int64.max), 62) // 63 minus 1 for sign bit.
+}
+
 runAllTests()
 
