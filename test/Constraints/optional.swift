@@ -95,3 +95,6 @@ func test10(i: Int, io: Int?) {
   let result2 = test10_helper(io)
   var d: Double = result2
 }
+
+var z: Int? = nil
+z = z ?? 3
