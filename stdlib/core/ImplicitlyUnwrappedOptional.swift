@@ -38,17 +38,6 @@ public enum ImplicitlyUnwrappedOptional<T>
     return .None
   }
 
-  /// Allow use in a Boolean context.
-  @transparent
-  public var boolValue: Bool {
-    switch self {
-    case .Some:
-      return true
-    case .None:
-      return false
-    }
-  }
-
   /// Haskell's fmap, which was mis-named
   public func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
     switch self {
@@ -83,13 +72,23 @@ extension ImplicitlyUnwrappedOptional : Printable {
 // Intrinsics for use by language features.
 @transparent internal
 func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
-  return v.boolValue.value
+  switch v {
+  case .Some:
+    return true.value
+  case .None:
+    return false.value
+  }
 }
 
 @transparent internal
 func _preconditionImplicitlyUnwrappedOptionalHasValue<T>(inout v: T!) {
-  _precondition(v.boolValue,
-                "unexpectedly found nil while unwrapping an Optional value")
+  switch v {
+  case .Some:
+    break
+  case .None:
+    _preconditionFailure(
+      "unexpectedly found nil while unwrapping an Optional value")
+  }
 }
 
 @transparent internal
