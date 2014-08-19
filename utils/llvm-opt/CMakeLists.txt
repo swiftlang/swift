@@ -7,7 +7,7 @@ configure_file(
   @ONLY
   NEWLINE_STYLE UNIX)
 add_custom_target(llvm-opt-copy ALL
+                  COMMAND mkdir -p ${SWIFT_BINARY_DIR}/bin
                   COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/llvm-opt ${SWIFT_BINARY_DIR}/bin/llvm-opt
                   COMMAND chmod u+x ${SWIFT_BINARY_DIR}/bin/llvm-opt
-                  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/llvm-opt
-                          ${SWIFT_BINARY_DIR}/bin)
+                  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/llvm-opt)
