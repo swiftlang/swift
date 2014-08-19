@@ -20,18 +20,6 @@ var raw = testNoinline(x: false)
 
 var a = NoInlineInitStruct(x: false)
 
-// SIL: [[FUNC3:%.+]] = function_ref @_TF12def_noinline16testNoinlineLateFT1xSb_Sb : $@thin (Bool) -> Bool
-// SIL: [[RESULT:%.+]] = apply [[FUNC3]]({{%.+}}) : $@thin (Bool) -> Bool
-var raw2 = testNoinlineLate(x: true)
-
-// SIL: [[FUNC4:%.+]] = function_ref @_TFV12def_noinline20LateInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin LateInlineInitStruct.Type) -> LateInlineInitStruct
-// SIL: apply [[FUNC4]]({{%.+}}, {{%.+}}) : $@thin (Bool, @thin LateInlineInitStruct.Type) -> LateInlineInitStruct
-var b = LateInlineInitStruct(x: true)
-
 // SIL-LABEL: [noinline] @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@thin (Bool) -> Bool
 
 // SIL-LABEL: sil public_external [noinline] @_TFV12def_noinline18NoInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
-
-// SIL-LABEL: [noinlinesil] @_TF12def_noinline16testNoinlineLateFT1xSb_Sb : $@thin (Bool) -> Bool
-
-// SIL-LABEL: sil public_external [noinlinesil] @_TFV12def_noinline20LateInlineInitStructCfMS0_FT1xSb_S0_ : $@thin (Bool, @thin LateInlineInitStruct.Type) -> LateInlineInitStruct {

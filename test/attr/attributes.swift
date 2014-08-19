@@ -189,10 +189,6 @@ var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}
 @inline(never) var noinlineVar : Int // expected-error {{'inline(never)' attribute cannot be applied to this declaration}}
 @inline(never) class FooClass { // expected-error {{'inline(never)' attribute cannot be applied to this declaration}}
 }
-@inline(late) func nolineFunc2() {}
-@inline(late) var noinlineVar2 : Int // expected-error {{'inline(late)' attribute cannot be applied to this declaration}}
-@inline(late) class FooClass2 { // expected-error {{'inline(late)' attribute cannot be applied to this declaration}}
-}
 
 class A {
   @inline(never) init(a : Int) {}
@@ -201,17 +197,6 @@ class A {
       return 42
     }
     @inline(never) set {
-    }
-  }
-}
-
-class B {
-  @inline(late) init(a : Int) {}
-  var b : Int {
-    @inline(late) get {
-      return 42
-    }
-    @inline(late) set {
     }
   }
 }

@@ -33,7 +33,6 @@ class SILModule;
   
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
-enum Inline_t { InlineDefault , NoInline = 1 , NoInlineSIL = 2 };
   
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -84,7 +83,7 @@ private:
   unsigned GlobalInitFlag : 1;
 
   /// The function's noinline attribute.
-  unsigned NoinlineFlag : 2;
+  unsigned NoinlineFlag : 1;
 
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
@@ -104,7 +103,7 @@ private:
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
-              Inline_t isNoinline, EffectsKind E,
+              bool isNoinline, EffectsKind E,
               SILFunction *insertBefore,
               SILDebugScope *debugScope,
               DeclContext *DC);
@@ -116,7 +115,7 @@ public:
                              Optional<SILLocation> loc = Nothing,
                              IsBare_t isBareSILFunction = IsNotBare,
                              IsTransparent_t isTrans = IsNotTransparent,
-                             Inline_t isNoinline = InlineDefault,
+                             bool isNoinline = false,
                              EffectsKind EK = EffectsKind::Unspecified,
                              SILFunction *InsertBefore = nullptr,
                              SILDebugScope *DebugScope = nullptr,
@@ -231,8 +230,8 @@ public:
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
 
   /// Get this function's noinline attribute.
-  Inline_t isNoinline() const { return Inline_t(NoinlineFlag); }
-  void setNoinline(Inline_t isNI) { NoinlineFlag = isNI; }
+  bool isNoinline() const { return NoinlineFlag; }
+  void setNoinline(bool isNI) { NoinlineFlag = isNI; }
 
   /// \return the function side effects information.
   EffectsKind getEffectsInfo() const { return EK; }

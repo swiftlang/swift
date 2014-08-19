@@ -397,8 +397,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     InlineKind kind;
     if (Tok.getText() == "never")
       kind = InlineKind::Never;
-    else if (Tok.getText() == "late")
-      kind = InlineKind::NoInlineSIL;
     else {
       diagnose(Loc, diag::inline_attribute_unknown_option,
                Tok.getText(), AttrName);

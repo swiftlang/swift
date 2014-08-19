@@ -15,7 +15,6 @@
 #include "swift/AST/Mangle.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILLinkage.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/Attr.h"
@@ -230,15 +229,12 @@ bool SILDeclRef::isTransparent() const {
 }
 
 /// \brief True if the function has noinline attribute.
-unsigned SILDeclRef::isNoinline() const {
+bool SILDeclRef::isNoinline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>()) {
+  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
     if (InlineA->getKind() == InlineKind::Never)
-      return NoInline;
-    else if (InlineA->getKind() == InlineKind::NoInlineSIL)
-      return NoInlineSIL;
-  }
+      return true;
    return false;
 }
 
