@@ -25,7 +25,6 @@ add_swift_library(swiftSILPasses
   PerformanceInliner.cpp
   SILLowerAggregateInstrs.cpp
   SILSROA.cpp
-  ARCOpts.cpp
   StripDebugInfo.cpp
   DeadObjectElimination.cpp
   InstCount.cpp

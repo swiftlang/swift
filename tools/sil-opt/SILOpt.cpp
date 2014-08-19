@@ -62,7 +62,6 @@ enum class PassKind {
   CodeMotion,
   LowerAggregateInstrs,
   SROA,
-  ARCOpts,
   StripDebugInfo,
   DeadObjectElimination,
   InstCount,
@@ -207,10 +206,6 @@ Passes(llvm::cl::desc("Passes:"),
                                    "sroa",
                                    "Perform SIL scalar replacement of "
                                    "aggregates."),
-                        clEnumValN(PassKind::ARCOpts,
-                                   "arc-opts",
-                                   "Perform automatic reference counting "
-                                   "optimizations."),
                         clEnumValN(PassKind::StripDebugInfo,
                                    "strip-debug-info",
                                    "Strip debug info."),
@@ -417,9 +412,6 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::SROA:
       PM.add(createSROA());
-      break;
-    case PassKind::ARCOpts:
-      PM.add(createARCOpts());
       break;
     case PassKind::StripDebugInfo:
       PM.add(createStripDebug());
