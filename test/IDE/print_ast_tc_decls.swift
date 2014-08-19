@@ -406,9 +406,11 @@ class d0120_TestClassBase {
   required init() {}
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
-  // FIXME: Add these once we can SILGen them reasonable.
-  // init?(fail: String) { }
-  // init!(iuoFail: String) { }
+  init?(fail: String) { }
+// PASS_COMMON-NEXT: {{^}}  init?(fail: String){{$}}
+
+  init!(iuoFail: String) { }
+// PASS_COMMON-NEXT: {{^}}  init!(iuoFail: String){{$}}
 
   final func baseFunc1() {}
 // PASS_COMMON-NEXT: {{^}}  final func baseFunc1(){{$}}

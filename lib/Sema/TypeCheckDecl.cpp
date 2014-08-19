@@ -2030,9 +2030,6 @@ static void configureConstructorType(ConstructorDecl *ctor,
   Type allocFnType;
   Type initFnType;
   Type resultType = selfType->getInOutObjectType();
-  if (ctor->getFailability() != OTK_None) {
-    resultType = OptionalType::get(ctor->getFailability(), resultType);
-  }
 
   // Use the argument names in the argument type.
   argType = argType->getRelabeledType(ctor->getASTContext(), 
@@ -2045,7 +2042,7 @@ static void configureConstructorType(ConstructorDecl *ctor,
   } else {
     fnType = FunctionType::get(argType, resultType);
   }
-  Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
+  Type selfMetaType = MetatypeType::get(resultType);
   if (outerGenericParams) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
