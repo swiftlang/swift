@@ -1060,13 +1060,14 @@ bool swift::conflicting(const OverloadSignature& sig1,
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
                                      bool isMethod,
+                                     bool isInitializer,
                                      unsigned curryLevels);
 
 /// Map a type within the signature of a declaration.
 static Type mapSignatureType(ASTContext &ctx, Type type) {
   return type.transform([&](Type type) -> Type {
       if (type->is<FunctionType>()) {
-        return mapSignatureFunctionType(ctx, type, false, false, 1);
+        return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
       
       return type;
@@ -1090,9 +1091,16 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
                                      bool isMethod,
+                                     bool isInitializer,
                                      unsigned curryLevels) {
   if (curryLevels == 0) {
-    /// Translate implicitly unwrapped optionals into strict optionals.
+    // In an initializer, ignore optionality.
+    if (isInitializer) {
+      if (auto objectType = type->getAnyOptionalObjectType())
+        type = objectType;
+    }
+
+    // Translate implicitly unwrapped optionals into strict optionals.
     if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
       type = OptionalType::get(uncheckedOptOf);
     }
@@ -1144,7 +1152,8 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
 
   // Map the result type.
   auto resultTy = mapSignatureFunctionType(
-      ctx, funcTy->getResult(), topLevelFunction, false, curryLevels - 1);
+    ctx, funcTy->getResult(), topLevelFunction, false, isInitializer,
+    curryLevels - 1);
 
   // At the top level, none of the extended information is relevant.
   AnyFunctionType::ExtInfo info;
@@ -1177,6 +1186,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
             getASTContext(), getInterfaceType(),
             /*topLevelFunction=*/true,
             /*isMethod=*/afd->getImplicitSelfDecl() != nullptr,
+            /*isInitializer=*/isa<ConstructorDecl>(afd),
             afd->getNumParamPatterns())->getCanonicalType();
 
     signature.IsInstanceMember = isInstanceMember();

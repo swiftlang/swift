@@ -1537,6 +1537,36 @@ struct ASTNodeBase {};
                "should be marked invalid";
         abort();
       }
+
+      // Verify that the optionality of the result type of the
+      // initializer matches the failability of the initializer.
+      if (!CD->isInvalid() && 
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+            != Ctx.getOptionalDecl() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
+            != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
+        OptionalTypeKind resultOptionality = OTK_None;
+        CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
+        if (resultOptionality != CD->getFailability()) {
+          Out << "Initializer has result optionality/failability mismatch\n";
+          CD->dump(llvm::errs());
+          abort();
+        }
+
+        // Also check the interface type.
+        if (auto genericFn 
+              = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
+          resultOptionality = OTK_None;
+          genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
+            ->getAnyOptionalObjectType(resultOptionality);
+          if (resultOptionality != CD->getFailability()) {
+            Out << "Initializer has result optionality/failability mismatch\n";
+            CD->dump(llvm::errs());
+            abort();
+          }
+        }
+      }
+
       verifyCheckedBase(CD);
     }
 

@@ -669,6 +669,11 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       funcTy = ctor->getExtensionType()->getAnyNominal()
                  ->getDeclaredInterfaceType();
     }
+    
+    // Adjust result type for failability.
+    if (ctor->getFailability() != OTK_None)
+      funcTy = OptionalType::get(ctor->getFailability(), funcTy);
+
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));

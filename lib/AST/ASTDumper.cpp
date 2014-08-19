@@ -699,11 +699,11 @@ namespace {
         break;
 
       case OTK_Optional:
-        OS << "  failable?";
+        OS << " failable?";
         break;
 
       case OTK_ImplicitlyUnwrappedOptional:
-        OS << "  failable!";
+        OS << " failable!";
         break;
       }
 
