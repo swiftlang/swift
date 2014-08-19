@@ -1401,8 +1401,22 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
+      switch (decl->getFailability()) {
+      case OTK_None:
+        break;
+        
+      case OTK_Optional:
+        Printer << "?";
+        break;
+
+      case OTK_ImplicitlyUnwrappedOptional:
+        Printer << "!";
+        break;
+      }
+
       if (decl->isGeneric())
         printGenericParams(decl->getGenericParams());
+
       printFunctionParameters(decl);
     });
   

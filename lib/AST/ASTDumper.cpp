@@ -693,6 +693,19 @@ namespace {
         OS << " factory";
         break;
       }
+      
+      switch (CD->getFailability()) {
+      case OTK_None:
+        break;
+
+      case OTK_Optional:
+        OS << "  failable?";
+        break;
+
+      case OTK_ImplicitlyUnwrappedOptional:
+        OS << "  failable!";
+        break;
+      }
 
       printAbstractFunctionDecl(CD);
       OS << ')';

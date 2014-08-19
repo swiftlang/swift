@@ -964,6 +964,18 @@ Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
   }
 }
 
+static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
+  switch (kind) {
+  case swift::OTK_None:
+    return static_cast<uint8_t>(serialization::OptionalTypeKind::None);
+  case swift::OTK_Optional:
+    return static_cast<uint8_t>(serialization::OptionalTypeKind::Optional);
+  case swift::OTK_ImplicitlyUnwrappedOptional:
+    return static_cast<uint8_t>(
+             serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
+  }
+}
+
 static bool shouldSerializeMember(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -1918,6 +1930,8 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(DC),
+                                  getRawStableOptionalTypeKind(
+                                    ctor->getFailability()),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   getStableCtorInitializerKind(

@@ -406,6 +406,12 @@ class d0120_TestClassBase {
   required init() {}
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
+  init?(fail: String) { }
+// PASS_COMMON-NEXT: {{^}}  init?(fail: String){{$}}
+
+  init!(iuoFail: String) { }
+// PASS_COMMON-NEXT: {{^}}  init!(iuoFail: String){{$}}
+
   final func baseFunc1() {}
 // PASS_COMMON-NEXT: {{^}}  final func baseFunc1(){{$}}
 
@@ -421,7 +427,7 @@ class d0120_TestClassBase {
 class d0121_TestClassDerived : d0120_TestClassBase {
 // PASS_COMMON-LABEL: {{^}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
 
-  required init() {}
+  required init() { super.init() }
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
 
   final override func baseFunc2() {}

@@ -4383,6 +4383,12 @@ enum class CtorInitializerKind {
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
+  /// The failability of this initializer, which is an OptionalTypeKind.
+  unsigned Failability : 2;
+
+  /// The location of the '!' or '?' for a failable initializer.
+  SourceLoc FailabilityLoc;
+
   Pattern *BodyParams[2];
 
   /// The type of the initializing constructor.
@@ -4401,6 +4407,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
+                  OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
                   GenericParamList *GenericParams, DeclContext *Parent);
 
@@ -4513,6 +4520,14 @@ public:
       return true;
     }
   }
+
+  /// Determine the failability of the initializer.
+  OptionalTypeKind getFailability() const {
+    return static_cast<OptionalTypeKind>(Failability);
+  }
+
+  /// Retrieve the location of the '!' or '?' in a failable initializer.
+  SourceLoc getFailabilityLoc() const { return FailabilityLoc; }
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {

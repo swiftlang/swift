@@ -751,6 +751,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
 
   DeclName name(C, C.Id_init, { });
   auto *ctorDecl = new (C) ConstructorDecl(name, optionSetDecl->getLoc(),
+                                           OTK_None, SourceLoc(),
                                            selfPattern, methodParam,
                                            nullptr, optionSetDecl);
   ctorDecl->setImplicit();
@@ -1320,6 +1321,7 @@ namespace {
       DeclName name(context, context.Id_init, argNames);
       auto constructor =
         new (context) ConstructorDecl(name, structDecl->getLoc(),
+                                      OTK_None, SourceLoc(),
                                       selfPattern, paramPattern,
                                       nullptr, structDecl);
 
@@ -2863,9 +2865,11 @@ namespace {
       selfPat = createTypedNamedPattern(selfVar);
 
       // Create the actual constructor.
+      // FIXME: Failability.
+      OptionalTypeKind failability = OTK_None;
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
-                          name, SourceLoc(), selfPat, bodyPatterns.back(),
-                          /*GenericParams=*/nullptr, dc);
+                      name, SourceLoc(), failability, SourceLoc(), selfPat, 
+                      bodyPatterns.back(), /*GenericParams=*/nullptr, dc);
       
       // Make the constructor declaration immediately visible in its
       // class or protocol type.

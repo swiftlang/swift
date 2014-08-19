@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 128;
+const uint16_t VERSION_MINOR = 129;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -221,6 +221,15 @@ enum class AccessibilityKind : uint8_t {
   Public,
 };
 using AccessibilityKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class OptionalTypeKind : uint8_t {
+  None,
+  Optional,
+  ImplicitlyUnwrappedOptional
+};
+using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -692,6 +701,7 @@ namespace decls_block {
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
     DeclIDField, // context decl
+    OptionalTypeKindField,  // failability
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     CtorInitializerKindField,  // initializer kind

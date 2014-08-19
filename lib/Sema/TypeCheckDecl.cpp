@@ -6244,7 +6244,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   DeclName name(context, context.Id_init, argNames);
   Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
-  auto *ctor = new (context) ConstructorDecl(name, Loc, selfPat, pattern,
+  auto *ctor = new (context) ConstructorDecl(name, Loc, OTK_None, SourceLoc(),
+                                             selfPat, pattern,
                                              nullptr, decl);
 
   // Mark implicit.
@@ -6494,6 +6495,8 @@ createDesignatedInitOverride(TypeChecker &tc,
 
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
+                                        SourceLoc(),
+                                        superclassCtor->getFailability(),
                                         SourceLoc(),
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);

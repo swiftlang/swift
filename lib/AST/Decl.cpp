@@ -2772,17 +2772,22 @@ bool FuncDecl::isBinaryOperator() const {
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
+                                 OptionalTypeKind Failability, 
+                                 SourceLoc FailabilityLoc,
                                  Pattern *SelfBodyParam, Pattern *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name,
-                         ConstructorLoc, 2, GenericParams) {
+                         ConstructorLoc, 2, GenericParams),
+    FailabilityLoc(FailabilityLoc) 
+{
   setBodyParams(SelfBodyParam, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
   ConstructorDeclBits.InitKind
     = static_cast<unsigned>(CtorInitializerKind::Designated);
   ConstructorDeclBits.HasStubImplementation = 0;
+  this->Failability = static_cast<unsigned>(Failability);
 }
 
 void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {

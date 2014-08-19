@@ -1425,6 +1425,20 @@ getActualAccessibility(uint8_t raw) {
   return Nothing;
 }
 
+static Optional<swift::OptionalTypeKind>
+getActualOptionalTypeKind(uint8_t raw) {
+  switch (serialization::OptionalTypeKind(raw)) {
+  case serialization::OptionalTypeKind::None:
+    return OTK_None;
+  case serialization::OptionalTypeKind::Optional:
+    return OTK_Optional;
+  case serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional:
+    return OTK_ImplicitlyUnwrappedOptional;
+  }
+
+  return Nothing;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -1798,6 +1812,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
+    uint8_t rawFailability;
     bool isImplicit, isObjC;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID signatureID;
@@ -1805,9 +1820,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID overriddenID;
     ArrayRef<uint64_t> argNameIDs;
 
-    decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
-                                               isObjC,
-                                               storedInitKind,
+    decls_block::ConstructorLayout::readRecord(scratch, parentID,
+                                               rawFailability, isImplicit, 
+                                               isObjC, storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
@@ -1824,10 +1839,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (auto argNameID : argNameIDs)
       argNames.push_back(getIdentifier(argNameID));
 
+    OptionalTypeKind failability = OTK_None;
+    if (auto actualFailability = getActualOptionalTypeKind(rawFailability))
+      failability = *actualFailability;
+
     DeclName name(ctx, ctx.Id_init, argNames);
-    auto ctor = new (ctx) ConstructorDecl(name, SourceLoc(),
-                                          /*bodyParams=*/nullptr, nullptr,
-                                          genericParams, parent);
+    auto ctor = new (ctx) ConstructorDecl(name, SourceLoc(), failability, 
+                                          SourceLoc(), /*bodyParams=*/nullptr, 
+                                          nullptr, genericParams, parent);
     declOrOffset = ctor;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {

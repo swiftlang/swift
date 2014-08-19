@@ -3908,12 +3908,24 @@ ParserResult<ConstructorDecl>
 Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
+  OptionalTypeKind Failability = OTK_None;
+  SourceLoc FailabilityLoc;
 
   const bool ConstructorsNotAllowed = !(Flags & PD_HasContainerType);
 
   // Reject constructors outside of types.
   if (ConstructorsNotAllowed) {
     diagnose(Tok, diag::initializer_decl_wrong_scope);
+  }
+
+  // Parse the '!' or '?' for a failable initializer.
+  if (Tok.isAny(tok::exclaim_postfix, tok::sil_exclamation) ||
+      (Tok.isAnyOperator() && Tok.getText() == "!")) {
+    Failability = OTK_ImplicitlyUnwrappedOptional;
+    FailabilityLoc = consumeToken();
+  } else if (Tok.isAny(tok::question_postfix, tok::question_infix)) {
+    Failability = OTK_Optional;
+    FailabilityLoc = consumeToken();
   }
 
   // Parse the generic-params, if present.
@@ -3937,6 +3949,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
+                                           Failability, FailabilityLoc,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
   
