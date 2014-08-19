@@ -521,40 +521,69 @@ struct FoundDeclTy {
 
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
-  std::set<ValueDecl *> FoundDecls;
-  llvm::DenseSet<Identifier> FoundAssociatedTypes;
+  std::set<ValueDecl *> AllFoundDecls;
+  std::map<Identifier, std::set<ValueDecl *>> FoundDecls;
   llvm::SetVector<FoundDeclTy> DeclsToReport;
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    if (FoundDecls.count(VD))
+    if (!AllFoundDecls.insert(VD).second)
       return;
 
-    if (auto ATD = dyn_cast<AssociatedTypeDecl>(VD)) {
-      // AssociatedTypeDecls don't track overriding. They can come from
-      // multiple implemented protocols (where there is no overriding
-      // relationship), so we need to track them separately.
-      //
-      // In any case, don't report multiple AssociatedTypeDecls with same name.
-      auto Res = FoundAssociatedTypes.insert(ATD->getName());
-      if (Res.second)
-        DeclsToReport.insert(FoundDeclTy(ATD, Reason));
+    if (VD->isInvalid()) {
+      FoundDecls[VD->getName()].insert(VD);
+      DeclsToReport.insert(FoundDeclTy(VD, Reason));
       return;
     }
+    auto &PossiblyConflicting = FoundDecls[VD->getName()];
 
-    // Insert all overridden decls into FoundDecls.
-    ValueDecl *OverriddenDecl = nullptr;
-    while (ValueDecl *OverriddenDecl = VD->getOverriddenDecl()) {
-      if (FoundDecls.count(OverriddenDecl))
-        break;
-      FoundDecls.insert(OverriddenDecl);
+    // Check all overriden decls.
+    {
+      auto *CurrentVD = VD->getOverriddenDecl();
+      while (CurrentVD) {
+        if (!AllFoundDecls.insert(CurrentVD).second)
+          break;
+        if (PossiblyConflicting.count(CurrentVD)) {
+          PossiblyConflicting.erase(CurrentVD);
+          PossiblyConflicting.insert(VD);
+
+          bool Erased = DeclsToReport.remove(
+              FoundDeclTy(CurrentVD, DeclVisibilityKind::LocalVariable));
+          assert(Erased);
+          (void)Erased;
+
+          DeclsToReport.insert(FoundDeclTy(VD, Reason));
+          return;
+        }
+        CurrentVD = CurrentVD->getOverriddenDecl();
+      }
     }
 
-    if (OverriddenDecl) {
-      bool Erased = DeclsToReport.remove(
-          FoundDeclTy(OverriddenDecl, DeclVisibilityKind::LocalVariable));
-      assert(Erased);
-      (void)Erased;
+    auto FoundSignature = VD->getOverloadSignature();
+    for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
+         I != E; ++I) {
+      auto *OtherVD = *I;
+      if (OtherVD->isInvalid()) {
+        // For some invalid decls it might be impossible to compute the
+        // signature, for example, if the types could not be resolved.
+        continue;
+      }
+      if (conflicting(FoundSignature, OtherVD->getOverloadSignature())) {
+        if (VD->getAccessibility() > OtherVD->getAccessibility()) {
+          PossiblyConflicting.erase(I);
+          PossiblyConflicting.insert(VD);
+
+          bool Erased = DeclsToReport.remove(
+              FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable));
+          assert(Erased);
+          (void)Erased;
+
+          DeclsToReport.insert(FoundDeclTy(VD, Reason));
+        }
+        return;
+      }
     }
+
+    PossiblyConflicting.insert(VD);
     DeclsToReport.insert(FoundDeclTy(VD, Reason));
   }
 };

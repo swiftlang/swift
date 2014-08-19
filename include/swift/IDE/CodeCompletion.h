@@ -61,6 +61,10 @@ public:
 
   public:
     enum class ChunkKind {
+      /// "internal", "private" or "public".
+      AccessControlKeyword,
+
+      /// The "override" keyword.
       OverrideKeyword,
 
       /// The keyword part of a declaration before the name, like "func".
@@ -143,7 +147,8 @@ public:
     };
 
     static bool chunkHasText(ChunkKind Kind) {
-      return Kind == ChunkKind::OverrideKeyword ||
+      return Kind == ChunkKind::AccessControlKeyword ||
+             Kind == ChunkKind::OverrideKeyword ||
              Kind == ChunkKind::DeclIntroducer ||
              Kind == ChunkKind::Text ||
              Kind == ChunkKind::LeftParen ||

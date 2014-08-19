@@ -1074,14 +1074,7 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 }
 
 /// Map a signature type for a parameter.
-static Type mapSignatureParamType(ASTContext &ctx, Type type,
-                                  bool isMethodSelf) {
-  if (isMethodSelf) {
-    // Strip 'inout' on 'self' parameter, so that mutating and nonmutating
-    // methods have the same overload signature.
-    type = type->getInOutObjectType();
-  }
-
+static Type mapSignatureParamType(ASTContext &ctx, Type type) {
   /// Translate implicitly unwrapped optionals into strict optionals.
   if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
     type = OptionalType::get(uncheckedOptOf);
@@ -1115,8 +1108,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     bool anyChanged = false;
     unsigned idx = 0;
     for (const auto &elt : tupleTy->getFields()) {
-      Type eltTy = mapSignatureParamType(ctx, elt.getType(),
-                                         /*isMethodSelf=*/false);
+      Type eltTy = mapSignatureParamType(ctx, elt.getType());
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
           elt.hasInit()) {
         if (!anyChanged) {
@@ -1141,7 +1133,13 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       argTy = TupleType::get(elements, ctx);
     }
   } else {
-    argTy = mapSignatureParamType(ctx, argTy, /*isMethodSelf=*/isMethod);
+    if (isMethod) {
+      // In methods, map 'self' to an empty tuple to allow comparing two
+      // methods from different types to determine if they would conflict when
+      // placed into a single nominal decl.
+      argTy = TupleType::getEmpty(ctx);
+    } else
+      argTy = mapSignatureParamType(ctx, argTy);
   }
 
   // Map the result type.
@@ -1154,9 +1152,13 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     info = funcTy->getExtInfo();
 
   // Rebuild the resulting function type.
-  if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
-    return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    argTy, resultTy, info);
+  //
+  // If the original function was generic, but our transformations removed all
+  // generic parameters from the signature, build a non-generic function type.
+  if (argTy->isDependentType() || resultTy->isDependentType())
+    if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
+      return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
+                                      argTy, resultTy, info);
 
   return FunctionType::get(argTy, resultTy, info);
 }

@@ -177,7 +177,7 @@ func testStruct2() {
 func testStruct3(a: StructWithAssociatedTypes) {
   a.#^STRUCT_INSTANCE^#
 }
-// STRUCT_TYPE_COUNT: Begin completions, 27 items
+// STRUCT_TYPE_COUNT: Begin completions, 26 items
 
 // STRUCT_INSTANCE: Begin completions, 14 items
 // STRUCT_INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal:   deduceCommonA()[#Int#]
@@ -216,7 +216,6 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDeducedTypeC[#Int#]{{$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDeducedTypeD[#Int#]{{$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDefaultedTypeA[#Int#]{{$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDefaultedTypeC[#FooBaseDefaultedTypeC#]{{$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeA[#Int#]{{$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeB[#Int#]{{$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeC[#Int#]{{$}}
@@ -254,8 +253,6 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeC[#Int#]{{$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeD[#Int#]{{$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeA[#Int#]{{$}}
-// FIXME: the following result should not be shown.
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeC[#FooBaseDefaultedTypeC#]{{$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeC[#Double#]{{$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeA[#Int#]{{$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeB[#Int#]{{$}}

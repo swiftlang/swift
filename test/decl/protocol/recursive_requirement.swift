@@ -17,7 +17,7 @@ protocol P {
 struct X<T: P> {
 }
 
-func f<T: P>() {
+func f<T : P>(z: T) {
  let x = X<T.A>()
 }
 
@@ -37,7 +37,7 @@ struct Y2 : P2 {
   typealias A = Y2
 }
 
-func f<T: P2>() {
+func f<T : P2>(z: T) {
  let x = X2<T.A>()
 }
 

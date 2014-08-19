@@ -86,10 +86,5 @@ func test3(md: TestAMoreDerived) {
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooMoreDerived#]{{$}}
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          derivedInstanceVar[#FooBase#]{{$}}
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{$}}
-// FIXME: duplicates.
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/Super:          baseOverInstanceVar[#FooBase#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/Super:       baseOverFunc()[#Void#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/Super:       baseOverContravariant({#(a): FooMoreDerived#})[#Void#]{{$}}
-// OVER_MORE_DERIVED_1-NEXT: Decl[InstanceMethod]/Super:       baseOverCovariant()[#FooBase#]{{$}}
 // OVER_MORE_DERIVED_1-NEXT: End completions
 

@@ -128,6 +128,12 @@ protocol P2 { }
 func ovl_generic1<T: protocol<P1, P2>>(#t: T) { } // expected-note{{previous}}
 func ovl_generic1<U: protocol<P1, P2>>(#t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
 
+func ovl_generic2<T : P1>() {} // expected-note{{previously declared here}}
+func ovl_generic2<T : P2>() {} // expected-error{{invalid redeclaration of 'ovl_generic2()'}}
+
+func ovl_generic3<T : P1>(x: T) {} // OK
+func ovl_generic3<T : P2>(x: T) {} // OK
+
 // Redeclarations within nominal types
 struct X { }
 struct Y { }

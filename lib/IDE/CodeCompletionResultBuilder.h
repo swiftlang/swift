@@ -74,6 +74,24 @@ public:
     AssociatedDecl = D;
   }
 
+  void addAccessControlKeyword(Accessibility Access) {
+    switch (Access) {
+    case Accessibility::Private:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "private ");
+      break;
+    case Accessibility::Internal:
+      // 'internal' is the default, don't add it.
+      break;
+    case Accessibility::Public:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "public ");
+      break;
+    }
+  }
+
   void addOverrideKeyword() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::OverrideKeyword, "override ");

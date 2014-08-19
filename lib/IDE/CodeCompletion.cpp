@@ -130,6 +130,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "#}";
     }
     switch (C.getKind()) {
+    case Chunk::ChunkKind::AccessControlKeyword:
     case Chunk::ChunkKind::OverrideKeyword:
     case Chunk::ChunkKind::DeclIntroducer:
     case Chunk::ChunkKind::Text:
@@ -690,6 +691,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
+    case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
@@ -2044,8 +2046,6 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       DeclNameOffsetLocatorPrinter Printer(OS);
-      if (Reason == DeclVisibilityKind::MemberOfSuper)
-        Builder.addOverrideKeyword();
       PrintOptions Options;
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
@@ -2054,6 +2054,11 @@ public:
       FD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
+    Builder.addAccessControlKeyword(std::min(
+        FD->getAccessibility(),
+        cast<NominalTypeDecl>(CurrDeclContext)->getAccessibility()));
+    if (Reason == DeclVisibilityKind::MemberOfSuper)
+      Builder.addOverrideKeyword();
     Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
     Builder.addBraceStmtWithCursor();
