@@ -50,7 +50,7 @@ class Sub : Super {
   override init() { super.init() } // okay, never fails
 
   init(nonfail: Int) { // expected-note{{propagate the failure with 'init?'}}{{7-7=?}}
-    super.init(fail: "boom") // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+    super.init(fail: "boom") // expected-error{{a non-failable initializer cannot chain to failable initializer 'init(fail:)' written with 'init?'}}
   }
 
   init(nonfail2: Int) { // okay, traps on nil
@@ -81,3 +81,42 @@ class Sub : Super {
     super.init()
   }
 }
+
+extension Super {
+  convenience init(convenienceNonFailNonFail: String) { // okay, non-failable
+    self.init()
+  }
+
+  convenience init(convenienceNonFailFail: String) { // expected-note{{propagate the failure with 'init?'}}{{19-19=?}}
+    self.init(fail: convenienceNonFailFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+  }
+
+  convenience init(convenienceNonFailFailIUO: String) { // okay, trap on failure
+    self.init(failIUO: convenienceNonFailFailIUO) 
+  }
+
+  convenience init?(convenienceFailNonFail: String) { 
+    self.init() // okay, can introduce its own failure
+  }
+
+  convenience init?(convenienceFailFail: String) {
+    self.init(fail: convenienceFailFail) // okay, propagates ?
+  }
+
+  convenience init?(convenienceFailFailIUO: String) { // okay, propagates ! as ?
+    self.init(failIUO: convenienceFailFailIUO) 
+  }
+
+  convenience init!(convenienceFailIUONonFail: String) { 
+    self.init() // okay, can introduce its own failure
+  }
+
+  convenience init!(convenienceFailIUOFail: String) {
+    self.init(fail: convenienceFailIUOFail) // okay, propagates ? as !
+  }
+
+  convenience init!(convenienceFailIUOFailIUO: String) { // okay, propagates !
+    self.init(failIUO: convenienceFailIUOFailIUO) 
+  }
+}
+
