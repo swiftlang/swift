@@ -67,7 +67,8 @@ enum class Accessibility : uint8_t {
 };
 
 enum class InlineKind : uint8_t {
-  Never = 0
+  Never = 0,
+  NoInlineSIL = 1
 };
 
 /// This enum represents the possible values of the @effects attribute.

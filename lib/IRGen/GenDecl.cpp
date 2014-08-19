@@ -1118,7 +1118,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   auto cc = expandAbstractCC(*this, f->getAbstractCC());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  if (f->isNoinline()) {
+  if (f->isNoinline() == NoInline) {
     attrs = attrs.addAttribute(fnType->getContext(),
                 llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
   }

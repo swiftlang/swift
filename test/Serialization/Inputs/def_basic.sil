@@ -818,6 +818,16 @@ bb0:
 }
 sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 
+// CHECK-LABEL: [noinlinesil] @noinlinesil_callee
+sil [noinlinesil] @noinlinesil_callee : $@thin () -> Int {
+bb0:
+  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  %1 = metatype $@thin Int.Type
+  %2 = integer_literal $Builtin.Int2048, 0
+  %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  return %3 : $Int
+}
+
 // CHECK-LABEL: [semantics "foo"] @test_semantics : $@thin () -> ()
 sil [semantics "foo"] @test_semantics : $@thin () -> () {
 bb0:
@@ -1197,6 +1207,7 @@ bb0:
   %107 = function_ref @test_assign : $@thin (Int, @inout Int) -> ()
   %109 = function_ref @test_transparent : $@thin () -> ()
   %130 = function_ref @noinline_callee : $@thin () -> Int
+  %132 = function_ref @noinlinesil_callee : $@thin () -> Int
   %131 = function_ref @test_semantics : $@thin () -> ()
   %111 = function_ref @test_partial_apply : $@thin Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@thin (AnyObject) -> ()

@@ -671,7 +671,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
-                                 bool &isNoinline, std::string &Semantics,
+                                 Inline_t &isNoinline, std::string &Semantics,
                                  EffectsKind &MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
@@ -683,7 +683,9 @@ static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
     else if (P.Tok.getText() == "global_init")
       isGlobalInit = true;
     else if (P.Tok.getText() == "noinline")
-      isNoinline = true;
+      isNoinline = NoInline;
+    else if (P.Tok.getText() == "noinlinesil")
+      isNoinline = NoInlineSIL;
     else if (P.Tok.getText() == "readnone")
       MRK = EffectsKind::ReadNone;
     else if (P.Tok.getText() == "readonly")
@@ -2994,7 +2996,8 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
-  bool isGlobalInit = false, isNoinline = false;
+  bool isGlobalInit = false;
+  Inline_t isNoinline = InlineDefault;
   std::string Semantics;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||

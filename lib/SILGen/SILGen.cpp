@@ -271,7 +271,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans,
-                                constant.isNoinline(), EK);
+                                Inline_t(constant.isNoinline()), EK);
 
   F->setGlobalInit(constant.isGlobal());
   if (constant.hasDecl())
@@ -586,7 +586,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto *f = 
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr,
-                        binding, IsNotBare, IsNotTransparent, false);
+                        binding, IsNotBare, IsNotTransparent, Inline_t(false));
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);

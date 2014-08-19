@@ -216,7 +216,7 @@ namespace sil_block {
     SILLinkageField,
     BCFixed<1>,        // transparent
     BCFixed<1>,        // global_init
-    BCFixed<1>,        // noinline
+    BCFixed<2>,        // noinline
     BCFixed<2>,        // side effect info.
     TypeIDField,
     IdentifierIDField  // Semantics Attribute

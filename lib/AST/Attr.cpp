@@ -243,6 +243,8 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
+    case InlineKind::NoInlineSIL:
+      return "inline(late)";
     }
     llvm_unreachable("Invalid inline kind");
   }

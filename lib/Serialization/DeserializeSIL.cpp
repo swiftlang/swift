@@ -420,7 +420,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              nullptr, loc);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setGlobalInit(isGlobal == 1);
-    fn->setNoinline(isNoinline == 1);
+    assert(isNoinline >= 0 && isNoinline <= 2 &&
+           "Only value between 0 and 2 allowed - see SILFunction.h");
+    fn->setNoinline(Inline_t(isNoinline));
     fn->setEffectsInfo((EffectsKind)effect);
     if (SemanticsID)
       fn->setSemanticsAttr(MF->getIdentifier(SemanticsID).str());

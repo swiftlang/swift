@@ -226,7 +226,7 @@ struct SILDeclRef {
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function has noinline attribute.
-  bool isNoinline() const;
+  unsigned isNoinline() const;
 
   /// \return True if the function has a effects attribute.
   bool hasEffectsAttribute() const;

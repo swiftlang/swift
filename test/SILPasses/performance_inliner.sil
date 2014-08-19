@@ -869,6 +869,26 @@ bb0:
 }
 sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 
+// CHECK-LABEL: @caller_of_noinlinesil
+sil @caller_of_noinlinesil : $@thin () -> () {
+bb0:
+  // CHECK: function_ref @noinlinesil_callee
+  // CHECK: apply
+  %0 = function_ref @noinlinesil_callee : $@thin () -> Int
+  %1 = apply %0() : $@thin () -> Int
+  %2 = tuple ()
+  return %2 : $()
+}
+// CHECK-LABEL: [noinlinesil] @noinlinesil_callee
+sil [noinlinesil] @noinlinesil_callee : $@thin () -> Int {
+bb0:
+  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  %1 = metatype $@thin Int.Type
+  %2 = integer_literal $Builtin.Int2048, 0
+  %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  return %3 : $Int
+}
+
 sil @coldcall : $@thin () -> () {
 bb0:
   %0 = tuple ()                                   // user: %1

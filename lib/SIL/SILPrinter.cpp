@@ -1316,8 +1316,10 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isGlobalInit())
     OS << "[global_init] ";
   
-  if (isNoinline())
+  if (isNoinline() == NoInline)
     OS << "[noinline] ";
+  if (isNoinline() == NoInlineSIL)
+    OS << "[noinlinesil] ";
 
   if (getEffectsInfo() == EffectsKind::ReadOnly)
     OS << "[readonly] ";
