@@ -171,7 +171,7 @@ Algorithm.test("filter/eager") {
   expectEqual(10, count)
 }
 
-Algorithm.test("sorted") {
+Algorithm.test("sorted/strings") {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
     sorted([ "apple", "Banana", "cherry" ]))
@@ -276,6 +276,62 @@ Algorithm.test("invalidOrderings") {
     let predicate: (Int,Int)->Bool = $0
     let result = lexicographicalCompare(randomArray(), randomArray(), predicate)
   }
+}
+
+// The routine is based on http://www.cs.dartmouth.edu/~doug/mdmspe.pdf
+func makeQSortKiller(len: Int) -> [Int] {
+  var candidate: Int = 0
+  var keys = [Int:Int]()
+  func Compare(x: Int, y : Int) -> Bool {
+    if keys[x] == nil && keys[y] == nil {
+      if (x == candidate) {
+        keys[x] = keys.count
+      } else {
+        keys[y] = keys.count
+      }
+    }
+    if keys[x] == nil {
+      candidate = x
+      return true
+    }
+    if keys[y] == nil {
+      candidate = y
+      return false
+    }
+    return keys[x]! > keys[y]!
+  }
+
+  var ary = [Int](count: len, repeatedValue:0)
+  var ret = [Int](count: len, repeatedValue:0)
+  for i in 0..<len { ary[i] = i }
+  ary = sorted(ary, Compare)
+  for i in 0..<len {
+    ret[ary[i]] = i
+  }
+  return ret
+}
+
+Algorithm.test("sorted/complexity") {
+  var ary: [Int] = []
+
+  // Check performance of sort on array of repeating values
+  var comparisons_100 = 0
+  ary = [Int](count: 100, repeatedValue: 0)
+  sort(&ary) { comparisons_100++; return $0 < $1 }
+  var comparisons_1000 = 0
+  ary = [Int](count: 1000, repeatedValue: 0)
+  sort(&ary) { comparisons_1000++; return $0 < $1 }
+  expectTrue(comparisons_1000/comparisons_100 < 20)
+
+  // Try to construct 'bad' case for quicksort, on which the algorithm
+  // goes quadratic.
+  comparisons_100 = 0
+  ary = makeQSortKiller(100)
+  sort(&ary) { comparisons_100++; return $0 < $1 }
+  comparisons_1000 = 0
+  ary = makeQSortKiller(1000)
+  sort(&ary) { comparisons_1000++; return $0 < $1 }
+  expectTrue(comparisons_1000/comparisons_100 < 20)
 }
 
 runAllTests()
