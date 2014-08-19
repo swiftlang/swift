@@ -11,5 +11,6 @@ if (APPLE)
   add_custom_target(leaks-runner-copy ALL
                     COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner ${SWIFT_BINARY_DIR}/bin/leaks-runner
                     COMMAND chmod u+x ${SWIFT_BINARY_DIR}/bin/leaks-runner
-                    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner)
+                    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner
+                            ${SWIFT_BINARY_DIR}/bin)
 endif()
