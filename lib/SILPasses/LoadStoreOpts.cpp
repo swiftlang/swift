@@ -307,7 +307,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI, AliasAnalysis *AA,
     // We are only given this if we are being used for multi-bb load store opts
     // (when this is required). If we are being used for single-bb load store
     // opts, this is not necessary, so skip it.
-    if (PDI && !PDI->properlyDominates(SI, PrevStore)) {
+    if (!PDI->properlyDominates(SI, PrevStore)) {
       StoresToStopTracking.push_back(PrevStore);
       DEBUG(llvm::dbgs() << "        Found dead store... That we don't "
             "postdominate... Can't remove it but will track it.");
