@@ -5,7 +5,6 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -module-cache-path %t/clang-module-cache -code-completion-token=T2 | FileCheck %s -check-prefix=T2
 
 // REQUIRES: sdk
-// REQUIRES: long_tests
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx

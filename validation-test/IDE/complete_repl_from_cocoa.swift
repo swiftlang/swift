@@ -3,7 +3,6 @@
 // A smoketest for REPL code completion in Cocoa.
 
 // REQUIRES: sdk
-// REQUIRES: long_tests
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx
