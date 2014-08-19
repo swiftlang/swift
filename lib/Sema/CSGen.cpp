@@ -275,7 +275,9 @@ namespace {
       auto argsTy = CS.createTypeVariable(
                       CS.getConstraintLocator(expr),
                       TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
-      auto methodTy = FunctionType::get(argsTy, baseTy);
+      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                            /*options=*/0);
+      auto methodTy = FunctionType::get(argsTy, resultTy);
       CS.addValueMemberConstraint(baseTy,
                                   C.Id_init,
         methodTy,

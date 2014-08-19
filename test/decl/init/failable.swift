@@ -36,3 +36,48 @@ func testConstruction(i: Int, s: String) {
   
   s0 = s0IUO
 }
+
+// ----------------------------------------------------------------------------
+// Superclass initializer chaining
+// ----------------------------------------------------------------------------
+class Super {
+  init?(fail: String) { }
+  init!(failIUO: String) { }
+  init() { }
+}
+
+class Sub : Super {
+  override init() { super.init() } // okay, never fails
+
+  init(nonfail: Int) { // expected-note{{propagate the failure with 'init?'}}{{7-7=?}}
+    super.init(fail: "boom") // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+  }
+
+  init(nonfail2: Int) { // okay, traps on nil
+    super.init(failIUO: "boom")
+  }
+
+  override init?(fail: String) {
+    super.init(fail: fail) // okay, propagates ?
+  }
+
+  init?(fail2: String) { // okay, propagates ! as ?
+    super.init(failIUO: fail2)
+  }
+
+  init?(fail3: String) { // okay, can introduce its own failure
+    super.init()
+  }
+
+  override init!(failIUO: String) {
+    super.init(failIUO: failIUO) // okay, propagates !
+  }
+
+  init!(failIUO2: String) { // okay, propagates ? as !
+    super.init(fail: failIUO2)
+  }
+
+  init!(failIUO3: String) { // okay, can introduce its own failure
+    super.init()
+  }
+}

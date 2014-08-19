@@ -1084,6 +1084,12 @@ NOTE(delegation_here,sema_tce,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,sema_tce,none,
       "must call a designated initializer of the superclass %0",
       (Type))
+ERROR(delegate_chain_nonoptional_to_optional,sema_tce,none,
+      "a non-failable initializer cannot %select{delegate|chain}0 to "
+      "failable initializer %1 written with 'init?'", (bool, DeclName))
+NOTE(init_propagate_failure,sema_tce,none,
+     "propagate the failure with 'init?'", ())
+
 NOTE(convenience_init_here,sema_tce,none,
      "convenience initializer is declared here", ())
 ERROR(designated_init_in_extension,sema_tcd,none,

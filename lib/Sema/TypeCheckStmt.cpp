@@ -852,8 +852,8 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
-static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
-                           bool implicitlyGenerated) {
+static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor, 
+                           ApplyExpr *apply, bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getFn()->getSemanticsProvidingExpr());
@@ -870,11 +870,28 @@ static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
     return true;
   }
   
+  // If the superclass initializer is failable (using '?'), and the current
+  // initializer is not, complain.
+  if (ctor->getFailability() == OTK_Optional &&
+      fromCtor->getFailability() == OTK_None) {
+    if (!implicitlyGenerated) {
+      // FIXME: We can't actually patch up the AST here, so 
+      tc.diagnose(apply->getArg()->getLoc(), 
+                  diag::delegate_chain_nonoptional_to_optional, 
+                  false, ctor->getFullName());
+      tc.diagnose(fromCtor->getLoc(), diag::init_propagate_failure)
+        .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                fromCtor->getLoc()),
+                     "?");
+    }
+    return true;
+  }
+
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
     auto superclassTy = ctor->getExtensionType();
-    for (auto member : tc.lookupConstructors(superclassTy, dc)) {
+    for (auto member : tc.lookupConstructors(superclassTy, fromCtor)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
