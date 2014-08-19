@@ -123,6 +123,16 @@ func _conditionallyUnreachable() {
   Builtin.conditionallyUnreachable()
 }
 
+/// We don't want this function to get inlined at the SIL level. This allows us
+/// to do dominance based optimization (CSE) on the readnone property of this
+/// function. Otherwise, only the sizeof check would dominate.
+@effects(readnone)
+@inline(late) internal
+func _isClassOrObjCExistentialAndSizeofAnyObject<T>(x: T.Type) -> Bool {
+  // FIXME: Dirty hack; see <rdar://problem/16823238>
+  return sizeof(x) == sizeof(AnyObject) && _swift_isClassOrObjCExistential(x)
+}
+
 @asmname("swift_isClassOrObjCExistential")
 func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
@@ -130,9 +140,7 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 /// AnyObject
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   return _canBeClass(x)
-    // FIXME: Dirty hack; see <rdar://problem/16823238>
-    && sizeof(x) == sizeof(AnyObject) 
-    && _swift_isClassOrObjCExistential(x)
+    && _isClassOrObjCExistentialAndSizeofAnyObject(x)
 }
 
 //===----------------------------------------------------------------------===//
