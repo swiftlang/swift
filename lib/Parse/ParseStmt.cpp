@@ -1323,7 +1323,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc()));
+        Body, BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc));
 
   return makeParserResult(
       Status,

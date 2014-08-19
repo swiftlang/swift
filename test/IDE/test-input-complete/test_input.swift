@@ -1,4 +1,5 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/err_type_complete.swift | FileCheck %s -check-prefix=COMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/for_incomplete1.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_complete.swift | FileCheck %s -check-prefix=COMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete1.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete2.swift | FileCheck %s -check-prefix=INCOMPLETE
