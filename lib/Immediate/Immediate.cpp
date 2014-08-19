@@ -332,9 +332,10 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   auto *swiftModule = CI.getMainModule();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto Module = performIRGeneration(IRGenOpts, swiftModule, CI.getSILModule(),
-                                    swiftModule->Name.str(),
-                                    llvm::getGlobalContext());
+  auto ModuleOwner = performIRGeneration(
+      IRGenOpts, swiftModule, CI.getSILModule(), swiftModule->Name.str(),
+      llvm::getGlobalContext());
+  auto *Module = ModuleOwner.get();
 
   if (Context.hadError())
     return;
@@ -360,7 +361,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   }
 
   // Build the ExecutionEngine.
-  llvm::EngineBuilder builder(Module.get());
+  llvm::EngineBuilder builder(std::move(ModuleOwner));
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
   TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
@@ -955,7 +956,7 @@ private:
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
   llvm::LLVMContext &LLVMContext;
-  llvm::Module Module;
+  llvm::Module *Module;
   llvm::Module DumpModule;
   llvm::SmallString<128> DumpSource;
 
@@ -1015,7 +1016,7 @@ private:
       return false;
     
     std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(&Module, LineModule.get(),
+    if (llvm::Linker::LinkModules(Module, LineModule.get(),
                                   llvm::Linker::PreserveSource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
@@ -1032,7 +1033,7 @@ private:
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(CI, Module, ImportedModules, InitFns,
+    if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
                              IRGenOpts, SILOpts, sil.get()))
       return false;
     
@@ -1043,10 +1044,10 @@ private:
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
     if (!RanGlobalInitializers) {
-      EE->runStaticConstructorsDestructors(&Module, false);
+      EE->runStaticConstructorsDestructors(*Module, false);
       RanGlobalInitializers = true;
     }
-    llvm::Function *EntryFn = Module.getFunction("main");
+    llvm::Function *EntryFn = Module->getFunction("main");
     EE->runFunctionAsMain(EntryFn, CmdLine, 0);
     EE->freeMachineCodeForFunction(EntryFn);
     EntryFn->eraseFromParent();
@@ -1067,7 +1068,7 @@ public:
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
       LLVMContext(LLVMCtx),
-      Module("REPL", LLVMContext),
+      Module(new llvm::Module("REPL", LLVMContext)),
       DumpModule("REPL", LLVMContext),
       IRGenOpts(),
       SILOpts(),
@@ -1090,7 +1091,8 @@ public:
       tryLoadLibrary(linkLib, Ctx.SearchPathOpts, CI.getDiags());
     });
 
-    llvm::EngineBuilder builder(&Module);
+    llvm::EngineBuilder builder(
+        std::move(std::unique_ptr<llvm::Module>(Module)));
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
