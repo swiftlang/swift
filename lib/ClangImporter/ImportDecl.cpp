@@ -2787,13 +2787,22 @@ namespace {
       if (!type)
         return nullptr;
 
+      // FIXME: Set failability based on nullability of result.
+      OptionalTypeKind failability = OTK_None;
+
+      // Determine the type of the result.
+      Type resultTy = selfTy;
+      if (failability != OTK_None) {
+        resultTy = OptionalType::get(failability, resultTy);
+      }
+
       // A constructor returns an object of the type, not 'id'.
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
-                               selfTy);
+                               resultTy);
 
       // Add the 'self' parameter to the function types.
       Type allocType = FunctionType::get(selfMetaVar->getType(), type);
-      Type initType = FunctionType::get(selfTy, type);
+      Type initType = FunctionType::get(resultTy, type);
 
       // Look for other constructors that occur in this context with
       // the same name.
@@ -2865,8 +2874,6 @@ namespace {
       selfPat = createTypedNamedPattern(selfVar);
 
       // Create the actual constructor.
-      // FIXME: Failability.
-      OptionalTypeKind failability = OTK_None;
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
                       name, SourceLoc(), failability, SourceLoc(), selfPat, 
                       bodyPatterns.back(), /*GenericParams=*/nullptr, dc);

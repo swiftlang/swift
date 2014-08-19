@@ -1,6 +1,6 @@
 // RUN: %swift -parse %s -verify
 
-class X {
+struct S0 {
   init!(int: Int) { }
   init! (uint: UInt) { }
   init !(float: Float) { }
@@ -10,6 +10,9 @@ class X {
   init ? (char: Character) { }
 }
 
+struct S1<T> {
+  init?(value: T) { }
+}
 
 class DuplicateDecls {
   init!() { } // expected-note{{'init()' previously declared here}}
