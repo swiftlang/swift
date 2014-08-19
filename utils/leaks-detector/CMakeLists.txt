@@ -8,9 +8,8 @@ if (APPLE)
     ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner
     @ONLY
     NEWLINE_STYLE UNIX)
-  add_custom_target(leaks-runner-copy ALL
-                    COMMAND mkdir -p ${SWIFT_BINARY_DIR}/bin
-                    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner ${SWIFT_BINARY_DIR}/bin/leaks-runner
-                    COMMAND chmod u+x ${SWIFT_BINARY_DIR}/bin/leaks-runner
-                    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner)
+  file(COPY ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner
+       DESTINATION ${CMAKE_BINARY_DIR}/bin
+       FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+       GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endif()
