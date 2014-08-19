@@ -1048,12 +1048,16 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         });
     }
   }
-  // If this is a construct, replace the result type with the base object type.
-  else if (isa<ConstructorDecl>(value)) {
+  // If this is an initializer, replace the result type with the base
+  // object type.
+  else if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
     auto outerFnType = openedType->castTo<FunctionType>();
     auto innerFnType = outerFnType->getResult()->castTo<FunctionType>();
+    auto resultTy = baseObjTy;
+    if (ctor->getFailability() != OTK_None)
+      resultTy = OptionalType::get(ctor->getFailability(), resultTy);
 
-    openedType = FunctionType::get(innerFnType->getInput(), baseObjTy,
+    openedType = FunctionType::get(innerFnType->getInput(), resultTy,
                                    innerFnType->getExtInfo());
     openedType = FunctionType::get(outerFnType->getInput(), openedType,
                                    outerFnType->getExtInfo());
