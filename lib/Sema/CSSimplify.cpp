@@ -2066,7 +2066,8 @@ commit_to_conversions:
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
+ConstraintSystem::simplifyConstructionConstraint(Type valueType, 
+                                                 FunctionType *fnType,
                                                  unsigned flags,
                                                  ConstraintLocator *locator) {
   // Desugar the value type.
@@ -2082,6 +2083,9 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
       desugarValueTypeVar = nullptr;
     }
   }
+
+  Type argType = fnType->getInput();
+  Type resultType = fnType->getResult();
 
   switch (desugarValueType->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -2107,6 +2111,14 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 
   case TypeKind::Tuple: {
     // Tuple construction is simply tuple conversion.
+    if (matchTypes(resultType, desugarValueType,
+                   TypeMatchKind::BindType,
+                   flags,
+                   ConstraintLocatorBuilder(locator)
+                     .withPathElement(ConstraintLocator::ApplyFunction))
+          == SolutionKind::Error)
+      return SolutionKind::Error;
+
     return matchTypes(argType, valueType, TypeMatchKind::Conversion,
                       flags|TMF_GenerateConstraints, locator);
   }
@@ -2166,11 +2178,10 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
                                TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
 
   // The constructor will have function type T -> T2, for a fresh type
-  // variable T. Note that these constraints specifically require a
-  // match on the result type because the constructors for enums and struct
-  // types always return a value of exactly that type.
+  // variable T. T2 is the result type provided via the construction
+  // constraint itself.
   addValueMemberConstraint(valueType, name,
-                           FunctionType::get(tv, valueType),
+                           FunctionType::get(tv, resultType),
                            getConstraintLocator(
                              locator, 
                              ConstraintLocator::ConstructorMember));
@@ -3190,18 +3201,8 @@ retry:
 
   // For a metatype, perform a construction.
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
-    auto instanceTy2 = meta2->getInstanceType();
-
-    // Bind the result type to the instance type.
-    if (matchTypes(func1->getResult(), instanceTy2,
-                   TypeMatchKind::BindType,
-                   flags,
-                   locator.withPathElement(ConstraintLocator::ApplyFunction))
-        == SolutionKind::Error)
-      return SolutionKind::Error;
-
     // Construct the instance from the input arguments.
-    addConstraint(ConstraintKind::Construction, func1->getInput(), instanceTy2,
+    addConstraint(ConstraintKind::Construction, func1, meta2->getInstanceType(),
                   getConstraintLocator(outerLocator));
     return SolutionKind::Solved;
   }
@@ -3983,7 +3984,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Construction:
     return simplifyConstructionConstraint(constraint.getSecondType(),
-                                          constraint.getFirstType(),
+                                          constraint.getFirstType()
+                                            ->castTo<FunctionType>(),
                                           TMF_None,
                                           constraint.getLocator());
 

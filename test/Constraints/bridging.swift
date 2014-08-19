@@ -77,7 +77,7 @@ func arrayToNSArray() {
   nsa = [BridgedClass]()
   nsa = [OtherClass]()
   nsa = [BridgedStruct]()
-  nsa = [NotBridgedStruct]() // expected-error{{'[(NotBridgedStruct)]' is not convertible to 'NSArray'}}
+  nsa = [NotBridgedStruct]() // expected-error{{missing argument for parameter #1 in call}}
 }
 
 // NSArray -> Array

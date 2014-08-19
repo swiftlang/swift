@@ -2005,15 +2005,17 @@ private:
   ///
   /// \param valueType The type being constructed.
   ///
-  /// \param argType The type of the argument, used to call \c
-  /// valueType's constructor.
+  /// \param fnType The argument type that will be the input to the
+  /// valueType initializer and the result type will be the result of
+  /// calling that initializer.
   ///
   /// \param flags Flags that indicate how the constraint should be
   /// simplified.
   /// 
   /// \param locator Locator describing where this construction
   /// occurred.
-  SolutionKind simplifyConstructionConstraint(Type valueType, Type argType,
+  SolutionKind simplifyConstructionConstraint(Type valueType, 
+                                              FunctionType *fnType,
                                               unsigned flags,
                                               ConstraintLocator *locator);
 

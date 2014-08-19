@@ -67,9 +67,10 @@ enum class ConstraintKind : char {
   OperatorArgumentTupleConversion,
   /// \brief The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
-  /// \brief The first type can be converted to the second type or can be
-  /// used as an argument to a constructor for the second (non-reference)
-  /// type.
+  /// \brief The first type is a function that whose input type is an
+  /// input to an initializer and whose result type is the result type
+  /// of that initialization, and the second type is the type being
+  /// constructed.
   Construction,
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).

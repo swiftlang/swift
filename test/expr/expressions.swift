@@ -558,7 +558,7 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   --i8
 
   // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{cannot invoke '++' with an argument of type 'Int64'}}
+  ++Int64(5) // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
 }
 
 //===----------------------------------------------------------------------===//
