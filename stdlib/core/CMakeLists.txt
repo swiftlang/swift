@@ -71,6 +71,7 @@ set(SWIFTLIB_ESSENTIAL
   Reflection.swift
   Repeat.swift
   Reverse.swift.gyb
+  Sort.swift.gyb
   Shims.swift
   StaticString.swift
   Stride.swift
