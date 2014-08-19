@@ -43,7 +43,7 @@ func testConstruction(i: Int, s: String) {
 class Super {
   init?(fail: String) { }
   init!(failIUO: String) { }
-  init() { }
+  init() { } // expected-note 2{{non-failable initializer 'init()' overridden here}}
 }
 
 class Sub : Super {
@@ -82,6 +82,9 @@ class Sub : Super {
   }
 }
 
+// ----------------------------------------------------------------------------
+// Initializer delegation
+// ----------------------------------------------------------------------------
 extension Super {
   convenience init(convenienceNonFailNonFail: String) { // okay, non-failable
     self.init()
@@ -120,3 +123,48 @@ extension Super {
   }
 }
 
+// ----------------------------------------------------------------------------
+// Initializer overriding
+// ----------------------------------------------------------------------------
+class Sub2 : Super {
+  override init!(fail: String) { // okay to change ? to !
+    super.init(fail: fail) 
+  }
+  override init?(failIUO: String) { // okay to change ! to ?
+    super.init(failIUO: failIUO)
+  }
+
+  override init() { super.init() } // no change
+}
+
+// Dropping optionality
+class Sub3 : Super {
+  override init(fail: String) { // okay, strengthened result type
+    super.init()
+  }
+
+  override init(failIUO: String) { // okay, strengthened result type
+    super.init()
+  }
+
+  override init() { } // no change
+}
+
+// Adding optionality
+class Sub4 : Super {
+  override init?(fail: String) { super.init() }
+  override init!(failIUO: String) { super.init() }
+
+  override init?() { // expected-error{{failable initializer 'init()' cannot override a non-failable initializer}}
+    super.init()
+  }
+}
+
+class Sub5 : Super {
+  override init?(fail: String) { super.init() }
+  override init!(failIUO: String) { super.init() }
+
+  override init!() { // expected-error{{failable initializer 'init()' cannot override a non-failable initializer}}
+    super.init()
+  }
+}

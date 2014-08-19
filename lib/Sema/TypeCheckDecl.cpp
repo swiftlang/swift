@@ -4592,6 +4592,33 @@ public:
     return elt.getPattern();
   }
 
+  /// Drop the optionality of the result type of the given function type.
+  static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
+    // We've hit the result type.
+    if (uncurryLevel == 0) {
+      if (auto objectTy = type->getAnyOptionalObjectType())
+        return objectTy;
+
+      return type;
+    }
+
+    // Determine the input and result types of this function.
+    auto fnType = type->castTo<AnyFunctionType>();
+    Type inputType = fnType->getInput();
+    Type resultType = dropResultOptionality(fnType->getResult(), 
+                                            uncurryLevel - 1);
+    
+    // Produce the resulting function type.
+    if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+      return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                      inputType, resultType,
+                                      fnType->getExtInfo());
+    }
+    
+    assert(!isa<PolymorphicFunctionType>(fnType));  
+    return FunctionType::get(inputType, resultType, fnType->getExtInfo());    
+  }
+
   /// Diagnose overrides of '(T) -> T?' with '(T!) -> T!'.
   void diagnoseUnnecessaryIUOs(const AbstractFunctionDecl *method,
                                const AbstractFunctionDecl *parentMethod,
@@ -4738,6 +4765,10 @@ public:
         return false;
     
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
+    ConstructorDecl *ctor = nullptr;
+    if (method)
+      ctor = dyn_cast<ConstructorDecl>(method);
+
     auto abstractStorage = dyn_cast<AbstractStorageDecl>(decl);
     assert((method || abstractStorage) && "Not a method or abstractStorage?");
 
@@ -4750,6 +4781,12 @@ public:
       declTy = declTy->getReferenceStorageReferent();
     }
 
+    // Ignore the optionality of initializers when comparing types;
+    // we'll enforce this separately
+    if (ctor) {
+      declTy = dropResultOptionality(declTy, 1);
+    }
+      
     // If the method is an Objective-C method, compute its selector.
     Optional<ObjCSelector> methodSelector;
     ObjCSubscriptKind subscriptKind = ObjCSubscriptKind::None;
@@ -4828,6 +4865,12 @@ public:
         parentDeclTy = parentDeclTy->getReferenceStorageReferent();
       }
 
+      // Ignore the optionality of initializers when comparing types;
+      // we'll enforce this separately
+      if (ctor) {
+        parentDeclTy = dropResultOptionality(parentDeclTy, 1);
+      }
+
       if (declTy->isEqual(parentDeclTy)) {
         matches.push_back({parentDecl, true, parentDeclTy});
         hadExactMatch = true;
@@ -4875,7 +4918,7 @@ public:
         return false;
 
       // Try looking again, this time using just the base name, so that we'll
-      // catch
+      // catch mismatched names.
       retried = true;
       name = name.getBaseName();
       goto retry;
@@ -5638,6 +5681,20 @@ public:
                         diag::convenience_init_override_here);
           }
         }
+      }
+
+      // A failable initializer cannot override a non-failable one.
+      // This would normally be diagnosed by the covariance rules;
+      // however, those are disabled so that we can provide a more
+      // specific diagnostic here.
+      if (CD->getFailability() != OTK_None &&
+          CD->getOverriddenDecl() &&
+          CD->getOverriddenDecl()->getFailability() == OTK_None) {
+        TC.diagnose(CD, diag::failable_initializer_override,
+                    CD->getFullName());
+        TC.diagnose(CD->getOverriddenDecl(), 
+                    diag::nonfailable_initializer_override_here,
+                    CD->getOverriddenDecl()->getFullName());
       }
     }
 

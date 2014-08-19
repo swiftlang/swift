@@ -974,7 +974,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     case ConstructorDecl::BodyInitKind::Delegating:
       isDelegating = true;
       wantSuperInitCall = false;
-      checkDelegatingInit(*this, ctor, initExpr);
+      if (initExpr)
+        checkDelegatingInit(*this, ctor, initExpr);
       break;
 
     case ConstructorDecl::BodyInitKind::Chained:

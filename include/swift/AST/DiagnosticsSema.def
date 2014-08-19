@@ -777,6 +777,12 @@ ERROR(subscript_does_not_override,sema_tcd,none,
 ERROR(initializer_does_not_override,sema_tcd,none,
       "initializer does not override a designated initializer from its "
       "superclass", ())
+ERROR(failable_initializer_override,sema_tcd,none,
+      "failable initializer %0 cannot override a non-failable initializer",
+      (DeclName))
+NOTE(nonfailable_initializer_override_here,sema_tcd,none,
+     "non-failable initializer %0 overridden here", (DeclName))
+
 NOTE(property_override_here,sema_tcd,none,
      "attempt to override property here", ())
 NOTE(subscript_override_here,sema_tcd,none,
