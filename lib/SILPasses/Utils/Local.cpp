@@ -57,6 +57,13 @@ bool swift::isReadNone(BuiltinFunctionRefInst *FR) {
   llvm_unreachable("All cases are covered.");
 }
 
+bool swift::isReadNone(FunctionRefInst *FR) {
+  auto *F = FR->getReferencedFunction();
+  if (!F)
+    return false;
+  return F->getEffectsInfo() == EffectsKind::ReadNone;
+}
+
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.

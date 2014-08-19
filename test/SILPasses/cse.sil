@@ -687,3 +687,23 @@ bb0(%0 : $*D, %1 : $Builtin.Word):
   %6 = tuple(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer)
   return %6 : $(Builtin.RawPointer, Builtin.RawPointer)
 }
+
+
+sil [readnone] @readnonefun : $@thin (@inout Builtin.Int8) -> ()
+
+// CHECK-LABEL: cse_readnone
+// CHECK: bb0
+// CHECK: function_ref @readnonefun
+// CHECK: apply
+// CHECK-NOT: function_ref @readnonefun
+// CHECK-NOT: apply
+// CHECK:return
+sil @cse_readnone : $@thin (@inout Builtin.Int8) -> () {
+bb0(%0 : $*Builtin.Int8):
+  %1 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> ()
+  apply %1(%0) : $@thin (@inout Builtin.Int8) -> ()
+  %2 = function_ref @readnonefun : $@thin (@inout Builtin.Int8) -> ()
+  apply %2(%0) : $@thin (@inout Builtin.Int8) -> ()
+  %3 = tuple()
+  return %3 : $()
+}
