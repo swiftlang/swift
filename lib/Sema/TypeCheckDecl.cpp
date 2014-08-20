@@ -3969,6 +3969,23 @@ public:
     TC.checkDeclAttributes(CD);
   }
 
+  void validateAncestorProtocols(ArrayRef<ProtocolDecl *> initialProtos) {
+    llvm::SmallPtrSet<ProtocolDecl *, 16> seenProtos;
+    SmallVector<ProtocolDecl *, 16> queue(initialProtos.begin(),
+                                          initialProtos.end());
+
+    while (!queue.empty()) {
+      ProtocolDecl *proto = queue.pop_back_val();
+      if (!seenProtos.insert(proto))
+        continue;
+
+      queue.append(proto->getProtocols().begin(), proto->getProtocols().end());
+      for (auto *member : proto->getMembers())
+        if (auto *requirement = dyn_cast<ValueDecl>(member))
+          TC.validateDecl(requirement);
+    }
+  }
+
   void visitProtocolDecl(ProtocolDecl *PD) {
     // This protocol declaration is technically a parse error, so do not type
     // check.
@@ -3992,6 +4009,9 @@ public:
       SmallVector<ProtocolDecl *, 8> path;
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        diag::protocol_here, path);
+
+      // Make sure the parent protocols have been fully validated.
+      validateAncestorProtocols(PD->getProtocols());
     }
 
     // Check the members.
