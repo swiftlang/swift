@@ -1315,10 +1315,29 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
   %2 = struct_extract %0 : $S, #S.x
   strong_retain %2 : $Builtin.NativeObject
   release_value %0 : $S
-
   %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1
   strong_retain %3 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %5 = tuple()
   return %5 : $()
+}
+
+// CHECK-LABEL: sil @strip_off_single_pred_args : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: strong_release
+sil @strip_off_single_pred_args : $@thin (FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : $FakeOptional<Builtin.NativeObject>):
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1(%1 : $Builtin.NativeObject):
+  retain_value %0 : $FakeOptional<Builtin.NativeObject>
+  strong_release %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
 }

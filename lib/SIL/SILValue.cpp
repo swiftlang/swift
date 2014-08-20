@@ -120,6 +120,8 @@ static bool isFirstPayloadedCaseOfEnum(EnumDecl *E, EnumElementDecl *Elt) {
 SILValue SILValue::stripRCIdentityPreservingOps() {
   SILValue V = *this;
   while (true) {
+    V = V.stripNonPHIRCIdentityPreservingArgs();
+
     // Strip off RC identity preserving casts.
     if (isRCIdentityPreservingCast(V->getKind())) {
       V = cast<SILInstruction>(V.getDef())->getOperand(0);
