@@ -2618,6 +2618,10 @@ public:
   /// Get the arguments to the false BB.
   OperandValueArrayRef getFalseArgs() const;
 
+  /// Returns the ith argument on the cond_br terminator that will be passed to
+  /// DestBB.
+  SILValue getArgForDestBB(SILBasicBlock *DestBB, unsigned i);
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 

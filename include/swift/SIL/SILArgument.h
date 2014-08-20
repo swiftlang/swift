@@ -50,6 +50,15 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SILArgument;
   }
+
+  unsigned getIndex() {
+    ArrayRef<SILArgument *> Args = getParent()->getBBArgs();
+    for (unsigned i = 0, e = Args.size(); i != e; ++i)
+      if (Args[i] == this)
+        return i;
+    llvm_unreachable("SILArgument not argument of its parent BB");
+  }
+
 private:
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :

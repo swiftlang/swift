@@ -1098,6 +1098,15 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
+SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, unsigned i) {
+  if (DestBB == getTrueBB())
+    return Operands[1 + i].get();
+
+  assert(DestBB == getFalseBB()
+         && "By process of elimination BB must be false BB");
+  return Operands[1 + NumTrueArgs + i].get();
+}
+
 SwitchIntInst::SwitchIntInst(SILLocation Loc, SILValue Operand,
                              SILBasicBlock *DefaultBB,
                              ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs)
