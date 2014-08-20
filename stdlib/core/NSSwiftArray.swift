@@ -55,11 +55,11 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArrayType {
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim || count == 0) {
       // These objects are "returned" at +0, so treat them as values to
       // avoid retains.
-      var dst = UnsafeMutablePointer<Word>(aBuffer)
+      var dst = aBuffer.asPointerTo(Word.self)
       
       if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
         dst.initializeFrom(
-          UnsafeMutablePointer(buffer.baseAddress + range.location),
+          (buffer.baseAddress + range.location).asPointerTo(Word.self),
           count: range.length)
       }
       

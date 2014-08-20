@@ -58,8 +58,8 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   #expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   #desired: UnsafeMutablePointer<T>) -> Bool {
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
-    object: UnsafeMutablePointer(object),
-    expected: UnsafeMutablePointer(expected),
+    object: object.asPointerTo(COpaquePointer.self),
+    expected: expected.asPointerTo(COpaquePointer.self),
     desired: COpaquePointer(desired))
 }
 

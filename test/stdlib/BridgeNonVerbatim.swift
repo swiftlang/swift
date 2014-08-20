@@ -122,7 +122,7 @@ func testScope() {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (inout buf: UnsafeMutableBufferPointer<Word>)->() in
     nsx.getObjects(
-      UnsafeMutablePointer<AnyObject>(buf.baseAddress),
+      buf.baseAddress.asPointerTo(AnyObject.self),
       range: _SwiftNSRange(location: 1, length: 2))
   }
 

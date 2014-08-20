@@ -340,10 +340,15 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   }
 
   @transparent
-  var _isNull : Bool {
-    return UnsafeMutablePointer<T>(self)._isNull
+  public var unsafePointer : UnsafeMutablePointer<T> {
+    return UnsafeMutablePointer<T>(self.value)    
   }
   
+  @transparent
+  var _isNull : Bool {
+    return unsafePointer._isNull
+  }
+
   /// Access the underlying raw memory, getting and
   /// setting values.
   public var memory : T {
@@ -351,7 +356,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     @transparent get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return UnsafeMutablePointer<T>(self).memory
+      return unsafePointer.memory
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -368,9 +373,8 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
       // Trivially assign it as a COpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      let p = UnsafeMutablePointer<COpaquePointer>(
-        UnsafeMutablePointer<T>(self))
-        p.memory = unsafeBitCast(newValue, COpaquePointer.self)
+      let p = unsafePointer.asPointerTo(COpaquePointer.self)
+      p.memory = unsafeBitCast(newValue, COpaquePointer.self)
     }
   }
 
@@ -380,7 +384,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return (UnsafePointer<T>(self) + i).memory
+      return (self.unsafePointer + i).memory
     }
   }
   

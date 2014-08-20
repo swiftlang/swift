@@ -42,7 +42,7 @@ class Vector<T> {
     if length == capacity {
       var newcapacity = capacity * 2 + 2
       var size = Int(Builtin.sizeof(T.self))
-      var newbase = UnsafeMutablePointer<T>(c_malloc(newcapacity * size))
+      var newbase = c_malloc(newcapacity * size).asPointerTo(T.self)
       for i in 0..<length {
         (newbase + i).initialize((base+i).move())
       }

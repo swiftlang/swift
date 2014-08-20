@@ -287,8 +287,9 @@ extension _ArrayBuffer {
     let cocoa = _CocoaArrayWrapper(nonNative!)
     let start = cocoa.contiguousStorage(subRange)
     if start != nil {
-      return _SliceBuffer(owner: nonNative, start: UnsafeMutablePointer(start),
-          count: subRangeCount, hasNativeBuffer: false)
+      return _SliceBuffer(
+        owner: nonNative, start: start.asPointerTo(T.self),
+        count: subRangeCount, hasNativeBuffer: false)
     }
     
     // No contiguous storage found; we must allocate
@@ -297,7 +298,7 @@ extension _ArrayBuffer {
 
     // Tell Cocoa to copy the objects into our storage
     cocoa.buffer.getObjects(
-      UnsafeMutablePointer(result.baseAddress),
+      result.baseAddress.asPointerTo(AnyObject.self),
       range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
     )
 

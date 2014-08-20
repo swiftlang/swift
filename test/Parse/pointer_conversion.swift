@@ -173,11 +173,12 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
 }
 
 func pointerConstructor(x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Float> {
-  return UnsafeMutablePointer(x)
+  return x.asPointerTo(Float.self)
 }
 
-func pointerArithmetic(x: UnsafeMutablePointer<Int>, y: UnsafeMutablePointer<Int>,
-                       i: Int) {
+func pointerArithmetic(
+  x: UnsafeMutablePointer<Int>, y: UnsafeMutablePointer<Int>, i: Int
+) {
   let p = x + i
   let d = x - y
 }
@@ -190,7 +191,7 @@ func genericPointerArithmetic<T>(x: UnsafeMutablePointer<T>, i: Int, t: T) -> Un
 func passPointerToClosure(f: UnsafeMutablePointer<Float> -> Int) -> Int { }
 
 func pointerInClosure(f: UnsafeMutablePointer<Int> -> Int) -> Int {
-  return passPointerToClosure { f(UnsafeMutablePointer($0)) }
+  return passPointerToClosure { f($0.asPointerTo(Int.self)) }
 }
 
 struct NotEquatable {}

@@ -112,16 +112,15 @@ public struct HeapBuffer<Value, Element> : Equatable {
   }
 
   var _value: UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(
-      HeapBuffer._valueOffset() + _address)
+    return (HeapBuffer._valueOffset() + _address).asPointerTo(Value.self)
   }
 
   var baseAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(HeapBuffer._elementOffset() + _address)
+    return (HeapBuffer._elementOffset() + _address).asPointerTo(Element.self)
   }
 
   func _allocatedSize() -> Int {
-    return _malloc_size(UnsafeMutablePointer(_address))
+    return _malloc_size(_address.asPointerTo(Void.self))
   }
 
   func _allocatedAlignMask() -> Int {

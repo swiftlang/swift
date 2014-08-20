@@ -136,13 +136,13 @@ public final class _NSContiguousString : _NSSwiftString {
     if _core.elementWidth == 2 {
       UTF16.copy(
         _core.startUTF16 + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
+        destination: buffer.asPointerTo(UInt16.self),
         count: aRange.length)
     }
     else {
       UTF16.copy(
         _core.startASCII + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
+        destination: buffer.asPointerTo(UInt16.self),
         count: aRange.length)
     }
   }
@@ -150,7 +150,7 @@ public final class _NSContiguousString : _NSSwiftString {
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16> {
     return _core.elementWidth == 2
-      ? UnsafeMutablePointer(_core.startUTF16) : nil
+      ? _core.startUTF16.asPointerTo(UInt16.self) : nil
   }
 
   //

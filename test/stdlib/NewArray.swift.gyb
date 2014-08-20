@@ -213,7 +213,9 @@ func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(objects: UnsafePointer($0.baseAddress), count: $0.count)
+    let ns =  NSArray(
+      objects: $0.baseAddress.asPointerTo(Optional<AnyObject>.self),
+      count: $0.count)
     return Array(_fromNSArray: ns)
   }
 }

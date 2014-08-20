@@ -77,20 +77,18 @@ public struct ${Self}<T>
     self.value = Builtin.inttoptr_Word(bitPattern.value)
   }
 
-  /// Convert from an UnsafeMutablePointer of a different type.
+  /// Return ${a_Self}\ `<U>` that points the same memory address
+  /// as `self`.  Requires: `self` is properly aligned for an object
+  /// of type `U`.
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init<U>(_ from : UnsafeMutablePointer<U>) {
-    value = from.value
-  }
-
-  /// Convert from a UnsafePointer of a different type.
-  ///
-  /// This is a fundamentally unsafe conversion.
-  @transparent
-  public init<U>(_ from : UnsafePointer<U>) {
-    value = from.value
+  public func asPointerTo<U>(_: U.Type) -> ${Self}<U> {
+    _debugPrecondition(
+      unsafeBitCast(self.value, UInt.self) % UInt(alignof(U.self)) == 0,
+      "Attempt to create pointer to improperly-aligned address"
+    )
+    return ${Self}<U>(self.value)
   }
 
   // Make nil work with ${Self}.
@@ -445,6 +443,26 @@ func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
 }
 % end # for mutable
+
+extension UnsafeMutablePointer {  
+  /// An `UnsafePointer<T>` that points the same memory address
+  /// as `self`.  This conversion is fundamentally safe.
+  public var asImmutablePointer: UnsafePointer<T> {
+    return UnsafePointer(self.value)
+  }
+}
+
+extension UnsafePointer {
+  /// An `UnsafeMutablePointer<T>` that points the same memory address
+  /// as `self`.
+  ///
+  /// This is a fundamentally unsafe conversion.  In particular, if
+  /// this property is misused to break immutability guarantees such
+  /// as those conferred by `let`, the effects are undefined.
+  public var asMutablePointer: UnsafeMutablePointer<T> {
+    return UnsafeMutablePointer(self.value)
+  }
+}
 
 extension UnsafeMutablePointer : SinkType {
   public mutating func put(x: T) {

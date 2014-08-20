@@ -51,9 +51,10 @@ public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
   var tmp = x
-  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
-          src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
-          size: UInt(sizeof(T.self)))
+  _memcpy(
+    dest: result._baseAddressIfContiguous.asPointerTo(Void.self),
+    src: &tmp,
+    size: UInt(sizeof(T.self)))
   return result
 }
 
