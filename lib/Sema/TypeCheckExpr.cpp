@@ -712,12 +712,15 @@ namespace {
         return { false, DRE };
       }
 
-      // TODO: Recursive local function references aren't implemented in SILGen
-      // yet. Observing accessors appear to harmlessly capture each other,
-      // however, so give them an exception.
       if (auto FD = dyn_cast<FuncDecl>(D)) {
+        // TODO: Recursive local function references aren't implemented in
+        // SILGen yet. However, if there are no local captures, it will work.
+        // Keep track of these local function captures so we can check them
+        // later.
+        // Observing accessors appear to harmlessly capture each
+        // other, however, so give them an exception.
         if (!FD->getAccessorStorageDecl())
-          TC.diagnose(DRE->getLoc(), diag::unsupported_local_function_reference);
+          TC.LocalFunctionCaptures.push_back({FD, DRE->getLoc()});
       }
       
       captures.insert(D);

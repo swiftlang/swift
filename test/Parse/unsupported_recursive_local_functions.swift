@@ -1,25 +1,41 @@
 // RUN: %swift -parse -verify %s
 
 func foo() {
+  var i = 0
+
   func bar() {
-    bar() // expected-error{{cannot reference a local function from another local function}}
+    ++i
+    bar() // expected-error{{cannot reference a local function with captures from another local function}}
   }
 
   func bas() {
-    bar() // expected-error{{cannot reference a local function from another local function}}
+    ++i
+    bar() // expected-error{{cannot reference a local function with captures from another local function}}
   }
 
   func zim() {
+    ++i
     func zang() {
-      zim()  // expected-error{{cannot reference a local function from another local function}}
+      ++i
+      zim()  // expected-error{{cannot reference a local function with captures from another local function}}
     }
     zang() // OK
   }
 
   func flippity() {
+    ++i
     floppity() // expected-error{{cannot capture 'floppity' before it is declared}}
   }
   func floppity() { // expected-note{{declared here}}
-    flippity() // expected-error{{cannot reference a local function from another local function}}
+    ++i
+    flippity() // expected-error{{cannot reference a local function with captures from another local function}}
+  }
+
+  func nocaptures() { }
+  func capturesTheNoCaptures() {
+    nocaptures() // okay
+  }
+  func capturesTheNoCapturesNoCaptures() {
+    capturesTheNoCaptures() // okay
   }
 }

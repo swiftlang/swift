@@ -138,7 +138,7 @@ var disambiguateGetSet1d: Int = 0 {
 func disambiguateGetSet2() {
   func get(fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    get {} // expected-error{{local function from another local function}}
+    get {}
   }
   // Check that the property is read-write.
   a = a + 42
@@ -148,7 +148,7 @@ func disambiguateGetSet2Attr() {
   var a: Int = takeTrailingClosure {
     @noreturn
     func foo() {}
-    get {} // expected-error{{local function from another local function}}
+    get {}
   }
   // Check that the property is read-write.
   a = a + 42
@@ -158,7 +158,7 @@ func disambiguateGetSet2Attr() {
 func disambiguateGetSet3() {
   func set(fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    set {} // expected-error{{local function from another local function}}
+    set {}
   }
   // Check that the property is read-write.
   a = a + 42
@@ -168,7 +168,7 @@ func disambiguateGetSet3Attr() {
   var a: Int = takeTrailingClosure {
     @noreturn
     func foo() {}
-    set {} // expected-error{{local function from another local function}}
+    set {}
   }
   // Check that the property is read-write.
   a = a + 42
@@ -179,7 +179,7 @@ func disambiguateGetSet4() {
   func set(x: Int, fn: () -> ()) {}
   var newValue: Int = 0
   var a: Int = takeTrailingClosure {
-    set(newValue) {} // expected-error{{local function from another local function}}
+    set(newValue) {}
   }
   // Check that the property is read-write.
   a = a + 42
@@ -190,7 +190,7 @@ func disambiguateGetSet4Attr() {
   var a: Int = takeTrailingClosure {
     @noreturn
     func foo() {}
-    set(newValue) {} // expected-error{{local function from another local function}}
+    set(newValue) {}
   }
   // Check that the property is read-write.
   a = a + 42

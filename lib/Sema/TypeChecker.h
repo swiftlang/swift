@@ -271,6 +271,23 @@ public:
   // during the current typecheck cycle.
   bool HasForcedExternalDecl = false;
 
+  /// Describes an attempt to capture a local function.
+  struct LocalFunctionCapture {
+    FuncDecl *LocalFunction;
+    SourceLoc CaptureLoc;
+  };
+
+  /// A list of local function captures, which can only be verified
+  /// once we have type-checked the bodies of all of the local functions that it
+  /// might reference.
+  ///
+  /// FIXME: That we need this at all is very unfortunate. We should be able to
+  /// check this as part of checking the non-local function (or other
+  /// DeclContext) that encloses all of its local functions, but the type
+  /// checker doesn't have any point where that happens. Moreover, this
+  /// check wouldn't even be needed if we could handle captures within SILGen.
+  std::vector<LocalFunctionCapture> LocalFunctionCaptures;
+
 private:
   Type IntLiteralType;
   Type FloatLiteralType;
