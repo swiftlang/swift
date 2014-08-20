@@ -53,15 +53,15 @@ def verify : Flag<["-"], "verify">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
            
-def enable_objc_attr_requires_objc_module :
-  Flag<["-"], "enable-objc-attr-requires-objc-module">,
-  HelpText<"Enable requiring uses of @objc require importing the "
-           "ObjectiveC module">;
+def enable_objc_attr_requires_foundation_module :
+  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+  HelpText<"Enable requiring uses of @objc to require importing the "
+           "Foundation module">;
 
-def disable_objc_attr_requires_objc_module :
-  Flag<["-"], "disable-objc-attr-requires-objc-module">,
-  HelpText<"Disable requiring uses of @objc require importing the "
-           "ObjectiveC module">;
+def disable_objc_attr_requires_foundation_module :
+  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+  HelpText<"Disable requiring uses of @objc to require importing the "
+           "Foundation module">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;

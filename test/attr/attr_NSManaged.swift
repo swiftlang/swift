@@ -1,4 +1,4 @@
-// RUN: %swift -parse -disable-objc-attr-requires-objc-module %s -verify
+// RUN: %swift -parse -disable-objc-attr-requires-foundation-module %s -verify
 
 protocol SwiftProto { }
 

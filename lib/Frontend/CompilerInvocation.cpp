@@ -607,10 +607,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   
-  if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_objc_module,
-                               OPT_disable_objc_attr_requires_objc_module)) {
+  if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
+                               OPT_disable_objc_attr_requires_foundation_module)) {
     Opts.EnableObjCAttrRequiresObjCModule
-      = A->getOption().matches(OPT_enable_objc_attr_requires_objc_module);
+      = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 
   if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
