@@ -15,10 +15,12 @@
 // RUN: FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
 
 // CHECK: bin/swift -frontend
+// CHECK: -module-name {{[^ ]+}}
 // CHECK: -o [[OBJECTFILE:.*]]
 
 // CHECK-NEXT: bin/swift -frontend
 // CHECK: -emit-module
+// CHECK: -module-name {{[^ ]+}}
 // CHECK: -o {{[^ ]+}}
 
 
@@ -70,16 +72,16 @@
 // RUN: FileCheck -check-prefix MERGE_1 %s < %t.complex.txt
 
 // MERGE_1: bin/swift -frontend -emit-module -primary-file {{[^ ]+}}/Inputs/main.swift {{[^ ]+}}/Inputs/lib.swift
-// MERGE_1: -module-name merge
 // MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_A:[^ ]+]].swiftdoc
+// MERGE_1: -module-name merge
 // MERGE_1: -o [[PARTIAL_MODULE_A]].swiftmodule
 // MERGE_1: bin/swift -frontend -emit-module {{[^ ]+}}/Inputs/main.swift -primary-file {{[^ ]+}}/Inputs/lib.swift
-// MERGE_1: -module-name merge
 // MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
+// MERGE_1: -module-name merge
 // MERGE_1: -o [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: bin/swift -frontend -emit-module [[PARTIAL_MODULE_A]].swiftmodule [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: -parse-as-library
-// MERGE_1: -module-name merge
 // MERGE_1: -emit-module-doc-path /tmp/modules.swiftdoc
+// MERGE_1: -module-name merge
 // MERGE_1: -o /tmp/modules
 

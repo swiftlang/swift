@@ -41,7 +41,7 @@
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -deprecated-integrated-repl -### | FileCheck -check-prefix=ROOT-SDK %s
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -### %s | FileCheck -check-prefix=ROOT-SDK %s
 
-// ROOT-SDK: -sdk /{{\s|$}}
+// ROOT-SDK: -sdk /{{ |$}}
 
 // RUN: rm -rf %t && mkdir %t
 // RUN: mkdir %t/MacOSX10.8.sdk && not %swift_driver -sdk %t/MacOSX10.8.sdk -### 2>&1 | FileCheck -check-prefix=SDK-TOO-OLD %s

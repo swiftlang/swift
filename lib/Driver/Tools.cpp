@@ -175,9 +175,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   // Default the ABI based on the triple.
   configureDefaultABI(Triple, arguments);
 
-  arguments.push_back("-module-name");
-  arguments.push_back(inputArgs.MakeArgString(OI.ModuleName));
-
   if (!OI.SDKPath.empty()) {
     arguments.push_back("-sdk");
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
@@ -355,6 +352,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
   Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
+  Arguments.push_back("-module-name");
+  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
+
   const std::string &ModuleOutputPath =
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
   if (!ModuleOutputPath.empty()) {
@@ -432,6 +432,9 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-parse-as-library");
 
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
 
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
