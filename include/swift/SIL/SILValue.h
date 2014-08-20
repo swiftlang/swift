@@ -198,6 +198,13 @@ public:
 
   inline bool hasOneUse();
 
+  // Return the underlying SILValue after stripping off non-phi SILArguments.
+  SILValue stripNonPHIArgs();
+
+  // Return the underlying SILValue after stripping off non-phi SILArguments
+  // that can not affect RC Identity.
+  SILValue stripNonPHIRCIdentityPreservingArgs();
+
   // Return the underlying SILValue after stripping off all casts from the
   // current SILValue.
   SILValue stripCasts();

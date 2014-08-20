@@ -12,6 +12,8 @@
 
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
 
 using namespace swift;
 
@@ -141,6 +143,80 @@ SILValue SILValue::stripRCIdentityPreservingOps() {
         V = UEDI->getOperand();
         continue;
       }
+    }
+
+    return V;
+  }
+}
+
+/// Return the underlying SILValue after stripping off non-phi SILArguments.
+SILValue SILValue::stripNonPHIArgs() {
+  SILValue V = *this;
+
+  while (true) {
+    auto *A = dyn_cast<SILArgument>(V);
+    if (!A)
+      return V;
+
+    SILBasicBlock *BB = A->getParent();
+
+    // First try and grab the single predecessor of our parent BB. If we don't
+    // have one, bail.
+    SILBasicBlock *Pred = BB->getSinglePredecessor();
+    if (!Pred)
+      return V;
+
+    // Then grab the terminator of Pred...
+    TermInst *PredTI = Pred->getTerminator();
+
+    // And attempt to find our matching argument.
+    if (auto *BI = dyn_cast<BranchInst>(PredTI)) {
+      V = BI->getArg(A->getIndex());
+      continue;
+    }
+
+    if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
+      V = CBI->getArgForDestBB(BB, A->getIndex());
+      continue;
+    }
+
+    return V;
+  }
+}
+
+/// Return the underlying SILValue after stripping off non-phi SILArguments
+/// that can not affect RC Identity.
+SILValue SILValue::stripNonPHIRCIdentityPreservingArgs() {
+  SILValue V = *this;
+
+  while (true) {
+    // First strip off non PHI args that
+    V = V.stripNonPHIArgs();
+
+    auto *A = dyn_cast<SILArgument>(V);
+    if (!A)
+      return V;
+
+    SILBasicBlock *BB = A->getParent();
+
+    // First try and grab the single predecessor of our parent BB. If we don't
+    // have one, bail.
+    SILBasicBlock *Pred = BB->getSinglePredecessor();
+    if (!Pred)
+      return V;
+
+    // Then grab the terminator of Pred...
+    TermInst *PredTI = Pred->getTerminator();
+
+    // Maybe we need a cast stripping equivalent?
+    if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredTI)) {
+      V = CCBI->getOperand();
+      continue;
+    }
+
+    if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
+      V = SWEI->getOperand();
+      continue;
     }
 
     return V;
