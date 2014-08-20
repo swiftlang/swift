@@ -609,7 +609,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
-    Opts.EnableObjCAttrRequiresObjCModule
+    Opts.EnableObjCAttrRequiresFoundation
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 

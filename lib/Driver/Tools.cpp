@@ -337,8 +337,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
   }
 
-  if (!Args.hasArg(options::OPT_parse_stdlib))
-    Arguments.push_back("-enable-objc-attr-requires-foundation-module");
+  if (Args.hasArg(options::OPT_parse_stdlib))
+    Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 

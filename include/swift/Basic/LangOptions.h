@@ -68,8 +68,10 @@ namespace swift {
     bool SplitPrepositions = false;
 
     /// Enables checking that uses of @objc require importing
-    /// the ObjectiveC module.
-    bool EnableObjCAttrRequiresObjCModule = false;
+    /// the Foundation module.
+    /// This is enabled by default because SILGen can crash in such a case, but
+    /// it gets disabled when compiling the Swift core stdlib.
+    bool EnableObjCAttrRequiresFoundation = true;
 
     /// Enables special importing of CF types.
     bool ImportCFTypes = true;
