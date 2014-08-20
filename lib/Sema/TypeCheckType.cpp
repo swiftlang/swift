@@ -1623,10 +1623,12 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     } 
 
     // Single-element labeled tuples are not permitted, either.
-    if (elements.size() == 1 && elements[0].hasName()) {
+    if (elements.size() == 1 && elements[0].hasName() &&
+        !(options & TR_EnumCase)) {
       if (!complained) {
         auto named = cast<NamedTypeRepr>(repr->getElements()[0]);
-        TC.diagnose(repr->getStartLoc(), diag::tuple_single_element)
+        TC.diagnose(repr->getElements()[0]->getStartLoc(),
+                    diag::tuple_single_element)
           .fixItRemoveChars(named->getStartLoc(),
                             named->getTypeRepr()->getStartLoc());
       }

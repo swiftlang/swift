@@ -250,3 +250,28 @@ func badTupleElement() {
   var y = X.y // expected-error{{'X.Type' does not have a member named 'y'}}
   var z = X.z // expected-error{{'X.Type' does not have a member named 'z'}}
 }
+
+enum Direction {
+  case North(distance: Int)
+  case NorthEast(distanceNorth: Int, distanceEast: Int)
+}
+
+func testDirection() {
+  var dir: Direction = .North(distance: 5)
+  dir = .NorthEast(distanceNorth: 5, distanceEast: 7)
+
+  var i: Int
+  switch dir {
+  case .North(let x):
+    i = x.distance
+    break;
+
+  case .NorthEast(let x):
+    i = x.distanceEast
+    break;
+  }
+}
+
+enum NestedSingleElementTuple {
+  case Case(x: (y: Int)) // expected-error{{cannot create a single-element tuple with an element label}}
+}

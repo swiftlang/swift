@@ -211,6 +211,9 @@ enum TypeResolutionFlags {
   
   /// Whether this type is the referent of a global type alias.
   TR_GlobalTypeAlias = 0x800,
+
+  /// Whether this type is the value carried in an enum case.
+  TR_EnumCase = 0x1000,
 };
 
 /// Option set describing how type resolution should work.
@@ -222,6 +225,7 @@ withoutContext(TypeResolutionOptions options) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_FunctionResult;
+  options -= TR_EnumCase;
   return options;
 }
 

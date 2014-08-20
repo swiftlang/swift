@@ -5410,7 +5410,8 @@ public:
       validateAttributes(TC, EED);
       
       if (!EED->getArgumentTypeLoc().isNull())
-        if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext())) {
+        if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
+                            TR_EnumCase)) {
           EED->overwriteType(ErrorType::get(TC.Context));
           EED->setInvalid();
           return;
