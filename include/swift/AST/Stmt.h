@@ -726,6 +726,27 @@ public:
   }
 };
 
+/// FailStmt - A statement that indicates a failable, which is currently
+/// spelled as "return nil" and can only be used within failable initializers.
+class FailStmt : public Stmt {
+  SourceLoc ReturnLoc;
+  SourceLoc NilLoc;
+
+public:
+  FailStmt(SourceLoc returnLoc, SourceLoc nilLoc, Optional<bool> implicit = {})
+    : Stmt(StmtKind::Fail, getDefaultImplicitFlag(implicit, returnLoc)),
+      ReturnLoc(returnLoc), NilLoc(nilLoc)
+  {}
+  
+  SourceLoc getLoc() const { return ReturnLoc; }
+  
+  SourceRange getSourceRange() const { return SourceRange(ReturnLoc, NilLoc); }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Fail;
+  }
+};
+
 } // end namespace swift
 
 #endif

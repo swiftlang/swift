@@ -577,6 +577,8 @@ public:
 
   void visitCaseStmt(CaseStmt *S);
 
+  void visitFailStmt(FailStmt *S);
+
   void emitBreakOutOf(SILLocation loc, Stmt *S);
   
   //===--------------------------------------------------------------------===//

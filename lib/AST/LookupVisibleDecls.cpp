@@ -689,6 +689,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitBreakStmt(BreakStmt *) {}
   void visitContinueStmt(ContinueStmt *) {}
   void visitFallthroughStmt(FallthroughStmt *) {}
+  void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
   void visitIfStmt(IfStmt * S) {
     if (auto *PBD = S->getCond().dyn_cast<PatternBindingDecl *>())

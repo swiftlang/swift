@@ -1059,6 +1059,9 @@ public:
     printRec(S->getBody());
     OS << ')';
   }
+  void visitFailStmt(FailStmt *S) {
+    OS.indent(Indent) << "(fail_stmt)";
+  }
 };
 
 } // end anonymous namespace.

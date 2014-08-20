@@ -1640,6 +1640,10 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
   printBraceStmtElements(cast<BraceStmt>(CS->getBody()));
 }
 
+void PrintAST::visitFailStmt(FailStmt *stmt) {
+  Printer << "return nil";
+}
+
 void Decl::print(raw_ostream &os) const {
   PrintOptions options;
   options.FunctionDefinitions = true;

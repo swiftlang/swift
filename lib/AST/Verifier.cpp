@@ -571,6 +571,26 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
+    void verifyChecked(FailStmt *S) {
+      // Dig out the initializer we're in (if we are).
+      ConstructorDecl *ctor = nullptr;
+      if (!Functions.empty()) {
+        ctor = dyn_cast<ConstructorDecl>(Functions.back());
+      }
+
+      // Fail statements are only permitted in initializers.
+      if (!ctor) {
+        Out << "'fail' statement outside of initializer\n";
+        abort();
+      }
+
+      if (ctor->getFailability() == OTK_None && !ctor->isInvalid()) {
+        Out << "non-failable initializer contains a 'fail' statement\n";
+        ctor->dump(Out);
+        abort();
+      }
+    }
+
     void checkCondition(StmtCondition C) {
       if (auto E = C.dyn_cast<Expr*>()) {
         checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),

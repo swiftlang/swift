@@ -626,6 +626,10 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
   emitSwitchFallthrough(S);
 }
 
+void SILGenFunction::visitFailStmt(FailStmt *S) {
+  llvm_unreachable("fail statement in SILGen");
+}
+
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
   // Nothing to do for these kinds of decls - anything active has been added
   // to the enclosing declaration.

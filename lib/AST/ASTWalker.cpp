@@ -748,6 +748,10 @@ Stmt *Traversal::visitFallthroughStmt(FallthroughStmt *CS) {
   return CS;
 }
 
+Stmt *Traversal::visitFailStmt(FailStmt *FS) {
+  return FS;
+}
+
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
     if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {

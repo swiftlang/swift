@@ -280,7 +280,8 @@ public:
                       TheFunc->getAbstractFunctionDecl())) {
       // The only valid return expression in an initializer is the literal
       // 'nil'.
-      if (!isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
+      auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
+      if (!nilExpr) {
         TC.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
         RS->setResult(nullptr);
@@ -300,9 +301,9 @@ public:
         return RS;
       }
 
-      // FIXME: Replace with a new 'fail' statement.
-      RS->setResult(nullptr);
-      return RS;
+      // Replace the "return nil" with a new 'fail' statement.
+      return new (TC.Context) FailStmt(RS->getReturnLoc(), nilExpr->getLoc(),
+                                       RS->isImplicit());
     }
 
     if (TC.typeCheckExpression(E, DC, ResultTy, Type(), /*discardedExpr=*/false))
@@ -667,6 +668,12 @@ public:
   Stmt *visitCaseStmt(CaseStmt *S) {
     // Cases are handled in visitSwitchStmt.
     llvm_unreachable("case stmt outside of switch?!");
+  }
+
+  Stmt *visitFailStmt(FailStmt *S) {
+    // These are created as part of type-checking "return" in an initializer.
+    // There is nothing more to do.
+    return S;
   }
 };
   
