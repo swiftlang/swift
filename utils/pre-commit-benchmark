@@ -61,7 +61,7 @@ def getWorkTreeSha():
 def buildBenchmarks(cacheDir):
     print('Building executables...')
     
-    configVars = {'SWIFT_INCLUDE_PERF_TEST_SUITE':'ON', 'SWIFT_OPTIMIZED':'ON', 'SWIFT_STDLIB_INTERNAL_CHECKS':'OFF'}
+    configVars = {'SWIFT_INCLUDE_PERF_TESTSUITE':'ON', 'SWIFT_OPTIMIZED':'ON', 'SWIFT_STDLIB_INTERNAL_CHECKS':'OFF'}
     
     cmakeCache = os.path.join(buildDir, 'CMakeCache.txt')
     
