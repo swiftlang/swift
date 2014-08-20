@@ -160,11 +160,27 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
   }
 
   auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();
-  fn = getCastOfRetainFn(IGF.IGM, fn, value->getType());
+
+  // We don't want to cast the function here because it interferes with
+  // LLVM's ability to recognize and special-case this function.
+  // Note that the parameter and result must also have type i8*.
+  llvm::Type *valueType = value->getType();
+  if (isa<llvm::PointerType>(valueType)) {
+    value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
+  } else {
+    value = IGF.Builder.CreateIntToPtr(value, IGF.IGM.Int8PtrTy);
+  }
 
   auto call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
-  return call;
+
+  llvm::Value *result = call;
+  if (isa<llvm::PointerType>(valueType)) {
+    result = IGF.Builder.CreateBitCast(result, valueType);
+  } else {
+    result = IGF.Builder.CreatePtrToInt(result, valueType);
+  }
+  return result;
 }
 
 /// Autorelease a return value.

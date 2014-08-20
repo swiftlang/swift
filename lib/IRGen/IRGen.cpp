@@ -42,6 +42,7 @@
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/ObjCARC.h"
 #include "IRGenModule.h"
 
 using namespace swift;
@@ -335,6 +336,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
     TargetMachine->addAnalysisPasses(EmitPasses);
+
+    // Make sure we do ARC contraction under optimization.  We don't
+    // rely on any other LLVM ARC transformations, but we do need ARC
+    // contraction to add the objc_retainAutoreleasedReturnValue
+    // assembly markers.
+    if (Opts.Optimize)
+      EmitPasses.add(createObjCARCContractPass());
+
     bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
                                                    FileType, !Opts.Verify);
     if (fail) {

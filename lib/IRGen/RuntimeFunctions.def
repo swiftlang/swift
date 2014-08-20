@@ -575,7 +575,7 @@ FUNCTION(ObjCAutorelease, objc_autorelease, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRetainAutoreleasedReturnValue,
          objc_retainAutoreleasedReturnValue, C_CC,
-         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+         RETURNS(Int8PtrTy), ARGS(Int8PtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCAutoreleaseReturnValue, objc_autoreleaseReturnValue, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCMsgSend, objc_msgSend, C_CC,

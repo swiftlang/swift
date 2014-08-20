@@ -29,7 +29,8 @@ func extensionMethods(#b: B) {
   // CHECK: load i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK: [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
   // CHECK: [[T1:%.*]] = ptrtoint i8* [[T0]] to i64
-  // CHECK: call i64 bitcast (%objc_object* (%objc_object*)* @objc_retainAutoreleasedReturnValue to i64 (i64)*)(i64 [[T1]])
+  // CHECK: [[T2:%.*]] = inttoptr i64 [[T1]] to i8*
+  // CHECK: call i8* @objc_retainAutoreleasedReturnValue(i8* [[T2]])
   b.method(1, separateExtMethod:1.5)
 }
 
