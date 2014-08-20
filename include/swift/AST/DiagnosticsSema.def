@@ -586,6 +586,10 @@ ERROR(witness_initializer_not_required,sema_tcd,none,
       "initializer requirement %0 can only be satisfied by a `required` "
       "initializer in%select{| the definition of}1 non-final class %2", 
       (DeclName, bool, Type))
+ERROR(witness_initializer_failability,sema_tcd,none,
+      "non-failable initializer requirement %0 cannot be satisfied by a "
+      "failable initializer ('init%select{?|!}1')", 
+      (DeclName, bool))
 ERROR(witness_self_non_subtype,sema_tcd,none,
       "protocol %0 requirement %1 cannot be satisfied by a non-final class "
       "(%2) because it uses 'Self' in a non-parameter, non-result type "

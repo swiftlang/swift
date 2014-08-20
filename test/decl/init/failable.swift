@@ -168,3 +168,52 @@ class Sub5 : Super {
     super.init()
   }
 }
+
+// ----------------------------------------------------------------------------
+// Initializer conformances
+// ----------------------------------------------------------------------------
+protocol P1 {
+  init(string: String)
+}
+
+protocol P2 {
+  init?(fail: String)
+}
+
+protocol P3 {
+  init!(failIUO: String)
+}
+
+class C1a : P1 {
+  required init?(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' cannot be satisfied by a failable initializer ('init?')}}
+}
+
+class C1b : P1 {
+  required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' cannot be satisfied by a failable initializer ('init!')}}
+}
+
+class C2a : P2 {
+  required init(fail: String) { } // okay to remove failability
+}
+
+class C2b : P2 {
+  required init?(fail: String) { } // okay, ? matches
+}
+
+class C2c : P2 {
+  required init!(fail: String) { } // okay to satisfy init? with init!
+}
+
+class C3a : P3 {
+  required init(failIUO: String) { } // okay to remove failability
+}
+
+class C3b : P3 {
+  required init?(failIUO: String) { } // okay to satisfy ! with ?
+}
+
+class C3c : P3 {
+  required init!(failIUO: String) { } // okay, ! matches
+}
+
+

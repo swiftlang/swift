@@ -1298,20 +1298,36 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            shouldDiagnoseSetter);
       }
 
-      // If we have an initializer requirement and the conforming type
-      // is a non-final class, the witness must be 'required'.
-      ClassDecl *classDecl = nullptr;
-      if (isa<ConstructorDecl>(requirement) &&
-          ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
-           !classDecl->isFinal()) &&
-          !cast<ConstructorDecl>(best.Witness)->isRequired()) {
-        bool inExtension = isa<ExtensionDecl>(best.Witness->getDeclContext());
-        auto diag = TC.diagnose(best.Witness->getLoc(), 
-                                diag::witness_initializer_not_required,
-                                requirement->getFullName(), inExtension,
-                                Adoptee);
-        if (!best.Witness->isImplicit() && !inExtension)
-          diag.fixItInsert(best.Witness->getStartLoc(), "required ");
+      if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
+        // If we have an initializer requirement and the conforming type
+        // is a non-final class, the witness must be 'required'.
+        ClassDecl *classDecl = nullptr;
+        auto witnessCtor = cast<ConstructorDecl>(best.Witness);
+        if (((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
+             !classDecl->isFinal()) &&
+            !witnessCtor->isRequired()) {
+          // FIXME: We're not recovering (in the AST), so the Fix-It
+          // should move.
+          bool inExtension = isa<ExtensionDecl>(best.Witness->getDeclContext());
+          auto diag = TC.diagnose(best.Witness->getLoc(), 
+                                  diag::witness_initializer_not_required,
+                                  requirement->getFullName(), inExtension,
+                                  Adoptee);
+          if (!best.Witness->isImplicit() && !inExtension)
+            diag.fixItInsert(best.Witness->getStartLoc(), "required ");
+        }
+
+        // An non-failable initializer requirement cannot be satisfied
+        // by a failable initializer.
+        if (ctor->getFailability() == OTK_None &&
+            witnessCtor->getFailability() != OTK_None) {
+          TC.diagnose(best.Witness->getLoc(),
+                      diag::witness_initializer_failability,
+                      ctor->getFullName(), 
+                      witnessCtor->getFailability() 
+                        == OTK_ImplicitlyUnwrappedOptional)
+            .highlight(witnessCtor->getFailabilityLoc());
+        }
       }
 
       // Check whether this requirement uses Self in a way that might
@@ -1321,10 +1337,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // No references to Self: nothing more to do.
         break;
 
-      case SelfReferenceKind::Yes:
+      case SelfReferenceKind::Yes: {
         // References to Self in a position where subclasses cannot do
         // the right thing. Complain if the adoptee is a non-final
         // class.
+        ClassDecl *classDecl = nullptr;
         if ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
             !classDecl->isFinal()) {
           TC.diagnose(best.Witness->getLoc(), diag::witness_self_non_subtype,
@@ -1332,10 +1349,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                       Adoptee);
         }
         break;
+      }
 
-      case SelfReferenceKind::Result:
+      case SelfReferenceKind::Result: {
         // The reference to Self occurs in the result type. A non-final class 
         // can satisfy this requirement with a method that returns Self.
+        ClassDecl *classDecl = nullptr;
         if ((classDecl = Adoptee->getClassOrBoundGenericClass()) &&
             !classDecl->isFinal()) {
           if (auto func = dyn_cast<FuncDecl>(best.Witness)) {
@@ -1357,6 +1376,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         }
         
         break;
+      }
       }
 
       // Record the match.
