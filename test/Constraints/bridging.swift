@@ -4,7 +4,7 @@
 import Foundation
 
 class BridgedClass : NSObject, NSCopying { 
-  func copyWithZone(zone: NSZone) -> AnyObject! {
+  func copyWithZone(zone: NSZone) -> AnyObject {
     return self
   }
 }
