@@ -213,6 +213,9 @@ static void rewriteApplyInst(ArgSpecDescriptor &AD, SILFunction *NewF) {
   AD.AI->replaceAllUsesWith(NewAI);
   // Erase the old apply.
   AD.AI->eraseFromParent();
+
+  if (AD.PAI->use_empty())
+    AD.PAI->eraseFromParent();
 }
 
 struct ClosureSpecializer {

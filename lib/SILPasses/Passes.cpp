@@ -223,6 +223,9 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   // take advantage of static dispatch.
   PM.add(createCapturePropagation());
 
+  // Specialize closure.
+  PM.add(createClosureSpecializer());
+
   // Insert inline caches for virtual calls.
   PM.add(createDevirtualization());
   PM.add(createInlineCaches());
