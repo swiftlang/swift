@@ -170,6 +170,16 @@ func testPreferClassMethodToCurriedInstanceMethod(obj: InstanceOrClassMethod) {
   let curried = InstanceOrClassMethod.method(obj) as () -> Bool
 }
 
+protocol Numeric {
+  func +(x: Self, y: Self) -> Self
+}
+
+func acceptBinaryFunc<T>(x: T, fn: (T, T) -> T) { }
+
+func testNumeric<T : Numeric>(x: T) {
+  acceptBinaryFunc(x, +) // expected-error{{partial application of generic method is not allowed}}
+}
+
 /* FIXME: We can't check this directly, but it can happen with
 multiple modules.
 

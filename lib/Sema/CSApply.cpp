@@ -407,15 +407,31 @@ namespace {
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
-        assert(isa<FuncDecl>(decl) && "Can only refer to functions here");
         assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
         auto openedFnType = openedType->castTo<FunctionType>();
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
         Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
-        return buildMemberRef(base, openedType, SourceLoc(), decl,
-                              loc, openedFnType->getResult(),
-                              locator, implicit, isDirectPropertyAccess);
+        auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
+                                     loc, openedFnType->getResult(),
+                                     locator, implicit, isDirectPropertyAccess);
+        if (!result)
+          return nullptr;;
+
+        // Track the partial application of an operator here. This is the
+        // only case where a non-member reference can find a member.
+        auto fn = cast<FuncDecl>(decl);
+        InvalidPartialApplications.insert({
+          result,
+          {
+            fn->getNaturalArgumentCount() - 1,
+            baseTy->getRValueInstanceType()->isAnyExistentialType()
+              ? MemberPartialApplication::Protocol
+              : MemberPartialApplication::Archetype
+          }
+        });
+
+        return result;
       }
 
       // If this is a declaration with generic function type, build a
@@ -1949,7 +1965,7 @@ namespace {
     
   private:
     struct MemberPartialApplication {
-      unsigned level : 31;
+      unsigned level : 29;
       // Selector for the partial_application_of_method_invalid diagnostic
       // message.
       enum : unsigned {
