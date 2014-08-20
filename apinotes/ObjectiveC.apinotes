@@ -1,22 +1,85 @@
-Name:            ObjectiveC
+---
+Name: ObjectiveC
 Classes:
-  - Name:            NSObject
-    Methods:
-      - Selector:        'dealloc'
-        MethodKind:      Instance
-        Availability:    none
-        AvailabilityMsg: "use 'deinit' to define a de-initializer"
-      - Selector:        'init'
-        MethodKind:      Instance
-        DesignatedInit:  true
-      - Selector:        'class'
-        MethodKind:      Class
-        Availability:    none
-        AvailabilityMsg: "use 'self' instead"
+- Name: NSObject
+  Methods:
+  - Selector: alloc
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: 'allocWithZone:'
+    MethodKind: Class
+    Nullability:
+    - S
+    NullabilityOfRet: N
+  - Selector: class
+    MethodKind: Class
+    Availability: none
+    AvailabilityMsg: use 'self' instead
+  - Selector: 'conformsToProtocol:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: copy
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: dealloc
+    MethodKind: Instance
+    Availability: none
+    AvailabilityMsg: use 'deinit' to define a de-initializer
+  - Selector: 'forwardingTargetForSelector:'
+    MethodKind: Instance
+    Nullability:
+    - S
+    NullabilityOfRet: O
+  - Selector: init
+    MethodKind: Instance
+    NullabilityOfRet: N
+    DesignatedInit: true
+  - Selector: 'isSubclassOfClass:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: mutableCopy
+    MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: new
+    MethodKind: Class
+    NullabilityOfRet: N
+  - Selector: superclass
+    MethodKind: Class
+    NullabilityOfRet: O
 Protocols:
-  - Name:            NSObject
-    Methods:
-      - Selector:        'class'
-        MethodKind:      Instance
-        Availability:    none
-        AvailabilityMsg: "use 'dynamicType' instead"
+- Name: NSObject
+  Methods:
+  - Selector: class
+    MethodKind: Instance
+    Availability: none
+    AvailabilityMsg: use 'dynamicType' instead
+  - Selector: 'conformsToProtocol:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isEqual:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
+  - Selector: 'isKindOfClass:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: 'isMemberOfClass:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: S
+  - Selector: self
+    MethodKind: Instance
+    NullabilityOfRet: N
+  Properties:
+  - Name: superclass
+    Nullability: O
