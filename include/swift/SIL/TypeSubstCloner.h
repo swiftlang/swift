@@ -188,11 +188,27 @@ protected:
                   ::getLinkageForProtocolConformance(normal, NotForDefinition);
       OtherMod.createWitnessTableDeclaration(Conformance, linkage);
     }
+
+    auto newLookupType = getOpType(Inst->getLookupType());
+    if (Conformance) {
+      CanType Ty = Conformance->getType()->getCanonicalType();
+      SILType SILTy = SILType::getPrimitiveType(Ty,
+                                                newLookupType.getCategory());
+
+      if (SILTy != newLookupType) {
+        assert(SILTy.isSuperclassOf(newLookupType) &&
+               "Should only create upcasts for sub class.");
+
+        // We use the super class as the new look up type.
+        newLookupType = SILTy;
+      }
+    }
+
     // We already subst so getOpConformance is not needed.
     SILBuilder &Builder = getBuilder();
     doPostProcess(Inst, Builder.createWitnessMethod(
                             getOpLocation(Inst->getLoc()),
-                            getOpType(Inst->getLookupType()),
+                            newLookupType,
                             Conformance, Inst->getMember(),
                             getOpType(Inst->getType()), Inst->isVolatile()));
   }

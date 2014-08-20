@@ -442,7 +442,8 @@ found_inherited:
     return getType()->getASTContext()
       .getSpecializedConformance(getType(), foundInherited, subs);
   }
-  assert(getType()->isEqual(foundInherited->getType())
+  assert((getType()->isEqual(foundInherited->getType()) ||
+          foundInherited->getType()->isSuperclassOf(getType(), nullptr))
          && "inherited conformance does not match type");
   return foundInherited;
 }
