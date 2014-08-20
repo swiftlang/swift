@@ -283,19 +283,24 @@ public:
   }
 
   std::pair<Expr *, ValueDecl *> digForVariable(Expr *E) {
-    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E)) {
-      return std::make_pair(DRE, llvm::dyn_cast<VarDecl>(DRE->getDecl()));
-    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(E)) {
-      return std::make_pair(MRE, MRE->getMember().getDecl());
-    } else if (LoadExpr *LE = llvm::dyn_cast<LoadExpr>(E)) {
-      return digForVariable(LE->getSubExpr());
-    } else if (ForceValueExpr *FVE = llvm::dyn_cast<ForceValueExpr>(E)) {
-      return digForVariable(FVE->getSubExpr());
-    } else if (ImplicitConversionExpr *ICE =
-               llvm::dyn_cast<ImplicitConversionExpr>(E)) {
-      return digForVariable(ICE->getSubExpr());
-    } else {
+    switch (E->getKind()) {
+    default:
+      if (ImplicitConversionExpr *ICE =
+          llvm::dyn_cast<ImplicitConversionExpr>(E)) {
+        return digForVariable(ICE->getSubExpr());
+      }
       return std::make_pair(nullptr, nullptr);
+    case ExprKind::DeclRef:
+      return std::make_pair(E, llvm::cast<DeclRefExpr>(E)->getDecl());
+    case ExprKind::MemberRef:
+      return std::make_pair(
+        E, llvm::cast<MemberRefExpr>(E)->getMember().getDecl());
+    case ExprKind::Load:
+      return digForVariable(llvm::cast<LoadExpr>(E)->getSubExpr());
+    case ExprKind::ForceValue:
+      return digForVariable(llvm::cast<ForceValueExpr>(E)->getSubExpr());
+    case ExprKind::InOut:
+      return digForVariable( llvm::cast<InOutExpr>(E)->getSubExpr());
     }
   }
   
