@@ -282,9 +282,11 @@ public:
     return D;
   }
 
-  std::pair<DeclRefExpr *, VarDecl *> digForVariable(Expr *E) {
+  std::pair<Expr *, ValueDecl *> digForVariable(Expr *E) {
     if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E)) {
       return std::make_pair(DRE, llvm::dyn_cast<VarDecl>(DRE->getDecl()));
+    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(E)) {
+      return std::make_pair(MRE, MRE->getMember().getDecl());
     } else if (LoadExpr *LE = llvm::dyn_cast<LoadExpr>(E)) {
       return digForVariable(LE->getSubExpr());
     } else if (ForceValueExpr *FVE = llvm::dyn_cast<ForceValueExpr>(E)) {
@@ -298,9 +300,9 @@ public:
   }
   
   std::string digForName(Expr *E) {
-    DeclRefExpr *DRE = nullptr;
-    VarDecl *VD = nullptr;
-    std::tie(DRE, VD) = digForVariable(E);
+    Expr *_RE = nullptr;
+    ValueDecl *VD = nullptr;
+    std::tie(_RE, VD) = digForVariable(E);
     if (VD) {
       return VD->getName().str();
     } else {
@@ -353,12 +355,12 @@ public:
               llvm::dyn_cast<MemberRefExpr>(AE->getDest())) {
             // an assignment to a property of an object counts as a mutation of
             // that object
-            DeclRefExpr *BaseDRE = nullptr;
-            VarDecl *BaseVD = nullptr;
-            std::tie(BaseDRE, BaseVD) = digForVariable(MRE->getBase());
+            Expr *Base_RE = nullptr;
+            ValueDecl *BaseVD = nullptr;
+            std::tie(Base_RE, BaseVD) = digForVariable(MRE->getBase());
             
-            if (BaseDRE) {
-              Expr *Log = logDeclRef(BaseDRE);
+            if (Base_RE) {
+              Expr *Log = logDeclOrMemberRef(Base_RE);
               if (Log) {
                 Elements.insert(Elements.begin() + (EI + 1), Log);
                 ++EI;
@@ -434,20 +436,20 @@ public:
             if (DotSyntaxCallExpr *DSCE =
                 llvm::dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
-              DeclRefExpr *TargetDRE = nullptr;
-              VarDecl *TargetVD = nullptr;
+              Expr *Target_RE = nullptr;
+              ValueDecl *TargetVD = nullptr;
 
-              std::tie(TargetDRE, TargetVD) = digForVariable(TargetExpr);
+              std::tie(Target_RE, TargetVD) = digForVariable(TargetExpr);
 
               if (TargetVD) {
-                Expr *Log = logDeclRef(TargetDRE);
+                Expr *Log = logDeclOrMemberRef(Target_RE);
                 if (Log) {
                   Elements.insert(Elements.begin() + (EI + 1), Log);
                   ++EI;
                 }
               }
             } else if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
-              Expr *Log = logDeclRef(DRE);
+              Expr *Log = logDeclOrMemberRef(DRE);
               if (Log) {
                 Elements.insert(Elements.begin() + (EI + 1), Log);
                 ++EI;
@@ -588,22 +590,44 @@ public:
       VD->getSourceRange(), VD->getName().str().str().c_str());
   }
 
-  Expr *logDeclRef(DeclRefExpr *DRE) {
-    VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
+  Expr *logDeclOrMemberRef(Expr *_RE) {
+    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(_RE)) {
+      VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
+  
+      if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
+          VD->getNameStr().equals("self")) {
+        // Don't log "self" in a constructor
+        return nullptr;
+      }
+  
+      return buildLoggerCall(
+        new (Context) DeclRefExpr(ConcreteDeclRef(VD),
+                                  SourceLoc(),
+                                  true, // implicit
+                                  false, // uses direct property access
+                                  Type()),
+        DRE->getSourceRange(), VD->getName().str().str().c_str());
+    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(_RE)) {
+      Expr *B = MRE->getBase();
+      ConcreteDeclRef M = MRE->getMember();
 
-    if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
-        VD->getNameStr().equals("self")) {
-      // Don't log "self" in a constructor
+      if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
+          !digForName(B).compare("self")) {
+        // Don't log attributes of "self" in a constructor
+        return nullptr;
+      }
+  
+      return buildLoggerCall(
+        new (Context) MemberRefExpr(B,
+                                    SourceLoc(),
+                                    M,
+                                    SourceRange(),
+                                    true, // implicit
+                                    false), // uses direct property access
+        MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
+    } else {
       return nullptr;
     }
-
-    return buildLoggerCall(
-      new (Context) DeclRefExpr(ConcreteDeclRef(VD),
-                                SourceLoc(),
-                                true, // implicit
-                                false, // uses direct property access
-                                Type()),
-      DRE->getSourceRange(), VD->getName().str().str().c_str());
   }
 
   Expr *logPrint(VarDecl *VD, SourceRange SR, bool IsPrintln) {
