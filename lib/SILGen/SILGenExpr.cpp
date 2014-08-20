@@ -474,8 +474,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
-    assert(!declRef.isSpecialized() &&
-           "Cannot handle specialized type references");
     assert(decl->getType()->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
     return ManagedValue::forUnmanaged(B.createMetatype(loc,

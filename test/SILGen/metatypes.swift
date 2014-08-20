@@ -1,5 +1,7 @@
 // RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
+import Swift
+
 // FIXME: typeof should be available through the standard library.
 
 protocol SomeProtocol {
@@ -77,7 +79,7 @@ func generic_metatypes<T>(x: T)
 
 // rdar://16610078
 
-// CHECK:    sil @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T1]] : $@thick SomeStruct.Type to $@thick Any.Type
@@ -86,7 +88,7 @@ func existential_metatype_from_thin() -> Any.Type {
   return SomeStruct.self
 }
 
-// CHECK:    sil @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructCfMS0_FT_S0_
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
@@ -98,4 +100,11 @@ func existential_metatype_from_thin() -> Any.Type {
 func existential_metatype_from_thin_value() -> Any.Type {
   let s = SomeStruct()
   return s.dynamicType
+}
+
+// CHECK-LABEL: sil @_TF9metatypes20specialized_metatypeFT_GVSs10DictionarySSSi_
+// CHECK:         metatype $@thin Dictionary<String, Int>.Type
+func specialized_metatype() -> Dictionary<String, Int> {
+  let dict = Swift.Dictionary<Swift.String, Int>()
+  return dict
 }
