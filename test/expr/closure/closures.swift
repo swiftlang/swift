@@ -182,16 +182,6 @@ extension SomeClass {
 }
 
 
-class Foo {
-  func method() {
-    doStuff { [unowned self] in
-      method()
-    }
-  }
-}
-
-
-
 // <rdar://problem/16955318> Observed variable in a closure triggers an assertion
 var closureWithObservedProperty: () -> () = {
   var a: Int = 42 {
