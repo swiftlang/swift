@@ -61,7 +61,7 @@ def getWorkTreeSha():
 def buildBenchmarks(cacheDir):
     print('Building executables...')
     
-    configVars = {'SWIFT_INCLUDE_PRECOMMIT_BENCHMARKS':'ON', 'SWIFT_OPTIMIZED':'ON', 'SWIFT_STDLIB_INTERNAL_CHECKS':'OFF'}
+    configVars = {'SWIFT_INCLUDE_PERF_TEST_SUITE':'ON', 'SWIFT_OPTIMIZED':'ON', 'SWIFT_STDLIB_INTERNAL_CHECKS':'OFF'}
     
     cmakeCache = os.path.join(buildDir, 'CMakeCache.txt')
     
@@ -242,11 +242,11 @@ def compareTimingsFiles(file1, file2):
             print ((widths[n] - len(x)) * ' ') + x,
         print ''
 
-def checkAndUpdatePrecommitBench(sourceDir):
-    """Check that the precommit benchmark directory is in its appropriate
+def checkAndUpdatePerfTestSuite(sourceDir):
+    """Check that the performance testsuite directory is in its appropriate
        location and attempt to update it to ToT."""
     # Compute our benchmark directory name.
-    benchdir = os.path.join(sourceDir, 'benchmark', 'PrecommitBench')
+    benchdir = os.path.join(sourceDir, 'benchmark', 'PerfTestSuite')
 
     # If it's not there, clone it on demand.
     if not os.path.isdir(benchdir):
@@ -261,7 +261,7 @@ def checkAndUpdatePrecommitBench(sourceDir):
     # errors.
     gitdir = os.path.join(benchdir, '.git')
     if not os.path.exists(gitdir):
-        raise RuntimeError("PrecommitBench dir is not a .git repo?!")
+        raise RuntimeError("PerfTestSuite dir is not a .git repo?!")
 
     # We always update the benchmarks to ToT.
     check_call(['git', 'pull', 'origin', 'master'], cwd=benchdir)
@@ -278,12 +278,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     optimization = args.optimization or ['3']
-    exeNames = ['PrecommitBench_O' + ('' if x == '3' else x) for x in optimization]
+    exeNames = ['PerfTests_O' + ('' if x == '3' else x) for x in optimization]
 
-    # Update precommit bench to ToT. If it does not exist, throw an error.
+    # Update PerfTests bench to ToT. If it does not exist, throw an error.
     #
     # TODO: This name sucks.
-    checkAndUpdatePrecommitBench(sourceDir)
+    checkAndUpdatePerfTestSuite(sourceDir)
 
     workCacheDir = collectBenchmarks(exeNames, None, args.repeat)    
     baselineCacheDir = collectBenchmarks(exeNames, args.baseline, args.repeat)
