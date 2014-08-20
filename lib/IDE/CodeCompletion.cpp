@@ -2054,9 +2054,18 @@ public:
       FD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
+
+    Accessibility AccessibilityOfContext;
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
+      AccessibilityOfContext = NTD->getAccessibility();
+    else
+      AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
+                                   ->getExtendedType()
+                                   ->getAnyNominal()
+                                   ->getAccessibility();
     Builder.addAccessControlKeyword(std::min(
-        FD->getAccessibility(),
-        cast<NominalTypeDecl>(CurrDeclContext)->getAccessibility()));
+        FD->getAccessibility(), AccessibilityOfContext));
+
     if (Reason == DeclVisibilityKind::MemberOfSuper)
       Builder.addOverrideKeyword();
     Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));

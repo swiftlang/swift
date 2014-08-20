@@ -5,6 +5,14 @@
 // RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_1 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_2 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_PA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PB -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_PB < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PB < %t.txt
@@ -19,6 +27,16 @@
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT1 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BA < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
@@ -42,6 +60,16 @@
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT1 -code-completion-keywords=false > %t.txt
+// RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT2 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_BE < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_PA < %t.txt
@@ -210,6 +238,15 @@ class TestClass_PA : ProtocolA {
 }
 // CLASS_PA: Begin completions, 4 items
 
+class TestClass_PA_Ext {
+  func ERROR1() {}
+  #^CLASS_PA_EXT_1^#
+}
+extension TestClass_PA_Ext : ProtocolA {
+  func ERROR2() {}
+  #^CLASS_PA_EXT_2^#
+}
+
 class TestClass_PB : ProtocolB {
   #^CLASS_PB^#
 }
@@ -229,6 +266,14 @@ class TestClass_BA_PA : BaseA, ProtocolA {
   #^CLASS_BA_PA^#
 }
 // CLASS_BA_PA: Begin completions, 9 items
+
+class TestClass_BA_PA_Ext : BaseA {
+  #^CLASS_BA_PA_EXT1^#
+}
+
+extension TestClass_BA_PA_Ext : ProtocolA {
+  #^CLASS_BA_PA_EXT2^#
+}
 
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
@@ -254,6 +299,13 @@ class TestClass_BE_PA_PE : BaseE, ProtocolA, ProtocolE {
   #^CLASS_BE_PA_PE^#
 }
 // CLASS_BE_PA_PE: Begin completions, 8 items
+
+class TestClass_BE_PA_PE_Ext : BaseE {
+  #^CLASS_BE_PA_PE_EXT1^#
+}
+extension TestClass_BE_PA_PE_Ext : ProtocolA, ProtocolE {
+  #^CLASS_BE_PA_PE_EXT2^#
+}
 
 class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
   #^CLASS_PEI_PE^#

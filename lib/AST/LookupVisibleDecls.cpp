@@ -341,6 +341,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         continue;
       Worklist.push_back(Conformance->getProtocol());
     }
+    for (const auto *ED : CurrNominal->getExtensions()) {
+      for (const auto *Conformance : ED->getConformances()) {
+        if (!Conformance->isComplete())
+          continue;
+        Worklist.push_back(Conformance->getProtocol());
+      }
+    }
 
     while (!Worklist.empty()) {
       auto Proto = Worklist.pop_back_val();
@@ -355,6 +362,11 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   auto TopProtocols = CurrNominal->getProtocols();
   SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
                                           TopProtocols.end());
+  for (const auto *ED : CurrNominal->getExtensions()) {
+    auto Protocols = ED->getProtocols();
+    Worklist.append(Protocols.begin(), Protocols.end());
+  }
+
   while (!Worklist.empty()) {
     auto Proto = Worklist.pop_back_val();
     if (!Visited.insert(Proto))
