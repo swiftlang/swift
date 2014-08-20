@@ -71,3 +71,17 @@ test_dynamic_lookup_g(Y())
 test_dynamic_lookup_myValue(X())
 // CHECK: Object does not respond to the selector "myValue"
 test_dynamic_lookup_myValue(Y())
+
+
+// <rdar://problem/16554056> __FUNCTION__ in deinit for NSObject subclasses crashes the compiler
+// Test __FUNCTION__
+class FUNCTION_NAME_TEST : NSObject {
+  override init() { super.init() ; println(__FUNCTION__) }
+  deinit { println(__FUNCTION__) }
+}
+
+FUNCTION_NAME_TEST()
+
+// CHECK: init()
+// CHECK: deinit
+
