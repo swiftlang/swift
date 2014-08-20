@@ -273,6 +273,38 @@ public:
     }
 
     Expr *E = RS->getResult();
+
+    // In an initializer, the only expression allowed is "nil", which indicates
+    // failure from a failable initializer.
+    if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
+                      TheFunc->getAbstractFunctionDecl())) {
+      // The only valid return expression in an initializer is the literal
+      // 'nil'.
+      if (!isa<NilLiteralExpr>(E->getSemanticsProvidingExpr())) {
+        TC.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
+          .highlight(E->getSourceRange());
+        RS->setResult(nullptr);
+        return RS;
+      }
+
+      // "return nil" is only permitted in a failable initializer.
+      if (ctor->getFailability() == OTK_None) {
+        TC.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
+          .highlight(E->getSourceRange());
+        TC.diagnose(ctor->getLoc(), diag::make_init_failable,
+                    ctor->getFullName())
+        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                ctor->getLoc()),
+                     "?");
+        RS->setResult(nullptr);
+        return RS;
+      }
+
+      // FIXME: Replace with a new 'fail' statement.
+      RS->setResult(nullptr);
+      return RS;
+    }
+
     if (TC.typeCheckExpression(E, DC, ResultTy, Type(), /*discardedExpr=*/false))
       return 0;
     RS->setResult(E);

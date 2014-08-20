@@ -38,7 +38,7 @@ func createMyDocument1() {
 
 class MyDocument2 : NSDocument {
   init(URL url: String) {
-    return super.init(URL: url) // expected-error{{must call a designated initializer of the superclass 'NSDocument'}}
+    super.init(URL: url) // expected-error{{must call a designated initializer of the superclass 'NSDocument'}}
   }
 }
 

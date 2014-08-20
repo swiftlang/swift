@@ -1320,6 +1320,14 @@ ERROR(return_invalid_outside_func,sema_tcs,none,
       "return invalid outside of a func", ())
 ERROR(return_expr_missing,sema_tcs,none,
       "non-void function should return a value", ())
+ERROR(return_non_failable_init,sema_tcs,none,
+      "only a failable initializer can return 'nil'", ())
+NOTE(make_init_failable,sema_tcs,none,
+      "use 'init?' to make the initializer %0 failable", (DeclName))
+ERROR(return_init_non_nil,sema_tcs,none,
+      "'nil' is the only return value permitted in an initializer",
+      ())
+
 ERROR(expression_unused_function,sema_tcs,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,sema_tcs,none,

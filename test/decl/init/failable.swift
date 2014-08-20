@@ -217,3 +217,23 @@ class C3c : P3 {
 }
 
 
+// ----------------------------------------------------------------------------
+// Initiating failure
+// ----------------------------------------------------------------------------
+struct InitiateFailureS {
+  init(string: String) { // expected-note{{use 'init?' to make the initializer 'init(string:)' failable}}{{7-7=?}}
+    return (nil) // expected-error{{only a failable initializer can return 'nil'}}
+  }
+
+  init(int: Int) {
+    return 0 // expected-error{{'nil' is the only return value permitted in an initializer}}
+  }
+
+  init?(double: Double) {
+    return nil // ok
+  }
+
+  init!(char: Character) {
+    return nil // ok
+  }
+}

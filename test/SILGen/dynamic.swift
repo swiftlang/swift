@@ -315,13 +315,13 @@ extension Gizmo {
   // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT19foreignClassFactorySi_S_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
-    return self.init(stuff: x)
+    self.init(stuff: x)
   }
 
   // CHECK-LABEL: sil @_TFCSo5GizmocfMS_FT24foreignClassExactFactorySi_S_
   // CHECK:         class_method [volatile] {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassExactFactory x: Int) {
-    return self.init(exactlyStuff: x)
+    self.init(exactlyStuff: x)
   }
 
   @objc func foreignObjCExtension() { }

@@ -1120,7 +1120,7 @@ extension NSPredicate {
   public
   convenience init(format predicateFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
-    return self.init(format: predicateFormat, arguments: va_args)
+    self.init(format: predicateFormat, arguments: va_args)
   }
 }
 
@@ -1129,7 +1129,7 @@ extension NSExpression {
   public
   convenience init(format expressionFormat: String, _ args: CVarArgType...) {
     let va_args = getVaList(args)
-    return self.init(format: expressionFormat, arguments: va_args)
+    self.init(format: expressionFormat, arguments: va_args)
   }
 }
 

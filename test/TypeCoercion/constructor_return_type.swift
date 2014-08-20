@@ -6,7 +6,7 @@ struct S {
   }
 
   init(b:Bool) {
-    return 1 // expected-error {{type '()' does not conform to protocol 'IntegerLiteralConvertible'}}
+    return 1 // expected-error {{'nil' is the only return value permitted in an initializer}}
   }
 }
 
