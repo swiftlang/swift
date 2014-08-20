@@ -307,7 +307,7 @@ public:
 /// an instance of a reference type whose runtime type is provided by
 /// the given metatype value. Aside from the reference count, the
 /// instance is returned uninitialized.
-class AllocRefDynamicInst 
+class AllocRefDynamicInst
   : public UnaryInstructionBase<ValueKind::AllocRefDynamicInst, AllocationInst>
 {
   bool ObjC;
@@ -666,7 +666,7 @@ public:
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
-  
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
@@ -1205,7 +1205,7 @@ public:
   UncheckedRefCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 class UncheckedAddrCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedAddrCastInst,
                                 ConversionInst>
@@ -1214,7 +1214,7 @@ public:
   UncheckedAddrCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// Convert a value's binary representation to a trivial type of the same size.
 class UncheckedTrivialBitCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedTrivialBitCastInst,
@@ -1224,7 +1224,7 @@ public:
   UncheckedTrivialBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// Convert a value to a layout-compatible type with equivalent
 /// "reference semantics identity", that is, a type for which retain_value and
 /// release_value have equivalent effects to retaining or releasing the original
@@ -1237,7 +1237,7 @@ public:
   UncheckedRefBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// RefToRawPointer - Convert a reference type to a Builtin.RawPointer.
 class RefToRawPointerInst
   : public UnaryInstructionBase<ValueKind::RefToRawPointerInst, ConversionInst>
@@ -1336,7 +1336,7 @@ public:
   ObjCToThickMetatypeInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// Given an Objective-C metatype value, convert it to an AnyObject value.
 class ObjCMetatypeToObjectInst
   : public UnaryInstructionBase<ValueKind::ObjCMetatypeToObjectInst,
@@ -1346,7 +1346,7 @@ public:
   ObjCMetatypeToObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// Given an Objective-C existential metatype value, convert it to an AnyObject
 /// value.
 class ObjCExistentialMetatypeToObjectInst
@@ -1357,7 +1357,7 @@ public:
   ObjCExistentialMetatypeToObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// Return the Objective-C Protocol class instance for a protocol.
 class ObjCProtocolInst : public SILInstruction
 {
@@ -1368,10 +1368,10 @@ public:
   {}
 
   ProtocolDecl *getProtocol() const { return Proto; }
-  
+
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
-  
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
@@ -2024,7 +2024,7 @@ class OpenExistentialRefInst
 public:
   OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
 };
-  
+
 /// InitExistentialInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
@@ -2139,7 +2139,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, DestTy)
   {}
 };
-  
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<ValueKind::ProjectBlockStorageInst,
@@ -2152,9 +2152,9 @@ public:
     : UnaryInstructionBase(Loc, Operand, DestTy)
   {}
 };
-  
+
 ///
-  
+
 /// Initializes a block header, creating a block that
 /// invokes a given thin cdecl function.
 class InitBlockStorageHeaderInst : public SILInstruction {
@@ -2169,18 +2169,18 @@ public:
                      Loc, BlockType),
       Operands(this, BlockStorage, InvokeFunction)
   {}
-  
+
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
   /// Get the invoke function to form the block around.
   SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
-  
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   /// getType() is OK since there's only one result.
   SILType getType() const { return SILInstruction::getType(0); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitBlockStorageHeaderInst;
   }
@@ -2254,7 +2254,7 @@ public:
   UnownedReleaseInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
-  
+
 /// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
 /// RVO optimizations.
 class FixLifetimeInst :
@@ -2265,7 +2265,7 @@ public:
   FixLifetimeInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
-  
+
 /// Promote an Objective-C block that is on the stack to the heap, or simply
 /// retain a block that is already on the heap.
 class CopyBlockInst :
@@ -2276,7 +2276,7 @@ public:
   CopyBlockInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand, operand.getType()) {}
 };
-  
+
 //===----------------------------------------------------------------------===//
 // DeallocationInsts
 //===----------------------------------------------------------------------===//
@@ -2891,7 +2891,7 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DynamicMethodBranchInst;
-  }	
+  }
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
