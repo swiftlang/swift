@@ -1,5 +1,7 @@
 // RUN: %swift -target x86_64-apple-macosx10.9 %s -emit-ir | FileCheck %s
 
+import Swift
+
 // CHECK: [[A:%C13generic_types1A]] = type <{ [[REF:%swift.refcounted]], [[INT:%Si]] }>
 // CHECK: [[INT]] = type <{ i64 }>
 // CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%VSs20UnsafeMutablePointer]] }>
@@ -123,4 +125,18 @@ struct E<T> {
   var x : Int
   func foo() { bar() }
   func bar() {}
+}
+
+class ClassA {}
+class ClassB {}
+
+// This type is fixed-size across specializations, but it needs to use
+// a different implementation in IR-gen so that types match up.
+// It just asserts if we get it wrong.
+struct F<T: AnyObject> {
+  var value: T
+}
+func testFixed() {
+  var a = F(value: ClassA()).value
+  var b = F(value: ClassB()).value
 }

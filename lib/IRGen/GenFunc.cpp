@@ -2080,7 +2080,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
   case ResultDifference::Identical:
-  case ResultDifference::Aliasable:
     // We can emit directly if the explosion levels match.
     if (out.getKind() == getCallee().getExplosionLevel()) {
       emitToUnmappedExplosion(out);
@@ -2092,6 +2091,22 @@ void CallEmission::emitToExplosion(Explosion &out) {
       substResultTI.reexplode(IGF, temp, out);
     }
     return;
+
+  case ResultDifference::Aliasable: {
+    Explosion temp(getCallee().getExplosionLevel());
+    emitToUnmappedExplosion(temp);
+    ExplosionSchema resultSchema = substResultTI.getSchema(out.getKind());
+    assert(temp.size() == resultSchema.size());
+    for (unsigned i = 0, e = temp.size(); i != e; ++i) {
+      llvm::Type *expectedType = resultSchema.begin()[i].getScalarType();
+      llvm::Value *value = temp.claimNext();
+      if (value->getType() != expectedType)
+        value = IGF.Builder.CreateBitCast(value, expectedType,
+                                          value->getName() + ".asSubstituted");
+      out.add(value);
+    }
+    return;
+  }
 
   // If they do differ, we need to remap.
   case ResultDifference::Divergent:

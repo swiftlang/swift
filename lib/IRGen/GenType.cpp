@@ -1373,24 +1373,122 @@ static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cach
   cache[key] = result;
 }
 
+namespace {
+  /// Is IR-gen type-dependent for the given type?  Specifically, will
+  /// basic operations on the type misbehave (e.g. by having an IR
+  /// type mismatch) if an aggregate type containing a value of this
+  /// type is generated generically rather than independently for
+  /// different specializations?
+  class IsIRTypeDependent : public CanTypeVisitor<IsIRTypeDependent, bool> {
+    IRGenModule &IGM;
+  public:
+    IsIRTypeDependent(IRGenModule &IGM) : IGM(IGM) {}
+
+    // If the type isn't actually dependent, we're okay.
+    bool visit(CanType type) {
+      if (!type->hasArchetype()) return false;
+      return CanTypeVisitor::visit(type);
+    }
+
+    // Dependent struct types need their own implementation if any
+    // field type might need its own implementation.
+    bool visitStructType(CanStructType type) {
+      return visitStructDecl(type->getDecl());
+    }
+    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
+      return visitStructDecl(type->getDecl());
+    }
+    bool visitStructDecl(StructDecl *decl) {
+      if (IGM.isResilient(decl, ResilienceScope::Local))
+        return true;
+
+      for (auto field : decl->getStoredProperties()) {
+        if (visit(field->getType()->getCanonicalType()))
+          return true;
+      }
+      return false;
+    }
+
+    // Dependent enum types need their own implementation if any
+    // element payload type might need its own implementation.
+    bool visitEnumType(CanEnumType type) {
+      return visitEnumDecl(type->getDecl());
+    }
+    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
+      return visitEnumDecl(type->getDecl());
+    }
+    bool visitEnumDecl(EnumDecl *decl) {
+      if (IGM.isResilient(decl, ResilienceScope::Local))
+        return true;
+
+      for (auto elt : decl->getAllElements()) {
+        if (elt->hasArgumentType() &&
+            visit(elt->getArgumentType()->getCanonicalType()))
+          return true;
+      }
+      return false;
+    }
+
+    // Classes do not need unique implementations.
+    bool visitClassType(CanClassType type) { return false; }
+    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
+      return false;
+    }
+
+    // Reference storage types propagate the decision.
+    bool visitReferenceStorageType(CanReferenceStorageType type) {
+      return visit(type.getReferentType());
+    }
+
+    // The IR-generation for function types is specifically not
+    // type-dependent.
+    bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
+
+    // The safe default for a dependent type is to assume that it
+    // needs its own implementation.
+    bool visitType(CanType type) {
+      return true;
+    }
+  };
+}
+
+static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
+  assert(!isa<ProtocolDecl>(decl));
+  if (isa<ClassDecl>(decl)) {
+    return false;
+  } else if (auto sd = dyn_cast<StructDecl>(decl)) {
+    return IsIRTypeDependent(IGM).visitStructDecl(sd);
+  } else {
+    auto ed = cast<EnumDecl>(decl);
+
+    // HACK: there's some sort of logic in multi-payload enums that
+    // tries to assume that there are no spare bits in class-bounded
+    // archetypes.  This logic is quite broken; if you instantiate a
+    // non-shared implementation for the enum, you get different
+    // results.  This check prevents this from being a problem in
+    // common practice by pretending that a shared implementation is
+    // acceptable as long as the generic instance is known to be fixed
+    // in size.
+    if (IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
+                       ed->getDeclaredTypeInContext()->getCanonicalType()),
+                             ResilienceScope::Local)
+          == ObjectSize::Fixed)
+      return false;
+
+    return IsIRTypeDependent(IGM).visitEnumDecl(cast<EnumDecl>(decl));
+  }
+}
+
 TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
                                                     NominalTypeDecl *decl) {
   // By "any", we don't mean existentials.
   assert(!isa<ProtocolDecl>(decl));
 
-  // We want to try to re-use implementations between generic
-  // specializations.  However, don't bother with this secondary hash
-  // if the type isn't generic or if its type is obviously fixed.
-  //
-  // (But if it's generic and even *resilient*, we might need the
-  // implementation to store a real type in order to grab the value
-  // witnesses successfully.)
-  if (!decl->getGenericParams() ||
-      (!isa<ClassDecl>(decl) && // fast path obvious case
-       IGM.classifyTypeSize(SILType::getPrimitiveObjectType(
-                        decl->getDeclaredTypeInContext()->getCanonicalType()),
-                            ResilienceScope::Local)
-         != ObjectSize::Fixed)) {
+  // We need to give generic specializations distinct TypeInfo objects
+  // if their IR-gen might be different, e.g. if they use different IR
+  // types or if type-specific operations like projections might need
+  // to be handled differently.
+  if (!decl->isGenericContext() || isIRTypeDependent(IGM, decl)) {
     switch (decl->getKind()) {
 #define NOMINAL_TYPE_DECL(ID, PARENT)
 #define DECL(ID, PARENT) \
