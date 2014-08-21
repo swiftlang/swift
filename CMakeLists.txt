@@ -1134,6 +1134,15 @@ macro(add_swift_library name)
     endif()
   endif()
 
+  # Use 16K segment alignment on 32-bit arm.
+  # The linker does this by default for iOS 8+ deployment, 
+  # but we deploy to iOS 7.
+  set(SWIFTLIB_DEFAULT_LINK_FLAGS)
+  if (CMAKE_SYSTEM_PROCESSOR MATCHES "^armv7")
+    set(SWIFTLIB_DEFAULT_LINK_FLAGS
+        "-Xlinker -segalign -Xlinker 0x4000")
+  endif()
+
   # If we're supposed to build this library for the target...
   if(SWIFTLIB_TARGET_LIBRARY AND SWIFT_SDKS)
     # Check whether we should build the default variant.
@@ -1161,7 +1170,8 @@ macro(add_swift_library name)
         COMPILE_FLAGS
           "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_COMPILE_FLAGS}"
           
-        LINK_FLAGS "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS}"
+        LINK_FLAGS 
+          "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS} ${SWIFTLIB_EXTRA_DEFAULT_LINK_FLAGS}"
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
         ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
         ${SWIFTLIB_INSTALL_FLAG}
@@ -1209,6 +1219,15 @@ macro(add_swift_library name)
             endif()
           endif()
         
+          # Use 16K segment alignment on 32-bit arm.
+          # The linker does this by default for iOS 8+ deployment, 
+          # but we deploy to iOS 7.
+          set(SWIFTLIB_CURRENT_LINK_FLAGS)
+          if (ARCH MATCHES "^armv7")
+            set(SWIFTLIB_CURRENT_LINK_FLAGS 
+                "-Xlinker -segalign -Xlinker 0x4000")
+          endif()
+
           # Add this library variant.
           add_swift_library_single(
             ${VARIANT_NAME}
@@ -1222,7 +1241,8 @@ macro(add_swift_library name)
             FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
             COMPILE_FLAGS
               "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_CURRENT_COMPILE_FLAGS}"
-            LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+            LINK_FLAGS 
+              "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_CURRENT_LINK_FLAGS}"
             ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
             ${SWIFTLIB_INSTALL_FLAG}
             ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
@@ -1292,7 +1312,8 @@ macro(add_swift_library name)
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
       COMPILE_FLAGS
         "${SWIFTLIB_COMPILE_FLAGS} ${SWIFTLIB_DEFAULT_COMPILE_FLAGS}"
-      LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
+      LINK_FLAGS
+        "${SWIFTLIB_LINK_FLAGS} ${SWIFTLIB_DEFAULT_LINK_FLAGS}"
       ${SWIFTLIB_API_NOTES_NON_OVERLAY_FLAG}
       ${SWIFTLIB_INSTALL_FLAG}
       ${SWIFTLIB_IS_STDLIB_CORE_FLAG}
