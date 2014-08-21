@@ -490,7 +490,7 @@ public:
 //--- Global context emission --------------------------------------------------
 public:
   void emitGlobalTopLevel();
-  void emitDebuggerInitializers();
+  void emitObjCRegistration();
   void emitLazyDefinitions();
 private:
   void emitGlobalDecl(Decl *D);

@@ -396,33 +396,34 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
 }
 
-void IRGenModule::emitDebuggerInitializers() {
-  SILFunction *DebuggerSILFunction = nullptr;
+void IRGenModule::emitObjCRegistration() {
+  SILFunction *EntryPoint = nullptr;
   
-  // In playgrounds mode, insert the initialization into top_level_code.
-  if (Context.LangOpts.Playground) {
-    DebuggerSILFunction = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-  } else {
-    // Otherwise, try to find the LLDBDebuggerFunction.
+  // In normal and playgrounds mode, insert the initialization into
+  // top_level_code.
+  if (Context.LangOpts.DebuggerSupport && !Context.LangOpts.Playground) {
+    // For debugging and REPL, though, try to find the LLDBDebuggerFunction.
     for (SILFunction &SF : *SILMod) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
           if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
             if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
-              DebuggerSILFunction = &SF;
+              EntryPoint = &SF;
               break;
             }
           }
         }
       }
     }
+  } else {
+    EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   }
   
-  if (!DebuggerSILFunction)
+  if (!EntryPoint)
     return;
     
   llvm::Function *DebuggerFunction
-    = Module.getFunction(DebuggerSILFunction->getName());
+    = Module.getFunction(EntryPoint->getName());
   if (!DebuggerFunction)
     return;
   
