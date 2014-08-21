@@ -45,6 +45,8 @@ SILValue SILValue::stripCasts() {
   SILValue V = *this;
 
   while (true) {
+    V = V.stripSinglePredecessorArgs();
+
     auto K = V->getKind();
     if (isRCIdentityPreservingCast(K) ||
         K == ValueKind::UncheckedTrivialBitCastInst) {
@@ -60,6 +62,8 @@ SILValue SILValue::stripAddressProjections() {
   SILValue V = *this;
 
   while (true) {
+    V = V.stripSinglePredecessorArgs();
+
     switch (V->getKind()) {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
@@ -76,6 +80,8 @@ SILValue SILValue::stripAggregateProjections() {
   SILValue V = *this;
 
   while (true) {
+    V = V.stripSinglePredecessorArgs();
+
     switch (V->getKind()) {
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
