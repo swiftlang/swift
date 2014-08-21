@@ -6,6 +6,7 @@
 import ctypes
 import CoreGraphics
 import Foundation
+import CoreFoundation
 
 var cgPointVar: CGPoint
 
@@ -177,7 +178,7 @@ func testImportSysTypesTypes() {
 
 func testImportCFTypes() {
   var t1_unqual: Int = CFIndex_test
-  var t1_qual: ctypes.CFIndex = t1_unqual
+  var t1_qual: CoreFoundation.CFIndex = t1_unqual
 }
 
 func testImportOSTypesTypes() {

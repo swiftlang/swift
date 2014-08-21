@@ -29,11 +29,7 @@ typedef struct {
   };
 } AnonStructs;
 
-typedef const void *CFTypeRef;
 typedef void const *HWND;
-typedef struct __CFString *CFMutableStringRef;
-typedef struct __CFString const *CFStringRef;
-typedef struct __CFTree *CFTreeRef;
 
 struct StructWithBitfields {
   unsigned First;
@@ -142,10 +138,6 @@ STDLIB_TYPEDEF(__UINT64_TYPE__, u_int64_t);
 // Types from libkern/OSTypes.h.
 STDLIB_TYPEDEF(signed int, SInt);
 STDLIB_TYPEDEF(unsigned int, UInt);
-
-// Types from CoreFoundation.
-STDLIB_TYPEDEF(signed long, CFIndex);
-
 
 void noreturnFunction() __attribute__((noreturn));
 void couldReturnFunction() __attribute__((noreturn));
