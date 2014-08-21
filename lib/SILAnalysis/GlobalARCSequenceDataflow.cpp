@@ -815,7 +815,7 @@ static bool matchCondFail(SILBasicBlock::iterator &II) {
   if (!CF)
     return false;
   auto L = dyn_cast<IntegerLiteralInst>(CF->getOperand().getDef());
-  APInt;
+
   if (!L || L->getValue() != 1)
     return false;
   ++II;
