@@ -4,7 +4,7 @@
 import CoreFoundation
 import Foundation
 
-func testCFToObjC(let cfStr: CFString, cfMutableStr: CFMutableString) {
+func testCFToObjC(cfStr: CFString, cfMutableStr: CFMutableString) {
   var nsStr: NSString = cfStr
   nsStr = cfMutableStr
 
@@ -15,7 +15,7 @@ func testCFToObjC(let cfStr: CFString, cfMutableStr: CFMutableString) {
   nsStr = nsMutableStr
 }
 
-func testObjCToCF(let nsStr: NSString, nsMutableStr: NSMutableString) {
+func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
   var cfStr: CFString = nsStr
   cfStr = nsMutableStr
 
@@ -35,3 +35,20 @@ func testNativeToCF(str: String) {
   var cfStr: CFString = str
   var cfMutableStr: CFMutableString = str // expected-error{{'NSString' is not a subtype of 'NSMutableString'}}
 }
+
+func testCFToAnyObject(cfStr: CFString, cfMutableStr: CFMutableString,
+                       cfTree: CFTree) {
+  var anyObject: AnyObject = cfStr
+  anyObject = cfMutableStr
+  anyObject = cfTree
+}
+
+func testAnyObjectToCF(anyObject: AnyObject) {
+  var cfStr: CFString = anyObject as CFString
+  var cfMutableStr: CFMutableString = anyObject as CFMutableString
+  var cfTree: CFTree = anyObject as CFTree
+
+  // No implicit conversions.
+  cfStr = anyObject // expected-error{{type 'AnyObject' cannot be implicitly downcast to 'CFString'; did you mean to use 'as' to force downcast?}}
+}
+
