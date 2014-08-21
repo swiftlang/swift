@@ -517,8 +517,6 @@ public:
   /// of the function, set the result type of the expression to that sugar type.
   Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-  void typeCheckIgnoredExpr(Expr *E);
-
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);

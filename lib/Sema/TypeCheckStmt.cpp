@@ -679,6 +679,27 @@ public:
   
 } // end anonymous namespace
   
+/// Check an expression whose result is not being used at all.
+static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
+  // Complain about l-values that are neither loaded nor stored.
+  if (E->getType()->is<LValueType>()) {
+    TC.diagnose(E->getLoc(), diag::expression_unused_lvalue)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
+  // Complain about functions that aren't called.
+  // TODO: What about tuples which contain functions by-value that are
+  // dead?
+  if (E->getType()->is<AnyFunctionType>()) {
+    TC.diagnose(E->getLoc(), diag::expression_unused_function)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
+  // FIXME: Complain about literals
+}
+
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = TC.Context.SourceMgr;
   for (auto &elem : BS->getElements()) {
@@ -695,8 +716,11 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         continue;
       }
       
-      if (isDiscarded)
-        TC.typeCheckIgnoredExpr(SubExpr);
+      if (isDiscarded &&
+          !TC.Context.LangOpts.Playground &&
+          !TC.Context.LangOpts.DebuggerSupport) {
+        diagnoseIgnoredExpr(TC, SubExpr);
+      }
       elem = SubExpr;
       continue;
     }
@@ -722,27 +746,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
   
   return BS;
-}
-
-/// Check an expression whose result is not being used at all.
-void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
-  // Complain about l-values that are neither loaded nor stored.
-  if (E->getType()->is<LValueType>() && !Context.LangOpts.DebuggerSupport) {
-    diagnose(E->getLoc(), diag::expression_unused_lvalue)
-      .highlight(E->getSourceRange());
-    return;
-  }
-
-  // Complain about functions that aren't called.
-  // TODO: What about tuples which contain functions by-value that are
-  // dead?
-  if (E->getType()->is<AnyFunctionType>()) {
-    diagnose(E->getLoc(), diag::expression_unused_function)
-      .highlight(E->getSourceRange());
-    return;
-  }
-
-  // FIXME: Complain about literals
 }
 
 /// Check the default arguments that occur within this pattern.

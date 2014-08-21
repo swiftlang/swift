@@ -352,6 +352,9 @@ void CompilerInstance::performSema() {
   
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
+    bool mainIsPrimary =
+      (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID);
+
     SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
     SILParserState SILContext(TheSILModule.get());
     unsigned CurTUElem = 0;
@@ -364,14 +367,14 @@ void CompilerInstance::performSema() {
       parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                           TheSILModule ? &SILContext : nullptr,
                           &PersistentState, DelayedCB.get());
-      if (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID) 
+      if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             CurTUElem);
+      }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
     
-    if (Invocation.getFrontendOptions().Playground &&
-        (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID))
+    if (mainIsPrimary && Invocation.getLangOptions().Playground)
       performPlaygroundTransform(MainFile);
   }
 

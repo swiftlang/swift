@@ -58,6 +58,10 @@ namespace swift {
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// \brief Enable features useful for running playgrounds.
+    // FIXME: This should probably be limited to the particular SourceFile.
+    bool Playground = false;
+
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 

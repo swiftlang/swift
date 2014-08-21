@@ -139,8 +139,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
 
-  Opts.Playground |= Args.hasArg(OPT_playground);
-
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
       Opts.PrintHelp = true;
@@ -602,7 +600,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
-  
+  Opts.Playground |= Args.hasArg(OPT_playground);
+
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
     Opts.EnableObjCAttrRequiresFoundation
@@ -924,9 +923,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
   Opts.OutputFilename = FrontendOpts.OutputFilename;
   Opts.ModuleName = FrontendOpts.ModuleName;
-
-  if (Args.hasArg(OPT_playground))
-    Opts.Playground = true;
 
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
