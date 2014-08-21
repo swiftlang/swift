@@ -860,7 +860,7 @@ private:
     auto *PreheaderTerm = dyn_cast<BranchInst>(Preheader->getTerminator());
     if (!PreheaderTerm)
       return nullptr;
-    auto Start = PreheaderTerm->getArg(Header->getBBArgIndex(HeaderVal));
+    auto Start = PreheaderTerm->getArg(HeaderVal->getIndex());
 
     // Find the exit condition.
     auto CondBr = dyn_cast<CondBranchInst>(ExitingBlk->getTerminator());

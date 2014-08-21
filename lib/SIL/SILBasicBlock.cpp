@@ -89,15 +89,6 @@ SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty, ValueDecl *D) {
   return NewArg;
 }
 
-size_t SILBasicBlock::getBBArgIndex(SILArgument *Target) {
-  auto *Block = Target->getParent();
-  for (size_t i = 0, e = Block->getNumBBArg(); i != e; ++i)
-    if (Block->getBBArg(i) == Target)
-      return i;
-
-  llvm_unreachable("Expected to find argument in block's argument list!");
-}
-
 SILArgument *SILBasicBlock::createArgument(SILType Ty) {
   return new (getModule()) SILArgument(Ty, this);
 }

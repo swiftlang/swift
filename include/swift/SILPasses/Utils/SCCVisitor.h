@@ -134,7 +134,7 @@ private:
 
     if (auto *A = dyn_cast<SILArgument>(User)) {
       auto *BB = A->getParent();
-      auto Index = BB->getBBArgIndex(A);
+      auto Index = A->getIndex();
 
       for (auto *Pred : BB->getPreds()) {
         auto *V = getArgForTerminator(Pred->getTerminator(), BB, Index);

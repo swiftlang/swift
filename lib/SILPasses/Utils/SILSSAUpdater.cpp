@@ -129,7 +129,7 @@ static bool
 isEquivalentPHI(SILArgument *PHI,
                 llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> &ValueMap) {
   SILBasicBlock *PhiBB = PHI->getParent();
-  size_t Idx = PhiBB->getBBArgIndex(PHI);
+  size_t Idx = PHI->getIndex();
   for (auto *PredBB : PhiBB->getPreds()) {
     auto DesiredVal = ValueMap[PredBB];
     OperandValueArrayRef EdgeValues =
@@ -236,11 +236,11 @@ public:
     explicit PHI_iterator(SILArgument *P) // begin iterator
         : PredIt(P->getParent()->pred_begin()),
           BB(P->getParent()),
-          Idx(P->getParent()->getBBArgIndex(P)) {}
+          Idx(P->getIndex()) {}
     PHI_iterator(SILArgument *P, bool) // end iterator
         : PredIt(P->getParent()->pred_end()),
           BB(P->getParent()),
-          Idx(P->getParent()->getBBArgIndex(P)) {}
+          Idx(P->getIndex()) {}
 
     PHI_iterator &operator++() { ++PredIt; return *this; }
     bool operator==(const PHI_iterator& x) const { return PredIt == x.PredIt; }
@@ -298,7 +298,7 @@ public:
   static void AddPHIOperand(SILArgument *PHI, SILValue Val,
                             SILBasicBlock *Pred) {
     auto *PHIBB = PHI->getParent();
-    size_t PhiIdx = PHIBB->getBBArgIndex(PHI);
+    size_t PhiIdx = PHI->getIndex();
     auto *TI = Pred->getTerminator();
     changeEdgeValue(TI, PHIBB, PhiIdx, Val);
   }
@@ -322,7 +322,7 @@ public:
     SILArgument *PHI = ValueIsPHI(Val, Updater);
     if (PHI) {
       auto *PhiBB = PHI->getParent();
-      size_t PhiIdx = PhiBB->getBBArgIndex(PHI);
+      size_t PhiIdx = PHI->getIndex();
 
       // If all predecessor edges are 'not set' this is a new phi.
       for (auto *PredBB : PhiBB->getPreds()) {

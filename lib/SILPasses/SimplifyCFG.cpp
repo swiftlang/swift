@@ -534,7 +534,7 @@ static bool isThreadableSwitchEnumInst(SwitchEnumInst *SEI,
   if (containsAllocStack(SEIBB))
       return false;
 
-  auto Idx = SEIBB->getBBArgIndex(Arg);
+  auto Idx = Arg->getIndex();
   auto IncomingBr0 = dyn_cast<BranchInst>(((*PIt))->getTerminator());
   ++PIt;
   auto IncomingBr1 = dyn_cast<BranchInst>((*PIt)->getTerminator());

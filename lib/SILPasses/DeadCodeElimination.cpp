@@ -236,7 +236,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
     return;
 
   auto *Block = Arg->getParent();
-  auto ArgIndex = Block->getBBArgIndex(Arg);
+  auto ArgIndex = Arg->getIndex();
 
   for (auto Pred : Block->getPreds())
     markTerminatorArgsLive(Pred, Block, ArgIndex);
