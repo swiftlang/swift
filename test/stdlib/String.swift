@@ -87,6 +87,11 @@ StringTests.test("indexComparability") {
 }
 
 StringTests.test("ForeignIndexes/Valid") {
+  // It is actually unclear what the correct behavior is.  This test is just a
+  // change detector.
+  //
+  // <rdar://problem/18037897> Design, document, implement invalidation model
+  // for foreign String indexes
   if true {
     let donor = "abcdef"
     let acceptor = "uvwxyz"
