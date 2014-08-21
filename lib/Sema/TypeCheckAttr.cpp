@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -840,16 +841,12 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     = C.getIdentifier("UIKit");
 
   auto UIKitModule = C.getLoadedModule(Id_UIKit);
-  llvm::SmallVector<ValueDecl *, 1> results;
-  if (UIKitModule)
-    UIKitModule->lookupValue({}, Id_UIApplicationDelegate,
-                             NLKind::UnqualifiedLookup, results);
-
   ProtocolDecl *uiApplicationDelegateProto = nullptr;
-  for (auto result : results) {
-    uiApplicationDelegateProto = dyn_cast<ProtocolDecl>(result);
-    if (uiApplicationDelegateProto)
-      break;
+  if (UIKitModule) {
+    UnqualifiedLookup lookup(Id_UIApplicationDelegate, UIKitModule, nullptr,
+                             SourceLoc(), /*IsType=*/true);
+    uiApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
+                                   lookup.getSingleTypeResult());
   }
 
   if (!uiApplicationDelegateProto ||
@@ -869,15 +866,23 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     attr->setInvalid();
   
   // Check that we have the needed symbols in the frameworks.
-  results.clear();
-  CD->getModuleContext()->lookupValue({},
-                                      C.getIdentifier("UIApplicationMain"),
-                                      NLKind::QualifiedLookup, results);
+  UnqualifiedLookup lookupMain(C.getIdentifier("UIApplicationMain"),
+                               UIKitModule, nullptr, SourceLoc(),
+                               /*IsType=*/false);
+  for (const auto &result : lookupMain.Results) {
+    if (result.hasValueDecl())
+      TC.validateDecl(result.getValueDecl());
+  }
   auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
-  Foundation->lookupValue({}, C.getIdentifier("NSStringFromClass"),
-                          NLKind::QualifiedLookup, results);
-  for (auto D : results)
-    TC.validateDecl(D);
+  if (Foundation) {
+    UnqualifiedLookup lookupString(C.getIdentifier("NSStringFromClass"),
+                                   Foundation, nullptr, SourceLoc(),
+                                   /*IsType=*/false);
+    for (const auto &result : lookupString.Results) {
+      if (result.hasValueDecl())
+        TC.validateDecl(result.getValueDecl());
+    }
+  }
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
