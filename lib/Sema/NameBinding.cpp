@@ -142,8 +142,10 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
                [&] { modulePathStr += "."; });
 
     auto diagKind = diag::sema_no_import;
-    if (SF.Kind == SourceFileKind::REPL)
+    if (SF.Kind == SourceFileKind::REPL ||
+        (Context.LangOpts.DebuggerSupport && !Context.LangOpts.Playground)) {
       diagKind = diag::sema_no_import_repl;
+    }
     diagnose(ID->getLoc(), diagKind, modulePathStr);
 
     if (Context.SearchPathOpts.SDKPath.empty()) {
