@@ -807,51 +807,51 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil @generic_is_objc
-sil @generic_is_objc : $@thin <T> (@in T) -> Bool {
+sil @generic_is_objc : $@thin <T> (@in T) -> Int8 {
 bb0(%0 : $*T):
 // CHECK: [[TYPE:%[a-zA-Z0-9]+]] = metatype $@thick [[ARCH:[a-zA-Z]+]].Type
   %1 = metatype $@thick T.Type                    // user: %3
 // CHECK: [[FUNCTION:%[a-zA-Z0-9]+]] = builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
 // CHECK: apply [[FUNCTION]]<[[ARCH]]>([[TYPE]])
-  %3 = apply %2<T>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
-  %4 = struct $Bool (%3 : $Builtin.Int1)          // user: %6
+  %3 = apply %2<T>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+  %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %6
   destroy_addr %0 : $*T                           // id: %5
-  return %4 : $Bool                               // id: %6
+  return %4 : $Int8                               // id: %6
 }
 
 // CHECK-LABEL: sil @is_int_objc
-sil @is_int_objc : $@thin (Int) -> Bool {
+sil @is_int_objc : $@thin (Int) -> Int8 {
 bb0(%0 : $Int):
   %1 = metatype $@thick Int.Type                  // user: %3
 // CHECK-NOT: builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
 // CHECK-NOT: apply
-  %3 = apply %2<Int>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
-// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int1, 0
-// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Bool ([[LITERAL]] : $Builtin.Int1)
-  %4 = struct $Bool (%3 : $Builtin.Int1)          // user: %5
-// CHECK: return [[RESULT]] : $Bool
-  return %4 : $Bool                               // id: %5
+  %3 = apply %2<Int>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 0
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %5
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8                               // id: %5
 }
 
 @objc class MyClass {
 }
 
 // CHECK-LABEL: sil @is_objc_class_objc
-sil @is_objc_class_objc : $@thin (@owned MyClass) -> Bool {
+sil @is_objc_class_objc : $@thin (@owned MyClass) -> Int8 {
 bb0(%0 : $MyClass):
   %1 = metatype $@thick MyClass.Type              // user: %3
 // CHECK-NOT: builtin_function_ref "canBeClass"
-  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %3
 // CHECK-NOT: apply
-  %3 = apply %2<MyClass>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
-// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Bool ([[LITERAL]] : $Builtin.Int1)
-  %4 = struct $Bool (%3 : $Builtin.Int1)          // user: %6
+  %3 = apply %2<MyClass>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int8 // user: %4
+// CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = struct $Int8 ([[LITERAL]] : $Builtin.Int8)
+  %4 = struct $Int8 (%3 : $Builtin.Int8)          // user: %6
   strong_release %0 : $MyClass                    // id: %5
-// CHECK: return [[RESULT]] : $Bool
-  return %4 : $Bool                               // id: %6
+// CHECK: return [[RESULT]] : $Int8
+  return %4 : $Int8                               // id: %6
 }
 
 // CHECK-LABEL: sil @constant_expect_hint

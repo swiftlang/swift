@@ -870,7 +870,7 @@ enum _VariantDictionaryStorage<Key : Hashable, Value> :
 
   @transparent
   var guaranteedNative: Bool {
-    return !_canBeClass(Key.self) && !_canBeClass(Value.self)
+    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
   }
 
   mutating func isUniquelyReferenced() -> Bool {
@@ -1449,7 +1449,7 @@ public struct DictionaryIndex<Key : Hashable, Value> :
 
   @transparent
   var _guaranteedNative: Bool {
-    return !_canBeClass(Key.self) && !_canBeClass(Value.self)
+    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
   }
 
   @transparent
@@ -1668,7 +1668,7 @@ public struct DictionaryGenerator<Key : Hashable, Value> : GeneratorType {
 
   @transparent
   var _guaranteedNative: Bool {
-    return !_canBeClass(Key.self) && !_canBeClass(Value.self)
+    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
   }
 
   mutating func _nativeNext() -> (Key, Value)? {

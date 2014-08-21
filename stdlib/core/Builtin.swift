@@ -57,9 +57,10 @@ func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
   return x & ~(alignment &- 1)
 }
 
+/// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
 @transparent
-func _canBeClass<T>(_: T.Type) -> Bool {
-  return Bool(Builtin.canBeClass(T.self))
+func _canBeClass<T>(_: T.Type) -> Int8 {
+  return Int8(Builtin.canBeClass(T.self))
 }
 
 @availability(*,unavailable,message="it has been renamed 'unsafeBitCast' and has acquired an explicit target type parameter")
@@ -130,10 +131,18 @@ func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 /// Returns true iff T is a class type or an @objc existential such as
 /// AnyObject
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
-  return _canBeClass(x)
-    // FIXME: Dirty hack; see <rdar://problem/16823238>
-    && sizeof(x) == sizeof(AnyObject) 
-    && _swift_isClassOrObjCExistential(x)
+  let tmp = _canBeClass(x)
+
+  // Is not a class.
+  if tmp == 0 {
+    return false
+  // Is a class.
+  } else if tmp == 1 {
+    return true
+  }
+
+  // Maybe a class.
+  return _swift_isClassOrObjCExistential(x)
 }
 
 //===----------------------------------------------------------------------===//

@@ -1047,10 +1047,10 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
   switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
     return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
-                                      APInt(1, 0), *AI->getFunction());
+                                      APInt(8, 0), *AI->getFunction());
   case TypeTraitResult::Is:
     return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
-                                      APInt(1, 1), *AI->getFunction());
+                                      APInt(8, 1), *AI->getFunction());
   case TypeTraitResult::CanBe:
     return nullptr;
   }

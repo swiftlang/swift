@@ -119,7 +119,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       max(count, minimumCapacity))
 
     var bridged = false
-    if _canBeClass(T.self) {
+    if _canBeClass(T.self) != 0 {
       bridged = _isBridgedVerbatimToObjectiveC(T.self)
     }
 

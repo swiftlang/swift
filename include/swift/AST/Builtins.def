@@ -313,9 +313,10 @@ BUILTIN_MISC_OPERATION(TakeArrayBackToFront, "takeArrayBackToFront", "", Special
   BUILTIN(Id, #Name, "n")
 #endif
 
-/// canBeClass(T.Type) -> Builtin.Int1
+/// canBeClass(T.Type) -> Builtin.Int8
 /// At compile time, evaluate whether T is or can be bound to a class or
-/// @objc protocol type.
+/// @objc protocol type. The answer is a tri-state of 0 = No, 1 = Yes, 2 =
+/// Maybe.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION

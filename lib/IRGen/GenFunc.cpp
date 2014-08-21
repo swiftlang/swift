@@ -1359,20 +1359,21 @@ static void emitTypeTraitBuiltin(IRGenFunction &IGF,
          && "type trait should have gotten single type parameter");
   args.claimNext();
   
-  // Lower away the trait to false if it's never true, or to true if it can
-  // possibly be true.
-  bool result;
+  // Lower away the trait to a tristate 0 = no, 1 = yes, 2 = maybe.
+  unsigned result;
   switch ((substitutions[0].getReplacement().getPointer()->*trait)()) {
   case TypeTraitResult::IsNot:
-    result = false;
+    result = 0;
     break;
   case TypeTraitResult::Is:
+    result = 1;
+    break;
   case TypeTraitResult::CanBe:
-    result = true;
+    result = 2;
     break;
   }
-  
-  out.add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, result));
+
+  out.add(llvm::ConstantInt::get(IGF.IGM.Int8Ty, result));
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.

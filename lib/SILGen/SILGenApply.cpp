@@ -2631,14 +2631,13 @@ namespace {
     auto metaTy = CanMetatypeType::get(param, MetatypeRepresentation::Thick);
     auto sig = GenericSignature::get(param.getPointer(), reqt)
       ->getCanonicalSignature();
-    auto boolTy = BuiltinIntegerType::get(1, C)
-      ->getCanonicalType();
+    auto int8Ty = BuiltinIntegerType::get(8, C)->getCanonicalType();
     auto fnTy = SILFunctionType::get(sig,
                  AnyFunctionType::ExtInfo()
                    .withRepresentation(FunctionType::Representation::Thin),
                  ParameterConvention::Direct_Unowned,
                  SILParameterInfo(metaTy, ParameterConvention::Direct_Unowned),
-                 SILResultInfo(boolTy, ResultConvention::Unowned), C);
+                 SILResultInfo(int8Ty, ResultConvention::Unowned), C);
     return SILType::getPrimitiveObjectType(fnTy);
   }
   
@@ -2655,17 +2654,17 @@ namespace {
     assert(args.size() == 1
            && "type trait should take a single argument");
     
-    bool result;
+    unsigned result;
     
     auto traitTy = substitutions[0].getReplacement()->getCanonicalType();
     
     switch ((traitTy.getPointer()->*Trait)()) {
     // If the type obviously has or lacks the trait, emit a constant result.
     case TypeTraitResult::IsNot:
-      result = false;
+      result = 0;
       break;
     case TypeTraitResult::Is:
-      result = true;
+      result = 1;
       break;
         
     // If not, emit the builtin call normally. Specialization may be able to
@@ -2688,9 +2687,9 @@ namespace {
     }
     
     // Produce the result as an integer literal constant.
-    auto val = gen.B.createIntegerLiteral(loc,
-                        SILType::getBuiltinIntegerType(1, gen.getASTContext()),
-                        (uintmax_t)result);
+    auto val = gen.B.createIntegerLiteral(
+        loc, SILType::getBuiltinIntegerType(8, gen.getASTContext()),
+        (uintmax_t)result);
     return ManagedValue::forUnmanaged(val);
   }
   

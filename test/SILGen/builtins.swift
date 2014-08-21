@@ -251,23 +251,23 @@ protocol P {}
 
 // CHECK-LABEL: sil @_TF8builtins10canBeClass
 func canBeClass<T>() {
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(O.self)
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(OP1.self)
   // -- FIXME: protocol<...> doesn't parse as a value
   typealias ObjCCompo = protocol<OP1, OP2>
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(ObjCCompo.self)
 
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(S.self)
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(C.self)
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(P.self)
   typealias MixedCompo = protocol<OP1, P>
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompo.self)
 
   // CHECK: [[CAN_BE:%.*]] = builtin_function_ref "canBeClass"
@@ -279,28 +279,28 @@ func canBeClass<T>() {
 
 // CHECK-LABEL: sil @_TF8builtins18canBeClassMetatype
 func canBeClassMetatype<T>() {
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   typealias OT = O.Type
   Builtin.canBeClass(OT.self)
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   typealias OP1T = OP1.Type
   Builtin.canBeClass(OP1T.self)
   // -- FIXME: protocol<...> doesn't parse as a value
   typealias ObjCCompoT = protocol<OP1, OP2>.Type
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(ObjCCompoT.self)
 
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias ST = S.Type
   Builtin.canBeClass(ST.self)
-  // CHECK: integer_literal $Builtin.Int1, -1
+  // CHECK: integer_literal $Builtin.Int8, 1
   typealias CT = C.Type
   Builtin.canBeClass(CT.self)
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias PT = P.Type
   Builtin.canBeClass(PT.self)
   typealias MixedCompoT = protocol<OP1, P>.Type
-  // CHECK: integer_literal $Builtin.Int1, 0
+  // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompoT.self)
 
   // CHECK: [[CAN_BE:%.*]] = builtin_function_ref "canBeClass"

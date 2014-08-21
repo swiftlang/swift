@@ -351,26 +351,26 @@ struct S {}
 protocol P {}
 
 // CHECK-LABEL: define void @_TF8builtins10canBeClass
-func canBeClass<T>(f: (Builtin.Int1) -> ()) {
-  // CHECK: call void {{%.*}}(i1 true
+func canBeClass<T>(f: (Builtin.Int8) -> ()) {
+  // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
-  // CHECK: call void {{%.*}}(i1 true
+  // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
   typealias ObjCCompo = protocol<OP1, OP2>
-  // CHECK: call void {{%.*}}(i1 true
+  // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
 
-  // CHECK: call void {{%.*}}(i1 false
+  // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(S.self))
-  // CHECK: call void {{%.*}}(i1 true
+  // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(C.self))
-  // CHECK: call void {{%.*}}(i1 false
+  // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
   typealias MixedCompo = protocol<OP1, P>
-  // CHECK: call void {{%.*}}(i1 false
+  // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
 
-  // CHECK: call void {{%.*}}(i1 true
+  // CHECK: call void {{%.*}}(i8 2
   f(Builtin.canBeClass(T.self))
 }
 

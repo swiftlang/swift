@@ -703,7 +703,7 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
                                           Identifier Id) {
-  // <T> T.Type -> Builtin.Int1
+  // <T> T.Type -> Builtin.Int8
   Type GenericTy;
   Type ArchetypeTy;
   GenericParamList *ParamList;
@@ -714,7 +714,7 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
   
   TupleTypeElt ArgParamElts[] = { GenericTy };
   TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
-  Type ResultTy = BuiltinIntegerType::get(1, Context);
+  Type ResultTy = BuiltinIntegerType::get(8, Context);
   return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
                                    ResultTy, ResultTy, ParamList);
 }
