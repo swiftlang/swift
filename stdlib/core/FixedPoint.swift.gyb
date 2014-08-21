@@ -135,7 +135,7 @@ public struct ${Self}
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     self = ${Self}(Builtin.int_bswap_${BuiltinName}(value.value) )
 #else
-    assert(false)
+    _UnsupportedArchitectureError()
 #endif
   }
 
@@ -146,7 +146,7 @@ public struct ${Self}
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     self = value
 #else
-    assert(false)
+    _UnsupportedArchitectureError()
 #endif
   }
 %  end
@@ -185,7 +185,7 @@ public struct ${Self}
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
 #else
-    assert(false)
+    _UnsupportedArchitectureError()
 #endif
   }
   /// Returns the little-endian representation of the integer, changing the
@@ -194,7 +194,7 @@ public struct ${Self}
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return self
 #else
-    assert(false)
+    _UnsupportedArchitectureError()
 #endif
   }
 % end
