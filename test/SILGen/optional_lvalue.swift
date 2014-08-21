@@ -1,4 +1,4 @@
-// RUN: %swift -enable-optional-lvalues -emit-silgen %s | FileCheck %s
+// RUN: %swift -emit-silgen %s | FileCheck %s
 
 // CHECK-LABEL: sil @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
 // CHECK:         [[SHADOW:%.*]] = alloc_box $Optional<Int>

@@ -143,10 +143,6 @@ def enable_union_import :
   Flag<["-"], "enable-union-import">,
   HelpText<"Import C unions">;
 
-def enable_optional_lvalues :
-  Flag<["-"], "enable-optional-lvalues">,
-  HelpText<"Propagate lvalue-ness through optional operations">;
-
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

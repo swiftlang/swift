@@ -599,8 +599,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.ImportUnions |= Args.hasArg(OPT_enable_union_import);
   
-  Opts.EnableOptionalLValues |= Args.hasArg(OPT_enable_optional_lvalues);
-
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);

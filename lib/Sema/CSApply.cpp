@@ -2756,49 +2756,7 @@ namespace {
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
-      if (cs.getASTContext().LangOpts.EnableOptionalLValues) {
-        Type valueType = simplifyType(expr->getType());
-        expr->setType(valueType);
-        return expr;
-      }
-      
       Type valueType = simplifyType(expr->getType());
-      Type optType =
-        cs.getTypeChecker().getOptionalType(expr->getQuestionLoc(), valueType);
-      if (!optType) return nullptr;
-
-      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
-                                   cs.getConstraintLocator(expr));
-      if (!subExpr) return nullptr;
-
-      // Complain if the sub-expression was converted to T? via the
-      // inject-into-optional implicit conversion.
-      //
-      // It should be the case that that's always the last conversion applied.
-      if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
-        // If the sub-expression was a forced downcast, suggest
-        // turning it into a conditional downcast.
-        auto &tc = cs.getTypeChecker();
-        if (auto forced = findForcedDowncast(tc.Context, 
-                                             injection->getSubExpr())) {
-          tc.diagnose(expr->getLoc(), diag::binding_explicit_downcast,
-                      injection->getSubExpr()->getType()->getRValueType())
-            .highlight(forced->getLoc())
-            .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                    forced->getLoc()),
-                        "?");
-        } else {
-          tc.diagnose(subExpr->getLoc(), diag::binding_injected_optional,
-                      expr->getSubExpr()->getType()->getRValueType())
-            .highlight(subExpr->getSourceRange())
-            .fixItRemove(expr->getQuestionLoc());
-        }
-
-        // Don't diagnose this injection again.
-        DiagnosedOptionalInjections.insert(injection);
-      }
-
-      expr->setSubExpr(subExpr);
       expr->setType(valueType);
       return expr;
     }

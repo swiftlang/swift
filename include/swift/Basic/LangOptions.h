@@ -76,9 +76,6 @@ namespace swift {
     /// Enables importing of unions and other partially-importable types.
     bool ImportUnions = false;
     
-    /// Enables lvalue propagation through optional operations.
-    bool EnableOptionalLValues = true;
-    
     /// Should access control be respected?
     bool EnableAccessControl = true;
 

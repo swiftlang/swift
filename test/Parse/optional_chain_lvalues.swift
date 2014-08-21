@@ -1,4 +1,4 @@
-// RUN: %swift -enable-optional-lvalues -parse -verify %s
+// RUN: %swift -parse -verify %s
 
 struct S {
   var x: Int = 0
