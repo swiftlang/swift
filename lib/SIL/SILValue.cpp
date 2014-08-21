@@ -120,7 +120,7 @@ static bool isFirstPayloadedCaseOfEnum(EnumDecl *E, EnumElementDecl *Elt) {
 SILValue SILValue::stripRCIdentityPreservingOps() {
   SILValue V = *this;
   while (true) {
-    V = V.stripNonPHIRCIdentityPreservingArgs();
+    V = V.stripSinglePredecessorRCIdentityPreservingArgs();
 
     // Strip off RC identity preserving casts.
     if (isRCIdentityPreservingCast(V->getKind())) {
@@ -151,8 +151,9 @@ SILValue SILValue::stripRCIdentityPreservingOps() {
   }
 }
 
-/// Return the underlying SILValue after stripping off non-phi SILArguments.
-SILValue SILValue::stripNonPHIArgs() {
+/// Return the underlying SILValue after stripping off identity SILArguments if
+/// we belong to a BB with one predecessor.
+SILValue SILValue::stripSinglePredecessorArgs() {
   SILValue V = *this;
 
   while (true) {
@@ -188,14 +189,14 @@ SILValue SILValue::stripNonPHIArgs() {
   }
 }
 
-/// Return the underlying SILValue after stripping off non-phi SILArguments
-/// that can not affect RC Identity.
-SILValue SILValue::stripNonPHIRCIdentityPreservingArgs() {
+/// Return the underlying SILValue after stripping off SILArguments that can not
+/// affect RC identity if our BB has only one predecessor.
+SILValue SILValue::stripSinglePredecessorRCIdentityPreservingArgs() {
   SILValue V = *this;
 
   while (true) {
     // First strip off non PHI args that
-    V = V.stripNonPHIArgs();
+    V = V.stripSinglePredecessorArgs();
 
     auto *A = dyn_cast<SILArgument>(V);
     if (!A)
