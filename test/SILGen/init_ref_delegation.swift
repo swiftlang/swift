@@ -150,3 +150,17 @@ class C3 {
 
   init(x: X) { }
 }
+
+class C4 { }
+
+extension C4 {
+  convenience init(x1: X) {
+    self.init()
+  }
+  // CHECK: sil @_TFC19init_ref_delegation2C4cfMS0_FT2x2VS_1X_S0_
+  // CHECK: [[PEER:%[0-9]+]] = function_ref @_TFC19init_ref_delegation2C4cfMS0_FT2x1VS_1X_S0_
+  // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[OBJ:%[0-9]+]])
+  convenience init(x2: X) {
+    self.init(x1: x2)
+  }
+}

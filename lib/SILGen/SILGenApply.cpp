@@ -1272,9 +1272,8 @@ public:
     // constructor (because there is no initializing constructor). For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (isa<ClassDecl>(nominal)) {
-      // If the constructor is a convenience initializer, use
-      // dynamic dispatch to the initializing constructor.
+    if (gen.getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
+      // Dynamic dispatch to the initializer.
       setCallee(Callee::forClassMethod(
                   gen,
                   self.getValue(),
