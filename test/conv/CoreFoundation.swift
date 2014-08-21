@@ -25,3 +25,13 @@ func testObjCToCF(let nsStr: NSString, nsMutableStr: NSMutableString) {
   // sanity check
   cfStr = cfMutableStr
 }
+
+func testCFToNative(cfStr: CFString, cfMutableStr: CFMutableString) {
+  var str: String = cfStr
+  str = cfMutableStr
+}
+
+func testNativeToCF(str: String) {
+  var cfStr: CFString = str
+  var cfMutableStr: CFMutableString = str // expected-error{{'NSString' is not a subtype of 'NSMutableString'}}
+}
