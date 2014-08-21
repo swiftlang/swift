@@ -1413,8 +1413,7 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
   }
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (gen.getASTContext().LangOpts.EnableDynamic &&
-      witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+  if (witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
     return gen.emitDynamicMethodRef(loc, witness,
                                     SGM.Types.getConstantInfo(witness));
   

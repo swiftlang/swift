@@ -44,9 +44,6 @@ SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
   // dispatched by objc_msgSend, which happens if they're foreign or dynamic.
   if (auto declaredType = dc->getDeclaredTypeInContext())
     if (declaredType->getClassOrBoundGenericClass()) {
-      if (!getASTContext().LangOpts.EnableDynamic
-          && method->isObjC())
-        return MethodDispatch::Class;
       if (method->hasClangNode())
         return MethodDispatch::Class;
       if (auto fd = dyn_cast<FuncDecl>(method)) {

@@ -143,10 +143,6 @@ def enable_union_import :
   Flag<["-"], "enable-union-import">,
   HelpText<"Import C unions">;
 
-def enable_dynamic :
-  Flag<["-"], "enable-dynamic">,
-  HelpText<"Use dynamic specifier to control ObjC dispatch">;
-
 def enable_optional_lvalues :
   Flag<["-"], "enable-optional-lvalues">,
   HelpText<"Propagate lvalue-ness through optional operations">;

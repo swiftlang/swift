@@ -1005,10 +1005,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     if (fd->isGetterOrSetter())
       return requiresObjCDispatch(fd->getAccessorStorageDecl());
 
-    if (getASTContext().LangOpts.EnableDynamic)
-      return fd->getAttrs().hasAttribute<DynamicAttr>();
-    else
-      return fd->isObjC() || fd->getAttrs().hasAttribute<IBActionAttr>();
+    return fd->getAttrs().hasAttribute<DynamicAttr>();
   }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign and only has
@@ -1016,18 +1013,12 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     if (vd->hasClangNode())
       return true;
 
-    if (getASTContext().LangOpts.EnableDynamic)
-      return cd->getAttrs().hasAttribute<DynamicAttr>();
-    else
-      return cd->isObjC();
+    return cd->getAttrs().hasAttribute<DynamicAttr>();
   }
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
     return asd->requiresObjCGetterAndSetter();
   
-  if (getASTContext().LangOpts.EnableDynamic)
-    return vd->getAttrs().hasAttribute<DynamicAttr>();
-  else
-    return vd->isObjC();
+  return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
 bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {

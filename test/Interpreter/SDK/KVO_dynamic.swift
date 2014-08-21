@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
-// RUN: %target-build-swift -Xfrontend -enable-dynamic %s -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
 
 import Foundation

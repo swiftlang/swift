@@ -2233,11 +2233,8 @@ bool AbstractStorageDecl::requiresObjCGetterAndSetter() const {
     return true;
   // Otherwise, we only dispatch by @objc if the declaration is dynamic or
   // NSManaged.
-  if (getASTContext().LangOpts.EnableDynamic)
-    if (!getAttrs().hasAttribute<DynamicAttr>()
-        && !getAttrs().hasAttribute<NSManagedAttr>())
-      return false;
-  return true;
+  return getAttrs().hasAttribute<DynamicAttr>() ||
+         getAttrs().hasAttribute<NSManagedAttr>();
 }
 
 
