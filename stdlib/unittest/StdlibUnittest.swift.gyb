@@ -412,9 +412,8 @@ func _childProcess() {
     let testName = parts[1]
 
     let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
-    let test = testSuite._getTestByName(testName)
     _anyExpectFailed = false
-    test.code()
+    testSuite._runTest(testName)
 
     println("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
@@ -586,7 +585,7 @@ struct _ParentProcess {
         var crashStderr = [String]()
         if _runTestsInProcess {
           _anyExpectFailed = false
-          t.code()
+          testSuite._runTest(t.name)
         } else {
           (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
            crashStderr) =
@@ -697,8 +696,24 @@ public class TestSuite {
     return _TestBuilder(testSuite: self, name: name)
   }
 
-  func _getTestByName(name: String) -> _Test {
-    return _tests[_testNameToIndex[name]!]
+  public func setUp(code: () -> ()) {
+    _precondition(_testSetUpCode == nil, "set-up code already set")
+    _testSetUpCode = code
+  }
+
+  public func tearDown(code: () -> ()) {
+    _precondition(_testTearDownCode == nil, "tear-down code already set")
+    _testTearDownCode = code
+  }
+
+  func _runTest(testName: String) {
+    if let f = _testSetUpCode {
+      f()
+    }
+    _tests[_testNameToIndex[testName]!].code()
+    if let f = _testTearDownCode {
+      f()
+    }
   }
 
   struct _Test {
@@ -758,6 +773,12 @@ public class TestSuite {
 
   var name: String
   var _tests: [_Test] = []
+
+  /// Code that is run before every test.
+  var _testSetUpCode: (() -> ())?
+
+  /// Code that is run after every test.
+  var _testTearDownCode: (() -> ())?
 
   /// Maps test name to index in `_tests`.
   var _testNameToIndex: [String : Int] = [:]

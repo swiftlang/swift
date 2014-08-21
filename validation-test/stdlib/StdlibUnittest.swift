@@ -236,5 +236,73 @@ PassThroughStdoutStderr.test("noNewline") {
 // CHECK: [       OK ] PassThroughStdoutStderr.noNewline
 // CHECK: PassThroughStdoutStderr: All tests passed
 
+//
+// Test 'setUp' and 'tearDown'
+//
+
+var TestSuiteWithSetUpPasses = TestSuite("TestSuiteWithSetUpPasses")
+
+TestSuiteWithSetUpPasses.test("passes") {
+  println("test body")
+}
+
+TestSuiteWithSetUpPasses.setUp {
+  println("setUp")
+}
+// CHECK: [ RUN      ] TestSuiteWithSetUpPasses.passes
+// CHECK: out>>> setUp
+// CHECK: out>>> test body
+// CHECK: [       OK ] TestSuiteWithSetUpPasses.passes
+// CHECK: TestSuiteWithSetUpPasses: All tests passed
+
+var TestSuiteWithSetUpFails = TestSuite("TestSuiteWithSetUpFails")
+
+TestSuiteWithSetUpFails.test("fails") {
+  println("test body")
+}
+
+TestSuiteWithSetUpFails.setUp {
+  println("setUp")
+  expectEqual(1, 2)
+}
+// CHECK: [ RUN      ] TestSuiteWithSetUpFails.fails
+// CHECK: out>>> setUp
+// CHECK: out>>> check failed at
+// CHECK: out>>> test body
+// CHECK: [     FAIL ] TestSuiteWithSetUpFails.fails
+// CHECK: TestSuiteWithSetUpFails: Some tests failed, aborting
+
+var TestSuiteWithTearDownPasses = TestSuite("TestSuiteWithTearDownPasses")
+
+TestSuiteWithTearDownPasses.test("passes") {
+  println("test body")
+}
+
+TestSuiteWithTearDownPasses.tearDown {
+  println("tearDown")
+}
+// CHECK: [ RUN      ] TestSuiteWithTearDownPasses.passes
+// CHECK: out>>> test body
+// CHECK: out>>> tearDown
+// CHECK: [       OK ] TestSuiteWithTearDownPasses.passes
+
+var TestSuiteWithTearDownFails = TestSuite("TestSuiteWithTearDownFails")
+
+TestSuiteWithTearDownFails.test("fails") {
+  println("test body")
+}
+
+TestSuiteWithTearDownFails.tearDown {
+  println("tearDown")
+  expectEqual(1, 2)
+}
+// CHECK: TestSuiteWithTearDownPasses: All tests passed
+// CHECK: [ RUN      ] TestSuiteWithTearDownFails.fails
+// CHECK: out>>> test body
+// CHECK: out>>> tearDown
+// CHECK: out>>> check failed at
+// CHECK: [     FAIL ] TestSuiteWithTearDownFails.fails
+// CHECK: TestSuiteWithTearDownFails: Some tests failed, aborting
+
 runAllTests()
 
