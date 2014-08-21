@@ -1341,3 +1341,41 @@ bb3:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @unreachable_bb_2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @unreachable_bb_2 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %4 = integer_literal $Builtin.Int1, -1
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+
+bb2:
+  cond_fail %4 : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @unreachable_bb_3 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @unreachable_bb_3 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+
+bb2:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4 : $Builtin.Int1
+  unreachable
+}

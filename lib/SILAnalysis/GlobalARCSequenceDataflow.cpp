@@ -790,17 +790,46 @@ bool swift::arc::ARCSequenceDataflowEvaluator::run() {
   return NestingDetected;
 }
 
-void swift::arc::ARCBBState::initializeTrapStatus() {
-  auto II = BB->begin();
+/// Match a call to int_trap. Advances the iterator passed in.
+static bool matchTrappingBB(SILBasicBlock::iterator &II) {
   auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(&*II);
   if (!BFRI || !BFRI->getName().str().equals("int_trap"))
-    return;
+    return false;
   ++II;
 
   auto *AI = dyn_cast<ApplyInst>(&*II);
   if (!AI || AI->getCallee() != SILValue(BFRI))
-    return;
+    return false;
   ++II;
+  return true;
+}
 
+/// Match a call to cond_fail. Advance the iterator passed in.
+static bool matchCondFail(SILBasicBlock::iterator &II) {
+  // Match integer_literals.
+  while(isa<IntegerLiteralInst>(II))
+    ++II;
+
+  // Match a failing cond_fail.
+  auto CF = dyn_cast<CondFailInst>(II);
+  if (!CF)
+    return false;
+  auto L = dyn_cast<IntegerLiteralInst>(CF->getOperand().getDef());
+  APInt;
+  if (!L || L->getValue() != 1)
+    return false;
+  ++II;
+  return true;
+}
+
+void swift::arc::ARCBBState::initializeTrapStatus() {
+  auto II = BB->begin();
+  // Try to match a trapping block. This can either be a call to int_trap or
+  // cond_fail.
+  if (!matchTrappingBB(II)) {
+    II = BB->begin();
+    if (!matchCondFail(II))
+      return;
+  }
   IsTrapBB = isa<UnreachableInst>(&*II);
 }
