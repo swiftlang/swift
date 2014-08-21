@@ -31,6 +31,7 @@ class ASTPrinter;
 class ASTContext;
 struct PrintOptions;
 class Decl;
+class ClassDecl;
 
 /// The associativity of a binary operator.
 enum class Associativity {
@@ -942,6 +943,31 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RawDocComment;
+  }
+};
+
+/// An attribute applied to a CoreFoundation class that is toll-free bridged to
+/// an Objective-C class.
+///
+/// This attribute is introduced by the Clang importer, and is therefore always
+/// implicit.
+class ObjCBridgedAttr : public DeclAttribute {
+  ClassDecl *ObjCClass;
+
+public:
+  ObjCBridgedAttr(ClassDecl *ObjCClass)
+    : DeclAttribute(DAK_ObjCBridged, SourceLoc(), SourceRange(),
+                    /*Implicit=*/true),
+      ObjCClass(ObjCClass)
+  {
+  }
+
+  /// Retrieve the Objective-C class to which this foreign class is toll-free
+  /// bridged.
+  ClassDecl *getObjCClass() const { return ObjCClass; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ObjCBridged;
   }
 };
 

@@ -198,6 +198,11 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_RawDocComment:
     // Not printed.
     return;
+
+  case DAK_ObjCBridged:
+    // Not printed.
+    return;
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
@@ -277,6 +282,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
+  case DAK_ObjCBridged:
+    return "<<ObjC bridged>>";
   }
 }
 

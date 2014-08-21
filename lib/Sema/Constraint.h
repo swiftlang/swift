@@ -198,6 +198,12 @@ enum class ConversionRestrictionKind {
   BridgeToObjC,
   /// Implicit bridging from an Objective-C class to a value type.
   BridgeFromObjC,
+  /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
+  /// class type.
+  CFTollFreeBridgeToObjC,
+  /// Implicit conversion from an Objective-C class type to its
+  /// toll-free-bridged CF type.
+  ObjCTollFreeBridgeToCF,
   /// User-defined conversions.
   User
 };

@@ -4038,6 +4038,26 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::BridgeFromObjC:
       return forceBridgeFromObjectiveC(expr, toType);
+
+    case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
+      auto foreignClass = expr->getType()->getClassOrBoundGenericClass();
+      auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
+                        ->getObjCClass()->getDeclaredInterfaceType();
+      auto asObjCClass = new (tc.Context) ForeignObjectConversionExpr(expr,
+                                                                      objcType);
+      return coerceToType(asObjCClass, toType, locator);
+    }
+
+    case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
+      auto foreignClass = toType->getClassOrBoundGenericClass();
+      auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
+                        ->getObjCClass()->getDeclaredInterfaceType();
+      Expr *result = coerceToType(expr, objcType, locator);
+      if (!result)
+        return nullptr;
+
+      return new (tc.Context) ForeignObjectConversionExpr(result, toType);
+    }
     }
   }
 

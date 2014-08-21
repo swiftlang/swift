@@ -2022,7 +2022,18 @@ public:
     return E->getKind() == ExprKind::PointerToPointer;
   }
 };
+
+/// Convert between a foreign object and its corresponding Objective-C object.
+class ForeignObjectConversionExpr : public ImplicitConversionExpr {
+public:
+  ForeignObjectConversionExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ForeignObjectConversion, subExpr, ty) {}
   
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ForeignObjectConversion;
+  }
+};
+
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.

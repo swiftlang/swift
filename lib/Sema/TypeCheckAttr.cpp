@@ -56,6 +56,7 @@ public:
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(RawDocComment)
+  IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(Required)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Semantics)
@@ -517,6 +518,7 @@ public:
     IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
+    IGNORED_ATTR(ObjCBridged)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Ownership)
     IGNORED_ATTR(Override)

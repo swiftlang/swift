@@ -1513,6 +1513,27 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (nominal1->getDecl() == nominal2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
+
+      // Check for CF <-> ObjectiveC bridging.
+      if (desugar1->getKind() == TypeKind::Class) {
+        auto class1 = cast<ClassDecl>(nominal1->getDecl());
+        auto class2 = cast<ClassDecl>(nominal2->getDecl());
+
+        // CF -> Objective-C via toll-free bridging.
+        if (class1->isForeign() && !class2->isForeign() &&
+            class1->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
+          conversionsOrFixes.push_back(
+            ConversionRestrictionKind::CFTollFreeBridgeToObjC);
+        }
+
+        // Objective-C -> CF via toll-free bridging.
+        if (class2->isForeign() && !class1->isForeign() &&
+            class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
+          conversionsOrFixes.push_back(
+            ConversionRestrictionKind::ObjCTollFreeBridgeToCF);
+        }
+      }
+
       break;
     }
 
@@ -3801,6 +3822,37 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
                       locator);
+  }
+
+  // T' < U and T a toll-free-bridged to T' ===> T' <c U
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+
+    auto nativeClass = type1->getClassOrBoundGenericClass();
+    auto bridgedObjCClass
+      = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
+
+    return matchTypes(bridgedObjCClass->getDeclaredInterfaceType(),
+                      type2, TypeMatchKind::Subtype, subFlags, locator);
+  }
+
+  // T < U' and U a toll-free-bridged to U' ===> T <c U
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+
+    auto nativeClass = type2->getClassOrBoundGenericClass();
+    auto bridgedObjCClass
+      = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
+
+    return matchTypes(type1,
+                      bridgedObjCClass->getDeclaredInterfaceType(),
+                      TypeMatchKind::Subtype, subFlags, locator);
   }
 
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U

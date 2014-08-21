@@ -333,6 +333,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     llvm_unreachable("DAK_Count should not appear in parsing switch");
 
   case DAK_RawDocComment:
+  case DAK_ObjCBridged:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
   case DAK_SetterAccessibility:

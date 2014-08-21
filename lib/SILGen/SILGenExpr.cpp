@@ -238,6 +238,8 @@ namespace {
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
     RValue visitStringToPointerExpr(StringToPointerExpr *E, SGFContext C);
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
+    RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
+                                            SGFContext C);
   };
 }
 
@@ -5657,6 +5659,18 @@ RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
   
   auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, C);
   return RValue(SGF, E, result);
+}
+
+RValue RValueEmitter::visitForeignObjectConversionExpr(
+         ForeignObjectConversionExpr *E,
+         SGFContext C) {
+  // Get the original value.
+  ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  ManagedValue result(SGF.B.createUncheckedRefCast(
+                        E, orig.getValue(),
+                        SGF.getLoweredType(E->getType())),
+                      orig.getCleanup());
+  return RValue(SGF, E, E->getType()->getCanonicalType(), result);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

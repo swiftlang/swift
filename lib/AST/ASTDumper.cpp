@@ -1526,6 +1526,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E) {
+    printCommon(E, "foreign_object_conversion") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';

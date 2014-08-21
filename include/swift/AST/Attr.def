@@ -192,6 +192,8 @@ DECL_ATTR(effects, Effects, OnFunc, 50)
 
 DECL_ATTR_ALIAS(unowned, Ownership)
 
+DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized,
+          /* Not serialized */51)
 
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS, "iOS")

@@ -108,6 +108,9 @@ NSString *NSStringToNSString(NSString *str);
 - (instancetype)visit;
 @end
 
+@interface NSMutableString : NSString
+@end
+
 BOOL BOOLtoBOOL(BOOL b);
 
 typedef CGPoint NSPoint;

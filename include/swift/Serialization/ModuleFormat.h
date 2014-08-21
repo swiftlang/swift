@@ -1058,10 +1058,11 @@ namespace decls_block {
   using AccessibilityDeclAttrLayout = BCRecordLayout<Accessibility_DECL_ATTR>;
   using SetterAccessibilityDeclAttrLayout =
     BCRecordLayout<SetterAccessibility_DECL_ATTR>;
+  using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
-  Inline_DECL_ATTR,
-  BCFixed<2>  // inline value
+    Inline_DECL_ATTR,
+    BCFixed<2>  // inline value
   >;
 
   // Encodes a VersionTuple:
