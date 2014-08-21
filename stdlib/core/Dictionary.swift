@@ -763,11 +763,26 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
         break
       }
       var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
-      let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(nativeKey)
-      // Autorelease the key to ensure that it is alive across function return.
-      // The only explicit reference to this object is stored in the buffer of
-      // unowned references, so something has to keep it alive.
-      _autorelease(bridgedKey)
+      var bridgedKey: AnyObject
+      if _fastPath(_isClassOrObjCExistential(Key.self)) {
+        bridgedKey = unsafeBitCast(nativeKey, AnyObject.self)
+        // The bridged value is guaranteed to be alive across the function the
+        // return because Dictionary keeps a strong reference to it.
+      } else {
+        if let theBridgedKey: AnyObject =
+          _bridgeNonVerbatimToObjectiveC(nativeKey) {
+          bridgedKey = theBridgedKey
+          // Autorelease the key to ensure that it is alive across function
+          // return.  The only explicit reference to this object is stored in
+          // the buffer of unowned references, so something has to keep it
+          // alive.
+          _autorelease(bridgedKey)
+          println("Dictionary: autoreleasing bridged key")
+        } else {
+          _preconditionFailure(
+            "Dictionary key failed to bridge from Swift type to a Objective-C type")
+        }
+      }
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()

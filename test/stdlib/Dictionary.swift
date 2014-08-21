@@ -2918,31 +2918,17 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_E
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
-  if true {
-    let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-    var pairs = slurpFastEnumeration(d, d)
-    assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  }
-
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  expectNotEqual(0, TestObjCKeyTy.objectCount)
-  TestObjCKeyTy.objectCount = 0
+  var pairs = slurpFastEnumeration(d, d)
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
-  if true {
-    let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-    var pairs = slurpFastEnumerationFromObjC(d, d)
-    assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  }
-
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  expectNotEqual(0, TestObjCKeyTy.objectCount)
-  TestObjCKeyTy.objectCount = 0
+  var pairs = slurpFastEnumerationFromObjC(d, d)
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
@@ -2988,6 +2974,26 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+
+  var pairs = slurpFastEnumeration(d, d)
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // Dictionary bridged (allocated) keys and autoreleased them.
+  TestObjCKeyTy.objectCount -= 3
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+
+  var pairs = slurpFastEnumerationFromObjC(d, d)
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // Dictionary bridged (allocated) keys and autoreleased them.
+  TestObjCKeyTy.objectCount -= 3
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
@@ -3123,11 +3129,6 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
 
   var pairs = slurpFastEnumeration(d, d)
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  expectNotEqual(0, TestObjCKeyTy.objectCount)
-  TestObjCKeyTy.objectCount = 0
 }
 
 //===---
