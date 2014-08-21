@@ -559,46 +559,64 @@ Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
 
-  // Convert the Swift import path over to a Clang import path.
-  // FIXME: Map source locations over. Fun, fun!
-  SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
-    clangPath;
-
-  auto &clangContext = Impl.Instance->getASTContext();
-  for (auto component : path) {
-    clangPath.push_back({&clangContext.Idents.get(component.first.str()),
-                         clang::SourceLocation()} );
-  }
-
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
-  // FIXME: We should also check that the submodule we want actually exists.
-  if (!clangHeaderSearch.lookupModule(path.front().first.str()))
+  clang::Module *clangModule =
+    clangHeaderSearch.lookupModule(path.front().first.str());
+  if (!clangModule)
     return nullptr;
 
-  clang::ModuleLoadResult clangModule;
-  {
-    auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
-    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+  // Convert the Swift import path over to a Clang import path.
+  auto &clangContext = Impl.Instance->getASTContext();
+  SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
+    clangPath;
+  for (auto component : path) {
+    clangPath.push_back({ &clangContext.Idents.get(component.first.str()),
+                          Impl.importSourceLoc(component.second) } );
+  }
+
+  auto &srcMgr = clangContext.getSourceManager();
+  auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+  auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+
+  auto loadModule = [&](clang::ModuleIdPath path,
+                        bool makeVisible) -> clang::ModuleLoadResult {
+    clang::Module::NameVisibilityKind visibility =
+      makeVisible ? clang::Module::AllVisible : clang::Module::Hidden;
+
     auto importRAII = diagClient.handleImport(clangPath.front().first,
                                               importLoc);
 
-    // Load the Clang module.
     // FIXME: The source location here is completely bogus. It can't be
     // invalid, and it can't be the same thing twice in a row, so we just use
     // a counter. Having real source locations would be far, far better.
-    auto &srcMgr = clangContext.getSourceManager();
     clang::SourceLocation clangImportLoc
       = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
               .getLocWithOffset(Impl.ImportCounter++);
-    clangModule = Impl.Instance->loadModule(clangImportLoc,
-                                            clangPath,
-                                            clang::Module::AllVisible,
-                                            /*IsInclusionDirective=*/false);
-    if (!clangModule)
+    return Impl.Instance->loadModule(clangImportLoc, path, visibility,
+                                     /*IsInclusionDirective=*/false);
+  };
+
+  // Now load the top-level module, so that we can check if the submodule
+  // exists without triggering a fatal error.
+  clangModule = loadModule(clangPath.front(), false);
+  if (!clangModule)
+    return nullptr;
+
+  // Verify that the submodule exists.
+  clang::Module *submodule = clangModule;
+  for (auto component : path.slice(1)) {
+    submodule = submodule->findSubmodule(component.first.str());
+    // FIXME: Specialize the error for a missing submodule?
+    if (!submodule)
       return nullptr;
   }
+
+  // Finally, load the submodule and make it visible.
+  clangModule = loadModule(clangPath, true);
+  if (!clangModule)
+    return nullptr;
 
   return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
 }
