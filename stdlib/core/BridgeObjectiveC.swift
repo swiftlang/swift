@@ -192,6 +192,22 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
   return optResult!
 }
 
+/// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
+/// return value if `T` is bridged non-verbatim.
+func _bridgeToObjectiveCUnconditionalAuterelease<T>(x: T) -> AnyObject
+{
+  if _fastPath(_isClassOrObjCExistential(T.self)) {
+    return unsafeBitCast(x, AnyObject.self)
+  }
+  if let bridged: AnyObject = _bridgeNonVerbatimToObjectiveC(x) {
+    _autorelease(bridged)
+    return bridged
+  } else {
+    _preconditionFailure(
+      "Dictionary key failed to bridge from Swift type to a Objective-C type")
+  }
+}
+
 @asmname("swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 

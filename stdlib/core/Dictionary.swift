@@ -533,6 +533,13 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
     _sanityCheckFailure("'bridgingNextObject' should be overridden")
   }
 
+  func bridgingCountByEnumeratingWithState(
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+  ) -> Int {
+    _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
+  }
+
   // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
   // `NSEnumerator` will provide a default implementation for us that is just
   // as fast as ours could be.  The issue is that there is some strange code
@@ -556,6 +563,15 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   func nextObject() -> AnyObject? {
     return bridgingNextObject(())
   }
+
+  @objc
+  func countByEnumeratingWithState(
+      state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+      objects: UnsafeMutablePointer<AnyObject>, count: Int
+  ) -> Int {
+    return bridgingCountByEnumeratingWithState(
+        state, objects: objects, count: count, dummy: ())
+  }
 }
 
 @objc final
@@ -577,6 +593,9 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
 
   var nextIndex: Index
   var endIndex: Index
+  var nativeStorage: NativeStorage {
+    return nextIndex.nativeStorage
+  }
 
   //
   // Dictionary -> NSDictionary bridging.
@@ -589,6 +608,35 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
     let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
     nextIndex = nextIndex.successor()
     return _bridgeToObjectiveC(nativeKey)
+  }
+
+  override func bridgingCountByEnumeratingWithState(
+         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+  ) -> Int {
+    var theState = state.memory
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+
+    if nextIndex == endIndex {
+      state.memory = theState
+      return 0
+    }
+
+    // Return only a single element so that code can start iterating via fast
+    // enumeration, terminate it, and continue via NSEnumerator.
+    var (nativeKey, _) = nativeStorage.assertingGet(nextIndex)
+    nextIndex = nextIndex.successor()
+
+    var bridgedKey: AnyObject =
+      _bridgeToObjectiveCUnconditionalAuterelease(nativeKey)
+    let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
+    unmanagedObjects[0] = bridgedKey
+    state.memory = theState
+    return 1
   }
 }
 
@@ -763,26 +811,9 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
         break
       }
       var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
-      var bridgedKey: AnyObject
-      if _fastPath(_isClassOrObjCExistential(Key.self)) {
-        bridgedKey = unsafeBitCast(nativeKey, AnyObject.self)
-        // The bridged value is guaranteed to be alive across the function the
-        // return because Dictionary keeps a strong reference to it.
-      } else {
-        if let theBridgedKey: AnyObject =
-          _bridgeNonVerbatimToObjectiveC(nativeKey) {
-          bridgedKey = theBridgedKey
-          // Autorelease the key to ensure that it is alive across function
-          // return.  The only explicit reference to this object is stored in
-          // the buffer of unowned references, so something has to keep it
-          // alive.
-          _autorelease(bridgedKey)
-          println("Dictionary: autoreleasing bridged key")
-        } else {
-          _preconditionFailure(
-            "Dictionary key failed to bridge from Swift type to a Objective-C type")
-        }
-      }
+
+      var bridgedKey: AnyObject =
+        _bridgeToObjectiveCUnconditionalAuterelease(nativeKey)
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()

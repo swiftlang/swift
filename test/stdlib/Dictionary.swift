@@ -1499,7 +1499,7 @@ func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> 
 }
 
 func slurpFastEnumeration(
-    d: NSDictionary, fe: NSFastEnumeration
+  d: NSDictionary, fe: NSFastEnumeration, maxItems: Int? = nil
 ) -> Array<(Int, Int)> {
   var state = NSFastEnumerationState()
 
@@ -1522,6 +1522,9 @@ func slurpFastEnumeration(
       let value: AnyObject = d.objectForKey(key)!
       let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
       pairs += [kv]
+    }
+    if maxItems != nil && pairs.count >= maxItems! {
+      return pairs
     }
   }
 
@@ -2880,31 +2883,17 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty"
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromSwift") {
-  if true {
-    let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-    var pairs = slurpFastEnumeration(d, d.keyEnumerator())
-    assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  }
-
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  expectNotEqual(0, TestObjCKeyTy.objectCount)
-  TestObjCKeyTy.objectCount = 0
+  var pairs = slurpFastEnumeration(d, d.keyEnumerator())
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromObjC") {
-  if true {
-    let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-    var pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
-    assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  }
-
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  expectNotEqual(0, TestObjCKeyTy.objectCount)
-  TestObjCKeyTy.objectCount = 0
+  var pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
@@ -2948,14 +2937,16 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
 // Key type and value type are bridged non-verbatim.
 //===---
 
-func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary {
+func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
+  numElements: Int = 3
+) -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>()
-  d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
-  d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
-  d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
+  for i in 0..<numElements {
+    d[TestBridgedKeyTy((i + 1) * 10)] = TestBridgedValueTy((i + 1) * 10 + 1000)
+  }
 
   let bridged = _convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
@@ -2974,6 +2965,47 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+
+  var pairs = slurpFastEnumeration(d, d.keyEnumerator())
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // Dictionary bridged (allocated) keys and autoreleased them.
+  TestObjCKeyTy.objectCount -= 3
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift.Partial") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
+    numElements: 9)
+  let enumerator = d.keyEnumerator()
+
+  var pairs = slurpFastEnumeration(d, enumerator, maxItems: 5)
+  while let key: AnyObject = enumerator.nextObject() {
+    let value: AnyObject = d.objectForKey(key)!
+    let kv = ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
+    pairs.append(kv)
+  }
+  assert(equalsUnordered(
+    pairs,
+    [ (10, 1010), (20, 1020), (30, 1030), (40, 1040), (50, 1050),
+      (60, 1060), (70, 1070), (80, 1080), (90, 1090) ]))
+
+  // While performing fast enumeration, Dictionary bridged (allocated)
+  // keys and autoreleased them.
+  TestObjCKeyTy.objectCount -= 5
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromObjC") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+
+  var pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // Dictionary bridged (allocated) keys and autoreleased them.
+  TestObjCKeyTy.objectCount -= 3
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
