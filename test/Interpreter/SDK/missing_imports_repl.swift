@@ -1,5 +1,7 @@
-// RUN: %swift -sdk %sdk -repl < %s 2>%t.txt | FileCheck %s
-// RUN: FileCheck -check-prefix CHECK-ERROR %s < %t.txt
+// RUN: rm -rf %t && mkdir %t
+// RUN: touch %t/Corrupted_Module.swiftmodule
+// RUN: not %swift -sdk %sdk -I %t -repl <%s 2>%t/stderr.txt | FileCheck %s
+// RUN: FileCheck -check-prefix CHECK-ERROR %s < %t/stderr.txt
 // REQUIRES: sdk
 // REQUIRES: swift_repl
 
@@ -27,3 +29,10 @@ MKMapRectIsNull(x)
 
 "end"
 // CHECK-NEXT: String = "end"{{$}}
+
+
+import Corrupted_Module
+// CHECK-ERROR: error: malformed module file
+
+"unreached"
+// CHECK-NOT: unreached

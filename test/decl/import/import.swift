@@ -4,7 +4,6 @@
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
 // RUN: %swift %s -I=%t -sdk "" -enable-source-import -verify -show-diagnostics-after-fatal
-// RUN: not %swift %s -I=%t -sdk "" -enable-source-import 2>&1 | FileCheck %s
 
 import Builtin  // expected-error {{no such module 'Builtin'}}
 
@@ -48,8 +47,7 @@ import Swift.import.abc // expected-error 2 {{expected identifier}}
 import where Swift.Int // expected-error {{expected identifier}}
 import 2 // expected-error {{expected identifier}}
 
-// CHECK-NOT: no such module 'really'
-import really.nonexistent // expected-error {{no such module}}
+import really.nonexistent // expected-error {{no such module 'really.nonexistent'}}
 
 
 import import_text // no-warning despite function body problems

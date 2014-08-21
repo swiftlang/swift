@@ -299,7 +299,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                          isFramework)) {
       if (err != std::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                           moduleID.first.str(), err.message());
+                           moduleID.first, err.message());
       }
 
       return nullptr;

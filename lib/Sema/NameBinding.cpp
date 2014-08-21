@@ -133,14 +133,19 @@ void
 NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
                       ImportDecl *ID) {
   Module *M = getModule(ID->getModulePath());
-  if (M == 0) {
-    // FIXME: print entire path regardless.
-    if (ID->getModulePath().size() == 1) {
-      diagnose(ID->getLoc(), diag::sema_no_import,
-               ID->getModulePath().front().first.str());
-    } else {
-      diagnose(ID->getLoc(), diag::sema_no_import_submodule);
-    }
+  if (!M) {
+    SmallString<64> modulePathStr;
+    interleave(ID->getModulePath(),
+               [&](ImportDecl::AccessPathElement elem) {
+                 modulePathStr += elem.first.str();
+               },
+               [&] { modulePathStr += "."; });
+
+    auto diagKind = diag::sema_no_import;
+    if (SF.Kind == SourceFileKind::REPL)
+      diagKind = diag::sema_no_import_repl;
+    diagnose(ID->getLoc(), diagKind, modulePathStr);
+
     if (Context.SearchPathOpts.SDKPath.empty()) {
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);

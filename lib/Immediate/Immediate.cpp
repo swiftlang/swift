@@ -985,6 +985,9 @@ private:
     }
 
     if (CI.getASTContext().hadError()) {
+      if (CI.getDiags().hasFatalErrorOccurred())
+        return false;
+
       CI.getASTContext().Diags.resetHadAnyError();
       while (REPLInputFile.Decls.size() > RC.CurElem)
         REPLInputFile.Decls.pop_back();
