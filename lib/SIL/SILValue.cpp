@@ -219,7 +219,7 @@ SILValue SILValue::stripNonPHIRCIdentityPreservingArgs() {
 
     if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
       EnumDecl *Enum = SWEI->getOperand().getType().getEnumOrBoundGenericEnum();
-      if (EnumElementDecl *EltDecl = SWEI->getBBCase(BB)) {
+      if (EnumElementDecl *EltDecl = SWEI->getUniqueCaseForDestination(BB)) {
         if (isFirstPayloadedCaseOfEnum(Enum, EltDecl)) {
           V = SWEI->getOperand();
           continue;

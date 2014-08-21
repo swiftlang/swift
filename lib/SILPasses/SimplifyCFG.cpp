@@ -140,28 +140,6 @@ static bool isConditional(TermInst *I) {
   }
 }
 
-// Get the unique enum element of a switch_enum_inst that transfers control
-// to a given basic block. If multiple cases go to the block, or only
-// the default case does, return nullptr;
-static EnumElementDecl *getUniqueCaseElement(SwitchEnumInst *SEI,
-                                             SILBasicBlock *BB) {
-  EnumElementDecl* element = nullptr;
-  for (unsigned i = 0, e = SEI->getNumCases(); i != e; ++i) {
-    std::pair<EnumElementDecl *, SILBasicBlock *> enumCase;
-
-    enumCase = SEI->getCase(i);
-    if (enumCase.second != BB)
-      continue;
-
-    if (element)
-      return nullptr;
-
-    element = enumCase.first;
-  }
-
-  return element;
-}
-
 // Replace a SwitchEnumInst with an unconditional branch based on the
 // assertion that it will select a particular element.
 static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
@@ -313,7 +291,7 @@ bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
     switch (Kind) {
     case ValueKind::SwitchEnumInst: {
       auto *SEI = cast<SwitchEnumInst>(PredTerm);
-      auto *Element = getUniqueCaseElement(SEI, DomBB);
+      auto *Element = SEI->getUniqueCaseForDestination(DomBB);
       if (Element) {
         simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element, DomBB);
         return true;
