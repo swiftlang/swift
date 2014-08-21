@@ -34,6 +34,7 @@
 #include <mutex>
 #include <unordered_map>
 #include "../shims/shims.h"
+#import <CoreFoundation/CFBase.h> // for CFTypeID
 
 // Redeclare these just we check them.
 extern "C" id objc_retain(id);
@@ -288,6 +289,18 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 - (NSString *)debugDescription {
   return _getDescription(self);
+}
+
+- (CFTypeID)_cfTypeID {
+  // Adopt the same CFTypeID as NSObject.
+  __block CFTypeID result;
+  static dispatch_once_t predicate;
+  dispatch_once(&predicate, ^{
+    id obj = [[NSObject alloc] init];
+    result = [obj _cfTypeID];
+    [obj release];
+  });
+  return result;
 }
 @end
 
