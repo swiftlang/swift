@@ -3477,7 +3477,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
       auto *substArgTI = argTI;
-      if (type->is<BoundGenericType>()) {
+      if (theEnum->isGenericContext()) {
         Type origArgTy = elt->getArgumentType();
         Type substArgTy = type->getTypeOfMember(theEnum->getModuleContext(),
                                                 elt, nullptr,
