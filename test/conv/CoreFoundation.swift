@@ -52,3 +52,10 @@ func testAnyObjectToCF(anyObject: AnyObject) {
   cfStr = anyObject // expected-error{{type 'AnyObject' cannot be implicitly downcast to 'CFString'; did you mean to use 'as' to force downcast?}}
 }
 
+func testUncheckableCasts(anyObject: AnyObject, nsObject: NSObject) {
+  if let cfStr = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}}
+  if let cfStr = nsObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}}
+
+  if let cfTree = anyObject as? CFTree { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree' will always succeed}}
+  if let cfTree = nsObject as? CFTree { } // expected-error{{'CFTree' is not a subtype of 'NSObject'}}
+}

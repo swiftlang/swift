@@ -2463,6 +2463,17 @@ namespace {
       auto destValueType
         = finalResultType->lookThroughAllAnyOptionalTypes(destOptionals);
 
+      // Complain about conditional casts to foreign class types; they can't
+      // actually be conditionally checked.
+      if (conditionalCast) {
+        if (auto destClass = destValueType->getClassOrBoundGenericClass()) {
+          if (destClass->isForeign()) {
+            tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
+                        destValueType);
+          }
+        }
+      }
+
       // There's nothing special to do if the operand isn't optional
       // and we don't need any bridging.
       if (srcOptionals.empty()) {
