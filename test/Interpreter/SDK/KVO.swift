@@ -40,3 +40,11 @@ class Observer : NSObject {
 // CHECK: abc
 // CHECK-NEXT: 42
 Observer().test()
+
+class Foo: NSObject {
+  let foo = 0
+}
+
+let foo = Foo()
+foo.addObserver(foo, forKeyPath: "foo", options: nil, context: &kvoContext)
+let bar = foo.foo
