@@ -42,3 +42,8 @@ func testFactoryMethodBlacklist() {
   _ = NCWidgetController.widgetController()
   _ = NSProcessInfo.processInfo()
 }
+
+func test17261609() {
+  let num1 = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
+  NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
+}

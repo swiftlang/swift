@@ -260,7 +260,7 @@ extension String {
     cString: UnsafePointer<CChar>,
     encoding enc: NSStringEncoding
   ) -> String? {
-    return NSString.stringWithCString(cString, encoding: enc)
+    return NSString(CString: cString, encoding: enc)
   }
 
 
@@ -275,7 +275,7 @@ extension String {
   public static func stringWithUTF8String(
     bytes: UnsafePointer<CChar>
   ) -> String? {
-    return NSString.stringWithUTF8String(bytes)
+    return NSString(UTF8String: bytes)
   }
 
   //===--- Instance Methods/Properties-------------------------------------===//

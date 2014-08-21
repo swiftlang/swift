@@ -2328,14 +2328,12 @@ namespace {
         }
       }
 
-      // FIXME: Check for redundant initializers. It's very, very hard to
-      // avoid order dependencies here. Perhaps we should just deal with the
-      // ambiguity later?
+      bool redundant = false;
       auto result = importConstructor(decl, dc, false, initKind,
                                       /*required=*/false, selector, initName,
                                       {decl->param_begin(), decl->param_size()},
-                                      decl->isVariadic());
-      if (result && member) {
+                                      decl->isVariadic(), redundant);
+      if ((result || redundant) && member) {
         ++NumFactoryMethodsAsInitializers;
 
         // Mark the imported class method "unavailable", with a useful error
@@ -2708,8 +2706,9 @@ namespace {
       bool variadic = objcMethod->isVariadic();
       DeclName name = mapInitSelectorToDeclName(selector, params, variadic);
 
+      bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name, params, variadic);
+                               selector, name, params, variadic, redundant);
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
@@ -2732,7 +2731,10 @@ namespace {
                                        ObjCSelector selector,
                                        DeclName name,
                                        ArrayRef<const clang::ParmVarDecl*> args,
-                                       bool variadic) {
+                                       bool variadic,
+                                       bool &redundant) {
+      redundant = false;
+
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
@@ -2877,6 +2879,7 @@ namespace {
 
         // Otherwise, we shouldn't create a new constructor, because
         // it will be no better than the existing one.
+        redundant = true;
         return nullptr;
       }
 
@@ -3966,6 +3969,7 @@ namespace {
           // If this initializer came from a factory method, inherit
           // it as an initializer.
           if (objcMethod->isClassMethod()) {
+            bool redundant;
             if (auto newCtor = importConstructor(objcMethod, dc, 
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
@@ -3974,7 +3978,8 @@ namespace {
                                                  ctor->getFullName(),
                                                  {objcMethod->param_begin(),
                                                   objcMethod->param_size()},
-                                                 objcMethod->isVariadic()))
+                                                 objcMethod->isVariadic(),
+                                                 redundant))
               newMembers.push_back(newCtor);
             continue;
           }

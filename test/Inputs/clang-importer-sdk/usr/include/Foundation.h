@@ -77,6 +77,11 @@ NS_SWIFT_UNAVAILABLE void NSSwiftUnavailableFunction();
 @interface NSNumber : NSObject
 @end
 
+@interface NSDecimalNumber : NSObject
++ (instancetype)initWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)isNegative;
++ (NSDecimalNumber *)decimalNumberWithMantissa:(unsigned long long)mantissa exponent:(short)exponent isNegative:(BOOL)isNegative;
+@end
+
 @interface NSError : NSObject
 @end
 
