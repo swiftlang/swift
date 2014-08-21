@@ -39,7 +39,8 @@ bb0(%0 : $C):
 // armv7:       bl _foo
 // armv7-NEXT:  @ InlineAsm Start
 // armv7-NEXT:  mov r7, r7
-// armv7-NEXT:  @ InlineAsm End
+// sometimes:   .code 32
+// armv7:       @ InlineAsm End
 // armv7-NEXT:  bl _objc_retainAutoreleasedReturnValue
 
 // arm64:       bl _foo
