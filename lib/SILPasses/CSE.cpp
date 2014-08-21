@@ -89,6 +89,7 @@ struct SimpleValue {
     case ValueKind::UncheckedTrivialBitCastInst:
     case ValueKind::RefToRawPointerInst:
     case ValueKind::UpcastInst:
+    case ValueKind::ThickToObjCMetatypeInst:
         return true;
     default:
         return false;
@@ -241,6 +242,10 @@ public:
   hash_code visitIndexAddrInst(IndexAddrInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getBase(),
                               X->getIndex());
+  }
+
+  hash_code visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
   }
 
 };
