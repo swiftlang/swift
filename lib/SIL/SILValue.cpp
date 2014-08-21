@@ -212,15 +212,19 @@ SILValue SILValue::stripNonPHIRCIdentityPreservingArgs() {
     // Then grab the terminator of Pred...
     TermInst *PredTI = Pred->getTerminator();
 
-    // Maybe we need a cast stripping equivalent?
     if (auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredTI)) {
       V = CCBI->getOperand();
       continue;
     }
 
     if (auto *SWEI = dyn_cast<SwitchEnumInst>(PredTI)) {
-      V = SWEI->getOperand();
-      continue;
+      EnumDecl *Enum = SWEI->getOperand().getType().getEnumOrBoundGenericEnum();
+      if (EnumElementDecl *EltDecl = SWEI->getBBCase(BB)) {
+        if (isFirstPayloadedCaseOfEnum(Enum, EltDecl)) {
+          V = SWEI->getOperand();
+          continue;
+        }
+      }
     }
 
     return V;

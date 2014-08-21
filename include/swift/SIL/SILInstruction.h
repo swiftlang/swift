@@ -2792,6 +2792,21 @@ public:
     return getDefaultBB();
   }
 
+  /// \brief If the given block only has one enum element decl matched to it,
+  /// return it.
+  EnumElementDecl *getBBCase(SILBasicBlock *BB) {
+    EnumElementDecl *D = nullptr;
+    for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+      auto Entry = getCase(i);
+      if (Entry.second == BB) {
+        if (D != nullptr)
+          return nullptr;
+        D = Entry.first;
+      }
+    }
+    return D;
+  }
+
   bool hasDefault() const { return HasDefault; }
   SILBasicBlock *getDefaultBB() const {
     assert(HasDefault && "doesn't have a default");
