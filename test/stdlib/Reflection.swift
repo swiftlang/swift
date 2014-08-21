@@ -329,7 +329,7 @@ case _:
   println("got something else")
 }
 
-let color = OSColor.blackColor()! // FIXME: unnecessary bang
+let color = OSColor.blackColor()
 switch reflect(color).quickLookObject {
 case .Some(.Color(let color2 as OSColor)) where color === color2:
   println("got the expected quick look color")
