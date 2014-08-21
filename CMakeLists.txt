@@ -329,11 +329,12 @@ endif()
 #     [STATIC]                          # This is a static library
 #     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
 #                                       # into this directory.
+#     [INSTALL]                         # Install produced files.
 #     )
 function(compile_swift_files)
   parse_arguments(SWIFTFILE
     "OUTPUT;SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
-    "IS_MAIN;IS_STDLIB_CORE;STATIC"
+    "IS_MAIN;IS_STDLIB_CORE;STATIC;INSTALL"
     ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
@@ -518,8 +519,10 @@ function(compile_swift_files)
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
     endforeach()
 
-    install(FILES ${module_file} ${module_doc_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
+    if (SWIFTFILE_INSTALL)
+      install(FILES ${module_file} ${module_doc_file}
+        DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTFILE_LIBRARY_SUBDIR})
+    endif()
   endif()
 
   set(stdlib_dep)
@@ -656,7 +659,8 @@ function(handle_swift_sources sourcesvar externalvar name)
       ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
       API_NOTES ${SWIFTSOURCES_API_NOTES}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} ${STATIC_arg}
-      OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS})
+      OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS}
+      INSTALL)
     list(APPEND result ${swift_obj})
   endif()
 
