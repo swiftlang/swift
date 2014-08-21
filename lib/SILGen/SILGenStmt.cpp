@@ -627,7 +627,9 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
 }
 
 void SILGenFunction::visitFailStmt(FailStmt *S) {
-  llvm_unreachable("fail statement in SILGen");
+  
+  // TODO
+  B.createUnreachable(S);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

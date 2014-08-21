@@ -3321,7 +3321,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Emit the prolog.
   emitProlog(ctor->getBodyParamPatterns()[1],
-             ctor->getImplicitSelfDecl()->getType()->getInOutObjectType(),
+             ctor->getResultType(),
              ctor);
   emitConstructorMetatypeArg(*this, ctor);
   
@@ -3356,10 +3356,42 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
+    
+    // Get the address to which to store the result.
+    SILValue returnAddress;
+    switch (ctor->getFailability()) {
+    // For non-failable initializers, store to the return address directly.
+    case OTK_None:
+      returnAddress = IndirectReturnAddress;
+      break;
+    // If this is a failable initializer, project out the payload.
+    case OTK_Optional:
+    case OTK_ImplicitlyUnwrappedOptional:
+      returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
+          getASTContext().getOptionalSomeDecl(ctor->getFailability()),
+          selfLV.getType());
+      break;
+    }
+    
     // We have to do a non-take copy because someone else may be using the box.
-    B.createCopyAddr(cleanupLoc, selfLV, IndirectReturnAddress,
+    B.createCopyAddr(cleanupLoc, selfLV, returnAddress,
                      IsNotTake, IsInitialization);
     B.emitStrongRelease(cleanupLoc, selfBox);
+    
+    // Inject the enum tag if the result is optional because of failability.
+    switch (ctor->getFailability()) {
+    case OTK_None:
+      // Not optional.
+      break;
+
+    case OTK_Optional:
+    case OTK_ImplicitlyUnwrappedOptional:
+      // Inject the 'Some' tag.
+      B.createInjectEnumAddr(ctor, IndirectReturnAddress,
+                   getASTContext().getOptionalSomeDecl(ctor->getFailability()));
+      break;
+    }
+    
     B.createReturn(returnLoc, emitEmptyTuple(ctor));
     return;
   }
@@ -3372,6 +3404,21 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Release the box.
   B.emitStrongRelease(cleanupLoc, selfBox);
+  
+  // Inject the self value into an optional if the constructor is failable.
+  switch (ctor->getFailability()) {
+  case OTK_None:
+    // Not optional.
+    break;
+      
+  case OTK_Optional:
+  case OTK_ImplicitlyUnwrappedOptional:
+    selfValue = B.createEnum(ctor, selfValue,
+                   getASTContext().getOptionalSomeDecl(ctor->getFailability()),
+                   getLoweredLoadableType(ctor->getResultType()));
+    break;
+  }
+  
   B.createReturn(returnLoc, selfValue);
 }
 
