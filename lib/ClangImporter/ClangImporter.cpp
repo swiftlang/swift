@@ -1766,7 +1766,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   // If we *still* haven't found anything, try looking for '<name>Ref'.
   // Eventually, this should be optimized by recognizing this case when
   // generating the clang module.
-  if (!FoundAny && clangID && Impl.SwiftContext.LangOpts.ImportCFTypes) {
+  if (!FoundAny && clangID) {
     lookupResult.clear(clang::Sema::LookupOrdinaryName);
 
     llvm::SmallString<128> buffer;

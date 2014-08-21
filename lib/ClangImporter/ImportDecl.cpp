@@ -1163,8 +1163,7 @@ namespace {
           return nullptr;
 
         // Import 'typedef struct __Blah *BlahRef;' as a CF type.
-        if (!SwiftType && Impl.SwiftContext.LangOpts.ImportCFTypes &&
-            Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX)) {
+        if (!SwiftType && Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX)) {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
@@ -2137,8 +2136,7 @@ namespace {
         // If the declaration is const, consider it audited.
         // We can assume that loading a const global variable doesn't
         // involve an ownership transfer.
-        bool isAudited = (decl->getType().isConstQualified() &&
-                          Impl.SwiftContext.LangOpts.ImportCFTypes);
+        bool isAudited = decl->getType().isConstQualified();
 
         type = Impl.importType(decl->getType(),
                                (isAudited ? ImportTypeKind::AuditedVariable

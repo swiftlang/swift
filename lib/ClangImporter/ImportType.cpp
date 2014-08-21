@@ -851,8 +851,7 @@ Type ClangImporter::Implementation::importFunctionType(
   // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
   bool isAuditedResult =
-    (SwiftContext.LangOpts.ImportCFTypes &&
-     clangDecl &&
+    (clangDecl &&
      (clangDecl->hasAttr<clang::CFAuditedTransferAttr>() ||
       clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
       clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
@@ -980,8 +979,7 @@ Type ClangImporter::Implementation::importMethodType(
   ImportTypeKind resultKind;
   if (kind == SpecialMethodKind::PropertyAccessor)
     resultKind = ImportTypeKind::PropertyAccessor;
-  else if (SwiftContext.LangOpts.ImportCFTypes &&
-           isObjCMethodResultAudited(clangDecl))
+  else if (isObjCMethodResultAudited(clangDecl))
     resultKind = ImportTypeKind::AuditedResult;
   else
     resultKind = ImportTypeKind::Result;

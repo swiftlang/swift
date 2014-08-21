@@ -73,9 +73,6 @@ namespace swift {
     /// it gets disabled when compiling the Swift core stdlib.
     bool EnableObjCAttrRequiresFoundation = true;
 
-    /// Enables special importing of CF types.
-    bool ImportCFTypes = true;
-    
     /// Enables importing of unions and other partially-importable types.
     bool ImportUnions = false;
     
