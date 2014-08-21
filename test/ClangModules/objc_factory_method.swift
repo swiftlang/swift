@@ -47,3 +47,14 @@ func test17261609() {
   let num1 = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
   NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
 }
+
+func testURL() {
+  let url = NSURL(string: "http://www.llvm.org")
+  NSURL.URLWithString("http://www.llvm.org") // expected-error{{'URLWithString' is unavailable: use object construction 'NSURL(string:)'}}
+
+  NSURLRequest(string: "http://www.llvm.org")
+  NSURLRequest(URL: url)
+
+  NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' is unavailable: use object construction 'NSURLRequest(string:)'}}
+  NSURLRequest.URLRequestWithURL(url) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(URL:)'}}
+}

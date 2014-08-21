@@ -1293,9 +1293,25 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
   if (firstPiece.empty())
     return DeclName();
 
+  // If the first selector piece starts with an acronym, and that acronym
+  // matches the end of the first word of the class name, pretend the class
+  // name starts at the beginning of that acronym. This effectively
+  // adjusts the class name "NSURL" to "URL" when mapping a selector
+  // starting with "URL".
+  auto firstPieceStr = firstPiece.str();
+  if (firstPieceStr.size() > 1 &&
+      clang::isUppercase(firstPieceStr[0]) &&
+      clang::isUppercase(firstPieceStr[1])) {
+    auto selectorAcronym = camel_case::getFirstWord(firstPieceStr);
+    auto classNameStart = camel_case::getFirstWord(className);
+    if (classNameStart.endswith(selectorAcronym)) {
+      className = className.substr(
+                    classNameStart.size() - selectorAcronym.size());
+    }
+  }
+
   // Match the camelCase beginning of the first selector piece to the
   // ending of the class name.
-  auto firstPieceStr = firstPiece.str();
   auto methodWords = camel_case::getWords(firstPieceStr);
   auto classWords = camel_case::getWords(className);
   auto methodWordIter = methodWords.begin(),

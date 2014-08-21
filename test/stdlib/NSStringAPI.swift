@@ -135,8 +135,8 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
 
 NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
-  let existingURL = NSURL.URLWithString("file://" + existingPath)
-  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
+  let existingURL = NSURL(string: "file://" + existingPath)
+  let nonExistentURL = NSURL(string: "file://" + nonExistentPath)
   if true {
     var err: NSError?
     var content = String.stringWithContentsOfURL(existingURL,
@@ -159,8 +159,8 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
 
 NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
-  let existingURL = NSURL.URLWithString("file://" + existingPath)
-  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
+  let existingURL = NSURL(string: "file://" + existingPath)
+  let nonExistentURL = NSURL(string: "file://" + nonExistentPath)
   if true {
     var usedEncoding: NSStringEncoding = 0
     var err: NSError?
@@ -1541,7 +1541,7 @@ NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
 
 NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   let (_, nonExistentPath) = createNSStringTemporaryFile()
-  let nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
+  let nonExistentURL = NSURL(string: "file://" + nonExistentPath)
   if true {
     let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit"
     var err: NSError?

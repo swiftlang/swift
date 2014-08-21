@@ -365,6 +365,12 @@ typedef NS_OPTIONS(NSUInteger, NSABitmapFormat5) {
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
 @interface NSURL : NSObject
++ (instancetype)URLWithString:(NSString *)URLString;
+@end
+
+@interface NSURLRequest : NSObject
++ (instancetype)requestWithString:(NSString *)URLString;
++ (instancetype)URLRequestWithURL:(NSURL *)URL;
 @end
 
 typedef struct _NSRange {
