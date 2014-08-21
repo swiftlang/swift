@@ -155,8 +155,8 @@ class VaListBuilder {
   
   func va_list() -> CVaListPointer {
     return CVaListPointer(
-      fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
-        storage._baseAddressIfContiguous))
+      fromUnsafeMutablePointer:
+        storage._baseAddressIfContiguous.asPointerTo(Void.self))
   }
 
   var storage = [Word]()
