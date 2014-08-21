@@ -6020,6 +6020,16 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
           PBD->getPattern()->setType(ErrorType::get(Context));
           setBoundVarsTypeError(PBD->getPattern(), Context);
+          
+          // If no type has been set for the initializer, we need to diagnose
+          // the failure.
+          if (PBD->getInit() &&
+              !PBD->getInit()->getType()) {
+            diagnose(PBD->getPattern()->getLoc(),
+                     diag::identifier_init_failure,
+                     PBD->getPattern()->getBoundName());
+          }
+          
           return;
         }
       } else if (VD->isImplicit() &&

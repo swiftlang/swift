@@ -68,3 +68,4 @@ class SomeClass {}
 // <rdar://problem/16877304> weak let's should be rejected
 weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
 
+let a = b ; let b = a // expected-error{{could not infer type for 'a'}} expected-error{{could not infer type for 'b'}}
