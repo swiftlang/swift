@@ -293,7 +293,7 @@ static NSString *_getDescription(SwiftObject *obj) {
 
 - (CFTypeID)_cfTypeID {
   // Adopt the same CFTypeID as NSObject.
-  __block CFTypeID result;
+  static CFTypeID result;
   static dispatch_once_t predicate;
   dispatch_once(&predicate, ^{
     id obj = [[NSObject alloc] init];
