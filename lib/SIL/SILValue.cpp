@@ -178,8 +178,10 @@ SILValue SILValue::stripNonPHIArgs() {
     }
 
     if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
-      V = CBI->getArgForDestBB(BB, A->getIndex());
-      continue;
+      if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
+        V = Arg;
+        continue;
+      }
     }
 
     return V;

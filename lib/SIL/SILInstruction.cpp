@@ -1098,7 +1098,17 @@ OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + NumTrueArgs, NumFalseArgs);
 }
 
-SILValue CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, unsigned i) {
+SILValue
+CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
+  // If TrueBB and FalseBB equal, we can not find an arg for this DestBB so
+  // return an empty SILValue.
+  if (getTrueBB() == getFalseBB()) {
+    assert(DestBB == getTrueBB() && "DestBB is not a target of this cond_br");
+    return SILValue();
+  }
+
+  unsigned i = A->getIndex();
+
   if (DestBB == getTrueBB())
     return Operands[1 + i].get();
 

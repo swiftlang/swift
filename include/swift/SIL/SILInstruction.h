@@ -41,6 +41,7 @@ class SILDebugScope;
 class SILFunction;
 class SILGlobalVariable;
 class SILType;
+class SILArgument;
 class Stmt;
 class StringLiteralExpr;
 class Substitution;
@@ -2618,9 +2619,9 @@ public:
   /// Get the arguments to the false BB.
   OperandValueArrayRef getFalseArgs() const;
 
-  /// Returns the ith argument on the cond_br terminator that will be passed to
-  /// DestBB.
-  SILValue getArgForDestBB(SILBasicBlock *DestBB, unsigned i);
+  /// Returns the argument on the cond_br terminator that will be passed to
+  /// DestBB in A.
+  SILValue getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A);
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
