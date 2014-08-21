@@ -838,26 +838,28 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     = C.getIdentifier("UIApplicationDelegate");
   Identifier Id_UIKit
     = C.getIdentifier("UIKit");
-  
-  bool conformsToDelegate = false;
-  Module *UIKit = nullptr;
-  for (auto proto : CD->getProtocols()) {
-    if (proto->getName() != Id_UIApplicationDelegate)
-      continue;
-    if (proto->getModuleContext()->Name != Id_UIKit)
-      continue;
-    
-    conformsToDelegate = true;
-    UIKit = proto->getModuleContext();
-    break;
+
+  auto UIKitModule = C.getLoadedModule(Id_UIKit);
+  llvm::SmallVector<ValueDecl *, 1> results;
+  if (UIKitModule)
+    UIKitModule->lookupValue({}, Id_UIApplicationDelegate,
+                             NLKind::UnqualifiedLookup, results);
+
+  ProtocolDecl *uiApplicationDelegateProto = nullptr;
+  for (auto result : results) {
+    uiApplicationDelegateProto = dyn_cast<ProtocolDecl>(result);
+    if (uiApplicationDelegateProto)
+      break;
   }
-  
-  if (!conformsToDelegate) {
+
+  if (!uiApplicationDelegateProto ||
+      !TC.conformsToProtocol(CD->getDeclaredType(), uiApplicationDelegateProto,
+                             CD)) {
     TC.diagnose(attr->getLocation(),
                 diag::attr_UIApplicationMain_not_UIApplicationDelegate);
     attr->setInvalid();
   }
-  
+
   if (attr->isInvalid())
     return;
   
@@ -867,9 +869,10 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     attr->setInvalid();
   
   // Check that we have the needed symbols in the frameworks.
-  SmallVector<ValueDecl*, 4> results;
-  UIKit->lookupValue({}, C.getIdentifier("UIApplicationMain"),
-                     NLKind::QualifiedLookup, results);
+  results.clear();
+  CD->getModuleContext()->lookupValue({},
+                                      C.getIdentifier("UIApplicationMain"),
+                                      NLKind::QualifiedLookup, results);
   auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
   Foundation->lookupValue({}, C.getIdentifier("NSStringFromClass"),
                           NLKind::QualifiedLookup, results);
