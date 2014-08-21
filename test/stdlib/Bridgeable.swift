@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: interpret
 
 // CHECK: testing...
 println("testing...")

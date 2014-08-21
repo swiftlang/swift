@@ -17,6 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift %s | FileCheck %s
+// XFAIL: interpret
 
 import SwiftShims
 import ObjectiveC

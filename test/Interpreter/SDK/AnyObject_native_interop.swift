@@ -11,7 +11,7 @@ class FullyNative {
 autoreleasepool {
   let c: AnyObject = FullyNative() as AnyObject
 
-  // CHECK: {{^}}a.FullyNative{{$}}
+  // CHECK: {{^}}main.FullyNative{{$}}
   println(c.description!)
 }
 // CHECK-NEXT: dead

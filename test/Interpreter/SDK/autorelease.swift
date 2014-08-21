@@ -4,6 +4,8 @@
 // optimization on i386, even in the iOS simulator.
 // XFAIL: CPU=i386
 
+// XFAIL: interpret
+
 import Foundation
 
 class PrintOnDeinit: NSObject {

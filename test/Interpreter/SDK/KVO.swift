@@ -48,3 +48,5 @@ class Foo: NSObject {
 let foo = Foo()
 foo.addObserver(foo, forKeyPath: "foo", options: nil, context: &kvoContext)
 let bar = foo.foo
+// CHECK-NEXT: 0
+println(bar)
