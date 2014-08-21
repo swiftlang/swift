@@ -124,6 +124,7 @@ func _conditionallyUnreachable() {
 }
 
 @asmname("swift_isClassOrObjCExistential")
+@effects(readnone)
 func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
 /// Returns true iff T is a class type or an @objc existential such as
