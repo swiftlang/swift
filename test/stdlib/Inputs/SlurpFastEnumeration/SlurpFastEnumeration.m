@@ -1,10 +1,12 @@
 #include <Foundation/Foundation.h>
 
-void slurpFastEnumerationFromObjCImpl(NSDictionary *d,
-                                      id<NSFastEnumeration> fe,
-                                      NSMutableArray *keyValuePairs) {
-  for (NSObject *key in fe) {
-    [keyValuePairs addObject: [NSArray arrayWithObjects: key, d[key], nil]];
+void slurpFastEnumerationFromObjCImpl(id Dictionary,
+                                      id<NSFastEnumeration> FE,
+                                      NSMutableArray *KeyValuePairs) {
+  NSDictionary *NSD = Dictionary;
+  for (NSObject *Key in FE) {
+    [KeyValuePairs addObject: Key];
+    [KeyValuePairs addObject: NSD[Key]];
   }
 }
 

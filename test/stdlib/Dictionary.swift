@@ -3,7 +3,7 @@
 //
 // FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
 //
-// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: %target-build-swift %s -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
 // RUN: %target-run %t/Dictionary
@@ -1543,10 +1543,9 @@ func slurpFastEnumerationFromObjC(
   var objcPairs = NSMutableArray()
   slurpFastEnumerationFromObjCImpl(d, fe, objcPairs)
   var pairs = Array<(Int, Int)>()
-  for pairAnyObject: AnyObject in objcPairs {
-    let pair = pairAnyObject as NSArray
-    let key = (pair[0] as TestObjCKeyTy).value
-    let value = (pair[1] as TestObjCValueTy).value
+  for i in 0..<objcPairs.count/2 {
+    let key = (objcPairs[i * 2] as TestObjCKeyTy).value
+    let value = (objcPairs[i * 2 + 1] as TestObjCValueTy).value
     pairs += [(key, value)]
   }
   return pairs
@@ -2905,9 +2904,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
   // FIXME: We should not be leaking
   // <rdar://problem/17944094> Dictionary.swift leaks again
   expectNotEqual(0, TestObjCKeyTy.objectCount)
-  expectNotEqual(0, TestObjCValueTy.objectCount)
   TestObjCKeyTy.objectCount = 0
-  TestObjCValueTy.objectCount = 0
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
@@ -2920,7 +2917,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_E
   assert(equalsUnordered(pairs, []))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration") {
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
   if true {
     let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
@@ -2931,12 +2928,10 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration") {
   // FIXME: We should not be leaking
   // <rdar://problem/17944094> Dictionary.swift leaks again
   expectNotEqual(0, TestObjCKeyTy.objectCount)
-  expectNotEqual(0, TestObjCValueTy.objectCount)
   TestObjCKeyTy.objectCount = 0
-  TestObjCValueTy.objectCount = 0
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration") {
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
   if true {
     let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
@@ -2947,9 +2942,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration") {
   // FIXME: We should not be leaking
   // <rdar://problem/17944094> Dictionary.swift leaks again
   expectNotEqual(0, TestObjCKeyTy.objectCount)
-  expectNotEqual(0, TestObjCValueTy.objectCount)
   TestObjCKeyTy.objectCount = 0
-  TestObjCValueTy.objectCount = 0
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
