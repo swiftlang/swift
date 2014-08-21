@@ -166,23 +166,23 @@ namespace {
 
     bool visitInjectEnumAddrInst(const InjectEnumAddrInst *RHS) {
         auto *X = cast<InjectEnumAddrInst>(LHS);
-        return (X->getOperand() == RHS->getOperand()) &&
-               (X->getElement() == RHS->getElement());
+        return X->getElement() == RHS->getElement();
     }
 
     bool visitDestroyAddrInst(const DestroyAddrInst *RHS) {
-      auto *X = cast<DestroyAddrInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitReleaseValueInst(const ReleaseValueInst *RHS) {
-      auto *X = cast<ReleaseValueInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
+    }
+
+    bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
     }
 
     bool visitDeallocStackInst(const DeallocStackInst *RHS) {
-      auto *X = cast<DeallocStackInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitAllocStackInst(const AllocStackInst *RHS) {
@@ -190,8 +190,7 @@ namespace {
     }
 
     bool visitDeallocBoxInst(const DeallocBoxInst *RHS) {
-      auto *X = cast<DeallocBoxInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitAllocBoxInst(const AllocBoxInst *RHS) {
@@ -199,8 +198,7 @@ namespace {
     }
 
     bool visitDeallocRefInst(const DeallocRefInst *RHS) {
-      auto *X = cast<DeallocRefInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitAllocRefInst(const AllocRefInst *RHS) {
@@ -212,18 +210,15 @@ namespace {
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
-      auto *X = cast<StrongReleaseInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitStrongRetainInst(const StrongRetainInst *RHS) {
-      auto *X = cast<StrongRetainInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitLoadInst(const LoadInst *RHS) {
-      auto *X = cast<LoadInst>(LHS);
-      return X->getOperand() == RHS->getOperand();
+      return true;
     }
 
     bool visitStoreInst(const StoreInst *RHS) {
