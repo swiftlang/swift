@@ -40,11 +40,6 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
-  // Conversion lookups never permit dynamic lookup.
-  if (name.isSimpleName(Context.Id_Conversion)) {
-    options = options & ~NL_DynamicLookup;
-  }
-
   // Look for the member.
   if (!dc->lookupQualified(type, name, options, this, result.Results)) {
     // If we didn't find anything, /and/ this is a nominal type, check to see

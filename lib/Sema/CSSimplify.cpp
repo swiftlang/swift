@@ -513,23 +513,6 @@ bool constraints::matchCallArguments(
   return listener.relabelArguments(actualArgNames);
 }
 
-/// Determine whether we should attempt a user-defined conversion.
-static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
-  // Strip the l-value qualifier if present.
-  type = type->getRValueType();
-  
-  // If this isn't a type that can have user-defined conversions, there's
-  // nothing to do.
-  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
-    return false;
-  
-  // If there are no user-defined conversions, there's nothing to do.
-  // FIXME: lame name!
-  auto &ctx = cs.getASTContext();
-  auto name = ctx.Id_Conversion;
-  return static_cast<bool>(cs.lookupMember(type, name));
-}
-
 // Match the argument of a call to the parameter.
 static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
@@ -1204,79 +1187,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   }
 
   llvm_unreachable("unhandled type matching kind");
-}
-
-/// If the given type has user-defined conversions, introduce new
-/// relational constraint between the result of performing the user-defined
-/// conversion and an arbitrary other type.
-static ConstraintSystem::SolutionKind
-tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
-                  Type otherType, ConstraintLocatorBuilder locator) {
-  assert(kind != ConstraintKind::Construction &&
-         kind != ConstraintKind::Conversion &&
-         kind != ConstraintKind::ArgumentTupleConversion &&
-         kind != ConstraintKind::OperatorArgumentTupleConversion &&
-         kind != ConstraintKind::OperatorArgumentConversion &&
-         "Construction/conversion constraints create potential cycles");
-  
-  // If this isn't a type that can have user-defined conversions, there's
-  // nothing to do.
-  if (!shouldTryUserConversion(cs, type))
-    return ConstraintSystem::SolutionKind::Unsolved;
-
-  auto memberLocator = cs.getConstraintLocator(
-                         locator.withPathElement(
-                           ConstraintLocator::ConversionMember));
-  auto inputTV = cs.createTypeVariable(
-                   cs.getConstraintLocator(memberLocator,
-                                           ConstraintLocator::ApplyArgument),
-                   /*options=*/0);
-  auto outputTV = cs.createTypeVariable(
-                    cs.getConstraintLocator(memberLocator,
-                                            ConstraintLocator::ApplyFunction),
-                    /*options=*/0);
-
-  auto &ctx = cs.getASTContext();
-  auto name = ctx.Id_Conversion;
-
-  // The conversion function will have function type TI -> TO, for fresh
-  // type variables TI and TO.
-  cs.addValueMemberConstraint(type, name,
-                              FunctionType::get(inputTV, outputTV),
-                              memberLocator);
-
-  // A conversion function must accept an empty parameter list ().
-  // Note: This should never fail, because the declaration checker
-  // should ensure that conversions have no non-defaulted parameters.
-  cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                   TupleType::getEmpty(ctx),
-                   inputTV, cs.getConstraintLocator(locator));
-
-  // Relate the output of the conversion function to the other type, using
-  // the provided constraint kind.
-  // If the type we're converting to is existential, we can also have an
-  // existential conversion here, so introduce a disjunction.
-  auto resultLocator = cs.getConstraintLocator(
-                         locator.withPathElement(
-                           ConstraintLocator::ConversionResult));
-  if (otherType->isExistentialType()) {
-    Constraint *constraints[2] = {
-      Constraint::create(cs, kind, outputTV, otherType, Identifier(),
-                         resultLocator),
-      Constraint::createRestricted(cs, ConstraintKind::Conversion,
-                                   ConversionRestrictionKind::Existential,
-                                   outputTV, otherType, resultLocator)
-    };
-    cs.addConstraint(Constraint::createDisjunction(cs, constraints,
-                                                   resultLocator));
-  } else {
-    cs.addConstraint(kind, outputTV, otherType, resultLocator);
-  }
-
-  // We're adding a user-defined conversion.
-  cs.increaseScore(SK_UserConversion);
-
-  return ConstraintSystem::SolutionKind::Solved;
 }
 
 static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
@@ -1957,19 +1867,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         (objectType1 = lookThroughImplicitlyUnwrappedOptionalType(type1))) {
       conversionsOrFixes.push_back(
                           ConversionRestrictionKind::ForceUnchecked);
-    }
-  }
-
-  // A nominal type can be converted to another type via a user-defined
-  // conversion function.
-  if (concrete && kind >= TypeMatchKind::Conversion &&
-      !(flags & TMF_ApplyingOperatorParameter) &&
-      shouldTryUserConversion(*this, type1)) {
-    conversionsOrFixes.push_back(ConversionRestrictionKind::User);
-    
-    // Favor array conversions to non-array types (such as NSArray).
-    if (this->isArrayType(desugar1) && !this->isArrayType(desugar2)) {
-      this->increaseScore(SK_UserConversion);
     }
   }
 
@@ -3854,16 +3751,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       TypeMatchKind::Subtype, subFlags, locator);
   }
-
-  // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
-  case ConversionRestrictionKind::User:
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-    return tryUserConversion(*this, type1,
-                             ConstraintKind::Subtype,
-                             type2,
-                             locator);
-      
   }
   
   llvm_unreachable("bad conversion restriction");

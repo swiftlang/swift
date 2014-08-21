@@ -112,7 +112,6 @@ IDENTIFIER_WITH_NAME(ConvertFromDictionaryLiteral,
 IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")
 IDENTIFIER_WITH_NAME(ArrayBoundValue, "arrayBoundValue")
 IDENTIFIER_WITH_NAME(GetBuiltinArrayBoundValue, "_getBuiltinArrayBoundValue")
-IDENTIFIER_WITH_NAME(Conversion, "__conversion")
 
 IDENTIFIER_WITH_NAME(CVarArgType, "CVarArgType")
 IDENTIFIER_WITH_NAME(OptionalNilComparisonType, "_OptionalNilComparisonType")

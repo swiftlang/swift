@@ -144,7 +144,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{could not find a user-defined conversion from type 'RDar16603812' to type 'inout RDar16603812'}} expected-error {{initializer delegation can only occur within an initializer}}
+      self.init() // expected-error {{initializer delegation can only occur within an initializer}}
    }
 }
 

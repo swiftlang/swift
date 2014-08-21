@@ -100,14 +100,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "closure result";
       break;
 
-    case ConversionMember:
-      out << "conversion member";
-      break;
-
-    case ConversionResult:
-      out << "conversion result";
-      break;
-
     case ConstructorMember:
       out << "constructor member";
       break;

@@ -435,7 +435,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   enum {
     CheckAll,
     CheckInput,
-    CheckResult
   } checkKind;
   if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
     // Nothing to do: these have the curried 'self' already.
@@ -443,12 +442,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
     } else {
       checkKind = CheckInput;
-    }
-    
-    // Only check the result type for conversion functions.
-    if (auto func = dyn_cast<FuncDecl>(decl1)) {
-      if (func->getName() == tc.Context.Id_Conversion)
-        checkKind = CheckResult;
     }
   } else {
     // Add a curried 'self' type.
@@ -541,17 +534,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     cs.addConstraint(ConstraintKind::Subtype,
                      funcTy1->getInput(),
                      funcTy2->getInput(),
-                     locator);
-    break;
-  }
-
-  case CheckResult: {
-    // Check whether the first function type's input is a subtype of the second.
-    auto funcTy1 = openedType1->castTo<FunctionType>();
-    auto funcTy2 = openedType2->castTo<FunctionType>();
-    cs.addConstraint(ConstraintKind::Subtype,
-                     funcTy1->getResult(),
-                     funcTy2->getResult(),
                      locator);
     break;
   }

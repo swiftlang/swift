@@ -2024,11 +2024,6 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
         }
         return false;
       }
-
-      // FIXME: Egregious hack to avoid our conversion operations becoming
-      // @objc for bridged classes, which causes extraneous thunks.
-      if (FD->getName() == Context.Id_Conversion)
-        return false;
     }
 
     // willSet/didSet implementations are never exposed to objc, they are always

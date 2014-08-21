@@ -194,9 +194,6 @@ ERROR(tuple_conversion_not_expressible,sema_tcc,none,
       "cannot express tuple conversion %0 to %1", (Type, Type))
 ERROR(load_of_explicit_lvalue,sema_tcc,none,
       "%0 variable is not being passed by reference", (Type))
-ERROR(could_not_find_user_conversion,sema_tcc,none,
-      "could not find a user-defined conversion from type %0 to type %1",
-      (Type, Type))
 
 //------------------------------------------------------------------------------
 // Expression Type Checking Errors
@@ -337,11 +334,6 @@ ERROR(functions_mutating_and_not,sema_tcd,none,
 ERROR(static_functions_not_mutating,sema_tcd,none,
       "static functions may not be declared mutating", ())
 
-ERROR(conversion_not_function,sema_tcd,none,
-      "conversion should be applied to an instance method", ())
-ERROR(conversion_not_instance_method,sema_tcd,none,
-      "conversion function %0 is not an instance method",
-      (Identifier))
 ERROR(transparent_stored_property,sema_tcd,none,
       "'transparent' attribute cannot be applied to stored properties", ())
 ERROR(transparent_on_invalid_extension,sema_tcd,none,
@@ -353,8 +345,6 @@ ERROR(transparent_in_classes_not_supported,sema_tcd,none,
       "'transparent' attribute is not supported on declarations within classes",
       ())
 
-ERROR(conversion_params,sema_tcd,none,
-      "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_iboutlet,sema_tcd,none,
       "only instance properties can be declared 'IBOutlet'", ())
 ERROR(iboutlet_nonobjc_class,sema_tcd,none,

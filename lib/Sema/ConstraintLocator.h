@@ -110,10 +110,6 @@ public:
     ScalarToTuple,
     /// \brief The load of an lvalue.
     Load,
-    /// \brief The lookup for a conversion member.
-    ConversionMember,
-    /// \brief The conversion result.
-    ConversionResult,
     /// \brief The 'then' branch of a ternary expression.
     IfThen,
     /// \brief The 'else' branch of a ternary expression.
@@ -151,8 +147,6 @@ public:
     case LvalueObjectType:
     case ScalarToTuple:
     case Load:
-    case ConversionMember:
-    case ConversionResult:
     case IfThen:
     case IfElse:
     case AssignSource:
@@ -196,8 +190,6 @@ public:
     case CheckedCastOperand:
     case ClosureResult:
     case ConstructorMember:
-    case ConversionMember:
-    case ConversionResult:
     case InstanceType:
     case Load:
     case LvalueObjectType:

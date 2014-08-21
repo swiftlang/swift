@@ -372,18 +372,6 @@ namespace {
     Expr *coerceExistentialMetatype(Expr *expr, Type toType,
                                     ConstraintLocatorBuilder locator);
 
-    /// \brief Coerce the expression to another type via a user-defined
-    /// conversion.
-    ///
-    /// \param expr The expression to be coerced.
-    /// \param toType The tupe to which the expression will be coerced.
-    /// \param locator Locator describing where this conversion occurs.
-    ///
-    /// \return The coerced expression, whose type will be equivalent to
-    /// \c toType.
-    Expr *coerceViaUserConversion(Expr *expr, Type toType,
-                                  ConstraintLocatorBuilder locator);
-
     /// \brief Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
     Expr *coerceOptionalToOptional(Expr *expr, Type toType,
@@ -1806,6 +1794,7 @@ namespace {
                    cs.DC->getInnermostMethodContext())) {
               tc.diagnose(expr->getDotLoc(),
                           diag::init_delegation_outside_initializer);
+              return nullptr;
             }
           }
         }
@@ -3347,18 +3336,6 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
   
-  if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC, toType, 
-                                                              fromType)) {
-    // Protect against "no-op" conversions. If the bridged type points back
-    // to itself, the constraint solver won't have a conversion handy to
-    // coerce to a user conversion, so we should avoid creating a new
-    // expression node.
-    if (!bridgedType->isEqual(fromType) && !bridgedType->isEqual(toType)) {
-      expr = coerceViaUserConversion(expr, bridgedType, locator);
-      fromType = bridgedType;
-    }
-  }
-  
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
     expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
@@ -3388,92 +3365,6 @@ Expr *ExprRewriter::coerceExistentialMetatype(Expr *expr, Type toType,
   auto conformances =
     collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);
   return new (tc.Context) MetatypeErasureExpr(expr, toType, conformances);
-}
-
-Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
-                                            ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-
-  // Determine the locator that corresponds to the conversion member.
-  auto storedLocator
-    = cs.getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::ConversionMember));
-  auto knownOverload = solution.overloadChoices.find(storedLocator);
-  if (knownOverload != solution.overloadChoices.end()) {
-    auto selected = knownOverload->second;
-
-    // FIXME: Location information is suspect throughout.
-    // Form a reference to the conversion member.
-    auto memberRef = buildMemberRef(expr,
-                                    selected.openedFullType,
-                                    expr->getStartLoc(),
-                                    selected.choice.getDecl(),
-                                    expr->getEndLoc(),
-                                    selected.openedType,
-                                    locator,
-                                    /*Implicit=*/true, /*direct ivar*/false);
-
-    // Form an empty tuple.
-    Expr *args = TupleExpr::createEmpty(tc.Context,
-                                        expr->getStartLoc(),
-                                        expr->getEndLoc(),
-                                        /*Implicit=*/true);
-
-    // Call the conversion function with an empty tuple.
-    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
-                                                 /*Implicit=*/true);
-    auto openedType = selected.openedType->castTo<FunctionType>()->getResult();
-    expr = finishApply(apply, openedType,
-                       ConstraintLocatorBuilder(
-                         cs.getConstraintLocator(apply)));
-
-    if (!expr)
-      return nullptr;
-
-    return coerceToType(expr, toType, locator);
-  }
-
-  // If there was no conversion member, look for a constructor member.
-  // This is only used for handling interpolated string literals, where
-  // we allow construction or conversion.
-  storedLocator
-    = cs.getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::ConstructorMember));
-  knownOverload = solution.overloadChoices.find(storedLocator);
-  
-  // Could not find a user conversion.
-  if(knownOverload == solution.overloadChoices.end()) {
-    tc.diagnose(expr->getLoc(), diag::could_not_find_user_conversion,
-                expr->getType(), toType);
-    return nullptr;
-  }
-
-  auto selected = knownOverload->second;
-
-  // FIXME: Location information is suspect throughout.
-  // Form a reference to the constructor.
-
-  // Form a reference to the constructor or enum declaration.
-  // FIXME: Bogus location info.
-  Expr *typeBase = TypeExpr::createImplicitHack(expr->getStartLoc(), toType,
-                                                 tc.Context);
-  Expr *declRef = buildMemberRef(typeBase,
-                                 selected.openedFullType,
-                                 expr->getStartLoc(),
-                                 selected.choice.getDecl(),
-                                 expr->getStartLoc(),
-                                 selected.openedType,
-                                 storedLocator,
-                                 /*Implicit=*/true, /*direct ivar*/false);
-
-  // FIXME: Lack of openedType here is an issue.
-  ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr,
-                                               /*Implicit=*/true);
-  expr = finishApply(apply, toType, locator);
-  if (!expr)
-    return nullptr;
-
-  return coerceToType(expr, toType, locator);
 }
 
 static uint getOptionalBindDepth(const BoundGenericType *bgt) {
@@ -4003,11 +3894,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                                              isBridged);
     }
 
-    case ConversionRestrictionKind::User: {
-      tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      return coerceViaUserConversion(expr, toType, locator);
-    }
-    
     case ConversionRestrictionKind::InoutToPointer: {
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) InOutToPointerExpr(expr, toType);
@@ -4212,14 +4098,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       diagnoseOptionalInjection(result);
       return result;
     }
-  }
-
-  // Coerce via conversion function or constructor.
-  if (fromType->getNominalOrBoundGenericNominal()||
-      fromType->is<ArchetypeType>() ||
-      toType->getNominalOrBoundGenericNominal() ||
-      toType->is<ArchetypeType>()) {
-    return coerceViaUserConversion(expr, toType, locator);
   }
 
   // Coercion from one metatype to another.

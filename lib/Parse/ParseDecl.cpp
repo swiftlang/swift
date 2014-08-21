@@ -3091,11 +3091,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       return nullptr;
   }
 
-  // Ban __conversion functions.
-  if (SimpleName == Context.Id_Conversion) {
-    diagnose(NameLoc, diag::func_conversion);
-  }
-
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
   
   if (NonglobalError && !DCC.movedToTopLevel()) {
