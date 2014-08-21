@@ -2888,6 +2888,13 @@ DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.FastEnumeration") {
 
   pairs = slurpFastEnumerationFromObjC(d, d.keyEnumerator())
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // FIXME: We should not be leaking
+  // <rdar://problem/17944094> Dictionary.swift leaks again
+  expectNotEqual(0, TestObjCKeyTy.objectCount)
+  expectNotEqual(0, TestObjCValueTy.objectCount)
+  TestObjCKeyTy.objectCount = 0
+  TestObjCValueTy.objectCount = 0
 }
 
 DictionaryTestSuite.test("BridgedToObjC.KeyEnumerator.FastEnumeration_Empty") {
@@ -2908,6 +2915,12 @@ DictionaryTestSuite.test("BridgedToObjC.FastEnumeration") {
 
   pairs = slurpFastEnumerationFromObjC(d, d)
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  // FIXME: We should not be leaking
+  // <rdar://problem/17944094> Dictionary.swift leaks again
+  expectNotEqual(0, TestObjCKeyTy.objectCount)
+  expectNotEqual(0, TestObjCValueTy.objectCount)
+  TestObjCKeyTy.objectCount = 0
+  TestObjCValueTy.objectCount = 0
 }
 
 DictionaryTestSuite.test("BridgedToObjC.FastEnumeration_Empty") {
@@ -3088,6 +3101,11 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryCoversion") {
 
   var pairs = slurpFastEnumeration(d, d)
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+
+  // FIXME: We should not be leaking
+  // <rdar://problem/17944094> Dictionary.swift leaks again
+  expectNotEqual(0, TestObjCKeyTy.objectCount)
+  TestObjCKeyTy.objectCount = 0
 }
 
 //===---
@@ -3836,14 +3854,19 @@ DictionaryTestSuite.test("misc") {
   }
 }
 
-DictionaryTestSuite.test("noLeaks") {
+DictionaryTestSuite.setUp {
+  keyCount = 0
+  valueCount = 0
+  TestObjCKeyTy.objectCount = 0
+  TestObjCValueTy.objectCount = 0
+}
+
+DictionaryTestSuite.tearDown {
   expectEqual(0, keyCount) { "key leak" }
   expectEqual(0, valueCount) { "value leak" }
 
-  // FIXME: We should not be leaking
-  // <rdar://problem/17944094> Dictionary.swift leaks again
-  //expectEqual(0, TestObjCKeyTy.objectCount) { "key leak" }
-  //expectEqual(0, TestObjCValueTy.objectCount) { "value leak" }
+  expectEqual(0, TestObjCKeyTy.objectCount) { "key leak" }
+  expectEqual(0, TestObjCValueTy.objectCount) { "value leak" }
 }
 
 runAllTests()
