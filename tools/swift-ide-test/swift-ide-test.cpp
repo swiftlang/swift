@@ -178,6 +178,11 @@ ImplicitProperties("enable-objc-implicit-properties",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+UseFailableInitializers("enable-objc-failable-initializers",
+                        llvm::cl::desc("Import Objective-C initializers using failable initializers"),
+                        llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
                    llvm::cl::desc("Implicitly import Objective-C factory methods as initializers"),
                    llvm::cl::init(false));
@@ -2128,6 +2133,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().SplitPrepositions = options::SplitObjCSelectors;
   InitInvok.getClangImporterOptions().InferImplicitProperties =
     options::ImplicitProperties;
+  InitInvok.getClangImporterOptions().UseFailableInitializers =
+    options::UseFailableInitializers;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

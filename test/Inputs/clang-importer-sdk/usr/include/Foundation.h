@@ -83,6 +83,7 @@ NS_SWIFT_UNAVAILABLE void NSSwiftUnavailableFunction();
 @interface NSString : NSObject <NSSecureCoding, NSCopying>
 - (void)onlyOnNSString;
 + (instancetype)stringWithContentsOfFile:(NSString*)path error:(NSError**)error;
++ (instancetype)stringWithContentsOfFile:(NSString*)path encoding:(int)encoding error:(NSError**)error;
 @end
 
 NSString *NSStringToNSString(NSString *str);

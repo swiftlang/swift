@@ -2312,16 +2312,18 @@ namespace {
         return Nothing;
       }
 
-      // Check whether there is an NSError parameter, which implies failability.
-      // FIXME: Revisit once we have failing initializers.
-      for (auto param : decl->parameters()) {
-        if (auto ptr = param->getType()->getAs<clang::PointerType>()) {
-          if (auto classPtr = ptr->getPointeeType()
-                                ->getAs<clang::ObjCObjectPointerType>()) {
-            if (auto classDecl = classPtr->getInterfaceDecl()) {
-              if (classDecl->getName() == "NSError") {
-                ++NumFactoryMethodsNSError;
-                return Nothing;
+      if (!Impl.UseFailableInitializers) {
+        // If we aren't using failable initializers, check whether there is an
+        // NSError parameter, which implies failability.
+        for (auto param : decl->parameters()) {
+          if (auto ptr = param->getType()->getAs<clang::PointerType>()) {
+            if (auto classPtr = ptr->getPointeeType()
+                                  ->getAs<clang::ObjCObjectPointerType>()) {
+              if (auto classDecl = classPtr->getInterfaceDecl()) {
+                if (classDecl->getName() == "NSError") {
+                  ++NumFactoryMethodsNSError;
+                  return Nothing;
+                }
               }
             }
           }
@@ -2787,8 +2789,23 @@ namespace {
       if (!type)
         return nullptr;
 
-      // FIXME: Set failability based on nullability of result.
-      OptionalTypeKind failability = OTK_None;
+      // Determine the failability of this initializer.
+      OptionalTypeKind failability;
+      if (Impl.UseFailableInitializers) {
+        // Default to implicit failability.
+        failability = OTK_ImplicitlyUnwrappedOptional;
+        
+        // If the method is known to have nullability information for
+        // its return type, use that.
+        if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
+          if (known->NullabilityAudited) {
+            failability = Impl.translateNullability(known->getReturnTypeInfo());
+          }
+        }
+      } else {
+        // No failable initializers.
+        failability = OTK_None;
+      }
 
       // Determine the type of the result.
       Type resultTy = selfTy;
