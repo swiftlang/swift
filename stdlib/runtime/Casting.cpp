@@ -509,6 +509,13 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
 }
 
+const void *
+swift::swift_dynamicCastForeignClass(const void *object,
+                                     const ForeignClassMetadata *targetType) {
+  // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
+  return object;
+}
+
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
 const void *
@@ -526,7 +533,10 @@ swift::swift_dynamicCastUnknownClass(const void *object,
     return swift_dynamicCastObjCClass(object, targetClassType);
   }
 
-  case MetadataKind::ForeignClass: // FIXME
+  case MetadataKind::ForeignClass: {
+    auto targetClassType = static_cast<const ForeignClassMetadata*>(targetType);
+    return swift_dynamicCastForeignClass(object, targetClassType);
+  }
 
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
@@ -543,6 +553,14 @@ swift::swift_dynamicCastUnknownClass(const void *object,
     swift::crash("Swift dynamic cast failed");
   }
   swift::crash("bad metadata kind!");
+}
+
+const void *
+swift::swift_dynamicCastForeignClassUnconditional(
+         const void *object,
+         const ForeignClassMetadata *targetType) {
+  // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
+  return object;
 }
 
 /// Perform a dynamic class of some sort of class instance to some
@@ -562,7 +580,10 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
     return swift_dynamicCastObjCClassUnconditional(object, targetClassType);
   }
 
-  case MetadataKind::ForeignClass: // FIXME
+  case MetadataKind::ForeignClass: {
+    auto targetClassType = static_cast<const ForeignClassMetadata*>(targetType);
+    return swift_dynamicCastForeignClassUnconditional(object, targetClassType);
+  }
 
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
@@ -1210,10 +1231,12 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
   switch (targetType->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
     case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper: {
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass: {
       // Do a dynamic cast on the instance pointer.
       const void *object
         = *reinterpret_cast<const void * const *>(value);
@@ -1221,7 +1244,6 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
         return nullptr;
       break;
     }
-    case MetadataKind::ForeignClass: // FIXME
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -1242,7 +1264,6 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     return _dynamicCastToExistential(value, sourceType,
                                    (const ExistentialTypeMetadata*)targetType);
     
-  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
@@ -1271,17 +1292,18 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
   switch (targetType->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
     case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper: {
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass: {
       // Do a dynamic cast on the instance pointer.
       const void *object
         = *reinterpret_cast<const void * const *>(value);
       swift_dynamicCastUnknownClassUnconditional(object, targetType);
       break;
     }
-    case MetadataKind::ForeignClass: // FIXME
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -1306,7 +1328,6 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     return r;
   }
     
-  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:

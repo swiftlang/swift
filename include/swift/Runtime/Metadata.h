@@ -1921,6 +1921,17 @@ swift_dynamicCastClassUnconditional(const void *object,
 extern "C" const void *
 swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
 
+/// \brief Checked dynamic cast to a foreign class type.
+///
+/// \param object The object to cast, or nil.
+/// \param targetType The type to which we are casting, which is known to be
+/// a foreign class type.
+///
+/// \returns the object if the cast succeeds, or null otherwise.
+extern "C" const void *
+swift_dynamicCastForeignClass(const void *object,
+                              const ForeignClassMetadata *targetType);
+
 /// \brief Unconditional, checked, Objective-C-style dynamic cast to a class
 /// type.
 ///
@@ -1936,6 +1947,18 @@ swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
 extern "C" const void *
 swift_dynamicCastObjCClassUnconditional(const void *object,
                                         const ClassMetadata *targetType);
+
+/// \brief Unconditional, checked dynamic cast to a foreign class type.
+///
+/// \param object The object to cast, or nil.
+/// \param targetType The type to which we are casting, which is known to be
+/// a foreign class type.
+///
+/// \returns the object if the cast succeeds, or null otherwise.
+extern "C" const void *
+swift_dynamicCastForeignClassUnconditional(
+  const void *object,
+  const ForeignClassMetadata *targetType);
 
 /// \brief Checked dynamic cast of a class instance pointer to the given type.
 ///
