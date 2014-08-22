@@ -7,8 +7,8 @@ using namespace swift;
 using namespace llvm;
 
 static std::vector<SourceLoc> tokenize(SourceManager &SM, StringRef Source) {
-  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
-  SM.addNewSourceBuffer(Buf);
+  unsigned ID = SM.addMemBufferCopy(Source);
+  const MemoryBuffer *Buf = SM.getLLVMSourceMgr().getMemoryBuffer(ID);
 
   SourceLoc BeginLoc(SMLoc::getFromPointer(Buf->getBuffer().begin()));
   std::vector<SourceLoc> Result;
