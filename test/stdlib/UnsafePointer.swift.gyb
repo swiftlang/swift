@@ -29,8 +29,8 @@ ${SelfName}TestSuite.test("initNoArgs") {
 }
 
 ${SelfName}TestSuite.test("initFromCOpaquePointer") {
-  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
-  let ptr = other.asPointerTo(Float.self)
+  let other = COpaquePointer(bitPattern: 0x12345678)
+  let ptr = UnsafePointer<Float>(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 
