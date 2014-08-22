@@ -590,7 +590,7 @@ endfunction(compute_library_subdir)
 function(handle_swift_sources sourcesvar externalvar name)
   parse_arguments(SWIFTSOURCES  
     "DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS"
-    "IS_MAIN;IS_STDLIB_CORE;STATIC"
+    "IS_MAIN;IS_STDLIB_CORE;STATIC;INSTALL"
     ${ARGN})
 
   set(result)
@@ -619,6 +619,9 @@ function(handle_swift_sources sourcesvar externalvar name)
   set(STATIC_arg)
   if(SWIFTSOURCES_STATIC)
     set(STATIC_arg STATIC)
+  endif()
+  if(SWIFTSOURCES_INSTALL)
+    set(INSTALL_arg INSTALL)
   endif()
 
   if(swift_sources)
@@ -658,7 +661,7 @@ function(handle_swift_sources sourcesvar externalvar name)
       API_NOTES ${SWIFTSOURCES_API_NOTES}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg} ${STATIC_arg}
       OPT_FLAGS ${SWIFTSOURCES_OPT_FLAGS}
-      INSTALL)
+      ${INSTALL_arg})
     list(APPEND result ${swift_obj})
   endif()
 
@@ -822,6 +825,9 @@ macro(add_swift_library_single target name)
   if(SWIFTLIB_SINGLE_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
+  if(SWIFTLIB_SINGLE_INSTALL)
+    set(INSTALL_arg INSTALL)
+  endif()
 
   # Copy the sources now before they may get modified.
   set(SWIFTLIB_SINGLE_STATIC_SOURCES ${SWIFTLIB_SINGLE_SOURCES})
@@ -855,7 +861,7 @@ macro(add_swift_library_single target name)
     SDK ${SWIFTLIB_SINGLE_SDK}
     ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
     API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
-    ${IS_STDLIB_CORE_arg})
+    ${IS_STDLIB_CORE_arg} ${INSTALL_arg})
 
   add_library( ${target} ${libkind}
     ${SWIFTLIB_SINGLE_SOURCES}
@@ -987,7 +993,7 @@ macro(add_swift_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
-      ${IS_STDLIB_CORE_arg}
+      ${IS_STDLIB_CORE_arg} ${INSTALL_arg}
       STATIC)
 
     # Note: the dummy.c source file provides no definitions. However,
