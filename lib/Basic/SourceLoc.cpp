@@ -22,10 +22,12 @@ SourceLoc SourceManager::getCodeCompletionLoc() const {
       .getAdvancedLoc(CodeCompletionOffset);
 }
 
-unsigned SourceManager::addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
+unsigned
+SourceManager::addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(Buffer);
-  auto ID = LLVMSourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
-  BufIdentIDMap[Buffer->getBufferIdentifier()] = ID;
+  StringRef BufIdentifier = Buffer->getBufferIdentifier();
+  auto ID = LLVMSourceMgr.AddNewSourceBuffer(std::move(Buffer), llvm::SMLoc());
+  BufIdentIDMap[BufIdentifier] = ID;
   return ID;
 }
 
@@ -35,8 +37,9 @@ unsigned SourceManager::addMemBufferCopy(llvm::MemoryBuffer *Buffer) {
 
 unsigned SourceManager::addMemBufferCopy(StringRef InputData,
                                          StringRef BufIdentifier) {
-  auto Buffer = llvm::MemoryBuffer::getMemBufferCopy(InputData, BufIdentifier);
-  return addNewSourceBuffer(Buffer);
+  auto Buffer = std::unique_ptr<llvm::MemoryBuffer>(
+      llvm::MemoryBuffer::getMemBufferCopy(InputData, BufIdentifier));
+  return addNewSourceBuffer(std::move(Buffer));
 }
 
 bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,

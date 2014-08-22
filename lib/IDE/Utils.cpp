@@ -92,7 +92,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   SourceManager SM;
-  auto BufferID = SM.addNewSourceBuffer(MemBuf.release());
+  auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
   ParserUnit Parse(SM, BufferID);
   Parser &P = Parse.getParser();
 

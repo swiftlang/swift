@@ -102,13 +102,7 @@ public:
   unsigned findBufferContainingLoc(SourceLoc Loc) const;
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
-  ///
-  /// FIXME: remove this overload.
-  unsigned addNewSourceBuffer(llvm::MemoryBuffer *Buffer);
-
-  unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
-    return addNewSourceBuffer(Buffer.release());
-  }
+  unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
 
   /// Add a #line-defined virtual file region.
   ///

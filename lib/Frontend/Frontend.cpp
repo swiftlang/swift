@@ -112,13 +112,13 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     auto *InputBuffer = Invocation.getInputBuffers()[i];
-    auto *Copy = llvm::MemoryBuffer::getMemBufferCopy(
-        InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier());
+    auto Copy = std::unique_ptr<llvm::MemoryBuffer>(
+        llvm::MemoryBuffer::getMemBufferCopy(
+            InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier()));
     if (SerializedModuleLoader::isSerializedAST(Copy->getBuffer())) {
-      PartialModules.push_back({ std::unique_ptr<llvm::MemoryBuffer>(Copy),
-                                 nullptr });
+      PartialModules.push_back({ std::move(Copy), nullptr });
     } else {
-      unsigned BufferID = SourceMgr.addNewSourceBuffer(Copy);
+      unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(Copy));
       BufferIDs.push_back(BufferID);
 
       if (SILMode)

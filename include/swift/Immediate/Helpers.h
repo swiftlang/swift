@@ -19,19 +19,21 @@
 #define SWIFT_IMMEDIATE_HELPERS_H
 
 #include "swift/Basic/LLVM.h"
+#include <memory>
 
 namespace llvm {
-  class MemoryBuffer;
+class MemoryBuffer;
 }
 
 namespace swift {
-  class PersistentParserState;
-  class REPLContext;
-  class SILModule;
-  class SourceFile;
+class PersistentParserState;
+class REPLContext;
+class SILModule;
+class SourceFile;
 
-  bool appendToREPLFile(SourceFile &SF, PersistentParserState &State,
-                        REPLContext &RC, llvm::MemoryBuffer *Buffer);
+bool appendToREPLFile(SourceFile &SF, PersistentParserState &State,
+                      REPLContext &RC,
+                      std::unique_ptr<llvm::MemoryBuffer> Buffer);
 } // namespace swift
 
 #endif

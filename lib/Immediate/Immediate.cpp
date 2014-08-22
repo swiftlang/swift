@@ -971,9 +971,10 @@ private:
 private:
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
-    auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
+    auto InputBuf = std::unique_ptr<llvm::MemoryBuffer>(
+        llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
     bool ShouldRun = swift::appendToREPLFile(REPLInputFile, PersistentState,
-                                             RC, InputBuf);
+                                             RC, std::move(InputBuf));
     
     // SILGen the module and produce SIL diagnostics.
     std::unique_ptr<SILModule> sil;
@@ -1113,15 +1114,17 @@ public:
     IRGenOpts.DebugInfo = false;
 
     if (!ParseStdlib) {
-    // Force standard library to be loaded immediately.  This forces any errors
-    // to appear upfront, and helps eliminate some nasty lag after the first
-    // statement is typed into the REPL.
-    static const char WarmUpStmt[] = "Void()\n";
+      // Force standard library to be loaded immediately.  This forces any
+      // errors to appear upfront, and helps eliminate some nasty lag after the
+      // first statement is typed into the REPL.
+      static const char WarmUpStmt[] = "Void()\n";
 
       swift::appendToREPLFile(
           REPLInputFile, PersistentState, RC,
-          llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
-                                               "<REPL Initialization>"));
+          std::unique_ptr<llvm::MemoryBuffer>(
+              llvm::MemoryBuffer::getMemBufferCopy(
+                  WarmUpStmt, "<REPL Initialization>")));
+
       if (Ctx.hadError())
         return;
     }

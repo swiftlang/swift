@@ -24,12 +24,13 @@ using namespace swift;
 
 bool swift::appendToREPLFile(SourceFile &SF,
                              PersistentParserState &PersistentState,
-                             REPLContext &RC, llvm::MemoryBuffer *Buffer) {
+                             REPLContext &RC,
+                             std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   SourceManager &SrcMgr = SF.getParentModule()->Ctx.SourceMgr;
-  RC.CurBufferID = SrcMgr.addNewSourceBuffer(Buffer);
-  
+  RC.CurBufferID = SrcMgr.addNewSourceBuffer(std::move(Buffer));
+
   bool FoundAnySideEffects = false;
   unsigned CurElem = RC.CurElem;
   bool Done;
