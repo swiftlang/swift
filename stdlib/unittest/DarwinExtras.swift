@@ -64,17 +64,17 @@ func _stdlib_select(
   inout readfds: _stdlib_fd_set, inout writefds: _stdlib_fd_set,
   inout errorfds: _stdlib_fd_set, timeout: UnsafeMutablePointer<timeval>
 ) -> CInt {
-  return readfds._data.withUnsafeBufferPointer {
+  return readfds._data.withUnsafeMutableBufferPointer {
     (readfds) in
-    writefds._data.withUnsafeBufferPointer {
+    writefds._data.withUnsafeMutableBufferPointer {
       (writefds) in
-      errorfds._data.withUnsafeBufferPointer {
+      errorfds._data.withUnsafeMutableBufferPointer {
         (errorfds) in
         return select(
           _stdlib_FD_SETSIZE,
-          readfds.baseAddress.asPointerTo(fd_set.self).asMutablePointer,
-          writefds.baseAddress.asPointerTo(fd_set.self).asMutablePointer,
-          errorfds.baseAddress.asPointerTo(fd_set.self).asMutablePointer,
+          readfds.baseAddress.asPointerTo(fd_set.self),
+          writefds.baseAddress.asPointerTo(fd_set.self),
+          errorfds.baseAddress.asPointerTo(fd_set.self),
           timeout)
       }
     }
