@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/CallGraph.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
