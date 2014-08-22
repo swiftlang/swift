@@ -174,8 +174,8 @@ extension String {
             if e2 < e1 {
               return 1
             }
-            aIdx++
-            bIdx++
+            aIdx = aIdx &+ 1
+            bIdx = bIdx &+ 1
             continue // equivalent
           }
           return 1
