@@ -436,8 +436,6 @@ function(compile_swift_files)
     set(SWIFTFILE_LIBRARY_SUBDIR "${SWIFTLIB_SUBDIR}${arch_subdir}")
   endif()
 
-  file(MAKE_DIRECTORY "${SWIFTFILE_LIBRARY_SUBDIR}")
-
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
     list(APPEND swift_flags "-module-cache-path" "${SWIFT_MODULE_CACHE_PATH}")
