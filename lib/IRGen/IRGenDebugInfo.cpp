@@ -318,6 +318,14 @@ static FullLocation getLocation(SourceManager &SM,
     return {LinetableLoc, DLoc};
   }
 
+  if (Loc.getKind() == SILLocation::SILFileKind) {
+    // Return the location within the SIL file. This is useful for
+    // debugging SIL optimizations.
+    auto SILFileLoc = static_cast<SILFileLocation*>(&Loc);
+    auto SILLoc = getLoc(SM, SILFileLoc->getFileLocation());
+    return { SILLoc, SILLoc };
+  }
+
   llvm_unreachable("unexpected location type");
 }
 
@@ -775,9 +783,12 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   // Imports are visited after SILFunctions.
   llvm::DIScope Module = MainFile;
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
-  assert(M && "Could not find module for import decl.");
-  if (!M)
+  if (!M && D->getModulePath()[0].first.str() == "Builtin")
+    M = IGM.Context.TheBuiltinModule;
+  if (!M) {
+    assert(M && "Could not find module for import decl.");
     return;
+  }
   auto File = getOrCreateFile(getFilenameFromDC(M->getFiles().front()));
 
   std::string Printed, Mangled("_T");
