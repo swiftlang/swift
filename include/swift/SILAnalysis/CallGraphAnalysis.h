@@ -24,6 +24,191 @@
 
 namespace swift {
 
+  class CallGraphEdge {
+  public:
+    typedef llvm::DenseSet<SILFunction *> CalleeSetType;
+
+    /// Create a call graph edge for a call site where we will fill in
+    /// the set of potentially called functions later.
+    CallGraphEdge(ApplyInst *CallSite) : CallSite(CallSite),
+                                         CalleeSet(new CalleeSetType, 0) {
+      // TODO: We will probably have many call sites that can share a
+      //       callee set so we should optimize allocation and
+      //       deallocation of these accordingly.
+    }
+
+    /// Create a call graph edge for a call site that is known to have
+    /// only a single callee.
+    CallGraphEdge(ApplyInst *CallSite, SILFunction *F)
+      : CallSite(CallSite),
+        // FIXME: Do not allocate memory for the singleton callee case.
+        CalleeSet(new CalleeSetType, 0) {
+      addCallee(F);
+      markCalleeSetComplete();
+    }
+
+    ~CallGraphEdge() {
+      delete CalleeSet.getPointer();
+    }
+
+    const ApplyInst *getCallSite() const {
+      return CallSite;
+    }
+
+    /// Return a callee set that is known to be complete.
+    const CalleeSetType &getCalleeSet() const {
+      assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
+      return *CalleeSet.getPointer();
+    }
+
+    /// Return a callee set that is not known to be complete.
+    const CalleeSetType &getKnownCalleeSet() {
+      return *CalleeSet.getPointer();
+    }
+
+    /// Add the given function to the set of functions that we could
+    /// call from this call site.
+    void addCallee(SILFunction *F) {
+      assert(!isCalleeSetComplete() &&
+             "Attempting to add another callee to a complete call set!");
+      CalleeSet.getPointer()->insert(F);
+    }
+
+    /// Return whether the call set is known to be complete.
+    bool isCalleeSetComplete() const {
+      return CalleeSet.getInt();
+    }
+
+  private:
+    /// Mark the call set as being complete.
+    void markCalleeSetComplete() {
+      CalleeSet.setInt(1);
+    }
+
+    // The call site represented by this call graph edge.
+    ApplyInst *CallSite;
+
+    // The set of functions potentially called from this call site. This
+    // might include functions that are not actually callable based on
+    // dynamic types. If the int bit is non-zero, the set is complete in
+    // the sense that no function outside the set could be called.
+    llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
+  };
+
+  class CallGraphNode {
+  public:
+    friend class CallGraph;
+
+    CallGraphNode(SILFunction *Function, unsigned Ordinal) : Function(Function),
+                                                             Ordinal(Ordinal),
+                                                      CallerSetComplete(false) {
+      assert(Function &&
+             "Cannot build a call graph node with a null function pointer!");
+    }
+
+    ~CallGraphNode() {
+      for (auto *CallSite : getCallSites())
+        delete CallSite;
+    }
+
+    SILFunction &getFunction() {
+      return *Function;
+    }
+
+    /// Get the complete set of call sites that can call into this
+    /// function.
+    const llvm::SmallVectorImpl<CallGraphEdge *> &getCallers() const {
+      assert(isCallerSetComplete() &&
+             "Attempt to get an incomplete caller set!");
+      return Callers;
+    }
+
+    /// Get the known set of call sites that can call into this
+    /// function.
+    llvm::SmallVectorImpl<CallGraphEdge *> &getKnownCallers() {
+      return Callers;
+    }
+
+    /// Get the call sites within this function.
+    llvm::SmallVectorImpl<CallGraphEdge *> &getCallSites() {
+      return CallSites;
+    }
+
+    /// Do we know that the set of call sites is complete - i.e. that
+    /// there is no other place that we can call from that can reach
+    /// this function?
+    bool isCallerSetComplete() const {
+      return CallerSetComplete;
+    }
+
+    unsigned getOrdinal() const {
+      return Ordinal;
+    }
+
+  private:
+    /// Mark a set of callers as known to be complete.
+    void markCallerSetComplete() {
+      assert(!isCallerSetComplete() &&
+             "The caller set should only be marked complete once!");
+
+      CallerSetComplete = true;
+    }
+
+    /// Add an edge representing a call site within this function.
+    void addCallSite(CallGraphEdge *CallSite) {
+      CallSites.push_back(CallSite);
+    }
+
+    /// Add an edge representing a call site that calls into this function.
+    void addCaller(CallGraphEdge *CallerCallSite) {
+      Callers.push_back(CallerCallSite);
+    }
+
+    /// The function represented by this call graph node.
+    SILFunction *Function;
+
+    /// The call graph node ordinal within the SILModule.
+    const unsigned Ordinal;
+
+    /// The known call sites that call into this function. The
+    /// caller's call graph node owns these.
+    llvm::SmallVector<CallGraphEdge *, 4> Callers;
+
+    /// The call sites within this function. This CallGraph node owns these.
+    llvm::SmallVector<CallGraphEdge *, 4> CallSites;
+
+    /// Do we know all the potential callers of this function?
+    bool CallerSetComplete;
+  };
+
+  class CallGraph {
+  public:
+    CallGraph(SILModule *M, bool completeModule);
+
+    ~CallGraph() {
+      for (auto &MapEntry : FunctionToNodeMap)
+        delete MapEntry.second;
+    }
+
+    llvm::DenseSet<CallGraphNode *> &getCallGraphRoots();
+
+    CallGraphNode *getCallGraphNode(SILFunction *F) {
+      auto Found = FunctionToNodeMap.find(F);
+      if (Found == FunctionToNodeMap.end())
+        return nullptr;
+
+      assert(Found->second && "Unexpected null call graph node in map!");
+      return Found->second;
+    }
+
+  private:
+    void addCallGraphNode(SILFunction *F, unsigned Ordinal);
+    void addEdges(SILFunction *F);
+
+    llvm::DenseSet<CallGraphNode *> CallGraphRoots;
+    llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
+  };
+
   /// \brief a utility class that is used to traverse the call-graph
   /// and return a top-down or bottom up list of functions to process.
   template <typename Node> struct CallGraphSorter {
@@ -144,4 +329,3 @@ namespace swift {
 } // end namespace swift
 
 #endif
-
