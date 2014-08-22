@@ -489,7 +489,7 @@ struct _ParentProcess {
       var ret: CInt
       do {
         ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
-      } while ret == EINTR
+      } while ret == -1  &&  errno == EINTR
       if ret <= 0 {
         fatalError("select() returned an error")
       }
