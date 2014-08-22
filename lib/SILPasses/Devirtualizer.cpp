@@ -731,8 +731,8 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-/// Return the final class decl using metadata.
-static ClassDecl *getClassFromClassMetadata(ClassMethodInst *CMI) {
+/// Return the final class decl based on access control information.
+static ClassDecl *getClassFromAccessControl(ClassMethodInst *CMI) {
   const DeclContext *associatedDC = CMI->getModule().getAssociatedContext();
   if (!associatedDC) {
     // Without an associated context, we can't perform any access-based
@@ -801,7 +801,7 @@ static bool optimizeApplyInst(ApplyInst *AI) {
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
     // Check if the class member is known to be final.
-    if (ClassDecl *C = getClassFromClassMetadata(CMI))
+    if (ClassDecl *C = getClassFromAccessControl(CMI))
       return devirtMethod(AI, CMI->getMember(), CMI->getOperand(), C);
 
     // Try to search for the point of construction.
