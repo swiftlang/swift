@@ -469,43 +469,6 @@ static Type getAsDependentType(Type t,
   return t;
 }
 
-// Helper to translate a RequirementRepr into a canonical Requirement expressed
-// in terms of dependent types.
-static void
-addRequirementForRepr(SmallVectorImpl<Requirement> &requirements,
-                      const RequirementRepr &repr,
-                     const llvm::DenseMap<ArchetypeType*, Type> &archetypeMap) {
-  switch (repr.getKind()) {
-  case RequirementKind::Conformance: {
-    // Primary conformance declarations would have already been gathered as
-    // conformance requirements off the archetype.
-    if (auto arch = repr.getSubject()->getAs<ArchetypeType>()) {
-      if (!arch->getParent())
-        return;
-    }
-    Requirement reqt(RequirementKind::Conformance,
-                     getAsDependentType(repr.getSubject(), archetypeMap),
-                     getAsDependentType(repr.getConstraint(), archetypeMap));
-    requirements.push_back(reqt);
-    return;
-  }
-  case RequirementKind::SameType: {
-    // FIXME: ArchetypeBuilder doesn't preserve the distinction between the
-    // matched archetypes, so this ends up producing useless '$T == $T'
-    // requirements.
-    /*
-    Requirement reqt(RequirementKind::SameType,
-                     getAsDependentType(repr.getFirstType(), archetypeMap),
-                     getAsDependentType(repr.getSecondType(), archetypeMap));
-    requirements.push_back(reqt);
-     */
-    return;
-  }
-  case RequirementKind::WitnessMarker:
-    llvm_unreachable("should not exist after typechecking (?)");
-  }
-}
-
 // A helper to recursively collect the generic parameters from the outer levels
 // of a generic parameter list.
 void
@@ -558,6 +521,28 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     auto depTy = getAsDependentType(assocTy, archetypeMap);
     requirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                        depTy, depTy));
+
+    // Add conformance requirements for this associated archetype.
+    for (const auto &repr : getRequirements()) {
+      // Handle same-type requirements at last.
+      if (repr.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // Primary conformance declarations would have already been gathered as
+      // conformance requirements of the archetype.
+      if (auto arch = repr.getSubject()->getAs<ArchetypeType>())
+        if (!arch->getParent())
+          continue;
+
+      auto depTyOfReqt = getAsDependentType(repr.getSubject(), archetypeMap);
+      if (depTyOfReqt.getPointer() != depTy.getPointer())
+        continue;
+
+      Requirement reqt(RequirementKind::Conformance,
+                       getAsDependentType(repr.getSubject(), archetypeMap),
+                       getAsDependentType(repr.getConstraint(), archetypeMap));
+      requirements.push_back(reqt);
+    }
   }
   
   // Add all of the same-type requirements.
@@ -575,10 +560,6 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
       requirements.push_back(Requirement(RequirementKind::SameType,
                                          firstType, secondType));
     }
-  }
-  // Collect requirements from the 'where' clause.
-  for (const auto &repr : getRequirements()) {
-    addRequirementForRepr(requirements, repr, archetypeMap);
   }
 }
 
