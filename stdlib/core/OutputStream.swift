@@ -296,7 +296,7 @@ internal func _doubleToString(value: Double) -> String {
   var buffer = _Buffer32()
   return withUnsafeMutablePointer(&buffer) {
     (bufferPtr) in
-    let bufferUTF8Ptr = bufferPtr.asPointerTo(UTF8.CodeUnit.self)
+    let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
     let actualLength = _doubleToStringImpl(bufferUTF8Ptr, 32, value)
     return String._fromWellFormedCodeUnitSequence(
         UTF8.self,
@@ -318,7 +318,7 @@ internal func _int64ToString(
     var buffer = _Buffer32()
     return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = bufferPtr.asPointerTo(UTF8.CodeUnit.self)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -329,7 +329,7 @@ internal func _int64ToString(
     var buffer = _Buffer72()
     return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = bufferPtr.asPointerTo(UTF8.CodeUnit.self)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -352,7 +352,7 @@ func _uint64ToString(
     var buffer = _Buffer32()
     return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = bufferPtr.asPointerTo(UTF8.CodeUnit.self)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(
@@ -363,7 +363,7 @@ func _uint64ToString(
     var buffer = _Buffer72()
     return withUnsafeMutablePointer(&buffer) {
       (bufferPtr) in
-      let bufferUTF8Ptr = bufferPtr.asPointerTo(UTF8.CodeUnit.self)
+      let bufferUTF8Ptr = UnsafeMutablePointer<UTF8.CodeUnit>(bufferPtr)
       let actualLength =
           _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
       return String._fromWellFormedCodeUnitSequence(

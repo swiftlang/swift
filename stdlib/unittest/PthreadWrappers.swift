@@ -150,7 +150,7 @@ public func _stdlib_pthread_join<Result>(
   var threadResultPtr = UnsafeMutablePointer<Void>()
   let result = pthread_join(thread, &threadResultPtr)
   if result == 0 {
-    let threadResult = threadResultPtr.asPointerTo(Result.self).memory
+    let threadResult = UnsafeMutablePointer<Result>(threadResultPtr).memory
     threadResultPtr.destroy()
     threadResultPtr.dealloc(1)
     return (result, threadResult)

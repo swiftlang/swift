@@ -72,9 +72,9 @@ func _stdlib_select(
         (errorfds) in
         return select(
           _stdlib_FD_SETSIZE,
-          readfds.baseAddress.asPointerTo(fd_set.self),
-          writefds.baseAddress.asPointerTo(fd_set.self),
-          errorfds.baseAddress.asPointerTo(fd_set.self),
+          UnsafeMutablePointer(readfds.baseAddress),
+          UnsafeMutablePointer(writefds.baseAddress),
+          UnsafeMutablePointer(errorfds.baseAddress),
           timeout)
       }
     }
@@ -180,7 +180,7 @@ func readAll(fd: CInt) -> String {
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
       (buffer) in
-      let ptr = (buffer.baseAddress + usedBytes).asPointerTo(Void.self)
+      let ptr = UnsafeMutablePointer<Void>(buffer.baseAddress + usedBytes)
       return read(fd, ptr, size_t(buffer.count - usedBytes))
     }
     if readResult > 0 {

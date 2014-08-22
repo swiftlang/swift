@@ -23,7 +23,7 @@ autoreleasepool {
   do {
     let data = NSData(bytes: [2, 3, 5, 7] as [UInt8], length: 4)
     hangCanary(data)
-    bytes = data.bytes.asPointerTo(UInt8.self).asMutablePointer
+    bytes = UnsafeMutablePointer<UInt8>(data.bytes)
   } while false // CHECK-NOT: died
   println(bytes[0]) // CHECK:      2
   println(bytes[1]) // CHECK-NEXT: 3
@@ -39,7 +39,7 @@ autoreleasepool {
     let data = NSData(bytes: [11, 13, 17, 19] as [UInt8], length: 4)
     hangCanary(data)
     let dataAsAny: AnyObject = data
-    bytes = dataAsAny.bytes!.asPointerTo(UInt8.self).asMutablePointer
+    bytes = UnsafeMutablePointer<UInt8>(dataAsAny.bytes!)
   } while false // CHECK-NOT: died
   println(bytes[0]) // CHECK:      11
   println(bytes[1]) // CHECK-NEXT: 13

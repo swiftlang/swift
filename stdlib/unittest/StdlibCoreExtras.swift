@@ -71,8 +71,8 @@ func withArrayOfCStrings<R>(
 
   return argsBuffer.withUnsafeBufferPointer {
     (argsBuffer) in
-    let ptr = argsBuffer.baseAddress.asPointerTo(CChar.self)
-    var cStrings = Array(map(argsOffsets) { ptr.asMutablePointer + $0 })
+    let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
+    var cStrings = Array(map(argsOffsets) { ptr + $0 })
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
@@ -97,8 +97,7 @@ struct _FDOutputStream : OutputStreamType {
       let bufferSize = size_t(utf8.count - 1)
       while writtenBytes != bufferSize {
         let result = Darwin.write(
-          self.fd,
-          (utf8.baseAddress + Int(writtenBytes)).asPointerTo(Void.self),
+          self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
           fatalError("write() returned an error")
@@ -113,10 +112,8 @@ func _stdlib_mkstemps(inout template: String, suffixlen: CInt) -> CInt {
   var utf8 = template.nulTerminatedUTF8
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
-    let fd = mkstemps(
-      utf8.baseAddress.asPointerTo(Int8.self), suffixlen)
-    let fileName = String.fromCString(
-      utf8.baseAddress.asPointerTo(CChar.self))!
+    let fd = mkstemps(UnsafeMutablePointer(utf8.baseAddress), suffixlen)
+    let fileName = String.fromCString(UnsafePointer(utf8.baseAddress))!
     return (fd, fileName)
   }
   template = fileName

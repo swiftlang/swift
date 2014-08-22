@@ -506,7 +506,7 @@ extension String {
       var stop_ = false
       body(line: line!, stop: &stop_)
       if stop_ {
-        stop.asPointerTo(ObjCBool.self).memory = true
+        UnsafeMutablePointer<ObjCBool>(stop).memory = true
       }
     }
   }
@@ -542,7 +542,7 @@ extension String {
       var stop_ = false
       body($0, self._range($1), self._range($2), &stop_)
       if stop_ {
-        $3.asPointerTo(ObjCBool.self).memory = true
+        UnsafeMutablePointer($3).memory = true
       }
     }
   }
@@ -577,7 +577,7 @@ extension String {
         &stop_)
       
       if stop_ {
-        $3.asPointerTo(ObjCBool.self).memory = true
+        UnsafeMutablePointer($3).memory = true
       }
     }
   }
@@ -790,7 +790,7 @@ extension String {
     freeWhenDone flag: Bool
   ) {
     self = NSString(
-      charactersNoCopy: utf16CodeUnitsNoCopy.asMutablePointer,
+      charactersNoCopy: UnsafeMutablePointer(utf16CodeUnitsNoCopy),
       length: count,
       freeWhenDone: flag)
   }

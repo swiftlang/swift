@@ -39,7 +39,7 @@ extension String {
     f: (UnsafePointer<Int8>)->Result
   ) -> Result {
     return self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      f($0.baseAddress.asPointerTo(Int8.self))
+      f(UnsafePointer($0.baseAddress))
     }
   }
 }

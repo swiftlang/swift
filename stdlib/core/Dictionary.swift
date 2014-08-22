@@ -1661,7 +1661,7 @@ class _CocoaDictionaryGenerator : GeneratorType {
           &fastEnumerationState, &fastEnumerationStackBuf) {
         (statePtr, bufPtr) -> Int in
         cocoaDictionary.countByEnumeratingWithState(
-          statePtr, objects: bufPtr.asPointerTo(AnyObject.self),
+          statePtr, objects: UnsafeMutablePointer(bufPtr),
           count: stackBufLength)
       }
       if itemCount == 0 {
@@ -1670,7 +1670,8 @@ class _CocoaDictionaryGenerator : GeneratorType {
       }
       itemIndex = 0
     }
-    let itemsPtrUP = fastEnumerationState.itemsPtr.unsafePointer.asPointerTo(AnyObject.self)
+    let itemsPtrUP: UnsafeMutablePointer<AnyObject> =
+        UnsafeMutablePointer(fastEnumerationState.itemsPtr)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     ++itemIndex
@@ -2571,7 +2572,7 @@ struct _UnmanagedAnyObjectArray {
   var value: UnsafeMutablePointer<Word>
 
   init(_ up: UnsafeMutablePointer<AnyObject>) {
-    self.value = up.asPointerTo(Word.self)
+    self.value = UnsafeMutablePointer(up)
   }
 
   subscript(i: Int) -> AnyObject {

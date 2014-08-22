@@ -110,7 +110,7 @@ extension NSString : StringLiteralConvertible {
     var immutableResult: NSString
     if value.hasPointerRepresentation {
       immutableResult = NSString(
-        bytesNoCopy: value.utf8Start.asPointerTo(Void.self).asMutablePointer,
+        bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
         length: Int(value.byteSize),
         encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
         freeWhenDone: false)
@@ -178,7 +178,7 @@ func _cocoaStringToContiguousImpl(
 
   CFStringGetCharacters(
     cfSelf, CFRange(location: startIndex, length: count), 
-    buffer.start.asPointerTo(UniChar.self))
+    UnsafeMutablePointer<UniChar>(buffer.start))
   
   return buffer
 }
@@ -316,11 +316,10 @@ extension String {
 
     // start will hold the base pointer of contiguous storage, if it
     // is found.
-    var start = nulTerminatedASCII.asPointerTo(RawByte.self)
+    var start = UnsafeMutablePointer<RawByte>(nulTerminatedASCII)
     let isUTF16 = nulTerminatedASCII._isNull
     if (isUTF16) {
-      start = CFStringGetCharactersPtr(
-        cfImmutableValue).asPointerTo(RawByte.self)
+      start = UnsafeMutablePointer(CFStringGetCharactersPtr(cfImmutableValue))
     }
 
     self._core = _StringCore(
@@ -602,7 +601,7 @@ extension NSArray : ArrayLiteralConvertible {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     let result = self(
-      objects: x.baseAddress.asPointerTo(Optional<AnyObject>.self), count: x.count)
+      objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
     return result
   }
@@ -1190,8 +1189,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(
-      objects: x.baseAddress.asPointerTo(Optional<AnyObject>.self), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1222,9 +1220,7 @@ extension NSOrderedSet {
     // @objc(initWithObjects:count:)
     // init(withObjects objects: UnsafePointer<AnyObject?>,
     //      count cnt: Int)
-    self.init(
-      objects: x.baseAddress.asPointerTo(Optional<AnyObject>.self),
-      count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1238,9 +1234,7 @@ extension NSSet {
     // Imported as:
     // @objc(initWithObjects:count:)
     // init(withObjects objects: UnsafePointer<AnyObject?>, count cnt: Int)
-    self.init(
-      objects: x.baseAddress.asPointerTo(Optional<AnyObject>.self),
-      count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
     _fixLifetime(x)
   }
 }

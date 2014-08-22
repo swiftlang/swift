@@ -36,13 +36,13 @@ ${SelfName}TestSuite.test("initFromCOpaquePointer") {
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
   let other = UnsafePointer<Double>(bitPattern: 0x12345678)
-  let ptr = other.asPointerTo(Float.self)
+  let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
   let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
-  let ptr = other.asPointerTo(Float.self)
+  let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
 }
 

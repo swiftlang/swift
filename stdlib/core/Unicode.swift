@@ -780,8 +780,8 @@ extension UTF16 {
   ) {
     if strideof(T.self) == strideof(U.self) {
       _memcpy(
-        dest: destination.asPointerTo(Void.self),
-        src: source.asPointerTo(Void.self),
+        dest: UnsafeMutablePointer(destination),
+        src: UnsafeMutablePointer(source),
         size: UInt(count) * UInt(strideof(U.self)))
     }
     else {

@@ -200,9 +200,7 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
     i++
   }
   up[i] = 0
-  expectOptionalEqual(
-    s, String.stringWithUTF8String(
-      up.asImmutablePointer.asPointerTo(CChar.self)))
+  expectOptionalEqual(s, String.stringWithUTF8String(UnsafePointer(up)))
   up.dealloc(100)
 }
 
@@ -394,7 +392,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
     let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
     let bytes = Array(
       UnsafeBufferPointer(
-        start: data!.bytes.asPointerTo(UInt8.self), count: data!.length))
+        start: UnsafePointer<UInt8>(data!.bytes), count: data!.length))
     let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]
@@ -1868,7 +1866,7 @@ func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (up.asPointerTo(CChar.self), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
 func getIllFormedUTF8String1() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
@@ -1879,7 +1877,7 @@ func getIllFormedUTF8String1() -> (UnsafeMutablePointer<CChar>, dealloc: ()->())
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (up.asPointerTo(CChar.self), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
 func getIllFormedUTF8String2() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
@@ -1890,7 +1888,7 @@ func getIllFormedUTF8String2() -> (UnsafeMutablePointer<CChar>, dealloc: ()->())
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (up.asPointerTo(CChar.self), { up.dealloc(100) })
+  return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
 func asCCharArray(a: [UInt8]) -> [CChar] {

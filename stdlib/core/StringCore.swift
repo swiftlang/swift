@@ -418,9 +418,8 @@ public struct _StringCore {
       // FIXME: can we get Cocoa to tell us quickly that an opaque
       // string is ASCII?  Do we care much about that edge case?
       _sanityCheck(newStorage.elementShift == 1)
-      _cocoaStringReadAll(
-        source: cocoaBuffer!, 
-        destination: newStorage.start.asPointerTo(UTF16.CodeUnit.self))
+      _cocoaStringReadAll(source: cocoaBuffer!, 
+                          destination: UnsafeMutablePointer(newStorage.start))
     }
     
     self = _StringCore(newStorage)
@@ -631,7 +630,7 @@ extension _StringCore : RangeReplaceableCollectionType {
         }
       }
       else {
-        var dst = rangeStart.asPointerTo(UTF16.CodeUnit.self)
+        var dst = UnsafeMutablePointer<UTF16.CodeUnit>(rangeStart)
         for u in newValues {
           dst++.memory = u
         }

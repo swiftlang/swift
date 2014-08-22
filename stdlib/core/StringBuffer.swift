@@ -96,7 +96,7 @@ public struct _StringBuffer {
           elementWidth: isAscii ? 1 : 2)
 
       if isAscii {
-        var p = result.start.asPointerTo(UTF8.CodeUnit.self)
+        var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
         let hadError = transcode(encoding, UTF32.self, input.generate(),
             SinkOf {
               (p++).memory = UTF8.CodeUnit($0)
@@ -121,7 +121,7 @@ public struct _StringBuffer {
 
   /// a pointer to the start of this buffer's data area
   public var start: UnsafeMutablePointer<RawByte> {
-    return _storage.baseAddress.asPointerTo(RawByte.self)
+    return UnsafeMutablePointer(_storage.baseAddress)
   }
 
   /// a past-the-end pointer for this buffer's stored data
@@ -168,9 +168,7 @@ public struct _StringBuffer {
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  
-    let offset = (
-      r.startIndex - start.asPointerTo(RawByte.self)
-    ) >> elementShift
+    let offset = (r.startIndex - UnsafePointer(start)) >> elementShift
     return cap + offset <= capacity
   }
 
@@ -192,9 +190,7 @@ public struct _StringBuffer {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount += (
-      subRange.startIndex - start.asPointerTo(RawByte.self)
-    ) >> elementShift
+    newUsedCount += (subRange.startIndex - UnsafePointer(start)) >> elementShift
 
     if _slowPath(newUsedCount > capacity) {
       return false
@@ -216,11 +212,9 @@ public struct _StringBuffer {
     //  usedEnd = newUsedEnd
     //  return true
     // }
-    let usedEndPhysicalPtr = _storage._value.asPointerTo(
-      UnsafeMutablePointer<RawByte>.self)
-    
-    var expected = subRange.endIndex.asPointerTo(RawByte.self).asMutablePointer
-    
+    let usedEndPhysicalPtr =
+      UnsafeMutablePointer<UnsafeMutablePointer<RawByte>>(_storage._value)
+    var expected = UnsafeMutablePointer<RawByte>(subRange.endIndex)
     if _stdlib_atomicCompareExchangeStrongPtr(
       object: usedEndPhysicalPtr, expected: &expected, desired: newUsedEnd) {
       return true

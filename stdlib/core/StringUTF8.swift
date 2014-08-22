@@ -39,7 +39,7 @@ extension _StringCore {
       
       _memcpy(
         dest: UnsafeMutablePointer(Builtin.addressof(&result)), 
-        src: (startASCII + i).asPointerTo(Void.self), 
+        src: UnsafeMutablePointer(startASCII + i), 
         size: numericCast(utf16Count))
       
       return (i + utf16Count, result)
