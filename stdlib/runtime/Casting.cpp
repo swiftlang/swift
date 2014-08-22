@@ -509,13 +509,6 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   }
 }
 
-const void *
-swift::swift_dynamicCastForeignClass(const void *object,
-                                     const ForeignClassMetadata *targetType) {
-  // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
-  return object;
-}
-
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
 const void *
@@ -553,14 +546,6 @@ swift::swift_dynamicCastUnknownClass(const void *object,
     swift::crash("Swift dynamic cast failed");
   }
   swift::crash("bad metadata kind!");
-}
-
-const void *
-swift::swift_dynamicCastForeignClassUnconditional(
-         const void *object,
-         const ForeignClassMetadata *targetType) {
-  // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
-  return object;
 }
 
 /// Perform a dynamic class of some sort of class instance to some
@@ -630,7 +615,15 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
         return origSourceType;
       return nullptr;
     }
-    case MetadataKind::ForeignClass: // FIXME
+    case MetadataKind::ForeignClass: {
+      // Check if the source is a subclass of the target.
+      if (swift_dynamicCastForeignClassMetatype(
+            (const ClassMetadata*)sourceType,
+              (const ClassMetadata*)targetType))
+        return origSourceType;
+      return nullptr;
+    }
+
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -647,7 +640,37 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     }
     break;
       
-  case MetadataKind::ForeignClass: // FIXME
+  case MetadataKind::ForeignClass:
+    switch (sourceType->getKind()) {
+    case MetadataKind::ObjCClassWrapper:
+      // Get the actual class object.
+      sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
+        ->Class;
+      SWIFT_FALLTHROUGH;
+    case MetadataKind::Class:
+    case MetadataKind::ForeignClass:
+      // Check if the source is a subclass of the target.
+      if (swift_dynamicCastForeignClassMetatype(
+            (const ClassMetadata*)sourceType,
+              (const ClassMetadata*)targetType))
+        return origSourceType;
+      return nullptr;
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Function:
+    case MetadataKind::Block:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      return nullptr;
+    }
+    break;
+
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -697,7 +720,14 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       // If we returned, then the cast succeeded.
       return origSourceType;
     }
-    case MetadataKind::ForeignClass: // FIXME
+    case MetadataKind::ForeignClass: {
+      // Check if the source is a subclass of the target.
+      swift_dynamicCastForeignClassMetatypeUnconditional(
+                                            (const ClassMetadata*)sourceType,
+                                            (const ClassMetadata*)targetType);
+      // If we returned, then the cast succeeded.
+      return origSourceType;
+    }
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -713,8 +743,38 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       _dynamicCastFailure(sourceType, targetType);
     }
     break;
-      
-  case MetadataKind::ForeignClass: // FIXME
+    
+  case MetadataKind::ForeignClass:
+    // The source value must also be a class; otherwise the cast fails.
+    switch (sourceType->getKind()) {
+    case MetadataKind::ObjCClassWrapper:
+      // Get the actual class object.
+      sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
+        ->Class;
+      SWIFT_FALLTHROUGH;
+    case MetadataKind::Class:
+    case MetadataKind::ForeignClass:
+      // Check if the source is a subclass of the target.
+      swift_dynamicCastForeignClassMetatypeUnconditional(
+                                            (const ClassMetadata*)sourceType,
+                                            (const ClassMetadata*)targetType);
+      // If we returned, then the cast succeeded.
+      return origSourceType;
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Function:
+    case MetadataKind::Block:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      _dynamicCastFailure(sourceType, targetType);
+    }
+    break;
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -1128,8 +1188,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                          flags);
       }
 
-      // FIXME: _fail?
-      return false;
+      return _fail(src, srcType, targetType, flags);
     }
 
     case MetadataKind::ExistentialMetatype:
@@ -1141,7 +1200,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Opaque:
     case MetadataKind::PolyFunction:
     case MetadataKind::Tuple:
-      return false;
+      return _fail(src, srcType, targetType, flags);
     }
     break;
 
@@ -1474,8 +1533,6 @@ recur:
   }
   
   // If the type was a class, try again with the superclass.
-  // FIXME: This isn't sound if the conformance isn't heritable, but the
-  // protocols we're using with this hack all should be.
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto theClass = static_cast<const ClassMetadata *>(type);

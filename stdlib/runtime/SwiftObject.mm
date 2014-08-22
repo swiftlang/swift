@@ -564,6 +564,20 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
   swift::crash("Swift dynamic cast failed");
 }
 
+const void *
+swift::swift_dynamicCastForeignClass(const void *object,
+                                     const ForeignClassMetadata *targetType) {
+  // FIXME: Actually compare CFTypeIDs, once they are available in the metadata.
+  return object;
+}
+
+const void *
+swift::swift_dynamicCastForeignClassUnconditional(
+         const void *object,
+         const ForeignClassMetadata *targetType) {
+  // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
+  return object;
+}
 
 /// \brief Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
@@ -644,6 +658,24 @@ swift::swift_dynamicCastObjCClassMetatypeUnconditional(
   if ([(Class)source isSubclassOfClass:(Class)dest])
     return source;
   swift::crash("Swift dynamic cast failed");
+}
+
+const ClassMetadata *
+swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
+                                             const ClassMetadata *targetType) {
+  // FIXME: Actually compare CFTypeIDs, once they arae available in
+  // the metadata.
+  return sourceType;
+}
+
+const ClassMetadata *
+swift::swift_dynamicCastForeignClassMetatypeUnconditional(
+  const ClassMetadata *sourceType,
+  const ClassMetadata *targetType) 
+{
+  // FIXME: Actually compare CFTypeIDs, once they arae available in
+  // the metadata.
+  return sourceType;
 }
 
 extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,

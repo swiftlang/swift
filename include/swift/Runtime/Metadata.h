@@ -2025,6 +2025,14 @@ swift_dynamicCastObjCClassMetatype(const ClassMetadata *sourceType,
 extern "C" const ClassMetadata *
 swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
                                                 const ClassMetadata *targetType);
+
+extern "C" const ClassMetadata *
+swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
+                                   const ClassMetadata *targetType);
+extern "C" const ClassMetadata *
+swift_dynamicCastForeignClassMetatypeUnconditional(
+  const ClassMetadata *sourceType,
+  const ClassMetadata *targetType);
   
 /// \brief Return the dynamic type of an opaque value.
 ///
