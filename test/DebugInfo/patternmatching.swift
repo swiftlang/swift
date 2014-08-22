@@ -20,7 +20,7 @@ func classifyPoint2(p: (Double, Double)) {
         case (var x, var y) where
           // CHECK:   call double {{.*}}return_same{{.*}}, !dbg ![[LOC1:.*]]
           // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC1]]
-          // CHECK: convertFromBuiltinUTF16StringLiteral{{.*}}, !dbg ![[LOC2:.*]]
+          // CHECK: convertFromBuiltin{{(UTF16)?}}StringLiteral{{.*}}, !dbg ![[LOC2:.*]]
           // CHECK: ![[LOC1]] = metadata !{i32 [[@LINE+1]], i32
                             return_same(x) == return_same(y):
           // CHECK: ![[LOC2]] = metadata !{i32 [[@LINE+1]], i32

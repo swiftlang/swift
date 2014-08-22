@@ -1502,14 +1502,27 @@ namespace {
       Diag<> brokenBuiltinProtocolDiag;
 
       if (isStringLiteral) {
+        // If the string contains only ASCII, force a UTF8 representation
+        bool forceASCII = stringLiteral != nullptr;
+        if (forceASCII) {
+          for (auto c: stringLiteral->getValue()) {
+            if (c & (1 << 7)) {
+              forceASCII = false;
+              break;
+            }
+          }
+        }
+        
         literalType = tc.Context.Id_StringLiteralType;
         literalFuncName = tc.Context.Id_ConvertFromStringLiteral;
 
-        // If the type can handle UTF-16 string literals, prefer them.
+        // If the string contains non-ASCII and the type can handle
+        // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
-        if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
+        if (!forceASCII &&
+            tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
           elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));

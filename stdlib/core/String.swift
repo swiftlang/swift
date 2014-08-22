@@ -118,6 +118,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 }
 
 extension String : _BuiltinStringLiteralConvertible {
+  @effects(readonly)
   public
   static func _convertFromBuiltinStringLiteral(
     start: Builtin.RawPointer,

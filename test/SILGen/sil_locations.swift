@@ -261,7 +261,7 @@ func tuple_element(x: (Int, Float)) {
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
   // CHECK-LABEL: sil @_TF13sil_locations10containers
-  // CHECK: string_literal utf16 "Ankeny"                             {{.*}} line:[[@LINE-2]]:23
+  // CHECK: string_literal utf8 "Ankeny"                             {{.*}} line:[[@LINE-2]]:23
 
   // CHECK: integer_literal $Builtin.Int2048, 1                      {{.*}} line:[[@LINE-4]]:33
   // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-5]]:48

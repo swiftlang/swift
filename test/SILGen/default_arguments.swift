@@ -14,11 +14,11 @@
 
 // Default argument for third parameter.
 // CHECK-LABEL: sil  @_TIF17default_arguments7defarg1{{.*}} : $@thin () -> @owned String
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSS37_convertFromBuiltinUTF16
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSS32_convertFromBuiltinStringLiteral
 // CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
-// CHECK: [[LIT:%[0-9]+]] = string_literal utf16 "Hello"
+// CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], [[STRING]]) : $@thin
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@thin
 // CHECK: return [[RESULT]] : $String
 func defarg1(i: Int = 17, #d: Double, s: String = "Hello") { }
 

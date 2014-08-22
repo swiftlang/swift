@@ -4,4 +4,4 @@ func bar<T, U>(x: T, y: U) { println("bar") }
 // Make sure there is no allocation happening between the end of
 // prologue and the beginning of the function body.
 // CHECK-NOT: callq	*
-// CHECK: callq	{{.*}}convertFromBuiltinUTF16StringLiteral
+// CHECK: callq	{{.*}}convertFromBuiltin{{(UTF16)?}}StringLiteral

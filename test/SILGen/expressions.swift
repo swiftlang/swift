@@ -70,14 +70,14 @@ func literals() {
   var a = 1
   var b = 1.25
   var c = 'x'
-  var d = "foo"
+  var d = "foö"
   var e:SillyString = "foo"
 }
 // CHECK-LABEL: sil  @_TF11expressions8literalsFT_T_
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE64, 0x3FF4000000000000
 // CHECK: integer_literal $Builtin.Int32, 120
-// CHECK: string_literal utf16 "foo"
+// CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
 
 func bar(x: Int) {}
@@ -485,8 +485,8 @@ func magic_identifier_expansion(a: Int = __COLUMN__) {
 
 func print_string() {
   // CHECK-LABEL: print_string
-  var str = "\u{08}\u{09}\thello\r\n\0world\u{1e}\u{7f}"
-  // CHECK: string_literal utf16 "\u{08}\t\thello\r\n\0world\u{1E}\u{7F}"
+  var str = "\u{08}\u{09}\thello\r\n\0wörld\u{1e}\u{7f}"
+  // CHECK: string_literal utf16 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
 }
 
 

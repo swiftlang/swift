@@ -18,10 +18,10 @@ struct SillyCharacter :
   }
 }
 
-// CHECK: private unnamed_addr constant [22 x i16] [i16 116, i16 104, i16 105, i16 115, i16 32, i16 105, i16 115, i16 32, i16 106, i16 117, i16 115, i16 116, i16 32, i16 97, i16 10, i16 10, i16 32, i16 116, i16 101, i16 115, i16 116, i16 0]
+// CHECK: private unnamed_addr constant [22 x i8] c"this is just a\0A\0A test\00"
 
 // CHECK: define [[stringLayout:[^@]*]] @_TF11expressions17TestStringLiteralFT_SS() {
-// CHECK: call [[stringLayout]] @_TFSS37_convertFromBuiltinUTF16StringLiteral{{.*}}(i8* bitcast ([22 x i16]* @0 to i8*), i64 21)
+// CHECK: call [[stringLayout]] @_TFSS32_convertFromBuiltinStringLiteral{{.*}}(i8* getelementptr inbounds ([22 x i8]* @0, i64 0, i64 0), i64 21, i1 true)
 
 func TestStringLiteral() -> String {
   return "this is just a\n\u{0a} test"

@@ -17,7 +17,7 @@ import gizmo
 // OPT:         [[OPT:%.*]] = unchecked_ref_bit_cast
 // OPT:         switch_enum [[OPT]] : $Optional<NSObject>, case #Optional.None!enumelt: [[NIL:bb[0-9]+]]
 // OPT:       [[NIL]]:
-// OPT:         string_literal utf16 "nil"
+// OPT:         string_literal utf8 "nil"
 
 func makeObject() -> NSObject? {
   let foo: NSObject? = NSObject()
