@@ -2466,7 +2466,10 @@ namespace {
       // Complain about conditional casts to foreign class types; they can't
       // actually be conditionally checked.
       if (conditionalCast) {
-        if (auto destClass = destValueType->getClassOrBoundGenericClass()) {
+        auto destObjectType = destValueType;
+        if (auto metaTy = destObjectType->getAs<MetatypeType>())
+          destObjectType = metaTy->getInstanceType();
+        if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
           if (destClass->isForeign()) {
             tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
                         destValueType);
