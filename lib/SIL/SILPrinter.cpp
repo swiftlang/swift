@@ -34,10 +34,15 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
 
 using namespace swift;
 using namespace demangle_wrappers;
+
+llvm::cl::opt<bool>
+SILPrintNoColor("sil-print-no-color", llvm::cl::init(""),
+                llvm::cl::desc("Don't use color when printing SIL"));
 
 struct ID {
   enum ID_Kind {
@@ -71,7 +76,7 @@ public:
 #define DEF_COL(NAME, RAW) case NAME: Color = raw_ostream::RAW; break;
 
   explicit SILColor(raw_ostream &OS, SILColorKind K) : OS(OS) {
-    if (!OS.has_colors())
+    if (!OS.has_colors() || SILPrintNoColor)
       return;
     switch (K) {
       DEF_COL(SC_Type, YELLOW)
@@ -81,7 +86,7 @@ public:
   }
 
   explicit SILColor(raw_ostream &OS, ID::ID_Kind K) : OS(OS) {
-    if (!OS.has_colors())
+    if (!OS.has_colors() || SILPrintNoColor)
       return;
     switch (K) {
       DEF_COL(ID::SILUndef, RED)
@@ -93,7 +98,7 @@ public:
   }
   
   ~SILColor() {
-    if (!OS.has_colors())
+    if (!OS.has_colors() || SILPrintNoColor)
       return;
     // FIXME: instead of resetColor(), we can look into
     // capturing the current active color and restoring it.
