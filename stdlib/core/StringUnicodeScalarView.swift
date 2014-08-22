@@ -174,6 +174,8 @@ extension String {
             if e2 < e1 {
               return 1
             }
+            // Note: using modular arithmetic because indicies are range
+            // checked in the condition above.
             aIdx = aIdx &+ 1
             bIdx = bIdx &+ 1
             continue // equivalent
