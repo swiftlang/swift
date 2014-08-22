@@ -91,6 +91,12 @@ namespace irgen {
                        CanSILBlockStorageType blockTy,
                        llvm::Function *invokeFunction,
                        CanSILFunctionType invokeTy);
+
+  /// Can a series of values be simply pairwise coerced to (or from) an
+  /// explosion schema, or do they need to traffic through memory?
+  bool canCoerceToSchema(IRGenModule &IGM,
+                         ArrayRef<llvm::Type*> types,
+                         const ExplosionSchema &schema);
   
 } // end namespace irgen
 } // end namespace swift

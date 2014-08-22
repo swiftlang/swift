@@ -69,3 +69,7 @@ static inline One makeOne(float f, float s) {
 
   return one;
 }
+
+static inline float MyRect_Area(struct MyRect rect) {
+  return rect.width * rect.height;
+}

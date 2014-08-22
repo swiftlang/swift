@@ -1015,9 +1015,17 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       addExtendAttribute(IGM, Attrs, getCurParamIndex()+1, signExt);
       SWIFT_FALLTHROUGH;
     }
-    case clang::CodeGen::ABIArgInfo::Direct:
-      ParamIRTypes.push_back(AI.getCoerceToType());
+    case clang::CodeGen::ABIArgInfo::Direct: {
+      // If the coercion type is a struct, we need to expand it.
+      auto type = AI.getCoerceToType();
+      if (auto expandedType = dyn_cast<llvm::StructType>(type)) {
+        for (size_t j = 0, e = expandedType->getNumElements(); j != e; ++j)
+          ParamIRTypes.push_back(expandedType->getElementType(j));
+      } else {
+        ParamIRTypes.push_back(type);
+      }
       break;
+    }
     case clang::CodeGen::ABIArgInfo::Indirect: {
       assert(i >= paramOffset &&
              "Unexpected index for indirect byval argument");
@@ -2222,12 +2230,93 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   return ti.getStorageType()->getPointerTo();
 }
 
+bool irgen::canCoerceToSchema(IRGenModule &IGM,
+                              ArrayRef<llvm::Type*> expandedTys,
+                              const ExplosionSchema &schema) {
+  // If the schemas don't even match in number, we have to go
+  // through memory.
+  if (expandedTys.size() != schema.size())
+    return false;
+
+  // If there's just one element, we can always coerce as a scalar.
+  if (expandedTys.size() == 1) return true;
+
+  // If there are multiple elements, the pairs of types need to
+  // match in size for the coercion to work.
+  for (size_t i = 0, e = expandedTys.size(); i != e; ++i) {
+    llvm::Type *inputTy = schema[i].getScalarType();
+    llvm::Type *outputTy = expandedTys[i];
+    if (inputTy != outputTy &&
+        IGM.DataLayout.getTypeSizeInBits(inputTy) !=
+        IGM.DataLayout.getTypeSizeInBits(outputTy))
+      return false;
+  }
+
+  // Okay, everything is fine.
+  return true;
+}
+
+static void emitDirectExternalArgument(IRGenFunction &IGF,
+                                       SILType argType, llvm::Type *toTy,
+                                       Explosion &in, Explosion &out) {
+  // If we're supposed to pass directly as a struct type, that
+  // really means expanding out as multiple arguments.
+  ArrayRef<llvm::Type*> expandedTys;
+  if (auto expansionTy = dyn_cast<llvm::StructType>(toTy)) {
+    // Is there any good reason this isn't public API of llvm::StructType?
+    expandedTys = makeArrayRef(expansionTy->element_begin(),
+                               expansionTy->getNumElements());
+  } else {
+    expandedTys = toTy;
+  }
+
+  auto &argTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(argType));
+  auto inputSchema = argTI.getSchema(in.getKind());
+
+  // Check to see if we can pairwise coerce Swift's exploded scalars
+  // to Clang's expanded elements.
+  if (canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
+    for (auto outputTy : expandedTys) {
+      llvm::Value *arg = in.claimNext();
+      if (arg->getType() != outputTy)
+        arg = IGF.coerceValue(arg, outputTy, IGF.IGM.DataLayout);
+      out.add(arg);
+    }
+    return;
+  }
+
+  // Otherwise, we need to coerce through memory.
+
+  // Store to a temporary.
+  Address temporary = argTI.allocateStack(IGF, argType.getSwiftRValueType(),
+                                          "coerced-arg").getAddress();
+  argTI.initializeFromParams(IGF, in, temporary, argType.getSwiftRValueType());
+
+  // Bitcast the temporary to the expected type.
+  Address coercedAddr =
+    IGF.Builder.CreateBitCast(temporary, toTy->getPointerTo());
+
+  // Project out individual elements if necessary.
+  if (auto expansionTy = dyn_cast<llvm::StructType>(toTy)) {
+    auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
+    for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
+      auto fieldOffset = Size(layout->getElementOffset(i));
+      auto fieldAddr = IGF.Builder.CreateStructGEP(coercedAddr, i, fieldOffset);
+      out.add(IGF.Builder.CreateLoad(fieldAddr));
+    }
+
+  // Otherwise, collect the single scalar.
+  } else {
+    out.add(IGF.Builder.CreateLoad(coercedAddr));
+  }
+
+  argTI.deallocateStack(IGF, temporary, argType.getSwiftRValueType());
+}
+
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                                  ArrayRef<SILParameterInfo> &params) {
-
-  unsigned paramOffset = 0;
 
   SmallVector<clang::CanQualType,4> paramTys;
   auto const &clangCtx = IGF.IGM.getClangASTContext();
@@ -2242,7 +2331,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
-    paramOffset = 2;
   }
 
   for (auto param : params) {
@@ -2262,65 +2350,45 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   assert(FI.arg_size() == paramTys.size() &&
          "Expected one ArgInfo for each parameter type!");
 
-  for (auto i : indices(paramTys)) {
+  // The index of the first "physical" parameter from paramTys/FI that
+  // corresponds to a logical parameter from params.
+  unsigned firstParam = 0;
+
+  // Handle the ObjC prefix.
+  if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
+    // The first two parameters are pointers, and we make some
+    // simplifying assumptions.
+    assert(FI.arg_begin()[0].info.isDirect());
+    assert(!FI.arg_begin()[0].info.getPaddingType());
+    assert(FI.arg_begin()[1].info.isDirect());
+    assert(!FI.arg_begin()[1].info.getPaddingType());
+
+    // We do not have SILParameterInfo for the self and _cmd arguments,
+    // but we expect these to be internally consistent in the compiler
+    // so we shouldn't need to do any coercion.
+    out.add(in.claimNext());
+    out.add(in.claimNext());
+    firstParam = 2;
+  }
+
+  for (auto i : indices(paramTys).slice(firstParam)) {
     auto &AI = FI.arg_begin()[i].info;
 
     // Add a padding argument if required.
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
 
+    SILType paramType = params[i - firstParam].getSILType();
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend:
       // FIXME: Handle extension attribute.
       SWIFT_FALLTHROUGH;
-    case clang::CodeGen::ABIArgInfo::Direct: {
-      // Direct arguments that are passed as scalars or aggregates.
-      auto toTy = AI.getCoerceToType();
-
-      if (i < paramOffset) {
-        // We do not have SILParameterInfo for the self and _cmd arguments,
-        // but we expect these to be internally consistent in the compiler
-        // so we shouldn't need to do any coercion.
-        assert(callee.getAbstractCC() == AbstractCC::ObjCMethod &&
-               "Unexpected index in externalizing arguments!");
-        out.add(in.claimNext());
-        continue;
-      }
-
-      auto ty = params[i - paramOffset].getSILType();
-      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
-
-      // If the exploded parameter is just one value, we can just
-      // transfer it or if necessary coerce it with a bitcast or single
-      // store/load pair.
-      auto schema = ti.getSchema(out.getKind());
-      if (schema.size() == 1) {
-        auto *arg = in.claimNext();
-        if (arg->getType() != toTy)
-          arg = IGF.coerceValue(arg, toTy, IGF.IGM.DataLayout);
-
-        out.add(arg);
-        continue;
-      }
-
-      // Otherwise we need to store multiple values and then load the
-      // aggregate.
-      auto swiftTy = ty.getSwiftRValueType();
-      Address addr = ti.allocateStack(IGF, swiftTy, "coerced-arg").getAddress();
-      ti.initializeFromParams(IGF, in, addr, swiftTy);
-
-      auto *coerced = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                                toTy->getPointerTo());
-      auto *value = IGF.Builder.CreateLoad(coerced);
-      out.add(value);
+    case clang::CodeGen::ABIArgInfo::Direct:
+      emitDirectExternalArgument(IGF, paramType, AI.getCoerceToType(), in, out);
       break;
-    }
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(i >= paramOffset &&
-             "Unexpected index for indirect argument");
-      auto ty = params[i - paramOffset].getSILType();
-      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
-      Address addr = ti.allocateStack(IGF, ty.getSwiftRValueType(),
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
+      Address addr = ti.allocateStack(IGF, paramType.getSwiftRValueType(),
                                       "indirect-temporary").getAddress();
       ti.initialize(IGF, in, addr);
 
@@ -2330,8 +2398,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       break;
     }
     case clang::CodeGen::ABIArgInfo::Expand: {
-      auto ty = params[i - paramOffset].getSILType();
-      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
       ti.reexplode(IGF, in, out);
       break;
     }

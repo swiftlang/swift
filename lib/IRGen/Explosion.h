@@ -243,6 +243,10 @@ public:
     return size() == 1 && containsAggregate();
   }
 
+  const Element &operator[](size_t index) const {
+    return Elements[index];
+  }
+
   bool requiresIndirectResult(IRGenModule &IGM) const;
 
   typedef SmallVectorImpl<Element>::iterator iterator;

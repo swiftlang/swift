@@ -872,6 +872,80 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
   }  
 }
 
+/// Emit a direct parameter that was passed under a native CC.
+static void emitDirectExternalParameter(IRGenSILFunction &IGF,
+                                        Explosion &in,
+                                        llvm::Type *coercionTy,
+                                        Explosion &out,
+                                        SILType paramType,
+                                        const LoadableTypeInfo &paramTI) {
+  // The ABI IR types for the entrypoint might differ from the
+  // Swift IR types for the body of the function.
+
+  ArrayRef<llvm::Type*> expandedTys;
+  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
+    expandedTys = makeArrayRef(expansionTy->element_begin(),
+                               expansionTy->getNumElements());
+
+  // Fast-path a really common case.  This check assumes that either
+  // the storage type of a type is an llvm::StructType or it has a
+  // single-element explosion.
+  } else if (coercionTy == paramTI.StorageType) {
+    out.add(in.claimNext());
+    return;
+  } else {
+    expandedTys = coercionTy;
+  }
+
+  auto outputSchema = paramTI.getSchema(out.getKind());
+
+  // Check to see if we can pairwise-coerce Swift's exploded scalars
+  // to Clang's expanded elements.
+  if (canCoerceToSchema(IGF.IGM, expandedTys, outputSchema)) {
+    for (auto &outputElt : outputSchema) {
+      llvm::Value *param = in.claimNext();
+      llvm::Type *outputTy = outputElt.getScalarType();
+      if (param->getType() != outputTy)
+        param = IGF.coerceValue(param, outputTy, IGF.IGM.DataLayout);
+      out.add(param);
+    }
+    return;
+  }
+
+  // Otherwise, we need to traffic through memory.
+  assert((IGF.IGM.DataLayout.getTypeSizeInBits(coercionTy) ==
+          IGF.IGM.DataLayout.getTypeSizeInBits(paramTI.StorageType))
+         && "Coerced types should not differ in size!");
+
+  // Create a temporary.
+  Address temporary = paramTI.allocateStack(IGF, paramType.getSwiftRValueType(),
+                                            "coerced-param").getAddress();
+
+  // Write the input parameters into the temporary:
+  Address coercedAddr =
+    IGF.Builder.CreateBitCast(temporary, coercionTy->getPointerTo());
+
+  // Break down a struct expansion if necessary.
+  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
+    auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
+    for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
+      auto fieldOffset = Size(layout->getElementOffset(i));
+      auto fieldAddr = IGF.Builder.CreateStructGEP(coercedAddr, i, fieldOffset);
+      IGF.Builder.CreateStore(in.claimNext(), fieldAddr);
+    }
+
+  // Otherwise, store the single scalar.
+  } else {
+    IGF.Builder.CreateStore(in.claimNext(), coercedAddr);
+  }
+
+  // Pull out the elements.
+  paramTI.loadAsTake(IGF, temporary, out);
+
+  // Deallocate the temporary.
+  paramTI.deallocateStack(IGF, temporary, paramType.getSwiftRValueType());
+}
+
 /// Emit entry point arguments for a SILFunction with the Swift calling
 /// convention.
 static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
@@ -1016,43 +1090,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend:
     case clang::CodeGen::ABIArgInfo::Direct: {
-
-      // The ABI IR types for the entrypoint might differ from the
-      // Swift IR types for the body of the function.
-
-      auto *value = params.claimNext();
-      auto *fromTy = value->getType();
-
-      // If the argument explodes to a single element in the body of
-      // the function, we might be able to use it directly, or coerce
-      // it to the appropriate type easily.
-      ExplosionSchema schema = argTI.getSchema(IGF.CurSILFnExplosionLevel);
-      if (schema.size() == 1) {
-        auto &element = *schema.begin();
-        auto *toValTy = element.isScalar() ?
-          element.getScalarType() : element.getAggregateType();
-        if (fromTy == toValTy) {
-          argExplosion.add(value);
-          IGF.setLoweredExplosion(arg, argExplosion);
-          continue;
-        }
-      }
-
-      // Otherwise we need to store the incoming value and then load
-      // to an explosion of the right types.
-      auto *toTy = loadableArgTI.getStorageType();
-
-      assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
-              IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
-             && "Coerced types should not differ in size!");
-
-      auto address = IGF.createAlloca(fromTy, loadableArgTI.getFixedAlignment(),
-                                      value->getName() + ".coerced");
-      IGF.Builder.CreateStore(value, address.getAddress());
-      auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
-                                                toTy->getPointerTo());
-      loadableArgTI.loadAsTake(IGF, Address(coerced, address.getAlignment()),
-                               argExplosion);
+      emitDirectExternalParameter(IGF, params, AI.getCoerceToType(),
+                                  argExplosion, arg->getType(), loadableArgTI);
       IGF.setLoweredExplosion(arg, argExplosion);
       continue;
     }

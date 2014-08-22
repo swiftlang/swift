@@ -37,7 +37,7 @@ class Foo {
   }
 
   // x86_64-macosx: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
-  // x86_64-macosx: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, { <2 x float>, <2 x float> }) unnamed_addr {
+  // x86_64-macosx: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, <2 x float>, <2 x float>) unnamed_addr {
   // armv7-ios: define float @_TFC8abitypes3Foo12getXFromRect{{.*}}(float, float, float, float, %C8abitypes3Foo*) {
   // armv7-ios: define internal float @_TToFC8abitypes3Foo12getXFromRect{{.*}}(i8*, i8*, { [4 x i32] }) unnamed_addr {
   dynamic func getXFromRect(r: MyRect) -> Float {
@@ -50,9 +50,12 @@ class Foo {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // x86_64-macosx: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 8
   // x86_64-macosx: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to { <2 x float>, <2 x float> }*
-  // x86_64-macosx: [[LOADED:%.*]] = load { <2 x float>, <2 x float> }* [[CAST]]
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
+  // x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>* [[T0]]
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
+  // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>* [[T0]]
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
-  // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, { <2 x float>, <2 x float> })*)(i8* [[SELFCAST]], i8* [[SEL]], { <2 x float>, <2 x float> } [[LOADED]])
+  // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*,  <2 x float>, <2 x float>)*)(i8* [[SELFCAST]], i8* [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
   // armv7-ios: define float @_TFC8abitypes3Foo17getXFromRectSwift{{.*}}(float, float, float, float, [[SELF:%.*]]*) {
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8** @"\01L_selector(getXFromRect:)", align 4
@@ -310,11 +313,7 @@ class Foo {
   // x86_64-macosx: define internal void @_TToFC8abitypes3Foo13testArchetypef{{.*}}(i8*, i8*, i8*) unnamed_addr {
   dynamic func testArchetype(work: Work) {
     work.doStuff(1)
-    // x86_64-macosx: [[PROTOCOL:%.*]] = alloca i8*, align 8
-    // x86_64-macosx: store i8* %2, i8** [[PROTOCOL]]
-    // x86_64-macosx: [[WORKPTR:%.*]] = bitcast i8** %.coerced to %P8abitypes4Work_*
-    // x86_64-macosx: [[GEP:%.*]] = getelementptr inbounds %P8abitypes4Work_* [[WORKPTR]], i32 0, i32 0
-    // x86_64-macosx: [[OBJCPTR:%.*]] = load %objc_object** [[GEP]], align 8
+    // x86_64-macosx: [[OBJCPTR:%.*]] = bitcast i8* %2 to %objc_object*
     // x86_64-macosx: call void @_TFC8abitypes3Foo13testArchetype{{.*}}(%objc_object* [[OBJCPTR]], %C8abitypes3Foo* %{{.*}})
   }
 
@@ -345,3 +344,21 @@ class Foo {
 }
 
 // armv7-ios: define internal void @makeOne(%struct.One* noalias sret %agg.result, float %f, float %s)
+
+// rdar://17631440 - Expand direct arguments that are coerced to aggregates.
+// x86_64-macosx: define float @_TF8abitypes13testInlineAggFVSC6MyRectSf(float, float, float, float) {
+// x86_64-macosx: [[COERCED:%.*]] = alloca %VSC6MyRect, align 4
+// x86_64-macosx: store float %0,
+// x86_64-macosx: store float %1,
+// x86_64-macosx: store float %2,
+// x86_64-macosx: store float %3,
+// x86_64-macosx: [[CAST:%.*]] = bitcast %VSC6MyRect* [[COERCED]] to { <2 x float>, <2 x float> }*
+// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
+// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
+// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>* [[T0]], align 4
+// x86_64-macosx: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
+// x86_64-macosx: ret float [[RESULT]]
+func testInlineAgg(rect: MyRect) -> Float {
+  return MyRect_Area(rect)
+}
