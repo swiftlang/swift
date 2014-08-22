@@ -1220,6 +1220,35 @@ SwitchEnumInstBase::createSwitchEnum(SILLocation Loc, SILValue Operand,
   return ::new (buf) SWITCH_ENUM_INST(Loc, Operand, DefaultBB, CaseBBs);
 }
 
+EnumElementDecl *
+SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
+  SILValue value = getOperand();
+  SILType enumType = value.getType();
+  EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+  assert(decl && "switch_enum operand is not an enum");
+
+  llvm::SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
+  for (auto elt : decl->getAllElements())
+    unswitchedElts.insert(elt);
+
+  EnumElementDecl *D = nullptr;
+  for (unsigned i = 0, e = getNumCases(); i != e; ++i) {
+    auto Entry = getCase(i);
+    unswitchedElts.erase(Entry.first);
+    if (Entry.second == BB) {
+      if (D != nullptr)
+        return nullptr;
+      D = Entry.first;
+    }
+  }
+  if (!D && hasDefault() && unswitchedElts.size() == 1 &&
+      !BB->getParent()->getModule().Types.isResilient(decl) &&
+      getDefaultBB() == BB) {
+    return *unswitchedElts.begin();
+  }
+  return D;
+}
+
 SwitchEnumInst *SwitchEnumInst::create(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
                 ArrayRef<std::pair<EnumElementDecl*, SILBasicBlock*>> CaseBBs,
