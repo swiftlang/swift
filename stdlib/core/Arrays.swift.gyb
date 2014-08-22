@@ -578,33 +578,6 @@ func _arrayNonSliceInPlaceReplace<
   }
 }
 
-func _arrayReplace<
-  B: _ArrayBufferType, C: CollectionType
-  where C.Generator.Element == B.Element, B.Index == Int
-  >(
-  inout target: B, subRange: Range<Int>, newValues: C
-) {
-  _precondition(
-    subRange.startIndex >= 0,
-    "${Self} replace: subRange start is negative")
-  
-  _precondition(
-    subRange.endIndex <= target.endIndex,
-    "${Self} replace: subRange extends past the end")
-  
-  let oldCount = target.count
-  let eraseCount = countElements(subRange)
-  let insertCount = numericCast(countElements(newValues)) as Int
-  let growth = insertCount - eraseCount
-  
-  if target.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
-    target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
-  }
-  else {
-    _arrayOutOfPlaceReplace(&target, subRange, newValues, insertCount)
-  }
-}
-
 func _growArrayCapacity(capacity: Int) -> Int {
   return capacity * 2
 }
@@ -617,7 +590,22 @@ extension ${Self} {
   >(
     subRange: Range<Int>, with newValues: C
   ) {
-    _arrayReplace(&self._buffer, subRange, newValues) 
+    _precondition(subRange.startIndex >= 0,
+      "${Self} replace: subRange start is negative")
+
+    _precondition(subRange.endIndex <= self._buffer.endIndex,
+      "${Self} replace: subRange extends past the end")
+
+    let oldCount = self._buffer.count
+    let eraseCount = countElements(subRange)
+    let insertCount = numericCast(countElements(newValues)) as Int
+    let growth = insertCount - eraseCount
+
+    if self._buffer.requestUniqueMutableBackingBuffer(oldCount + growth) != nil {
+      self._buffer.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
+    } else {
+      _arrayOutOfPlaceReplace(&self._buffer, subRange, newValues, insertCount)
+    }
   }
   
   public mutating func splice<
