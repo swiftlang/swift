@@ -2142,8 +2142,83 @@ public:
     T->getResult().print(Printer, Options);
   }
 
+  /// If we can't find the depth of a type, return ErrorDepth.
+  const unsigned ErrorDepth = ~0U;
+  /// A helper function to return the depth of a type.
+  unsigned getDepthOfType(Type ty) {
+    if (auto paramTy = ty->getAs<GenericTypeParamType>())
+      return paramTy->getDepth();
+
+    if (auto depMemTy = dyn_cast<DependentMemberType>(CanType(ty))) {
+      CanType rootTy;
+      do {
+        rootTy = depMemTy.getBase();
+      } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
+      if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
+        return rootParamTy->getDepth();
+      return ErrorDepth;
+    }
+
+    return ErrorDepth;
+  }
+
+  /// A helper function to return the depth of a requirement.
+  unsigned getDepthOfRequirement(const Requirement &req) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::WitnessMarker:
+      return getDepthOfType(req.getFirstType());
+
+    case RequirementKind::SameType:
+      // Return the max depth of firstType and secondType.
+      return std::max(getDepthOfType(req.getFirstType()),
+                      getDepthOfType(req.getSecondType()));
+    }
+  }
+
   void printGenericSignature(ArrayRef<GenericTypeParamType *> genericParams,
                              ArrayRef<Requirement> requirements) {
+    if (!Options.PrintInSILBody) {
+      printSingleDepthOfGenericSignature(genericParams, requirements, 0);
+      return;
+    }
+
+    // In order to recover the nested GenericParamLists, we divide genericParams
+    // and requirements according to depth.
+    unsigned paramIdx = 0, numParam = genericParams.size();
+    unsigned reqIdx = 0, numReq = requirements.size();
+    while (paramIdx < numParam) {
+      unsigned depth = genericParams[paramIdx]->getDepth();
+
+      // Move index to genericParams.
+      unsigned lastParamIdx = paramIdx;
+      do {
+        lastParamIdx++;
+      } while (lastParamIdx < numParam &&
+               genericParams[lastParamIdx]->getDepth() == depth);
+
+      // Move index to requirements as well.
+      unsigned lastReqIdx = reqIdx;
+      while (lastReqIdx < numReq) {
+        unsigned currentDepth = getDepthOfRequirement(requirements[lastReqIdx]);
+        if (currentDepth != ErrorDepth && currentDepth != depth)
+          break;
+        lastReqIdx++;
+      }
+
+      printSingleDepthOfGenericSignature(
+        ArrayRef<GenericTypeParamType *>(genericParams.begin() + paramIdx,
+                                          lastParamIdx - paramIdx),
+        ArrayRef<Requirement>(requirements.begin() + reqIdx,
+                              lastReqIdx - reqIdx), reqIdx);
+      paramIdx = lastParamIdx;
+      reqIdx = lastReqIdx;
+    }
+  }
+
+  void printSingleDepthOfGenericSignature(
+           ArrayRef<GenericTypeParamType *> genericParams,
+           ArrayRef<Requirement> requirements, unsigned reqIdx) {
     // Print the generic parameters.
     Printer << "<";
     bool isFirstParam = true;

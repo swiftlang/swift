@@ -126,7 +126,22 @@ GenericParamList *Parser::maybeParseGenericParams() {
   if (!startsWithLess(Tok))
     return nullptr;
 
-  return parseGenericParameters();
+  if (!isInSILMode())
+    return parseGenericParameters();
+
+  // In SIL mode, we can have multiple generic parameter lists, with the
+  // first one being the outmost generic parameter list.
+  GenericParamList *gpl = nullptr, *outer_gpl = nullptr;
+  do {
+    gpl = parseGenericParameters();
+    if (!gpl)
+      return nullptr;
+
+    if (outer_gpl)
+      gpl->setOuterParameters(outer_gpl);
+    outer_gpl = gpl;
+  } while(startsWithLess(Tok));
+  return gpl;
 }
 
 /// parseGenericWhereClause - Parse a 'where' clause, which places additional

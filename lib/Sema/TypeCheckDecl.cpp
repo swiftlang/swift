@@ -921,11 +921,24 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-bool TypeChecker::handleSILGenericParams(ArchetypeBuilder *builder,
-                                         GenericParamList *gp,
-                                         DeclContext *DC) {
-  checkGenericParamList(*builder, gp, *this, DC);
-  finalizeGenericParamList(*builder, gp, DC, *this);
+/// We pass in a vector of nested GenericParamLists and a vector of
+/// ArchetypeBuilders with the innermost GenericParamList in the beginning
+/// of the vector.
+bool TypeChecker::handleSILGenericParams(
+                    SmallVectorImpl<ArchetypeBuilder *> &builders,
+                    SmallVectorImpl<GenericParamList *> &gps,
+                    DeclContext *DC) {
+  // We call checkGenericParamList on all lists, then call
+  // finalizeGenericParamList on all lists. After finalizeGenericParamList, the
+  // generic parameters will be assigned to archetypes. That will cause SameType
+  // requirement to have Archetypes inside.
+
+  // Since the innermost GenericParamList is in the beginning of the vector,
+  // we process in reverse order to handle the outermost list first.
+  for (unsigned i = 0, e = gps.size(); i < e; i++)
+    checkGenericParamList(*builders.rbegin()[i], gps.rbegin()[i], *this, DC);
+  for (unsigned i = 0, e = gps.size(); i < e; i++)
+    finalizeGenericParamList(*builders.rbegin()[i], gps.rbegin()[i], DC, *this);
   return false;
 }
 

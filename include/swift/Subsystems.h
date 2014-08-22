@@ -145,9 +145,13 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  bool handleSILGenericParams(ASTContext &Ctx, GenericParamList *gp,
+  /// We pass in a vector of nested GenericParamLists and a vector of
+  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
+  /// of the vector.
+  bool handleSILGenericParams(ASTContext &Ctx,
+                              SmallVectorImpl<GenericParamList *> &gps,
                               DeclContext *DC,
-                              ArchetypeBuilder *builder);
+                              SmallVectorImpl<ArchetypeBuilder *> &builders);
 
   /// Turn the given module into SIL IR.
   ///

@@ -14,8 +14,8 @@ func archetype_generic_method<T: X>(var #x: T, #y: Loadable) -> Loadable {
   return x.generic(x: y)
 }
 // CHECK-LABEL: sil @_TF9witnesses24archetype_generic_methodUS_1X__FT1xQ_1yVS_8Loadable_S1_ : $@thin <T where T : X> (@in T, Loadable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.generic!1 : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : X> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
-// CHECK:         apply [[METHOD]]<T, Loadable>({{%.*}}, {{%.*}}, {{%.*}}) : $@cc(witness_method) @thin <τ_0_0, τ_1_0 where τ_0_0 : X> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
+// CHECK:         [[METHOD:%.*]] = witness_method $T, #X.generic!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X><τ_1_0> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
+// CHECK:         apply [[METHOD]]<T, Loadable>({{%.*}}, {{%.*}}, {{%.*}}) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X><τ_1_0> (@out τ_1_0, @in τ_1_0, @inout τ_0_0) -> ()
 // CHECK:       }
 
 // CHECK-LABEL: sil @_TF9witnesses32archetype_associated_type_methodUS_13WithAssocType_U__FT1xQ_1yQQ_9AssocType_Q_ : $@thin <T where T : WithAssocType> (@out T, @in T, @in T.AssocType) -> ()

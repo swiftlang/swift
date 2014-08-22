@@ -765,8 +765,11 @@ bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
      return false;
 
   if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr()))
-    if (auto gp = fnType->getGenericParams())
-      handleSILGenericParams(P.Context, gp, &P.SF, builder);
+    if (auto gp = fnType->getGenericParams()) {
+      SmallVector<ArchetypeBuilder *, 1> builders(1, builder);
+      SmallVector<GenericParamList *, 1> gps(1, gp);
+      handleSILGenericParams(P.Context, gps, &P.SF, builders);
+    }
   return false;
 }
 
@@ -802,23 +805,35 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
   if (TyR.isNull())
     return true;
 
-  ArchetypeBuilder builder(*P.SF.getParentModule(), P.Diags);
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
     if (auto generics = fnType->getGenericParams()) {
-      generics->setBuilder(&builder);
-      TypeLoc TyLoc = TyR.get();
-      handleGenericParams(TyLoc, &builder);
       GenericParams = generics;
+
+      // Collect the nested GenericParamLists and pass it to
+      // handleSILGenericParams.
+      SmallVector<GenericParamList *, 4> nestedLists;
+      SmallVector<ArchetypeBuilder *, 4> builders;
+      for (; generics; generics = generics->getOuterParameters()) {
+        nestedLists.push_back(generics);
+        auto *builder = new ArchetypeBuilder(*P.SF.getParentModule(), P.Diags);
+        generics->setBuilder(builder);
+        builders.push_back(builder);
+      }
+      handleSILGenericParams(P.Context, nestedLists, &P.SF, builders);
     }
   }
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
-  // We need the builder to be live here for generating GenericSignature.
+  // We need the builders to be live here for generating GenericSignature.
   bool retCode = performTypeLocChecking(Ty);
-  if (GenericParams)
-    GenericParams->setBuilder(nullptr);
+  for (auto generics = GenericParams; generics;
+       generics = generics->getOuterParameters())
+    if (auto *builder = generics->getBuilder()) {
+      delete builder;
+      generics->setBuilder(nullptr);
+    }
   if (retCode)
     return true;
 
@@ -1289,34 +1304,28 @@ bool SILParser::parseApplySubstitutions(
 /// from a SILFunctionType.
 bool getApplySubstitutionsFromParsed(
                              SILParser &SP,
-                             GenericParamList *params,
+                             GenericParamList *gp,
                              ArrayRef<ParsedSubstitution> parses,
                              SmallVectorImpl<Substitution> &subs) {
-  // Find the corresponding ArchetypeType for ArcheId in PTy.
-  ArrayRef<ArchetypeType *> allArchetypes = params->getAllArchetypes();
-  assert(parses.size() <= allArchetypes.size() &&
-         "Number of substitution exceeds number of archetypes");
-  unsigned Id = 0;
-  for (auto &parsed : parses) {
-    // The replacement is for the corresponding archetype by ordering.
-    auto subArchetype = allArchetypes[Id++];
-    if (!subArchetype) {
-      SP.P.diagnose(parsed.loc, diag::sil_apply_archetype_not_found);
-      return true;
-    }
+  // The replacement is for the corresponding archetype by ordering.
+  for (auto subArchetype : gp->getAllNestedArchetypes()) {
+    auto parsed = parses.front();
+    parses = parses.slice(1);
+
     // Collect conformances by looking up the conformance from replacement
     // type and protocol decl in GenericParamList.
     SmallVector<ProtocolConformance*, 2> conformances;
-    for (const auto &req : params->getRequirements())
-      if (req.getKind() == RequirementKind::Conformance)
-        if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
-          auto proto = protoTy->getDecl();
-          auto conformance = SP.P.SF.getParentModule()->lookupConformance(
-                               parsed.replacement, proto, nullptr);
-          if (conformance.getPointer() &&
-              req.getSubject().getPointer() == subArchetype)
-            conformances.push_back(conformance.getPointer());
-        }
+    for (auto params = gp; params; params = params->getOuterParameters())
+      for (const auto &req : params->getRequirements())
+        if (req.getKind() == RequirementKind::Conformance)
+          if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
+            auto proto = protoTy->getDecl();
+            auto conformance = SP.P.SF.getParentModule()->lookupConformance(
+                                 parsed.replacement, proto, nullptr);
+            if (conformance.getPointer() &&
+                req.getSubject().getPointer() == subArchetype)
+              conformances.push_back(conformance.getPointer());
+          }
 
     if (subArchetype && !parsed.replacement->is<ArchetypeType>() &&
         conformances.size() != subArchetype->getConformsTo().size()) {
@@ -1326,6 +1335,7 @@ bool getApplySubstitutionsFromParsed(
     subs.push_back({subArchetype, parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
+  assert(parses.empty() && "did not use all substitutions?");
   return false;
 }
 
@@ -3322,12 +3332,11 @@ static bool getSpecConformanceSubstitutionsFromParsed(
                              GenericParamList *gp,
                              ArrayRef<ParsedSubstitution> parses,
                              SmallVectorImpl<Substitution> &subs) {
-  ArrayRef<ArchetypeType *> allArchetypes = gp->getAllArchetypes();
   for (auto &parsed : parses) {
     ArchetypeType *subArchetype = nullptr;
     Type subReplacement;
     // Find the corresponding ArchetypeType.
-    for (auto archetype : allArchetypes)
+    for (auto archetype : gp->getAllNestedArchetypes())
       if (archetype->getName() == parsed.name) {
         subArchetype = archetype;
         break;
@@ -3354,7 +3363,9 @@ ProtocolConformance *SILParser::parseProtocolConformance(
   generics = P.maybeParseGenericParams();
   if (generics) {
     generics->setBuilder(&builder);
-    handleSILGenericParams(P.Context, generics, &P.SF, &builder);
+    SmallVector<ArchetypeBuilder *, 1> builders(1, &builder);
+    SmallVector<GenericParamList *, 1> gps(1, generics);
+    handleSILGenericParams(P.Context, gps, &P.SF, builders);
   }
 
   ProtocolConformance *retVal = parseProtocolConformanceHelper(proto,

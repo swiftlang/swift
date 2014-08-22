@@ -387,7 +387,11 @@ public:
                     ValueDecl *typeContext = nullptr);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  bool handleSILGenericParams(ArchetypeBuilder *builder, GenericParamList *gp,
+  /// We pass in a vector of nested GenericParamLists and a vector of
+  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
+  /// of the vector.
+  bool handleSILGenericParams(SmallVectorImpl<ArchetypeBuilder *> &builders,
+                              SmallVectorImpl<GenericParamList *> &gps,
                               DeclContext *DC);
 
   /// \brief Resolves a TypeRepr to a type.
