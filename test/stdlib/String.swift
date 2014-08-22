@@ -649,31 +649,5 @@ StringTests.test("growth") {
   expectLE(s.nativeCapacity, 34)
 }
 
-StringTests.test("UnicodeScalarView.compare") {
-  expectEqual(1, "hi".unicodeScalars.compare("bye".unicodeScalars))
-  expectEqual(-1, "bye".unicodeScalars.compare("hi".unicodeScalars))
-  expectEqual(0, "swift".unicodeScalars.compare("swift".unicodeScalars))
-  expectEqual(1, "a".unicodeScalars.compare("".unicodeScalars))
-  expectEqual(0, "a".unicodeScalars.compare("a".unicodeScalars))
-  expectEqual(-1, "a".unicodeScalars.compare("z".unicodeScalars))
-  expectEqual(1, "aa".unicodeScalars.compare("a".unicodeScalars))
-  expectEqual(-1, "a".unicodeScalars.compare("aa".unicodeScalars))
-  expectEqual(0, "".unicodeScalars.compare("".unicodeScalars))
-  expectEqual(-1, "a".unicodeScalars.compare("b".unicodeScalars))
-  expectEqual(1, "b".unicodeScalars.compare("a".unicodeScalars))
-
-  expectEqual(1, "hi".unicodeScalars.compare("bye".unicodeScalars))
-  expectEqual(-1, "bye".unicodeScalars.compare("hi".unicodeScalars))
-  expectEqual(0, "ראשון".unicodeScalars.compare("ראשון".unicodeScalars))
-  expectEqual(1, "א".unicodeScalars.compare("".unicodeScalars))
-  expectEqual(0, "א".unicodeScalars.compare("א".unicodeScalars))
-  expectEqual(-1, "א".unicodeScalars.compare("ת".unicodeScalars))
-  expectEqual(1, "אא".unicodeScalars.compare("א".unicodeScalars))
-  expectEqual(-1, "א".unicodeScalars.compare("אא".unicodeScalars))
-  expectEqual(0, "".unicodeScalars.compare("".unicodeScalars))
-  expectEqual(-1, "א".unicodeScalars.compare("ב".unicodeScalars))
-  expectEqual(1, "ב".unicodeScalars.compare("א".unicodeScalars))
-}
-
 runAllTests()
 
