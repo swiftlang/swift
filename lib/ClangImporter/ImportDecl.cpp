@@ -2499,6 +2499,7 @@ namespace {
         return nullptr;
 
       case clang::OMF_init:
+      case clang::OMF_initialize:
       case clang::OMF_new:
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
