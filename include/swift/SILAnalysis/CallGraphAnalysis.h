@@ -204,6 +204,7 @@ namespace swift {
   private:
     void addCallGraphNode(SILFunction *F, unsigned Ordinal);
     void addEdges(SILFunction *F);
+    void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
 
     llvm::DenseSet<CallGraphNode *> CallGraphRoots;
     llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
