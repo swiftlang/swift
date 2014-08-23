@@ -197,7 +197,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
   {
-    return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil
+    if _fastPath(isUniquelyReferenced() && capacity >= minimumCapacity) {
+      return self
+    }
+    return nil
   }
 
   public mutating func isMutableAndUniquelyReferenced() -> Bool {

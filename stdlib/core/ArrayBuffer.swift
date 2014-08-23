@@ -182,7 +182,9 @@ extension _ArrayBuffer {
   {
     if _fastPath(Swift._isUniquelyReferenced(&storage) && _hasMutableBuffer) {
       let b = _native
-      return b.capacity >= minimumCapacity ? b : nil
+      if _fastPath(b.capacity >= minimumCapacity) {
+        return b
+      }
     }
     return nil
   }
