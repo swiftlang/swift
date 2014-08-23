@@ -627,9 +627,8 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
 }
 
 void SILGenFunction::visitFailStmt(FailStmt *S) {
-  
-  // TODO
-  B.createUnreachable(S);
+  assert(FailDest.isValid() && "too big to fail");
+  Cleanups.emitBranchAndCleanups(FailDest, S);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

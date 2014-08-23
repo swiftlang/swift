@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "Condition.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
@@ -3300,7 +3301,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
-
+  
   // Emit a local variable for 'self'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
@@ -3331,6 +3332,25 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
   prepareEpilog(Type(), CleanupLocation(ctor));
+  
+  // If the constructor can fail, set up an alternative epilog for constructor
+  // failure.
+  SILBasicBlock *failureBB = nullptr;
+  if (ctor->getFailability() != OTK_None) {
+    failureBB = createBasicBlock();
+    
+    // On failure, we'll clean up everything (including self) and return nil
+    // instead.
+    auto curBB = B.getInsertionBB();
+    B.setInsertionPoint(failureBB);
+    Cleanups.emitCleanupsForReturn(ctor);
+    B.emitStrongRelease(ctor, selfBox);
+    // return nil...
+    B.createUnreachable(ctor);
+    
+    B.setInsertionPoint(curBB);
+    FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
+  }
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
@@ -4354,8 +4374,15 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
   auto selfDecl = E->getSelf();
+  auto ctorDecl = cast<ConstructorDecl>(selfDecl->getDeclContext());
   auto selfTy = selfDecl->getType()->getInOutObjectType();
-  bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
+  
+  auto newSelfTy = E->getSubExpr()->getType();
+  OptionalTypeKind failability;
+  if (auto objTy = newSelfTy->getAnyOptionalObjectType(failability))
+    newSelfTy = objTy;
+  
+  bool isSuper = !newSelfTy->isEqual(selfTy);
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
@@ -4365,6 +4392,53 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // Emit the subexpression.
   ManagedValue newSelf = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
+  // If the delegated-to initializer can fail, check for the potential failure.
+  switch (failability) {
+  case OTK_None:
+    // Not failable.
+    break;
+
+  case OTK_Optional:
+  case OTK_ImplicitlyUnwrappedOptional: {
+    // Materialize the value so we can pass it indirectly to optional
+    // intrinsics.
+    auto mat = SGF.emitMaterialize(E, newSelf);
+    
+    // If the current constructor is not failable, abort.
+    switch (ctorDecl->getFailability()) {
+
+    case OTK_Optional:
+    case OTK_ImplicitlyUnwrappedOptional: {
+      SILBasicBlock *noneBB = SGF.createBasicBlock();
+      SILBasicBlock *someBB = SGF.createBasicBlock();
+
+      auto hasValue = SGF.emitDoesOptionalHaveValue(E, mat.address);
+      SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
+      
+      // If the delegate result is nil, clean up and propagate 'nil' from our
+      // constructor.
+      SGF.B.emitBlock(noneBB);
+      assert(SGF.FailDest.isValid() && "too big to fail");
+      SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, E);
+      
+      // Otherwise, project out the value and carry on.
+      SGF.B.emitBlock(someBB);
+      
+      SWIFT_FALLTHROUGH;
+    }
+    case OTK_None: {
+      auto matMV = ManagedValue(mat.address, mat.valueCleanup);
+      // If the current constructor is not failable, force out the value.
+      newSelf = SGF.emitGetOptionalValueFrom(E, matMV,
+                                             SGF.getTypeLowering(newSelf.getType()),
+                                             SGFContext());
+      break;
+    }
+    }
+    break;
+  }
+  }
+  
   // If we called a superclass constructor, cast down to the subclass.
   if (isSuper) {
     assert(newSelf.getType().isObject() &&
@@ -4406,6 +4480,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // If we are using Objective-C allocation, the caller can return
   // nil. When this happens with an explicitly-written super.init or
   // self.init invocation, return early if we did get nil.
+  //
+  // TODO: Remove this when failable initializers are fully implemented.
   auto classDecl = selfTy->getClassOrBoundGenericClass();
   if (classDecl && !E->getSubExpr()->isImplicit() &&
       usesObjCAllocator(classDecl)) {

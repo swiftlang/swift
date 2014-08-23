@@ -21,6 +21,8 @@
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
+#include "SILGenFunction.h"
+#include "Scope.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
@@ -76,6 +78,58 @@ public:
   SILBasicBlock *complete(SILBuilder &B);
 };
 
+/// A conditional value is one that depends on conditional execution.
+/// Depending on whether a type is address-only, it may be representable using
+/// BB argument passing or by storing to a common result buffer.
+class ConditionalValue {
+  SILGenFunction &gen;
+  const TypeLowering &tl;
+  
+  /// The continuation block that receives the conditional value.
+  SILBasicBlock *contBB;
+  
+  /// The location associated with the value.
+  SILLocation loc;
+
+  /// The buffer to receive an address-only result, or the BB argument that
+  /// a loadable result is passed to.
+  SILValue result;
+  
+  /// The Scope for the current branch.
+  Optional<Scope> scope;
+  
+  /// A place to hold conditional Initializations of our result.
+  std::unique_ptr<Initialization> currentInitialization;
+  
+public:
+  /// Begins a conditional computation of the type represented by the given
+  /// type lowering. This potentially emits a temporary allocation for the
+  /// result, so it must be called with the insertion point valid and dominating
+  /// any branches that will be involved in the computation.
+  ConditionalValue(SILGenFunction &gen, SGFContext C, SILLocation loc,
+                   const TypeLowering &valueTL);
+  
+  /// Enter a branch of the conditional value computation. Expression evaluation
+  /// within this branch may use the returned SGFContext to potentially find a
+  /// buffer to emit into. If a basic block is given, the insertion point must
+  /// be invalid, and on return, the given basic block will be emitted, and the
+  /// insertion point will be inside it. If the basic block is null, then
+  /// codegen proceeds in the current basic block.
+  SGFContext enterBranch(SILBasicBlock *bb = nullptr);
+  
+  /// Exit a branch of the conditional value computation, using the given value
+  /// as the result of the computation on this branch. Branches to the
+  /// continuation block for the conditional value. On return, the insertion
+  /// point will be invalid.
+  void exitBranch(RValue &&result);
+  
+  /// Complete the conditional computation. The insertion point must be invalid.
+  /// On return, the continuation block for the conditional will be emitted, and
+  /// the insertion point will be inside it. The result of the conditional
+  /// computation will be returned.
+  ManagedValue complete();
+};
+  
 } // end namespace Lowering
 } // end namespace swift
   

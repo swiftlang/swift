@@ -37,22 +37,6 @@ using namespace Lowering;
 namespace swift {
 namespace Lowering {
 
-  
-/// Materialize - Represents a temporary allocation.
-struct LLVM_LIBRARY_VISIBILITY Materialize {
-  /// The address of the allocation.
-  SILValue address;
-  
-  /// The cleanup to dispose of the value before deallocating the buffer.
-  /// This cleanup can be killed by calling the consume method.
-  CleanupHandle valueCleanup;
-  
-  /// Load and claim ownership of the value in the buffer. Does not deallocate
-  /// the buffer.
-  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
-};
-
-  
 struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   SILLocation loc;
   std::unique_ptr<LogicalPathComponent> component;

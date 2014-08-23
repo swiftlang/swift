@@ -1495,9 +1495,17 @@ InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd) {
 std::unique_ptr<TemporaryInitialization>
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
+  return useBufferAsTemporary(loc, addr, tempTL);
+}
+
+/// Create an Initialization for an uninitialized buffer.
+std::unique_ptr<TemporaryInitialization>
+SILGenFunction::useBufferAsTemporary(SILLocation loc,
+                                     SILValue addr,
+                                     const TypeLowering &tempTL) {
   CleanupHandle cleanup = enterDormantTemporaryCleanup(addr, tempTL);
   return std::unique_ptr<TemporaryInitialization>(
-                                   new TemporaryInitialization(addr, cleanup));
+                                    new TemporaryInitialization(addr, cleanup));
 }
 
 CleanupHandle

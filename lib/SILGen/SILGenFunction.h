@@ -14,7 +14,6 @@
 #define SILGENFUNCTION_H
 
 #include "SILGen.h"
-#include "Condition.h"
 #include "JumpDest.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -23,15 +22,29 @@
 namespace swift {
 namespace Lowering {
 
+class Condition;
 class ConsumableManagedValue;
 class Initialization;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
-struct Materialize;
 class RValue;
 class RValueSource;
 class TemporaryInitialization;
+
+/// Represents a temporary allocation.
+struct Materialize {
+  /// The address of the allocation.
+  SILValue address;
+  
+  /// The cleanup to dispose of the value before deallocating the buffer.
+  /// This cleanup can be killed by calling the consume method.
+  CleanupHandle valueCleanup;
+  
+  /// Load and claim ownership of the value in the buffer. Does not deallocate
+  /// the buffer.
+  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
+};
 
 /// How a method is dispatched.
 enum class MethodDispatch {
@@ -130,8 +143,10 @@ public:
   /// BindOptionalExpr is a missing value.
   SmallVector<JumpDest, 2> BindOptionalFailureDests;
 
-  /// The cleanup depth and epilog BB for "return" instructions.
+  /// The cleanup depth and epilog BB for "return" statements.
   JumpDest ReturnDest;
+  /// The cleanup depth and epilog BB for "fail" statements.
+  JumpDest FailDest;
 
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
@@ -144,7 +159,6 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
-
 
   /// The stack of pending writebacks.
   std::vector<LValueWriteback> *WritebackStack = 0;
@@ -994,6 +1008,14 @@ public:
   /// The initialization is guaranteed to be a single buffer.
   std::unique_ptr<TemporaryInitialization>
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
+
+  /// Provides an Initialization that can be used to initialize an already-
+  /// allocated temporary, and registers cleanups in the active scope.
+  ///
+  /// The initialization is guaranteed to be a single buffer.
+  std::unique_ptr<TemporaryInitialization>
+  useBufferAsTemporary(SILLocation loc, SILValue addr,
+                       const TypeLowering &tempTL);
 
   /// Enter a currently-dormant cleanup to destroy the value in the
   /// given address.
