@@ -632,7 +632,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<Key : Hashable, Value>
     nextIndex = nextIndex.successor()
 
     var bridgedKey: AnyObject =
-      _bridgeToObjectiveCUnconditionalAuterelease(nativeKey)
+      _bridgeToObjectiveCUnconditionalAutorelease(nativeKey)
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = bridgedKey
     state.memory = theState
@@ -813,7 +813,7 @@ final class _NativeDictionaryStorageOwner<Key : Hashable, Value>
       var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
 
       var bridgedKey: AnyObject =
-        _bridgeToObjectiveCUnconditionalAuterelease(nativeKey)
+        _bridgeToObjectiveCUnconditionalAutorelease(nativeKey)
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()

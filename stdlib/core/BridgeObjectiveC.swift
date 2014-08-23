@@ -194,7 +194,7 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 
 /// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
 /// return value if `T` is bridged non-verbatim.
-func _bridgeToObjectiveCUnconditionalAuterelease<T>(x: T) -> AnyObject
+func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, AnyObject.self)
