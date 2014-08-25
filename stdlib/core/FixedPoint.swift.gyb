@@ -378,11 +378,6 @@ extension ${Self} {
 %    end
 % end
 
-  @availability(*,unavailable,message="it has been replaced by construction of the target type with an explicit 'bitPattern:' argument label")
-  public func as${'Unsigned' if signed else 'Signed'}() -> ${OtherSelf} {
-    return ${OtherSelf}(value)
-  }
-  
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
   /// occurs, and the resulting `${Self}` may not have the same numeric
