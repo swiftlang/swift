@@ -1811,9 +1811,8 @@ bool generateAPIAnnotation(StringRef moduleName, StringRef fileName) {
 #include "KnownObjCMethods.def"
   #undef MAKE_SELECTOR_REF
 
-  std::string errorInfo;
-  llvm::raw_fd_ostream os(fileName.str().c_str(), errorInfo, 
-                          llvm::sys::fs::OpenFlags::F_None);
+  std::error_code EC;
+  llvm::raw_fd_ostream os(fileName.str(), EC, llvm::sys::fs::OpenFlags::F_None);
   writer.writeToStream(os);
   os.flush();
 

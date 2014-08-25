@@ -3011,12 +3011,12 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
                       StringRef moduleLinkName, bool autolinkForceLoad) {
   assert(outputPath && outputPath[0] != '\0');
 
-  std::string errorInfo;
-  llvm::raw_fd_ostream out(outputPath, errorInfo, llvm::sys::fs::F_None);
+  std::error_code EC;
+  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
 
-  if (out.has_error() || !errorInfo.empty()) {
+  if (out.has_error() || EC) {
     getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  outputPath, errorInfo);
+                                  outputPath, EC.message());
     out.clear_error();
     return;
   }
@@ -3025,13 +3025,12 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
                             importedHeader, moduleLinkName, autolinkForceLoad);
 
   if (docOutputPath && docOutputPath[0] != '\0') {
-    std::string errorInfo;
-    llvm::raw_fd_ostream docOut(docOutputPath, errorInfo,
-                                llvm::sys::fs::F_None);
+    std::error_code EC;
+    llvm::raw_fd_ostream docOut(docOutputPath, EC, llvm::sys::fs::F_None);
 
-    if (docOut.has_error() || !errorInfo.empty()) {
+    if (docOut.has_error() || EC) {
       getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                    docOutputPath, errorInfo);
+                                    docOutputPath, EC.message());
       docOut.clear_error();
       return;
     }

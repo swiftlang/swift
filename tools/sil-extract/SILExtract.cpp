@@ -165,12 +165,11 @@ int main(int argc, char **argv) {
     F->getBlocks().clear();
   }
 
-  std::string ErrorInfo;
-  llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
-                          llvm::sys::fs::F_None);
-  if (!ErrorInfo.empty()) {
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
+  if (EC) {
     llvm::errs() << "while opening '" << OutputFilename << "': "
-                 << ErrorInfo << '\n';
+                 << EC.message() << '\n';
     return 1;
   }
   CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule());

@@ -113,8 +113,8 @@ int apinotes_main(ArrayRef<const char *> Args) {
           return 1;
       }
     }
-    std::string errorInfo;
-    llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
+    std::error_code EC;
+    llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
     if (swift::api_notes::compileAPINotes(input, os, targetOS))
@@ -132,8 +132,8 @@ int apinotes_main(ArrayRef<const char *> Args) {
       return 1;
     }
 
-    std::string errorInfo;
-    llvm::raw_fd_ostream os(OutputFilename.c_str(), errorInfo,
+    std::error_code EC;
+    llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
     if (swift::api_notes::decompileAPINotes(std::move(fileBufOrErr.get()), os))

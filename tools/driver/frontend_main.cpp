@@ -55,13 +55,13 @@ static bool emitDependencies(DiagnosticEngine &Diags,
                              const FrontendOptions &opts) {
   opts.forAllOutputPaths([&DFG](StringRef target) { DFG.addTarget(target); });
 
-  std::string errorInfo;
-  llvm::raw_fd_ostream out(opts.DependenciesFilePath.c_str(), errorInfo,
+  std::error_code EC;
+  llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
                            llvm::sys::fs::F_None);
 
-  if (out.has_error() || !errorInfo.empty()) {
+  if (out.has_error() || EC) {
     Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.DependenciesFilePath, errorInfo);
+                   opts.DependenciesFilePath, EC.message());
     out.clear_error();
     return true;
   }
@@ -73,12 +73,11 @@ static bool emitDependencies(DiagnosticEngine &Diags,
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
                      std::string &OutputFilename, bool SortSIL) {
-  std::string ErrorInfo;
-  llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
-                          llvm::sys::fs::F_None);
-  if (!ErrorInfo.empty()) {
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
+  if (EC) {
     M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                          OutputFilename, ErrorInfo);
+                          OutputFilename, EC.message());
     return true;
   }
   SM.print(OS, EmitVerboseSIL, M, SortSIL);
@@ -87,12 +86,12 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
 
 static bool printAsObjC(const std::string &path, Module *M,
                         StringRef bridgingHeader) {
-  std::string errorInfo;
-  llvm::raw_fd_ostream out(path.c_str(), errorInfo, llvm::sys::fs::F_None);
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
 
-  if (out.has_error() || !errorInfo.empty()) {
+  if (out.has_error() || EC) {
     M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      path, errorInfo);
+                                      path, EC.message());
     out.clear_error();
     return true;
   }
@@ -331,16 +330,16 @@ int frontend_main(ArrayRef<const char *>Args,
     const std::string &SerializedDiagnosticsPath =
       Invocation.getFrontendOptions().SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
-      std::string ErrorInfo;
+      std::error_code EC;
       std::unique_ptr<llvm::raw_fd_ostream> OS;
-      OS.reset(new llvm::raw_fd_ostream(SerializedDiagnosticsPath.c_str(),
-                                        ErrorInfo,
+      OS.reset(new llvm::raw_fd_ostream(SerializedDiagnosticsPath,
+                                        EC,
                                         llvm::sys::fs::F_None));
 
-      if (!ErrorInfo.empty()) {
+      if (EC) {
         Instance.getDiags().diagnose(SourceLoc(),
                                      diag::cannot_open_serialized_file,
-                                     SerializedDiagnosticsPath, ErrorInfo);
+                                     SerializedDiagnosticsPath, EC.message());
         return 1;
       }
 
