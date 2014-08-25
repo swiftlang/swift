@@ -29,18 +29,18 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: cacheNodes
     MethodKind: Instance
     NullabilityOfRet: N
   - Selector: 'initWithPersistentStoreCoordinator:configurationName:URL:options:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - O
+    - O
     - N
-    - U
-    NullabilityOfRet: O
+    - O
+    NullabilityOfRet: N
   - Selector: 'load:'
     MethodKind: Instance
     Nullability:
@@ -52,6 +52,17 @@ Classes:
     - N
     NullabilityOfRet: N
   - Selector: 'newReferenceObjectForManagedObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'objectIDForEntity:referenceObject:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
+  - Selector: 'referenceObjectForObjectID:'
     MethodKind: Instance
     Nullability:
     - N
@@ -77,8 +88,8 @@ Classes:
   - Selector: 'initWithObjectID:'
     MethodKind: Instance
     Nullability:
-    - U
-    NullabilityOfRet: O
+    - N
+    NullabilityOfRet: N
   - Selector: 'setValue:forKey:'
     MethodKind: Instance
     Nullability:
@@ -93,12 +104,19 @@ Classes:
   Properties:
   - Name: objectID
     Nullability: N
+  - Name: propertyCache
+    Nullability: O
 - Name: NSAttributeDescription
   Properties:
   - Name: valueTransformerName
     Nullability: O
 - Name: NSBatchUpdateRequest
   Methods:
+  - Selector: 'batchUpdateRequestWithEntityName:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: 'initWithEntity:'
     MethodKind: Instance
     Nullability:
@@ -109,6 +127,11 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: N
+  Properties:
+  - Name: entity
+    Nullability: N
+  - Name: entityName
+    Nullability: N
 - Name: NSEntityDescription
   Methods:
   - Selector: 'entityForName:inManagedObjectContext:'
@@ -122,12 +145,7 @@ Classes:
     Nullability:
     - N
     - N
-    NullabilityOfRet: N
-  - Selector: 'isKindOfEntity:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
+    NullabilityOfRet: U
   - Selector: 'relationshipsWithDestinationEntity:'
     MethodKind: Instance
     Nullability:
@@ -156,12 +174,18 @@ Classes:
     Nullability: N
   - Name: superentity
     Nullability: O
-  - Name: userInfo
-    Nullability: O
   - Name: versionHash
     Nullability: N
 - Name: NSEntityMapping
   Properties:
+  - Name: entityMigrationPolicyClassName
+    Nullability: N
+  - Name: relationshipMappings
+    Nullability: N
+  - Name: sourceEntityName
+    Nullability: N
+  - Name: sourceEntityVersionHash
+    Nullability: N
   - Name: userInfo
     Nullability: O
 - Name: NSEntityMigrationPolicy
@@ -241,7 +265,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'performFetch:'
     MethodKind: Instance
     Nullability:
@@ -257,7 +281,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   Properties:
   - Name: cacheName
     Nullability: O
@@ -265,8 +289,6 @@ Classes:
     Nullability: O
   - Name: fetchedObjects
     Nullability: O
-  - Name: fetchRequest
-    Nullability: N
   - Name: managedObjectContext
     Nullability: N
   - Name: sectionNameKeyPath
@@ -275,8 +297,18 @@ Classes:
     Nullability: O
 - Name: NSFetchRequest
   Methods:
+  - Selector: 'fetchRequestWithEntityName:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
   - Selector: init
     MethodKind: Instance
+    NullabilityOfRet: N
+  - Selector: 'initWithEntityName:'
+    MethodKind: Instance
+    Nullability:
+    - N
     NullabilityOfRet: N
   Properties:
   - Name: affectedStores
@@ -327,16 +359,32 @@ Classes:
   - Selector: 'newValuesForObjectWithID:withContext:error:'
     MethodKind: Instance
     Nullability:
-    - U
-    - U
+    - N
+    - N
     - O
     NullabilityOfRet: O
   - Selector: 'obtainPermanentIDsForObjects:error:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - O
     NullabilityOfRet: O
+- Name: NSIncrementalStoreNode
+  Methods:
+  - Selector: 'updateWithValues:version:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: S
+  - Selector: 'valueForPropertyDescription:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: U
+  Properties:
+  - Name: objectID
+    Nullability: N
 - Name: NSManagedObject
   Methods:
   - Selector: changedValues
@@ -372,11 +420,25 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
+  - Selector: 'initWithEntity:insertIntoManagedObjectContext:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - U
+    NullabilityOfRet: N
+  - Selector: observationInfo
+    MethodKind: Instance
+    NullabilityOfRet: O
   - Selector: 'primitiveValueForKey:'
     MethodKind: Instance
     Nullability:
     - N
     NullabilityOfRet: O
+  - Selector: 'setObservationInfo:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    NullabilityOfRet: S
   - Selector: 'setPrimitiveValue:forKey:'
     MethodKind: Instance
     Nullability:
@@ -408,7 +470,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - U
-    - U
+    - N
     - O
     NullabilityOfRet: S
   - Selector: 'valueForKey:'
@@ -416,11 +478,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: O
-  - Selector: 'willAccessValueForKey:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'willChangeValueForKey:'
     MethodKind: Instance
     Nullability:
@@ -431,12 +488,10 @@ Classes:
     Nullability:
     - N
     - S
-    - U
+    - N
     NullabilityOfRet: S
   Properties:
   - Name: entity
-    Nullability: N
-  - Name: managedObjectContext
     Nullability: N
   - Name: objectID
     Nullability: N
@@ -548,13 +603,7 @@ Classes:
     Nullability: N
   - Name: undoManager
     Nullability: O
-  - Name: userInfo
-    Nullability: O
 - Name: NSManagedObjectID
-  Methods:
-  - Selector: URIRepresentation
-    MethodKind: Instance
-    NullabilityOfRet: O
   Properties:
   - Name: entity
     Nullability: N
@@ -581,6 +630,11 @@ Classes:
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
+  - Selector: 'initWithContentsOfURL:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: O
   - Selector: 'isConfiguration:compatibleWithStoreMetadata:'
     MethodKind: Instance
     Nullability:
@@ -592,11 +646,22 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: U
-  - Selector: 'modelByMergingModels:forStoreMetadata:'
+  - Selector: 'mergedModelFromBundles:forStoreMetadata:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: O
+  - Selector: 'modelByMergingModels:'
     MethodKind: Class
     Nullability:
     - U
-    - U
+    NullabilityOfRet: O
+  - Selector: 'modelByMergingModels:forStoreMetadata:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - N
     NullabilityOfRet: O
   - Selector: 'setEntities:forConfiguration:'
     MethodKind: Instance
@@ -604,9 +669,13 @@ Classes:
     - N
     - N
     NullabilityOfRet: S
+  - Selector: 'setFetchRequestTemplate:forName:'
+    MethodKind: Instance
+    Nullability:
+    - O
+    - U
+    NullabilityOfRet: S
   Properties:
-  - Name: configurations
-    Nullability: N
   - Name: entities
     Nullability: N
   - Name: entitiesByName
@@ -624,6 +693,13 @@ Classes:
     - U
     - O
     NullabilityOfRet: O
+  - Selector: 'mappingModelFromBundles:forSourceModel:destinationModel:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - U
+    - U
+    NullabilityOfRet: O
 - Name: NSMergePolicy
   Methods:
   - Selector: 'initWithMergeType:'
@@ -639,10 +715,34 @@ Classes:
     NullabilityOfRet: S
 - Name: NSMigrationManager
   Methods:
+  - Selector: 'associateSourceInstance:withDestinationInstance:forEntityMapping:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    - N
+    NullabilityOfRet: S
+  - Selector: 'destinationEntityForEntityMapping:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: U
+  - Selector: 'destinationInstancesForEntityMappingNamed:sourceInstances:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: U
+  - Selector: 'initWithSourceModel:destinationModel:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
+    NullabilityOfRet: N
   - Selector: 'migrateStoreFromURL:type:options:withMappingModel:toDestinationURL:destinationType:destinationOptions:error:'
     MethodKind: Instance
     Nullability:
-    - U
+    - N
     - U
     - U
     - U
@@ -651,10 +751,29 @@ Classes:
     - U
     - O
     NullabilityOfRet: S
+  - Selector: 'sourceEntityForEntityMapping:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    NullabilityOfRet: U
+  - Selector: 'sourceInstancesForEntityMappingNamed:destinationInstances:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - O
+    NullabilityOfRet: U
   Properties:
   - Name: currentEntityMapping
     Nullability: N
   - Name: destinationContext
+    Nullability: N
+  - Name: destinationModel
+    Nullability: N
+  - Name: mappingModel
+    Nullability: N
+  - Name: sourceContext
+    Nullability: N
+  - Name: sourceModel
     Nullability: N
   - Name: userInfo
     Nullability: O
@@ -672,7 +791,7 @@ Classes:
     - O
     - U
     - O
-    NullabilityOfRet: U
+    NullabilityOfRet: N
   - Selector: 'loadMetadata:'
     MethodKind: Instance
     Nullability:
@@ -707,6 +826,10 @@ Classes:
   - Name: type
     Nullability: N
   - Name: URL
+    Nullability: O
+- Name: NSPersistentStoreAsynchronousResult
+  Properties:
+  - Name: operationError
     Nullability: O
 - Name: NSPersistentStoreCoordinator
   Methods:
@@ -750,7 +873,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'metadataForPersistentStore:'
     MethodKind: Instance
     Nullability:
@@ -763,11 +886,17 @@ Classes:
     - N
     - O
     NullabilityOfRet: O
+  - Selector: 'metadataForPersistentStoreWithURL:error:'
+    MethodKind: Class
+    Nullability:
+    - U
+    - O
+    NullabilityOfRet: O
   - Selector: 'migratePersistentStore:toURL:options:withType:error:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - N
     - O
     - N
     - O
@@ -798,8 +927,14 @@ Classes:
     MethodKind: Class
     Nullability:
     - N
-    - U
     - O
+    - O
+    NullabilityOfRet: S
+  - Selector: 'setMetadata:forPersistentStore:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - N
     NullabilityOfRet: S
   - Selector: 'setMetadata:forPersistentStoreOfType:URL:error:'
     MethodKind: Class
@@ -808,6 +943,12 @@ Classes:
     - O
     - N
     - O
+    NullabilityOfRet: S
+  - Selector: 'setURL:forPersistentStore:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - N
     NullabilityOfRet: S
   - Selector: 'URLForPersistentStore:'
     MethodKind: Instance
@@ -821,14 +962,18 @@ Classes:
     Nullability: N
 - Name: NSPropertyDescription
   Properties:
+  - Name: entity
+    Nullability: N
+  - Name: name
+    Nullability: N
   - Name: renamingIdentifier
     Nullability: O
   - Name: userInfo
     Nullability: O
+  - Name: versionHash
+    Nullability: N
 - Name: NSPropertyMapping
   Properties:
-  - Name: name
-    Nullability: O
   - Name: userInfo
     Nullability: O
   - Name: valueExpression
@@ -844,8 +989,6 @@ Classes:
     - O
     NullabilityOfRet: N
   Properties:
-  - Name: deletedObjects
-    Nullability: O
   - Name: insertedObjects
     Nullability: O
   - Name: lockedObjects

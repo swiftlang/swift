@@ -27,6 +27,9 @@ Classes:
     MethodKind: Instance
     Availability: none
     AvailabilityMsg: use 'deinit' to define a de-initializer
+  - Selector: description
+    MethodKind: Class
+    NullabilityOfRet: N
   - Selector: 'forwardingTargetForSelector:'
     MethodKind: Instance
     Nullability:

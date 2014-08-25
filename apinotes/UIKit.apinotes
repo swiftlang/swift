@@ -34,7 +34,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'stopProvidingItemAtURL:'
     MethodKind: Instance
@@ -45,7 +45,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'writePlaceholderAtURL:withMetadata:error:'
     MethodKind: Class
     Nullability:
@@ -200,7 +200,7 @@ Classes:
     Nullability:
     - S
     - S
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'setGlyphs:properties:characterIndexes:font:forGlyphRange:'
     MethodKind: Instance
@@ -338,18 +338,21 @@ Classes:
   Properties:
   - Name: options
     Nullability: O
+- Name: UIAccelerometer
+  Methods:
+  - Selector: sharedAccelerometer
+    MethodKind: Class
+    NullabilityOfRet: N
 - Name: UIAccessibilityCustomAction
   Methods:
   - Selector: 'initWithName:target:selector:'
     MethodKind: Instance
     Nullability:
-    - N
-    - N
+    - U
+    - U
     - S
     NullabilityOfRet: N
   Properties:
-  - Name: name
-    Nullability: N
   - Name: target
     Nullability: O
 - Name: UIAccessibilityElement
@@ -389,34 +392,6 @@ Classes:
     - O
     - O
     NullabilityOfRet: N
-  - Selector: 'showFromBarButtonItem:animated:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - S
-    NullabilityOfRet: S
-  - Selector: 'showFromRect:inView:animated:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    - N
-    - S
-    NullabilityOfRet: S
-  - Selector: 'showFromTabBar:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
-  - Selector: 'showFromToolbar:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
-  - Selector: 'showInView:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
   Properties:
   - Name: delegate
     Nullability: O
@@ -446,13 +421,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-- Name: UIActivityIndicatorView
-  Methods:
-  - Selector: 'initWithActivityIndicatorStyle:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
 - Name: UIActivityItemProvider
   Methods:
   - Selector: 'initWithPlaceholderItem:'
@@ -460,14 +428,9 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: N
-  - Selector: item
-    MethodKind: Instance
-    NullabilityOfRet: O
   Properties:
   - Name: activityType
     Nullability: O
-  - Name: placeholderItem
-    Nullability: N
 - Name: UIActivityViewController
   Methods:
   - Selector: 'initWithActivityItems:applicationActivities:'
@@ -490,7 +453,7 @@ Classes:
     Nullability:
     - N
     - S
-    - O
+    - U
     NullabilityOfRet: N
   Properties:
   - Name: title
@@ -501,11 +464,6 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: S
-  - Selector: 'addTextFieldWithConfigurationHandler:'
-    MethodKind: Instance
-    Nullability:
-    - O
     NullabilityOfRet: S
   - Selector: 'alertControllerWithTitle:message:preferredStyle:'
     MethodKind: Class
@@ -530,15 +488,10 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  - Selector: 'buttonTitleAtIndex:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
   - Selector: 'initWithTitle:message:delegate:cancelButtonTitle:otherButtonTitles:'
     MethodKind: Instance
     Nullability:
-    - N
+    - O
     - O
     - O
     - O
@@ -567,7 +520,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'cancelLocalNotification:'
     MethodKind: Instance
@@ -644,8 +597,6 @@ Classes:
     Nullability: N
   - Name: preferredContentSizeCategory
     Nullability: N
-  - Name: scheduledLocalNotifications
-    Nullability: N
   - Name: windows
     Nullability: N
 - Name: UIAttachmentBehavior
@@ -655,20 +606,20 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'initWithItem:attachedToItem:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'initWithItem:offsetFromCenter:attachedToAnchor:'
     MethodKind: Instance
     Nullability:
     - N
     - S
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'initWithItem:offsetFromCenter:attachedToItem:offsetFromCenter:'
     MethodKind: Instance
     Nullability:
@@ -676,7 +627,7 @@ Classes:
     - S
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
     DesignatedInit: true
   Properties:
   - Name: items
@@ -769,18 +720,6 @@ Classes:
   - Name: target
     Nullability: O
 - Name: UIBarItem
-  Methods:
-  - Selector: 'setTitleTextAttributes:forState:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - S
-    NullabilityOfRet: S
-  - Selector: 'titleTextAttributesForState:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: O
   Properties:
   - Name: image
     Nullability: O
@@ -867,12 +806,6 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: O
-  - Selector: 'setAttributedTitle:forState:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - S
-    NullabilityOfRet: S
   - Selector: 'setBackgroundImage:forState:'
     MethodKind: Instance
     Nullability:
@@ -927,8 +860,6 @@ Classes:
     Nullability: O
   - Name: currentTitle
     Nullability: O
-  - Name: currentTitleColor
-    Nullability: N
   - Name: currentTitleShadowColor
     Nullability: O
   - Name: imageView
@@ -939,11 +870,6 @@ Classes:
     Nullability: O
 - Name: UICollectionReusableView
   Methods:
-  - Selector: 'applyLayoutAttributes:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'didTransitionFromLayout:toLayout:'
     MethodKind: Instance
     Nullability:
@@ -954,7 +880,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'willTransitionFromLayout:toLayout:'
     MethodKind: Instance
     Nullability:
@@ -985,14 +911,14 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - U
     NullabilityOfRet: N
   - Selector: 'dequeueReusableSupplementaryViewOfKind:withReuseIdentifier:forIndexPath:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    - O
+    - U
     NullabilityOfRet: N
   - Selector: 'deselectItemAtIndexPath:animated:'
     MethodKind: Instance
@@ -1054,7 +980,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'registerClass:forCellWithReuseIdentifier:'
     MethodKind: Instance
@@ -1117,7 +1043,7 @@ Classes:
     Nullability:
     - N
     - S
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'startInteractiveTransitionToCollectionViewLayout:completion:'
     MethodKind: Instance
@@ -1143,20 +1069,16 @@ Classes:
     Nullability: O
   - Name: contentView
     Nullability: N
-  - Name: selectedBackgroundView
-    Nullability: O
 - Name: UICollectionViewController
   Methods:
   - Selector: 'initWithCollectionViewLayout:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: O
   Properties:
   - Name: collectionView
     Nullability: O
-  - Name: collectionViewLayout
-    Nullability: N
 - Name: UICollectionViewLayout
   Methods:
   - Selector: 'finalLayoutAttributesForDisappearingDecorationElementOfKind:atIndexPath:'
@@ -1240,7 +1162,7 @@ Classes:
     Nullability:
     - N
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'layoutAttributesForElementsInRect:'
     MethodKind: Instance
     Nullability:
@@ -1250,24 +1172,14 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'layoutAttributesForSupplementaryViewOfKind:atIndexPath:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: O
-  - Selector: 'prepareForCollectionViewUpdates:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
+    NullabilityOfRet: U
   - Selector: 'prepareForTransitionFromLayout:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
-  - Selector: 'prepareForTransitionToLayout:'
     MethodKind: Instance
     Nullability:
     - N
@@ -1312,11 +1224,6 @@ Classes:
     - N
     - N
     NullabilityOfRet: N
-  Properties:
-  - Name: indexPath
-    Nullability: N
-  - Name: representedElementKind
-    Nullability: O
 - Name: UICollectionViewLayoutInvalidationContext
   Methods:
   - Selector: 'invalidateDecorationElementsOfKind:atIndexPaths:'
@@ -1358,17 +1265,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  Properties:
-  - Name: currentLayout
-    Nullability: N
-  - Name: nextLayout
-    Nullability: N
-- Name: UICollectionViewUpdateItem
-  Properties:
-  - Name: indexPathAfterUpdate
-    Nullability: O
-  - Name: indexPathBeforeUpdate
-    Nullability: O
 - Name: UICollisionBehavior
   Methods:
   - Selector: 'addBoundaryWithIdentifier:forPath:'
@@ -1398,7 +1294,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'removeBoundaryWithIdentifier:'
     MethodKind: Instance
     Nullability:
@@ -1434,6 +1330,16 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
+    NullabilityOfRet: N
+  - Selector: 'colorWithCIColor:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: N
+  - Selector: 'colorWithPatternImage:'
+    MethodKind: Class
+    Nullability:
+    - N
     NullabilityOfRet: N
   - Selector: cyanColor
     MethodKind: Class
@@ -1515,8 +1421,6 @@ Classes:
     MethodKind: Class
     NullabilityOfRet: N
   Properties:
-  - Name: CGColor
-    Nullability: N
   - Name: CIColor
     Nullability: N
 - Name: UIControl
@@ -1599,8 +1503,6 @@ Classes:
     MethodKind: Class
     NullabilityOfRet: N
   Properties:
-  - Name: identifierForVendor
-    Nullability: O
   - Name: localizedModel
     Nullability: N
   - Name: model
@@ -1615,8 +1517,6 @@ Classes:
   Properties:
   - Name: alternativeInterpretations
     Nullability: O
-  - Name: text
-    Nullability: N
 - Name: UIDocument
   Methods:
   - Selector: 'autosaveWithCompletionHandler:'
@@ -1683,11 +1583,6 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
-  - Selector: 'performAsynchronousFileAccessUsingBlock:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
   - Selector: 'readFromURL:error:'
     MethodKind: Instance
     Nullability:
@@ -1712,9 +1607,6 @@ Classes:
     - S
     - O
     NullabilityOfRet: S
-  - Selector: savingFileType
-    MethodKind: Instance
-    NullabilityOfRet: N
   - Selector: 'updateChangeCountWithToken:forSaveOperation:'
     MethodKind: Instance
     Nullability:
@@ -1804,8 +1696,6 @@ Classes:
     Nullability: N
   - Name: icons
     Nullability: N
-  - Name: name
-    Nullability: N
   - Name: URL
     Nullability: N
   - Name: UTI
@@ -1818,33 +1708,25 @@ Classes:
     - O
     - O
     - S
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'initWithDocumentTypes:inMode:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'initWithURL:inMode:'
     MethodKind: Instance
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   Properties:
   - Name: delegate
     Nullability: O
 - Name: UIDocumentPickerExtensionViewController
-  Methods:
-  - Selector: 'dismissGrantingAccessToURL:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   Properties:
-  - Name: documentStorageURL
-    Nullability: N
   - Name: originalURL
     Nullability: O
   - Name: providerIdentifier
@@ -1870,11 +1752,6 @@ Classes:
     Nullability: O
 - Name: UIDynamicAnimator
   Methods:
-  - Selector: 'addBehavior:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'initWithCollectionViewLayout:'
     MethodKind: Instance
     Nullability:
@@ -1894,24 +1771,19 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'layoutAttributesForDecorationViewOfKind:atIndexPath:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'layoutAttributesForSupplementaryViewOfKind:atIndexPath:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    NullabilityOfRet: O
-  - Selector: 'removeBehavior:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
+    NullabilityOfRet: U
   - Selector: 'updateItemUsingCurrentState:'
     MethodKind: Instance
     Nullability:
@@ -1926,11 +1798,6 @@ Classes:
     Nullability: O
 - Name: UIDynamicBehavior
   Methods:
-  - Selector: 'addChildBehavior:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'removeChildBehavior:'
     MethodKind: Instance
     Nullability:
@@ -1942,8 +1809,6 @@ Classes:
     - O
     NullabilityOfRet: S
   Properties:
-  - Name: action
-    Nullability: O
   - Name: childBehaviors
     Nullability: N
   - Name: dynamicAnimator
@@ -2116,7 +1981,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - O
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'matchingFontDescriptorsWithMandatoryKeys:'
     MethodKind: Instance
     Nullability:
@@ -2126,7 +1991,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'preferredFontDescriptorWithTextStyle:'
     MethodKind: Class
     Nullability:
@@ -2148,7 +2013,7 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
     DesignatedInit: true
   - Selector: 'locationInView:'
     MethodKind: Instance
@@ -2204,20 +2069,20 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'animatedImageWithImages:duration:'
     MethodKind: Class
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'animatedResizableImageNamed:capInsets:duration:'
     MethodKind: Class
     Nullability:
     - N
     - S
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'animatedResizableImageNamed:capInsets:resizingMode:duration:'
     MethodKind: Class
     Nullability:
@@ -2225,7 +2090,7 @@ Classes:
     - S
     - S
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'imageNamed:'
     MethodKind: Class
     Nullability:
@@ -2243,6 +2108,34 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: N
+  - Selector: 'imageWithCIImage:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'imageWithCIImage:scale:orientation:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    - S
+    NullabilityOfRet: O
+  - Selector: 'imageWithContentsOfFile:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'imageWithData:'
+    MethodKind: Class
+    Nullability:
+    - N
+    NullabilityOfRet: O
+  - Selector: 'imageWithData:scale:'
+    MethodKind: Class
+    Nullability:
+    - N
+    - S
+    NullabilityOfRet: O
   - Selector: 'imageWithRenderingMode:'
     MethodKind: Instance
     Nullability:
@@ -2306,11 +2199,7 @@ Classes:
     - S
     NullabilityOfRet: N
   Properties:
-  - Name: CGImage
-    Nullability: O
   - Name: CIImage
-    Nullability: O
-  - Name: imageAsset
     Nullability: O
   - Name: images
     Nullability: O
@@ -2336,11 +2225,6 @@ Classes:
     NullabilityOfRet: S
 - Name: UIImagePickerController
   Methods:
-  - Selector: 'availableCaptureModesForCameraDevice:'
-    MethodKind: Class
-    Nullability:
-    - S
-    NullabilityOfRet: N
   - Selector: 'availableMediaTypesForSourceType:'
     MethodKind: Class
     Nullability:
@@ -2358,12 +2242,12 @@ Classes:
   - Selector: 'initWithImage:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: N
   - Selector: 'initWithImage:highlightedImage:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - O
     NullabilityOfRet: N
   Properties:
@@ -2392,8 +2276,6 @@ Classes:
     - N
     NullabilityOfRet: S
   Properties:
-  - Name: inputView
-    Nullability: N
   - Name: primaryLanguage
     Nullability: O
   - Name: textDocumentProxy
@@ -2423,8 +2305,6 @@ Classes:
     Nullability: N
 - Name: UILabel
   Properties:
-  - Name: attributedText
-    Nullability: O
   - Name: font
     Nullability: N
   - Name: highlightedTextColor
@@ -2441,9 +2321,6 @@ Classes:
     Nullability: N
 - Name: UILocalizedIndexedCollation
   Methods:
-  - Selector: currentCollation
-    MethodKind: Class
-    NullabilityOfRet: N
   - Selector: 'sectionForObject:collationStringSelector:'
     MethodKind: Instance
     Nullability:
@@ -2494,7 +2371,7 @@ Classes:
     Nullability:
     - U
     - U
-    - U
+    - O
     - O
     - O
     NullabilityOfRet: S
@@ -2518,13 +2395,15 @@ Classes:
   Properties:
   - Name: modelConfiguration
     Nullability: O
+  - Name: persistentStoreOptions
+    Nullability: O
 - Name: UIMarkupTextPrintFormatter
   Methods:
   - Selector: 'initWithMarkupText:'
     MethodKind: Instance
     Nullability:
     - O
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   Properties:
   - Name: markupText
     Nullability: O
@@ -2550,9 +2429,6 @@ Classes:
     - N
     - S
     NullabilityOfRet: O
-  Properties:
-  - Name: title
-    Nullability: N
 - Name: UINavigationBar
   Methods:
   - Selector: 'backgroundImageForBarMetrics:'
@@ -2575,12 +2451,6 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    - S
-    NullabilityOfRet: S
-  - Selector: 'setBackgroundImage:forBarMetrics:'
-    MethodKind: Instance
-    Nullability:
-    - O
     - S
     NullabilityOfRet: S
   - Selector: 'setBackgroundImage:forBarPosition:barMetrics:'
@@ -2642,17 +2512,11 @@ Classes:
     - N
     - S
     NullabilityOfRet: S
-  - Selector: 'setViewControllers:animated:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - S
-    NullabilityOfRet: S
   - Selector: 'showViewController:sender:'
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - U
     NullabilityOfRet: S
   Properties:
   - Name: barHideOnSwipeGestureRecognizer
@@ -2661,17 +2525,7 @@ Classes:
     Nullability: N
   - Name: delegate
     Nullability: O
-  - Name: interactivePopGestureRecognizer
-    Nullability: N
   - Name: navigationBar
-    Nullability: N
-  - Name: toolbar
-    Nullability: O
-  - Name: topViewController
-    Nullability: N
-  - Name: viewControllers
-    Nullability: N
-  - Name: visibleViewController
     Nullability: N
 - Name: UINavigationItem
   Methods:
@@ -2742,16 +2596,21 @@ Classes:
     - N
     - O
     NullabilityOfRet: O
+- Name: UIPageControl
+  Properties:
+  - Name: currentPageIndicatorTintColor
+    Nullability: O
+  - Name: pageIndicatorTintColor
+    Nullability: O
 - Name: UIPageViewController
   Methods:
-  - Selector: 'setViewControllers:direction:animated:completion:'
+  - Selector: 'initWithTransitionStyle:navigationOrientation:options:'
     MethodKind: Instance
     Nullability:
-    - U
     - S
     - S
     - O
-    NullabilityOfRet: S
+    NullabilityOfRet: N
   Properties:
   - Name: dataSource
     Nullability: O
@@ -2838,7 +2697,7 @@ Classes:
     Nullability:
     - N
     - O
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   Properties:
   - Name: color
     Nullability: O
@@ -2846,10 +2705,12 @@ Classes:
     Nullability: O
   - Name: name
     Nullability: N
+  - Name: string
+    Nullability: O
+  - Name: strings
+    Nullability: O
   - Name: URL
     Nullability: O
-  - Name: URLs
-    Nullability: N
 - Name: UIPickerView
   Methods:
   - Selector: 'viewForRow:forComponent:'
@@ -2869,7 +2730,14 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: N
+  - Selector: 'presentPopoverFromBarButtonItem:permittedArrowDirections:animated:'
+    MethodKind: Instance
+    Nullability:
+    - N
+    - S
+    - S
+    NullabilityOfRet: S
   - Selector: 'presentPopoverFromRect:inView:permittedArrowDirections:animated:'
     MethodKind: Instance
     Nullability:
@@ -2885,15 +2753,21 @@ Classes:
     - S
     NullabilityOfRet: S
   Properties:
+  - Name: backgroundColor
+    Nullability: O
   - Name: contentViewController
     Nullability: N
   - Name: delegate
+    Nullability: O
+  - Name: passthroughViews
     Nullability: O
   - Name: popoverBackgroundViewClass
     Nullability: O
 - Name: UIPopoverPresentationController
   Properties:
   - Name: delegate
+    Nullability: O
+  - Name: popoverBackgroundViewClass
     Nullability: O
 - Name: UIPresentationController
   Methods:
@@ -2906,13 +2780,14 @@ Classes:
   Properties:
   - Name: delegate
     Nullability: O
+  - Name: overrideTraitCollection
+    Nullability: O
+  - Name: presentedViewController
+    Nullability: N
+  - Name: presentingViewController
+    Nullability: N
 - Name: UIPrinter
   Methods:
-  - Selector: 'contactPrinter:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    NullabilityOfRet: S
   - Selector: 'printerWithURL:'
     MethodKind: Class
     Nullability:
@@ -2933,14 +2808,31 @@ Classes:
     - S
     - O
     NullabilityOfRet: S
+  - Selector: 'presentFromBarButtonItem:animated:completionHandler:'
+    MethodKind: Instance
+    Nullability:
+    - U
+    - S
+    - O
+    NullabilityOfRet: S
   Properties:
   - Name: delegate
+    Nullability: O
+  - Name: selectedPrinter
     Nullability: O
 - Name: UIPrintInfo
   Methods:
   - Selector: dictionaryRepresentation
     MethodKind: Instance
     NullabilityOfRet: O
+  - Selector: 'printInfoWithDictionary:'
+    MethodKind: Class
+    Nullability:
+    - O
+    NullabilityOfRet: U
+  Properties:
+  - Name: printerID
+    Nullability: O
 - Name: UIPrintInteractionController
   Methods:
   - Selector: 'canPrintData:'
@@ -3007,7 +2899,11 @@ Classes:
   Properties:
   - Name: progressImage
     Nullability: O
+  - Name: progressTintColor
+    Nullability: O
   - Name: trackImage
+    Nullability: O
+  - Name: trackTintColor
     Nullability: O
 - Name: UIPushBehavior
   Methods:
@@ -3016,12 +2912,6 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  - Selector: 'initWithItems:mode:'
-    MethodKind: Instance
-    Nullability:
-    - U
-    - S
-    NullabilityOfRet: N
   - Selector: 'removeItem:'
     MethodKind: Instance
     Nullability:
@@ -3155,12 +3045,6 @@ Classes:
     Nullability: O
 - Name: UIScreen
   Methods:
-  - Selector: 'displayLinkWithTarget:selector:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - S
-    NullabilityOfRet: N
   - Selector: mainScreen
     MethodKind: Class
     NullabilityOfRet: N
@@ -3183,16 +3067,12 @@ Classes:
     Nullability: N
   - Name: mirroredScreen
     Nullability: O
-  - Name: preferredMode
-    Nullability: O
 - Name: UIScrollView
   Properties:
   - Name: delegate
     Nullability: O
   - Name: panGestureRecognizer
     Nullability: N
-  - Name: pinchGestureRecognizer
-    Nullability: O
 - Name: UISearchBar
   Methods:
   - Selector: 'backgroundImageForBarPosition:barMetrics:'
@@ -3201,29 +3081,12 @@ Classes:
     - S
     - S
     NullabilityOfRet: O
-  - Selector: 'imageForSearchBarIcon:state:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    - S
-    NullabilityOfRet: N
   - Selector: 'scopeBarButtonBackgroundImageForState:'
     MethodKind: Instance
     Nullability:
     - S
     NullabilityOfRet: O
-  - Selector: 'scopeBarButtonDividerImageForLeftSegmentState:rightSegmentState:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    - S
-    NullabilityOfRet: N
   - Selector: 'scopeBarButtonTitleTextAttributesForState:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: O
-  - Selector: 'searchFieldBackgroundImageForState:'
     MethodKind: Instance
     Nullability:
     - S
@@ -3284,8 +3147,6 @@ Classes:
     Nullability: O
   - Name: scopeButtonTitles
     Nullability: O
-  - Name: text
-    Nullability: N
   - Name: tintColor
     Nullability: O
 - Name: UISearchController
@@ -3293,7 +3154,7 @@ Classes:
   - Selector: 'initWithSearchResultsController:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: N
   Properties:
   - Name: delegate
@@ -3307,24 +3168,16 @@ Classes:
   - Selector: 'initWithSearchBar:contentsController:'
     MethodKind: Instance
     Nullability:
-    - O
-    - N
+    - U
+    - U
     NullabilityOfRet: N
   Properties:
   - Name: delegate
     Nullability: O
-  - Name: navigationItem
-    Nullability: O
-  - Name: searchBar
-    Nullability: O
-  - Name: searchContentsController
-    Nullability: N
   - Name: searchResultsDataSource
     Nullability: O
   - Name: searchResultsDelegate
     Nullability: O
-  - Name: searchResultsTableView
-    Nullability: N
   - Name: searchResultsTitle
     Nullability: O
 - Name: UISegmentedControl
@@ -3350,19 +3203,12 @@ Classes:
   - Selector: 'initWithItems:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     NullabilityOfRet: O
   - Selector: 'insertSegmentWithImage:atIndex:animated:'
     MethodKind: Instance
     Nullability:
     - N
-    - S
-    - S
-    NullabilityOfRet: S
-  - Selector: 'insertSegmentWithTitle:atIndex:animated:'
-    MethodKind: Instance
-    Nullability:
-    - O
     - S
     - S
     NullabilityOfRet: S
@@ -3404,11 +3250,6 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: O
-  - Selector: 'titleTextAttributesForState:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: O
 - Name: UISimpleTextPrintFormatter
   Methods:
   - Selector: 'initWithAttributedText:'
@@ -3421,6 +3262,9 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: O
+  Properties:
+  - Name: color
+    Nullability: O
 - Name: UISlider
   Methods:
   - Selector: 'maximumTrackImageForState:'
@@ -3457,10 +3301,6 @@ Classes:
     - S
     NullabilityOfRet: O
   Properties:
-  - Name: currentMaximumTrackImage
-    Nullability: O
-  - Name: currentMinimumTrackImage
-    Nullability: O
   - Name: currentThumbImage
     Nullability: O
   - Name: maximumTrackTintColor
@@ -3480,18 +3320,12 @@ Classes:
     Nullability:
     - N
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: U
 - Name: UISplitViewController
   Methods:
   - Selector: displayModeButtonItem
     MethodKind: Instance
     NullabilityOfRet: N
-  - Selector: 'showDetailViewController:sender:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - U
-    NullabilityOfRet: S
   - Selector: 'showViewController:sender:'
     MethodKind: Instance
     Nullability:
@@ -3501,6 +3335,8 @@ Classes:
   Properties:
   - Name: delegate
     Nullability: O
+  - Name: viewControllers
+    Nullability: N
 - Name: UIStepper
   Methods:
   - Selector: 'backgroundImageForState:'
@@ -3511,12 +3347,6 @@ Classes:
   - Selector: 'decrementImageForState:'
     MethodKind: Instance
     Nullability:
-    - S
-    NullabilityOfRet: N
-  - Selector: 'dividerImageForLeftSegmentState:rightSegmentState:'
-    MethodKind: Instance
-    Nullability:
-    - S
     - S
     NullabilityOfRet: N
   - Selector: 'incrementImageForState:'
@@ -3549,9 +3379,6 @@ Classes:
     - O
     - S
     NullabilityOfRet: S
-  Properties:
-  - Name: tintColor
-    Nullability: O
 - Name: UIStoryboard
   Methods:
   - Selector: instantiateInitialViewController
@@ -3561,7 +3388,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'storyboardWithName:bundle:'
     MethodKind: Class
     Nullability:
@@ -3577,10 +3404,10 @@ Classes:
   - Selector: 'initWithIdentifier:source:destination:'
     MethodKind: Instance
     Nullability:
-    - O
+    - U
     - N
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
     DesignatedInit: true
   - Selector: 'segueWithIdentifier:source:destination:performHandler:'
     MethodKind: Class
@@ -3588,7 +3415,7 @@ Classes:
     - O
     - N
     - N
-    - O
+    - N
     NullabilityOfRet: N
   Properties:
   - Name: destinationViewController
@@ -3608,8 +3435,6 @@ Classes:
   - Name: offImage
     Nullability: O
   - Name: onImage
-    Nullability: O
-  - Name: onTintColor
     Nullability: O
   - Name: thumbTintColor
     Nullability: O
@@ -3645,8 +3470,6 @@ Classes:
     Nullability: O
   - Name: shadowImage
     Nullability: O
-  - Name: tintColor
-    Nullability: N
 - Name: UITabBarController
   Methods:
   - Selector: 'setViewControllers:animated:'
@@ -3863,8 +3686,6 @@ Classes:
     Nullability: O
   - Name: sectionIndexTrackingBackgroundColor
     Nullability: O
-  - Name: separatorColor
-    Nullability: O
   - Name: separatorEffect
     Nullability: O
   - Name: tableFooterView
@@ -3897,8 +3718,6 @@ Classes:
     Nullability: O
   - Name: reuseIdentifier
     Nullability: O
-  - Name: selectedBackgroundView
-    Nullability: O
   - Name: textLabel
     Nullability: O
 - Name: UITableViewController
@@ -3911,8 +3730,6 @@ Classes:
   Properties:
   - Name: refreshControl
     Nullability: O
-  - Name: tableView
-    Nullability: N
 - Name: UITableViewHeaderFooterView
   Methods:
   - Selector: 'initWithReuseIdentifier:'
@@ -3924,8 +3741,6 @@ Classes:
   - Name: backgroundView
     Nullability: O
   - Name: contentView
-    Nullability: N
-  - Name: detailTextLabel
     Nullability: N
   - Name: reuseIdentifier
     Nullability: O
@@ -3939,13 +3754,11 @@ Classes:
     MethodKind: Class
     Nullability:
     - S
-    - O
+    - U
     - N
     NullabilityOfRet: N
   Properties:
   - Name: backgroundEffect
-    Nullability: O
-  - Name: title
     Nullability: O
 - Name: UITextChecker
   Methods:
@@ -3976,24 +3789,14 @@ Classes:
     Nullability:
     - N
     NullabilityOfRet: S
-  - Selector: 'learnWord:'
-    MethodKind: Class
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'rangeOfMisspelledWordInString:range:startingAt:wrap:language:'
     MethodKind: Instance
     Nullability:
-    - N
+    - U
     - S
     - S
     - S
     - N
-    NullabilityOfRet: S
-  - Selector: 'setIgnoredWords:'
-    MethodKind: Instance
-    Nullability:
-    - O
     NullabilityOfRet: S
   - Selector: 'unlearnWord:'
     MethodKind: Class
@@ -4022,8 +3825,6 @@ Classes:
     Nullability: O
   - Name: rightView
     Nullability: O
-  - Name: textColor
-    Nullability: N
   - Name: typingAttributes
     Nullability: O
 - Name: UITextInputMode
@@ -4040,7 +3841,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
 - Name: UITextRange
   Properties:
   - Name: end
@@ -4057,23 +3858,13 @@ Classes:
     NullabilityOfRet: N
     DesignatedInit: true
   Properties:
-  - Name: attributedText
-    Nullability: O
   - Name: delegate
     Nullability: O
-  - Name: font
-    Nullability: N
   - Name: inputAccessoryView
     Nullability: O
   - Name: inputView
     Nullability: O
   - Name: layoutManager
-    Nullability: N
-  - Name: linkTextAttributes
-    Nullability: N
-  - Name: text
-    Nullability: O
-  - Name: textColor
     Nullability: N
   - Name: textContainer
     Nullability: N
@@ -4139,11 +3930,6 @@ Classes:
     Nullability: N
 - Name: UITraitCollection
   Methods:
-  - Selector: 'containsTraitsInCollection:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'traitCollectionWithDisplayScale:'
     MethodKind: Class
     Nullability:
@@ -4169,16 +3955,6 @@ Classes:
     Nullability:
     - S
     NullabilityOfRet: N
-- Name: UIUserNotificationCategory
-  Methods:
-  - Selector: 'actionsForContext:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: O
-  Properties:
-  - Name: identifier
-    Nullability: O
 - Name: UIUserNotificationSettings
   Methods:
   - Selector: 'settingsForTypes:categories:'
@@ -4187,9 +3963,6 @@ Classes:
     - S
     - O
     NullabilityOfRet: N
-  Properties:
-  - Name: categories
-    Nullability: N
 - Name: UIVibrancyEffect
   Methods:
   - Selector: 'effectForBlurEffect:'
@@ -4364,7 +4137,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - S
-    NullabilityOfRet: O
+    NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'insertSubview:aboveSubview:'
     MethodKind: Instance
@@ -4489,7 +4262,7 @@ Classes:
     NullabilityOfRet: O
   - Selector: viewPrintFormatter
     MethodKind: Instance
-    NullabilityOfRet: O
+    NullabilityOfRet: N
   - Selector: 'viewWithTag:'
     MethodKind: Instance
     Nullability:
@@ -4514,7 +4287,7 @@ Classes:
   - Name: backgroundColor
     Nullability: O
   - Name: gestureRecognizers
-    Nullability: N
+    Nullability: O
   - Name: layer
     Nullability: N
   - Name: maskView
@@ -4590,7 +4363,7 @@ Classes:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'performSegueWithIdentifier:sender:'
     MethodKind: Instance
     Nullability:
@@ -4726,8 +4499,6 @@ Classes:
     Nullability: O
   - Name: tabBarController
     Nullability: O
-  - Name: tabBarItem
-    Nullability: N
   - Name: title
     Nullability: O
   - Name: toolbarItems
@@ -4737,7 +4508,7 @@ Classes:
   - Name: transitioningDelegate
     Nullability: O
   - Name: view
-    Nullability: O
+    Nullability: N
 - Name: UIViewPrintFormatter
   Properties:
   - Name: view
@@ -4756,20 +4527,6 @@ Classes:
     Nullability: N
 - Name: UIWebView
   Methods:
-  - Selector: 'loadData:MIMEType:textEncodingName:baseURL:'
-    MethodKind: Instance
-    Nullability:
-    - U
-    - O
-    - U
-    - U
-    NullabilityOfRet: S
-  - Selector: 'loadHTMLString:baseURL:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - O
-    NullabilityOfRet: S
   - Selector: 'loadRequest:'
     MethodKind: Instance
     Nullability:
@@ -4883,7 +4640,7 @@ Protocols:
     - S
     - S
     - S
-    - O
+    - U
     - S
     NullabilityOfRet: S
   - Selector: 'layoutManager:shouldUseAction:forControlCharacterAtIndex:'
@@ -4921,7 +4678,7 @@ Protocols:
     - S
     - N
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
 - Name: NSTextStorageDelegate
   Methods:
   - Selector: 'textStorage:didProcessEditing:range:changeInLength:'
@@ -4940,10 +4697,6 @@ Protocols:
     - S
     - S
     NullabilityOfRet: S
-- Name: UIAccessibilityIdentification
-  Properties:
-  - Name: accessibilityIdentifier
-    Nullability: O
 - Name: UIAccessibilityReadingContent
   Methods:
   - Selector: 'accessibilityContentForLineNumber:'
@@ -4951,9 +4704,6 @@ Protocols:
     Nullability:
     - S
     NullabilityOfRet: O
-  - Selector: accessibilityPageContent
-    MethodKind: Instance
-    NullabilityOfRet: N
 - Name: UIActionSheetDelegate
   Methods:
   - Selector: 'actionSheet:clickedButtonAtIndex:'
@@ -5013,9 +4763,9 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - U
     - S
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'activityViewControllerPlaceholderItem:'
     MethodKind: Instance
     Nullability:
@@ -5091,7 +4841,7 @@ Protocols:
     Nullability:
     - N
     - N
-    - O
+    - N
     NullabilityOfRet: S
   - Selector: 'application:didChangeStatusBarFrame:'
     MethodKind: Instance
@@ -5128,7 +4878,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'application:didReceiveLocalNotification:'
     MethodKind: Instance
@@ -5140,14 +4890,14 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - N
     NullabilityOfRet: S
   - Selector: 'application:didReceiveRemoteNotification:fetchCompletionHandler:'
     MethodKind: Instance
     Nullability:
     - N
-    - O
-    - O
+    - N
+    - N
     NullabilityOfRet: S
   - Selector: 'application:didRegisterForRemoteNotificationsWithDeviceToken:'
     MethodKind: Instance
@@ -5173,22 +4923,22 @@ Protocols:
     - N
     - O
     - N
-    - O
+    - N
     NullabilityOfRet: S
   - Selector: 'application:handleActionWithIdentifier:forRemoteNotification:completionHandler:'
     MethodKind: Instance
     Nullability:
     - N
     - O
-    - O
-    - O
+    - N
+    - N
     NullabilityOfRet: S
   - Selector: 'application:handleEventsForBackgroundURLSession:completionHandler:'
     MethodKind: Instance
     Nullability:
     - N
     - N
-    - O
+    - N
     NullabilityOfRet: S
   - Selector: 'application:handleOpenURL:'
     MethodKind: Instance
@@ -5208,7 +4958,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - N
     NullabilityOfRet: S
   - Selector: 'application:shouldAllowExtensionPointIdentifier:'
     MethodKind: Instance
@@ -5270,7 +5020,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - N
+    - O
     NullabilityOfRet: S
   - Selector: 'applicationDidBecomeActive:'
     MethodKind: Instance
@@ -5366,7 +5116,7 @@ Protocols:
     - N
     - S
     - N
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'collectionView:didDeselectItemAtIndexPath:'
     MethodKind: Instance
@@ -5413,7 +5163,7 @@ Protocols:
     - N
     - S
     - N
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'collectionView:shouldDeselectItemAtIndexPath:'
     MethodKind: Instance
@@ -5445,7 +5195,7 @@ Protocols:
     - N
     - N
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'collectionView:willDisplayCell:forItemAtIndexPath:'
     MethodKind: Instance
     Nullability:
@@ -5741,7 +5491,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: guidedAccessRestrictionIdentifiers
     MethodKind: Instance
     NullabilityOfRet: N
@@ -5848,7 +5598,7 @@ Protocols:
     MethodKind: Class
     Nullability:
     - N
-    - U
+    - N
     NullabilityOfRet: O
 - Name: UIPageViewControllerDataSource
   Methods:
@@ -6025,7 +5775,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - N
     NullabilityOfRet: S
   - Selector: 'printerPickerControllerDidDismiss:'
     MethodKind: Instance
@@ -6063,13 +5813,13 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - U
-    NullabilityOfRet: U
+    - N
+    NullabilityOfRet: O
   - Selector: 'printInteractionController:cutLengthForPaper:'
     MethodKind: Instance
     Nullability:
     - N
-    - U
+    - N
     NullabilityOfRet: S
   - Selector: 'printInteractionControllerDidDismissPrinterOptions:'
     MethodKind: Instance
@@ -6090,7 +5840,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: U
+    NullabilityOfRet: O
   - Selector: 'printInteractionControllerWillDismissPrinterOptions:'
     MethodKind: Instance
     Nullability:
@@ -6542,7 +6292,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'tableView:canEditRowAtIndexPath:'
     MethodKind: Instance
     Nullability:
@@ -6727,7 +6477,7 @@ Protocols:
     - N
     - S
     - N
-    - O
+    - U
     NullabilityOfRet: S
   - Selector: 'tableView:shouldHighlightRowAtIndexPath:'
     MethodKind: Instance
@@ -6759,7 +6509,7 @@ Protocols:
     Nullability:
     - N
     - N
-    NullabilityOfRet: N
+    NullabilityOfRet: U
   - Selector: 'tableView:viewForFooterInSection:'
     MethodKind: Instance
     Nullability:
@@ -6858,11 +6608,6 @@ Protocols:
     - N
     - S
     NullabilityOfRet: S
-  - Selector: 'caretRectForPosition:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
   - Selector: 'characterOffsetOfPosition:withinRange:'
     MethodKind: Instance
     Nullability:
@@ -6879,18 +6624,7 @@ Protocols:
     Nullability:
     - N
     - S
-    NullabilityOfRet: N
-  - Selector: 'closestPositionToPoint:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    NullabilityOfRet: N
-  - Selector: 'closestPositionToPoint:withinRange:'
-    MethodKind: Instance
-    Nullability:
-    - S
-    - N
-    NullabilityOfRet: O
+    NullabilityOfRet: U
   - Selector: 'comparePosition:toPosition:'
     MethodKind: Instance
     Nullability:
@@ -6898,11 +6632,6 @@ Protocols:
     - N
     NullabilityOfRet: S
   - Selector: 'firstRectForRange:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    NullabilityOfRet: S
-  - Selector: 'frameForDictationResultPlaceholder:'
     MethodKind: Instance
     Nullability:
     - N
@@ -6969,15 +6698,9 @@ Protocols:
     - S
     NullabilityOfRet: U
   Properties:
-  - Name: beginningOfDocument
-    Nullability: N
   - Name: endOfDocument
     Nullability: N
-  - Name: inputDelegate
-    Nullability: O
   - Name: markedTextRange
-    Nullability: O
-  - Name: markedTextStyle
     Nullability: O
   - Name: selectedTextRange
     Nullability: O
@@ -7173,19 +6896,6 @@ Protocols:
     NullabilityOfRet: O
 - Name: UIViewControllerTransitionCoordinator
   Methods:
-  - Selector: 'animateAlongsideTransition:completion:'
-    MethodKind: Instance
-    Nullability:
-    - O
-    - O
-    NullabilityOfRet: S
-  - Selector: 'animateAlongsideTransitionInView:animation:completion:'
-    MethodKind: Instance
-    Nullability:
-    - N
-    - O
-    - O
-    NullabilityOfRet: S
   - Selector: 'notifyWhenInteractionEndsUsingBlock:'
     MethodKind: Instance
     Nullability:
@@ -7234,7 +6944,7 @@ Protocols:
     MethodKind: Instance
     Nullability:
     - N
-    - O
+    - U
     - N
     NullabilityOfRet: O
 - Name: UIWebViewDelegate

@@ -57,7 +57,7 @@ func classMethods(b: B, other: NSObject) {
   i += b.classMethod() // expected-error{{'B' does not have a member named 'classMethod'}}
     
   // Both class and instance methods exist.
-  let x : AnyObject = B.description()!
+  let x : AnyObject = B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
   B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument of type 'NSObject'}}
 
