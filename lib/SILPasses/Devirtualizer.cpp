@@ -273,13 +273,6 @@ class WitnessMethodDevirtualizer {
   /// If we needed to change Self, this field contains the modified self.
   Optional<SILValue> Self;
 
-  /// If we had other substitutions that
-  SmallVector<Substitution, 16> SubstList;
-
-  /// Field which distinguishes the SubstList being empty from it not having a
-  /// value. This could be as apart of an optional but I don't think that
-  bool HasSubstList;
-
   /// If we needed to modify the subst callee type of the function, this is the
   /// new subst callee type.
   Optional<SILType> SubstCalleeSILType;
@@ -292,8 +285,8 @@ public:
   WitnessMethodDevirtualizer(ApplyInst *AI, WitnessMethodInst *WMI,
                              ProtocolConformance *C, SILFunction *F,
                              ArrayRef<Substitution> Subs, SILWitnessTable *WT)
-      : AI(AI), WMI(WMI), C(C), F(F), Subs(Subs), WT(WT), Self(), SubstList(),
-        HasSubstList(false), SubstCalleeSILType(), ResultSILType() {}
+      : AI(AI), WMI(WMI), C(C), F(F), Subs(Subs), WT(WT), Self(),
+        SubstCalleeSILType(), ResultSILType() {}
 
   /// Main entry point.
   bool devirtualize();
@@ -471,8 +464,6 @@ processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
     GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
                                              Subs);
 
-  std::copy(Subs.begin(), Subs.end(), SubstList.begin());
-  HasSubstList = true;
   SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
   ResultSILType = SubstCalleeType->getSILResult();
 
