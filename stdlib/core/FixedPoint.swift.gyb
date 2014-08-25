@@ -106,7 +106,6 @@ T : _UnsignedIntegerType, U : _SignedIntegerType
 %   BuiltinName = builtin_int_name(name)
 %   Self = int_name(name, signed)
 %   OtherSelf = other_int_name(name, signed)
-%   ConstructIntType = 'Int' if Self != 'Int' else ''
 
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'} {
