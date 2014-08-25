@@ -570,6 +570,9 @@ public:
   /// \brief Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
 
+  /// Clone the given constraint.
+  Constraint *clone(ConstraintSystem &cs) const;
+
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(

@@ -979,7 +979,6 @@ namespace {
                          isFavoredParamAndArg(secondParamTy, secondArgTy)) &&
                         firstParamTy->isEqual(secondParamTy) &&
                         (!contextualTy || (*contextualTy)->isEqual(resultTy))) {
-                      oldConstraint->setFavored();
                       favoredConstraints.push_back(oldConstraint);
                     }
                   }
@@ -1030,6 +1029,15 @@ namespace {
                           Constraint::createDisjunction(CS,
                                                         favoredConstraints,
                                                         csLoc);
+
+                  // If we didn't actually build a disjunction, clone
+                  // the underlying constraint so we can mark it as
+                  // favored.
+                  if (favoredConstraints.size() == 1) {
+                    favoredConstraintsDisjunction
+                      = favoredConstraintsDisjunction->clone(CS);
+                  }
+
                   favoredConstraintsDisjunction->setFavored();
                   
                   if (newConstraints.size()) {

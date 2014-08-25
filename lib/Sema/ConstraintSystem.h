@@ -1148,6 +1148,10 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
+  /// Whether this constraint system is processing a favored
+  /// constraint.
+  bool HandlingFavoredConstraint = false;
+
   SmallVector<TypeVariableType *, 16> TypeVariables;
   llvm::DenseMap<Expr *, Type *> ContextualTypes;
 

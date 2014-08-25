@@ -141,6 +141,50 @@ ProtocolDecl *Constraint::getProtocol() const {
   return Types.Second->castTo<ProtocolType>()->getDecl();
 }
 
+Constraint *Constraint::clone(ConstraintSystem &cs) const {
+  switch (getKind()) {
+  case ConstraintKind::Bind:
+  case ConstraintKind::Equal:
+  case ConstraintKind::Subtype:
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::Construction:
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::CheckedCast:
+  case ConstraintKind::DynamicTypeOf:
+  case ConstraintKind::SelfObjectOfProtocol:
+  case ConstraintKind::ApplicableFunction:
+  case ConstraintKind::OptionalObject:
+    return create(cs, getKind(), getFirstType(), getSecondType(),
+                  DeclName(), getLocator());
+
+  case ConstraintKind::BindOverload:
+    return createBindOverload(cs, getFirstType(), getOverloadChoice(),
+                              getLocator());
+
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::TypeMember:
+    return create(cs, getKind(), getFirstType(), Type(), getMember(), 
+                  getLocator());
+
+  case ConstraintKind::Archetype:
+  case ConstraintKind::Class:
+  case ConstraintKind::BridgedToObjectiveC:
+    return create(cs, getKind(), getFirstType(), Type(), DeclName(),
+                  getLocator());
+
+  case ConstraintKind::Conjunction:
+    return createConjunction(cs, getNestedConstraints(), getLocator());
+
+  case ConstraintKind::Disjunction:
+    return createDisjunction(cs, getNestedConstraints(), getLocator());
+  }
+}
+
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   if (Kind == ConstraintKind::Conjunction ||
       Kind == ConstraintKind::Disjunction) {

@@ -1675,7 +1675,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                       TC.Context.Id_CVarArgType;
       }
       
-      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1)) {
+      if (isBridgeableTargetType && TC.getBridgedToObjC(DC, type1) &&
+          !HandlingFavoredConstraint) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToObjC);
       }
     }
@@ -1686,7 +1687,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     if (type1->mayHaveSuperclass() && type2->isPotentiallyBridgedValueType() &&
         type2->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-        TC.getBridgedToObjC(DC, type2)) {
+        TC.getBridgedToObjC(DC, type2) &&
+        !HandlingFavoredConstraint) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
     }
 
