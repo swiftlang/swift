@@ -25,9 +25,9 @@ func defarg1(i: Int = 17, #d: Double, s: String = "Hello") { }
 // CHECK-LABEL: sil  @_TF17default_arguments15testDefaultArg1FT_T_
 func testDefaultArg1() {
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg1{{.*}}
-  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFBf64_Sd
+  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFBf80_Sd
   // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
-  // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE64, 0x4009000000000000
+  // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
   // CHECK: [[FLOATVAL:%[0-9]+]] = apply [transparent] [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
   // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg1{{.*}}_A_
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()

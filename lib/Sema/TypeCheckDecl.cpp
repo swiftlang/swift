@@ -28,8 +28,9 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
-#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -58,29 +59,58 @@ struct RawValueKey {
     String, UnicodeScalar, Float, Int, Tombstone, Empty
   } kind;
   
+  struct IntValueTy {
+    uint64_t v0;
+    uint64_t v1;
+
+    IntValueTy(const APInt &bits) {
+      APInt bits128 = bits.sextOrTrunc(128);
+      assert(bits128.getBitWidth() <= 128);
+      const uint64_t *data = bits128.getRawData();
+      v0 = data[0];
+      v1 = data[1];
+    }
+  };
+
+  struct FloatValueTy {
+    uint64_t v0;
+    uint64_t v1;
+  };
+
   // FIXME: doesn't accommodate >64-bit or signed raw integer or float values.
   union {
     StringRef stringValue;
     uint32_t charValue;
-    int64_t intValue;
-    double floatValue;
+    IntValueTy intValue;
+    FloatValueTy floatValue;
   };
   
   explicit RawValueKey(LiteralExpr *expr) {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
       kind = Kind::Int;
-      intValue = cast<IntegerLiteralExpr>(expr)->getValue().getSExtValue();
+      intValue = IntValueTy(cast<IntegerLiteralExpr>(expr)->getValue());
       return;
     case ExprKind::FloatLiteral: {
-      double v = cast<FloatLiteralExpr>(expr)->getValue().convertToDouble();
-      // If the value losslessly converts to int, key it as an int.
-      if (v <= (double)INT64_MAX && round(v) == v) {
+      APFloat value = cast<FloatLiteralExpr>(expr)->getValue();
+      llvm::APSInt asInt(127, /*isUnsigned=*/false);
+      bool isExact = false;
+      APFloat::opStatus status =
+          value.convertToInteger(asInt, APFloat::rmTowardZero, &isExact);
+      if (asInt.getBitWidth() <= 128 && status == APFloat::opOK && isExact) {
         kind = Kind::Int;
-        intValue = (int64_t)v;
-      } else {
+        intValue = IntValueTy(asInt);
+        return;
+      }
+      APInt bits = value.bitcastToAPInt();
+      const uint64_t *data = bits.getRawData();
+      if (bits.getBitWidth() == 80) {
         kind = Kind::Float;
-        floatValue = v;
+        floatValue = FloatValueTy{ data[0], 0 };
+      } else {
+        assert(bits.getBitWidth() == 64);
+        kind = Kind::Float;
+        floatValue = FloatValueTy{ data[0], data[1] };
       }
       return;
     }
@@ -132,8 +162,11 @@ public:
     case RawValueKey::Kind::Float:
       // Hash as bits. We want to treat distinct but IEEE-equal values as not
       // equal.
+      return DenseMapInfo<uint64_t>::getHashValue(k.floatValue.v0) ^
+             DenseMapInfo<uint64_t>::getHashValue(k.floatValue.v1);
     case RawValueKey::Kind::Int:
-      return DenseMapInfo<int64_t>::getHashValue(k.intValue);
+      return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
+             DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::UnicodeScalar:
       return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
     case RawValueKey::Kind::String:
@@ -150,8 +183,11 @@ public:
     case RawValueKey::Kind::Float:
       // Hash as bits. We want to treat distinct but IEEE-equal values as not
       // equal.
+      return a.floatValue.v0 == b.floatValue.v0 &&
+             a.floatValue.v1 == b.floatValue.v1;
     case RawValueKey::Kind::Int:
-      return a.intValue == b.intValue;
+      return a.intValue.v0 == b.intValue.v0 &&
+             a.intValue.v1 == b.intValue.v1;
     case RawValueKey::Kind::UnicodeScalar:
       return a.charValue == b.charValue;
     case RawValueKey::Kind::String:

@@ -75,7 +75,7 @@ func literals() {
 }
 // CHECK-LABEL: sil  @_TF11expressions8literalsFT_T_
 // CHECK: integer_literal $Builtin.Int2048, 1
-// CHECK: float_literal $Builtin.FPIEEE64, 0x3FF4000000000000
+// CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: integer_literal $Builtin.Int32, 120
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"

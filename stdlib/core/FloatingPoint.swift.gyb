@@ -26,9 +26,6 @@ allIntBits = [8, 16, 32, 64, 'Int']
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
-# Number of bits in floating point literals.
-builtinFloatLiteralBits = 64
-
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
@@ -306,6 +303,9 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
   }
 }
 
+#if arch(i386) || arch(x86_64)
+
+% builtinFloatLiteralBits = 80
 @transparent
 extension ${Self} : _BuiltinFloatLiteralConvertible {
   public
@@ -320,6 +320,26 @@ extension ${Self} : _BuiltinFloatLiteralConvertible {
 %   end
   }
 }
+
+#else
+
+% builtinFloatLiteralBits = 64
+@transparent
+extension ${Self} : _BuiltinFloatLiteralConvertible {
+  public
+  static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
+%   if bits == builtinFloatLiteralBits:
+    return ${Self}(value)
+%   elif bits < builtinFloatLiteralBits:
+    return ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+%   else:
+    // FIXME: This is actually losing precision <rdar://problem/14073102>.
+    return ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
+%   end
+  }
+}
+
+#endif
 
 @transparent
 extension ${Self} : FloatLiteralConvertible {

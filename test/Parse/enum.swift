@@ -202,6 +202,39 @@ enum RawTypeWithRepeatValues2 : Double {
   case Wilson = 22.0 // expected-error {{raw value for enum case is not unique}}
 }
 
+enum RawTypeWithRepeatValues3 : Double {
+  // 2^63-1
+  case Vaughn = 9223372036854775807   // expected-note {{raw value previously used here}}
+  case Wilson = 9223372036854775807.0 // expected-error {{raw value for enum case is not unique}}
+}
+
+enum RawTypeWithRepeatValues4 : Double {
+  // 2^64-1
+  case Vaughn = 18446744073709551615   // expected-note {{raw value previously used here}}
+  case Wilson = 18446744073709551615.0 // expected-error {{raw value for enum case is not unique}}
+}
+
+enum RawTypeWithRepeatValues5 : Double {
+  // FIXME: should reject.
+  // 2^65-1
+  case Vaughn = 36893488147419103231
+  case Wilson = 36893488147419103231.0
+}
+
+enum RawTypeWithRepeatValues6 : Double {
+  // FIXME: should reject.
+  // 2^127-1
+  case Vaughn = 170141183460469231731687303715884105727
+  case Wilson = 170141183460469231731687303715884105727.0
+}
+
+enum RawTypeWithRepeatValues7 : Double {
+  // FIXME: should reject.
+  // 2^128-1
+  case Vaughn = 340282366920938463463374607431768211455
+  case Wilson = 340282366920938463463374607431768211455.0
+}
+
 enum RawTypeWithRepeatValuesAutoInc : Double {
   case Vaughn = 22 // expected-note {{raw value auto-incremented from here}}
   case Wilson    // expected-note {{raw value previously used here}}
