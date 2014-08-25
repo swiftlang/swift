@@ -292,7 +292,7 @@ public:
   bool devirtualize();
 private:
 
-  bool processNormalProtocolConformance();
+  bool processNormalProtocolConformance(bool PartOfSpecialized = false);
   bool processInheritedProtocolConformance();
   bool
   processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
@@ -337,7 +337,8 @@ bool WitnessMethodDevirtualizer::devirtualize() {
   return false;
 }
 
-bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
+bool WitnessMethodDevirtualizer::processNormalProtocolConformance(
+                                   bool PartOfSpecialized) {
   // Ok, we found the member we are looking for. Devirtualize away!
   SILBuilder Builder(AI);
   SILLocation Loc = AI->getLoc();
@@ -364,8 +365,24 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
       NewSubstList.push_back(origSub);
   }
 
-  if (!SubstCalleeSILType)
-    SubstCalleeSILType = AI->getSubstCalleeSILType();
+  if (!SubstCalleeSILType) {
+    if (!PartOfSpecialized)
+      SubstCalleeSILType = AI->getSubstCalleeSILType();
+    else {
+      // We do not need to worry about covariant/contravariant return types here
+      // since we don't support that for 1.0. But when we do this needs to be
+      // updated.
+      SILModule &M = F->getModule();
+      CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+      // Here we have the full substitutions, by combining substitutions from
+      // the specialized protocol conformance and substitutions from the AI.
+      CanSILFunctionType SubstCalleeType =
+        GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
+                                        NewSubstList);
+      SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+      ResultSILType = SubstCalleeType->getSILResult();
+    }
+  }
   if (!ResultSILType)
     ResultSILType = AI->getType();
 
@@ -425,49 +442,11 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   return processNormalProtocolConformance();
 }
 
-/// The substitution is going to fail if there are more dependent types than
-/// substitutions.
-static bool isSubstitutionGoingToFailHack(ArrayRef<Substitution> Subs,
-                                          CanSILFunctionType GenCalleeType) {
-  auto *GenSig = GenCalleeType->getGenericSignature();
-  unsigned NumSubsNeccessary = 0;
-  for (auto depTy : GenSig->getAllDependentTypes()) {
-    if (depTy->getAs<SubstitutableType>() ||
-        depTy->getAs<DependentMemberType>()) {
-      ++NumSubsNeccessary;
-    }
-  }
-  if (NumSubsNeccessary > Subs.size())
-    return true;
-  return false;
-}
-
 bool
 WitnessMethodDevirtualizer::
 processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
                                       ProtocolConformance *GenericConf) {
-  // We do not need to worry about covariant/contravariant return types here
-  // since we don't support that for 1.0. But when we do this needs to be
-  // updated.
-  SILModule &M = F->getModule();
-  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
-
-  // HACK: work around the fact that the substitution below might fail (there
-  // are more dependent types than substitutions).
-  //
-  // Note: This is probably problem in the AST generics code. It is not an issue
-  // of the devirtualizer.
-  if (isSubstitutionGoingToFailHack(Subs, GenCalleeType))
-    return false;
-
-  CanSILFunctionType SubstCalleeType =
-    GenCalleeType->substGenericArgs(M, M.getSwiftModule(),
-                                             Subs);
-
-  SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
-  ResultSILType = SubstCalleeType->getSILResult();
-
-  return processNormalProtocolConformance();
+  return processNormalProtocolConformance(true/*PartOfSpecialized*/);
 }
 
 /// Devirtualize apply instructions that call witness_method instructions:
