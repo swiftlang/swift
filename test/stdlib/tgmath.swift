@@ -107,37 +107,37 @@ d1 = acos(dx)
 f1 = acos(fx)
 g1 = acos(gx)
 print3("acos", d1, f1, g1)
-// CHECK-NEXT: acos 1.47062890563334 1.47062885761261 acos
+// CHECK-NEXT: acos 1.47062890563334 1.47063 acos
 
 d1 = asin(dx)
 f1 = asin(fx)
 g1 = asin(gx)
 print3("asin", d1, f1, g1)
-// CHECK-NEXT: asin 0.10016742116156 0.10016742348671 asin
+// CHECK-NEXT: asin 0.10016742116156 0.100167 asin
 
 d1 = atan(dx)
 f1 = atan(fx)
 g1 = atan(gx)
 print3("atan", d1, f1, g1)
-// CHECK-NEXT: atan 0.099668652491162 0.0996686518192291 atan
+// CHECK-NEXT: atan 0.099668652491162 0.0996687 atan
 
 d1 = cos(dx)
 f1 = cos(fx)
 g1 = cos(gx)
 print3("cos", d1, f1, g1)
-// CHECK-NEXT: cos 0.995004165278026 0.995004177093506 cos
+// CHECK-NEXT: cos 0.995004165278026 0.995004 cos
 
 d1 = sin(dx)
 f1 = sin(fx)
 g1 = sin(gx)
 print3("sin", d1, f1, g1)
-// CHECK-NEXT: sin 0.0998334166468282 0.0998334214091301 sin
+// CHECK-NEXT: sin 0.0998334166468282 0.0998334 sin
 
 d1 = tan(dx)
 f1 = tan(fx)
 g1 = tan(gx)
 print3("tan", d1, f1, g1)
-// CHECK-NEXT: tan 0.100334672085451 0.100334674119949 tan
+// CHECK-NEXT: tan 0.100334672085451 0.100335 tan
 
 
 d1 = acosh(dx)
@@ -150,57 +150,57 @@ d1 = asinh(dx)
 f1 = asinh(fx)
 g1 = asinh(gx)
 print3("asinh", d1, f1, g1)
-// CHECK-NEXT: asinh 0.0998340788992076 0.0998340770602226 asinh
+// CHECK-NEXT: asinh 0.0998340788992076 0.0998341 asinh
 
 d1 = atanh(dx)
 f1 = atanh(fx)
 g1 = atanh(gx)
 print3("atanh", d1, f1, g1)
-// CHECK-NEXT: atanh 0.100335347731076 0.100335352122784 atanh
+// CHECK-NEXT: atanh 0.100335347731076 0.100335 atanh
 
 d1 = cosh(dx)
 f1 = cosh(fx)
 g1 = cosh(gx)
 print3("cosh", d1, f1, g1)
-// CHECK-NEXT: cosh 1.0050041680558 1.00500416755676 cosh
+// CHECK-NEXT: cosh 1.0050041680558 1.005 cosh
 
 d1 = sinh(dx)
 f1 = sinh(fx)
 g1 = sinh(gx)
 print3("sinh", d1, f1, g1)
-// CHECK-NEXT: sinh 0.100166750019844 0.100166752934456 sinh
+// CHECK-NEXT: sinh 0.100166750019844 0.100167 sinh
 
 d1 = tanh(dx)
 f1 = tanh(fx)
 g1 = tanh(gx)
 print3("tanh", d1, f1, g1)
-// CHECK-NEXT: tanh 0.0996679946249558 0.0996679961681366 tanh
+// CHECK-NEXT: tanh 0.0996679946249558 0.099668 tanh
 
 
 d1 = exp(dx)
 f1 = exp(fx)
 g1 = exp(gx)
 print3("exp", d1, f1, g1)
-// CHECK-NEXT: exp 1.10517091807565 1.1051709651947 exp
+// CHECK-NEXT: exp 1.10517091807565 1.10517 exp
 
 d1 = exp2(dx)
 f1 = exp2(fx)
 g1 = exp2(gx)
 print3("exp2", d1, f1, g1)
-// CHECK-NEXT: exp2 1.07177346253629 1.07177340984344 exp2
+// CHECK-NEXT: exp2 1.07177346253629 1.07177 exp2
 
 d1 = expm1(dx)
 f1 = expm1(fx)
 g1 = expm1(gx)
 print3("expm1", d1, f1, g1)
-// CHECK-NEXT: expm1 0.105170918075648 0.105170920491219 expm1
+// CHECK-NEXT: expm1 0.105170918075648 0.105171 expm1
 
 
 d1 = log(dx)
 f1 = log(fx)
 g1 = log(gx)
 print3("log", d1, f1, g1)
-// CHECK-NEXT: log -2.30258509299405 -2.30258512496948 log
+// CHECK-NEXT: log -2.30258509299405 -2.30259 log
 
 d1 = log10(dx)
 f1 = log10(fx)
@@ -212,13 +212,13 @@ d1 = log2(dx)
 f1 = log2(fx)
 g1 = log2(gx)
 print3("log2", d1, f1, g1)
-// CHECK-NEXT: log2 -3.32192809488736 -3.32192802429199 log2
+// CHECK-NEXT: log2 -3.32192809488736 -3.32193 log2
 
 d1 = log1p(dx)
 f1 = log1p(fx)
 g1 = log1p(gx)
 print3("log1p", d1, f1, g1)
-// CHECK-NEXT: log1p 0.0953101798043249 0.0953101813793182 log1p
+// CHECK-NEXT: log1p 0.0953101798043249 0.0953102 log1p
 
 d1 = logb(dx)
 f1 = logb(fx)
@@ -231,37 +231,37 @@ d1 = fabs(dx)
 f1 = fabs(fx)
 g1 = fabs(gx)
 print3("fabs", d1, f1, g1)
-// CHECK-NEXT: fabs 0.1 0.100000001490116 fabs
+// CHECK-NEXT: fabs 0.1 0.1 fabs
 
 d1 = cbrt(dx)
 f1 = cbrt(fx)
 g1 = cbrt(gx)
 print3("cbrt", d1, f1, g1)
-// CHECK-NEXT: cbrt 0.464158883361278 0.464158892631531 cbrt
+// CHECK-NEXT: cbrt 0.464158883361278 0.464159 cbrt
 
 d1 = sqrt(dx)
 f1 = sqrt(fx)
 g1 = sqrt(gx)
 print3("sqrt", d1, f1, g1)
-// CHECK-NEXT: sqrt 0.316227766016838 0.31622776389122 sqrt
+// CHECK-NEXT: sqrt 0.316227766016838 0.316228 sqrt
 
 d1 = erf(dx)
 f1 = erf(fx)
 g1 = erf(gx)
 print3("erf", d1, f1, g1)
-// CHECK-NEXT: erf 0.112462916018285 0.112462915480137 erf
+// CHECK-NEXT: erf 0.112462916018285 0.112463 erf
 
 d1 = erfc(dx)
 f1 = erfc(fx)
 g1 = erfc(gx)
 print3("erfc", d1, f1, g1)
-// CHECK-NEXT: erfc 0.887537083981715 0.887537062168121 erfc
+// CHECK-NEXT: erfc 0.887537083981715 0.887537 erfc
 
 d1 = tgamma(dx)
 f1 = tgamma(fx)
 g1 = tgamma(gx)
 print3("tgamma", d1, f1, g1)
-// CHECK-NEXT: tgamma 9.51350769866873 9.51350784301758 tgamma
+// CHECK-NEXT: tgamma 9.51350769866873 9.51351 tgamma
 
 
 d1 = ceil(dx)
@@ -307,43 +307,43 @@ d1 = atan2(dx, dy)
 f1 = atan2(fx, fy)
 g1 = atan2(gx, gy)
 print3("atan2", d1, f1, g1)
-// CHECK-NEXT: atan2 0.045423279421577 0.0454232804477215 atan2
+// CHECK-NEXT: atan2 0.045423279421577 0.0454233 atan2
 
 d1 = hypot(dx, dy)
 f1 = hypot(fx, fy)
 g1 = hypot(gx, gy)
 print3("hypot", d1, f1, g1)
-// CHECK-NEXT: hypot 2.20227155455452 2.2022716999054 hypot
+// CHECK-NEXT: hypot 2.20227155455452 2.20227 hypot
 
 d1 = pow(dx, dy)
 f1 = pow(fx, fy)
 g1 = pow(gx, gy)
 print3("pow", d1, f1, g1)
-// CHECK-NEXT: pow 0.00630957344480193 0.00630957307294011 pow
+// CHECK-NEXT: pow 0.00630957344480193 0.00630957 pow
 
 d1 = fmod(dx, dy)
 f1 = fmod(fx, fy)
 g1 = fmod(gx, gy)
 print3("fmod", d1, f1, g1)
-// CHECK-NEXT: fmod 0.1 0.100000001490116 fmod
+// CHECK-NEXT: fmod 0.1 0.1 fmod
 
 d1 = remainder(dx, dy)
 f1 = remainder(fx, fy)
 g1 = remainder(gx, gy)
 print3("remainder", d1, f1, g1)
-// CHECK-NEXT: remainder 0.1 0.100000001490116 remainder
+// CHECK-NEXT: remainder 0.1 0.1 remainder
 
 d1 = copysign(dx, dy)
 f1 = copysign(fx, fy)
 g1 = copysign(gx, gy)
 print3("copysign", d1, f1, g1)
-// CHECK-NEXT: copysign 0.1 0.100000001490116 copysign
+// CHECK-NEXT: copysign 0.1 0.1 copysign
 
 d1 = nextafter(dx, dy)
 f1 = nextafter(fx, fy)
 g1 = nextafter(gx, gy)
 print3("nextafter", d1, f1, g1)
-// CHECK-NEXT: nextafter 0.1 0.100000008940697 nextafter
+// CHECK-NEXT: nextafter 0.1 0.1 nextafter
 
 d1 = fdim(dx, dy)
 f1 = fdim(fx, fy)
@@ -355,13 +355,13 @@ d1 = fmax(dx, dy)
 f1 = fmax(fx, fy)
 g1 = fmax(gx, gy)
 print3("fmax", d1, f1, g1)
-// CHECK-NEXT: fmax 2.2 2.20000004768372 fmax
+// CHECK-NEXT: fmax 2.2 2.2 fmax
 
 d1 = fmin(dx, dy)
 f1 = fmin(fx, fy)
 g1 = fmin(gx, gy)
 print3("fmin", d1, f1, g1)
-// CHECK-NEXT: fmin 0.1 0.100000001490116 fmin
+// CHECK-NEXT: fmin 0.1 0.1 fmin
 
 
 // Other functions
@@ -406,19 +406,19 @@ print3("signbit", i1, i2, i3)
 (f1, f2) = modf(fy)
 (g1, g2) = modf(gy)
 print6("modf", d1,d2, f1,f2, g1,g2)
-// CHECK-NEXT: modf 2.0,0.2 2.0,0.200000047683716 modf
+// CHECK-NEXT: modf 2.0,0.2 2.0,0.2 modf
 
 d1 = ldexp(dx, ix)
 f1 = ldexp(fx, ix)
 g1 = ldexp(gx, ix)
 print3("ldexp", d1, f1, g1)
-// CHECK-NEXT: ldexp 204.8 204.800003051758 ldexp
+// CHECK-NEXT: ldexp 204.8 204.8 ldexp
 
 (d1, i1) = frexp(dy)
 (f1, i2) = frexp(fy)
 (g1, i3) = frexp(gy)
 print6("frexp", d1,i1, f1,i2, g1,i3)
-// CHECK-NEXT: frexp 0.55,2 0.550000011920929,2 frexp
+// CHECK-NEXT: frexp 0.55,2 0.55,2 frexp
 
 i1 = ilogb(dy)
 i2 = ilogb(fy)
@@ -430,19 +430,19 @@ d1 = scalbn(dx, ix)
 f1 = scalbn(fx, ix)
 g1 = scalbn(gx, ix)
 print3("scalbn", d1, f1, g1)
-// CHECK-NEXT: scalbn 204.8 204.800003051758 scalbn
+// CHECK-NEXT: scalbn 204.8 204.8 scalbn
 
 (d1, i1) = lgamma(dx)
 (f1, i2) = lgamma(fx)
 (g1, i3) = lgamma(gx)
 print6("lgamma", d1,i1, f1,i2, g1,i3)
-// CHECK-NEXT: lgamma 2.25271265173421,1 2.25271272659302,1 lgamma
+// CHECK-NEXT: lgamma 2.25271265173421,1 2.25271,1 lgamma
 
 (d1, i1) = remquo(dz, dy)
 (f1, i2) = remquo(fz, fy)
 (g1, i3) = remquo(gz, gy)
 print6("remquo", d1,i1, f1,i2, g1,i3)
-// CHECK-NEXT: remquo 1.1,1 1.09999990463257,1 remquo
+// CHECK-NEXT: remquo 1.1,1 1.1,1 remquo
 
 d1 = nan("12345")
 f1 = nan("12345")
@@ -454,7 +454,7 @@ d1 = fma(dx, dy, dz)
 f1 = fma(fx, fy, fz)
 g1 = fma(gx, gy, gz)
 print3("fma", d1, f1, g1)
-// CHECK-NEXT: fma 3.52 3.51999998092651 fma
+// CHECK-NEXT: fma 3.52 3.52 fma
 
 
 d1 = j0(dx)

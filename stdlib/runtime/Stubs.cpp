@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <xlocale.h>
+#include <limits>
 #include "llvm/ADT/StringExtras.h"
 #include "Debug.h"
 
@@ -91,19 +92,23 @@ extern "C" uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                             /*Negative=*/false);
 }
 
-extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
-                                         double Value) {
+template <typename T>
+static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
+                                            T Value, const char *Format) {
   if (BufferLength < 32)
-    swift::crash("swift_doubleToString: insufficient buffer size");
+    swift::crash("swift_floatingPointToString: insufficient buffer size");
+
+  const int Precision = std::numeric_limits<T>::digits10;
 
   // Pass a null locale to use the C locale.
-  int i = snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, "%0.15g", Value);
+  int i = snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, Format,
+                     Precision, Value);
   if (i < 0)
     swift::crash(
-        "swift_doubleToString: unexpected return value from sprintf");
+        "swift_floatingPointToString: unexpected return value from sprintf");
   if (size_t(i) >= BufferLength)
-    swift::crash("swift_doubleToString: insufficient buffer size");
-  
+    swift::crash("swift_floatingPointToString: insufficient buffer size");
+
   // Add ".0" to a float that (a) is not in scientific notation, (b) does not
   // already have a fractional part, (c) is not infinite, and (d) is not a NaN
   // value.
@@ -112,10 +117,27 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
     Buffer[i++] = '.';
     Buffer[i++] = '0';
   }
-  
+
   return i;
 }
 
+extern "C" uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
+                                          float Value) {
+  return swift_floatingPointToString<float>(Buffer, BufferLength, Value,
+                                            "%0.*g");
+}
+
+extern "C" uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
+                                          double Value) {
+  return swift_floatingPointToString<double>(Buffer, BufferLength, Value,
+                                             "%0.*g");
+}
+
+extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
+                                          long double Value) {
+  return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
+                                                  "%0.*Lg");
+}
 
 extern "C" float _swift_fmodf(float lhs, float rhs) {
     return fmodf(lhs, rhs);

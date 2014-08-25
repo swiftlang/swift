@@ -142,11 +142,7 @@ public struct ${Self} {
 
 extension ${Self} : Printable {
   public var description: String {
-% if bits == 64:
-    return _doubleToString(self)
-% else:
-    return _doubleToString(Double(self))
-% end
+    return _float${bits}ToString(self)
   }
 }
 
