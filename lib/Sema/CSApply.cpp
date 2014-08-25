@@ -1712,6 +1712,9 @@ namespace {
       case MagicIdentifierLiteralExpr::Line:
       case MagicIdentifierLiteralExpr::Column:
         return handleIntegerLiteralExpr(expr);
+
+      case MagicIdentifierLiteralExpr::DSOHandle:
+        return expr;
       }
     }
 
@@ -2972,6 +2975,10 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
       
   case DefaultArgumentKind::Function:
     magicKind = MagicIdentifierLiteralExpr::Function;
+    break;
+
+  case DefaultArgumentKind::DSOHandle:
+    magicKind = MagicIdentifierLiteralExpr::DSOHandle;
     break;
   }
 

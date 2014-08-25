@@ -36,6 +36,8 @@ enum class DefaultArgumentKind {
   Column,
   /// The __FUNCTION__ default argument, which is expanded at the call site.
   Function,
+  /// The __DSO_HANDLE__ default argument, which is expanded at the call site.
+  DSOHandle,
 };
 
 } // end namespace swift

@@ -384,7 +384,10 @@ public:
 
   /// Retrieve the declaration of Swift.CFunctionPointer<T>.
   NominalTypeDecl *getCFunctionPointerDecl() const;
-  
+
+  /// Retrieve the declaration of Swift.Void.
+  TypeAliasDecl *getVoidDecl() const;
+
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;

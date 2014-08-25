@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -357,6 +358,32 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
   }
   llvm_unreachable("the client should not be calling this function if "
                    "there is no DerivedFileUnit");
+}
+
+VarDecl *Module::getDSOHandle() {
+  if (DSOHandle)
+    return DSOHandle;
+
+  auto unsafeMutablePtr = Ctx.getUnsafeMutablePointerDecl();
+  if (!unsafeMutablePtr)
+    return nullptr;
+
+  Type arg;
+  if (auto voidDecl = Ctx.getVoidDecl()) {
+    arg = voidDecl->getDeclaredInterfaceType();
+  } else {
+    arg = TupleType::getEmpty(Ctx);
+  }
+  
+  Type type = BoundGenericType::get(unsafeMutablePtr, Type(), { arg });
+  DSOHandle = new (Ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
+                                SourceLoc(), 
+                                Ctx.getIdentifier("__dso_handle"),
+                                type, Files[0]);
+  DSOHandle->setImplicit(true);
+  DSOHandle->getAttrs().add(
+    new (Ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
+  return DSOHandle;
 }
 
 #define FORWARD(name, args) \

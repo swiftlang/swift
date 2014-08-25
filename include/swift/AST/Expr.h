@@ -198,10 +198,10 @@ class alignas(8) Expr {
     friend class MagicIdentifierLiteralExpr;
     unsigned : NumLiteralExprBits;
 
-    unsigned Kind : 2;
+    unsigned Kind : 3;
     unsigned StringEncoding : 1;
   };
-  enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 3 };
+  enum { NumMagicIdentifierLiteralExprBits = NumLiteralExprBits + 4 };
   static_assert(NumMagicIdentifierLiteralExprBits <= 32, "fits in an unsigned");
 
   class AbstractClosureExprBitfields {
@@ -628,7 +628,7 @@ public:
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
   enum Kind : unsigned {
-    File, Line, Column, Function
+    File, Line, Column, Function, DSOHandle
   };
 private:
   SourceLoc Loc;
@@ -658,10 +658,15 @@ public:
       return true;
     case Line:
     case Column:
+    case DSOHandle:
       return false;
     }
   }
-  
+
+  bool isDSOHandle() const {
+    return getKind() == DSOHandle;
+  }
+
   SourceRange getSourceRange() const { return Loc; }
 
   // For a magic identifier that produces a string literal, retrieve the

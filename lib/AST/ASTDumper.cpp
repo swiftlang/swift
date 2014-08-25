@@ -1203,6 +1203,7 @@ public:
         
     case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
     case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
+    case MagicIdentifierLiteralExpr::DSOHandle:  OS << "__DSO_HANDLE__"; break;
     }
     OS << ')';
   }

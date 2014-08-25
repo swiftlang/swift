@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 129;
+const uint16_t VERSION_MINOR = 130;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -202,6 +202,7 @@ enum DefaultArgumentKind : uint8_t {
   Column,
   Function,
   Inherited,
+  DSOHandle,
 };
 using DefaultArgumentField = BCFixed<3>;
 

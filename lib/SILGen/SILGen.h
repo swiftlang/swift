@@ -79,9 +79,6 @@ public:
   Optional<SILDeclRef> NSDictionaryToDictionaryFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
-  Optional<SILDeclRef> StringDefaultInitFn;
-  Optional<SILDeclRef> ArrayDefaultInitFn;
-  Optional<SILDeclRef> ConvertArraySimpleFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
   

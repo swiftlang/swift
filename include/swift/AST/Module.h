@@ -64,6 +64,7 @@ namespace swift {
   class TupleType;
   class Type;
   class ValueDecl;
+  class VarDecl;
   class VisibleDeclConsumer;
   
   /// NLKind - This is a specifier for the kind of name lookup being performed
@@ -195,7 +196,10 @@ private:
   
   /// The source location of the main class.
   SourceLoc MainClassDiagLoc;
-  
+
+  /// The magic __dso_handle variable.
+  VarDecl *DSOHandle = nullptr;
+
   /// Did we complain about multiple main classes yet?
   bool DiagnosedMultipleMainClasses: 1;
   
@@ -235,6 +239,9 @@ public:
     assert(!DebugClient && "Debugger client already set");
     DebugClient = R;
   }
+
+  /// Retrieve the magic __dso_handle variable.
+  VarDecl *getDSOHandle();
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)

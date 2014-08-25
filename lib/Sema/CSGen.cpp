@@ -211,6 +211,24 @@ namespace {
       return tv;
     }
 
+    Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+      switch (expr->getKind()) {
+      case MagicIdentifierLiteralExpr::Column:
+      case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::Function:
+      case MagicIdentifierLiteralExpr::Line:
+        return visitLiteralExpr(expr);
+
+      case MagicIdentifierLiteralExpr::DSOHandle: {
+        // __DSO_HANDLE__ has type UnsafeMutablePointer<Void>.
+        auto &tc = CS.getTypeChecker();
+        if (tc.requirePointerArgumentIntrinsics(expr->getLoc()))
+          return nullptr;
+
+        return CS.DC->getParentModule()->getDSOHandle()->getInterfaceType();
+      }
+      }
+    }
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If we're referring to an invalid declaration, don't type-check.
       //

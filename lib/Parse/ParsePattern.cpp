@@ -42,6 +42,8 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
     return DefaultArgumentKind::Line;
   case MagicIdentifierLiteralExpr::Function:
     return DefaultArgumentKind::Function;
+  case MagicIdentifierLiteralExpr::DSOHandle:
+    return DefaultArgumentKind::DSOHandle;
   }
 }
 

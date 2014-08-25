@@ -701,7 +701,9 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
     return MagicIdentifierLiteralExpr::Kind::Function;
   case tok::kw___LINE__:
     return MagicIdentifierLiteralExpr::Kind::Line;
-      
+  case tok::kw___DSO_HANDLE__:
+    return MagicIdentifierLiteralExpr::Kind::DSOHandle;
+
   default:
     llvm_unreachable("not a magic literal");
   }
@@ -721,6 +723,7 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///     '__LINE__'
 ///     '__COLUMN__'
 ///     '__FUNCTION__'
+///     '__DSO_HANDLE__'
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -811,7 +814,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::kw___FILE__:
   case tok::kw___LINE__:
   case tok::kw___COLUMN__:
-  case tok::kw___FUNCTION__: {
+  case tok::kw___FUNCTION__:
+  case tok::kw___DSO_HANDLE__: {
     auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
     SourceLoc Loc = consumeToken();
     Result = makeParserResult(

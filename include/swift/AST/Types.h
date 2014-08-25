@@ -1035,33 +1035,13 @@ public:
 
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
-  /// An optional name for the field.
-  Identifier Name;
+  /// An optional name for the field, along with a bit indicating whether it
+  /// is variadic.
+  llvm::PointerIntPair<Identifier, 1, bool> NameAndVariadic;
 
-  /// Describes whether this element is variadic or what kind of default
-  /// argument it stores.
-  enum class DefaultArgOrVarArg : uint8_t {
-    /// Neither variadic nor a default argument.
-    None,
-    /// Variadic.
-    VarArg,
-    /// It has a normal default argument.
-    DefaultArgument,
-    /// It has an inherited default argument.
-    InheritedDefaultArgument,
-    /// It has a caller-provided __FILE__ default argument.
-    FileArgument,
-    /// It has a caller-provided __LINE__ default argument.
-    LineArgument,
-    /// It has a caller-provided __COLUMN__ default argument.
-    ColumnArgument,
-    /// It has a caller-provided __FUNCTION__ default argument.
-    FunctionArgument,
-  };
-
-  /// \brief This is the type of the field, which is mandatory, along with a bit
-  /// indicating whether this is a vararg.
-  llvm::PointerIntPair<Type, 3, DefaultArgOrVarArg> TyAndDefaultOrVarArg;
+  /// \brief This is the type of the field, which is mandatory, along with the
+  /// kind of default argument.
+  llvm::PointerIntPair<Type, 3, DefaultArgumentKind> TyAndDefaultArg;
 
   friend class TupleType;
 
@@ -1071,40 +1051,25 @@ public:
                                    Identifier name = Identifier(),
                                    DefaultArgumentKind defaultArg =
                                      DefaultArgumentKind::None,
-                                   bool isVarArg = false);
+                                   bool isVariadic = false);
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : Name(Identifier()), TyAndDefaultOrVarArg(Ty, DefaultArgOrVarArg::None) { }
+    : NameAndVariadic(Identifier(), false),
+      TyAndDefaultArg(Ty, DefaultArgumentKind::None) { }
 
-  bool hasName() const { return !Name.empty(); }
-  Identifier getName() const { return Name; }
+  bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
+  Identifier getName() const { return NameAndVariadic.getPointer(); }
 
-  Type getType() const { return TyAndDefaultOrVarArg.getPointer(); }
+  Type getType() const { return TyAndDefaultArg.getPointer(); }
 
   /// Determine whether this field is variadic.
   bool isVararg() const {
-    return TyAndDefaultOrVarArg.getInt() == DefaultArgOrVarArg::VarArg;
+    return NameAndVariadic.getInt();
   }
 
   /// Retrieve the kind of default argument available on this field.
   DefaultArgumentKind getDefaultArgKind() const {
-    switch (TyAndDefaultOrVarArg.getInt()) {
-    case DefaultArgOrVarArg::None:
-    case DefaultArgOrVarArg::VarArg:
-      return DefaultArgumentKind::None;
-    case DefaultArgOrVarArg::DefaultArgument:
-      return DefaultArgumentKind::Normal;
-    case DefaultArgOrVarArg::InheritedDefaultArgument:
-      return DefaultArgumentKind::Inherited;
-    case DefaultArgOrVarArg::FileArgument:
-      return DefaultArgumentKind::File;
-    case DefaultArgOrVarArg::LineArgument:
-      return DefaultArgumentKind::Line;
-    case DefaultArgOrVarArg::ColumnArgument:
-      return DefaultArgumentKind::Column;
-    case DefaultArgOrVarArg::FunctionArgument:
-      return DefaultArgumentKind::Function;
-    }
+    return TyAndDefaultArg.getInt();
   }
 
   static inline Type getVarargBaseTy(Type VarArgT);
@@ -3658,47 +3623,13 @@ inline bool TypeBase::mayHaveSuperclass() {
 inline TupleTypeElt::TupleTypeElt(Type ty,
                                   Identifier name,
                                   DefaultArgumentKind defArg,
-                                  bool isVarArg)
-  : Name(name), TyAndDefaultOrVarArg(ty.getPointer(),
-                                     DefaultArgOrVarArg::None) {
-  assert(!isVarArg || isa<ArraySliceType>(ty.getPointer()) ||
+                                  bool isVariadic)
+  : NameAndVariadic(name, isVariadic),
+    TyAndDefaultArg(ty.getPointer(), defArg)
+{
+  assert(!isVariadic || isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
-
-  if (isVarArg) {
-    assert(defArg == DefaultArgumentKind::None && "Defaulted vararg");
-    TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::VarArg);
-  } else {
-    switch (defArg) {
-    case DefaultArgumentKind::None:
-      break;
-
-    case DefaultArgumentKind::Normal:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::DefaultArgument);
-      break;
-
-    case DefaultArgumentKind::Inherited:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::InheritedDefaultArgument);
-      break;
-
-    case DefaultArgumentKind::File:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::FileArgument);
-      break;
-
-    case DefaultArgumentKind::Line:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::LineArgument);
-      break;
-
-    case DefaultArgumentKind::Column:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::ColumnArgument);
-      break;
-        
-    case DefaultArgumentKind::Function:
-      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::FunctionArgument);
-      break;
-        
-    }
-  }
 }
 
 inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {

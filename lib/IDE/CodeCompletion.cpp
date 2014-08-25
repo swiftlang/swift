@@ -1360,8 +1360,10 @@ public:
         case DefaultArgumentKind::Line:
         case DefaultArgumentKind::Column:
         case DefaultArgumentKind::Function:
-          // Skip parameters that are defaulted to source location.  Users
-          // typically don't want to specify these parameters.
+        case DefaultArgumentKind::DSOHandle:
+          // Skip parameters that are defaulted to source location or other
+          // caller context information.  Users typically don't want to specify
+          // these parameters.
           continue;
         }
         auto ParamType = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
@@ -2340,6 +2342,8 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.BooleanLiteralType.
   AddKeyword("false", "Bool");
   AddKeyword("true", "Bool");
+
+  AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
 
   AddKeyword("nil", StringRef());
 }

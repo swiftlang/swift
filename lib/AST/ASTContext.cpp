@@ -95,6 +95,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.CFunctionPointer<T -> U>.
   NominalTypeDecl *CFunctionPointerDecl = nullptr;
 
+  /// The declaration of Swift.Void.
+  TypeAliasDecl *VoidDecl = nullptr;
+
   /// The declaration of NSObject.
   NominalTypeDecl *NSObjectDecl = nullptr;
 
@@ -565,6 +568,24 @@ NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
     Impl.CFunctionPointerDecl = findSyntaxSugarImpl(*this, "CFunctionPointer");
   
   return Impl.CFunctionPointerDecl;
+}
+
+TypeAliasDecl *ASTContext::getVoidDecl() const {
+  if (Impl.VoidDecl) {
+    return Impl.VoidDecl;
+  }
+
+  // Go find 'Void' in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("Void", results);
+  for (auto result : results) {
+    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
+      Impl.VoidDecl = typeAlias;
+      return typeAlias;
+    }
+  }
+
+  return Impl.VoidDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
@@ -1404,8 +1425,8 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.getName().get());
-    ID.AddPointer(Elt.TyAndDefaultOrVarArg.getOpaqueValue());
+    ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
+    ID.AddPointer(Elt.TyAndDefaultArg.getOpaqueValue());
   }
 }
 

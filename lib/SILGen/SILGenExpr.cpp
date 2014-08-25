@@ -4364,6 +4364,12 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
     return RValue(SGF, E, ManagedValue::forUnmanaged(V));
   }
+
+  case MagicIdentifierLiteralExpr::DSOHandle: {
+    auto Val = SGF.emitRValueForDecl(E, SGF.SGM.SwiftModule->getDSOHandle(), 
+                                     E->getType(), C);
+    return RValue(SGF, E, Val);
+  }
   }
 }
 

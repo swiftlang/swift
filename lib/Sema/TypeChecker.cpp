@@ -144,6 +144,9 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     case MagicIdentifierLiteralExpr::Column:
       return getProtocol(expr->getLoc(),
                          KnownProtocolKind::IntegerLiteralConvertible);
+
+    case MagicIdentifierLiteralExpr::DSOHandle:
+      return nullptr;
     }
   }
   

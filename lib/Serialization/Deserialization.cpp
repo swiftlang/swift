@@ -249,6 +249,8 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::Line;
   case serialization::DefaultArgumentKind::Function:
     return swift::DefaultArgumentKind::Function;
+  case serialization::DefaultArgumentKind::DSOHandle:
+    return swift::DefaultArgumentKind::DSOHandle;
   }
   return Nothing;
 }
